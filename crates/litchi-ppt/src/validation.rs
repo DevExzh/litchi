@@ -1564,6 +1564,8 @@ fn is_structural_cfb_error(error: &OleError) -> bool {
             | OleError::NotOleFile
             | OleError::CorruptedFile(_)
             | OleError::StreamNotFound
+            | OleError::LimitExceeded { .. }
+            | OleError::InvalidLimit { .. }
     )
 }
 
@@ -1574,6 +1576,7 @@ fn cfb_error_code(error: &OleError) -> &'static str {
         OleError::InvalidData(_) => "ppt.cfb.invalid_data",
         OleError::CorruptedFile(_) => "ppt.cfb.corrupted",
         OleError::StreamNotFound => "ppt.cfb.stream_missing",
+        OleError::LimitExceeded { .. } | OleError::InvalidLimit { .. } => "ppt.cfb.limit",
         OleError::Io(_)
         | OleError::Allocation { .. }
         | OleError::Committed { .. }

@@ -8,6 +8,7 @@
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
 use litchi_core::binary::{read_u16_le, read_u32_le};
+use std::sync::Arc;
 
 /// Size of a `PieceDescriptor` in bytes (8 bytes as per Apache POI)
 pub const PIECE_DESCRIPTOR_SIZE: usize = 8;
@@ -28,9 +29,9 @@ const UTF16_CODE_UNIT_BYTES: usize = 2;
 /// Handles the complex text extraction process from DOC binary structures.
 pub struct TextExtractor {
     /// The extracted text
-    text: String,
+    text: Arc<String>,
     /// UTF-16 CP boundary to UTF-8 byte-offset mapping.
-    cp_to_byte: Vec<usize>,
+    cp_to_byte: Arc<[usize]>,
 }
 
 impl TextExtractor {
@@ -48,15 +49,15 @@ impl TextExtractor {
     ) -> Result<Self> {
         // Extract text using the piece table
         let utf16 = Self::extract_text_from_pieces(fib, word_document, table_stream)?;
-        let text = String::from_utf16_lossy(&utf16);
-        let cp_to_byte = Self::build_cp_to_byte_map(&text);
+        let text = Arc::new(String::from_utf16_lossy(&utf16));
+        let cp_to_byte = Arc::from(Self::build_cp_to_byte_map(&text).into_boxed_slice());
 
         Ok(Self { text, cp_to_byte })
     }
 
     /// Extract all text from the document.
     pub fn extract_all_text(&self) -> Result<String> {
-        Ok(self.text.clone())
+        Ok(self.text.as_ref().clone())
     }
 
     /// Get a reference to the full extracted text.
@@ -64,6 +65,16 @@ impl TextExtractor {
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Share the decoded text with semantic readers without copying it.
+    pub(crate) fn text_shared(&self) -> Arc<String> {
+        Arc::clone(&self.text)
+    }
+
+    /// Share the UTF-16 CP boundary map with semantic readers without rebuilding it.
+    pub(crate) fn cp_to_byte_shared(&self) -> Arc<[usize]> {
+        Arc::clone(&self.cp_to_byte)
     }
 
     /// Extract text for a specific character position (CP) range.
@@ -555,8 +566,8 @@ mod tests {
     fn text_ranges_are_utf16_code_unit_positions() {
         let utf16 = "A😀B".encode_utf16().collect::<Vec<_>>();
         let extractor = TextExtractor {
-            text: String::from_utf16(&utf16).unwrap(),
-            cp_to_byte: TextExtractor::build_cp_to_byte_map("A😀B"),
+            text: Arc::new(String::from_utf16(&utf16).unwrap()),
+            cp_to_byte: Arc::from(TextExtractor::build_cp_to_byte_map("A😀B").into_boxed_slice()),
         };
 
         assert_eq!(extractor.text(), "A😀B");
@@ -566,5 +577,20 @@ mod tests {
         assert_eq!(extractor.text_at_range(1, 2), "");
         assert_eq!(extractor.text_at_range(2, 3), "");
         assert_eq!(extractor.text_at_range(99, 100), "");
+    }
+
+    #[test]
+    fn shared_text_and_cp_map_retain_one_decoded_source() {
+        let extractor = TextExtractor {
+            text: Arc::new("A😀B".to_string()),
+            cp_to_byte: Arc::from(TextExtractor::build_cp_to_byte_map("A😀B").into_boxed_slice()),
+        };
+
+        let text = extractor.text_shared();
+        let cp_to_byte = extractor.cp_to_byte_shared();
+        assert!(Arc::ptr_eq(&text, &extractor.text));
+        assert!(Arc::ptr_eq(&cp_to_byte, &extractor.cp_to_byte));
+        assert_eq!(text.as_str(), "A😀B");
+        assert_eq!(&*cp_to_byte, &[0, 1, 1, 5, 6]);
     }
 }

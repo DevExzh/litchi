@@ -836,10 +836,17 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**344 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**350 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
+
+Four opt-in XLSB lifecycle selectors cover fresh open, worksheet listing, one
+cell, and a prepared full `worksheet.cells()` scan over deterministic tiny,
+medium, large, and sparse BIFF12 corpora. The scan timer excludes archive
+cloning and workbook/worksheet preparation, while exact canonical cell hashes
+and counts are verified outside timing. The default 36-case/198-record tranche
+is unchanged.
 
 Change 0188 adds eight opt-in DOCX/PPTX fresh-open-plus-query lifecycle
 selectors. A CPU-2 release A1-eager/B1-source/B2-source/A2-eager run with 30
