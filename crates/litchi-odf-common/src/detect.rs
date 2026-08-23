@@ -381,9 +381,7 @@ pub fn packaged_has_ooxml_catalog_with_limits(
 ///
 /// Returns source I/O, source-change, or bounded scratch-buffer allocation
 /// errors.
-pub fn packaged_has_ooxml_catalog_read_at(
-    source: &dyn ReadAt,
-) -> Result<Option<bool>> {
+pub fn packaged_has_ooxml_catalog_read_at(source: &dyn ReadAt) -> Result<Option<bool>> {
     packaged_has_ooxml_catalog_read_at_with_limits(source, CatalogProbeLimits::default())
 }
 
