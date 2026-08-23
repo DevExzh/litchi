@@ -86,6 +86,12 @@ struct SourceInner {
     date_system: DateSystem,
     active_sheet: Option<usize>,
     sheets: Box<[Arc<SourceSheetData>]>,
+    /// Sheet positions sorted by their canonical, case-insensitive names.
+    ///
+    /// The mandatory workbook catalog rejects duplicate canonical names, so a
+    /// sorted position index is equivalent to the previous linear search while
+    /// avoiding a second allocation of every key string.
+    sheet_name_order: Box<[usize]>,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -440,6 +446,15 @@ impl SourceBackedWorkbook {
             }));
         }
         let sheets = sheets.into_boxed_slice();
+        let mut sheet_name_order = (0..sheets.len()).collect::<Vec<_>>();
+        sheet_name_order.sort_unstable_by(|left, right| {
+            sheets[*left]
+                .name_key
+                .as_ref()
+                .cmp(sheets[*right].name_key.as_ref())
+                .then_with(|| left.cmp(right))
+        });
+        let sheet_name_order = sheet_name_order.into_boxed_slice();
         // The source can change after the mandatory root and relationship
         // reads, including while the semantic sheet metadata above is being
         // allocated. Do not publish a facade whose catalog was assembled from
@@ -464,6 +479,7 @@ impl SourceBackedWorkbook {
                 },
                 active_sheet,
                 sheets,
+                sheet_name_order,
             }),
         })
     }
@@ -526,9 +542,15 @@ impl SourceBackedWorkbook {
             CoreSelector::Name(name) => {
                 let key = crate::sheet::key(&name);
                 self.inner
-                    .sheets
-                    .iter()
-                    .find(|sheet| sheet.name_key == key)
+                    .sheet_name_order
+                    .binary_search_by(|&position| {
+                        self.inner.sheets[position]
+                            .name_key
+                            .as_ref()
+                            .cmp(key.as_ref())
+                    })
+                    .ok()
+                    .and_then(|order| self.inner.sheets.get(self.inner.sheet_name_order[order]))
                     .cloned()
             },
             CoreSelector::Id(never) => match never {},
