@@ -555,7 +555,7 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
 
     fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
         for worksheet in &self.worksheets {
-            if worksheet.name() == name {
+            if names_equal(worksheet.name(), name) {
                 // Return reference instead of clone - zero-copy!
                 return Ok(Box::new(worksheet));
             }

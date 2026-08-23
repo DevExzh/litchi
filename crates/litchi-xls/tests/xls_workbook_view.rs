@@ -102,6 +102,25 @@ fn workbook_trait_follows_active_window_worksheet() {
 }
 
 #[test]
+fn workbook_trait_sheet_lookup_is_case_insensitive() {
+    let mut writer = Writer::new();
+    writer.add_worksheet("MixedCase").unwrap();
+
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook_trait: &dyn WorkbookTrait = &workbook;
+
+    assert_eq!(
+        workbook_trait
+            .worksheet_by_name("mixedcase")
+            .unwrap()
+            .name(),
+        "MixedCase"
+    );
+}
+
+#[test]
 fn reads_poi_simple_workbook_window_and_sheet_ids() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/Simple.xls");
