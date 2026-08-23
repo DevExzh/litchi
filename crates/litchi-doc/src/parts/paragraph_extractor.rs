@@ -38,7 +38,7 @@ pub struct ParagraphExtractor<'a> {
     /// The extracted text (shared via Arc to avoid cloning, thread-safe)
     text: Arc<String>,
     /// Text piece character positions
-    text_ranges: Vec<usize>, // UTF-16 CP boundary -> UTF-8 byte offset
+    text_ranges: Arc<[usize]>, // UTF-16 CP boundary -> UTF-8 byte offset
     /// Character position range to extract (for subdocuments)
     cp_range: Option<(u32, u32)>,
     /// Stylesheet used to apply paragraph-style character properties.
@@ -59,7 +59,7 @@ impl<'a> ParagraphExtractor<'a> {
         chp_bin_table: Option<&'a ChpBinTable>,
     ) -> Result<Self> {
         // Build text ranges for mapping CPs to text offsets
-        let text_ranges = Self::build_text_ranges(&text);
+        let text_ranges = Arc::from(Self::build_text_ranges(&text).into_boxed_slice());
 
         Ok(Self {
             pap_bin_table,
@@ -103,6 +103,25 @@ impl<'a> ParagraphExtractor<'a> {
         let mut extractor = Self::new_with_range(text, pap_bin_table, chp_bin_table, cp_range)?;
         extractor.stylesheet = stylesheet;
         Ok(extractor)
+    }
+
+    /// Create a range extractor while reusing the decoded text's CP boundary map.
+    pub(crate) fn new_with_range_and_stylesheet_and_shared_ranges(
+        text: Arc<String>,
+        text_ranges: Arc<[usize]>,
+        pap_bin_table: Option<&'a PapBinTable>,
+        chp_bin_table: Option<&'a ChpBinTable>,
+        cp_range: (u32, u32),
+        stylesheet: Option<&'a StyleSheet>,
+    ) -> Result<Self> {
+        Ok(Self {
+            pap_bin_table,
+            chp_bin_table,
+            text,
+            text_ranges,
+            cp_range: Some(cp_range),
+            stylesheet,
+        })
     }
 
     /// Build mapping from character positions to text offsets.
@@ -168,62 +187,7 @@ impl<'a> ParagraphExtractor<'a> {
                 continue;
             }
 
-            // Extract paragraph text (excluding the CR marker itself)
-            let terminator = self.extract_text_range(para_end - 1, para_end);
-            let mut para_text = self.extract_text_range(para_start, para_end);
-            // Structural terminators are not paragraph content.
-            if matches!(terminator.as_str(), "\r" | "\u{7}") {
-                para_text.pop();
-            }
-
-            // Find matching PAP properties for this paragraph
-            let mut para_props = self
-                .pap_bin_table
-                .and_then(|table| table.properties_at(para_start))
-                .cloned()
-                .unwrap_or_default();
-            let table_context = self.table_text_context(para_start, &para_props);
-            let (table_papx, table_chpx) = if let (Some(stylesheet), Some(context)) =
-                (self.stylesheet, table_context.as_ref())
-            {
-                let (_, paragraph, character) = stylesheet
-                    .resolve_table_text_style_sprms_for_conditions(
-                        context.style_index,
-                        &context.conditions,
-                    )?;
-                (paragraph, character)
-            } else {
-                (Vec::new(), Vec::new())
-            };
-            if let (Some(stylesheet), Some(paragraph_run)) = (
-                self.stylesheet,
-                self.pap_bin_table
-                    .and_then(|table| table.run_at(para_start)),
-            ) && !table_papx.is_empty()
-            {
-                para_props = ParagraphProperties::cascade_table_style(
-                    &table_papx,
-                    paragraph_run.initial_style_index,
-                    &paragraph_run.direct_grpprl,
-                    stylesheet,
-                )?;
-            }
-            para_props.is_table_cell_end = terminator == "\u{7}";
-
-            // Extract character runs within this paragraph (excluding the CR)
-            let para_text_end = if matches!(terminator.as_str(), "\r" | "\u{7}") {
-                para_end - 1
-            } else {
-                para_end
-            };
-            let runs = self.extract_runs(
-                para_start,
-                para_text_end,
-                para_props.style_index,
-                &table_chpx,
-            )?;
-
-            paragraphs.push((para_text, para_props, runs));
+            paragraphs.push(self.extract_paragraph_range(para_start, para_end)?);
         }
 
         // Fallback if no paragraphs were found
@@ -237,6 +201,153 @@ impl<'a> ParagraphExtractor<'a> {
         }
 
         Ok(paragraphs)
+    }
+
+    /// Extract one paragraph without materializing the surrounding paragraph collection.
+    ///
+    /// The second return value is the number of paragraphs in this range when the requested
+    /// position is not present. A caller walking multiple subdocuments can use it to adjust the
+    /// remaining ordinal without rescanning a range that has already been visited.
+    pub(crate) fn extract_paragraph_at(
+        &self,
+        position: usize,
+    ) -> Result<(Option<ExtractedParagraph>, usize)> {
+        let (range, paragraph_count) = self.find_paragraph_range(position);
+        if let Some((start, end)) = range {
+            return Ok((Some(self.extract_paragraph_range(start, end)?), 0));
+        }
+
+        // Preserve the existing extractor fallback for a non-empty range that contains no
+        // structural paragraph mark. This is observable on malformed/minimal DOC input.
+        if paragraph_count == 0 && !self.text.is_empty() {
+            if position != 0 {
+                return Ok((None, 1));
+            }
+            let doc_start_cp = self.cp_range.map_or(0, |(start, _)| start);
+            let doc_end_cp = self.cp_range.map_or_else(
+                || self.text_ranges.len().saturating_sub(1) as u32,
+                |(_, end)| end,
+            );
+            let runs = self.extract_runs(doc_start_cp, doc_end_cp, None, &[])?;
+            return Ok((
+                Some((
+                    self.text.as_ref().clone(),
+                    ParagraphProperties::default(),
+                    runs,
+                )),
+                1,
+            ));
+        }
+
+        Ok((None, paragraph_count))
+    }
+
+    /// Find one paragraph range while scanning only as far as the requested ordinal.
+    fn find_paragraph_range(&self, position: usize) -> (Option<(u32, u32)>, usize) {
+        let doc_start_cp = self.cp_range.map_or(0, |(start, _)| start);
+        let doc_end_cp = self.cp_range.map_or_else(
+            || self.text_ranges.len().saturating_sub(1) as u32,
+            |(_, end)| end,
+        );
+        let mut paragraph_start = doc_start_cp;
+        let mut paragraph_index = 0usize;
+        let mut current_cp = 0u32;
+
+        for c in self.text.chars() {
+            let next_cp = current_cp + c.len_utf16() as u32;
+            if next_cp <= doc_start_cp {
+                current_cp = next_cp;
+                continue;
+            }
+            if current_cp >= doc_end_cp {
+                break;
+            }
+            if matches!(c, '\r' | '\u{7}') && next_cp <= doc_end_cp {
+                if paragraph_start < next_cp {
+                    if paragraph_index == position {
+                        return (Some((paragraph_start, next_cp)), paragraph_index);
+                    }
+                    paragraph_index += 1;
+                }
+                paragraph_start = next_cp;
+            }
+            current_cp = next_cp;
+        }
+
+        if current_cp > doc_start_cp {
+            let paragraph_end = current_cp.min(doc_end_cp);
+            if paragraph_start < paragraph_end {
+                if paragraph_index == position {
+                    return (Some((paragraph_start, paragraph_end)), paragraph_index);
+                }
+                paragraph_index += 1;
+            }
+        }
+
+        (None, paragraph_index)
+    }
+
+    /// Extract one paragraph range, preserving the same PAP/CHP/style cascade as enumeration.
+    fn extract_paragraph_range(
+        &self,
+        para_start: u32,
+        para_end: u32,
+    ) -> Result<ExtractedParagraph> {
+        // Extract paragraph text (excluding the CR marker itself)
+        let terminator = self.extract_text_range(para_end - 1, para_end);
+        let mut para_text = self.extract_text_range(para_start, para_end);
+        // Structural terminators are not paragraph content.
+        if matches!(terminator.as_str(), "\r" | "\u{7}") {
+            para_text.pop();
+        }
+
+        // Find matching PAP properties for this paragraph
+        let mut para_props = self
+            .pap_bin_table
+            .and_then(|table| table.properties_at(para_start))
+            .cloned()
+            .unwrap_or_default();
+        let table_context = self.table_text_context(para_start, &para_props);
+        let (table_papx, table_chpx) =
+            if let (Some(stylesheet), Some(context)) = (self.stylesheet, table_context.as_ref()) {
+                let (_, paragraph, character) = stylesheet
+                    .resolve_table_text_style_sprms_for_conditions(
+                        context.style_index,
+                        &context.conditions,
+                    )?;
+                (paragraph, character)
+            } else {
+                (Vec::new(), Vec::new())
+            };
+        if let (Some(stylesheet), Some(paragraph_run)) = (
+            self.stylesheet,
+            self.pap_bin_table
+                .and_then(|table| table.run_at(para_start)),
+        ) && !table_papx.is_empty()
+        {
+            para_props = ParagraphProperties::cascade_table_style(
+                &table_papx,
+                paragraph_run.initial_style_index,
+                &paragraph_run.direct_grpprl,
+                stylesheet,
+            )?;
+        }
+        para_props.is_table_cell_end = terminator == "\u{7}";
+
+        // Extract character runs within this paragraph (excluding the CR)
+        let para_text_end = if matches!(terminator.as_str(), "\r" | "\u{7}") {
+            para_end - 1
+        } else {
+            para_end
+        };
+        let runs = self.extract_runs(
+            para_start,
+            para_text_end,
+            para_props.style_index,
+            &table_chpx,
+        )?;
+
+        Ok((para_text, para_props, runs))
     }
 
     /// Extract text for a character position range.
@@ -606,6 +717,79 @@ mod tests {
         assert!(paragraphs[0].1.is_table_cell_end);
         assert_eq!(paragraphs[1].0, "");
         assert!(paragraphs[1].1.is_table_cell_end);
+    }
+
+    #[test]
+    fn ordinal_extraction_matches_enumeration_without_materializing_neighbors() {
+        let text = Arc::new("first\rsecond 😀\rthird".to_string());
+        let ranges = Arc::from(ParagraphExtractor::build_text_ranges(&text).into_boxed_slice());
+        let extractor = ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
+            Arc::clone(&text),
+            ranges,
+            None,
+            None,
+            (0, 20),
+            None,
+        )
+        .unwrap();
+        let all = extractor.extract_paragraphs().unwrap();
+
+        for (position, expected) in all.iter().enumerate() {
+            let (actual, available) = extractor.extract_paragraph_at(position).unwrap();
+            let actual = actual.expect("enumerated paragraph must be selectable");
+            assert_eq!(available, 0);
+            assert_eq!(actual.0, expected.0);
+            assert_eq!(actual.1, expected.1);
+            assert_eq!(actual.2, expected.2);
+        }
+
+        let (missing, available) = extractor.extract_paragraph_at(all.len()).unwrap();
+        assert!(missing.is_none());
+        assert_eq!(available, all.len());
+    }
+
+    #[test]
+    fn shared_ranges_preserve_structural_and_rich_text_results() {
+        let text = Arc::new("bold\rCell\u{7}".to_string());
+        let ranges = Arc::from(ParagraphExtractor::build_text_ranges(&text).into_boxed_slice());
+        let extractor = ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
+            Arc::clone(&text),
+            ranges,
+            None,
+            None,
+            (0, 10),
+            None,
+        )
+        .unwrap();
+        let paragraphs = extractor.extract_paragraphs().unwrap();
+
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].0, "bold");
+        assert_eq!(paragraphs[1].0, "Cell");
+        assert!(paragraphs[1].1.is_table_cell_end);
+        assert_eq!(paragraphs[0].2[0].0, "bold");
+    }
+
+    #[test]
+    fn ordinal_extraction_preserves_unmarked_text_fallback() {
+        let text = Arc::new("unmarked text".to_string());
+        let ranges = Arc::from(ParagraphExtractor::build_text_ranges(&text).into_boxed_slice());
+        let extractor = ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
+            text,
+            ranges,
+            None,
+            None,
+            (0, 13),
+            None,
+        )
+        .unwrap();
+
+        let (first, available) = extractor.extract_paragraph_at(0).unwrap();
+        assert_eq!(available, 1);
+        assert_eq!(first.unwrap().0, "unmarked text");
+        let (missing, available) = extractor.extract_paragraph_at(1).unwrap();
+        assert!(missing.is_none());
+        assert_eq!(available, 1);
     }
 
     #[test]
