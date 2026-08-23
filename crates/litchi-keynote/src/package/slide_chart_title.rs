@@ -1093,7 +1093,9 @@ fn read_chart_title(data: &[u8], limits: WireLimits) -> Result<Option<String>, C
     let mut extension_count = 0usize;
     for field in &fields {
         if field.number() == GENERATED_CHART_NON_STYLE_EXTENSION_FIELD {
-            extension_count += 1;
+            extension_count = extension_count
+                .checked_add(1)
+                .ok_or(ChartTitleError::InvalidSource)?;
             extension_field = Some(*field);
         }
     }
