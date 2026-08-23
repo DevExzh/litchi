@@ -2,8 +2,10 @@
 //! ([MS-XLS] 2.4.55).
 //!
 //! The semantic payload is bounded to a future-record header, one Boolean,
-//! and a retained opaque tail. A detached [`Snapshot`] can retain unrelated
-//! BIFF records and apply typed changes through an atomic [`Transaction`].
+//! and a retained opaque tail. A detached
+//! [`crate::picture_compression::Snapshot`] can retain unrelated BIFF records
+//! and apply typed changes through an atomic
+//! [`crate::picture_compression::Transaction`].
 
 mod codec;
 mod model;

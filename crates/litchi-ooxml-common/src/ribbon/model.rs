@@ -120,7 +120,7 @@ impl<'a> Ui<'a> {
 
     /// Low-level package relationship ID.
     ///
-    /// Prefer [`Set::effective`] and [`remove`] for semantic operations.
+    /// Prefer [`Set::effective`] and [`crate::ribbon::remove`] for semantic operations.
     #[must_use]
     #[inline]
     pub const fn id(self) -> &'a str {

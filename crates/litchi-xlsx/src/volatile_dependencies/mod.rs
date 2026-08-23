@@ -1,7 +1,7 @@
 //! Layered, inert `SpreadsheetML` volatile-dependency records.
 //!
-//! Typed semantic values live in [`model`], bounded XML conversion in
-//! [`codec`], and workbook relationship traversal in [`package`]. The
+//! Typed semantic values live in `model`, bounded XML conversion in
+//! `codec`, and workbook relationship traversal in `package`. The
 //! historical `litchi_xlsx::volatile_dependencies::*` facade remains exposed
 //! through the re-exports below.
 

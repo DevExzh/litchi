@@ -1,8 +1,8 @@
 //! Layered Word 2015 `symEx` run symbols.
 //!
-//! The semantic values live in [`model`], bounded lexical and resource rules
-//! live in [`validation`], and the source-preserving `WordprocessingML` seam is
-//! implemented by [`codec`] and [`transaction`].  Unknown run content is not
+//! The semantic values live in `model`, bounded lexical and resource rules
+//! live in `validation`, and the source-preserving `WordprocessingML` seam is
+//! implemented by `codec` and `transaction`.  Unknown run content is not
 //! interpreted and remains byte-for-byte intact when a symbol edit is
 //! committed.
 

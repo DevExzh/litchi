@@ -2,8 +2,8 @@
 //!
 //! Conditional formatting is embedded in worksheet XML and refers to frozen
 //! differential formats in the workbook styles part. Semantic declarations
-//! live in [`model`], bounded SpreadsheetML conversion and differential-format
-//! association in [`codec`], and guarded package/source publication in the
+//! live in `model`, bounded SpreadsheetML conversion and differential-format
+//! association in `codec`, and guarded package/source publication in the
 //! private package, snapshot, patch, and source layers. The public editor
 //! replaces the complete ordered core collection for one existing worksheet
 //! while binding its workbook, relationship, and styles dependency closure.

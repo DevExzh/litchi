@@ -21,7 +21,7 @@ const MAX_CODE_LENGTH: usize = 255;
 
 /// Error returned when a number format fails authoring validation.
 ///
-/// Deserialization never produces this error: [`NumberFormat::from_raw`]
+/// Deserialization never produces this error: `NumberFormat::from_raw`
 /// preserves authored file content losslessly (ADR-0006).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -67,7 +67,7 @@ impl std::error::Error for InvalidNumberFormat {}
 /// This includes both built-in formats (IDs below [`FIRST_CUSTOM_ID`]) and
 /// custom formats. Construction through [`NumberFormat::new`] and
 /// [`NumberFormat::custom`] validates the format code (ADR-0004); the
-/// stylesheet deserializer uses [`NumberFormat::from_raw`] to preserve
+/// stylesheet deserializer uses `NumberFormat::from_raw` to preserve
 /// authored content losslessly.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NumberFormat {

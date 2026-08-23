@@ -6,9 +6,9 @@
 //! choices and extensions remain bounded [`Unknown`] values instead of being
 //! silently discarded.
 //!
-//! The semantic values live in [`model`], the fragment codec and structural
-//! limits live in [`codec`], and the focused conformance checks live in
-//! [`tests`]. Format crates own the surrounding fill, line, shape, and package
+//! The semantic values live in `model`, the fragment codec and structural
+//! limits live in `codec`, and the focused conformance checks live in `tests`.
+//! Format crates own the surrounding fill, line, shape, and package
 //! relationships.
 
 mod codec;

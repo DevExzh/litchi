@@ -1,6 +1,6 @@
 //! Shared, inert MS-OFFMACRO2 package-graph mutation.
 //!
-//! The `project` payload itself remains owned by [`litchi-vba`]. This module
+//! The `project` payload itself remains owned by `litchi-vba`. This module
 //! only validates and mutates the OPC relationship graph shared by DOCX,
 //! PPTX, XLSX, and XLSB hosts.
 
