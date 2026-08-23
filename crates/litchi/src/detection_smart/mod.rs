@@ -11,6 +11,18 @@ pub mod functions;
 pub(crate) mod ole2;
 pub mod ooxml;
 
+/// Detect the fixed transport header used by compressed RTF.
+///
+/// The shared core detector intentionally has no dependency on the RTF leaf
+/// crate. Keep this probe in the facade, where the optional RTF transport
+/// implementation is available, so smart detection can hand compressed bytes
+/// to the native parser without weakening non-RTF builds.
+#[cfg(feature = "rtf")]
+#[inline]
+pub(crate) fn is_compressed_rtf(bytes: &[u8]) -> bool {
+    litchi_rtf::transport::is_compressed_rtf(bytes)
+}
+
 #[cfg(test)]
 use std::cell::Cell;
 

@@ -811,6 +811,11 @@ fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
         return None;
     }
 
+    #[cfg(feature = "rtf")]
+    if !mask.is_ole2() && !mask.is_zip() && super::is_compressed_rtf(&bytes) {
+        return Some(DetectedFormat::Rtf(bytes));
+    }
+
     if mask.is_zip() {
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
         let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
@@ -917,6 +922,11 @@ pub fn detect_format_smart_with_limits(
             }
         }
         return None;
+    }
+
+    #[cfg(feature = "rtf")]
+    if !mask.is_ole2() && !mask.is_zip() && super::is_compressed_rtf(&bytes) {
+        return Some(DetectedFormat::Rtf(bytes));
     }
 
     // Check ZIP candidates in the same order as the ordinary detector.
@@ -1691,7 +1701,9 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
 
 #[cfg(test)]
 mod short_signature_tests {
-    use super::{detect_format_smart, detect_format_smart_with_limits};
+    use super::detect_format_smart;
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    use super::detect_format_smart_with_limits;
     #[cfg(any(feature = "docx", feature = "pptx"))]
     use std::io::{Cursor, Write};
 
@@ -2110,6 +2122,40 @@ mod short_signature_tests {
             Some(super::DetectedFormat::Rtf(bytes)) => assert_eq!(bytes, br#"{\rtf"#),
             _ => panic!("minimal RTF signature was not retained"),
         }
+    }
+
+    #[cfg(feature = "rtf")]
+    #[test]
+    fn compressed_rtf_signature_is_retained_without_overriding_zip_precedence() {
+        let source = br#"{\rtf1\ansi Compressed RTF\par}"#;
+        let compressed = litchi_rtf::transport::compress(source, true).unwrap();
+
+        match detect_format_smart(compressed.clone()) {
+            Some(super::DetectedFormat::Rtf(bytes)) => assert_eq!(bytes, compressed),
+            _ => panic!("compressed RTF was not retained"),
+        }
+
+        // The bytes at offset 8 are part of a ZIP local header. A matching
+        // LZFu marker there must not turn a ZIP candidate into RTF.
+        let mut zip_polyglot = b"PK\x03\x04\x00\x00\x00\x00".to_vec();
+        zip_polyglot.extend_from_slice(b"LZFu");
+        assert!(detect_format_smart(zip_polyglot.clone()).is_none());
+
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        assert!(
+            detect_format_smart_with_limits(zip_polyglot, crate::opc::ReadLimits::default())
+                .is_none()
+        );
+
+        let mut ole_polyglot = litchi_core::detection::utils::OLE2_SIGNATURE.to_vec();
+        ole_polyglot.extend_from_slice(b"LZFu");
+        assert!(detect_format_smart(ole_polyglot.clone()).is_none());
+
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        assert!(
+            detect_format_smart_with_limits(ole_polyglot, crate::opc::ReadLimits::default())
+                .is_none()
+        );
     }
 
     #[cfg(feature = "pages")]
