@@ -58,7 +58,7 @@ use litchi_xlsx::{
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
 const SCHEMA_VERSION: u32 = 1;
@@ -82,6 +82,7 @@ const XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR: &str = "litchi-xlsx-named-sheet-
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
+const PPTX_SLIDE_NAME_INDEX_CORPUS_GENERATOR: &str = "litchi-pptx-slide-name-index-v1";
 const PPTX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-pptx-source-edit-media-v1";
 const PPTX_CROSS_COPY_CORPUS_GENERATOR: &str = "litchi-pptx-cross-slide-copy-evidence-v1";
 const PPTX_SOURCE_BACKED_CROSS_COPY_CORPUS_GENERATOR: &str =
@@ -846,6 +847,7 @@ enum Case {
     PptFreshWriteTo,
     DocSemanticOpen,
     DocSemanticListParagraphs,
+    DocSemanticParagraphCount,
     DocSemanticOneParagraph,
     DocSemanticOneParagraphAt,
     DocSemanticFullText,
@@ -978,6 +980,9 @@ enum Case {
     PptxSemanticNoopEditSave,
     PptxSemanticOneEditSave,
     PptxSemanticOnePercentEditSave,
+    PptxNamedOneEditSave,
+    PptxNamedRepeatedEditSave,
+    PptxNumericRepeatedEditSave,
     PptxValidationReport,
     OdtSemanticOpen,
     OdtSemanticListParagraphs,
@@ -1328,6 +1333,7 @@ impl Case {
             Self::PptFreshWriteTo => "ppt_fresh_write_to",
             Self::DocSemanticOpen => "doc_semantic_open",
             Self::DocSemanticListParagraphs => "doc_semantic_list_paragraphs",
+            Self::DocSemanticParagraphCount => "doc_semantic_paragraph_count",
             Self::DocSemanticOneParagraph => "doc_semantic_one_paragraph",
             Self::DocSemanticOneParagraphAt => "doc_semantic_one_paragraph_at",
             Self::DocSemanticFullText => "doc_semantic_full_text",
@@ -1474,6 +1480,9 @@ impl Case {
             Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
             Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
             Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
+            Self::PptxNamedOneEditSave => "pptx_named_one_edit_save",
+            Self::PptxNamedRepeatedEditSave => "pptx_named_repeated_edit_save",
+            Self::PptxNumericRepeatedEditSave => "pptx_numeric_repeated_edit_save",
             Self::PptxValidationReport => "pptx_validation_report",
             Self::OdtSemanticOpen => "odt_semantic_open",
             Self::OdtSemanticListParagraphs => "odt_semantic_list_paragraphs",
@@ -1633,6 +1642,7 @@ impl Case {
             self,
             Self::DocSemanticOpen
                 | Self::DocSemanticListParagraphs
+                | Self::DocSemanticParagraphCount
                 | Self::DocSemanticOneParagraph
                 | Self::DocSemanticOneParagraphAt
                 | Self::DocSemanticFullText
@@ -1889,6 +1899,15 @@ impl Case {
                 | Self::PptxSemanticNoopEditSave
                 | Self::PptxSemanticOneEditSave
                 | Self::PptxSemanticOnePercentEditSave
+        )
+    }
+
+    const fn uses_pptx_slide_name_index(self) -> bool {
+        matches!(
+            self,
+            Self::PptxNamedOneEditSave
+                | Self::PptxNamedRepeatedEditSave
+                | Self::PptxNumericRepeatedEditSave
         )
     }
 
@@ -6936,6 +6955,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_rtf_picture_crud()
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
+                    && !case.uses_pptx_slide_name_index()
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
                     && !case.is_odt_repeated_text()
@@ -7848,6 +7868,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 case.uses_semantic_pptx()
                     && (*shape == SemanticShape::Tiny || !case.is_semantic_create_small())
             }) {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_pptx_slide_name_index())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = build_pptx_slide_name_index_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .filter(|case| case.uses_pptx_slide_name_index())
+            {
                 results.push(run_case_with_config(
                     *case,
                     &corpus,
@@ -8922,6 +8965,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_fresh_write_to" => Some(Case::PptFreshWriteTo),
         "doc_semantic_open" => Some(Case::DocSemanticOpen),
         "doc_semantic_list_paragraphs" => Some(Case::DocSemanticListParagraphs),
+        "doc_semantic_paragraph_count" => Some(Case::DocSemanticParagraphCount),
         "doc_semantic_one_paragraph" => Some(Case::DocSemanticOneParagraph),
         "doc_semantic_one_paragraph_at" => Some(Case::DocSemanticOneParagraphAt),
         "doc_semantic_full_text" => Some(Case::DocSemanticFullText),
@@ -9070,6 +9114,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
         "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
         "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
+        "pptx_named_one_edit_save" => Some(Case::PptxNamedOneEditSave),
+        "pptx_named_repeated_edit_save" => Some(Case::PptxNamedRepeatedEditSave),
+        "pptx_numeric_repeated_edit_save" => Some(Case::PptxNumericRepeatedEditSave),
         "pptx_validation_report" => Some(Case::PptxValidationReport),
         "odt_semantic_open" => Some(Case::OdtSemanticOpen),
         "odt_semantic_list_paragraphs" => Some(Case::OdtSemanticListParagraphs),
@@ -9355,6 +9402,7 @@ fn print_usage() {
                                        cfb_open_stream_simulated_mini_4095_shared_repeat8,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
+                                       doc_semantic_paragraph_count,\n\
                                        doc_semantic_one_paragraph,doc_semantic_one_paragraph_at,\n\
                                        doc_semantic_full_text,\n\
                                        doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
@@ -9460,6 +9508,8 @@ fn print_usage() {
                                        pptx_semantic_one_slide,pptx_semantic_full_text,\n\
                                        pptx_semantic_create_small,pptx_semantic_noop_edit_save,\n\
                                        pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,\n\
+                                       pptx_named_one_edit_save,pptx_named_repeated_edit_save,\n\
+                                       pptx_numeric_repeated_edit_save,\n\
                                        odt_semantic_open,odt_semantic_list_paragraphs,\n\
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
@@ -13024,6 +13074,72 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
     })
 }
 
+#[derive(Clone, Debug)]
+struct PptxSelectorEdit {
+    slide_index: usize,
+    shape_index: usize,
+    name: String,
+    text: String,
+}
+
+fn pptx_named_slide_name(index: usize) -> String {
+    format!("litchi-perf-pptx-slide-name-index-{index:03}")
+}
+
+fn pptx_slide_member_index(member: &str) -> Option<usize> {
+    let stem = member.strip_prefix("ppt/slides/")?.strip_suffix(".xml")?;
+    let number = stem.strip_prefix("slide")?;
+    if number.is_empty() || !number.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    number.parse::<usize>().ok()?.checked_sub(1)
+}
+
+fn rename_pptx_slide_payload(payload: &[u8], name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    let xml = std::str::from_utf8(payload)?;
+    let marker = r#"<p:cSld name=""#;
+    let start = xml
+        .find(marker)
+        .map(|offset| offset + marker.len())
+        .ok_or("generated PPTX slide has no cSld name")?;
+    let end = start
+        .checked_add(
+            xml.get(start..)
+                .ok_or("generated PPTX slide name starts outside XML")?
+                .find('"')
+                .ok_or("generated PPTX slide cSld name is unterminated")?,
+        )
+        .ok_or("generated PPTX slide name offset overflows usize")?;
+    let mut renamed = String::with_capacity(xml.len() + name.len());
+    renamed.push_str(
+        xml.get(..start)
+            .ok_or("generated PPTX slide name prefix is out of bounds")?,
+    );
+    renamed.push_str(name);
+    renamed.push_str(
+        xml.get(end..)
+            .ok_or("generated PPTX slide name suffix is out of bounds")?,
+    );
+    Ok(renamed.into_bytes())
+}
+
+fn rewrite_pptx_slide_names(
+    archive: &[u8],
+    mut replacement: impl FnMut(usize) -> Option<String>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let reader = ArchiveReader::new(archive)?;
+    let mut writer = StreamingArchiveWriter::new();
+    for member in reader.file_names() {
+        let payload = reader.read(member)?;
+        let payload = match pptx_slide_member_index(member).and_then(&mut replacement) {
+            Some(name) => rename_pptx_slide_payload(&payload, &name)?,
+            None => payload,
+        };
+        writer.write_stored(member, &payload)?;
+    }
+    Ok(writer.finish_to_bytes()?)
+}
+
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut package = litchi_pptx::Package::new()?;
     let presentation = package.presentation_mut()?;
@@ -14441,6 +14557,51 @@ fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
     };
     verify_xlsb_corpus(&corpus, shape)?;
     Ok(corpus)
+}
+
+fn build_pptx_slide_name_index_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let source = semantic_pptx_bytes(shape)?;
+    let archive = rewrite_pptx_slide_names(&source, |index| Some(pptx_named_slide_name(index)))?;
+    let package = litchi_pptx::Package::from_bytes(&archive)?;
+    verify_semantic_pptx(&package, shape, &[])?;
+    verify_pptx_named_slide_names(&package, shape)?;
+    let count = shape
+        .pptx_slides()
+        .checked_mul(shape.pptx_text_boxes_per_slide())
+        .ok_or("PPTX slide-name index shape count overflows usize")?;
+    let content_bytes = (0..shape.pptx_slides())
+        .try_fold(0usize, |total, slide| {
+            (0..shape.pptx_text_boxes_per_slide()).try_fold(total, |total, object| {
+                total.checked_add(semantic_pptx_text(slide, object, false).len())
+            })
+        })
+        .ok_or("PPTX slide-name index text byte count overflows usize")?;
+    let target_payload = pptx_named_slide_name(0).into_bytes();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("pptx-slide-name-index-{}", shape.name()),
+            generator: PPTX_SLIDE_NAME_INDEX_CORPUS_GENERATOR,
+            package_format: "PPTX/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-named-slide-text",
+            compression: "stored",
+            entry_count: count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: semantic_pptx_text(0, 0, false).len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "slide:0/name".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "slide:0/name".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
 }
 
 fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
@@ -16229,6 +16390,7 @@ fn run_case_with_config(
         },
         Case::DocSemanticOpen
         | Case::DocSemanticListParagraphs
+        | Case::DocSemanticParagraphCount
         | Case::DocSemanticOneParagraph
         | Case::DocSemanticOneParagraphAt
         | Case::DocSemanticFullText
@@ -16449,6 +16611,11 @@ fn run_case_with_config(
         | Case::PptxSemanticOneEditSave
         | Case::PptxSemanticOnePercentEditSave => {
             run_semantic_pptx(case, corpus, warmup_iterations, samples)
+        },
+        Case::PptxNamedOneEditSave
+        | Case::PptxNamedRepeatedEditSave
+        | Case::PptxNumericRepeatedEditSave => {
+            run_pptx_slide_name_index(case, corpus, warmup_iterations, samples)
         },
         Case::PptxValidationReport => {
             run_pptx_validation_report(corpus, warmup_iterations, samples)
@@ -17036,6 +17203,173 @@ fn verify_semantic_pptx(
         return Err("semantic PPTX full text differs from slide scan".into());
     }
     Ok(())
+}
+
+fn verify_pptx_named_slide_names(
+    package: &litchi_pptx::Package,
+    shape: SemanticShape,
+) -> Result<(), Box<dyn Error>> {
+    let presentation = package.presentation()?;
+    for slide_index in 0..shape.pptx_slides() {
+        let slide = presentation
+            .slide(slide_index)?
+            .ok_or("PPTX named-selector slide is missing")?;
+        let expected = pptx_named_slide_name(slide_index);
+        if slide.name()? != expected {
+            return Err("PPTX named-selector slide name differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
+fn pptx_selector_edits(shape: SemanticShape, repeated: bool) -> Vec<PptxSelectorEdit> {
+    let slide_indices = if repeated {
+        (0..shape.pptx_slides()).collect::<Vec<_>>()
+    } else {
+        vec![shape.pptx_slides() / 2]
+    };
+    slide_indices
+        .into_iter()
+        .map(|slide_index| PptxSelectorEdit {
+            slide_index,
+            shape_index: 0,
+            name: pptx_named_slide_name(slide_index),
+            text: semantic_pptx_text(slide_index, 0, true),
+        })
+        .collect()
+}
+
+fn verify_pptx_selector_error_oracle(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
+    let missing_name = "litchi-perf-pptx-slide-name-index-missing";
+    let package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+    let snapshot = package.opened_presentation()?;
+    let mut missing_edit = snapshot.edit();
+    match missing_edit.set_shape_text(missing_name, 0usize, "missing") {
+        Err(litchi_pptx::Error::SlideNameNotFound(name)) if name == missing_name => {},
+        Err(error) => {
+            return Err(
+                format!("PPTX named-selector missing-name oracle returned {error:?}").into(),
+            );
+        },
+        Ok(changed) => {
+            return Err(format!(
+                "PPTX named-selector missing-name oracle unexpectedly changed {changed} shapes"
+            )
+            .into());
+        },
+    }
+
+    let duplicate_name = pptx_named_slide_name(0);
+    let duplicate_archive = rewrite_pptx_slide_names(&corpus.archive, |index| {
+        (index == 1).then(|| duplicate_name.clone())
+    })?;
+    let duplicate_package = litchi_pptx::Package::from_vec(duplicate_archive)?;
+    let duplicate_snapshot = duplicate_package.opened_presentation()?;
+    let mut duplicate_edit = duplicate_snapshot.edit();
+    match duplicate_edit.set_shape_text(duplicate_name.as_str(), 0usize, "duplicate") {
+        Err(litchi_pptx::Error::AmbiguousSlideName { name, matches })
+            if name == duplicate_name && matches == 2 => {},
+        Err(error) => {
+            return Err(
+                format!("PPTX named-selector duplicate-name oracle returned {error:?}").into(),
+            );
+        },
+        Ok(changed) => {
+            return Err(format!(
+                "PPTX named-selector duplicate-name oracle unexpectedly changed {changed} shapes"
+            )
+            .into());
+        },
+    }
+    Ok(())
+}
+
+fn escape_pptx_xml_text(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn rewrite_pptx_shape_text(
+    payload: &[u8],
+    shape_index: usize,
+    source_text: &str,
+    replacement: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let xml = std::str::from_utf8(payload)?;
+    let (start, marker) = xml
+        .match_indices("<a:t>")
+        .nth(shape_index)
+        .ok_or("PPTX selector oracle target shape text is missing")?;
+    let content_start = start
+        .checked_add(marker.len())
+        .ok_or("PPTX selector oracle text start overflows usize")?;
+    let content_end = content_start
+        .checked_add(
+            xml.get(content_start..)
+                .ok_or("PPTX selector oracle text start is outside XML")?
+                .find("</a:t>")
+                .ok_or("PPTX selector oracle target shape text is unterminated")?,
+        )
+        .ok_or("PPTX selector oracle text end overflows usize")?;
+    if xml.get(content_start..content_end) != Some(source_text) {
+        return Err("PPTX selector oracle source shape text differs from specification".into());
+    }
+    let replacement = escape_pptx_xml_text(replacement);
+    let mut output = String::with_capacity(
+        xml.len()
+            .checked_sub(content_end - content_start)
+            .and_then(|length| length.checked_add(replacement.len()))
+            .ok_or("PPTX selector oracle output size overflows usize")?,
+    );
+    output.push_str(
+        xml.get(..content_start)
+            .ok_or("PPTX selector oracle text prefix is outside XML")?,
+    );
+    output.push_str(&replacement);
+    output.push_str(
+        xml.get(content_end..)
+            .ok_or("PPTX selector oracle text suffix is outside XML")?,
+    );
+    Ok(output.into_bytes())
+}
+
+/// Build the expected publication through the raw OPC graph rather than the
+/// opened-presentation transaction used by the measured candidate.
+fn build_pptx_selector_oracle(
+    corpus: &Corpus,
+    shape: SemanticShape,
+    edits: &[PptxSelectorEdit],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
+    for operation in edits {
+        let part_name = PackURI::new(format!(
+            "/ppt/slides/slide{}.xml",
+            operation.slide_index + 1
+        ))?;
+        let source = package.get_part(&part_name)?.blob().to_vec();
+        let replacement = rewrite_pptx_shape_text(
+            &source,
+            operation.shape_index,
+            &semantic_pptx_text(operation.slide_index, operation.shape_index, false),
+            operation.text.as_str(),
+        )?;
+        package.get_part_mut(&part_name)?.set_blob(replacement);
+    }
+    let output = PackageWriter::to_bytes(&package)?;
+    let reopened = litchi_pptx::Package::from_bytes(&output)?;
+    let mut updated = Vec::with_capacity(edits.len());
+    for operation in edits {
+        let linear = operation
+            .slide_index
+            .checked_mul(shape.pptx_text_boxes_per_slide())
+            .and_then(|base| base.checked_add(operation.shape_index))
+            .ok_or("PPTX selector oracle update index overflows usize")?;
+        updated.push(linear);
+    }
+    verify_semantic_pptx(&reopened, shape, &updated)?;
+    verify_pptx_named_slide_names(&reopened, shape)?;
+    Ok(output)
 }
 
 fn verify_pptx_source_edit_semantics(
@@ -18472,6 +18806,21 @@ fn run_semantic_doc(
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
     }
     let selected = shape.doc_paragraph_count() / 2;
+    let expected_paragraph_count = if case == Case::DocSemanticParagraphCount {
+        let mut oracle_package =
+            litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+        let oracle_document = oracle_package.document()?;
+        let oracle_paragraphs = oracle_document.paragraphs()?;
+        let expected = oracle_paragraphs.len();
+        if expected != corpus.manifest.entry_count || expected != shape.doc_paragraph_count() {
+            return Err(
+                "semantic DOC paragraph-count oracle differs from writer specification".into(),
+            );
+        }
+        expected
+    } else {
+        shape.doc_paragraph_count()
+    };
     let expected_changed = if case == Case::DocSemanticOneEditSave {
         let source = Snapshot::from_bytes(corpus.archive.clone())?;
         let mut edit = source.edit()?;
@@ -18510,6 +18859,23 @@ fn run_semantic_doc(
                 }
                 verify_semantic_doc(&corpus.archive, shape, None)?;
                 std::hint::black_box(paragraphs);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticParagraphCount => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let count = document.paragraph_count()?;
+                let duration = started.elapsed();
+                if count != expected_paragraph_count {
+                    return Err(
+                        "semantic DOC paragraph count differs from independent paragraph oracle"
+                            .into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(count);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::DocSemanticOneParagraph => {
@@ -23636,6 +24002,82 @@ fn run_semantic_pptx(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_pptx_slide_name_index(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let repeated = matches!(
+        case,
+        Case::PptxNamedRepeatedEditSave | Case::PptxNumericRepeatedEditSave
+    );
+    let named = matches!(
+        case,
+        Case::PptxNamedOneEditSave | Case::PptxNamedRepeatedEditSave
+    );
+    if !named && !matches!(case, Case::PptxNumericRepeatedEditSave) {
+        return Err("non-PPTX slide-name index case passed to slide-name runner".into());
+    }
+    let edits = pptx_selector_edits(shape, repeated);
+    // Build the independent publication and exercise selector refusals once
+    // before the sample loop; neither setup path belongs to the timed edit.
+    let expected_output = build_pptx_selector_oracle(corpus, shape, &edits)?;
+    verify_pptx_selector_error_oracle(corpus)?;
+    let mut updated = Vec::with_capacity(edits.len());
+    for operation in &edits {
+        let linear = operation
+            .slide_index
+            .checked_mul(shape.pptx_text_boxes_per_slide())
+            .and_then(|base| base.checked_add(operation.shape_index))
+            .ok_or("PPTX selector update index overflows usize")?;
+        updated.push(linear);
+    }
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+        let started = Instant::now();
+        let mut edit = package.opened_presentation_transaction()?;
+        for operation in &edits {
+            let changed = if named {
+                edit.set_shape_text(
+                    operation.name.as_str(),
+                    operation.shape_index,
+                    operation.text.as_str(),
+                )?
+            } else {
+                edit.set_shape_text(
+                    operation.slide_index,
+                    operation.shape_index,
+                    operation.text.as_str(),
+                )?
+            };
+            if !changed {
+                return Err("PPTX selector edit unexpectedly reported no change".into());
+            }
+        }
+        let commit = edit.commit()?;
+        if !commit.is_changed() {
+            return Err("PPTX selector edit did not produce a changed commit".into());
+        }
+        package.apply_opened_presentation_commit(commit)?;
+        let output = package.to_bytes()?;
+        let duration = started.elapsed();
+        if output != expected_output {
+            return Err("PPTX selector output differs from the independent raw OPC oracle".into());
+        }
+        let reopened = litchi_pptx::Package::from_bytes(&output)?;
+        verify_semantic_pptx(&reopened, shape, &updated)?;
+        verify_pptx_named_slide_names(&reopened, shape)?;
+        std::hint::black_box(output);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let mut result = result(case, corpus, elapsed, None);
+    result.output_sha256 = Some(sha256_hex(&expected_output));
+    Ok(result)
 }
 
 fn run_semantic_odt(
@@ -43063,12 +43505,12 @@ mod tests {
         build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
         build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
         build_opc_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
-        build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
-        build_xlsb_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_pptx_slide_name_index_corpus, build_pptx_source_backed_cross_copy_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
+        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
+        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
+        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
+        build_xls_visibility_edit_corpus, build_xlsb_corpus, build_xlsx_auto_filter_edit_corpus,
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
         build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
         build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
@@ -43079,10 +43521,10 @@ mod tests {
         build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
         cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
         ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
-        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
-        run_docx_source_backed_one_edit_save, run_odf_content_cow,
-        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        pptx_named_slide_name, resolve_execution_workers, run_case, run_case_with_config,
+        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
+        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
+        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -43528,7 +43970,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 350);
+        assert_eq!(selectable_count, 362);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -45558,6 +46000,38 @@ mod tests {
         assert_eq!(pptx.manifest.entry_count, 12);
         let pptx_result = run_case(Case::PptxSemanticOnePercentEditSave, &pptx, 0, 1).unwrap();
         assert!(pptx_result.sink.is_none());
+    }
+
+    #[test]
+    fn pptx_slide_name_index_selectors_have_exact_output_and_error_oracles() {
+        for case in [
+            Case::PptxNamedOneEditSave,
+            Case::PptxNamedRepeatedEditSave,
+            Case::PptxNumericRepeatedEditSave,
+        ] {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        let tiny = build_pptx_slide_name_index_corpus(SemanticShape::Tiny).unwrap();
+        let tiny_again = build_pptx_slide_name_index_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(tiny.archive, tiny_again.archive);
+        assert_eq!(tiny.manifest.entry_count, 12);
+        assert_eq!(tiny.manifest.target_entry, "slide:0/name");
+        assert_eq!(tiny.target_name, "slide:0/name");
+        assert_eq!(tiny.target_payload, pptx_named_slide_name(0).as_bytes());
+        assert_eq!(
+            tiny.manifest.target_payload_sha256,
+            sha256_hex(pptx_named_slide_name(0).as_bytes())
+        );
+        let named_one = run_case(Case::PptxNamedOneEditSave, &tiny, 0, 1).unwrap();
+        assert!(named_one.output_sha256.is_some());
+
+        let large = build_pptx_slide_name_index_corpus(SemanticShape::Large).unwrap();
+        assert_eq!(large.manifest.shape, "large");
+        assert_eq!(large.manifest.entry_count, 10_000);
+        let named_repeated = run_case(Case::PptxNamedRepeatedEditSave, &large, 0, 1).unwrap();
+        let numeric_repeated = run_case(Case::PptxNumericRepeatedEditSave, &large, 0, 1).unwrap();
+        assert_eq!(named_repeated.output_sha256, numeric_repeated.output_sha256);
     }
 
     #[test]

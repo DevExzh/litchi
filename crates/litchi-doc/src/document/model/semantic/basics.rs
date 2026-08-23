@@ -37,24 +37,12 @@ impl Document {
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
         let text = self.text_extractor.text();
-        self.fib.get_all_subdoc_ranges().into_iter().try_fold(
-            0usize,
-            |count, (_, start_cp, end_cp)| {
-                if start_cp >= end_cp {
-                    Ok(count)
-                } else {
-                    count
-                        .checked_add(ParagraphExtractor::count_paragraphs_in_range(
-                            text,
-                            (start_cp, end_cp),
-                        ))
-                        .ok_or_else(|| {
-                            PackageError::Corrupted(
-                                "DOC paragraph count exceeds the addressable range".to_owned(),
-                            )
-                        })
-                }
-            },
+        count_paragraphs_in_ranges(
+            text,
+            self.fib
+                .get_all_subdoc_ranges()
+                .into_iter()
+                .map(|(_, start_cp, end_cp)| (start_cp, end_cp)),
         )
     }
 
@@ -269,5 +257,42 @@ impl Document {
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| PackageError::Corrupted(format!("invalid attached glossary: {error}")))
+    }
+}
+
+fn count_paragraphs_in_ranges(
+    text: &str,
+    ranges: impl IntoIterator<Item = (u32, u32)>,
+) -> Result<usize> {
+    ranges
+        .into_iter()
+        .try_fold(0usize, |count, (start_cp, end_cp)| {
+            if start_cp >= end_cp {
+                return Ok(count);
+            }
+
+            count
+                .checked_add(ParagraphExtractor::count_paragraphs_in_range(
+                    text,
+                    (start_cp, end_cp),
+                ))
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "DOC paragraph count exceeds the addressable range".to_owned(),
+                    )
+                })
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::count_paragraphs_in_ranges;
+
+    #[test]
+    fn paragraph_count_skips_equal_reversed_and_wrapped_ranges() {
+        let text = "one\rtwo\r";
+        let ranges = [(0, 8), (8, 8), (8, 7), (u32::MAX - 1, 2)];
+
+        assert_eq!(count_paragraphs_in_ranges(text, ranges).unwrap(), 2);
     }
 }

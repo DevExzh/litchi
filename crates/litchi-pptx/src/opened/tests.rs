@@ -53,6 +53,41 @@ fn opened_plain_slides_package(count: usize) -> Result<Package> {
     Package::from_vec(bytes)
 }
 
+#[test]
+fn opened_slide_name_index_preserves_identity_after_reorder() -> Result<()> {
+    let mut package = opened_plain_slides_package(3)?;
+    rename_slide(&mut package, 0, "first")?;
+    rename_slide(&mut package, 1, "second")?;
+    rename_slide(&mut package, 2, "third")?;
+    let snapshot = package.opened_presentation()?;
+    let first_part = snapshot.slides()[0].part_name().clone();
+
+    let mut edit = snapshot.edit();
+    edit.move_slide(0, 2)?;
+    assert!(edit.set_shape_text("first", 0usize, "indexed")?);
+    let committed = edit.commit()?;
+    let first_xml = committed.snapshot().package.get_part(&first_part)?.blob();
+    assert!(
+        first_xml
+            .windows(b"indexed".len())
+            .any(|window| window == b"indexed")
+    );
+    Ok(())
+}
+
+#[test]
+fn opened_slide_name_index_preserves_ambiguity() -> Result<()> {
+    let mut package = opened_plain_slides_package(2)?;
+    rename_slide(&mut package, 0, "same")?;
+    rename_slide(&mut package, 1, "same")?;
+    let snapshot = package.opened_presentation()?;
+    assert!(matches!(
+        snapshot.plan_slide_removal("same"),
+        Err(Error::AmbiguousSlideName { matches: 2, .. })
+    ));
+    Ok(())
+}
+
 fn borrowed_plain_slides_package(count: usize) -> Result<Package> {
     let mut package = opened_plain_slides_package(count)?;
     Package::from_bytes(&package.to_bytes()?)
