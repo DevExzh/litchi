@@ -828,6 +828,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns a typed error if decoded text cannot be represented safely.
+    #[deprecated(
+        since = "0.0.1",
+        note = "native rich-text storage diagnostic; use Package::document and Document::plain_text for rooted semantic workbook text"
+    )]
     pub fn text(&self) -> Result<String> {
         const STORAGE_TYPES: [u32; 14] = [
             200, 201, 202, 203, 204, 205, 2001, 2002, 2003, 2004, 2005, 2011, 2012, 2022,

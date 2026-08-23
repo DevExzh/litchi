@@ -103,6 +103,7 @@ fn form_sheet_projection_matches_standard_sheet_semantics_and_ignores_unknowns()
 }
 
 #[test]
+#[allow(deprecated)]
 fn package_text_preserves_storage_fragment_boundaries_and_skips_malformed_storage() -> TestResult {
     let root = numbers_root([]).encode_to_vec();
     let first = tswp::StorageArchive {
@@ -132,6 +133,7 @@ fn package_text_preserves_storage_fragment_boundaries_and_skips_malformed_storag
 }
 
 #[test]
+#[allow(deprecated)]
 fn package_text_enforces_the_selected_aggregate_output_budget() -> TestResult {
     let root = numbers_root([]).encode_to_vec();
     let storage = tswp::StorageArchive {
@@ -216,6 +218,7 @@ fn duplicate_sheet_payload_ownership_is_rejected_before_projection() -> TestResu
 }
 
 #[test]
+#[allow(deprecated)]
 fn length_delimited_wire_fields_are_not_accidentally_treated_as_scalars() -> TestResult {
     let mut root = numbers_root([]).encode_to_vec();
     // Field 99 is unknown, but its payload is deliberately framed as a
