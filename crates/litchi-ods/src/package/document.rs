@@ -57,7 +57,12 @@ impl Package {
     /// Returns an error for file I/O, an incorrect password, malformed encryption metadata,
     /// MIME/body mismatch, invalid XML, or worksheet validation failure.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_bytes_with_password(std::fs::read(path)?, password)
+        let package =
+            family::Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODS")?;
+        crate::authoring::validate_content_xml(package.content_xml())?;
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     ///
