@@ -1635,7 +1635,7 @@ fn map_package_error_with_kind(
 fn map_storage_wire_limits_error(error: super::StorageWireLimitsError) -> FootnoteTextError {
     match error {
         super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
-        super::StorageWireLimitsError::Wire(_error) => FootnoteTextError::InvalidSource,
+        super::StorageWireLimitsError::Wire(error) => map_text_rewrite_error(error),
     }
 }
 
@@ -1649,6 +1649,15 @@ fn map_text_rewrite_error(error: RewriteError) -> FootnoteTextError {
             kind: text_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
+        },
+        RewriteError::InvalidLimit {
+            field,
+            value,
+            maximum,
+        } => FootnoteTextError::LimitExceeded {
+            kind: text_limit_kind(field),
+            observed: usize_to_u64(value),
+            maximum: usize_to_u64(maximum),
         },
         RewriteError::Allocation { amount, .. } => FootnoteTextError::Allocation { amount },
         _ => FootnoteTextError::InvalidSource,
@@ -1755,13 +1764,15 @@ mod tests {
 
     use super::{
         FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind, FootnoteTextPatch,
-        checked_utf16_units, is_canonical_component_name, map_package_error_with_kind,
-        position_from_anchor, rewrite_custom_mark_wire,
+        StorageWireLimitsError, checked_utf16_units, is_canonical_component_name,
+        map_package_error_with_kind, map_storage_wire_limits_error, position_from_anchor,
+        rewrite_custom_mark_wire,
     };
     use crate::footnote::body::{Footnote, Position};
     use crate::{Error as SemanticError, PackageError};
     use litchi_iwa_common::WireLimits;
     use litchi_iwa_core::ArchiveObject;
+    use litchi_iwa_text_wire::RewriteError;
 
     #[test]
     fn mutation_authority_accepts_only_canonical_index_components() {
@@ -1840,6 +1851,41 @@ mod tests {
                 kind: FootnoteTextLimitKind::Entries,
                 observed: 5,
                 maximum: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn storage_wire_limits_keep_typed_rewrite_categories() {
+        let exceeded = map_storage_wire_limits_error(StorageWireLimitsError::Wire(
+            RewriteError::LimitExceeded {
+                resource: "rewrite work",
+                observed: 9,
+                limit: 8,
+            },
+        ));
+        assert_eq!(
+            exceeded,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::WireWork,
+                observed: 9,
+                maximum: 8,
+            }
+        );
+
+        let invalid = map_storage_wire_limits_error(StorageWireLimitsError::Wire(
+            RewriteError::InvalidLimit {
+                field: "fields",
+                value: 0,
+                maximum: 1_000,
+            },
+        ));
+        assert_eq!(
+            invalid,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::WireFields,
+                observed: 0,
+                maximum: 1_000,
             }
         );
     }
