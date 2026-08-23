@@ -48,6 +48,14 @@ patch/inverse behavior, compact XML validation, security policy, package
 reopen, semantic readback, dependency edge, runtime, lock, cache, unsafe code,
 or global state changed.
 
+## Correctness qualification (2026-08-23)
+
+The source-aware raw-preservation audit exempts exact source members and
+checked `xml_splice_publication` edits whose unchanged bytes retain their
+source provenance. Newly authored XML and changed whole parts that cannot be
+classified as one checked splice remain subject to the compact-XML audit; this
+qualification does not admit producer formatting into newly generated output.
+
 ## Corpus and experiment
 
 The deterministic corpus has 12 original slides, eight 2 MiB opaque members,
