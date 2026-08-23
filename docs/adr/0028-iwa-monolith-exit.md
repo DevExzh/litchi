@@ -4157,3 +4157,73 @@ are bounded source, test, deprecation, and fuzz-harness hardening:
 No test/build/Cargo execution, sanitizer campaign, native application
 result, performance/allocation measurement, dependency-edge or ordered-debt
 change, host-exit, or monolith-deletion result is admitted by this amendment.
+
+## 2026-08-23 amendment: current HEAD truth audit
+
+The preceding `4f2c14484` note is a historical snapshot, not the current
+monolith status. At committed HEAD `51ca8eae7` (parent `9366d0a00`),
+`b316320c9` deprecates the `litchi-iwa::raw` compatibility facade and updates
+ordered debt 9's exit wording to include removal of that facade. The host,
+its dependency edge, and all 13 ordered debts remain present. The Keynote
+owned-title setter change (`e4533c17d`), XLS test-call cleanup (`9366d0a00`),
+and fallible Pages footnote staging copies (`51ca8eae7`) do not move ownership
+out of the migration host or satisfy a deletion-gate item.
+
+The archived HEAD still inventories 64 workspace packages and 239 internal
+dependency declarations. Its complete boundary checker remains non-green with
+22 findings: two Keynote slide-transition validator exports, 18 Pages
+table-lock alias sites, and the two existing `TableLockState`/`TableSelector`
+aliases. These are current source-audit results, not an exit or deletion
+gate. No test/build/Cargo execution, native application or Rust/native parity
+result, Buffa/Prost migration, generated-schema retirement, dependency-edge or
+ordered-debt retirement, host exit, or monolith deletion is admitted.
+
+## 2026-08-23 amendment: current HEAD extension after the truth audit
+
+The preceding `51ca8eae7` audit is historical. At current HEAD
+`ff782f2f5` (parent `dab07a09f`), the Keynote chart-title owner guard now
+rejects shared title stand-ins before read or edit (`dab07a09f`), while the
+migration-host `KeynoteSlideInfo` title/body/speaker-notes native IDs are
+explicitly deprecated (`ff782f2f5`). Both changes retain compatibility code;
+neither moves an owner out of `litchi-iwa` or retires a deletion-gate item.
+
+The host, its dependency edge, and all 13 ordered debts remain. No test/build
+execution, native application or Rust/native parity result, Buffa/Prost
+migration, generated-schema retirement, dependency-edge/debt retirement,
+host exit, or monolith deletion is admitted. The current boundary audit
+remains non-green with 22 findings: two Keynote slide-transition validator
+exports, 18 Pages table-lock alias sites, and the two existing
+`TableLockState`/`TableSelector` aliases.
+
+## 2026-08-23 amendment: current HEAD extension after cache and stale-metadata fixes
+
+The preceding `ff782f2f5` note is historical. At current HEAD `8cddd44af`,
+`09286432e` tightens the Pages table-lock boundary by charging empty body
+metadata before declaration reservation and rejecting stale table ownership;
+`8cddd44af` adds only a moved/replaced-entry cache test. Neither change moves
+ownership out of `litchi-iwa` or satisfies a deletion-gate item.
+
+The host, its dependency edge, and all 13 ordered debts remain. No test/build
+execution, native or Rust/native parity result, Buffa/Prost migration,
+generated-schema retirement, dependency-edge/debt retirement, host exit, or
+monolith deletion is admitted. The boundary checker remains non-green with
+22 findings: two Keynote slide-transition validator exports, 18 Pages
+table-lock alias sites, and the two existing `TableLockState`/`TableSelector`
+aliases.
+
+## 2026-08-23 amendment: current HEAD extension after deprecation and alias guards
+
+The preceding `8cddd44af` note is historical. At current HEAD `546df8f04`,
+`406cff111` adds boundary ratchets for retained Numbers and Pages raw-ID
+compatibility methods, and `546df8f04` rejects aliased Keynote
+slide/show/node identities before transition reads or staging. These changes
+retain the migration-host compatibility surfaces and move no owner out of
+`litchi-iwa`; no deletion-gate item is satisfied.
+
+The host, its dependency edge, and all 13 ordered debts remain. No test/build
+execution, native or Rust/native parity result, Buffa/Prost migration,
+generated-schema retirement, dependency-edge/debt retirement, host exit, or
+monolith deletion is admitted. The boundary checker remains non-green with
+22 findings: two Keynote slide-transition validator exports, 18 Pages
+table-lock alias sites, and the two existing `TableLockState`/`TableSelector`
+aliases.
