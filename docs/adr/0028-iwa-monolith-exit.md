@@ -4422,3 +4422,26 @@ unchanged. After save/close/reopen, normalized outputs were solid
 This is bounded application acceptance on a text-only fixture only. It does
 not establish Rust/native parity, media preservation, exact RSS or allocation
 behavior, performance, or a durable workspace publication gate.
+
+## 2026-08-24 amendment: Wave54 Numbers table-cell storage bounded reader slice (not a monolith-exit gate)
+
+Commit `b7f720872` moves strict `TableDataList` and
+`TableDataListSegment` read projection into the doc-hidden
+`litchi-iwa-protos::numbers_table_cell_storage_codec`, but the three migrated
+helpers and the package graph still live in the `litchi-iwa` Numbers editor.
+The migration host continues to own candidate routing, aggregate operation
+budgets, segment lookup, semantic result staging, and all generated mutation
+and writer paths. No public API or manifest edge changes.
+
+The focused codec/host regressions, all-target check, scoped strict Clippy, and
+335/335 boundary-policy tests pass. The live boundary command remains
+non-green only for 23 known Pages findings and reports no Numbers storage
+finding. Numbers 14.4 also opened, saved, closed, and reopened the disposable
+sorted-text candidate without repair while preserving the visible stable
+equal-key order; ADR 0008 records the exact hashes and bounded caveats.
+
+Generated `TableDataList` schemas, Prost-backed mutation code, the
+`litchi-iwa` owner and dependency edges, all ordered debts, and the migration
+host remain. This slice retires no generated schema or Prost use, moves no
+package owner out of the host, and satisfies no host- or monolith-deletion
+gate.
