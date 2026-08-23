@@ -17,7 +17,7 @@ struct Link {
     target: String,
 }
 
-fn fixture(document: Vec<u8>, links: Vec<Link>, non_main_link: bool) -> Vec<u8> {
+fn fixture(document: Vec<u8>, links: Vec<Link>, non_main_link: bool, signed: bool) -> Vec<u8> {
     let mut package = OpcPackage::new();
     let mut main = BlobPart::new(
         PackURI::new(MAIN).unwrap(),
@@ -60,19 +60,16 @@ fn fixture(document: Vec<u8>, links: Vec<Link>, non_main_link: bool) -> Vec<u8> 
         package.try_add_part(Box::new(header)).unwrap();
     }
     package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
-    PackageWriter::to_bytes(&package).unwrap()
-}
-
-fn sign(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
-    package
-        .try_add_part(Box::new(BlobPart::new(
-            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
-            ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-            b"<origin/>".to_vec(),
-        )))
-        .unwrap();
-    package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    if signed {
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                b"<origin/>".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    }
     PackageWriter::to_bytes(&package).unwrap()
 }
 
@@ -177,6 +174,7 @@ fn inventories_and_irreversibly_redacts_duplicate_target_ids_first_middle_last()
             link("rLast", "https://remove.invalid/"),
         ],
         false,
+        false,
     );
     let package = open(bytes);
     let snapshot = package.external_hyperlink_redaction_snapshot().unwrap();
@@ -235,6 +233,7 @@ fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
         format!(r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:hyperlink r:id="rOne"><w:r><w:t>visible</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#).into_bytes(),
         vec![link("rOne", "https://one.invalid/")],
         false,
+        false,
     );
     let package = open(bytes.clone());
     let noop = package
@@ -279,6 +278,7 @@ fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
     let bytes = fixture(
         format!(r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p>{wrappers}</w:p></w:body></w:document>"#).into_bytes(),
         links,
+        false,
         false,
     );
     let package = open(bytes.clone());
@@ -331,7 +331,7 @@ fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
 #[test]
 fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
     let links = vec![link("rFirst", "https://one.invalid/")];
-    let original = fixture(one_document(), links, false);
+    let original = fixture(one_document(), links, false, false);
     let package = open_colliding(original.clone());
     let commit = package
         .plan_external_hyperlink_redaction(&["https://one.invalid/"])
@@ -358,7 +358,8 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
 fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
     let one = vec![link("rFirst", "https://shared.invalid/")];
     assert!(matches!(
-        open(fixture(one_document(), one.clone(), true)).external_hyperlink_redaction_snapshot(),
+        open(fixture(one_document(), one.clone(), true, false))
+            .external_hyperlink_redaction_snapshot(),
         Err(Error::UnsafeEdit {
             operation: "external_hyperlink_redaction",
             ..
@@ -369,7 +370,7 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
     )
     .into_bytes();
     assert!(matches!(
-        open(fixture(field, one.clone(), false)).external_hyperlink_redaction_snapshot(),
+        open(fixture(field, one.clone(), false, false)).external_hyperlink_redaction_snapshot(),
         Err(Error::UnsafeEdit {
             operation: "external_hyperlink_redaction",
             ..
@@ -380,14 +381,19 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
     )
     .into_bytes();
     assert!(matches!(
-        open(fixture(unknown_relationship_attribute, one.clone(), false,))
-            .external_hyperlink_redaction_snapshot(),
+        open(fixture(
+            unknown_relationship_attribute,
+            one.clone(),
+            false,
+            false
+        ))
+        .external_hyperlink_redaction_snapshot(),
         Err(Error::UnsafeEdit {
             operation: "external_hyperlink_redaction",
             ..
         })
     ));
-    let base = fixture(one_document(), one.clone(), false);
+    let base = fixture(one_document(), one.clone(), false, false);
     for foreign_owner in [
         add_external_owner(&base, false, rt::IMAGE),
         add_external_owner(&base, true, rt::HYPERLINK),
@@ -401,7 +407,7 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
         ));
     }
 
-    let package = open(fixture(one_document(), one, false));
+    let package = open(fixture(one_document(), one, false, false));
     let commit = package
         .plan_external_hyperlink_redaction(&["https://shared.invalid/"])
         .unwrap()
@@ -417,11 +423,12 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
     ));
     assert_eq!(sink.accepted, 128);
 
-    let signed = sign(&fixture(
+    let signed = fixture(
         one_document(),
         vec![link("rFirst", "https://shared.invalid/")],
         false,
-    ));
+        true,
+    );
     assert!(matches!(
         open(signed).external_hyperlink_redaction_snapshot(),
         Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
