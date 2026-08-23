@@ -12011,3 +12011,16 @@ those historical records is admitted here.
 The host edge and all ordered debt remain. There is no Prost removal,
 generated-schema retirement, dependency-edge/debt retirement, migration-host
 exit, or `litchi-iwa` monolith deletion in this amendment.
+
+## 2026-08-23 amendment: Wave50 current-head disposition
+
+Wave50 is recorded through committed HEAD `1b11c3e16` (parent
+`66f33161f9`). The static boundary suite is 315 tests, correcting the prior
+314-test count. `Package::from_archive_bytes` is retained for compatibility
+and deprecated in favor of `Package::from_bytes`; the Numbers
+`Package::text` diagnostic is likewise deprecated. `litchi-iwa` remains the
+sole migration host, with 13 ordered debts and 22 boundary findings. Native
+evidence is only the native evidence already separately verified; this
+amendment adds no new Cargo, native, Rust/native-parity, or
+performance/allocation claim, and retires no gate, dependency edge, debt,
+host exit, or monolith deletion.
