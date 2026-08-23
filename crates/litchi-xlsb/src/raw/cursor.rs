@@ -36,6 +36,18 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    /// Construct a cursor after validating its raw limit profile.
+    pub fn try_with_limits(
+        data: &'a [u8],
+        context: &'static str,
+        limits: Limits,
+    ) -> Result<Self> {
+        match limits.validate() {
+            Ok(limits) => Ok(Self::with_limits(data, context, limits)),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Diagnostic context supplied by the caller.
     #[must_use]
     pub const fn context(&self) -> &'static str {
@@ -56,6 +68,7 @@ impl<'a> Cursor<'a> {
 
     /// Require that `needed` bytes remain.
     pub fn guard(&self, needed: usize) -> Result<()> {
+        self.limits.validate()?;
         let end = self
             .offset
             .checked_add(needed)
@@ -243,6 +256,7 @@ impl<'a> Cursor<'a> {
 
     /// Require that the complete payload was consumed.
     pub fn finish(&self) -> Result<()> {
+        self.limits.validate()?;
         let remaining = self.remaining();
         if remaining != 0 {
             return Err(Error::Trailing {
