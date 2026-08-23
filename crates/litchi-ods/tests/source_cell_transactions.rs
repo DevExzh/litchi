@@ -123,8 +123,7 @@ fn source_cell_commit_streams_one_and_repeated_run_edits_with_exact_patch() {
 #[test]
 fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
     let source = package(&ordinary_content(), false).unwrap();
-    let owner =
-        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
 
     // The first replacement changes the row length, so every later row moves
     // in the derived content.xml.  The owner's cached layout still describes
@@ -141,7 +140,9 @@ fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
 
     let mut second_edit = first_commit.snapshot().edit().unwrap();
     assert_eq!(
-        second_edit.set_cell("Data", 1, 0, text("second-edit")).unwrap(),
+        second_edit
+            .set_cell("Data", 1, 0, text("second-edit"))
+            .unwrap(),
         Some(true)
     );
     let second_commit = second_edit.commit().unwrap();

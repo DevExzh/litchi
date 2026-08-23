@@ -233,6 +233,14 @@ and times only `Paragraph::text()` for the tiny, medium, and large shapes; exact
 text and error guards remain outside the timed interval. This brings the
 selectable matrix to 342 names while leaving the default 36 cases / 198 records
 unchanged.
+Four additional opt-in XLSB lifecycle selectors (`xlsb_semantic_open`,
+`xlsb_semantic_list_worksheets`, `xlsb_semantic_one_cell`, and
+`xlsb_semantic_full_cell_scan`) use deterministic tiny, medium, large, and
+sparse BIFF12 corpora. Archive cloning, workbook/worksheet preparation, and
+verification stay outside the timer; the full scan times only boxed
+`worksheet.cells()` consumption and verifies an exact canonical cell digest.
+These selectors bring the matrix to 348 names while leaving the default 36
+cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly
@@ -1349,12 +1357,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 ```
 
 Run the complete native DOC/XLS/PPT semantic matrix over the same deterministic
-tiny and large writer artifacts (46 records):
+tiny and large writer artifacts (48 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --writer-shape tiny,large \
-  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_repeated_shape_text,ppt_source_backed_repeated_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_one_paragraph_at,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_repeated_shape_text,ppt_source_backed_repeated_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
   --json target/perf/ole2-semantic-baseline.json
 ```
 
@@ -2397,9 +2405,11 @@ native-Office claim is made.
 - `doc_semantic_open`: open the generated DOC container and its document model
   through `litchi_doc::Package`.
 - `doc_semantic_list_paragraphs` / `doc_semantic_one_paragraph` /
-  `doc_semantic_full_text`: time ordinary document paragraph enumeration,
-  middle-paragraph selection, or complete text extraction. The public
-  one-paragraph path necessarily materializes the paragraph collection.
+  `doc_semantic_one_paragraph_at` / `doc_semantic_full_text`: time ordinary
+  document paragraph enumeration, the materializing middle-paragraph control,
+  the direct ordinal middle-paragraph query, or complete text extraction. The
+  two one-paragraph selectors are independent controls for the collection
+  materialization candidate.
 - `doc_semantic_noop_edit_save` / `doc_semantic_one_edit_save`: start from an
   already-open exact-source `body_text::Snapshot`, publish zero or one middle
   paragraph replacement, and materialize owned bytes. Exact no-op bytes,

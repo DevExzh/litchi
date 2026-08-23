@@ -51,4 +51,5 @@ pub(super) use crate::parts::table_char_cache::TableCharacterCache;
 pub(super) use crate::parts::text_services::TextServicesTables;
 pub(super) use crate::parts::textbox_breaks::TextBoxBreakTables;
 pub(super) use crate::table::Table;
+pub(super) use litchi_core::Position;
 pub(super) use std::sync::Arc;
