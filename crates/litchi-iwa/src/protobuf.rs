@@ -408,9 +408,95 @@ fn decode_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 }
 
 /// Static decoder function for TableModelArchive messages
+fn table_names_codec_decode_options(
+    data: &[u8],
+) -> litchi_iwa_protos::numbers_names_codec::DecodeOptions {
+    let source_bytes = data.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let source_fields = data.len().clamp(1, WireLimits::MAX_FIELDS);
+    let source_work = data
+        .len()
+        .saturating_mul(4)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    let recursion = u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX);
+    litchi_iwa_protos::numbers_names_codec::DecodeOptions::new(
+        source_bytes,
+        source_fields,
+        source_work,
+        recursion,
+    )
+}
+
+fn table_names_codec_error(
+    error: litchi_iwa_protos::numbers_names_codec::DecodeError,
+) -> Error {
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::Fields,
+            observed,
+            limit: maximum,
+        });
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::RewriteWork,
+            observed,
+            limit: maximum,
+        });
+    }
+    match error.wire_resource_limit() {
+        Some(litchi_iwa_protos::numbers_names_codec::WireResourceLimit::Bytes {
+            observed,
+            maximum,
+        }) => Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::InputBytes,
+            observed,
+            limit: maximum,
+        }),
+        Some(litchi_iwa_protos::numbers_names_codec::WireResourceLimit::Nesting {
+            observed,
+            maximum,
+        }) => Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::Nesting,
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            limit: usize::try_from(maximum).unwrap_or(usize::MAX),
+        }),
+        None | Some(_) => Error::InvalidFormat(format!(
+            "iWork TableModelArchive name payload failed strict validation: {error}"
+        )),
+    }
+}
+
+fn own_table_name(table_name: &str) -> Result<String> {
+    if table_name.len() > WireLimits::MAX_OUTPUT_BYTES {
+        return Err(Error::IwaCommon(
+            litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::OutputBytes,
+                observed: table_name.len(),
+                limit: WireLimits::MAX_OUTPUT_BYTES,
+            },
+        ));
+    }
+    let mut owned = String::new();
+    owned.try_reserve_exact(table_name.len()).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "iWork TableModelArchive table name",
+            amount: table_name.len(),
+        })
+    })?;
+    owned.push_str(table_name);
+    Ok(owned)
+}
+
 fn decode_table_model(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tst::TableModelArchive::decode(data)?;
-    Ok(Box::new(TableModelWrapper(msg)) as Box<dyn DecodedMessage>)
+    // Keep the archive payload as the source of truth; this neutral route
+    // publishes only an owned text projection and never reconstructs a model.
+    let names = litchi_iwa_protos::numbers_names_codec::decode_table_names(
+        data,
+        table_names_codec_decode_options(data),
+    )
+    .map_err(table_names_codec_error)?;
+    let table_name = own_table_name(names.table_name())?;
+    Ok(Box::new(TableModelWrapper { table_name }) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for TableDataList messages
@@ -619,14 +705,18 @@ impl DecodedMessage for StorageArchiveWrapper {
 
 /// Wrapper for Table Model Archive (Numbers tables)
 #[derive(Debug)]
-pub struct TableModelWrapper(pub tst::TableModelArchive);
+pub struct TableModelWrapper {
+    // The original TableModelArchive bytes remain authoritative in the archive
+    // object; only this best-effort text projection is owned here.
+    table_name: String,
+}
 
 impl DecodedMessage for TableModelWrapper {
     fn extract_text(&self) -> Vec<String> {
         let mut text = Vec::new();
         // Extract table name if present
-        if !self.0.table_name.is_empty() {
-            text.push(self.0.table_name.clone());
+        if !self.table_name.is_empty() {
+            text.push(self.table_name.clone());
         }
         // Note: Cell contents are stored in data_store which requires complex
         // processing to extract. For now, we only return the table name.
@@ -775,6 +865,13 @@ impl DecodedMessage for ChartDrawableArchiveWrapper {
 mod tests {
     use super::*;
 
+    fn table_model_wire(table_name: &[u8]) -> Vec<u8> {
+        let name_len = u8::try_from(table_name.len()).expect("test table name fits one byte");
+        let mut data = vec![0x0a, 0x02, b'i', b'd', 0x42, name_len];
+        data.extend_from_slice(table_name);
+        data
+    }
+
     #[test]
     fn neutral_decoder_registry_contains_only_supported_types() {
         assert!(COMMON_DECODERS.contains_key(&1));
@@ -803,6 +900,60 @@ mod tests {
         let message_info = [0x08, 0x07, 0x18, 0x0b];
         let decoded = decode_common(2, &message_info).unwrap();
         assert!(decoded.extract_text().is_empty());
+    }
+
+    #[test]
+    fn table_model_names_projection_owns_utf8_text_and_ignores_unknowns() {
+        let expected = "表 Café №42";
+        let mut data = table_model_wire(expected.as_bytes());
+        data.extend_from_slice(&[0x98, 0x06, 0x01]); // unknown field 99 = 1
+
+        let decoded = decode_common(6001, &data).expect("table model name must decode");
+        data.fill(0);
+
+        assert_eq!(decoded.extract_text(), [expected]);
+    }
+
+    #[test]
+    fn table_model_names_projection_rejects_malformed_payload() {
+        let malformed = [0x0a, 0x02, b'i']; // truncated table_id
+        assert!(decode_common(6001, &malformed).is_err());
+        assert!(decode_common(6001, &[]).is_err());
+    }
+
+    #[test]
+    fn table_model_names_projection_rejects_invalid_utf8() {
+        let data = table_model_wire(&[0xff]);
+        assert!(decode_common(6001, &data).is_err());
+    }
+
+    #[test]
+    fn table_model_names_projection_rejects_duplicate_singular_name() {
+        let mut data = table_model_wire(b"first");
+        data.extend_from_slice(&[0x42, 0x06]);
+        data.extend_from_slice(b"second");
+
+        assert!(decode_common(6001, &data).is_err());
+    }
+
+    #[test]
+    fn table_model_route_has_no_production_generated_decode() {
+        let source = include_str!("protobuf.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map(|(production, _)| production)
+            .expect("test module marker is present");
+        let body = production
+            .split_once("fn table_names_codec_decode_options")
+            .and_then(|(_, rest)| rest.split_once("fn decode_table_data_list"))
+            .map(|(body, _)| body)
+            .expect("table model decoder body is present");
+        assert!(body.contains("numbers_names_codec::decode_table_names"));
+        assert!(body.contains("WireLimits::MAX_INPUT_BYTES"));
+        assert!(body.contains("WireLimits::MAX_FIELDS"));
+        assert!(body.contains("WireLimits::MAX_REWRITE_WORK"));
+        assert!(body.contains("try_reserve_exact"));
+        assert!(!body.contains("TableModelArchive::decode"));
     }
 
     #[test]
