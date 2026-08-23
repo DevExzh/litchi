@@ -1452,6 +1452,14 @@ mod tests {
                 b"folder/".to_vec(),
             ]
         );
+
+        let replacement = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .find(|entry| entry.file_path().as_ref() == b"replacement.bin")
+            .unwrap();
+        assert_eq!(replacement.compression_method(), CompressionMethod::Deflate);
+        assert!(replacement.has_data_descriptor());
     }
 
     #[test]
