@@ -1507,6 +1507,42 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_iwa_keynote_slide_info_source_topology(root), []
             )
 
+    def test_iwa_keynote_slide_text_info_drawable_id_requires_deprecation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub struct KeynoteSlideTextInfo {\n"
+                "    pub slide_index: usize,\n"
+                "    pub drawable_object_id: u64,\n"
+                "    pub role: KeynoteSlideTextRole,\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_text_info_source_topology(root),
+                [
+                    "litchi-iwa Keynote slide text info native field must remain "
+                    "deprecated drawable_object_id: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:3"
+                ],
+            )
+
+            host.write_text(
+                "pub struct KeynoteSlideTextInfo {\n"
+                "    pub slide_index: usize,\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub drawable_object_id: u64,\n"
+                "    pub role: KeynoteSlideTextRole,\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_text_info_source_topology(root), []
+            )
+
     def test_iwa_numbers_pages_legacy_methods_require_deprecation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

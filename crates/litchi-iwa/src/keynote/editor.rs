@@ -194,6 +194,11 @@ pub enum KeynoteSlideTextRole {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeynoteSlideTextInfo {
     pub slide_index: usize,
+    /// Native drawable identity retained for migration-host graph work.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy native Keynote drawable object ID; use litchi_keynote::Package slide selectors and semantic text roles; retained for migration-host compatibility"
+    )]
     pub drawable_object_id: u64,
     pub role: KeynoteSlideTextRole,
     pub storage: TextStorageInfo,
