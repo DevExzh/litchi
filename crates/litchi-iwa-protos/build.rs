@@ -5679,7 +5679,7 @@ fn enforce_keynote_soundtrack_settings_projection_budget(
         "Keynote soundtrack-settings",
         EXPECTED_FILES,
         27_753,
-        "458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3",
+        "ae5fcc212efd42eca31ff2bafba83032a599cd5f5846009c712996cd8c3ab7e5",
     )
 }
 

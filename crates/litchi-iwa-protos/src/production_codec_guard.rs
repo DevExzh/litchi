@@ -823,4 +823,56 @@ mod oracle {
             );
         }
     }
+
+    #[test]
+    fn keynote_soundtrack_projection_keeps_canonical_scalar_provenance() {
+        let build_script = include_str!("../build.rs");
+        let canonical = include_str!("protos/KNArchives.proto");
+        let projection = include_str!("buffa-projections/KNSoundtrackSettingsArchive.proto");
+        let codec = include_str!("keynote_soundtrack_settings_codec.rs");
+        let library = include_str!("lib.rs");
+
+        assert_eq!(
+            canonical
+                .matches("optional .TSP.Reference soundtrack = 17;")
+                .count(),
+            1
+        );
+        for field in [
+            "optional double volume = 1;",
+            "optional .KN.Soundtrack.SoundtrackMode mode = 2 [default = kKNSoundtrackModePlayOnce];",
+            "repeated .TSP.DataReference movie_media = 3;",
+        ] {
+            assert_eq!(
+                canonical.matches(field).count(),
+                1,
+                "canonical field drifted: {field}"
+            );
+        }
+        assert!(projection.contains("message SoundtrackArchive"));
+        assert!(projection.contains("optional double volume = 1;"));
+        assert!(projection.contains("optional int32 mode = 2 [default = 0];"));
+        assert!(!projection.contains("repeated "));
+        assert!(codec.contains("projection::SoundtrackArchiveLazyView"));
+        assert!(library.contains("mod buffa_keynote_soundtrack_settings_generated"));
+
+        for marker in [
+            "fn enforce_keynote_soundtrack_settings_projection_provenance(",
+            "projection.contains(\"repeated \")",
+            "enforce_full_buffa_projection_budget(&buffa_out_directory)?;",
+            "enforce_keynote_soundtrack_settings_projection_budget(",
+            "enforce_table_cell_exact_budget(",
+            "27_753",
+            "ae5fcc212efd42eca31ff2bafba83032a599cd5f5846009c712996cd8c3ab7e5",
+        ] {
+            assert!(
+                build_script.contains(marker),
+                "build.rs lost Keynote soundtrack provenance marker: {marker}"
+            );
+        }
+        assert!(
+            !build_script
+                .contains("458206e0b57d8ec5ae4c3fc706bf793ccd385ab867b7e92ac30d66ab1858b4d3")
+        );
+    }
 }
