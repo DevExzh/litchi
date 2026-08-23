@@ -664,6 +664,16 @@ impl IWorkPackage {
         validate_entry_name(&name)?;
         let position = self.state.position(&name);
         self.validate_entry_update(position, &data)?;
+        if position.is_some_and(|position| {
+            self.state
+                .get_at(position)
+                .is_some_and(|entry| entry.data() == data.as_slice())
+        }) {
+            // Keep an exact replacement a true no-op. In particular, do this
+            // before `Arc::make_mut` so the existing entry storage, parsed
+            // cache, and any active parser flight remain owned by this state.
+            return Ok(Some(data));
+        }
         if position.is_some() {
             let state = Arc::make_mut(&mut self.state);
             let Some(previous) = state.replace_entry_data(&name, data) else {
@@ -1396,6 +1406,56 @@ mod tests {
 
         assert_eq!(package.to_bytes()?, before);
         assert_eq!(package.mutation_revision(), revision);
+        Ok(())
+    }
+
+    #[test]
+    fn identical_entry_replacement_preserves_state_source_revision_and_cache() -> crate::Result<()>
+    {
+        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let source: Arc<[u8]> = zip(&[
+            ("Index/Document.iwa", &compressed),
+            ("preview.jpg", b"preview"),
+        ])
+        .into();
+        let mut package = IWorkPackage::from_shared_bytes(Arc::clone(&source))?;
+        let state = Arc::clone(&package.state);
+        let exact_source = package.source.clone().expect("flat source is retained");
+        let revision = package.mutation_revision();
+        let cached = package.parsed_archive("Index/Document.iwa")?;
+
+        assert_eq!(
+            package.insert_entry("/Index/Document.iwa", compressed.clone())?,
+            Some(compressed.clone())
+        );
+
+        assert!(Arc::ptr_eq(&state, &package.state));
+        assert!(Arc::ptr_eq(
+            &exact_source,
+            package.source.as_ref().expect("source remains retained")
+        ));
+        assert_eq!(package.mutation_revision(), revision);
+        assert_eq!(package.to_bytes()?, source.as_ref());
+        let cached_again = package.parsed_archive("Index/Document.iwa")?;
+        assert!(Arc::ptr_eq(&cached, &cached_again));
+
+        let mut changed = package.clone();
+        let changed_state = Arc::clone(&changed.state);
+        let changed_revision = changed.mutation_revision();
+        let replacement = SnappyStream::compress(&archive_with_two_objects().to_bytes()?)?;
+        assert_eq!(
+            changed.insert_entry("Index/Document.iwa", replacement.clone())?,
+            Some(compressed)
+        );
+        assert!(!Arc::ptr_eq(&changed_state, &changed.state));
+        assert_eq!(changed.mutation_revision(), changed_revision + 1);
+        assert!(changed.source.is_none());
+        assert_eq!(
+            changed.entry("Index/Document.iwa"),
+            Some(replacement.as_slice())
+        );
+        let changed_cached = changed.parsed_archive("Index/Document.iwa")?;
+        assert!(!Arc::ptr_eq(&cached, &changed_cached));
         Ok(())
     }
 
