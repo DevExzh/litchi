@@ -88,6 +88,7 @@ sign = [
 encryption = [
     "dep:litchi-crypto",
     "litchi-docx?/encryption",
+    "litchi-ooxml-common?/encryption",
     "litchi-ppt?/encryption",
     "litchi-pptx?/encryption",
     "litchi-xlsx?/encryption",

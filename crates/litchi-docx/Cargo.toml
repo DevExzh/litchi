@@ -34,7 +34,6 @@ litchi-sign = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true }
 litchi-opc = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
-memchr = { workspace = true }
 quick-xml = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

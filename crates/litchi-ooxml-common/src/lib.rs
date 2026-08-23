@@ -30,6 +30,7 @@
     reason = "shared OOXML codecs retain schema and traversal order while generated vocabulary modules use bounded local preludes"
 )]
 
+mod binding_tracker;
 mod error;
 
 pub mod custom;
@@ -48,6 +49,17 @@ pub mod vba;
 pub mod web;
 pub mod xml;
 pub mod xml_name;
+
+/// Hidden, unstable cross-owner implementation plumbing.
+///
+/// Format crates use this narrow namespace for borrowing scanners that share
+/// OOXML wire behavior. It is deliberately excluded from the ordinary facade
+/// vocabulary, carries no compatibility promise, and is not a public semantic
+/// model.
+#[doc(hidden)]
+pub mod private {
+    pub use super::binding_tracker::{BindingTracker, BindingTrackerError};
+}
 
 pub use error::{Error, Result};
 pub use properties::{Keywords, Props};
