@@ -1,5 +1,6 @@
 //! Semantic workbook snapshot and worksheet models.
 
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -110,6 +111,11 @@ pub(super) struct SheetData {
     pub(super) part_uri: PackURI,
     pub(super) cells: OnceLock<Store>,
     pub(super) web_bindings: OnceCell<crate::web::Bindings>,
+    /// Successful page-break projections are retained only for the exact
+    /// worksheet payload allocation that produced them. A changed worksheet
+    /// gets a fresh cache; snapshots that share unchanged source bytes may
+    /// safely share the parsed projection too.
+    pub(super) page_breaks: Arc<OnceCell<crate::page_breaks::PageBreaks>>,
     #[allow(
         dead_code,
         reason = "the cached column index supports internal workbook edit planning"
@@ -123,6 +129,57 @@ pub(super) struct ValidatedWorksheetStore {
     pub(super) uri: PackURI,
     pub(super) content: Arc<Vec<u8>>,
     pub(super) store: Store,
+}
+
+struct PageBreakCacheEntry {
+    blob: Arc<Vec<u8>>,
+    cache: Arc<OnceCell<crate::page_breaks::PageBreaks>>,
+}
+
+/// Build the source cache index once per descendant snapshot. Keeping the
+/// lookup keyed by part URI avoids scanning every source sheet for each
+/// target sheet during publication.
+fn page_break_caches(source: Option<&Workbook>) -> HashMap<PackURI, PageBreakCacheEntry> {
+    let Some(source) = source else {
+        return HashMap::new();
+    };
+    let mut caches = HashMap::with_capacity(source.inner.sheets.len());
+    for sheet in source.inner.sheets.iter() {
+        let Ok(part) = source.inner.package.get_part(&sheet.part_uri) else {
+            continue;
+        };
+        caches.insert(
+            sheet.part_uri.clone(),
+            PageBreakCacheEntry {
+                blob: part.blob_arc(),
+                cache: Arc::clone(&sheet.page_breaks),
+            },
+        );
+    }
+    caches
+}
+
+/// Reuse a successful worksheet projection only when the target snapshot
+/// retains the exact source payload allocation. A publication that replaces
+/// the worksheet bytes receives a fresh cache, so no edit can observe a
+/// projection from an earlier generation.
+fn page_break_cache(
+    source_caches: &HashMap<PackURI, PageBreakCacheEntry>,
+    package: &OpcPackage,
+    part_uri: &PackURI,
+) -> Arc<OnceCell<crate::page_breaks::PageBreaks>> {
+    let Some(source) = source_caches.get(part_uri) else {
+        return Arc::new(OnceCell::new());
+    };
+    let Ok(target_part) = package.get_part(part_uri) else {
+        return Arc::new(OnceCell::new());
+    };
+    let target_blob = target_part.blob_arc();
+    if Arc::ptr_eq(&source.blob, &target_blob) {
+        Arc::clone(&source.cache)
+    } else {
+        Arc::new(OnceCell::new())
+    }
 }
 
 #[derive(Debug)]
@@ -145,6 +202,13 @@ pub(crate) struct Inner {
     pub(super) date_system: DateSystem,
     pub(super) active_sheet: Option<usize>,
     pub(super) sheets: Box<[Arc<SheetData>]>,
+    /// Sheet positions sorted by their canonical, case-insensitive names.
+    ///
+    /// `raw::parse_catalog` rejects duplicate canonical names before this
+    /// snapshot is built, so the order is a total lookup index rather than a
+    /// lossy collision map. Keeping positions (instead of cloning keys into
+    /// another map) preserves the existing name-key allocations.
+    pub(super) sheet_name_order: Box<[usize]>,
     pub(super) defined_names: Box<[raw::DefinedName]>,
     pub(super) pivot_caches: Box<[raw::PivotCache]>,
     pub(super) external_reference_ids: Box<[String]>,
@@ -386,6 +450,7 @@ impl Workbook {
             },
             Some(_) | None => Arc::new(SharedStringLineage),
         };
+        let source_page_break_caches = page_break_caches(source);
         let sheets = catalog
             .sheets
             .into_iter()
@@ -393,21 +458,33 @@ impl Workbook {
             .enumerate()
             .map(|(position, (sheet, part))| {
                 let name_key = crate::sheet::key(&sheet.name);
+                let part_uri = part.uri;
+                let page_breaks = page_break_cache(&source_page_break_caches, &package, &part_uri);
                 Arc::new(SheetData {
                     position,
                     name: sheet.name,
                     name_key,
                     kind: part.kind,
                     visibility: codec::visibility(sheet.visibility),
-                    part_uri: part.uri,
+                    part_uri,
                     cells: OnceLock::new(),
                     web_bindings: OnceCell::new(),
+                    page_breaks,
                     native_id: sheet.sheet_id,
                     relationship_id: sheet.relationship_id,
                 })
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
+        let mut sheet_name_order = (0..sheets.len()).collect::<Vec<_>>();
+        sheet_name_order.sort_unstable_by(|left, right| {
+            sheets[*left]
+                .name_key
+                .as_ref()
+                .cmp(sheets[*right].name_key.as_ref())
+                .then_with(|| left.cmp(right))
+        });
+        let sheet_name_order = sheet_name_order.into_boxed_slice();
 
         Ok(Self {
             inner: Arc::new(Inner {
@@ -429,6 +506,7 @@ impl Workbook {
                 },
                 active_sheet,
                 sheets,
+                sheet_name_order,
                 defined_names: catalog.defined_names.into_boxed_slice(),
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
@@ -525,9 +603,15 @@ impl Workbook {
             CoreSelector::Name(name) => {
                 let key = crate::sheet::key(&name);
                 self.inner
-                    .sheets
-                    .iter()
-                    .find(|sheet| sheet.name_key == key)
+                    .sheet_name_order
+                    .binary_search_by(|&position| {
+                        self.inner.sheets[position]
+                            .name_key
+                            .as_ref()
+                            .cmp(key.as_ref())
+                    })
+                    .ok()
+                    .and_then(|order| self.inner.sheets.get(self.inner.sheet_name_order[order]))
                     .cloned()
             },
             CoreSelector::Id(never) => match never {},
