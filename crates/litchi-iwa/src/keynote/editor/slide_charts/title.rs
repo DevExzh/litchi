@@ -17,7 +17,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-        title: &str,
+        title: impl AsRef<str>,
     ) -> Result<()> {
         set_slide_chart_title(self, slide_index, drawable_object_id, title)
     }
@@ -55,7 +55,7 @@ impl KeynoteEditor {
         &mut self,
         slide_index: usize,
         selector: impl Into<ChartSelector<'selector>>,
-        title: &str,
+        title: impl AsRef<str>,
     ) -> Result<()> {
         let selector = selector.into();
         self.resolve_chart_selector(slide_index, selector)?;
@@ -155,7 +155,7 @@ fn set_slide_chart_title(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    title: &str,
+    title: impl AsRef<str>,
 ) -> Result<()> {
     let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
     let package = focused_chart_title_package(editor)?;

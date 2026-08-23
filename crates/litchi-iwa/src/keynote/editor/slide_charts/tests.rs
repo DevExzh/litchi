@@ -1046,6 +1046,22 @@ fn scratch_presentation_supports_selector_chart_title_crud() {
 }
 
 #[test]
+fn selector_chart_title_set_accepts_owned_text() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    editor
+        .set_slide_chart_title_by_selector(0, 0usize, String::from("Revenue by region"))
+        .unwrap();
+    assert_eq!(
+        editor.slide_chart_title_by_selector(0, 0usize).unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+}
+
+#[test]
 fn scratch_presentation_supports_native_chart_axis_title_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
