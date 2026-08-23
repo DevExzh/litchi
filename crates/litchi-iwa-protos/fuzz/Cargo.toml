@@ -63,12 +63,6 @@ test = false
 doc = false
 bench = false
 
-[[bin]]
-name = "numbers_table_model"
-path = "fuzz_targets/numbers_table_model.rs"
-test = false
-doc = false
-bench = false
 
 [[bin]]
 name = "comment_storage_codec"
