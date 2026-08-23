@@ -3251,6 +3251,10 @@ class BoundaryPolicyTests(unittest.TestCase):
             ("SlideTransition", "Transition"),
         )
         self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TRANSITION_FORBIDDEN_PUBLIC_MEMBERS,
+            frozenset({"validate_opaque_transition_settings"}),
+        )
+        self.assertEqual(
             boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES,
             frozenset(
                 prefix + suffix
@@ -3920,6 +3924,43 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_keynote_slide_transition_facade_source_topology(root),
                 sorted(expected),
+            )
+
+    def test_focused_keynote_slide_transition_rejects_adapter_only_validator(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub use crate::package::slide_transition::"
+                "validate_opaque_transition_settings;\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub fn validate_opaque_transition_settings(settings: &Settings) "
+                "-> Result<(), Error> { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            violations = boundaries.audit_keynote_slide_transition_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(
+                violations,
+                [
+                    "focused litchi-keynote slide-transition public API retains "
+                    "adapter-only public member validate_opaque_transition_settings: "
+                    "crates/litchi-keynote/src/package/slide_transition.rs:1",
+                    "focused litchi-keynote slide-transition public API retains "
+                    "adapter-only public member validate_opaque_transition_settings: "
+                    "crates/litchi-keynote/src/transition.rs:1",
+                ],
             )
 
     def test_focused_keynote_slide_transition_exports_reject_all_root_aliases(

@@ -630,6 +630,12 @@ KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES = frozenset(
     for prefix in KEYNOTE_SLIDE_TRANSITION_FLAT_ALIAS_PREFIXES
     for suffix in KEYNOTE_SLIDE_TRANSITION_SHORT_NAMES
 )
+# Opaque wire validation is an adapter seam. It must not become a second
+# public transition operation or expose wire-policy details through the
+# archive-free semantic facade.
+KEYNOTE_SLIDE_TRANSITION_FORBIDDEN_PUBLIC_MEMBERS = frozenset(
+    {"validate_opaque_transition_settings"}
+)
 KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES = frozenset(
     KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES
     + KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
@@ -5028,9 +5034,13 @@ def _is_keynote_slide_transition_public_declaration(
     identifiers = {
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
     }
-    return bool(identifiers & KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES) or (
-        _keynote_slide_transition_owner_declaration(declaration)
-    )
+    return bool(
+        identifiers
+        & (
+            KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES
+            | KEYNOTE_SLIDE_TRANSITION_FORBIDDEN_PUBLIC_MEMBERS
+        )
+    ) or _keynote_slide_transition_owner_declaration(declaration)
 
 
 def _keynote_slide_delete_public_leak(identifier: str) -> str | None:
@@ -5960,6 +5970,16 @@ def audit_keynote_slide_transition_facade_source_topology(
                     violations.append(
                         "focused litchi-keynote slide-transition public API "
                         f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    public_declaration
+                    and identifier
+                    in KEYNOTE_SLIDE_TRANSITION_FORBIDDEN_PUBLIC_MEMBERS
+                ):
+                    violations.append(
+                        "focused litchi-keynote slide-transition public API "
+                        f"retains adapter-only public member {identifier}: "
                         f"{path.relative_to(root)}:{identifier_line}"
                     )
                 if (
