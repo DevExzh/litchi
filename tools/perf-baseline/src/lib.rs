@@ -15,6 +15,8 @@ mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
 mod process_metrics;
+#[cfg(test)]
+mod security_corpus;
 mod xls_numeric;
 
 use std::{

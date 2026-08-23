@@ -50,6 +50,26 @@ fails report generation rather than publishing unverifiable provenance.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
+## Real-producer security correctness corpus
+
+The ignored `security_corpus` test is a correctness-only gate over checked-in
+producer artifacts; it makes no latency claim and does not affect the default
+performance selector. Run it explicitly with the same locked command used by
+CI:
+
+```sh
+cargo test --locked --manifest-path tools/perf-baseline/Cargo.toml \
+  --lib security_corpus -- --ignored
+```
+
+The fixed corpus covers POI-signed DOCX/XLSX/PPTX, a read-only protected DOCX,
+POI encrypted CryptoAPI and binary-RC4 DOC files, POI `SimpleMacro.xls`, and an
+OOXML XLSX startup external-link sample. Assertions cover typed password
+behavior, signature/protection refusal and exact no-ops, inert VBA preservation,
+external-target inventory without resolution, and bounded read/output failure.
+Unsupported producer families and broader macro/signature authoring remain
+documented exclusions rather than latency measurements.
+
 Balanced A1/B1/B2/A2 captures can be validated and summarized with the
 standard-library-only helper at `tools/perf_abba_summary.py`:
 
