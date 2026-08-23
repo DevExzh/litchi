@@ -4044,12 +4044,15 @@ storage, and marker resolution. Missing identifiers still fail closed. The
 commit contains focused map and patch inverse/no-op tests, but this handoff
 supplies no test execution result.
 
-`0d5a523e6d3046a2d5ab2ee18755339ff7e1501b` marks the raw-ID Pages, Numbers,
-and Keynote direct drawable-comment and reply compatibility methods as
-deprecated while retaining `IWorkDrawableCommentEditor` as the migration-host
-editor. It does not alter signatures, IDs, validation, publication, or bytes;
-focused text comment/reply owners remain outside the deprecation. This is a
-source/rustdoc boundary, not a replacement owner or a host-exit step.
+`0d5a523e6d3046a2d5ab2ee18755339ff7e1501b` marks raw-ID Pages direct
+drawable-comment CRUD methods and raw-ID Numbers and Keynote direct
+drawable-comment/reply compatibility methods as deprecated while retaining
+`IWorkDrawableCommentEditor` as the migration-host editor. Pages reply methods
+are typed and carry only scoped `allow(deprecated)` internally; they are not
+deprecated. The change does not alter signatures, IDs, validation,
+publication, or bytes; focused text comment/reply owners remain outside the
+deprecation. This is a source/rustdoc boundary, not a replacement owner or a
+host-exit step.
 
 The supplied native evidence is limited to application reopen: Pages fixture
 `/private/tmp/litchi_native_pages_footnote_wave34.pages`, SHA-256
