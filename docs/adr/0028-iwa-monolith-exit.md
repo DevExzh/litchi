@@ -3829,3 +3829,21 @@ attachment payloads, nor full aggregate safety for every package graph,
 archive, or mutation route. This records legacy-path bounded hardening only;
 no Cargo/build/test or native result is admitted, no host dependency edge or
 ordered debt is retired, and no migration-host or monolith-exit claim follows.
+
+## 2026-08-23 amendment: checked Numbers formula-work products and owner preflight
+
+Detached commit `711e2b517` is limited to checked work accounting in
+`crates/litchi-numbers/src/package/extractor.rs`. Formula-reference and
+formula-owner/category/name preflights now use checked source-length products
+and checked cumulative owner charges. Overflow maps to the existing
+`SemanticLimitKind::FormulaWork` boundary, including wire rewrite-work errors
+from the owner preflight; a formula-work failure is propagated instead of
+being treated as an ordinary malformed compatibility candidate. Other
+malformed owner candidates retain their prior skip path.
+
+This does not move FormulaArchive or formula-owner responsibility out of the
+current package/host boundary and does not broaden formula authoring or
+rendering. It is source-level finite-accounting hardening only: no
+Cargo/build/test or native result is admitted, no `litchi-iwa` dependency edge
+or ordered debt is retired, and no host-exit or monolith-deletion claim
+follows.
