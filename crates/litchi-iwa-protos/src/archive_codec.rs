@@ -448,7 +448,7 @@ mod tests {
     use prost::Message as _;
 
     use super::{DecodeOptions, decode_archive_info, decode_message_info, encode_archive_info};
-    use crate::tsp;
+    use crate::{production_codec_guard::production_codec_source, tsp};
 
     fn options(length: usize) -> DecodeOptions {
         DecodeOptions::new(length, length.max(1), 4 * 1024 * 1024, 16)
@@ -464,6 +464,34 @@ mod tests {
         match u8::try_from(length) {
             Ok(byte_length) => byte_length,
             Err(error) => panic!("test payload must fit one-byte length: {error}"),
+        }
+    }
+
+    #[test]
+    fn production_decoder_keeps_the_borrowed_lazy_view_boundary() {
+        let production = production_codec_source(include_str!("archive_codec.rs"));
+
+        assert_eq!(
+            production.matches("decode_lazy_view").count(),
+            2,
+            "archive ingress should force exactly one lazy view per decoded message"
+        );
+        for marker in [
+            "decode_view(",
+            "OwnedView",
+            "from_owned",
+            "to_owned_message",
+            "to_owned_from_source",
+            "decode_view_handle",
+            "encode_to_vec",
+            "try_encode_to_vec",
+            "prost::",
+            "Message::decode",
+        ] {
+            assert!(
+                !production.contains(marker),
+                "archive production ingress must not retain generated {marker}"
+            );
         }
     }
 
