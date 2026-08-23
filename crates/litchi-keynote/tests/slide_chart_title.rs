@@ -34,17 +34,24 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
 }
 
 fn chart_payload(chart: usize) -> TestResult<Vec<u8>> {
-    chart_payload_with_title(chart, TITLES[chart])
+    chart_payload_with_graph(TITLES[chart], NON_STYLES[chart])
 }
 
 fn chart_payload_with_title(chart: usize, title_identifier: u64) -> TestResult<Vec<u8>> {
+    chart_payload_with_graph(title_identifier, NON_STYLES[chart])
+}
+
+fn chart_payload_with_graph(
+    title_identifier: u64,
+    non_style_identifier: u64,
+) -> TestResult<Vec<u8>> {
     let drawable = tsd::DrawableArchive {
         parent: Some(reference(SLIDE)),
         title: Some(reference(title_identifier)),
         ..tsd::DrawableArchive::default()
     };
     let chart_data = tsch::ChartArchive {
-        chart_non_style: Some(reference(NON_STYLES[chart])),
+        chart_non_style: Some(reference(non_style_identifier)),
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
@@ -579,6 +586,44 @@ fn chart_title_rejects_shared_title_standin_ownership() -> TestResult<()> {
         .find(|message| message.type_ == CHART_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing second synthetic chart message"))?;
     message.data = chart_payload_with_title(1, TITLES[0])?;
+    stream = archive.to_bytes()?;
+    let compressed = SnappyStream::compress(&stream)?;
+    let malformed = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?;
+
+    let package = Package::from_bytes(&malformed)?;
+    let before = exact_bytes(&package)?;
+    assert!(matches!(
+        package.slide_chart_title(0usize, 0usize),
+        Err(ChartTitleError::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_slide_chart_title(0usize, 0usize),
+        Err(ChartTitleError::InvalidSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn chart_title_rejects_shared_non_style_ownership() -> TestResult<()> {
+    let source = synthetic_package()?;
+    let mut stream = document_stream(&source)?;
+    let mut archive = Archive::parse(&stream)?;
+    let chart = archive
+        .object_mut(CHARTS[1])
+        .ok_or_else(|| io::Error::other("missing second synthetic chart"))?;
+    let message = chart
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("missing second synthetic chart message"))?;
+    message.data = chart_payload_with_graph(TITLES[1], NON_STYLES[0])?;
     stream = archive.to_bytes()?;
     let compressed = SnappyStream::compress(&stream)?;
     let malformed = Catalog::from_bytes(&source)?.reassemble_to_bytes(
