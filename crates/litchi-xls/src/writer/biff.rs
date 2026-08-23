@@ -212,11 +212,11 @@ pub(crate) fn write_format_record<W: Write>(
 }
 
 pub(crate) fn has_multibyte_char(s: &str) -> bool {
-    s.chars().any(|c| c as u32 > 0xFF)
+    s.encode_utf16().any(|unit| unit > 0x00FF)
 }
 
 pub(crate) fn unicode_string_size(value: &str) -> u16 {
-    let char_count = crate::utils::truncate_usize_to_u16(value.chars().count());
+    let char_count = crate::utils::truncate_usize_to_u16(value.encode_utf16().count());
     if has_multibyte_char(value) {
         2u16 + 1u16 + char_count.saturating_mul(2)
     } else {
@@ -225,7 +225,7 @@ pub(crate) fn unicode_string_size(value: &str) -> u16 {
 }
 
 pub(crate) fn write_unicode_string_biff8<W: Write>(writer: &mut W, value: &str) -> Result<()> {
-    let char_count: u16 = crate::utils::truncate_usize_to_u16(value.chars().count());
+    let char_count: u16 = crate::utils::truncate_usize_to_u16(value.encode_utf16().count());
     writer.write_all(&char_count.to_le_bytes())?;
 
     let is_16bit = has_multibyte_char(value);
