@@ -193,8 +193,7 @@ fn slice_entry(data: &[u8], entry: ZipArchiveEntryWayfinder) -> Result<ZipSliceE
     let variable_length = file_header.variable_length();
 
     let header_size = (ZipLocalFileHeaderFixed::SIZE + variable_length) as u32;
-    let (total_size, o1) =
-        (u64::from(header_size)).overflowing_add(entry.compressed_size_hint());
+    let (total_size, o1) = (u64::from(header_size)).overflowing_add(entry.compressed_size_hint());
 
     if o1 || (header.len() as u64) < total_size {
         return Err(Error::from(ErrorKind::Eof));

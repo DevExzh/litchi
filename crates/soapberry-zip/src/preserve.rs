@@ -1463,8 +1463,7 @@ mod tests {
 
         let prepared = generated_entry(&entry).unwrap();
         let PreparedLocal::Shared {
-            bytes: local_bytes,
-            ..
+            bytes: local_bytes, ..
         } = &prepared.local
         else {
             panic!("generated entry must retain the shared archive buffer");
