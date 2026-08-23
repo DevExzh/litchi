@@ -42,6 +42,7 @@ REPORT_PROFILE_LEGACY = "legacy-v1"
 REPORT_PROFILE_CURRENT = "current-v1"
 REPORT_PROFILES = frozenset((REPORT_PROFILE_LEGACY, REPORT_PROFILE_CURRENT))
 U64_MAX = (1 << 64) - 1
+U32_MAX = (1 << 32) - 1
 MIN_RETAINED_SAMPLES = 15
 ENVIRONMENT_VARIANTS = frozenset(("git_revision",))
 REQUIRED_TOOL_FIELDS = (
@@ -126,11 +127,94 @@ DEFAULT_DRIFT_CEILINGS: dict[str, float] = {
     "p99": 15.0,
 }
 
+# These selectors use fixed, non-CLI corpora.  Their shapes therefore cannot be
+# listed in any of the configurable ``*_shapes`` fields emitted by the
+# historical schema-1 harness.  Keep the complete manifest exact and
+# case-local: an unknown generator, an accidentally substituted archive, or an
+# added nested field must fail closed.
+_XLSX_REPEAT_STORE_MEDIUM_CORPUS: dict[str, Any] = {
+    "name": "xlsx-source-repeated-store-medium",
+    "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "medium",
+    "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+    "compression": "deflate",
+    "entry_count": 9216,
+    "archive_member_count": 17,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 4_231_168,
+    "archive_bytes": 4_226_429,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
+_XLSX_REPEAT_STORE_OVERSIZED_CORPUS: dict[str, Any] = {
+    "name": "xlsx-source-repeated-store-oversized",
+    "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "oversized",
+    "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+    "compression": "deflate",
+    "entry_count": 9216,
+    "archive_member_count": 17,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 12_789_836,
+    "archive_bytes": 4_236_114,
+    "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
+# These are deliberately distinct identities: the filesystem sample hashes the
+# full workbook, while the repeated-store evidence hashes only its query
+# projection.  They must never be compared for equality.
+_XLSX_REPEAT_STORE_FULL_SEMANTIC_SHA256 = (
+    "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e"
+)
+_XLSX_REPEAT_STORE_PROJECTION_SHA256 = (
+    "01c253bf3fc611835e0806414c6417a9cfbb012ff6e01f9bb55cec94236a6235"
+)
+
 # These selectors use a fixed, non-CLI corpus.  Its shape therefore cannot be
 # listed in any of the configurable ``*_shapes`` fields emitted by the
 # historical schema-1 harness.  Keep this exception exact and case-local so an
 # unknown generator or an accidentally substituted corpus still fails closed.
-FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, str]] = {
+FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
     "ods_source_backed_one_edit_save": {
         "name": "ods-media-publication",
         "generator": "litchi-ods-media-publication-v1",
@@ -151,6 +235,14 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, str]] = {
         "generator": "litchi-xlsx-page-break-source-edit-media-v1",
         "shape": "media-rich",
     },
+    "xlsx_source_repeated_store_medium": _XLSX_REPEAT_STORE_MEDIUM_CORPUS,
+    "xlsx_source_repeated_store_medium_reacquisition_control": (
+        _XLSX_REPEAT_STORE_MEDIUM_CORPUS
+    ),
+    "xlsx_source_repeated_store_oversized": _XLSX_REPEAT_STORE_OVERSIZED_CORPUS,
+    "xlsx_source_repeated_store_oversized_reacquisition_control": (
+        _XLSX_REPEAT_STORE_OVERSIZED_CORPUS
+    ),
 }
 
 _MISSING = object()
@@ -177,6 +269,7 @@ _FILESYSTEM_SAMPLE_KEYS = frozenset(
     {
         "sample_index",
         "cache_state",
+        "child_process_id",
         "elapsed_ns",
         "parent_wall_ns",
         "cold_advice",
@@ -192,6 +285,7 @@ _FILESYSTEM_SAMPLE_KEYS = frozenset(
         "logical_read_request_sizes",
         "logical_read_request_size_buckets",
         "process_metrics",
+        "allocation_metrics",
         "output_sha256",
         "output_bytes",
         "opc_materialized_parts",
@@ -200,6 +294,9 @@ _FILESYSTEM_SAMPLE_KEYS = frozenset(
         "cfb_phases",
         "pptx_source_replay",
         "docx_source_replay",
+        "xlsx_source_sha256",
+        "xlsx_semantic_sha256",
+        "xlsx_repeat_store",
     }
 )
 _FILESYSTEM_SAMPLE_IDENTITY_KEYS = frozenset(
@@ -209,6 +306,8 @@ _FILESYSTEM_SAMPLE_IDENTITY_KEYS = frozenset(
         "cold_advice",
         "logical_read_counter_scope",
         "output_sha256",
+        "xlsx_source_sha256",
+        "xlsx_semantic_sha256",
     }
 )
 _FILESYSTEM_EVIDENCE_REQUIRED_KEYS = frozenset(
@@ -363,6 +462,112 @@ _COLD_VERIFIED_SAMPLE_KEYS = frozenset(
     }
 )
 
+# XLSX repeated-store evidence is emitted by the filesystem harness after the
+# timed operation.  Keep this schema local to the ABBA reader: these fields are
+# not ordinary operation metrics and their role is selected by the explicit
+# claim scope, never by a Git revision string.
+_XLSX_REPEAT_STORE_KEYS = frozenset(
+    {
+        "implementation",
+        "scenario",
+        "selected_member",
+        "selected_member_uncompressed_bytes",
+        "cache_max_bytes",
+        "cache_max_entries",
+        "query_iterations",
+        "query_names",
+        "query_elapsed_ns",
+        "timed_elapsed_total_ns",
+        "control_reacquire_count",
+        "timing_scope",
+        "claim_scope",
+        "budget_managed",
+        "budget_memory_limit",
+        "budget_input_bytes_limit",
+        "budget_work_limit",
+        "semantic_projection_sha256",
+        "diagnostics_before",
+        "diagnostics_after",
+        "diagnostics_delta",
+    }
+)
+_XLSX_REPEAT_STORE_COUNTER_KEYS = frozenset(
+    {
+        "cache_cold_loads",
+        "cache_successful_loads",
+        "cache_bypasses",
+        "cache_oversized_bypasses",
+        "cache_evictions",
+        "source_read_calls",
+        "source_read_bytes",
+        "selected_member_read_calls",
+        "selected_member_read_bytes",
+        "budget_input_bytes_used",
+        "budget_work_used",
+    }
+)
+_XLSX_REPEAT_STORE_QUERY_NAMES = ("cell", "cells", "visit", "stored_extent")
+_XLSX_REPEAT_STORE_CACHE_LIMITS: dict[str, tuple[int, int]] = {
+    "medium": (8 * 1024 * 1024, 2),
+    "oversized": (8 * 1024 * 1024, 128),
+}
+_XLSX_REPEAT_STORE_SELECTED_MEMBER = "xl/worksheets/sheet1.xml"
+_XLSX_REPEAT_STORE_QUERY_ITERATIONS = 8
+_XLSX_REPEAT_STORE_TIMING_SCOPE = (
+    "semantic_query_only; explicit PartData reacquisition excluded"
+)
+_XLSX_REPEAT_STORE_PRIMARY_IMPLEMENTATION = "source_backed_cached_store"
+_XLSX_REPEAT_STORE_STRUCTURAL_IMPLEMENTATION = (
+    "explicit_part_data_reacquisition_structural_control"
+)
+_XLSX_REPEAT_STORE_PRIMARY_CLAIM_SCOPE = (
+    "primary repeated-query selector; compare only the same selector across A/B revisions"
+)
+_XLSX_REPEAT_STORE_STRUCTURAL_CLAIM_SCOPE = (
+    "structural cache/read control only; elapsed/query_ns must not be compared with candidate"
+)
+_XLSX_REPEAT_STORE_PRIMARY_SCOPE = "primary"
+_XLSX_REPEAT_STORE_STRUCTURAL_SCOPE = "structural"
+_XLSX_REPEAT_STORE_COUNTER_FIELDS = tuple(sorted(_XLSX_REPEAT_STORE_COUNTER_KEYS))
+_XLSX_REPEAT_STORE_CASE_CONTRACT: dict[str, dict[str, Any]] = {
+    "xlsx_source_repeated_store_medium": {
+        "role": _XLSX_REPEAT_STORE_PRIMARY_SCOPE,
+        "scenario": "medium",
+        "selected_member_uncompressed_bytes": 63_294,
+        "full_semantic_sha256": _XLSX_REPEAT_STORE_FULL_SEMANTIC_SHA256,
+        "semantic_projection_sha256": _XLSX_REPEAT_STORE_PROJECTION_SHA256,
+    },
+    "xlsx_source_repeated_store_medium_reacquisition_control": {
+        "role": _XLSX_REPEAT_STORE_STRUCTURAL_SCOPE,
+        "scenario": "medium",
+        "selected_member_uncompressed_bytes": 63_294,
+        "full_semantic_sha256": _XLSX_REPEAT_STORE_FULL_SEMANTIC_SHA256,
+        "semantic_projection_sha256": _XLSX_REPEAT_STORE_PROJECTION_SHA256,
+    },
+    "xlsx_source_repeated_store_oversized": {
+        "role": _XLSX_REPEAT_STORE_PRIMARY_SCOPE,
+        "scenario": "oversized",
+        "selected_member_uncompressed_bytes": 8_389_041,
+        "full_semantic_sha256": _XLSX_REPEAT_STORE_FULL_SEMANTIC_SHA256,
+        "semantic_projection_sha256": _XLSX_REPEAT_STORE_PROJECTION_SHA256,
+    },
+    "xlsx_source_repeated_store_oversized_reacquisition_control": {
+        "role": _XLSX_REPEAT_STORE_STRUCTURAL_SCOPE,
+        "scenario": "oversized",
+        "selected_member_uncompressed_bytes": 8_389_041,
+        "full_semantic_sha256": _XLSX_REPEAT_STORE_FULL_SEMANTIC_SHA256,
+        "semantic_projection_sha256": _XLSX_REPEAT_STORE_PROJECTION_SHA256,
+    },
+}
+
+_XLSX_REPEAT_STORE_CORPUS_GENERATOR = "litchi-xlsx-source-repeated-store-corpus-v1"
+_XLSX_REPEAT_STORE_CORPUS_NAMES = frozenset(
+    {
+        _XLSX_REPEAT_STORE_MEDIUM_CORPUS["name"],
+        _XLSX_REPEAT_STORE_OVERSIZED_CORPUS["name"],
+    }
+)
+
 
 class AbbaSummaryInputError(ValueError):
     """Raised when ABBA reports are not safely comparable."""
@@ -468,6 +673,19 @@ def _u64(value: Any, location: str, *, positive: bool = False) -> int:
         requirement = "positive " if positive else ""
         raise AbbaSummaryInputError(
             f"{location} must be a {requirement}unsigned 64-bit integer"
+        )
+    return value
+
+
+def _u32(value: Any, location: str, *, positive: bool = False) -> int:
+    """Validate an optional process identifier without making it identity."""
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise AbbaSummaryInputError(f"{location} must be an unsigned 32-bit integer")
+    if value < (1 if positive else 0) or value > U32_MAX:
+        requirement = "positive " if positive else ""
+        raise AbbaSummaryInputError(
+            f"{location} must be a {requirement}unsigned 32-bit integer"
         )
     return value
 
@@ -1169,6 +1387,407 @@ def _validate_cold_verified_sample(value: Any, location: str) -> dict[str, Any]:
     return sample
 
 
+def _validate_raw_allocation_metrics(value: Any, location: str) -> dict[str, Any]:
+    """Validate the raw allocator sample shape emitted by the harness.
+
+    ``perf_compare`` owns the allocator vocabulary for both operation and raw
+    filesystem evidence.  Reuse its exact field list here, while accounting
+    for the two compact ``Sample`` forms emitted by the Rust allocator target:
+    a measured sample carries every counter and unavailable/overflow samples
+    carry only status and scope.
+    """
+
+    allocation = _require_object(value, location)
+    vector_fields = tuple(perf_compare._ALLOCATOR_VECTOR_FIELDS)
+    expected_keys = {"status", "scope", *vector_fields}
+    compact_keys = {"status", "scope"}
+    keys = set(allocation)
+    if keys not in (expected_keys, compact_keys):
+        raise AbbaSummaryInputError(
+            f"{location} has an invalid allocator schema"
+        )
+    status = allocation.get("status")
+    if status not in {"measured", "unavailable", "overflow"}:
+        raise AbbaSummaryInputError(
+            f"{location}.status must be measured, unavailable, or overflow"
+        )
+    if allocation.get("scope") != "operation_global_system_allocator":
+        raise AbbaSummaryInputError(
+            f"{location}.scope must be 'operation_global_system_allocator'"
+        )
+    if status == "measured" and keys != expected_keys:
+        raise AbbaSummaryInputError(
+            f"{location}.measured samples must contain every allocator counter"
+        )
+    if status != "measured" and keys != compact_keys:
+        raise AbbaSummaryInputError(
+            f"{location}.{status} samples must omit allocator counters"
+        )
+    for field in vector_fields:
+        if field in allocation:
+            _u64(allocation[field], f"{location}.{field}")
+    return allocation
+
+
+def _validate_xlsx_repeat_store_counters(
+    value: Any, location: str
+) -> dict[str, Any]:
+    counters = _require_object(value, location)
+    if set(counters) != _XLSX_REPEAT_STORE_COUNTER_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location} keys mismatch: expected {sorted(_XLSX_REPEAT_STORE_COUNTER_KEYS)}"
+        )
+    for field in _XLSX_REPEAT_STORE_COUNTER_FIELDS:
+        _u64(counters[field], f"{location}.{field}")
+    if counters["cache_cold_loads"] > counters["cache_successful_loads"]:
+        raise AbbaSummaryInputError(
+            f"{location}.cache_cold_loads exceeds cache_successful_loads"
+        )
+    if counters["cache_bypasses"] > counters["cache_successful_loads"]:
+        raise AbbaSummaryInputError(
+            f"{location}.cache_bypasses exceeds cache_successful_loads"
+        )
+    if counters["cache_oversized_bypasses"] > counters["cache_bypasses"]:
+        raise AbbaSummaryInputError(
+            f"{location}.cache_oversized_bypasses exceeds cache_bypasses"
+        )
+    if (
+        counters["selected_member_read_calls"] > counters["source_read_calls"]
+        or counters["selected_member_read_bytes"] > counters["source_read_bytes"]
+    ):
+        raise AbbaSummaryInputError(
+            f"{location} selected-member reads exceed source reads"
+        )
+    if counters["budget_input_bytes_used"] > counters["source_read_bytes"]:
+        raise AbbaSummaryInputError(
+            f"{location}.budget_input_bytes_used exceeds source_read_bytes"
+        )
+    if counters["cache_cold_loads"] and counters["budget_work_used"] == 0:
+        raise AbbaSummaryInputError(
+            f"{location}.cache_cold_loads requires positive budget_work_used"
+        )
+    return counters
+
+
+def _validate_xlsx_repeat_store(
+    value: Any,
+    location: str,
+    *,
+    case: str,
+    report_label: str,
+    corpus: dict[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    """Validate one exact repeated-store evidence object.
+
+    The explicit claim scope determines whether an object is a primary
+    selector or a structural reacquisition control.  This is deliberately
+    independent of ``environment.git_revision`` so the verifier remains
+    useful for rebased or locally rebuilt ABBA legs.
+    """
+
+    contract = _XLSX_REPEAT_STORE_CASE_CONTRACT.get(case)
+    if contract is None:
+        raise AbbaSummaryInputError(
+            f"{location} is not permitted on filesystem case {case!r}"
+        )
+    expected_corpus = FIXED_CASE_CORPUS_IDENTITIES[case]
+    if _canonical_json(corpus, f"{location}.corpus") != _canonical_json(
+        expected_corpus, f"{location}.expected_corpus"
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.corpus does not match the pinned {case} corpus"
+        )
+    evidence = _require_object(value, location)
+    if set(evidence) != _XLSX_REPEAT_STORE_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location} keys mismatch: expected {sorted(_XLSX_REPEAT_STORE_KEYS)}"
+        )
+    implementation = _required_nonempty_string(
+        evidence.get("implementation"), location, "implementation"
+    )
+    scenario = _required_nonempty_string(evidence.get("scenario"), location, "scenario")
+    if scenario != contract["scenario"]:
+        raise AbbaSummaryInputError(
+            f"{location}.scenario does not match filesystem case {case!r}"
+        )
+    selected_member = _required_nonempty_string(
+        evidence.get("selected_member"), location, "selected_member"
+    )
+    if selected_member != _XLSX_REPEAT_STORE_SELECTED_MEMBER:
+        raise AbbaSummaryInputError(
+            f"{location}.selected_member does not match the pinned worksheet"
+        )
+    selected_member_bytes = _u64(
+        evidence.get("selected_member_uncompressed_bytes"),
+        f"{location}.selected_member_uncompressed_bytes",
+        positive=True,
+    )
+    if selected_member_bytes != contract["selected_member_uncompressed_bytes"]:
+        raise AbbaSummaryInputError(
+            f"{location}.selected_member_uncompressed_bytes does not match filesystem case {case!r}"
+        )
+    cache_max_bytes = _u64(
+        evidence.get("cache_max_bytes"), f"{location}.cache_max_bytes", positive=True
+    )
+    cache_max_entries = _u64(
+        evidence.get("cache_max_entries"),
+        f"{location}.cache_max_entries",
+        positive=True,
+    )
+    expected_cache_bytes, expected_cache_entries = _XLSX_REPEAT_STORE_CACHE_LIMITS[scenario]
+    if (cache_max_bytes, cache_max_entries) != (
+        expected_cache_bytes,
+        expected_cache_entries,
+    ):
+        raise AbbaSummaryInputError(
+            f"{location} cache limits do not match {scenario} scenario"
+        )
+    query_iterations = _u64(
+        evidence.get("query_iterations"),
+        f"{location}.query_iterations",
+        positive=True,
+    )
+    if query_iterations != _XLSX_REPEAT_STORE_QUERY_ITERATIONS:
+        raise AbbaSummaryInputError(
+            f"{location}.query_iterations must be {_XLSX_REPEAT_STORE_QUERY_ITERATIONS}"
+        )
+    query_names = evidence.get("query_names")
+    if query_names != list(_XLSX_REPEAT_STORE_QUERY_NAMES):
+        raise AbbaSummaryInputError(
+            f"{location}.query_names must be the four pinned semantic queries"
+        )
+    query_elapsed = evidence.get("query_elapsed_ns")
+    if (
+        not isinstance(query_elapsed, list)
+        or len(query_elapsed) != len(_XLSX_REPEAT_STORE_QUERY_NAMES)
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.query_elapsed_ns must contain four timings"
+        )
+    for index, elapsed in enumerate(query_elapsed):
+        _u64(elapsed, f"{location}.query_elapsed_ns[{index}]", positive=True)
+    timed_total = _u64(
+        evidence.get("timed_elapsed_total_ns"),
+        f"{location}.timed_elapsed_total_ns",
+        positive=True,
+    )
+    if timed_total != sum(query_elapsed):
+        raise AbbaSummaryInputError(
+            f"{location}.timed_elapsed_total_ns does not equal query_elapsed_ns"
+        )
+    control_reacquire_count = _u64(
+        evidence.get("control_reacquire_count"),
+        f"{location}.control_reacquire_count",
+    )
+    timing_scope = _required_nonempty_string(
+        evidence.get("timing_scope"), location, "timing_scope"
+    )
+    if timing_scope != _XLSX_REPEAT_STORE_TIMING_SCOPE:
+        raise AbbaSummaryInputError(f"{location}.timing_scope is not recognized")
+    claim_scope = _required_nonempty_string(
+        evidence.get("claim_scope"), location, "claim_scope"
+    )
+    if claim_scope == _XLSX_REPEAT_STORE_PRIMARY_CLAIM_SCOPE:
+        role = _XLSX_REPEAT_STORE_PRIMARY_SCOPE
+        if implementation != _XLSX_REPEAT_STORE_PRIMARY_IMPLEMENTATION:
+            raise AbbaSummaryInputError(
+                f"{location}.implementation does not match primary claim_scope"
+            )
+        if control_reacquire_count != 0:
+            raise AbbaSummaryInputError(
+                f"{location}.control_reacquire_count must be zero for primary evidence"
+            )
+    elif claim_scope == _XLSX_REPEAT_STORE_STRUCTURAL_CLAIM_SCOPE:
+        role = _XLSX_REPEAT_STORE_STRUCTURAL_SCOPE
+        if implementation != _XLSX_REPEAT_STORE_STRUCTURAL_IMPLEMENTATION:
+            raise AbbaSummaryInputError(
+                f"{location}.implementation does not match structural claim_scope"
+            )
+        expected_reacquire_count = query_iterations * len(_XLSX_REPEAT_STORE_QUERY_NAMES)
+        if control_reacquire_count != expected_reacquire_count:
+            raise AbbaSummaryInputError(
+                f"{location}.control_reacquire_count does not match structural queries"
+            )
+    else:
+        raise AbbaSummaryInputError(f"{location}.claim_scope is not recognized")
+    if role != contract["role"]:
+        raise AbbaSummaryInputError(
+            f"{location} scope does not match filesystem case {case!r}"
+        )
+
+    if evidence.get("budget_managed") is not True:
+        raise AbbaSummaryInputError(f"{location}.budget_managed must be true")
+    archive_bytes = corpus.get("archive_bytes")
+    if archive_bytes is None:
+        byte_summary = corpus.get("bytes")
+        if isinstance(byte_summary, dict):
+            archive_bytes = byte_summary.get("archive_bytes")
+    archive_bytes = _u64(
+        archive_bytes, f"{location}.corpus.archive_bytes", positive=True
+    )
+    expected_memory_limit = archive_bytes * 4 + 64 * 1024 * 1024
+    if expected_memory_limit > U64_MAX:
+        raise AbbaSummaryInputError(
+            f"{location}.corpus.archive_bytes overflows the repeated-store memory limit"
+        )
+    if (
+        _u64(evidence.get("budget_memory_limit"), f"{location}.budget_memory_limit")
+        != expected_memory_limit
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.budget_memory_limit does not match corpus bytes"
+        )
+    for field in ("budget_input_bytes_limit", "budget_work_limit"):
+        if _u64(evidence.get(field), f"{location}.{field}") != U64_MAX:
+            raise AbbaSummaryInputError(f"{location}.{field} must be u64::MAX")
+    semantic_sha256 = _validate_output_sha256(
+        evidence.get("semantic_projection_sha256"),
+        f"{location}.semantic_projection_sha256",
+    )
+    if semantic_sha256 != contract["semantic_projection_sha256"]:
+        raise AbbaSummaryInputError(
+            f"{location}.semantic_projection_sha256 does not match the pinned "
+            "repeated-store projection"
+        )
+    before = _validate_xlsx_repeat_store_counters(
+        evidence.get("diagnostics_before"), f"{location}.diagnostics_before"
+    )
+    after = _validate_xlsx_repeat_store_counters(
+        evidence.get("diagnostics_after"), f"{location}.diagnostics_after"
+    )
+    delta = _validate_xlsx_repeat_store_counters(
+        evidence.get("diagnostics_delta"), f"{location}.diagnostics_delta"
+    )
+    for field in _XLSX_REPEAT_STORE_COUNTER_FIELDS:
+        expected = before[field] + delta[field]
+        if expected > U64_MAX or after[field] != expected:
+            raise AbbaSummaryInputError(
+                f"{location}.diagnostics_delta is inconsistent for {field}"
+            )
+
+    if scenario == "medium":
+        if (
+            before["cache_evictions"] == 0
+            or before["cache_bypasses"] != 0
+            or before["cache_oversized_bypasses"] != 0
+        ):
+            raise AbbaSummaryInputError(
+                f"{location} medium evidence does not prove cache eviction"
+            )
+    else:
+        if before["cache_oversized_bypasses"] == 0:
+            raise AbbaSummaryInputError(
+                f"{location} oversized evidence does not prove cache bypass"
+            )
+
+    if role == _XLSX_REPEAT_STORE_PRIMARY_SCOPE:
+        if report_label in {"b1", "b2"}:
+            if any(delta[field] != 0 for field in _XLSX_REPEAT_STORE_COUNTER_FIELDS):
+                raise AbbaSummaryInputError(
+                    f"{location}.diagnostics_delta must be zero for candidate primary evidence"
+                )
+        elif report_label in {"a1", "a2"} and not any(
+            delta[field] > 0 for field in _XLSX_REPEAT_STORE_COUNTER_FIELDS
+        ):
+            raise AbbaSummaryInputError(
+                f"{location}.diagnostics_delta must contain positive control evidence"
+            )
+    else:
+        query_count = query_iterations * len(_XLSX_REPEAT_STORE_QUERY_NAMES)
+        parts_per_query = 3 if scenario == "medium" else 1
+        expected_cold_loads = query_count * parts_per_query
+        if (
+            delta["cache_cold_loads"] != expected_cold_loads
+            or delta["cache_successful_loads"] != expected_cold_loads
+            or delta["selected_member_read_calls"] != query_count
+            or delta["selected_member_read_bytes"] == 0
+            or delta["budget_input_bytes_used"] == 0
+            or delta["budget_work_used"] == 0
+        ):
+            raise AbbaSummaryInputError(
+                f"{location} structural control cache/read interval is not exact"
+            )
+        if scenario == "medium":
+            if (
+                delta["cache_bypasses"] != 0
+                or delta["cache_oversized_bypasses"] != 0
+                or delta["cache_evictions"] != expected_cold_loads
+            ):
+                raise AbbaSummaryInputError(
+                    f"{location} medium structural cache interval is not exact"
+                )
+        elif (
+            delta["cache_bypasses"] != query_count
+            or delta["cache_oversized_bypasses"] != query_count
+            or delta["cache_evictions"] != 0
+        ):
+            raise AbbaSummaryInputError(
+                f"{location} oversized structural cache interval is not exact"
+            )
+    return role, evidence
+
+
+def _looks_like_xlsx_repeat_store_corpus(corpus: Mapping[str, Any]) -> bool:
+    """Recognize a repeated-store corpus marker before evidence dispatch.
+
+    This is intentionally a one-way safety check.  A generic corpus is still
+    allowed to use arbitrary names, but a report that retains the
+    collision-free repeated-store name/generator pair cannot silently rename
+    the selector and strip its evidence to enter the legacy path.  Archive
+    hashes are deliberately not markers: the ordinary XLSX cell-values corpus
+    shares the medium archive hash.
+    """
+
+    return (
+        corpus.get("generator") == _XLSX_REPEAT_STORE_CORPUS_GENERATOR
+        and corpus.get("name") in _XLSX_REPEAT_STORE_CORPUS_NAMES
+    )
+
+
+def _xlsx_repeat_store_identity_projection(
+    value: Any, *, measurement: bool = False
+) -> Any:
+    """Retain structural constants and elide only timing/counter values.
+
+    Unlike the generic filesystem projection, string arrays such as
+    ``query_names`` remain explicit identities.  The selected member size,
+    cache limits, query count, reacquisition count, and budget limits are
+    structural constants and therefore remain exact.  Query timings and all
+    diagnostics counter values remain measurements; the raw report canonical
+    hash still binds their exact values.
+    """
+
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return "<number>" if measurement else value
+    if isinstance(value, list):
+        return [
+            _xlsx_repeat_store_identity_projection(item, measurement=measurement)
+            for item in value
+        ]
+    if isinstance(value, dict):
+        projected: dict[str, Any] = {}
+        for key, item in value.items():
+            child_measurement = measurement or key in {
+                "diagnostics_before",
+                "diagnostics_after",
+                "diagnostics_delta",
+                "query_elapsed_ns",
+                "timed_elapsed_total_ns",
+            }
+            projected[key] = _xlsx_repeat_store_identity_projection(
+                item, measurement=child_measurement
+            )
+        return projected
+    raise AbbaSummaryInputError(
+        "xlsx_repeat_store contains unsupported value "
+        f"{type(value).__name__}"
+    )
+
+
 def _validate_filesystem_sample(
     sample: Any, location: str, sample_count: int, cache_states: Sequence[str]
 ) -> dict[str, Any]:
@@ -1200,6 +1819,8 @@ def _validate_filesystem_sample(
         raise AbbaSummaryInputError(
             f"{location}.cache_state={cache_state!r} is absent from cache_states"
         )
+    if "child_process_id" in sample_object:
+        _u32(sample_object["child_process_id"], f"{location}.child_process_id", positive=True)
     cold_advice = _required_nonempty_string(
         sample_object.get("cold_advice"), location, "cold_advice"
     )
@@ -1217,7 +1838,10 @@ def _validate_filesystem_sample(
             location,
             "logical_read_counter_scope",
         )
-    if "logical_read_pattern" in sample_object and sample_object["logical_read_pattern"] is not None:
+    if (
+        "logical_read_pattern" in sample_object
+        and sample_object["logical_read_pattern"] is not None
+    ):
         pattern = sample_object["logical_read_pattern"]
         if pattern not in {"sequential", "random", "unknown"}:
             raise AbbaSummaryInputError(
@@ -1225,6 +1849,15 @@ def _validate_filesystem_sample(
             )
     if "output_sha256" in sample_object and sample_object["output_sha256"] is not None:
         _validate_output_sha256(sample_object["output_sha256"], f"{location}.output_sha256")
+    for field in ("xlsx_source_sha256", "xlsx_semantic_sha256"):
+        if field in sample_object:
+            _validate_output_sha256(sample_object[field], f"{location}.{field}")
+    if "allocation_metrics" in sample_object:
+        _validate_raw_allocation_metrics(
+            sample_object["allocation_metrics"], f"{location}.allocation_metrics"
+        )
+    if "xlsx_repeat_store" in sample_object:
+        _require_object(sample_object["xlsx_repeat_store"], f"{location}.xlsx_repeat_store")
     for field in (
         "elapsed_ns",
         "parent_wall_ns",
@@ -1315,6 +1948,8 @@ def _filesystem_evidence_identity_projection(evidence: dict[str, Any]) -> str:
             key: (
                 sample[key]
                 if key in _FILESYSTEM_SAMPLE_IDENTITY_KEYS
+                else _xlsx_repeat_store_identity_projection(sample[key])
+                if key == "xlsx_repeat_store"
                 else _filesystem_measurement_shape(sample[key])
             )
             for key in sorted(sample)
@@ -1328,20 +1963,124 @@ def _filesystem_evidence_identity_projection(evidence: dict[str, Any]) -> str:
     return _canonical_json(projected, "filesystem_evidence.identity")
 
 
+def _filesystem_evidence_scope(identity: str, location: str) -> str | None:
+    """Recover the validated repeated-store scope from an identity projection."""
+
+    try:
+        value = json.loads(identity)
+    except (TypeError, ValueError) as error:
+        raise AbbaSummaryInputError(
+            f"{location} filesystem identity is not canonical JSON"
+        ) from error
+    samples = _require_object(value, location).get("samples")
+    if not isinstance(samples, list):
+        raise AbbaSummaryInputError(f"{location}.samples identity must be a list")
+    scopes: set[str] = set()
+    for index, sample in enumerate(samples):
+        sample_object = _require_object(sample, f"{location}.samples[{index}]")
+        repeated = sample_object.get("xlsx_repeat_store")
+        if repeated is None:
+            continue
+        repeated_object = _require_object(
+            repeated, f"{location}.samples[{index}].xlsx_repeat_store"
+        )
+        claim_scope = repeated_object.get("claim_scope")
+        if claim_scope == _XLSX_REPEAT_STORE_PRIMARY_CLAIM_SCOPE:
+            scopes.add(_XLSX_REPEAT_STORE_PRIMARY_SCOPE)
+        elif claim_scope == _XLSX_REPEAT_STORE_STRUCTURAL_CLAIM_SCOPE:
+            scopes.add(_XLSX_REPEAT_STORE_STRUCTURAL_SCOPE)
+        else:
+            raise AbbaSummaryInputError(
+                f"{location}.samples[{index}].xlsx_repeat_store has an unknown claim scope"
+            )
+    if len(scopes) > 1:
+        raise AbbaSummaryInputError(
+            f"{location} filesystem identity mixes repeated-store scopes"
+        )
+    return next(iter(scopes), None)
+
+
+def _validated_result_elapsed_by_sample(
+    row: Mapping[str, Any], location: str, sample_count: int
+) -> tuple[int, ...]:
+    """Return authoritative elapsed values keyed by the original sample index.
+
+    The harness sorts ``elapsed_ns.samples`` for statistics and records the
+    inverse mapping in ``sample_order`` (sorted position -> original sample
+    index).  Repeated-store evidence is additive, so it must bind to this
+    exact permutation rather than guessing that the sorted position is the
+    filesystem sample index.
+    """
+
+    elapsed = _require_object(row.get("elapsed_ns"), f"{location}.elapsed_ns")
+    samples = elapsed.get("samples")
+    if not isinstance(samples, list) or len(samples) != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.samples must contain exactly {sample_count} samples"
+        )
+    sample_values = tuple(
+        _u64(value, f"{location}.elapsed_ns.samples[{index}]")
+        for index, value in enumerate(samples)
+    )
+    sample_order = elapsed.get("sample_order")
+    if not isinstance(sample_order, list) or len(sample_order) != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.sample_order must contain exactly {sample_count} entries"
+        )
+    normalized_order: list[int] = []
+    for index, value in enumerate(sample_order):
+        original_index = _u64(
+            value, f"{location}.elapsed_ns.sample_order[{index}]"
+        )
+        if original_index >= sample_count:
+            raise AbbaSummaryInputError(
+                f"{location}.elapsed_ns.sample_order[{index}] is outside the sample range"
+            )
+        normalized_order.append(original_index)
+    if set(normalized_order) != set(range(sample_count)):
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.sample_order must be an exact permutation"
+        )
+    by_original_index: list[int | None] = [None] * sample_count
+    for sorted_position, original_index in enumerate(normalized_order):
+        by_original_index[original_index] = sample_values[sorted_position]
+    if any(value is None for value in by_original_index):  # pragma: no cover - permutation guard
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.sample_order must cover every sample"
+        )
+    return tuple(value for value in by_original_index if value is not None)
+
+
 def _validate_filesystem_evidence(
     root: dict[str, Any],
     configuration: dict[str, Any],
     tool: dict[str, Any],
     indexed: Mapping[tuple[str, str], dict[str, Any]],
     label: str,
-) -> tuple[bool, frozenset[str], dict[tuple[str, str], str]]:
+) -> tuple[bool, frozenset[str], dict[tuple[str, str], str], frozenset[int]]:
     raw = root.get("filesystem_evidence", _MISSING)
+    for case, corpus_identity in indexed:
+        corpus = json.loads(corpus_identity)
+        if (
+            _looks_like_xlsx_repeat_store_corpus(corpus)
+            and case not in _XLSX_REPEAT_STORE_CASE_CONTRACT
+        ):
+            raise AbbaSummaryInputError(
+                f"{label}.results case {case!r} uses a pinned repeated-store corpus "
+                "but is not one of the exact repeated-store selectors"
+            )
     if raw is _MISSING:
-        return False, frozenset(), {}
+        if any(case in _XLSX_REPEAT_STORE_CASE_CONTRACT for case, _ in indexed):
+            raise AbbaSummaryInputError(
+                f"{label}.filesystem_evidence is required for repeated-store selectors"
+            )
+        return False, frozenset(), {}, frozenset()
     if not isinstance(raw, list):
         raise AbbaSummaryInputError(f"{label}.filesystem_evidence must be a list")
     evidence_index: dict[tuple[str, str], str] = {}
     filesystem_shapes: set[str] = set()
+    report_child_process_ids: set[int] = set()
+    report_pid_presence: bool | None = None
     configured_cache_states = configuration.get("filesystem_cache_states")
     if configured_cache_states is not None:
         configured_cache_states = _required_string_list(
@@ -1371,6 +2110,13 @@ def _validate_filesystem_evidence(
             )
         case = _required_nonempty_string(evidence_object.get("case"), location, "case")
         corpus = _require_object(evidence_object.get("corpus"), f"{location}.corpus")
+        if (
+            _looks_like_xlsx_repeat_store_corpus(corpus)
+            and case not in _XLSX_REPEAT_STORE_CASE_CONTRACT
+        ):
+            raise AbbaSummaryInputError(
+                f"{location} uses a pinned repeated-store corpus on an unknown selector"
+            )
         corpus_identity = _canonical_json(corpus, f"{location}.corpus")
         shape = corpus.get("shape")
         if not isinstance(shape, str) or not shape:
@@ -1422,6 +2168,10 @@ def _validate_filesystem_evidence(
         cache_states = _required_string_list(
             evidence_object.get("cache_states"), location, "cache_states"
         )
+        if case in _XLSX_REPEAT_STORE_CASE_CONTRACT and cache_states != ["warm"]:
+            raise AbbaSummaryInputError(
+                f"{location}.cache_states must be exactly ['warm'] for repeated-store evidence"
+            )
         if configured_cache_states is not None and cache_states != configured_cache_states:
             raise AbbaSummaryInputError(
                 f"{location}.cache_states does not match configuration"
@@ -1431,6 +2181,10 @@ def _validate_filesystem_evidence(
             location,
             "fresh_child_per_sample",
         )
+        if case in _XLSX_REPEAT_STORE_CASE_CONTRACT and fresh_child is not True:
+            raise AbbaSummaryInputError(
+                f"{location}.fresh_child_per_sample must be true for repeated-store evidence"
+            )
         if configured_fresh_child is not None and fresh_child != configured_fresh_child:
             raise AbbaSummaryInputError(
                 f"{location}.fresh_child_per_sample does not match configuration"
@@ -1444,9 +2198,22 @@ def _validate_filesystem_evidence(
                 f"{location}.samples has {len(samples)} entries; expected "
                 f"{expected_sample_total}"
             )
+        result_row = indexed[key]
+        authoritative_elapsed_by_sample = (
+            _validated_result_elapsed_by_sample(
+                result_row, f"{label}.results[{case}].elapsed_ns", sample_count
+            )
+            if case in _XLSX_REPEAT_STORE_CASE_CONTRACT
+            and _XLSX_REPEAT_STORE_CASE_CONTRACT[case]["role"]
+            == _XLSX_REPEAT_STORE_PRIMARY_SCOPE
+            else None
+        )
         pairs: list[tuple[int, str]] = []
         validated_samples = []
         range_size_presence: frozenset[str] | None = None
+        repeated_store_roles: set[str] = set()
+        repeated_store_semantics: set[str] = set()
+        repeated_store_sources: set[str] = set()
         for sample_position, sample in enumerate(samples):
             validated_sample = _validate_filesystem_sample(
                 sample,
@@ -1467,6 +2234,45 @@ def _validate_filesystem_evidence(
             pairs.append(
                 (validated_sample["sample_index"], validated_sample["cache_state"])
             )
+            if "xlsx_repeat_store" in validated_sample:
+                role, repeated_store = _validate_xlsx_repeat_store(
+                    validated_sample["xlsx_repeat_store"],
+                    f"{location}.samples[{sample_position}].xlsx_repeat_store",
+                    case=case,
+                    report_label=label,
+                    corpus=corpus,
+                )
+                repeated_store_roles.add(role)
+                repeated_store_semantics.add(
+                    repeated_store["semantic_projection_sha256"]
+                )
+                for field in ("xlsx_source_sha256", "xlsx_semantic_sha256"):
+                    if field not in validated_sample:
+                        raise AbbaSummaryInputError(
+                            f"{location}.samples[{sample_position}] is missing {field}"
+                        )
+                repeated_store_sources.add(validated_sample["xlsx_source_sha256"])
+                if (
+                    validated_sample["xlsx_semantic_sha256"]
+                    != _XLSX_REPEAT_STORE_CASE_CONTRACT[case]["full_semantic_sha256"]
+                ):
+                    raise AbbaSummaryInputError(
+                        f"{location}.samples[{sample_position}] XLSX semantic hash does not "
+                        "match the pinned full-workbook semantic identity"
+                    )
+                sample_index = validated_sample["sample_index"]
+                if repeated_store["timed_elapsed_total_ns"] != validated_sample["elapsed_ns"]:
+                    raise AbbaSummaryInputError(
+                        f"{location}.samples[{sample_position}] repeated-store timing "
+                        "must equal filesystem elapsed"
+                    )
+                if authoritative_elapsed_by_sample is not None:
+                    authoritative_elapsed = authoritative_elapsed_by_sample[sample_index]
+                    if repeated_store["timed_elapsed_total_ns"] != authoritative_elapsed:
+                        raise AbbaSummaryInputError(
+                            f"{location}.samples[{sample_position}] repeated-store timing "
+                            "must equal authoritative result elapsed"
+                        )
             validated_samples.append(validated_sample)
         expected_pairs = [
             (sample_index, cache_state)
@@ -1477,6 +2283,73 @@ def _validate_filesystem_evidence(
             raise AbbaSummaryInputError(
                 f"{location}.samples must contain each sample index/cache state exactly once"
             )
+        repeated_store_presence = ["xlsx_repeat_store" in sample for sample in validated_samples]
+        if case in _XLSX_REPEAT_STORE_CASE_CONTRACT and not any(repeated_store_presence):
+            raise AbbaSummaryInputError(
+                f"{location}.samples must contain xlsx_repeat_store for filesystem case {case!r}"
+            )
+        if any(repeated_store_presence) and not all(repeated_store_presence):
+            raise AbbaSummaryInputError(
+                f"{location}.samples must use one repeated-store evidence schema consistently"
+            )
+        if case in _XLSX_REPEAT_STORE_CASE_CONTRACT:
+            role = next(iter(repeated_store_roles), None)
+            if role == _XLSX_REPEAT_STORE_PRIMARY_SCOPE:
+                for field in ("source", "sink", "output_sha256"):
+                    if result_row.get(field) is not None:
+                        raise AbbaSummaryInputError(
+                            f"{label}.results[{case}].{field} must be absent or null for "
+                            "repeated-store filesystem results"
+                        )
+        sample_pid_presence = [
+            "child_process_id" in sample for sample in validated_samples
+        ]
+        evidence_has_pids = any(sample_pid_presence)
+        if report_pid_presence is None:
+            report_pid_presence = evidence_has_pids
+        elif evidence_has_pids != report_pid_presence:
+            raise AbbaSummaryInputError(
+                f"{label}.filesystem_evidence must use one child_process_id "
+                "presence schema across selectors"
+            )
+        if case in _XLSX_REPEAT_STORE_CASE_CONTRACT and not all(sample_pid_presence):
+            raise AbbaSummaryInputError(
+                f"{location}.samples must contain child_process_id for every repeated-store sample"
+            )
+        if any(sample_pid_presence):
+            if not all(sample_pid_presence):
+                raise AbbaSummaryInputError(
+                    f"{location}.samples must use one child_process_id presence schema"
+                )
+            sample_pids = [sample["child_process_id"] for sample in validated_samples]
+            if len(set(sample_pids)) != len(sample_pids):
+                raise AbbaSummaryInputError(
+                    f"{location}.samples child_process_id values must be unique"
+                )
+            duplicate_pids = report_child_process_ids.intersection(sample_pids)
+            if duplicate_pids:
+                raise AbbaSummaryInputError(
+                    f"{location}.samples child_process_id values repeat another selector: "
+                    f"{sorted(duplicate_pids)}"
+                )
+            report_child_process_ids.update(sample_pids)
+        if repeated_store_roles and len(repeated_store_roles) != 1:
+            raise AbbaSummaryInputError(
+                f"{location}.samples mix primary and structural repeated-store scopes"
+            )
+        if repeated_store_semantics and len(repeated_store_semantics) != 1:
+            raise AbbaSummaryInputError(
+                f"{location}.samples have inconsistent XLSX semantic hashes"
+            )
+        if repeated_store_sources:
+            corpus_source_sha256 = corpus.get("archive_sha256")
+            _validate_output_sha256(
+                corpus_source_sha256, f"{location}.corpus.archive_sha256"
+            )
+            if repeated_store_sources != {corpus_source_sha256}:
+                raise AbbaSummaryInputError(
+                    f"{location}.samples XLSX source hash differs from corpus archive"
+                )
         if "cold_verified_status" in evidence_object:
             status = evidence_object["cold_verified_status"]
             if status is not None and status not in _COLD_VERIFIED_STATUS_VALUES:
@@ -1524,7 +2397,18 @@ def _validate_filesystem_evidence(
         evidence_index[key] = _filesystem_evidence_identity_projection(
             {**evidence_object, "samples": validated_samples}
         )
-    return True, frozenset(filesystem_shapes), evidence_index
+    expected_repeat_keys = {
+        key for key in indexed if key[0] in _XLSX_REPEAT_STORE_CASE_CONTRACT
+    }
+    missing_repeat_keys = expected_repeat_keys - set(evidence_index)
+    if missing_repeat_keys:
+        raise AbbaSummaryInputError(
+            f"{label}.filesystem_evidence is missing repeated-store selectors: "
+            f"{sorted(missing_repeat_keys)}"
+        )
+    return True, frozenset(filesystem_shapes), evidence_index, frozenset(
+        report_child_process_ids
+    )
 
 
 def validate_parallel_metrics(report: Any, label: str = "report") -> None:
@@ -1553,6 +2437,7 @@ def _validate_report(
     bool,
     dict[tuple[str, str], str],
     dict[str, Any] | None,
+    frozenset[int],
 ]:
     root = _require_object(report, label)
     detected_profile = detect_report_profile(root, label)
@@ -1592,7 +2477,7 @@ def _validate_report(
         raise AbbaSummaryInputError(f"{label}.configuration must not be empty")
     _validate_configuration(configuration, label)
     indexed = _index_results(root, label)
-    filesystem_present, filesystem_shapes, filesystem_identity = (
+    filesystem_present, filesystem_shapes, filesystem_identity, filesystem_child_process_ids = (
         _validate_filesystem_evidence(root, configuration, tool, indexed, label)
     )
     return (
@@ -1606,6 +2491,7 @@ def _validate_report(
         filesystem_present,
         filesystem_identity,
         binary_identity,
+        filesystem_child_process_ids,
     )
 
 
@@ -1959,6 +2845,7 @@ def _project_report(
     filesystem_present = validated[7]
     filesystem_identity = validated[8]
     binary_identity = validated[9]
+    filesystem_child_process_ids = validated[10]
     if expected_revision is not None:
         if not isinstance(expected_revision, str) or not expected_revision:
             raise AbbaSummaryInputError("expected_revision must be a non-empty string")
@@ -2024,6 +2911,7 @@ def _project_report(
         "filesystem_present": filesystem_present,
         "filesystem_identity": filesystem_identity,
         "binary_identity": binary_identity,
+        "filesystem_child_process_ids": filesystem_child_process_ids,
     })
 
 
@@ -2091,6 +2979,17 @@ def _summarize_projected_reports(
         filesystem_present = projected.get("filesystem_present")
         if not isinstance(filesystem_present, bool):
             raise AbbaSummaryInputError(f"{label} projected filesystem presence is invalid")
+        filesystem_child_process_ids = projected.get("filesystem_child_process_ids")
+        if not isinstance(filesystem_child_process_ids, (frozenset, set, tuple, list)):
+            raise AbbaSummaryInputError(
+                f"{label} projected filesystem child-process identities are invalid"
+            )
+        normalized_child_process_ids: frozenset[int] = frozenset()
+        for child_process_id in filesystem_child_process_ids:
+            _u32(child_process_id, f"{label}.projected_child_process_id", positive=True)
+            normalized_child_process_ids = normalized_child_process_ids | frozenset(
+                (child_process_id,)
+            )
         binary_identity = projected.get("binary_identity")
         if detected == REPORT_PROFILE_CURRENT and not isinstance(binary_identity, dict):
             raise AbbaSummaryInputError(f"{label} current projection lacks binary identity")
@@ -2107,6 +3006,7 @@ def _summarize_projected_reports(
             filesystem_present,
             filesystem_identity,
             binary_identity,
+            normalized_child_process_ids,
         )
     if len(profiles) != 1:
         raise AbbaSummaryInputError("mixed legacy-v1/current-v1 ABBA report profiles")
@@ -2430,6 +3330,19 @@ def _summarize_reports_impl(
     if len(configurations) != 1:
         raise AbbaSummaryInputError("harness configuration differs between ABBA legs")
 
+    seen_child_process_ids: set[int] = set()
+    for label in LEG_ORDER:
+        child_process_ids = validated[label][10]
+        duplicate_child_process_ids = seen_child_process_ids.intersection(
+            child_process_ids
+        )
+        if duplicate_child_process_ids:
+            raise AbbaSummaryInputError(
+                "filesystem child_process_id values must be globally unique across "
+                f"ABBA legs; {label} repeats {sorted(duplicate_child_process_ids)}"
+            )
+        seen_child_process_ids.update(child_process_ids)
+
     binary_identity_values: dict[str, dict[str, Any] | None] = {
         label: item[9] for label, item in validated.items()
     }
@@ -2463,6 +3376,7 @@ def _summarize_reports_impl(
         _,
         _,
         _,
+        _,
     ) in validated.items():
         _validate_configuration_rows(
             configuration,
@@ -2493,6 +3407,13 @@ def _summarize_reports_impl(
                     "filesystem_evidence identity differs between ABBA legs for "
                     f"{key[0]}[{key[1]}]"
                 )
+    filesystem_scopes = {
+        key: _filesystem_evidence_scope(
+            first_filesystem_identity[key],
+            f"filesystem_evidence[{key[0]}[{key[1]}]]",
+        )
+        for key in sorted(first_filesystem_identity)
+    }
 
     result_sets = {frozenset(item[4]) for item in validated.values()}
     if len(result_sets) != 1:
@@ -2502,6 +3423,8 @@ def _summarize_reports_impl(
     first_index = validated["a1"][4]
     selected_keys = []
     for case, corpus_identity in sorted(first_index):
+        if filesystem_scopes.get((case, corpus_identity)) == _XLSX_REPEAT_STORE_STRUCTURAL_SCOPE:
+            continue
         corpus = json.loads(corpus_identity)
         if selected_cases is not None and case not in selected_cases:
             continue
@@ -2520,6 +3443,8 @@ def _summarize_reports_impl(
     # is emitted; it must not hide an unsafe mismatch in another report row.
     all_summaries: dict[tuple[str, str], dict[str, Any]] = {}
     for case, corpus_identity in sorted(first_index):
+        if filesystem_scopes.get((case, corpus_identity)) == _XLSX_REPEAT_STORE_STRUCTURAL_SCOPE:
+            continue
         rows = {label: validated[label][4][(case, corpus_identity)] for label in LEG_ORDER}
         all_summaries[(case, corpus_identity)] = _result_summary(
             rows,
