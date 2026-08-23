@@ -329,6 +329,7 @@ enum StorageWireLimitsError {
 enum BodyStorageDecodeError {
     Package(PackageError),
     Wire(litchi_iwa_text_wire::RewriteError),
+    SemanticLimit { observed: usize, limit: usize },
 }
 
 impl From<PackageError> for BodyStorageDecodeError {
@@ -1273,6 +1274,9 @@ fn map_body_storage_decode_error(error: BodyStorageDecodeError) -> PackageError 
     match error {
         BodyStorageDecodeError::Package(error) => error,
         BodyStorageDecodeError::Wire(error) => map_rooted_storage_decode_error(error),
+        BodyStorageDecodeError::SemanticLimit { observed, limit } => {
+            PackageError::PayloadLimit { observed, limit }
+        },
     }
 }
 
@@ -1283,6 +1287,7 @@ fn project_body_footnotes(
 ) -> PackageResult<Vec<Footnote>> {
     let mut semantic_budget = FootnoteSemanticBudget::new(max_text_bytes);
     project_body_footnotes_with_budget(components, limits, max_text_bytes, &mut semantic_budget)
+        .map_err(map_body_storage_decode_error)
 }
 
 fn project_body_footnotes_with_budget(
@@ -1290,7 +1295,7 @@ fn project_body_footnotes_with_budget(
     limits: Limits,
     max_text_bytes: usize,
     semantic_budget: &mut FootnoteSemanticBudget,
-) -> PackageResult<Vec<Footnote>> {
+) -> Result<Vec<Footnote>, BodyStorageDecodeError> {
     let root_references = root_references_with_limits(components, limits)?;
     let Some(body_identifier) = root_references.body else {
         return Ok(Vec::new());
@@ -1301,7 +1306,7 @@ fn project_body_footnotes_with_budget(
         ))
     })?;
     let body_payload = unique_text_payload(&body_object.messages, body_identifier)?;
-    let (body_storage, _) = decode_body_storage(
+    let (body_storage, _) = decode_body_storage_with_wire_error(
         &body_object.messages,
         body_identifier,
         MAX_SECTIONS,
@@ -1313,7 +1318,8 @@ fn project_body_footnotes_with_budget(
         return Err(PackageError::PayloadLimit {
             observed: entries.len(),
             limit: MAX_BODY_FOOTNOTES,
-        });
+        }
+        .into());
     }
 
     let mut footnotes = Vec::new();
@@ -1345,14 +1351,16 @@ fn project_body_footnotes_with_budget(
         if previous_position.is_some_and(|previous| previous >= entry.character_index) {
             return Err(PackageError::InvalidFormat(
                 "Pages body footnote positions are not strictly increasing".to_owned(),
-            ));
+            )
+            .into());
         }
         previous_position = Some(entry.character_index);
         if seen_references.contains(&entry.identifier) {
             return Err(PackageError::InvalidFormat(format!(
                 "Pages body references footnote object {} more than once",
                 entry.identifier
-            )));
+            ))
+            .into());
         }
         seen_references.push(entry.identifier);
         validate_body_footnote_anchor(body_storage.text(), body_identifier, entry.character_index)?;
@@ -1365,7 +1373,8 @@ fn project_body_footnotes_with_budget(
         {
             return Err(PackageError::InvalidFormat(
                 "Pages body footnote graph reuses a native object".to_owned(),
-            ));
+            )
+            .into());
         }
         seen_storages.push(storage_identifier);
         seen_markers.push(marker_identifier);
@@ -1437,7 +1446,7 @@ fn project_one_body_footnote(
     max_text_bytes: usize,
     entry: NativeFootnoteReference,
     semantic_budget: &mut FootnoteSemanticBudget,
-) -> PackageResult<(Footnote, NonZeroU64, NonZeroU64)> {
+) -> Result<(Footnote, NonZeroU64, NonZeroU64), BodyStorageDecodeError> {
     let reference_object = find_object(components, entry.identifier.get()).ok_or_else(|| {
         PackageError::InvalidFormat(format!(
             "Pages footnote reference object {} is missing",
@@ -1466,7 +1475,8 @@ fn project_one_body_footnote(
         return Err(PackageError::InvalidFormat(format!(
             "Pages footnote object {} has the wrong attachment kind",
             entry.identifier
-        )));
+        ))
+        .into());
     }
     let storage_identifier = reference
         .contained_storage()
@@ -1483,7 +1493,7 @@ fn project_one_body_footnote(
             storage_identifier
         ))
     })?;
-    let (storage, _) = decode_body_storage(
+    let (storage, _) = decode_body_storage_with_wire_error(
         &storage_object.messages,
         storage_identifier,
         MAX_SECTIONS,
@@ -1518,7 +1528,8 @@ fn project_one_body_footnote(
         return Err(PackageError::InvalidFormat(format!(
             "Pages footnote marker object {} has the wrong attachment kind",
             marker_identifier
-        )));
+        ))
+        .into());
     }
 
     let text = storage
@@ -1533,7 +1544,8 @@ fn project_one_body_footnote(
     if text.len() > crate::footnote::body::MAX_TEXT_BYTES {
         return Err(PackageError::InvalidFormat(format!(
             "Pages footnote storage {storage_identifier} exceeds its semantic text budget"
-        )));
+        ))
+        .into());
     }
     let custom_mark = reference
         .custom_mark_string()
@@ -1547,7 +1559,14 @@ fn project_one_body_footnote(
             Ok(value)
         })
         .transpose()?;
-    semantic_budget.charge(text.len(), custom_mark.map_or(0, str::len))?;
+    semantic_budget
+        .charge(text.len(), custom_mark.map_or(0, str::len))
+        .map_err(|error| match error {
+            PackageError::PayloadLimit { observed, limit } => {
+                BodyStorageDecodeError::SemanticLimit { observed, limit }
+            },
+            error => BodyStorageDecodeError::Package(error),
+        })?;
     let text = try_owned_footnote_string(text)?;
     let custom_mark = custom_mark.map(try_owned_footnote_string).transpose()?;
     let footnote = Footnote::with_custom_mark(
@@ -3378,7 +3397,8 @@ mod tests {
             package.state.source.limits(),
             maximum,
             &mut budget,
-        )?;
+        )
+        .map_err(map_body_storage_decode_error)?;
         assert_eq!(source.len(), 2);
         assert_eq!(budget.retained_bytes, maximum);
 
@@ -3392,7 +3412,7 @@ mod tests {
         .unwrap_or_else(|| panic!("a second exact-cap projection must be rejected"));
         assert!(matches!(
             error,
-            PackageError::PayloadLimit {
+            BodyStorageDecodeError::SemanticLimit {
                 observed: 19,
                 limit: 14,
             }
