@@ -92,19 +92,6 @@ impl<'a> ParagraphExtractor<'a> {
         Ok(extractor)
     }
 
-    /// Create a range extractor that applies paragraph and character styles.
-    pub(crate) fn new_with_range_and_stylesheet(
-        text: Arc<String>,
-        pap_bin_table: Option<&'a PapBinTable>,
-        chp_bin_table: Option<&'a ChpBinTable>,
-        cp_range: (u32, u32),
-        stylesheet: Option<&'a StyleSheet>,
-    ) -> Result<Self> {
-        let mut extractor = Self::new_with_range(text, pap_bin_table, chp_bin_table, cp_range)?;
-        extractor.stylesheet = stylesheet;
-        Ok(extractor)
-    }
-
     /// Create a range extractor while reusing the decoded text's CP boundary map.
     pub(crate) fn new_with_range_and_stylesheet_and_shared_ranges(
         text: Arc<String>,
@@ -285,6 +272,52 @@ impl<'a> ParagraphExtractor<'a> {
         }
 
         (None, paragraph_index)
+    }
+
+    /// Count the logical paragraphs in a UTF-16 character-position range.
+    ///
+    /// Paragraph counting is intentionally independent from semantic extraction: it only
+    /// classifies the structural paragraph and table-cell terminators and therefore does not
+    /// parse PAP/CHP runs, styles, images, or formulas. The fallback for non-empty source text
+    /// with no structural terminator matches [`Self::extract_paragraphs`] exactly.
+    pub(crate) fn count_paragraphs_in_range(text: &str, cp_range: (u32, u32)) -> usize {
+        let (doc_start_cp, doc_end_cp) = cp_range;
+        let mut paragraph_count = 0usize;
+        let mut current_cp = 0u32;
+        let mut has_text = false;
+        let mut last_boundary = doc_start_cp;
+
+        for character in text.chars() {
+            let next_cp = current_cp.saturating_add(character.len_utf16() as u32);
+            if next_cp <= doc_start_cp {
+                current_cp = next_cp;
+                continue;
+            }
+            if current_cp >= doc_end_cp {
+                break;
+            }
+            has_text = true;
+            if matches!(character, '\r' | '\u{7}') && next_cp <= doc_end_cp {
+                paragraph_count = paragraph_count.saturating_add(1);
+                last_boundary = next_cp;
+            }
+            current_cp = next_cp;
+        }
+
+        // `extract_paragraphs` appends a final boundary for trailing text, including text that
+        // ends before an over-large requested range. A range with only structural markers already
+        // has one paragraph per marker and must not receive an additional fallback paragraph.
+        if paragraph_count == 0 && !text.is_empty() {
+            return 1;
+        }
+        if has_text
+            && current_cp.min(doc_end_cp) > doc_start_cp
+            && current_cp.min(doc_end_cp) > last_boundary
+        {
+            paragraph_count = paragraph_count.saturating_add(1);
+        }
+
+        paragraph_count
     }
 
     /// Extract one paragraph range, preserving the same PAP/CHP/style cascade as enumeration.
@@ -739,7 +772,7 @@ mod tests {
             let actual = actual.expect("enumerated paragraph must be selectable");
             assert_eq!(available, 0);
             assert_eq!(actual.0, expected.0);
-            assert_eq!(actual.1, expected.1);
+            assert_eq!(format!("{:?}", actual.1), format!("{:?}", expected.1));
             assert_eq!(actual.2, expected.2);
         }
 
@@ -790,6 +823,48 @@ mod tests {
         let (missing, available) = extractor.extract_paragraph_at(1).unwrap();
         assert!(missing.is_none());
         assert_eq!(available, 1);
+    }
+
+    #[test]
+    fn paragraph_count_matches_extraction_without_parsing_runs() {
+        let text = "first\rsecond 😀\rCell\u{7}\u{7}tail";
+        let extractor = ParagraphExtractor::new(Arc::new(text.to_owned()), None, None).unwrap();
+        let utf16_len = text.encode_utf16().count() as u32;
+        let ranges = [
+            (0, utf16_len),
+            (0, 6),
+            (6, utf16_len),
+            (7, 17),
+            (17, utf16_len),
+            (utf16_len, utf16_len),
+            (utf16_len + 1, utf16_len + 2),
+            (utf16_len + 2, utf16_len + 1),
+        ];
+
+        for range in ranges {
+            let ranged =
+                ParagraphExtractor::new_with_range(Arc::new(text.to_owned()), None, None, range)
+                    .unwrap();
+            assert_eq!(
+                ParagraphExtractor::count_paragraphs_in_range(text, range),
+                ranged.extract_paragraphs().unwrap().len(),
+                "paragraph count mismatch for range {range:?}"
+            );
+        }
+
+        assert_eq!(
+            ParagraphExtractor::count_paragraphs_in_range(text, (0, utf16_len)),
+            extractor.extract_paragraphs().unwrap().len()
+        );
+
+        let terminated = "first\r";
+        let terminated_extractor =
+            ParagraphExtractor::new(Arc::new(terminated.to_owned()), None, None).unwrap();
+        let overlarge_range = (0, terminated.encode_utf16().count() as u32 + 5);
+        assert_eq!(
+            ParagraphExtractor::count_paragraphs_in_range(terminated, overlarge_range),
+            terminated_extractor.extract_paragraphs().unwrap().len()
+        );
     }
 
     #[test]
