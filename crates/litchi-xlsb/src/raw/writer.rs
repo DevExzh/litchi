@@ -31,8 +31,17 @@ impl<W: Write> Writer<W> {
         Self { writer, limits }
     }
 
+    /// Construct a writer after validating its raw limit profile.
+    pub fn try_with_limits(writer: W, limits: Limits) -> Result<Self> {
+        match limits.validate() {
+            Ok(limits) => Ok(Self::with_limits(writer, limits)),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Write one complete record.
     pub fn write_record(&mut self, kind: Kind, payload: &[u8]) -> Result<()> {
+        self.limits.validate()?;
         self.write_header(kind, payload.len())?;
         self.writer.write_all(payload)?;
         Ok(())
@@ -40,6 +49,7 @@ impl<W: Write> Writer<W> {
 
     /// Write a validated record header.
     pub fn write_header(&mut self, kind: Kind, len: usize) -> Result<()> {
+        self.limits.validate()?;
         if len > self.limits.payload() {
             return Err(Error::PayloadLimit {
                 length: len,
@@ -59,6 +69,7 @@ impl<W: Write> Writer<W> {
 
     /// Stream an `XLWideString` without constructing an intermediate UTF-16 buffer.
     pub fn write_wide_string(&mut self, value: &str) -> Result<()> {
+        self.limits.validate()?;
         let units = value.encode_utf16().count();
         if units > self.limits.string_units() {
             return Err(Error::StringLimit {
@@ -80,30 +91,35 @@ impl<W: Write> Writer<W> {
 
     /// Write one byte.
     pub fn write_u8(&mut self, value: u8) -> Result<()> {
+        self.limits.validate()?;
         self.writer.write_all(&[value])?;
         Ok(())
     }
 
     /// Write a little-endian `u16`.
     pub fn write_u16(&mut self, value: u16) -> Result<()> {
+        self.limits.validate()?;
         self.writer.write_all(&value.to_le_bytes())?;
         Ok(())
     }
 
     /// Write a little-endian `u32`.
     pub fn write_u32(&mut self, value: u32) -> Result<()> {
+        self.limits.validate()?;
         self.writer.write_all(&value.to_le_bytes())?;
         Ok(())
     }
 
     /// Write a little-endian `i32`.
     pub fn write_i32(&mut self, value: i32) -> Result<()> {
+        self.limits.validate()?;
         self.writer.write_all(&value.to_le_bytes())?;
         Ok(())
     }
 
     /// Write a little-endian `f64`.
     pub fn write_f64(&mut self, value: f64) -> Result<()> {
+        self.limits.validate()?;
         self.writer.write_all(&value.to_le_bytes())?;
         Ok(())
     }
@@ -118,6 +134,7 @@ impl<W: Write> Writer<W> {
 
     /// Flush the destination.
     pub fn flush(&mut self) -> Result<()> {
+        self.limits.validate()?;
         self.writer.flush()?;
         Ok(())
     }
