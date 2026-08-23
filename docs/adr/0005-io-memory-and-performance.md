@@ -492,3 +492,13 @@ remain open. These checks provide focused correctness/boundedness and native
 no-repair evidence only: no native segment/save-mutation, performance,
 host-exit, or complete-monolith-retirement claim follows. The dated gate
 counts above remain historical evidence.
+
+## 2026-08-23 boundary-audit disposition
+
+At committed HEAD `4e84abdf`, the Cargo metadata snapshot contains 64 workspace
+packages, 239 internal dependency declarations, and 13 ordered policy debts.
+Those figures are inventory evidence only: the complete
+`tools/check_crate_boundaries.py` run is not green and reports 20 focused
+Pages table-lock flat-alias findings for the compatibility aliases introduced
+by `093b82f40` (including the shared `TableSelector` export). This disposition
+changes no policy edge, debt item, ownership assignment, or verification gate.
