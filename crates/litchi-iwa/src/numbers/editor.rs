@@ -289,24 +289,7 @@ fn test_cell_selectors(
     editor: &NumbersEditor,
     native_id: u64,
 ) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
-    let owner = find_table_owner(editor.package(), native_id)?;
-    let sheet = test_sheet_selector(editor, owner.sheet_id);
-    let table_info_ids = table_models(editor.package())?
-        .into_iter()
-        .map(|table| table.table_info_id)
-        .collect::<HashSet<_>>();
-    let (_, _, native_sheet) = numbers_sheet(editor.package(), owner.sheet_id)?;
-    let table = native_sheet
-        .drawable_infos
-        .iter()
-        .filter(|drawable| table_info_ids.contains(&drawable.identifier))
-        .position(|drawable| drawable.identifier == owner.table_info_id)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Numbers table model {native_id} is missing from its focused sheet projection"
-            ))
-        })?;
-    Ok((sheet, TableSelector::index(table)))
+    selectors::focused_table_location(editor, native_id)
 }
 
 #[cfg(test)]

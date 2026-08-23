@@ -245,6 +245,57 @@ pub(super) fn table_index(editor: &NumbersEditor, native_id: u64) -> Result<usiz
         .ok_or_else(|| Error::ParseError(format!("Numbers table {native_id} not found")))
 }
 
+/// Resolve one legacy native table identifier to selector-first sheet and
+/// table positions without exposing that identifier to the focused owner.
+pub(super) fn focused_table_location(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
+    let owner = super::find_table_owner(editor.package(), native_id)?;
+    let sheets = editor.sheets()?;
+    let mut sheet_matches = sheets
+        .iter()
+        .enumerate()
+        .filter(|(_, sheet)| sheet.native_id() == owner.sheet_id);
+    let (sheet_index, _) = sheet_matches.next().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table model {native_id} belongs to an unreachable sheet"
+        ))
+    })?;
+    if sheet_matches.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table model {native_id} belongs to an ambiguous sheet"
+        )));
+    }
+
+    let table_info_ids = super::table_models(editor.package())?
+        .into_iter()
+        .map(|table| table.table_info_id)
+        .collect::<HashSet<_>>();
+    let (_, _, native_sheet) = super::numbers_sheet(editor.package(), owner.sheet_id)?;
+    let mut table_matches = native_sheet
+        .drawable_infos
+        .iter()
+        .filter(|drawable| table_info_ids.contains(&drawable.identifier))
+        .enumerate()
+        .filter(|(_, drawable)| drawable.identifier == owner.table_info_id);
+    let (table_index, _) = table_matches.next().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers table model {native_id} is missing from its focused sheet projection"
+        ))
+    })?;
+    if table_matches.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table model {native_id} has an ambiguous focused sheet projection"
+        )));
+    }
+
+    Ok((
+        SheetSelector::index(sheet_index),
+        TableSelector::index(table_index),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

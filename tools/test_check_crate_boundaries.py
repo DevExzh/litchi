@@ -14814,6 +14814,176 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_iwa_numbers_cell_comment_delegation_accepts_selector_first_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_text(
+                "impl NumbersEditor {\n"
+                "    #[deprecated]\n"
+                "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
+                "column: usize, text: impl Into<String>) -> Result<()> {\n"
+                "        let text = text.into();\n"
+                "        if self.set_cell_comment_focused(table_id, row, column, &text)? {\n"
+                "            return Ok(());\n"
+                "        }\n"
+                "        set_cell_comment_in_package(&mut self.package, table_id, row, column, text)\n"
+                "    }\n"
+                "    fn set_cell_comment_focused(&mut self, table_id: u64, row: usize, "
+                "column: usize, text: &str) -> Result<bool> {\n"
+                "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
+                "        let (sheet, table) = self::selectors::selector_mapping(self, table_id)?;\n"
+                "        let position = CellPosition::try_from_usize(row, column)?;\n"
+                "        match source.set_table_cell_comment(sheet, table, position, text) {\n"
+                "            Ok(()) => Ok(true),\n"
+                "            Err(litchi_numbers::package::comments::Error::UnsupportedDependency { .. })\n"
+                "            | Err(litchi_numbers::package::comments::Error::CommentNotFound { .. }) => Ok(false),\n"
+                "            Err(error) => Err(Error::InvalidFormat(error.to_string())),\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            selectors = root / boundaries.IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE
+            selectors.parent.mkdir(parents=True, exist_ok=True)
+            selectors.write_text(
+                "fn selector_mapping(_: &NumbersEditor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
+                "    let sheet = SheetSelector::index(0);\n"
+                "    let table = TableSelector::index(0);\n"
+                "    Ok((sheet, table))\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_cell_comment_delegation_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_cell_comment_delegation_rejects_legacy_only_writer(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_text(
+                "impl NumbersEditor {\n"
+                "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
+                "column: usize, text: impl Into<String>) -> Result<()> {\n"
+                "        set_cell_comment_in_package(&mut self.package, table_id, row, column, text.into())\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_cell_comment_delegation_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("does not reach focused Package::set_table_cell_comment" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing selector-first SheetSelector::index" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_cell_comment_delegation_rejects_broad_fallback(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_text(
+                "impl NumbersEditor {\n"
+                "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
+                "column: usize, text: impl Into<String>) -> Result<()> {\n"
+                "        self.set_cell_comment_focused(table_id, row, column, text.into().as_str())\n"
+                "    }\n"
+                "    fn set_cell_comment_focused(&mut self, table_id: u64, row: usize, "
+                "column: usize, text: &str) -> Result<bool> {\n"
+                "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
+                "        let (sheet, table) = selectors::selector_mapping(self, table_id)?;\n"
+                "        let position = CellPosition::try_from_usize(row, column)?;\n"
+                "        match source.set_table_cell_comment(sheet, table, position, text) {\n"
+                "            Ok(()) => Ok(true),\n"
+                "            Err(_) => Ok(false),\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            selectors = root / boundaries.IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE
+            selectors.parent.mkdir(parents=True, exist_ok=True)
+            selectors.write_text(
+                "fn selector_mapping(_: &NumbersEditor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
+                "    (SheetSelector::index(0), TableSelector::index(0))\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_cell_comment_delegation_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must explicitly handle" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must not treat every focused error" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_cell_comment_delegation_rejects_raw_id_focused_call(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_text(
+                "impl NumbersEditor {\n"
+                "    pub fn set_cell_comment(&mut self, table_id: u64, row: usize, "
+                "column: usize, text: impl Into<String>) -> Result<()> {\n"
+                "        let source = litchi_numbers::Package::from_bytes(&self.to_bytes()?)?;\n"
+                "        let position = CellPosition::try_from_usize(row, column)?;\n"
+                "        match source.set_table_cell_comment(table_id, table_id, position, text.into().as_str()) {\n"
+                "            Ok(()) => Ok(()),\n"
+                "            Err(litchi_numbers::package::comments::Error::UnsupportedDependency { .. })\n"
+                "            | Err(litchi_numbers::package::comments::Error::CommentNotFound { .. }) =>\n"
+                "                set_cell_comment_in_package(&mut self.package, table_id, row, column, text.into()),\n"
+                "            Err(error) => Err(Error::InvalidFormat(error.to_string())),\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            selectors = root / boundaries.IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE
+            selectors.parent.mkdir(parents=True, exist_ok=True)
+            selectors.write_text(
+                "fn selector_mapping(_: &NumbersEditor, _: u64) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {\n"
+                "    let sheet = SheetSelector::index(0);\n"
+                "    let table = TableSelector::index(0);\n"
+                "    Ok((sheet, table))\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_cell_comment_delegation_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("passes a raw native identifier" in item for item in violations),
+                violations,
+            )
+
     def test_iwa_numbers_table_cell_fixture_helpers_stay_test_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

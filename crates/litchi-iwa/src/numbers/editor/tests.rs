@@ -1295,6 +1295,66 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
 }
 
 #[test]
+fn supported_cell_comment_replacement_delegates_to_focused_package_owner() {
+    let source = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../litchi-numbers/tests/fixtures/comment-edit-root.numbers"
+    ));
+    let original = NumbersEditor::from_bytes(source).unwrap();
+    let table_id = original.tables().unwrap()[0].native_id();
+    let original_comment = original.cell_comment(table_id, 1, 1).unwrap().unwrap();
+    let mut editor = original;
+
+    editor
+        .set_cell_comment(table_id, 1, 1, "Focused replacement")
+        .unwrap();
+
+    let updated = editor.cell_comment(table_id, 1, 1).unwrap().unwrap();
+    assert_eq!(updated.storage_id, original_comment.storage_id);
+    assert_eq!(updated.comment.text, "Focused replacement");
+    assert_eq!(
+        updated.comment.creation_date_seconds,
+        original_comment.comment.creation_date_seconds
+    );
+    assert_eq!(
+        updated.comment.storage_uuid,
+        original_comment.comment.storage_uuid
+    );
+    assert_eq!(
+        updated.comment.reply_ids,
+        original_comment.comment.reply_ids
+    );
+    for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
+        assert!(editor.package().entry(preview).is_none());
+    }
+    NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+}
+
+#[test]
+fn unsupported_comment_graph_keeps_legacy_fallback_and_previews() {
+    let mut package = test_package_with_comments(false);
+    for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
+        package
+            .insert_entry(preview, preview.as_bytes().to_vec())
+            .unwrap();
+    }
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+
+    editor
+        .set_cell_comment(10, 0, 1, "Legacy reply replacement")
+        .unwrap();
+
+    assert_eq!(
+        editor.cell_comment(10, 0, 1).unwrap().unwrap().comment.text,
+        "Legacy reply replacement"
+    );
+    assert_eq!(editor.cell_comment_replies(10, 0, 1).unwrap().len(), 1);
+    for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
+        assert_eq!(editor.package().entry(preview), Some(preview.as_bytes()));
+    }
+}
+
+#[test]
 fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
     let mut editor = NumbersEditor::from_package(test_package_with_comments(false)).unwrap();
     let original_root = editor.cell_comment(10, 0, 1).unwrap().unwrap();

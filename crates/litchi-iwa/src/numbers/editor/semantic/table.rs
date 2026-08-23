@@ -1,11 +1,79 @@
 //! Table and cell editing semantics.
 
 use super::*;
+use crate::numbers::editor::selectors;
 use crate::numbers::editor::table::cell::Borders;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 use litchi_iwa_common::shape::stroke::Stroke;
 use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
 use litchi_numbers::table::merge::Region;
+use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
+
+enum FocusedCommentReplacement {
+    Published(NumbersEditor),
+    LegacyFallback,
+}
+
+fn focused_comment_error(error: TableCellCommentError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers cell-comment replacement failed: {error}"
+    ))
+}
+
+fn replace_cell_comment_with_focused_owner(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: &str,
+) -> Result<FocusedCommentReplacement> {
+    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
+    let position =
+        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
+            Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
+        })?;
+    let source_bytes = editor.to_bytes()?;
+    let source = match FocusedNumbersPackage::from_bytes(&source_bytes) {
+        Ok(source) => source,
+        Err(litchi_numbers::PackageError::InvalidFormat(_)) => {
+            return Ok(FocusedCommentReplacement::LegacyFallback);
+        },
+        Err(error) => {
+            return Err(Error::InvalidFormat(format!(
+                "focused Numbers comment source validation failed: {error}"
+            )));
+        },
+    };
+    let commit = match source.set_table_cell_comment(sheet, table, position, text) {
+        Ok(commit) => commit,
+        Err(TableCellCommentError::CommentNotFound { .. })
+        | Err(TableCellCommentError::UnsupportedDependency { .. }) => {
+            return Ok(FocusedCommentReplacement::LegacyFallback);
+        },
+        Err(error) => return Err(focused_comment_error(error)),
+    };
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
+        Error::InvalidFormat("could not allocate focused Numbers comment candidate".to_owned())
+    })?;
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    let verified = NumbersEditor::from_bytes(&bytes)?;
+    let observed =
+        cell_comment_in_package(verified.package(), table_id, row, column)?.ok_or_else(|| {
+            Error::InvalidFormat(
+                "focused Numbers cell-comment replacement lost the selected comment".to_owned(),
+            )
+        })?;
+    if observed.comment.text != text {
+        return Err(Error::InvalidFormat(
+            "focused Numbers cell-comment replacement failed legacy readback".to_owned(),
+        ));
+    }
+    Ok(FocusedCommentReplacement::Published(verified))
+}
 
 impl NumbersEditor {
     /// List absolute pivot categories backed by valid calculation-engine
@@ -2381,8 +2449,16 @@ impl NumbersEditor {
         column: usize,
         text: impl Into<String>,
     ) -> Result<()> {
+        let text = text.into();
+        match replace_cell_comment_with_focused_owner(self, table_id, row, column, &text)? {
+            FocusedCommentReplacement::Published(verified) => {
+                *self = verified;
+                return Ok(());
+            },
+            FocusedCommentReplacement::LegacyFallback => {},
+        }
         let mut staged = self.package.clone();
-        set_cell_comment_in_package(&mut staged, table_id, row, column, text.into())?;
+        set_cell_comment_in_package(&mut staged, table_id, row, column, text)?;
         let bytes = staged.to_bytes()?;
         IWorkPackage::from_bytes(&bytes)?;
         self.package = staged;
