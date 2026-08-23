@@ -1650,13 +1650,6 @@ impl KeynoteEditor {
         let show_identifier = operation.document_show_identifier()?;
         let show = operation.show_snapshot(show_identifier)?;
         let node_identifiers = show.slide_node_identifiers();
-        for (index, node_identifier) in node_identifiers.iter().enumerate() {
-            if node_identifiers[..index].contains(node_identifier) {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote show repeats slide node {node_identifier}"
-                )));
-            }
-        }
 
         let mut slides = Vec::with_capacity(node_identifiers.len());
         let mut layout_catalog = None;

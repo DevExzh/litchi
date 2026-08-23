@@ -1038,6 +1038,100 @@ mod tests {
     }
 
     #[test]
+    fn canonical_unknown_wire_forms_remain_opaque_and_source_owned() {
+        let source = [
+            0x0a, 0x16, // DrawableArchive.super
+            0x08, 0x07, // unknown varint
+            0x11, 0, 1, 2, 3, 4, 5, 6, 7, // unknown fixed64
+            0x1a, 0x02, 0xaa, 0xbb, // unknown length-delimited bytes
+            0x25, 9, 8, 7, 6, // unknown fixed32
+            0x28, 0x01, // selected locked=true
+            0x12, 0x08, // TableModelReference
+            0x08, 0x2a, // selected identifier=42
+            0x10, 0x09, // unknown varint in the nested reference
+            0x1b, 0x08, 0x0b, 0x1c, // unknown group in the nested reference
+            0x98, 0x06, 0x01, // root unknown varint
+            0xa1, 0x06, 0, 1, 2, 3, 4, 5, 6, 7, // root unknown fixed64
+            0xaa, 0x06, 0x01, 0xff, // root unknown bytes
+            0xb5, 0x06, 0, 1, 2, 3, // root unknown fixed32
+            0xbb, 0x06, 0x08, 0x01, 0xbc, 0x06, // root unknown group
+        ];
+        let before = source;
+
+        let snapshot = decode_table_info(
+            &source,
+            DecodeOptions::new(source.len(), 32, source.len() * 4, 3),
+        )
+        .expect("canonical unknown fields remain opaque");
+        assert_eq!(
+            snapshot.table_model().identifier(),
+            NonZeroU64::new(42).expect("non-zero test identifier")
+        );
+        assert_eq!(snapshot.locked(), Some(true));
+        assert_eq!(
+            source, before,
+            "projection must not rewrite caller-owned bytes"
+        );
+    }
+
+    #[test]
+    fn malformed_unknown_groups_and_nested_noncanonical_values_fail_closed() {
+        let malformed_groups: [&[u8]; 3] = [
+            &[0x0a, 0x01, 0x0b, 0x12, 0x02, 0x08, 0x01],
+            &[0x0a, 0x03, 0x0b, 0x08, 0x01, 0x12, 0x02, 0x08, 0x01],
+            &[0x0a, 0x03, 0x0b, 0x0c, 0x0c, 0x12, 0x02, 0x08, 0x01],
+        ];
+        for source in malformed_groups {
+            assert!(
+                decode(&source).is_err(),
+                "malformed unknown group: {source:?}"
+            );
+        }
+
+        let nested_noncanonical = [
+            0x0a, 0x03, 0x08, 0x81, 0x00, // noncanonical unknown nested varint
+            0x12, 0x02, 0x08, 0x01,
+        ];
+        assert_eq!(
+            decode(&nested_noncanonical)
+                .expect_err("noncanonical nested unknown value")
+                .noncanonical_reason(),
+            Some("protobuf varint value")
+        );
+    }
+
+    #[test]
+    fn nested_unknown_fields_consume_field_and_work_budgets() {
+        let source = [
+            0x0a, 0x02, 0x08, 0x01, // one nested unknown field in super
+            0x12, 0x04, 0x08, 0x2a, 0x10, 0x09, // identifier + nested unknown
+        ];
+        // Root has two fields and the selected nested messages have three
+        // fields total, for five strict visits. Message work is charged for
+        // the root and both selected nested payloads: 2 * (10 + 2 + 4).
+        let exact = DecodeOptions::new(source.len(), 5, 32, 2);
+        assert_eq!(
+            decode_table_model_reference(&source, exact)?
+                .identifier()
+                .get(),
+            42
+        );
+
+        assert_eq!(
+            decode_table_model_reference(&source, DecodeOptions::new(source.len(), 4, 32, 2))
+                .expect_err("nested field cap")
+                .field_limit_values(),
+            Some((5, 4))
+        );
+        assert_eq!(
+            decode_table_model_reference(&source, DecodeOptions::new(source.len(), 5, 31, 2))
+                .expect_err("nested work cap")
+                .work_limit_values(),
+            Some((32, 31))
+        );
+    }
+
+    #[test]
     fn exact_boundary_limits_are_accepted_and_one_less_is_rejected()
     -> Result<(), Box<dyn std::error::Error>> {
         let source = [0x0a, 0x00, 0x12, 0x02, 0x08, 0x01];

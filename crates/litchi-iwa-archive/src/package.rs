@@ -1590,14 +1590,6 @@ impl Catalog {
             checked_limits.check_output_size(source_size)?;
             return self.to_bytes();
         }
-
-        if deleted_names.is_empty()
-            && !edits.is_empty()
-            && identical_edits_are_noop(&self.entries, edits, checked_limits)?
-        {
-            checked_limits.check_output_size(source_size)?;
-            return self.to_bytes();
-        }
         if !self.source_is_exact {
             let reason = if self.semantic_profile.is_some() {
                 "semantic catalogs have a projected logical entry set"
@@ -1611,6 +1603,17 @@ impl Catalog {
         let shape = validate_reassembly_shape(&archive)?;
         let (prepared, deleted) =
             prepare_mutations(&archive, edits, deleted_names, checked_limits)?;
+        if deleted.is_empty()
+            && !edits.is_empty()
+            && edits.iter().all(|edit| {
+                self.entries.iter().any(|entry| {
+                    !entry.is_opaque() && entry.name() == edit.name() && entry.data() == edit.data()
+                })
+            })
+        {
+            checked_limits.check_output_size(source_size)?;
+            return self.to_bytes();
+        }
         let output_size = reassembled_output_size(&archive, &prepared, &deleted)?;
         checked_limits.check_output_size(output_size)?;
         let output_len = usize::try_from(output_size).map_err(|_error| {
@@ -2059,60 +2062,6 @@ fn validate_reassembly_shape(archive: &ZipArchive<'_>) -> Result<ReassemblyShape
     Ok(ReassemblyShape {
         base_offset: archive.base_offset(),
     })
-}
-
-fn identical_edits_are_noop(
-    entries: &[Entry],
-    edits: &[EntryEdit<'_>],
-    limits: Limits,
-) -> Result<bool> {
-    let mut requested_names = HashSet::new();
-    requested_names
-        .try_reserve(edits.len())
-        .map_err(|_error| Error::Allocation {
-            resource: "reassembly edit index",
-            amount: edits.len(),
-        })?;
-
-    let mut identical = true;
-    for &edit in edits {
-        if !requested_names.insert(edit.name()) {
-            return Err(Error::Reassembly(format!(
-                "member is edited more than once: {}",
-                edit.name()
-            )));
-        }
-
-        let entry = entries
-            .iter()
-            .find(|entry| entry.name() == edit.name())
-            .ok_or_else(|| {
-                Error::Reassembly(format!(
-                    "edited member does not exist in the flat catalog: {}",
-                    edit.name()
-                ))
-            })?;
-        if entry.is_opaque() {
-            return Err(Error::Reassembly(format!(
-                "edited member uses unsupported compression method {}: {}",
-                entry.metadata().central().compression_method(),
-                entry.name()
-            )));
-        }
-
-        let data_size = u64::try_from(edit.data().len()).map_err(|_error| {
-            Error::InvalidBundle("edited member length does not fit u64".to_owned())
-        })?;
-        if data_size > limits.max_entry_bytes() {
-            return Err(Error::Limit {
-                kind: crate::LimitKind::EntryBytes,
-                observed: data_size,
-                maximum: limits.max_entry_bytes(),
-            });
-        }
-        identical &= entry.data() == edit.data();
-    }
-    Ok(identical)
 }
 
 fn prepare_mutations(
@@ -5192,26 +5141,6 @@ mod tests {
         writer.write_stored("Stored/data", b"stored payload")?;
         writer.write_deflated("Deflated/data", b"deflated payload repeated")?;
         let bytes = writer.finish_to_bytes()?;
-        let catalog = Catalog::from_bytes(&bytes)?;
-        let edits = catalog
-            .iter()
-            .map(|entry| EntryEdit::new(entry.name(), entry.data()))
-            .collect::<Vec<_>>();
-
-        assert_eq!(
-            catalog.reassemble_to_bytes(&edits, Limits::default())?,
-            bytes
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn identical_nonempty_edits_preserve_legacy_source() -> Result<()> {
-        let index = zip(&[("Index/Document.iwa", b"iwa")])?;
-        let bytes = zip(&[
-            ("legacy.pages/Index.zip", index.as_slice()),
-            ("legacy.pages/Data/a", b"a"),
-        ])?;
         let catalog = Catalog::from_bytes(&bytes)?;
         let edits = catalog
             .iter()

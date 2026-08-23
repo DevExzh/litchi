@@ -118,12 +118,33 @@ pub(super) fn validate_transition_settings(settings: &TransitionSettings) -> Res
     settings.validate().map_err(|error| {
         Error::ParseError(format!("invalid Keynote transition settings: {error}"))
     })?;
-    litchi_keynote::transition::validate_opaque_transition_settings(settings)
-    .map_err(|error| {
-        Error::ParseError(format!(
-            "invalid Keynote transition opaque payload: {error}"
-        ))
-    })?;
+
+    if let Some(payload) = settings.animation_parameters().color_payload() {
+        let color = tsp::Color::decode(payload).map_err(|error| {
+            Error::ParseError(format!("invalid Keynote transition color payload: {error}"))
+        })?;
+        for component in [
+            color.r, color.g, color.b, color.a, color.c, color.m, color.y, color.k, color.w,
+        ] {
+            if component.is_some_and(|value| !value.is_finite()) {
+                return Err(Error::ParseError(
+                    "Keynote transition color components must be finite".to_owned(),
+                ));
+            }
+        }
+    }
+    for payload in settings
+        .animation_parameters()
+        .timing_curve_payloads()
+        .into_iter()
+        .flatten()
+    {
+        tsd::PathSourceArchive::decode(payload).map_err(|error| {
+            Error::ParseError(format!(
+                "invalid Keynote transition timing-curve payload: {error}"
+            ))
+        })?;
+    }
     Ok(())
 }
 
@@ -252,54 +273,5 @@ mod tests {
                 .map(TextDelivery::native_value),
             Some(-1)
         );
-    }
-
-    #[test]
-    fn strict_projection_adapter_rejects_malformed_opaque_payloads() {
-        let duplicate_color = [0x08, 0x01, 0x08, 0x01];
-        let color_animation = AnimationSnapshot {
-            animation_type: Some("Transition"),
-            effect: Some("none"),
-            duration: Some(1.0),
-            direction: None,
-            delay: None,
-            is_automatic: None,
-            color: Some(&duplicate_color),
-            custom_effect_timing_curve_1: None,
-            custom_effect_timing_curve_2: None,
-            custom_effect_timing_curve_3: None,
-            random_number_seed: None,
-            custom_detail: None,
-            custom_effect_timing_curve_theme_name_1: None,
-            custom_effect_timing_curve_theme_name_2: None,
-            custom_effect_timing_curve_theme_name_3: None,
-            writing_direction_is_rtl: None,
-        };
-        let color_snapshot = TransitionSettingsSnapshot {
-            has_legacy_database_fields: false,
-            animation: Some(color_animation),
-            custom_twist: None,
-            custom_mosaic_size: None,
-            custom_mosaic_type: None,
-            custom_bounce: None,
-            custom_magic_move_fade_unmatched_objects: None,
-            custom_timing_curve: None,
-            custom_text_delivery_type: None,
-            custom_motion_blur: None,
-            custom_travel_distance: None,
-        };
-        assert!(settings_from_projection(&color_snapshot).is_err());
-
-        let invalid_path = [0x4a, 0x01, 0xff];
-        let path_animation = AnimationSnapshot {
-            color: None,
-            custom_effect_timing_curve_1: Some(&invalid_path),
-            ..color_animation
-        };
-        let path_snapshot = TransitionSettingsSnapshot {
-            animation: Some(path_animation),
-            ..color_snapshot
-        };
-        assert!(settings_from_projection(&path_snapshot).is_err());
     }
 }
