@@ -2,6 +2,7 @@ use std::env;
 
 use litchi_iwa::pages::PagesEditor;
 
+#[allow(deprecated)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);
     let input = args.next().ok_or(

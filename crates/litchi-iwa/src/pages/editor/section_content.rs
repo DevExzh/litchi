@@ -137,6 +137,10 @@ impl PagesEditor {
     }
 
     /// Read the text owned by one reachable section, excluding native section-break markers.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages section-text API; use litchi_pages::Package::section_text with SectionSelector; retained for migration-host compatibility"
+    )]
     pub fn section_text(&self, section_id: u64) -> Result<String> {
         let position = self.section_position(section_id)?;
         if let Some(focused) = self.focused_section_package()? {
@@ -169,6 +173,10 @@ impl PagesEditor {
     }
 
     /// Replace a section-relative UTF-16 text range.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages section-text API; use litchi_pages::Package::edit_section_text with SectionSelector; retained for migration-host compatibility"
+    )]
     pub fn replace_section_text(
         &mut self,
         section_id: u64,
@@ -202,6 +210,10 @@ impl PagesEditor {
     }
 
     /// Replace all text owned by one section while preserving its layout and neighboring sections.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages section-text API; use litchi_pages::Package::set_section_text with SectionSelector; retained for migration-host compatibility"
+    )]
     pub fn set_section_text(&mut self, section_id: u64, replacement: &str) -> Result<()> {
         let position = self.section_position(section_id)?;
         if let Some(mut focused) = self.focused_section_package()? {
@@ -245,10 +257,12 @@ impl PagesEditor {
     }
 
     /// Clear all text owned by one section while preserving the section itself.
+    #[allow(deprecated)]
     pub fn clear_section_text(&mut self, section_id: u64) -> Result<()> {
         self.set_section_text(section_id, "")
     }
 
+    #[allow(deprecated)]
     fn legacy_set_section_text(&mut self, section_id: u64, replacement: &str) -> Result<()> {
         let length = self.legacy_section_text(section_id)?.encode_utf16().count();
         self.replace_section_text(section_id, 0..length, replacement)
