@@ -2301,3 +2301,36 @@ removed intentionally from the unpublished `0.0.1` API; semantic callers use
 `Settings`, checked payload setters, and package transactions rather than a
 wire validator. Generated Buffa types and codec values do not cross the
 focused public facade.
+
+## 2026-08-24 amendment: focused Keynote slide-background ownership
+
+Commit `0b12df5e1` adds the selector-first slide-background seam to the
+focused Keynote package. `Package::{slide_background,
+slide_background_override, edit_slide_background, apply_slide_background}`
+select a slide by the existing semantic selector contract. The edit exposes
+semantic `set`, `set_solid`, `set_gradient`, `set_opaque`, `clear`, and `reset`
+operations, while `Background::{None, Solid, Gradient, Opaque}` is the public
+value vocabulary. Effective inherited fill and direct override remain
+distinct: resetting a variation restores its parent effective state, and a
+shared collapsible variation redirects only the selected slide while retaining
+the other owner's style.
+
+The doc-hidden
+`litchi_iwa_protos::keynote_slide_background_codec` owns the bounded wire seam.
+It uses the private Buffa projection and borrowed snapshots for solid,
+gradient, image, opaque, and explicit-none payloads. Selected known fields are
+validated for canonical wire shape, required values, finite/ranged scalars,
+and supported semantic models; unknown source bytes remain source-owned and
+are preserved when the typed rewrite is safe. Deprecated protobuf groups are
+rejected. Typed gradient rewrites fail closed when unknown fields occur inside
+selected old stops, colors, or angle structures rather than silently dropping
+data.
+
+`litchi-keynote` retains graph selection, source/target style identity,
+copy-on-write style creation, stylesheet and package-metadata UUID/external
+reference maintenance, exact raw-byte publication, and reversible patch
+application. The package invalidates affected previews and publishes edits
+atomically; native identifiers and protobuf/wire types remain private. The
+`litchi-iwa` slide-background adapter remains a compatibility consumer of this
+semantic seam. This is a focused ownership slice and does not claim removal of
+the migration-host facade or compatibility behavior outside this operation.

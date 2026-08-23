@@ -4368,3 +4368,57 @@ through both read-only checks.
 No exact RSS/performance, native save/reopen mutation, Rust/native formula
 parity, workspace-wide Prost removal, host exit, debt retirement, or monolith
 deletion follows from this bounded source migration.
+
+## 2026-08-24 amendment: Wave53 Keynote slide-background bounded owner slice (not a monolith-exit gate)
+
+Commit `0b12df5e1` moves the selector-first Keynote slide-background semantic
+transaction into `litchi-keynote` while retaining `litchi-iwa` as a
+compatibility bridge. The package owns effective/direct background reads,
+solid/gradient/none/opaque setters, inheritance reset, exact reversible
+patches, copy-on-write style handling, stylesheet culling, package-metadata
+UUID/external-reference updates, and atomic preview-aware publication. The
+doc-hidden `litchi-iwa-protos::keynote_slide_background_codec` owns the strict
+borrowed wire snapshots and bounded typed rewrites. The host retains its
+compatibility surface and does not become the format owner again.
+
+The focused verification is 25/25 Keynote package cases, 19/19 background
+codec cases, 13/13 package-metadata codec cases, and 9/9 migration-host
+background cases. Strict Keynote/protos Clippy passes, and the all-target
+check for `litchi-iwa-protos`, `litchi-keynote`, and `litchi-iwa` passes with
+the checkout's existing warnings. Boundary units pass 324/324; the live
+explain audit exits 1 only for 23 known Pages findings (20 tracked and three
+untracked), with no Keynote finding. Targeted formatting and diff checks pass.
+
+The manifest and workspace ownership claims are unchanged: the focused
+Keynote direct Prost edge is dev-only, `litchi-iwa-protos` retains normal Prost
+for generated owners, and the Numbers formula oracle remains dev-only. This
+slice retires no `litchi-iwa` dependency edge or ordered debt, and it does not
+retire generated schemas, remove the migration host, or delete the monolith.
+
+The bounded native acceptance used Keynote 14.4 on disposable candidates from
+the pristine text-only `test-data/iwork/keynote/basic.key` fixture (500,058
+bytes; SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`). Keynote
+opened the candidates without repair. The pre-save candidate hashes/sizes
+were solid `da9437a0ee66a71cea632c427c41fdb45ff051e8e7fcf274cd841ed46bd76b82`
+(456,230 bytes), gradient
+`425a189d95cb535b5676d999f3e3d811c710de925c524a8e9877968e9a9394d5`
+(456,251), none
+`f50470a2356c188a14d27c4ab995e19c609d052fbf0716af4b7876da72feff83`
+(456,209), and reset
+`e171028d914283d90146cc7fc3ade20f54262c21d189cc6a638cfee9a9d91852`
+(456,207). Keynote displayed dark red Color Fill, red-to-blue Gradient Fill
+at 45 degrees, No Fill, and reset White at 100 percent; visible text stayed
+unchanged. After save/close/reopen, normalized outputs were solid
+`c2748466dda358870df9be1c8ba5c8e390a1cef86a136d73bee1d788efa1ec9b`
+(499,471 bytes), gradient
+`d41ea6c6e5aa3224824bac8461460c625cfbbc6870e9c8320b45b0ef705a4cd7`
+(503,600), none
+`15f0d2da655c573e80661893aac3fb0f4468704596509699c671545abafa4f62`
+(468,839), and reset
+`ae299a456bf40af628c6f8dc900cdc1e90c3cf1848de6a534a214874e813056a`
+(500,039).
+
+This is bounded application acceptance on a text-only fixture only. It does
+not establish Rust/native parity, media preservation, exact RSS or allocation
+behavior, performance, or a durable workspace publication gate.

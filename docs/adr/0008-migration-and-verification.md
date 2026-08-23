@@ -12131,3 +12131,71 @@ does not establish exact RSS/allocation/latency or performance, Rust/native
 formula equivalence, native save/reopen mutation parity, a publication change,
 workspace-wide Prost removal, host exit, ordered-debt retirement, or
 `litchi-iwa` monolith exit.
+
+## 2026-08-24 amendment: Wave53 Keynote slide-background verification record
+
+Commit `0b12df5e1` freezes the focused Keynote slide-background ownership and
+its verification record. The targeted cases passed as follows:
+
+- `cargo test -p litchi-keynote --test slide_background`: 25/25;
+- `cargo test -p litchi-iwa-protos keynote_slide_background_codec --lib`:
+  19/19;
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib`: 13/13;
+- `cargo test -p litchi-iwa --lib
+  keynote::editor::tests::slide_background_`: 9/9.
+
+Strict library Clippy passed for `litchi-keynote` and
+`litchi-iwa-protos`, and strict Clippy also passed for the focused
+`litchi-keynote` integration target. The all-target check
+`cargo check -p litchi-iwa-protos -p litchi-keynote -p litchi-iwa
+--all-targets` passed with the checkout's existing warnings. Targeted Rust
+formatting and `git diff --check` passed. The boundary-policy suite
+`python3 -m unittest tools.test_check_crate_boundaries` passed 324/324. The
+live `python3 tools/check_crate_boundaries.py --explain` command exits 1 only
+for the known 23 Pages table-lock findings (20 tracked aliases and three
+untracked retired-host findings); it reports no Keynote or slide-background
+finding. That live baseline is not represented as a green full boundary
+audit.
+
+The focused package's direct `prost` dependency remains test-only in
+`dev-dependencies`; `litchi-iwa-protos` retains its normal `prost` dependency
+for generated owners, and the earlier Numbers formula oracle remains
+dev-only. No manifest edge changed in Wave53, and no workspace-wide Prost
+removal or generated-schema retirement is claimed. The temporary Pages
+provenance bypass used by earlier detached verification is not part of this
+source change; the final focused checks above ran against the current tree.
+
+On macOS, Keynote 14.4 opened disposable candidates generated from the
+pristine text-only fixture `test-data/iwork/keynote/basic.key` (500,058 bytes,
+SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`) without
+repair. Before Keynote save/close/reopen, the candidate records were:
+
+The four pre-save files are
+`/private/tmp/litchi-wave53-bg-final-release.25zLao/{solid,gradient,none,reset}.key`.
+
+| operation | bytes | SHA-256 |
+| --- | ---: | --- |
+| solid | 456,230 | `da9437a0ee66a71cea632c427c41fdb45ff051e8e7fcf274cd841ed46bd76b82` |
+| gradient | 456,251 | `425a189d95cb535b5676d999f3e3d811c710de925c524a8e9877968e9a9394d5` |
+| none | 456,209 | `f50470a2356c188a14d27c4ab995e19c609d052fbf0716af4b7876da72feff83` |
+| reset | 456,207 | `e171028d914283d90146cc7fc3ade20f54262c21d189cc6a638cfee9a9d91852` |
+
+The observed semantics were dark red Color Fill, red-to-blue Gradient Fill at
+45 degrees, No Fill, and reset to White at 100 percent. The visible strings
+`Litchi native Keynote fixture`, `Buffa lazy-view migration verification`, and
+`2026-08-07` were unchanged. After save/close/reopen, Keynote normalized the
+candidates into
+`/private/tmp/litchi-wave53-bg-release.knewdR/{solid,gradient,none,reset}.key`:
+
+| operation | bytes | SHA-256 |
+| --- | ---: | --- |
+| solid | 499,471 | `c2748466dda358870df9be1c8ba5c8e390a1cef86a136d73bee1d788efa1ec9b` |
+| gradient | 503,600 | `d41ea6c6e5aa3224824bac8461460c625cfbbc6870e9c8320b45b0ef705a4cd7` |
+| none | 468,839 | `15f0d2da655c573e80661893aac3fb0f4468704596509699c671545abafa4f62` |
+| reset | 500,039 | `ae299a456bf40af628c6f8dc900cdc1e90c3cf1848de6a534a214874e813056a` |
+
+This is bounded application acceptance on a text-only fixture. It does not
+establish Rust/native byte or semantic parity, media preservation, exact RSS,
+allocation, latency, or other performance results, and it is not a native
+workspace save/publication gate.
