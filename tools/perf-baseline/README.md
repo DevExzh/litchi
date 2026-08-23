@@ -179,8 +179,49 @@ variant, source hash, text/paragraph digests, native exact-source round-trip
 proof, and explicit `performance_claim: "none"`;
 these selectors make no generic latency, allocation, physical-I/O, producer,
 or ABBA claim. They are opt-in and leave the default 36 cases / 198 records
-unchanged. The exhaustive `Case` registry/count tests now cover 380 selectable
-names.
+unchanged. Before change 0259, the exhaustive `Case` registry/count tests
+covered 380 selectable names.
+
+## Change 0259 relationship-heavy OPC structural open
+
+The opt-in `opc_relationship_open` selector raises the current selectable
+count to 381 while leaving the default 36 cases / 198 records unchanged. It
+uses one fixed in-memory corpus: 256 compressible 96-byte Parts, one external
+relationship per Part, one package-root relationship, and
+`[Content_Types].xml`. The resulting ZIP has exactly 514 members (256 Parts,
+257 `.rels` manifests, and one content-types manifest); all members must be
+deflated. The selector has no `--shape` or `--payload` matrix:
+those options are rejected when this case is selected so an unsupported shape
+cannot silently change the workload.
+
+The corpus is built and validated before measurement. An independent
+`ArchiveReader` captures sorted member names, every member payload, the
+relationship-only subset, the content-types payload, and the source byte/hash
+identity. A separate `LazyArchiveReader` must match every name and payload and
+must report every one of the 514 members—including all Parts, `.rels`, and
+`[Content_Types].xml`—as deflated. The emitted
+`source.opc_relationships.all_members_deflated_verified` flag records that
+gate. A preflight `PackageReader` (`OpcPackage`) cross-checks logical Part and
+relationship counts plus the aggregate Part payload bytes. These independent
+archive/lazy/package identities are emitted under `source.opc_relationships`;
+they are not inferred from the timed result.
+
+For each warm-up or retained sample, `elapsed_ns` covers exactly
+`OpcPackage::from_bytes` followed by the logical Part/relationship-count and
+aggregate Part-payload identity gates. Corpus generation, independent reader
+walks, hashing, JSON, and output handling are outside the timer. Physical ZIP
+member counts remain preflight identities because `PackageReader` does not
+expose its private member catalog. The selector reports
+`performance_claim: "none"`: it is correctness and timing-boundary coverage
+for 0259 only, with no latency, allocation, memory, I/O, decompression, or
+broad OOXML claim. Use it as the same selector on a pre-0259 control and a
+0259 candidate when a future controlled measurement is authorized:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release --bin litchi-perf-baseline -- \
+  --case opc_relationship_open --warmup 3 --samples 30 \
+  --json target/perf/opc-relationship-open.json
+```
 
 ## Run
 

@@ -2,7 +2,7 @@
 
 Date: 2026-08-23
 
-This is a coverage map, not a completion claim. It compares the 380 selectable
+This is a coverage map, not a completion claim. It compares the 381 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -35,7 +35,7 @@ performance claim.
 | Same-length OLE2 stream edits and metadata moves | Substrate plus bounded native-XLS/PPT/DOC consumers | `litchi-cfb` resolves existing logical streams through validated FAT/MiniFAT chains for bounded same-length whole-stream overlays and byte-range splices, and can move existing stream directory entries without copying payload sectors. Its writer also moves storage subtrees atomically while retaining descendant payload allocations and order. Exact source/version and target checks, overlap/duplicate/path/topology limits, complete reopen, direct sequential publication and atomic path output are covered where exposed. `litchi-ole-common` retains signing/encryption/DRM refusals. Change 0094 proves proportional MiniFAT exact-range reads at the generic substrate; change 0125 adds a distinct 4095-byte MiniFAT boundary control; change 0146 adds correctness/counter evidence for one-shot and repeated public `open_stream` calls, change 0148 adds different-SID A-B-A, public-bulk A-B-A, and overlapping same-target selectors, and change 0149 accepts only the configured-simulator aggregate same-target repeat result after a clean release ABBA. Same-target work changes from `[D,C,0...]` to `[D,D,...]`; local/per-invocation/bulk/concurrent and resource claims remain withheld. Change 0095 adds semantic existing-comment and worksheet-visibility publishers: one/256-comment plans submit 109/27,904 bytes instead of an 80,946-byte Workbook, and one/64-visibility plans submit 1/64 instead of 18,166. Change 0100 adds a native PPT one-shape equal-length text consumer; change 0102 replaces its full metadata-stream selector materialization with bounded Current User, persist-chain, Document-header, SlideList and selected-slide reads. Change 0105 adds a correctness-only Word97+ DOC main-story one-paragraph Unicode-piece splice with positional bounded chunk selection and same-width `WordDocument` replacement; its complete fingerprint and CFB validation/publication scans remain. Balanced XLS ABBA accepts no latency speedup; the PPT and DOC tranches remain correctness/selector-counter only because source identity and publication still read the complete artifact. Failure/retry, ineligible-root, FAT, native semantic, complete resource accounting, allocation/RSS, DOC broader CRUD, broader PPT edits, unstable FAT tails and cold/high-latency evidence remain open |
 
 The XLSB addition is deliberately a separate opt-in binary, so it does not
-change the 380-case selector count or the 36-case default matrix. Over one
+change the selectable-case count or the 36-case default matrix. Over one
 fixed real POI workbook it covers facade identification, worksheet catalog,
 one selected cell, a complete stored-cell scan of the selected worksheet,
 facade full text, an exact no-op worksheet patch plus save, one existing-scalar
