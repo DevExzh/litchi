@@ -1668,10 +1668,19 @@ fn enforce_text_projection_provenance(
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     const TEXT_DECLARATION: &str = "repeated string text = 3;";
+    // Pin the complete canonical StorageArchive declaration, not merely a
+    // globally matching field spelling.  A duplicate `text = 3` in another
+    // message must never authorize this ingress projection.
+    const STORAGE_ARCHIVE_DIGEST: &str =
+        "280fa513b7bda90cd2866d50ef250129afc885e7296fa391937dd93e9a143936";
 
     let canonical = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("TSWPStorageArchive.proto"))?;
-    if canonical.matches(TEXT_DECLARATION).count() != 1
+    let Some(storage_archive) = proto_message_block(&canonical, "StorageArchive") else {
+        return Err("TSWP text provenance lost the canonical StorageArchive message".into());
+    };
+    if proto_field(storage_archive, TEXT_DECLARATION) != 1
+        || sha256_hex(storage_archive) != STORAGE_ARCHIVE_DIGEST
         || projection.matches(TEXT_DECLARATION).count() != 1
     {
         return Err(
