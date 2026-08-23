@@ -1454,14 +1454,14 @@ fn verify_candidate(
         max_text_bytes,
         &mut semantic_budget,
     )
-    .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::TextBytes))?;
+    .map_err(map_body_footnote_projection_error)?;
     let after = super::project_body_footnotes_with_budget(
         candidate.state.source.components(),
         candidate.state.source.limits(),
         max_text_bytes,
         &mut semantic_budget,
     )
-    .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::TextBytes))?;
+    .map_err(map_body_footnote_projection_error)?;
     if before.len() != after.len() {
         return Err(FootnoteTextError::Verification);
     }
@@ -1608,6 +1608,34 @@ fn map_package_error(error: PackageError) -> FootnoteTextError {
 
 fn map_body_storage_decode_error(error: super::BodyStorageDecodeError) -> FootnoteTextError {
     match error {
+        super::BodyStorageDecodeError::Package(error) => map_package_error(error),
+        super::BodyStorageDecodeError::Wire(error) => map_text_rewrite_error(error),
+        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => {
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(limit),
+            }
+        },
+    }
+}
+
+fn map_body_footnote_projection_error(error: super::BodyStorageDecodeError) -> FootnoteTextError {
+    match error {
+        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => {
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(limit),
+            }
+        },
+        super::BodyStorageDecodeError::Package(PackageError::PayloadLimit { observed, limit }) => {
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::Entries,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(limit),
+            }
+        },
         super::BodyStorageDecodeError::Package(error) => map_package_error(error),
         super::BodyStorageDecodeError::Wire(error) => map_text_rewrite_error(error),
     }
@@ -1794,9 +1822,9 @@ mod tests {
 
     use super::{
         FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind, FootnoteTextPatch,
-        checked_utf16_units, is_canonical_component_name, map_body_storage_decode_error,
-        map_package_error_with_kind, map_storage_wire_limits_error, position_from_anchor,
-        rewrite_custom_mark_wire,
+        checked_utf16_units, is_canonical_component_name, map_body_footnote_projection_error,
+        map_body_storage_decode_error, map_package_error_with_kind, map_storage_wire_limits_error,
+        position_from_anchor, rewrite_custom_mark_wire,
     };
     use crate::footnote::body::{Footnote, Position};
     use crate::package::{BodyStorageDecodeError, StorageWireLimitsError};
@@ -1898,6 +1926,68 @@ mod tests {
                 kind: FootnoteTextLimitKind::TextBytes,
                 observed: 19,
                 maximum: 14,
+            }
+        );
+    }
+
+    #[test]
+    fn body_footnote_projection_keeps_entry_and_wire_limit_categories() {
+        let entries = map_body_footnote_projection_error(BodyStorageDecodeError::Package(
+            PackageError::PayloadLimit {
+                observed: 4097,
+                limit: 4096,
+            },
+        ));
+        assert_eq!(
+            entries,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::Entries,
+                observed: 4097,
+                maximum: 4096,
+            }
+        );
+
+        let aggregate = map_body_footnote_projection_error(BodyStorageDecodeError::SemanticLimit {
+            observed: 19,
+            limit: 14,
+        });
+        assert_eq!(
+            aggregate,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: 19,
+                maximum: 14,
+            }
+        );
+
+        let text = map_body_footnote_projection_error(BodyStorageDecodeError::Package(
+            PackageError::Semantic(SemanticError::TextTooLarge {
+                observed: 9,
+                limit: 8,
+            }),
+        ));
+        assert_eq!(
+            text,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: 9,
+                maximum: 8,
+            }
+        );
+
+        let wire = map_body_footnote_projection_error(BodyStorageDecodeError::Wire(
+            RewriteError::LimitExceeded {
+                resource: "rewrite work",
+                observed: 33,
+                limit: 32,
+            },
+        ));
+        assert_eq!(
+            wire,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::WireWork,
+                observed: 33,
+                maximum: 32,
             }
         );
     }
