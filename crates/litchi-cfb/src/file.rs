@@ -252,6 +252,24 @@ pub enum OleError {
     Committed {
         source: io::Error,
     },
+    /// The source exceeded a finite CFB ingress limit before parsing began.
+    LimitExceeded {
+        /// Resource whose configured ceiling was crossed.
+        resource: &'static str,
+        /// Observed source or metadata size.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A caller supplied a limit outside the CFB hard safety ceiling.
+    InvalidLimit {
+        /// Resource whose limit was invalid.
+        resource: &'static str,
+        /// Requested limit.
+        value: u64,
+        /// Largest supported limit.
+        maximum: u64,
+    },
     InvalidFormat(String),
     InvalidData(String),
     NotOleFile,
@@ -265,6 +283,53 @@ pub enum OleError {
         /// Version observed after the operation completed.
         observed: litchi_core::SourceVersion,
     },
+}
+
+/// Finite resource limits for the low-level CFB reader.
+///
+/// The limit is checked immediately after obtaining the reader length and
+/// before the parser allocates its physical-sector map or traverses any CFB
+/// metadata. The default is deliberately finite and matches the hard ingress
+/// ceiling used by [`crate::SharedOleFile`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OleFileLimits {
+    max_input_bytes: u64,
+}
+
+impl OleFileLimits {
+    /// Largest source accepted by the low-level CFB reader.
+    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+    /// Creates a finite input ceiling for one CFB source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// the low-level CFB hard ingress ceiling.
+    pub const fn new(max_input_bytes: u64) -> Result<Self, OleError> {
+        if max_input_bytes == 0 || max_input_bytes > Self::MAX_INPUT_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB input bytes",
+                value: max_input_bytes,
+                maximum: Self::MAX_INPUT_BYTES,
+            });
+        }
+        Ok(Self { max_input_bytes })
+    }
+
+    /// Maximum source length accepted before parsing begins.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+}
+
+impl Default for OleFileLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: Self::MAX_INPUT_BYTES,
+        }
+    }
 }
 
 impl From<io::Error> for OleError {
@@ -299,6 +364,22 @@ impl std::fmt::Display for OleError {
                 f,
                 "CFB destination was replaced but directory durability could not be confirmed: {source}"
             ),
+            OleError::LimitExceeded {
+                resource,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "CFB {resource} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            OleError::InvalidLimit {
+                resource,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid CFB {resource} limit {value}; maximum is {maximum}"
+            ),
             OleError::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             OleError::InvalidData(s) => write!(f, "Invalid data: {s}"),
             OleError::NotOleFile => write!(f, "Not an OLE file"),
@@ -319,6 +400,8 @@ impl std::error::Error for OleError {
             Self::Allocation { source, .. } => Some(source),
             Self::InvalidFormat(_)
             | Self::InvalidData(_)
+            | Self::LimitExceeded { .. }
+            | Self::InvalidLimit { .. }
             | Self::NotOleFile
             | Self::CorruptedFile(_)
             | Self::StreamNotFound
@@ -341,6 +424,19 @@ impl From<OleError> for litchi_core::Error {
                 litchi_core::Error::Allocation { resource, source }
             },
             error @ OleError::Committed { .. } => litchi_core::Error::Other(error.to_string()),
+            OleError::LimitExceeded {
+                resource,
+                observed,
+                maximum,
+            } => litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed,
+                limit: maximum,
+                scope: resource.into(),
+            }),
+            error @ OleError::InvalidLimit { .. } => {
+                litchi_core::Error::InvalidFormat(error.to_string())
+            },
             OleError::InvalidFormat(s) | OleError::InvalidData(s) => {
                 litchi_core::Error::InvalidFormat(s)
             },
@@ -383,9 +479,26 @@ impl<R: Read + Seek> OleFile<R> {
     /// # Errors
     /// Returns an `OleError` if the reader fails, or if the data is not a
     /// valid OLE compound file (bad magic, truncated header, corrupt FAT).
-    pub fn open(mut reader: R) -> Result<Self, OleError> {
+    pub fn open(reader: R) -> Result<Self, OleError> {
+        Self::open_with_limits(reader, OleFileLimits::default())
+    }
+
+    /// Open and parse an OLE file under an explicit finite ingress limit.
+    ///
+    /// The source length is checked immediately after the reader reports it,
+    /// before any CFB metadata can cause an allocation or index traversal.
+    /// Existing callers should use [`Self::open`], which retains the same
+    /// source-compatible entry point with finite default limits.
+    pub fn open_with_limits(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {
         // Get file size
         let file_size = reader.seek(SeekFrom::End(0))?;
+        if file_size > limits.max_input_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: file_size,
+                maximum: limits.max_input_bytes(),
+            });
+        }
         reader.seek(SeekFrom::Start(0))?;
 
         // Check minimum size
@@ -486,6 +599,33 @@ impl<R: Read + Seek> OleFile<R> {
         }
         let physical_sector_count = usize::try_from(file_size / sector_size as u64 - 1)
             .map_err(|_err| OleError::InvalidFormat("Too many physical sectors".to_string()))?;
+
+        // Validate all count metadata that can otherwise size an allocation or
+        // traversal before installing the physical-sector index. The checks
+        // remain duplicated in the table loaders as defense in depth for
+        // crate-private future callers.
+        let physical_sector_count_u64 = u64::try_from(physical_sector_count)
+            .map_err(|_err| OleError::InvalidFormat("Too many physical sectors".to_string()))?;
+        if u64::from(num_fat_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared FAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        if u64::from(num_difat_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared DIFAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        if u64::from(num_minifat_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared MiniFAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        if dll_version == 4 && u64::from(num_dir_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared directory sector count exceeds the physical file".to_string(),
+            ));
+        }
         let sector_roles = try_filled_vec(
             physical_sector_count,
             PhysicalSectorRole::Unclaimed,

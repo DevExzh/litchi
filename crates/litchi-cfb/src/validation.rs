@@ -216,6 +216,8 @@ fn is_structural_rejection(error: &OleError) -> bool {
         error,
         OleError::InvalidFormat(_)
             | OleError::InvalidData(_)
+            | OleError::LimitExceeded { .. }
+            | OleError::InvalidLimit { .. }
             | OleError::NotOleFile
             | OleError::CorruptedFile(_)
             | OleError::StreamNotFound
@@ -248,6 +250,16 @@ fn rejection_fields(error: &OleError) -> (&'static str, &'static str, &str) {
             "cfb.container.missing_stream",
             "The CFB ingress could not resolve a required structural stream",
             "required-structural-stream-not-found",
+        ),
+        OleError::LimitExceeded { .. } => (
+            "cfb.container.limit_exceeded",
+            "The CFB ingress exceeded a finite resource limit",
+            "resource-limit-exceeded",
+        ),
+        OleError::InvalidLimit { .. } => (
+            "cfb.container.invalid_limit",
+            "The CFB ingress received an invalid resource limit",
+            "invalid-resource-limit",
         ),
         OleError::Io(_)
         | OleError::Allocation { .. }
