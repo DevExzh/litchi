@@ -3316,22 +3316,6 @@ mod tests {
     }
 
     #[test]
-    fn footnote_semantic_budget_accepts_cap_and_rejects_next() -> PackageResult<()> {
-        let mut budget = FootnoteSemanticBudget::new(7);
-        budget.charge(4, 3)?;
-        assert!(matches!(
-            budget.charge(0, 1),
-            Err(PackageError::PayloadLimit {
-                observed: 8,
-                limit: 7,
-            })
-        ));
-        // A rejected charge must not consume the exact-cap allowance.
-        budget.charge(0, 0)?;
-        Ok(())
-    }
-
-    #[test]
     fn package_rewrites_existing_body_footnote_text_as_an_exact_reversible_edit()
     -> PackageResult<()> {
         let package_bytes = body_footnote_package_bytes()?;

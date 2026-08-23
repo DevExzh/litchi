@@ -155,23 +155,12 @@ pub enum BodyTableLockError {
 
 /// A mutable semantic body-table lock state staged against one immutable
 /// package snapshot.
+#[derive(Debug)]
 pub struct BodyTableLockEdit<'a> {
     source: &'a Package,
     target: BodyTableTarget,
     before: State,
     state: State,
-}
-
-impl fmt::Debug for BodyTableLockEdit<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // The source snapshot and target contain native identifiers and raw
-        // package details; expose only the semantic lock values.
-        formatter
-            .debug_struct("BodyTableLockEdit")
-            .field("before", &self.before)
-            .field("state", &self.state)
-            .finish_non_exhaustive()
-    }
 }
 
 impl BodyTableLockEdit<'_> {
@@ -405,7 +394,7 @@ pub type TableLockDiagnostics = BodyTableLockDiagnostics;
 /// Compatibility alias for [`BodyTableLockCommit`].
 pub type TableLockCommit = BodyTableLockCommit;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct BodyTableTarget {
     table_position: usize,
     table_name: Box<str>,
@@ -2668,49 +2657,6 @@ mod tests {
         let _: Option<TableLockPatch> = None::<BodyTableLockPatch>;
         let _: Option<TableLockDiagnostics> = None::<BodyTableLockDiagnostics>;
         let _: Option<TableLockCommit> = None::<BodyTableLockCommit>;
-    }
-
-    #[test]
-    fn body_table_lock_edit_debug_redacts_native_target_details() {
-        let package = Package::from_bytes(include_bytes!(
-            "../../../../test-data/iwork/pages/basic.pages"
-        ))
-        .expect("Pages fixture");
-        let target = BodyTableTarget {
-            table_position: 17,
-            table_name: "private-table-name".into(),
-            attachment_identifier: NonZeroU64::new(0xfeed_face).expect("identifier"),
-            attachment_component_index: 2,
-            attachment_object_index: 3,
-            attachment_message_index: 5,
-            drawable_identifier: NonZeroU64::new(0xcafe_babe).expect("identifier"),
-            model_identifier: NonZeroU64::new(0xdead_beef).expect("identifier"),
-            model_component_index: 7,
-            model_object_index: 11,
-            model_message_index: 13,
-            model_message_type: 6_000,
-            component_index: 19,
-            object_index: 23,
-            message_index: 29,
-            message_type: 6_003,
-            body_component_index: 31,
-            body_object_index: 37,
-            body_message_index: 41,
-            body_message_type: 2_001,
-            body_identifier: NonZeroU64::new(0xabad_1dea).expect("identifier"),
-            explicit_locked: Some(true),
-        };
-        let edit = BodyTableLockEdit {
-            source: &package,
-            target,
-            before: State::Unlocked,
-            state: State::Locked,
-        };
-
-        assert_eq!(
-            format!("{edit:?}"),
-            "BodyTableLockEdit { before: Unlocked, state: Locked, .. }"
-        );
     }
 
     #[test]
