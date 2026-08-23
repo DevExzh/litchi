@@ -2026,6 +2026,16 @@ fn table_limit_error(observed: usize, maximum: usize) -> Error {
     }
 }
 
+fn checked_next_table_count(current: usize, maximum: usize) -> Result<usize> {
+    let observed = current.checked_add(1).ok_or_else(|| {
+        Error::InvalidFormat("Numbers table count overflows host usize".to_owned())
+    })?;
+    if observed > maximum {
+        return Err(table_limit_error(observed, maximum));
+    }
+    Ok(observed)
+}
+
 fn decode_projected_legacy_candidate<T>(
     data: &[u8],
     admit: impl FnOnce() -> Result<()>,
@@ -2460,6 +2470,7 @@ pub(super) struct TableDataExtractor<'a> {
     bundle: &'a Components,
     object_index: &'a Index,
     projection_budget: RefCell<ProjectionBudget>,
+    max_tables: usize,
     retain_comments: bool,
     document_projection: bool,
 }
@@ -2490,6 +2501,7 @@ impl<'a> TableDataExtractor<'a> {
             bundle,
             object_index,
             projection_budget: RefCell::new(ProjectionBudget::new(limits)),
+            max_tables: limits.max_tables(),
             retain_comments: true,
             document_projection: false,
         }
@@ -2523,11 +2535,13 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Extract all tables from the document
     pub(super) fn extract_all_tables(&self) -> Result<Vec<Table>> {
+        let max_tables = self.max_tables;
         let mut tables = Vec::new();
-        self.for_each_table(usize::MAX, |table| {
-            tables.try_reserve(1).map_err(|_| {
-                allocation_error("Numbers extracted table results", tables.len() + 1)
-            })?;
+        self.for_each_table(max_tables, |table| {
+            let next_count = checked_next_table_count(tables.len(), max_tables)?;
+            tables
+                .try_reserve(1)
+                .map_err(|_| allocation_error("Numbers extracted table results", next_count))?;
             tables.push(table);
             Ok(())
         })?;
@@ -2544,11 +2558,13 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         max_tables: usize,
     ) -> Result<Vec<crate::Table>> {
+        let max_tables = max_tables.min(self.max_tables);
         let mut tables = Vec::new();
         self.for_each_table(max_tables, |table| {
-            tables.try_reserve(1).map_err(|_| {
-                allocation_error("Numbers semantic table results", tables.len() + 1)
-            })?;
+            let next_count = checked_next_table_count(tables.len(), max_tables)?;
+            tables
+                .try_reserve(1)
+                .map_err(|_| allocation_error("Numbers semantic table results", next_count))?;
             tables.push(table.into_semantic_table()?);
             Ok(())
         })?;
@@ -2560,6 +2576,7 @@ impl<'a> TableDataExtractor<'a> {
         max_tables: usize,
         mut visit: impl FnMut(Table) -> Result<()>,
     ) -> Result<()> {
+        let max_tables = max_tables.min(self.max_tables);
         let mut seen_objects = HashSet::new();
         let mut table_count = 0usize;
 
@@ -2572,11 +2589,13 @@ impl<'a> TableDataExtractor<'a> {
                 if seen_objects.contains(&entry.id()) {
                     continue;
                 }
-                seen_objects.try_reserve(1).map_err(|_error| {
-                    allocation_error(
-                        "Numbers structured table identities",
-                        seen_objects.len() + 1,
+                let next_seen = seen_objects.len().checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Numbers structured table identity count overflows host usize".to_owned(),
                     )
+                })?;
+                seen_objects.try_reserve(1).map_err(|_error| {
+                    allocation_error("Numbers structured table identities", next_seen)
                 })?;
                 seen_objects.insert(entry.id());
                 // Candidate admission is deliberately checked before protobuf
@@ -2584,24 +2603,15 @@ impl<'a> TableDataExtractor<'a> {
                 // later malformed canonical candidate cannot force another
                 // potentially large model allocation merely to choose an error.
                 if message_type == TABLE_MODEL_MESSAGE_TYPE && table_count >= max_tables {
-                    return Err(table_limit_error(table_count.saturating_add(1), max_tables));
+                    checked_next_table_count(table_count, max_tables)?;
                 }
                 if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
                     && let Some(table) =
                         self.extract_table_candidate(&resolved, message_type, || {
-                            if table_count >= max_tables {
-                                Err(table_limit_error(table_count.saturating_add(1), max_tables))
-                            } else {
-                                Ok(())
-                            }
+                            checked_next_table_count(table_count, max_tables).map(|_| ())
                         })?
                 {
-                    table_count = table_count
-                        .checked_add(1)
-                        .ok_or_else(|| table_limit_error(usize::MAX, max_tables))?;
-                    if table_count > max_tables {
-                        return Err(table_limit_error(table_count, max_tables));
-                    }
+                    table_count = checked_next_table_count(table_count, max_tables)?;
                     visit(table)?;
                 }
             }
