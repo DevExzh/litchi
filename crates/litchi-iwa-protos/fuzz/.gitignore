@@ -1,0 +1,7 @@
+target/
+artifacts/
+coverage/
+
+# cargo-fuzz can materialize a temporary workspace below the fuzz package when
+# invoked through a wrapper. Keep that generated tree out of the source tree.
+crates/
