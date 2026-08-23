@@ -445,4 +445,5 @@ pub(crate) use table_title::{
 pub(crate) use package::*;
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests;

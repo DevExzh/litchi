@@ -1,4 +1,7 @@
 //! Create and physically sort a Numbers table without an input document.
+
+#![allow(deprecated)]
+
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
 use litchi_iwa::numbers::{

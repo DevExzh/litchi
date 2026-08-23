@@ -1,5 +1,7 @@
 //! Create, update, or delete a Numbers cell comment.
 
+#![allow(deprecated)]
+
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;
