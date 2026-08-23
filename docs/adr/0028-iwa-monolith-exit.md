@@ -4213,9 +4213,9 @@ aliases.
 
 ## 2026-08-23 amendment: current HEAD extension after deprecation and alias guards
 
-The preceding `8cddd44af` note is historical. At current HEAD `546df8f04`,
-`406cff111` adds boundary ratchets for retained Numbers and Pages raw-ID
-compatibility methods, and `546df8f04` rejects aliased Keynote
+The preceding `8cddd44af` note is historical. At the then-current committed
+HEAD `546df8f04`, `406cff111` adds boundary ratchets for retained Numbers and
+Pages raw-ID compatibility methods, and `546df8f04` rejects aliased Keynote
 slide/show/node identities before transition reads or staging. These changes
 retain the migration-host compatibility surfaces and move no owner out of
 `litchi-iwa`; no deletion-gate item is satisfied.
@@ -4227,3 +4227,30 @@ monolith deletion is admitted. The boundary checker remains non-green with
 22 findings: two Keynote slide-transition validator exports, 18 Pages
 table-lock alias sites, and the two existing `TableLockState`/`TableSelector`
 aliases.
+
+## 2026-08-23 amendment: Wave45 source-only follow-up at HEAD 97972ce74
+
+The preceding `546df8f04` note is historical. At committed HEAD
+`97972ce74` (parent `875fe2a48`), the Wave45 changes do not advance the
+monolith deletion gate:
+
+- `6d7f1a701` repairs the Pages native-message provenance guard markers. The
+  supplied direct Pages guard evidence is `16/16`; it is scoped guard
+  evidence, not a full-workspace gate.
+- `1bad9156e` tightens the strict Numbers TableDataList/Segment route probe so
+  known repeated entry/segment fields must carry length-delimited wire shape
+  before a candidate is admitted to full decode. This is source-level wire
+  hardening; no test execution is recorded here.
+- `875fe2a48` stages private bundle aggregate fields/work/text/output budgets
+  with transactional publication. The seam is explicitly `dead_code`-allowed
+  pending neutral-decoder cutover and does not widen the 6005/6201/6011
+  compatibility routes. Review was limited to rustfmt/diff; Cargo was blocked
+  before this repair, so no Cargo or test result is claimed.
+- `97972ce74` repairs the Keynote soundtrack projection digest and adds a
+  scalar provenance guard. The supplied soundtrack-focused `cargo check`
+  passes; the full `litchi-iwa-protos` test remains blocked by the
+  `table_info` compile failure.
+
+No native or type-6011 result, Rust/native parity, full-workspace verification,
+Buffa/Prost exit, generated-schema retirement, dependency/debt retirement,
+migration-host exit, or monolith deletion is admitted by this amendment.

@@ -631,9 +631,10 @@ exit, or monolith deletion follows.
 
 ## 2026-08-23 amendment: current HEAD extension after deprecation and alias guards
 
-The preceding `8cddd44af` note is historical. At current committed HEAD
-`546df8f04`, `406cff111` adds source ratchets requiring the retained Numbers
-cell-comment and Pages section-text compatibility methods to stay deprecated;
+The preceding `8cddd44af` note is historical. At the then-current committed
+HEAD `546df8f04`, `406cff111` adds source ratchets requiring the retained
+Numbers cell-comment and Pages section-text compatibility methods to stay
+deprecated;
 it adds boundary unit cases but changes no runtime format path. `546df8f04`
 rejects aliased Keynote slide/show/node identities before transition reads or
 staging and adds malformed-topology coverage. The existing bounded owner-work
@@ -642,3 +643,32 @@ profile is retained; no package-wide or performance result is implied.
 No test command, native application result, Buffa/Prost or generated-schema
 change, dependency-edge/debt retirement, host exit, or monolith deletion is
 admitted by these source and boundary-ratchet changes.
+
+## 2026-08-23 amendment: Wave45 source-only follow-up at HEAD 97972ce74
+
+The preceding `546df8f04` note is historical. At committed HEAD
+`97972ce74` (parent `875fe2a48`), the intervening Wave45 changes remain
+bounded source hardening and staged budget work:
+
+- `6d7f1a701` repairs the Pages native-message provenance guard markers and
+  adds a direct guard check. The supplied direct Pages guard evidence is
+  `16/16`; this is scoped guard evidence, not a full workspace gate.
+- `1bad9156e` tightens the strict Numbers TableDataList/Segment route probe:
+  known repeated entry/segment fields must carry length-delimited wire shape
+  before a candidate is admitted to full decode. This is source-level wire
+  hardening; no test execution is recorded here.
+- `875fe2a48` stages private `BundleExtractionLimits`,
+  `BundleExtractionBudget`, `BundleExtractionContext`, and
+  `BundleExtractionTransaction` for cumulative fields/work/text/output
+  charging and atomic publication. The seam is explicitly `dead_code`-allowed
+  pending neutral-decoder cutover and does not widen the 6005/6201/6011
+  compatibility routes. Review was limited to rustfmt/diff; Cargo was blocked
+  before this repair, so no Cargo or test result is claimed.
+- `97972ce74` repairs the Keynote soundtrack projection digest and adds a
+  scalar provenance guard. The supplied soundtrack-focused `cargo check`
+  passes; the full `litchi-iwa-protos` test remains blocked by the
+  `table_info` compile failure.
+
+These changes establish no native or type-6011 result, full-workspace
+verification, Buffa/Prost exit, generated-schema retirement, dependency/debt
+change, host exit, monolith deletion, or performance measurement.
