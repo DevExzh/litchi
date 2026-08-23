@@ -413,6 +413,13 @@ where
                         .checked_add(bytes.len() as u64)
                         .ok_or_else(|| unsupported("output offset overflow"))?;
                 },
+                PreparedLocal::Shared { bytes, range } => {
+                    let generated = &bytes[range.clone()];
+                    sink.write_all(generated)?;
+                    output_offset = output_offset
+                        .checked_add(generated.len() as u64)
+                        .ok_or_else(|| unsupported("output offset overflow"))?;
+                },
             }
         }
         for index in self.entries.len()..prepared.len() {
@@ -431,6 +438,13 @@ where
                     sink.write_all(bytes)?;
                     output_offset = output_offset
                         .checked_add(bytes.len() as u64)
+                        .ok_or_else(|| unsupported("output offset overflow"))?;
+                },
+                PreparedLocal::Shared { bytes, range } => {
+                    let generated = &bytes[range.clone()];
+                    sink.write_all(generated)?;
+                    output_offset = output_offset
+                        .checked_add(generated.len() as u64)
                         .ok_or_else(|| unsupported("output offset overflow"))?;
                 },
             }
@@ -597,6 +611,15 @@ fn retained_entry_count(prepared: &[PreparedEntry]) -> usize {
 enum PreparedCentral {
     Copy(usize),
     Generated(Vec<u8>),
+    /// Generated local and central records may share the one archive buffer.
+    ///
+    /// Keeping ranges into the finished one-entry archive avoids copying the
+    /// central record into a second allocation merely to retain it while the
+    /// local record is emitted to a forward-only sink.
+    Shared {
+        bytes: Arc<Vec<u8>>,
+        range: Range<usize>,
+    },
 }
 
 impl PreparedCentral {
@@ -604,6 +627,7 @@ impl PreparedCentral {
         match self {
             Self::Copy(index) => &entries[*index].central_bytes,
             Self::Generated(bytes) => bytes,
+            Self::Shared { bytes, range } => &bytes[range.clone()],
         }
     }
 }
@@ -611,6 +635,13 @@ impl PreparedCentral {
 enum PreparedLocal {
     Copy(Range<u64>),
     Generated(Vec<u8>),
+    /// A range into the same finished archive buffer retained by the central
+    /// record. This keeps generated-member publication forward-only without
+    /// copying the central directory bytes.
+    Shared {
+        bytes: Arc<Vec<u8>>,
+        range: Range<usize>,
+    },
 }
 
 impl PreparedLocal {
@@ -618,6 +649,7 @@ impl PreparedLocal {
         match self {
             Self::Copy(range) => range.end - range.start,
             Self::Generated(bytes) => bytes.len() as u64,
+            Self::Shared { range, .. } => (range.end - range.start) as u64,
         }
     }
 }
@@ -680,16 +712,20 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         }
         (directory_offset, eocd_offset)
     };
-    let central_len = eocd_offset - directory_offset;
-    let mut central = Vec::new();
-    central
-        .try_reserve_exact(central_len)
-        .map_err(|source| allocation("generated central record", source))?;
-    central.extend_from_slice(&bytes[directory_offset..eocd_offset]);
-    bytes.truncate(directory_offset);
+    // Retain one owned archive buffer and publish disjoint ranges from it.
+    // The previous implementation copied the central record into another
+    // `Vec`, even though the finished one-entry archive already contained the
+    // exact bytes needed for both forward-only output phases.
+    let bytes = Arc::new(bytes);
     Ok(PreparedEntry {
-        local: PreparedLocal::Generated(bytes),
-        central: PreparedCentral::Generated(central),
+        local: PreparedLocal::Shared {
+            bytes: Arc::clone(&bytes),
+            range: 0..directory_offset,
+        },
+        central: PreparedCentral::Shared {
+            bytes,
+            range: directory_offset..eocd_offset,
+        },
         omitted: false,
     })
 }
