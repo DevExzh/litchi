@@ -216,6 +216,27 @@ fn malformed_writer_metadata_is_rejected() {
 }
 
 #[test]
+fn validation_surrogate_pair_messages_round_trip() {
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Validation").unwrap();
+    let mut rule = validation(0, DataValidationType::Any);
+    rule.input_title = Some("😀".to_string());
+    rule.input_message = Some("😀".to_string());
+    rule.error_title = Some("😀".to_string());
+    rule.error_message = Some("😀".to_string());
+    writer.add_data_validation(sheet, rule).unwrap();
+
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let rule = &workbook.xls_worksheet(0).unwrap().data_validations()[0];
+    assert_eq!(rule.prompt_title(), Some("😀"));
+    assert_eq!(rule.prompt(), Some("😀"));
+    assert_eq!(rule.error_title(), Some("😀"));
+    assert_eq!(rule.error(), Some("😀"));
+}
+
+#[test]
 fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("EmptyValidation").unwrap();
