@@ -746,6 +746,13 @@ class BoundaryPolicyTests(unittest.TestCase):
             },
         )
 
+    def test_opc_owns_xml_publication_audit_edge(self) -> None:
+        edge = boundaries.Edge("litchi-opc", "xml-minifier")
+
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.dev_only_edges)
+        self.assertNotIn(edge, self.policy.migration_edges)
+
     def test_pptx_drawingml_edge_is_canonical(self) -> None:
         edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
 

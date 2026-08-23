@@ -2415,10 +2415,13 @@ See [`0005`](changes/0005-xlsx-row-start-index.md),
 Consolidated OPC, PPTX and performance-harness tests passed, along with
 warning-denied changed-crate Clippy, formatter, workflow, JSON and final-diff
 checks. Warning-denied ODF-common Clippy and rustdoc also pass, revalidating the
-GenericArray deprecation fix. The broad crate-boundary checker retains existing
-unclassified workspace edges; no manifest or dependency edge changed. A
-workspace all-target/all-feature gate was not run because iWork was explicitly
-excluded while its crates are changing independently.
+GenericArray deprecation fix. At that historical capture, the broad
+crate-boundary checker retained existing unclassified workspace edges; the
+current policy now classifies every resolved edge, including the canonical
+`litchi-opc -> xml-minifier` publication-audit edge and the exact dev-only
+`soapberry-zip` annotations. A workspace all-target/all-feature gate was not
+run because iWork was explicitly excluded while its crates are changing
+independently.
 
 ## Accepted results
 
@@ -3118,11 +3121,11 @@ to that earlier capture.
 
 The repository-wide warning-denied rustdoc command remains blocked by existing
 broken/private intra-doc links in unchanged OPC, DOC, XLS, and PPT files. The
-dependency-direction checker unit suite passes, while the live policy check
-reports existing unclassified edges (including `litchi-opc -> xml-minifier`
-and several dev-only `-> soapberry-zip` edges); this tranche changes no Cargo
-manifest or dependency edge. These pre-existing gate failures are not counted
-as passing verification.
+dependency-direction checker unit suite and live policy check now pass. The
+historical capture above predates the policy entries for the canonical
+`litchi-opc -> xml-minifier` publication-audit edge and the exact dev-only
+`soapberry-zip` annotations; those old diagnostics are not current gate
+failures and no dependency edge is being hidden by a broad allowlist.
 
 During the stage-1 capture, hardware counters were unavailable because that
 host had `perf_event_paranoid=4`. The later targeted-OPC capture ran after the
