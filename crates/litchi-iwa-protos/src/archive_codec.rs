@@ -478,11 +478,17 @@ mod tests {
         );
         for marker in [
             "decode_view(",
+            "decode_view_with_options",
             "OwnedView",
             "from_owned",
             "to_owned_message",
             "to_owned_from_source",
             "decode_view_handle",
+            "decode_from_slice",
+            "merge_from_slice",
+            "decode_reader",
+            "decode_length_delimited_reader",
+            "decode_with_options",
             "encode_to_vec",
             "try_encode_to_vec",
             "prost::",
