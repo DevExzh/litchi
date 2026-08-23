@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0264 — real-producer security correctness corpus](changes/0264-real-producer-security-corpus.md)
+(the ignored locked gate covers eight pinned POI/OOXML fixtures: signed
+DOCX/XLSX/PPTX, protected DOCX, two encrypted DOC files, a macro XLS, and an
+external-link XLSX. Signature/protection/password, inert-VBA, external
+inventory, one-under input, zero-output publication, and RAII release checks
+pass. This is bounded correctness-only evidence with no selector/default
+count, latency, allocation/RSS, physical-I/O, or resource-performance claim.)
+
 [change 0263 — DOCX story-hyperlink publication selectors](changes/0263-docx-story-hyperlink-publication.md)
 (the opt-in no-op and shared-target redaction selectors cover seven Word story
 kinds, 15 Parts, 24 ZIP members, and a pinned 9,900-byte source. Their timer

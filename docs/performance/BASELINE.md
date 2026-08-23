@@ -21,6 +21,25 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest real-producer security correctness coverage (change 0264)
+
+The ignored locked `security_corpus` test covers eight pinned public fixtures:
+signed POI DOCX/XLSX/PPTX, a read-only protected DOCX, POI CryptoAPI and
+binary-RC4 encrypted DOC files, POI `SimpleMacro.xls`, and an OOXML startup
+external-link XLSX. Exact source SHA-256 values, paths, semantic decryption
+digests, and the external inventory digest are recorded in
+[change 0264](changes/0264-real-producer-security-corpus.md) and in the Rust
+source manifest.
+
+The gate validates signature status, exact no-op bytes, zero-output signed and
+protected mutation refusals, typed password errors and correct-password
+semantic readback, inert VBA CFB-stream identity and typed source-backed edit
+refusal, external inventory without target resolution, a one-under input
+limit, and a zero-output managed budget with post-drop `Memory`, `Objects`,
+and `OutputBytes` release. It remains correctness-only: no selector or
+default-count change and no latency, allocation, RSS, physical-I/O, or
+resource-performance claim.
+
 ## Latest DOCX story-hyperlink publication coverage (change 0263)
 
 The opt-in `docx_story_hyperlink_noop_save` and
