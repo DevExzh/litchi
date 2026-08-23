@@ -1349,8 +1349,13 @@ fn rewrite_custom_mark_wire(
     }
     let output_fields = view
         .len()
-        .saturating_sub(if selected.is_some() { 1 } else { 0 })
-        .saturating_add(if after.is_some() { 1 } else { 0 });
+        .checked_sub(usize::from(selected.is_some()))
+        .and_then(|fields| fields.checked_add(usize::from(after.is_some())))
+        .ok_or(FootnoteTextError::LimitExceeded {
+            kind: FootnoteTextLimitKind::WireFields,
+            observed: u64::MAX,
+            maximum: usize_to_u64(limits.max_fields()),
+        })?;
     if output_fields > limits.max_fields() {
         return Err(FootnoteTextError::LimitExceeded {
             kind: FootnoteTextLimitKind::WireFields,
@@ -1424,6 +1429,14 @@ fn verify_candidate(
     position: Position,
     expected: &Footnote,
 ) -> Result<(), FootnoteTextError> {
+    // Run the native graph projection first.  Besides checking that the
+    // candidate retained the same private identities, this is the pass that
+    // charges the aggregate footnote text/custom-marker budget with its
+    // dedicated TextBytes diagnostic.  `body_footnotes` is still needed for
+    // semantic readback, but its generic payload-limit mapping cannot tell an
+    // aggregate semantic refusal from a wire-level refusal.
+    let source_graphs = native_footnotes(source)?;
+    let candidate_graphs = native_footnotes(candidate)?;
     let before = source.body_footnotes().map_err(map_package_error)?;
     let after = candidate.body_footnotes().map_err(map_package_error)?;
     if before.len() != after.len() {
@@ -1450,8 +1463,6 @@ fn verify_candidate(
     if source.stats().total_objects() != candidate.stats().total_objects() {
         return Err(FootnoteTextError::Verification);
     }
-    let source_graphs = native_footnotes(source)?;
-    let candidate_graphs = native_footnotes(candidate)?;
     if source_graphs.len() != candidate_graphs.len()
         || source_graphs
             .iter()
@@ -1596,11 +1607,28 @@ fn map_package_error_with_kind(
                 maximum: usize_to_u64(limit),
             }
         },
+        PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(limit),
+            }
+        },
+        PackageError::Semantic(
+            crate::Error::TooManySections { actual, limit }
+            | crate::Error::TooManyBodyStorages { actual, limit },
+        ) => FootnoteTextError::LimitExceeded {
+            kind: FootnoteTextLimitKind::Entries,
+            observed: usize_to_u64(actual),
+            maximum: usize_to_u64(limit),
+        },
         PackageError::Io(_)
         | PackageError::Detection(_)
         | PackageError::NotPages
         | PackageError::InvalidFormat(_)
-        | PackageError::Semantic(_) => FootnoteTextError::InvalidSource,
+        | PackageError::Semantic(crate::Error::InvalidSectionIndex { .. }) => {
+            FootnoteTextError::InvalidSource
+        },
     }
 }
 
@@ -1727,10 +1755,11 @@ mod tests {
 
     use super::{
         FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind, FootnoteTextPatch,
-        checked_utf16_units, is_canonical_component_name, position_from_anchor,
-        rewrite_custom_mark_wire,
+        checked_utf16_units, is_canonical_component_name, map_package_error_with_kind,
+        position_from_anchor, rewrite_custom_mark_wire,
     };
     use crate::footnote::body::{Footnote, Position};
+    use crate::{Error as SemanticError, PackageError};
     use litchi_iwa_common::WireLimits;
     use litchi_iwa_core::ArchiveObject;
 
@@ -1778,6 +1807,41 @@ mod tests {
         assert_eq!(backward, source);
         assert_eq!(&forward[..2], &source[..2]);
         assert_eq!(&forward[5..], &source[5..]);
+    }
+
+    #[test]
+    fn semantic_package_limits_keep_typed_footnote_error_categories() {
+        let text_error = map_package_error_with_kind(
+            PackageError::Semantic(SemanticError::TextTooLarge {
+                observed: 9,
+                limit: 8,
+            }),
+            FootnoteTextLimitKind::WireBytes,
+        );
+        assert_eq!(
+            text_error,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: 9,
+                maximum: 8,
+            }
+        );
+
+        let entries_error = map_package_error_with_kind(
+            PackageError::Semantic(SemanticError::TooManyBodyStorages {
+                actual: 5,
+                limit: 4,
+            }),
+            FootnoteTextLimitKind::WireBytes,
+        );
+        assert_eq!(
+            entries_error,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::Entries,
+                observed: 5,
+                maximum: 4,
+            }
+        );
     }
 
     #[test]
