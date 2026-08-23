@@ -3,6 +3,25 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0267 — XLSX repeated-store strict schema and harness](changes/0267-xlsx-repeated-store-strict-harness.md)
+(the four opt-in selectors bring the current selectable matrix to 389 names
+while the default remains 36 cases / 198 records. A pinned medium/oversized
+XLSX corpus runs four semantic queries eight times in fresh warm children under
+the explicit semantic-query timing boundary. Primary selectors are reserved
+for same-selector ABBA comparison; reacquisition controls prove medium-cache
+eviction and oversized bypass but are structural-only and excluded from
+candidate elapsed comparison. Strict corpus, semantic, cache/read/Budget,
+child-process, allocator, and result-channel schemas fail closed. This is
+neutral correctness/evidence-boundary coverage only; no latency, allocation,
+RSS, physical-I/O, or production claim is made.)
+
+[change 0266 — fail-closed historical REPORT classification](changes/0266-report-claim-classification.md)
+(the sidecar/checker binds the two audited historical REPORT tables' headings,
+headers, row order, labels, and digests. It classifies 167 rows as 145
+historical, 14 descriptive, 8 withheld, and 0 strict claims, with no strict
+links. This is report-integrity evidence only and makes no latency or
+production claim.)
+
 [change 0265 — PPTX slide-boundary publication selectors](changes/0265-pptx-slide-boundary-publication.md)
 (the opt-in remove and move selectors use a deterministic four-slide,
 dependency-free PPTX corpus with 45 ZIP members, 32,396 source bytes, and

@@ -21,6 +21,39 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest XLSX repeated-store strict schema and harness (change 0267)
+
+The four opt-in selectors from [change 0267](changes/0267-xlsx-repeated-store-strict-harness.md)
+raise the current selectable matrix to **389 names** while the default remains
+**36 cases / 198 records**:
+`xlsx_source_repeated_store_medium`,
+`xlsx_source_repeated_store_oversized`, and their
+`*_reacquisition_control` structural controls. They use the pinned
+`litchi-xlsx-source-repeated-store-corpus-v1` generator over a selected
+`xl/worksheets/sheet1.xml` member. Each fresh warm child runs `cell`, `cells`,
+`visit`, and `stored_extent` eight times under the explicit timing scope
+`semantic_query_only; explicit PartData reacquisition excluded`.
+
+Primary selectors are reserved for future same-selector ABBA comparisons. The
+medium and oversized reacquisition controls prove eviction and oversized
+bypass through explicit `PartData` reads, but their elapsed/query vectors are
+structural-only and are excluded from candidate latency comparison. The strict
+summary path pins corpus, query, semantic, cache/read/Budget, child-process,
+allocator, and result-channel schemas. This is correctness and evidence-boundary
+coverage only: no latency, allocation, RSS, physical-I/O, throughput,
+decompression, producer, or production-performance claim is retained. See
+[change 0267](changes/0267-xlsx-repeated-store-strict-harness.md).
+
+## Latest fail-closed historical REPORT classification (change 0266)
+
+[Change 0266](changes/0266-report-claim-classification.md) adds the
+`report-claim-classification-v1.json` sidecar and its fail-closed checker for
+the two audited historical REPORT tables. It binds their headings, headers,
+row order, labels, and digests, classifying 167 rows as 145 `historical`, 14
+`descriptive`, 8 `withheld`, and 0 `strict_claim`; no strict-claim link is
+present. CI runs the checker and focused tests. This is report-integrity
+evidence only and makes no latency, resource, or production claim.
+
 ## Latest real-producer security correctness coverage (change 0264)
 
 The ignored locked `security_corpus` test covers eight pinned public fixtures:
@@ -48,9 +81,9 @@ dependency-free PPTX corpus with 45 ZIP members, 32,396 source archive bytes,
 and source SHA-256
 `685a1805ad291e8f9852d3ccd584320f20847bd0ac8fdf29857f96efe1109477`.
 Removal covers first, middle, and last positions and a final-only refusal;
-move covers `0 -> 3`, `3 -> 0`, and the exact `from == to` no-op. The two
-selectors raise the selectable matrix to 385 names while the default remains
-36 cases / 198 records.
+move covers `0 -> 3`, `3 -> 0`, and the exact `from == to` no-op. At change
+0265's landing, the historical selectable matrix was 385 names while the
+default remained 36 cases / 198 records.
 
 The production opened-presentation `Snapshot`/`Transaction` paths are used.
 Phase vectors cover plan, commit, sequential OPC publication, and semantic
@@ -1001,7 +1034,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**385 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**389 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

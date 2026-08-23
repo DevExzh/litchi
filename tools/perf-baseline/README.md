@@ -272,10 +272,47 @@ identity for untouched members, strict `[Content_Types].xml` identity on
 moves, serialized durable forward/inverse patches, dependency,
 unknown-member, markup-compatibility, signed-package, limits, stale/foreign,
 partial-sink, and zero-sink refusals. The two opt-in `Case` entries bring the
-selectable matrix to 385 names while the default remains 36 cases / 198
-records. This is correctness and phase evidence only: no latency,
+selectable matrix to 385 names at change 0265's landing; the default remained
+36 cases / 198 records. This is correctness and phase evidence only: no latency,
 allocation, RSS, decompression, throughput, physical-I/O, or broad PPTX claim
 is made. See [change 0265](../../docs/performance/changes/0265-pptx-slide-boundary-publication.md).
+
+## XLSX repeated-store strict schema and harness (change 0267)
+
+The four opt-in repeated-query selectors are:
+
+- `xlsx_source_repeated_store_medium`
+- `xlsx_source_repeated_store_oversized`
+- `xlsx_source_repeated_store_medium_reacquisition_control`
+- `xlsx_source_repeated_store_oversized_reacquisition_control`
+
+They bring the current selectable matrix to **389 names** while the default
+remains **36 cases / 198 records**. The medium and oversized corpora are pinned
+to generator `litchi-xlsx-source-repeated-store-corpus-v1` and the selected
+`xl/worksheets/sheet1.xml` member. Each warm fresh-child sample runs `cell`,
+`cells`, `visit`, and `stored_extent` eight times and records the exact timing
+scope `semantic_query_only; explicit PartData reacquisition excluded`.
+
+The two non-control selectors are the only possible future ABBA comparison
+path, and only against the same selector across revisions. The two
+`reacquisition_control` selectors explicitly reacquire `PartData` to prove
+medium-cache eviction and oversized-payload bypass; their elapsed/query
+vectors are structural-only and must not be compared with the candidate. The
+strict summary helper pins corpus, semantic/source identity, query shape,
+cache/read/Budget counters, child-process IDs, allocator shape, and result
+channels. These selectors add correctness and evidence-boundary coverage only:
+no latency, allocation, RSS, physical-I/O, throughput, decompression, producer,
+or production-performance claim follows. See
+[change 0267](../../docs/performance/changes/0267-xlsx-repeated-store-strict-harness.md).
+
+## Fail-closed historical REPORT classification (change 0266)
+
+[Change 0266](../../docs/performance/changes/0266-report-claim-classification.md)
+adds the fail-closed sidecar/checker for the two audited historical REPORT
+tables. It binds headings, headers, row order, labels, and digests for 167 rows
+(145 `historical`, 14 `descriptive`, 8 `withheld`, and 0 `strict_claim`), with
+no strict-claim links. This is report-integrity evidence only; it makes no
+latency or production claim.
 
 ## XLSX vendor-extension preservation shape (change 0262)
 
