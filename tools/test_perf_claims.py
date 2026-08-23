@@ -28,7 +28,10 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
         _, evidence, claims = check_perf_claims.validate_registry(
             registry, repo_root=REPO_ROOT
         )
-        self.assertEqual(set(evidence), {"abba-0248", "abba-0249", "abba-0250", "abba-0251"})
+        self.assertEqual(
+            set(evidence),
+            {"abba-0248", "abba-0249", "abba-0250", "abba-0251", "resource-0251"},
+        )
         self.assertEqual(
             set(claims),
             {
@@ -38,13 +41,17 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "claim-0251-xlsx-xml-borrowed",
             },
         )
+        claim = claims["claim-0251-xlsx-xml-borrowed"]["value"]
+        self.assertEqual(claim["status"], "landed")
+        self.assertEqual(claim["code_state"], "landed")
+        self.assertEqual(claim["resource_guardrail"]["evidence_id"], "resource-0251")
 
-    def test_seed_registry_cli_structural_mode(self) -> None:
+    def test_seed_registry_cli_strict_mode(self) -> None:
         status, messages = check_perf_claims.lint_registry(
             REGISTRY_PATH,
             repo_root=REPO_ROOT,
-            evidence_root=None,
-            mode="structural",
+            evidence_root=REPO_ROOT,
+            mode="strict",
         )
         self.assertEqual(status, 0, messages)
 
@@ -101,6 +108,7 @@ class ResourceReportShapeTests(unittest.TestCase):
     METRICS = (
         "heaptrack.allocation_calls",
         "heaptrack.allocated_bytes",
+        "heaptrack.temporary_allocations",
         "heaptrack.peak_heap_bytes",
         "heaptrack.peak_rss_bytes",
         "time.max_rss_kib",

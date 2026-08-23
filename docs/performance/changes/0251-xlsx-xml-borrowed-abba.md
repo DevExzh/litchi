@@ -10,7 +10,10 @@ Claim registry ID: `claim-0251-xlsx-xml-borrowed`
 ## Evidence-package identity
 
 The independently audited package is retained outside the repository at
-`/home/zhuhe/CodeProjects/litchi-perf-evidence/0251-xlsx-xml-borrowed-20260821/`.
+`<evidence-root>/0251-xlsx-xml-borrowed-20260821/`.
+An exact checked-in mirror is retained at
+`docs/performance/results/0251-xlsx-xml-borrowed-20260821/` so the claim
+registry's strict CI check does not depend on a machine-local evidence root.
 Its manifest is `0251-xlsx-xml-borrowed-abba-manifest.json` with SHA-256
 `06fbd58b2d9ae8fe460c656bc7316b1493ed78f47ec5d5c91e91d4c088e8c00b`.
 The `summary.json` file SHA-256 is
@@ -126,15 +129,24 @@ latency direction for this matched run.
 ## Strict allocator/resource guardrail
 
 The independently audited strict resource report is retained at
-`/home/zhuhe/CodeProjects/litchi-perf-evidence/0251-xlsx-xml-borrowed-resource-20260821.json`
+`<evidence-root>/0251-xlsx-xml-borrowed-resource-20260821.json`
+and mirrored at
+`docs/performance/results/0251-xlsx-xml-borrowed-resource-20260821.json`,
 with SHA-256
-`85208129e790507c09fdaa24c834de9f718d8125ce5f3b3e036d5fd6be265ea2`.
+`bad9031a246b80d1090ad16cb9837b4581d8f451bbd43e7d03c839e878ae99d3`.
 It was produced by `litchi-resource-profile` 0.1.6 from the same frozen
 control and candidate binaries, revisions, four selectors, exact corpora,
 30 warmups, and 500 retained samples. All 44 retained timed-harness,
 heaptrack, print, and histogram artifacts match their recorded sizes and
 SHA-256 identities. The instrumented harness elapsed values are retained for
 leg alignment only and are not latency evidence.
+
+The checked-in publication replaces only machine-local path strings with the
+stable placeholders `<artifact-root>`, `<control-worktree>`,
+`<candidate-worktree>`, and `<evidence-root>`. Binary, artifact, corpus,
+revision, and numeric resource identities are unchanged. The original and
+normalized reports both pass `validate_xlsx_xml_borrowed_resource_legs`, and
+the normalized report passes the strict claim-registry verifier.
 
 The run used fixed order A1 control, B1 candidate, B2 candidate, A2 control.
 Its control binary SHA-256 is
