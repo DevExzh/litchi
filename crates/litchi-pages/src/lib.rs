@@ -70,10 +70,7 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
-pub use package::{
-    Limits, MAX_OBJECTS, Package, PackageError, PackageResult, SelectedSectionText,
-    SelectiveTextOptions, SelectiveTextSelector, SourceMetrics, Stats,
-};
+pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats};
 pub use package::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
     PageLayoutPatch,

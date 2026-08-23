@@ -246,7 +246,6 @@
       "litchi-iwa-common",
       "litchi-iwa-core",
       "litchi-iwa-detect",
-      "litchi-iwa-index",
       "litchi-iwa-protos",
       "litchi-iwa-text",
       "litchi-iwa-text-wire"
