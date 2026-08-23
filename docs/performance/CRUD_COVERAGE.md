@@ -2,7 +2,7 @@
 
 Date: 2026-08-24
 
-This is a coverage map, not a completion claim. It compares the 385 selectable
+This is a coverage map, not a completion claim. It compares the 389 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -13,8 +13,8 @@ Change 0262 adds no selectable case or default record. Its CLI-only XLSX
 orphan XML/BIN Parts and an XML-local relationship, and adds correctness gates
 for exact no-op/edit/lifecycle behavior, topology/content types, typed sink
 refusals, managed resource bounds, and raw preservation of untouched members.
-The selectable count remains 381 and the default matrix remains 36 cases /
-198 records; no performance claim follows.
+At change 0262's landing, the selectable count was 381 and the default matrix
+remained 36 cases / 198 records; no performance claim follows.
 
 Change 0264 also adds no selectable case or default record. Its ignored locked
 real-producer security gate covers three signed OOXML packages, one protected
@@ -38,10 +38,19 @@ commit, sequential publication, and semantic-reopen phases. Twice-built
 determinism, source immutability, raw local plus normalized-central identity
 for untouched members, strict `[Content_Types].xml` identity on moves,
 serialized durable forward/inverse patches, and dependency/unknown/MCE/signed/
-limits/stale/foreign/partial/zero-sink gates are covered. The selectors bring
-the current matrix to 385 names while the default remains 36 cases / 198
-records; this is correctness and phase evidence only, with no latency,
+limits/stale/foreign/partial/zero-sink gates are covered. At change 0265's
+landing, the historical matrix was 385 names while the default remained 36
+cases / 198 records; this is correctness and phase evidence only, with no latency,
 allocation, RSS, or physical-I/O claim.
+
+Change 0267 adds four opt-in XLSX repeated-store selectors, bringing the
+current matrix to 389 names while leaving the default 36 cases / 198 records
+unchanged. The source-backed semantic query interval is explicitly separated
+from `PartData` reacquisition; primary selectors are reserved for future
+same-selector ABBA comparison, and medium/oversized reacquisition controls are
+structural cache/read evidence only. Pinned corpus, semantic projection,
+cache/read/Budget, fresh-child, allocator, and result-channel checks are strict
+correctness gates. No latency, production, or broad XLSX CRUD claim follows.
 
 | Required scenario | Current status | Coverage evidence |
 |---|---|---|

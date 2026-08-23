@@ -11,6 +11,48 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## XLSX repeated-store strict schema and harness (change 0267)
+
+[Change 0267](changes/0267-xlsx-repeated-store-strict-harness.md), landed in
+`ebd0c83ea4ea49c05f693d6af5c93296cf812ca9` and
+`1b3b5b094b8146d83df1c49a852efe4afdfeeaba`, adds four opt-in XLSX
+repeated-store selectors and a case-local strict report contract. The selectors
+are `xlsx_source_repeated_store_medium`,
+`xlsx_source_repeated_store_oversized`, and the matching
+`*_reacquisition_control` selectors. They bring the current selectable matrix
+to **389 names** while the default remains **36 cases / 198 records**.
+
+The pinned medium and oversized corpora use generator
+`litchi-xlsx-source-repeated-store-corpus-v1` and the selected
+`xl/worksheets/sheet1.xml` member. Each sample runs the four semantic queries
+(`cell`, `cells`, `visit`, and `stored_extent`) eight times in a fresh warm
+child, recording cache/read/Budget counters, full semantic identity, and a
+separate repeated-query projection identity. The exact timing scope is
+`semantic_query_only; explicit PartData reacquisition excluded`.
+
+Primary selectors are only a future same-selector ABBA comparison path. The two
+reacquisition controls explicitly prove medium-cache eviction and oversized
+cache bypass; their claim scope is structural cache/read control only, and
+their elapsed/query vectors are not candidate latency comparators. The strict
+summary validator rejects corpus, selector, timing, identity, counter, child,
+allocator, and result-channel drift, while validating structural controls
+without admitting them to the primary elapsed summary. This is neutral
+correctness and evidence-boundary infrastructure only: no latency, allocation,
+RSS, physical-I/O, throughput, decompression, producer, or production claim is
+registered.
+
+## Fail-closed historical REPORT classification (change 0266)
+
+[Change 0266](changes/0266-report-claim-classification.md), landed in
+`5d9120a1116ae1a6993d51469d219e1b27df3887`, labels the two audited historical
+REPORT tables as descriptive rather than current claims and binds them to the
+`report-claim-classification-v1.json` sidecar. The sidecar covers 167 rows
+(145 `historical`, 14 `descriptive`, 8 `withheld`, and 0 `strict_claim`) and
+has no strict-claim links. `tools/check_report_claim_classification.py` parses
+only those tables and fails closed on row/header/order/digest, JSON, path, and
+symlink drift; CI runs it with its focused tests. This is report-integrity
+evidence only and makes no latency or production claim.
+
 ## Real-producer security correctness corpus (change 0264)
 
 [Change 0264](changes/0264-real-producer-security-corpus.md), landed in
@@ -49,9 +91,10 @@ serialized forward/inverse patches, stale/foreign refusal, dependency,
 unknown-member, markup-compatibility, signed-package, and limits refusals,
 plus partial/zero-sink behavior, are required. Untouched members retain raw
 ZIP local records and central-directory records with local offsets normalized;
-move additionally requires strict `[Content_Types].xml` identity. The
-selectors raise the selectable matrix to 385 names while the default remains
-36 cases / 198 records. This is correctness and phase evidence only: no
+move additionally requires strict `[Content_Types].xml` identity.
+At change 0265's landing, these selectors raised the historical selectable
+matrix to 385 names while the default remained 36 cases / 198 records. This is
+correctness and phase evidence only: no
 latency, allocation, RSS, decompression, throughput, physical-I/O, or broad
 PPTX claim is registered.
 
@@ -73,7 +116,9 @@ story XML/`.rels` members and raw local plus offset-normalized central ZIP
 identity for untouched members. Stale, foreign, signed, unknown-owner,
 partial-sink, and zero-sink refusal gates are also required. This is
 correctness and phase evidence only; no latency, allocation, RSS,
-physical-I/O, or broad DOCX claim is registered.
+physical-I/O, or broad DOCX claim is registered. At change 0263's landing, the
+historical selectable matrix was 383 names and the default remained 36 cases /
+198 records.
 
 ## Strict claim canonical recomputation (change 0261)
 
@@ -1273,7 +1318,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 
 The original stage-1 results below remain historical and descriptive evidence;
 the rows below are not current performance claims. The current
-harness contains **385 selectable cases**; 200 was the count before the
+harness contains **389 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -2753,7 +2798,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 385 selectable cases. Change
+The current standalone harness provides 389 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
