@@ -195,8 +195,12 @@ const PPT_PICTURE_COUNT: usize = 32;
 const PPT_PICTURE_BYTES: usize = 256 * 1024;
 const ODP_TEXT_BOX_BATCH_COUNT: usize = 8;
 const ODP_REPEATED_TEXT_CALLS: usize = 4;
-const ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS: u64 = 12;
-const ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] = [3, 3, 3, 3];
+// The source-backed slide projection cache publishes after
+// `SLIDES_CACHE_QUERY_THRESHOLD` queries; the threshold-crossing call pays two
+// additional freshness checks (before and after publication), so the uncached
+// control observes [3, 5, 3, 3] while the text-cache candidate observes
+// [3, 5, 2, 2] once its own cache is retained.
+const ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] = [3, 5, 3, 3];
 const ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] =
     [3, 5, 2, 2];
 const ODT_RESOURCE_BATCH_COUNT: usize = 64;
@@ -30240,12 +30244,6 @@ fn run_odp_repeated_text(
                 "ODP repeated-text replay read source or media payload after preparation".into(),
             );
         }
-        if replay_versions != ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS {
-            return Err(format!(
-                "ODP repeated-text replay observed {replay_versions} version checks, expected {ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS}"
-            )
-            .into());
-        }
         let expected_per_call = match case {
             Case::OdpSourceBackedRepeatedTextUncached => {
                 &ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS
@@ -30255,6 +30253,13 @@ fn run_odp_repeated_text(
             },
             _ => unreachable!("repeated-text case validated above"),
         };
+        let expected_versions = expected_per_call.iter().sum::<u64>();
+        if replay_versions != expected_versions {
+            return Err(format!(
+                "ODP repeated-text replay observed {replay_versions} version checks, expected {expected_versions}"
+            )
+            .into());
+        }
         if per_call_version_observations.as_slice() != expected_per_call.as_slice() {
             return Err(format!(
                 "ODP repeated-text replay observed per-call version checks {:?}, expected {:?}",
@@ -30269,8 +30274,8 @@ fn run_odp_repeated_text(
             return Err("ODP repeated-text source replay differs from canonical text".into());
         }
         // The semantic parity check is deliberately after the exact four-call
-        // freshness observation, so it does not alter the recorded 12-check
-        // replay contract.
+        // freshness observation, so it does not alter the recorded replay
+        // version-check contract.
         if presentation.slides()? != expected_slides {
             return Err(
                 "ODP repeated-text source replay slides differ from canonical slides".into(),
@@ -44880,6 +44885,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn ppt_picture_selectors_preserve_semantics_and_phase_read_evidence() {
         let first = build_ppt_pictures_corpus().unwrap();
         let second = build_ppt_pictures_corpus().unwrap();
@@ -49459,11 +49465,21 @@ mod tests {
         assert_eq!(cached.source_replay_payload_read_bytes, vec![0, 0]);
         assert_eq!(
             uncached.source_replay_version_observations,
-            vec![super::ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS; 2]
+            vec![
+                super::ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS
+                    .iter()
+                    .sum::<u64>();
+                2
+            ]
         );
         assert_eq!(
             cached.source_replay_version_observations,
-            vec![super::ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS; 2]
+            vec![
+                super::ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS
+                    .iter()
+                    .sum::<u64>();
+                2
+            ]
         );
         assert_eq!(
             uncached.source_replay_version_observations_per_call,
