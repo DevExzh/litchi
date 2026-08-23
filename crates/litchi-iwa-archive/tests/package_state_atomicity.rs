@@ -356,6 +356,69 @@ fn reordered_patch_retains_name_keyed_archive_cache() {
 }
 
 #[test]
+fn mixed_reorder_patch_retains_only_unchanged_name_caches() {
+    let source = state();
+    let source_document = parse(&source, "Index/Document.iwa");
+    let source_metadata = parse(&source, "Index/Metadata.iwa");
+
+    let mut target = source.clone();
+    assert_eq!(
+        target.replace_entry_data("Index/Metadata.iwa", vec![8]),
+        Some(vec![2])
+    );
+    let document = target
+        .remove_entry("Index/Document.iwa")
+        .unwrap_or_else(|| panic!("document entry should exist"));
+    target
+        .try_insert_entry_at(1, document)
+        .unwrap_or_else(|error| panic!("reinserted document should be accepted: {error}"));
+
+    let patch = source.patch_to(&target);
+    assert_eq!(patch.len(), 2);
+    assert_eq!(
+        patch
+            .changes()
+            .iter()
+            .map(|change| (change.name(), change.kind()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "Index/Document.iwa",
+                litchi_iwa_package::EntryChangeKind::Reordered
+            ),
+            (
+                "Index/Metadata.iwa",
+                litchi_iwa_package::EntryChangeKind::Replaced
+            ),
+        ]
+    );
+    let published = source
+        .apply_patch(&patch)
+        .unwrap_or_else(|error| panic!("mixed patch should publish: {error}"));
+    assert_eq!(
+        published.iter().map(Entry::name).collect::<Vec<_>>(),
+        ["Index/Metadata.iwa", "Index/Document.iwa"]
+    );
+
+    let retained_document = published
+        .get_or_parse_archive("Index/Document.iwa", |_| {
+            panic!("reordered unchanged entry must retain its archive cache")
+        })
+        .unwrap_or_else(|error| panic!("retained document cache should be usable: {error}"));
+    assert!(Arc::ptr_eq(&source_document, &retained_document));
+
+    let metadata_parse_count = AtomicUsize::new(0);
+    let replacement_metadata = published
+        .get_or_parse_archive("Index/Metadata.iwa", |_| {
+            metadata_parse_count.fetch_add(1, Ordering::SeqCst);
+            Ok((Archive::default(), 1))
+        })
+        .unwrap_or_else(|error| panic!("replaced metadata should parse: {error}"));
+    assert!(!Arc::ptr_eq(&source_metadata, &replacement_metadata));
+    assert_eq!(metadata_parse_count.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn speculative_and_oversized_archives_are_rejected_with_typed_limits() {
     let limits = ArchiveLimits::default()
         .with_archive_bytes(4)
