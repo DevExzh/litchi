@@ -2,22 +2,41 @@
 
 Date: 2026-08-21
 
-Status: latency-supported on the listed cells; production landing remains
-pending an independent code/oracle audit and no broad XLSX claim is made
+Status: historical candidate evidence only; current production code is landed
+but is not attributable to these binaries, so no current latency claim is made
 
 ## Decision
 
-Retain the current-schema ABBA package as narrow evidence for the two fixed
-media-rich XLSX page-break edit selectors. The eager selector accepts p50,
-mean, p95, and p99. The source-backed selector accepts p50, mean, and p95;
-its p99 is excluded because the A2-to-B2 direction is a `-0.30069801395129325%`
-regression. All accepted cells pass the declared drift ceilings, and no
-adverse-both cell is present.
+Retain the current-schema ABBA package as narrow historical evidence for the
+two fixed media-rich XLSX page-break edit selectors at candidate
+`e619debe0a7b61ea24d76f03341ced6110245888`. Within that package, the eager
+selector accepts p50, mean, p95, and p99. The source-backed selector accepts
+p50, mean, and p95; its p99 is excluded because the A2-to-B2 direction is a
+`-0.30069801395129325%` regression. All accepted cells pass the declared drift
+ceilings, and no adverse-both cell is present.
 
-This result does not land the page-break projection production candidate.
-An independent audit must still review the production cache/projection
-correctness and the benchmark oracle/expected-output construction. Latency
-evidence alone is not approval for landing.
+These cells do not describe current production. The hardened page-break
+implementation and its later projection-cache lineage are already ancestors of
+current HEAD, while measured candidate `e619debe` is not. The package therefore
+predates current code and cannot authorize a current latency claim.
+
+## Current-head attribution audit (2026-08-23)
+
+The implementation at audited HEAD
+`9d5d6c3258611e0a0e83c9d6aec5656e86304478` passed 18 focused page-break
+unit tests, four owner/integration tests, and five source-backed tests. The
+audit found no immediate correctness blocker: current code retains finite
+XML/event/depth,
+break-count, and grid bounds; strict/transitional namespace and MCE safety;
+lossless untouched bytes; exact no-op identity; signed/stale/foreign/retargeted
+and partial-sink refusals; selected-worksheet-only overlays; readback before
+publication; and bounded cache retention/invalidation without caching errors.
+
+This correctness result does not repair performance attribution. A fresh
+current-HEAD A1/B1/B2/A2 must cover both edit/save selectors and the
+`xlsx_worksheet_repeated_page_breaks` /
+`xlsx_package_repeated_page_breaks` cache selectors before any current
+page-break projection latency claim is reinstated.
 
 ## Evidence-package identity
 
@@ -154,16 +173,16 @@ adverse-both cell is present, and all candidate/control drift checks pass.
 
 ## Claim boundary and verification
 
-This note covers only the two listed fixed-corpus page-break edit selectors.
-It makes no claim about other XLSX shapes, worksheets, page-break layouts,
-physical I/O, decompression, filesystem or cold-cache behavior, allocations,
-RSS, real-world producers, durable output breadth, or general XLSX CRUD.
+This note preserves historical cells only for the two listed fixed-corpus
+page-break edit selectors at the exact measured revisions. It makes no current
+production claim and no claim about other XLSX shapes, worksheets, page-break
+layouts, physical I/O, decompression, filesystem or cold-cache behavior,
+allocations, RSS, real-world producers, durable output breadth, or general
+XLSX CRUD.
 
-The measured production candidate remains pending an independent code/oracle
-audit and is not landed by this evidence-only commit. In particular, the
-latency package does not by itself establish that the production projection
-cache is correct for every snapshot/relationship transition or that the
-expected-byte oracle is sufficiently independent for a production decision.
+Current code has completed this focused current-head correctness audit, but its
+later hardening/cache lineage is outside the retained binary identity. Do not
+carry the old cells forward or register them as landed current-code evidence.
 
 Verification for this documentation-only record is package/hash inspection,
 compressed-member integrity testing, current-schema summary validation,
