@@ -1,5 +1,7 @@
 //! Create Pages, Numbers, and Keynote documents with table-comment threads.
 
+#![allow(deprecated)]
+
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::KeynoteDocumentBuilder;

@@ -329,6 +329,7 @@ fn fresh_merge_owner_id() -> tsp::CfuuidArchive {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};

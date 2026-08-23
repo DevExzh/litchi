@@ -2356,6 +2356,10 @@ impl NumbersEditor {
     }
 
     /// Read the comment attached to a writable BNC cell.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::table_cell_comment with SheetSelector and TableSelector for the focused semantic root-comment read; comment creation and replies remain migration-host scope"
+    )]
     pub fn cell_comment(
         &self,
         table_id: u64,
@@ -2366,6 +2370,10 @@ impl NumbersEditor {
     }
 
     /// Create or replace a cell comment without changing the cell value or style.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::edit_table_cell_comment or set_table_cell_comment with SheetSelector and TableSelector for supported existing-root replacement; creation and replies remain migration-host scope"
+    )]
     pub fn set_cell_comment(
         &mut self,
         table_id: u64,
@@ -2382,6 +2390,10 @@ impl NumbersEditor {
     }
 
     /// Delete a cell comment without changing the cell value or style.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::edit_table_cell_comment or clear_table_cell_comment with SheetSelector and TableSelector where the focused owner supports the operation; comment-graph cleanup remains migration-host scope"
+    )]
     pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
         let mut staged = self.package.clone();
         clear_cell_comment_in_package(&mut staged, table_id, row, column)?;
