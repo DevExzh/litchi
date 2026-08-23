@@ -2332,7 +2332,7 @@ impl Transaction {
         let reopened = package;
         let source_package = self.source.package.clone();
         if !content_changed {
-            validate_raw_preserved_referenced_xml_parts(&source_package)?;
+            validate_raw_preserved_referenced_xml_parts(&source_package, &source_package)?;
         }
         validate_compact_xml_parts(&reopened, &source_package)?;
         self.draft.verify_embedded_media(&reopened)?;
@@ -3865,12 +3865,18 @@ fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> 
     validate_compact_xml_parts_against(package, Some(source), true)
 }
 
-pub(crate) fn validate_raw_preserved_xml_parts(package: &OwnedPackage) -> Result<()> {
-    validate_compact_xml_parts_against(package, None, true)
+pub(crate) fn validate_raw_preserved_xml_parts(
+    package: &OwnedPackage,
+    source: &OwnedPackage,
+) -> Result<()> {
+    validate_compact_xml_parts_against(package, Some(source), true)
 }
 
-fn validate_raw_preserved_referenced_xml_parts(package: &OwnedPackage) -> Result<()> {
-    validate_compact_xml_parts_against(package, None, false)
+pub(crate) fn validate_raw_preserved_referenced_xml_parts(
+    package: &OwnedPackage,
+    source: &OwnedPackage,
+) -> Result<()> {
+    validate_compact_xml_parts_against(package, Some(source), false)
 }
 
 fn validate_compact_xml_parts_against(

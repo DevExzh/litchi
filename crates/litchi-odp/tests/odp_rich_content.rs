@@ -473,6 +473,106 @@ fn producer_bom_remains_source_provenance_during_rich_content_edit() {
 }
 
 #[test]
+fn real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_edit() {
+    let source_bytes = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/odf/odp/tdf169979.odp"
+    ))
+    .to_vec();
+    let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+
+    let mut transaction = source.transaction().unwrap();
+    transaction
+        .add_text_box(
+            0usize,
+            &TextBox::new(
+                "Litchi source sentinel",
+                RichText::plain("Litchi source sentinel text").unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+
+    let changed_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    for path in source_package.files().unwrap() {
+        if path != "content.xml" {
+            assert_eq!(
+                changed_package.get_file(&path).unwrap(),
+                source_package.get_file(&path).unwrap(),
+                "untouched source member changed: {path}"
+            );
+        }
+    }
+    for path in [
+        "META-INF/manifest.xml",
+        "Configurations2/accelerator/current.xml",
+        "OleobjectM2230000",
+    ] {
+        assert_eq!(
+            changed_package.get_file(path).unwrap(),
+            source_package.get_file(path).unwrap(),
+            "untouched source member changed: {path}"
+        );
+    }
+    let identical = raw_identical_members(source.bytes(), commit.snapshot().bytes()).unwrap();
+    for path in [
+        "META-INF/manifest.xml",
+        "Configurations2/accelerator/current.xml",
+        "OleobjectM2230000",
+    ] {
+        assert!(identical.contains(path), "{path}");
+    }
+
+    let reopened = Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert!(reopened.content_xml().contains("Litchi source sentinel"));
+    assert!(
+        reopened
+            .content_xml()
+            .contains("Litchi source sentinel text")
+    );
+    let applied = commit.patch().apply(&source).unwrap();
+    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    let restored = commit.patch().inverse().apply(&applied).unwrap();
+    assert_eq!(restored.bytes(), source.bytes());
+}
+
+#[test]
+fn noncompact_content_whole_rewrite_is_refused_atomically() {
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const CONTENT: &[u8] = br#"<?xml version="1.0"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0">
+  <office:body>
+    <office:presentation>
+      <draw:page draw:name="Source"><draw:rect draw:name="retained"/></draw:page>
+    </office:presentation>
+  </office:body>
+</office:document-content>"#;
+    const MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive.write_deflated("content.xml", CONTENT).unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    let source_bytes = archive.finish_to_bytes().unwrap();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+
+    let mut transaction = source.transaction().unwrap();
+    transaction
+        .add("Rejected formatted slide", "must not publish")
+        .unwrap();
+    let error = match transaction.commit() {
+        Err(error) => error,
+        Ok(_) => panic!("formatted content.xml unexpectedly published"),
+    };
+    assert!(error.to_string().contains("content.xml"));
+    assert_eq!(source.bytes(), source_bytes);
+}
+
+#[test]
 fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
     const MIME: &str = "application/vnd.oasis.opendocument.presentation";
     const MEDIA_PATH: &str = "Pictures/opaque.bin";
@@ -554,9 +654,9 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
 }
 
 #[test]
-fn content_only_raw_publication_refuses_noncompact_referenced_xml() {
+fn content_only_raw_publication_preserves_noncompact_referenced_xml() {
     const MIME: &str = "application/vnd.oasis.opendocument.presentation";
-    const CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="Source"/></office:presentation></office:body></office:document-content>"#;
+    const CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="Source"><draw:rect draw:name="retained"/></draw:page></office:presentation></office:body></office:document-content>"#;
     const MANIFEST: &[u8] = br#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
     let mut archive = StreamingArchiveWriter::new();
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
@@ -568,18 +668,22 @@ fn content_only_raw_publication_refuses_noncompact_referenced_xml() {
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
     let source_bytes = archive.finish_to_bytes().unwrap();
+    let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
     let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
 
     let mut transaction = source.transaction().unwrap();
-    assert!(
-        transaction
-            .add_text_box(
-                0usize,
-                &TextBox::new("Blocked", RichText::plain("Body").unwrap()).unwrap(),
-            )
-            .is_err()
-    );
+    transaction
+        .add_text_box(
+            0usize,
+            &TextBox::new("Preserved", RichText::plain("Body").unwrap()).unwrap(),
+        )
+        .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(commit.changed());
+    let changed_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert_eq!(
+        changed_package.get_file("Object 1/content.xml").unwrap(),
+        source_package.get_file("Object 1/content.xml").unwrap()
+    );
+    assert_eq!(source.bytes(), source_bytes);
 }

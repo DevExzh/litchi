@@ -2279,7 +2279,7 @@ pub(crate) fn apply(source: &crate::core::OwnedPackage, operation: &Operation) -
         ),
     };
     if resources.is_empty() {
-        crate::authoring::edit::validate_raw_preserved_xml_parts(source)?;
+        crate::authoring::edit::validate_raw_preserved_xml_parts(source, source)?;
         return replace_content_xml(source, &updated);
     }
     let additions = resources
@@ -2327,7 +2327,7 @@ pub(crate) fn apply_text_box_model_replacements(
             AuthoredXmlFragment::markup(replacement.into_bytes())?,
         )?;
     }
-    crate::authoring::edit::validate_raw_preserved_xml_parts(source)?;
+    crate::authoring::edit::validate_raw_preserved_xml_parts(source, source)?;
     Ok((
         Some(replace_content_xml_spliced(source, &updated, publication)?),
         staged.changed,

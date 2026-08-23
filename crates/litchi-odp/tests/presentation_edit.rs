@@ -154,7 +154,7 @@ fn changed_commit_snapshot_and_patch_output_share_backing_bytes() {
 }
 
 #[test]
-fn changed_publication_refuses_noncompact_referenced_xml() {
+fn changed_publication_preserves_noncompact_referenced_xml() {
     const MIME: &str = "application/vnd.oasis.opendocument.presentation";
     const CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#;
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
@@ -167,11 +167,19 @@ fn changed_publication_refuses_noncompact_referenced_xml() {
     archive
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
-    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
+    let source_bytes = archive.finish_to_bytes().unwrap();
+    let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
     let mut transaction = source.transaction().unwrap();
     transaction.add("New", "Body").unwrap();
-    assert!(transaction.commit().is_err());
-    assert!(source.slides().is_empty());
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    let changed_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert_eq!(
+        changed_package.get_file("Object 1/content.xml").unwrap(),
+        source_package.get_file("Object 1/content.xml").unwrap()
+    );
+    assert_eq!(source.bytes(), source_bytes);
 }
 
 #[test]
