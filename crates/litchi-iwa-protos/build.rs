@@ -53,6 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "../litchi-iwa/src/pages/editor/movies/graph.rs",
         "../litchi-iwa/src/pages/editor/movies/caption.rs",
         "../litchi-iwa/src/pages/editor/audio/graph.rs",
+        "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
         "../litchi-iwa/src/image_caption.rs",
         "../litchi-iwa/src/pages/editor/footnotes.rs",
         "../litchi-iwa/src/pages/creation.rs",
@@ -60,6 +61,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "../litchi-pages/src/package/footnote_text.rs",
         "../litchi-pages/src/package/document_settings.rs",
         "../litchi-pages/src/package/page_layout.rs",
+        "../litchi-pages/src/package/section_background.rs",
+        "../litchi-pages/src/package/section_pagination.rs",
+        "../litchi-pages/src/package/section_settings.rs",
+        "../litchi-pages/src/package/section_text.rs",
+        "../litchi-pages/src/package/section_transaction.rs",
         "../litchi-pages/src/package/table_lock.rs",
     ] {
         if Path::new(path).is_file() {
@@ -1227,30 +1233,41 @@ fn has_exact_private_module_declaration(source: &str, declaration: &str) -> bool
 /// Count an exact private or crate-visible route declaration.
 ///
 /// Route constants are implementation details. Accept a private declaration
-/// or `pub(crate)` visibility, but reject a public item; checking the complete
-/// trimmed line avoids accepting `const NAME ...` as a substring of `pub const
-/// NAME ...`. The lexical count also keeps declaration text in comments and
-/// string literals from satisfying the marker.
+/// or restricted `pub(...)` visibility, but reject a public item; checking the
+/// complete trimmed line avoids accepting `const NAME ...` as a substring of
+/// `pub const NAME ...`. The lexical count also keeps declaration text in
+/// comments and string literals from satisfying the marker.
 fn rust_non_public_declaration_count(source: &str, declaration: &str) -> usize {
-    let expected = declaration
-        .strip_prefix("pub(crate) ")
-        .unwrap_or(declaration);
+    let Some(expected) = rust_declaration_item(declaration) else {
+        return 0;
+    };
     let production = production_codec_source(source);
     let candidates = production
         .lines()
-        .filter(|line| {
-            let line = line.trim();
-            line == expected
-                || line
-                    .strip_prefix("pub(crate) ")
-                    .is_some_and(|line| line == expected)
-        })
+        .filter_map(rust_declaration_item)
+        .filter(|line| *line == expected)
         .count();
     if candidates == 1 && rust_code_marker_count(source, expected) == 1 {
         1
     } else {
         0
     }
+}
+
+/// Strip a Rust item's visibility while rejecting an unrestricted `pub`
+/// declaration.  Restricted forms such as `pub(crate)`, `pub(super)`, and
+/// `pub(in crate::pages)` remain implementation details and are accepted by
+/// the numeric-route ratchet.
+fn rust_declaration_item(declaration: &str) -> Option<&str> {
+    let declaration = declaration.trim();
+    if declaration.starts_with("pub ") {
+        return None;
+    }
+    if let Some(rest) = declaration.strip_prefix("pub(") {
+        let end = rest.find(") ")?;
+        return Some(&rest[end + 2..]);
+    }
+    Some(declaration)
 }
 
 /// Count a route marker only when it starts in production Rust code and does
@@ -3655,95 +3672,131 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // Keep their workspace routes private and check them only as a build-time
     // provenance seam. The canonical message blocks below are the authority
     // for what each number means; no ID is added to the public codec API.
-    const ROUTE_DECLARATIONS: [(&str, &str, &str); 18] = [
+    const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 21] = [
         (
             "../litchi-iwa/src/pages/editor.rs",
             "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
+            "../litchi-iwa/src/pages/editor.rs",
             "MOVIE_MESSAGE_TYPE => remap_pages_movie_wire",
         ),
         (
             "../litchi-iwa/src/pages/editor.rs",
             "const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
+            "../litchi-iwa/src/pages/editor.rs",
             "CAPTION_INFO_MESSAGE_TYPE => remap_pages_caption_info_wire",
         ),
         (
             "../litchi-iwa/src/pages/editor/movies/graph.rs",
             "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
+            "../litchi-iwa/src/pages/editor/movies/graph.rs",
             "decode_typed_package_object(package, identifier, MOVIE_MESSAGE_TYPE",
         ),
         (
             "../litchi-iwa/src/pages/editor/movies/caption.rs",
             "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
+            "../litchi-iwa/src/pages/editor/movies/caption.rs",
             "MOVIE_MESSAGE_TYPE,\n        \"TSD.MovieArchive\",",
         ),
         (
             "../litchi-iwa/src/pages/editor/audio/graph.rs",
             "const AUDIO_MESSAGE_TYPE: u32 = 3_007;",
+            "../litchi-iwa/src/pages/editor/audio/graph.rs",
             "decode_typed_package_object(\n        editor.package(),\n        drawable_object_id,\n        AUDIO_MESSAGE_TYPE,\n",
+        ),
+        (
+            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
+            "const THEME_MESSAGE_TYPE: u32 = 10_001;",
+            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
+            ".filter(|message| message.type_ == THEME_MESSAGE_TYPE)",
         ),
         (
             "../litchi-iwa/src/image_caption.rs",
             "pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
+            "../litchi-iwa/src/image_caption.rs",
             ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
         ),
         (
             "../litchi-iwa/src/pages/editor/footnotes.rs",
             "const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;",
+            "../litchi-iwa/src/pages/editor/footnotes.rs",
             "pages_footnote_codec::decode_footnote_reference(",
         ),
         (
             "../litchi-iwa/src/pages/editor/footnotes.rs",
             "const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;",
+            "../litchi-iwa/src/pages/editor/footnotes.rs",
             "pages_footnote_marker_codec::decode_textual_attachment(",
         ),
         (
             "../litchi-iwa/src/pages/editor.rs",
             "const DOCUMENT_MESSAGE_TYPE: u32 = 10000;",
+            "../litchi-iwa/src/pages/editor.rs",
             ".find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)\n        .map(|message| message.data.as_slice())",
         ),
         (
             "../litchi-iwa/src/pages/editor.rs",
             "const SECTION_MESSAGE_TYPE: u32 = 10011;",
+            "../litchi-iwa/src/pages/editor.rs",
             "SECTION_MESSAGE_TYPE,\n        \"TP.SectionArchive\",",
         ),
         (
             "../litchi-iwa/src/pages/creation.rs",
             "enum PagesMessageType {",
+            "../litchi-iwa/src/pages/creation.rs",
             "PagesMessageType::Document,\n            document,",
         ),
         (
             "../litchi-pages/src/package.rs",
             "const SECTION_MESSAGE_TYPE: u32 = 10_011;",
+            "../litchi-pages/src/package.rs",
             "unique_message_payload(&object.messages, SECTION_MESSAGE_TYPE",
         ),
         (
             "../litchi-pages/src/package.rs",
             "const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;",
+            "../litchi-pages/src/package.rs",
             "FOOTNOTE_REFERENCE_MESSAGE_TYPE,\n        &format!(\"Pages footnote reference object",
         ),
         (
             "../litchi-pages/src/package.rs",
             "const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;",
+            "../litchi-pages/src/package.rs",
             "TEXTUAL_ATTACHMENT_MESSAGE_TYPE,\n        &format!(\"Pages footnote marker object",
         ),
         (
             "../litchi-pages/src/package/document_settings.rs",
             "const DOCUMENT_MESSAGE_TYPE: u32 = 10_000;",
+            "../litchi-pages/src/package/document_settings.rs",
             "page_layout::unique_message(root, DOCUMENT_MESSAGE_TYPE)",
         ),
         (
             "../litchi-pages/src/package/document_settings.rs",
             "const SETTINGS_MESSAGE_TYPE: u32 = 10_012;",
+            "../litchi-pages/src/package/document_settings.rs",
             "RawMessage {\n                    type_: SETTINGS_MESSAGE_TYPE,",
         ),
         (
             "../litchi-pages/src/package/page_layout.rs",
             "const DOCUMENT_MESSAGE_TYPE: u32 = 10_000;",
+            "../litchi-pages/src/package/page_layout.rs",
             "unique_message(document_object, DOCUMENT_MESSAGE_TYPE)?",
+        ),
+        (
+            "../litchi-pages/src/package/section_transaction.rs",
+            "pub(super) const TEMPLATE_MESSAGE_TYPE: u32 = 10_143;",
+            "../litchi-pages/src/package/section_settings.rs",
+            "transaction::unique_message(object, transaction::TEMPLATE_MESSAGE_TYPE, path)?",
+        ),
+        (
+            "../litchi-pages/src/package/section_transaction.rs",
+            "pub(super) const STORAGE_MESSAGE_TYPES: [u32; 2] = [2_001, 2_022];",
+            "../litchi-pages/src/package/section_transaction.rs",
+            "STORAGE_MESSAGE_TYPES.contains(&message.type_)",
         ),
         (
             "../litchi-pages/src/package/table_lock.rs",
             "const ROOT_MESSAGE_TYPE: u32 = 10_000;",
+            "../litchi-pages/src/package/table_lock.rs",
             "ROOT_MESSAGE_TYPE,\n        budget,",
         ),
     ];
@@ -3752,7 +3805,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // private numeric routes exist; these markers prove that each route is
     // still used by the intended code path rather than a comment, string, or
     // test-only compatibility shim.
-    const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 25] = [
+    const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 40] = [
         (
             "../litchi-iwa/src/pages/editor/movies/graph.rs",
             "decode_typed_package_object(\n        editor.package(),\n        drawable_object_id,\n        MOVIE_MESSAGE_TYPE,\n",
@@ -3878,11 +3931,88 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
             "graph.marker_identifier,\n        TEXTUAL_ATTACHMENT_MESSAGE_TYPE,\n        budget,",
             1,
         ),
+        (
+            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
+            ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
+            1,
+        ),
+        (
+            "../litchi-iwa/src/pages/editor/body_shapes/caption.rs",
+            "pages_movie_caption_codec::decode_caption_info(",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_pagination.rs",
+            ".filter(|(_index, message)| message.type_ == SECTION_MESSAGE_TYPE)",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_pagination.rs",
+            "type_: SECTION_MESSAGE_TYPE,\n                data: rewritten,",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_pagination.rs",
+            ".filter(|message| message.type_ == SECTION_MESSAGE_TYPE)",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_settings.rs",
+            "transaction::resolve_target(source, position, &mut budget)?",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_settings.rs",
+            "transaction::unique_message(object, transaction::TEMPLATE_MESSAGE_TYPE, path)?",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_settings.rs",
+            "transaction::STORAGE_MESSAGE_TYPES.contains(&message.type_)",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_background.rs",
+            "transaction::resolve_target(source, position, &mut budget).map_err(map_transaction)?",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_background.rs",
+            "transaction::resolve_target(package, position, budget).map_err(map_transaction)?",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/section_text.rs",
+            "transaction::resolve_body_target(source, position, &mut budget)",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/footnote_text.rs",
+            "transaction::resolve_body_target(package, transaction_position, budget)",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/footnote_text.rs",
+            "transaction::resolve_message_target(\n        package,\n        transaction_position,\n        graph.reference_identifier,\n        FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/footnote_text.rs",
+            "transaction::resolve_storage_target(\n        package,\n        transaction_position,\n        graph.storage_identifier,\n        budget,",
+            1,
+        ),
+        (
+            "../litchi-pages/src/package/footnote_text.rs",
+            "transaction::resolve_message_target(\n        package,\n        transaction_position,\n        graph.marker_identifier,\n        TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
+            1,
+        ),
     ];
-    const REGISTRY_DECLARATIONS: [&str; 3] = [
+    const REGISTRY_DECLARATIONS: [&str; 5] = [
         "3007u32 => decode_shape_archive,",
         "2004u32 => decode_storage_archive,",
         "2008u32 => decode_storage_archive,",
+        "2001u32 => decode_storage_archive,",
+        "2022u32 => decode_storage_archive,",
     ];
     const MOVIE_FIELDS: [&str; 2] = [
         "required .TSD.DrawableArchive super = 1;",
@@ -4003,19 +4133,32 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     // workspace-only numeric route check is intentionally skipped. A partial
     // sibling checkout is an error so one missing route cannot weaken this
     // seam silently.
-    const ADDITIONAL_ROUTE_SOURCES: [&str; 1] = ["../litchi-pages/src/package/footnote_text.rs"];
+    const REGISTRY_SOURCE: &str = "../litchi-iwa/src/protobuf.rs";
+    const ADDITIONAL_ROUTE_SOURCES: [&str; 5] = [
+        "../litchi-pages/src/package/footnote_text.rs",
+        "../litchi-pages/src/package/section_background.rs",
+        "../litchi-pages/src/package/section_pagination.rs",
+        "../litchi-pages/src/package/section_settings.rs",
+        "../litchi-pages/src/package/section_text.rs",
+    ];
     let any_route_present = ROUTE_DECLARATIONS
         .iter()
-        .any(|(path, _, _)| Path::new(path).is_file())
+        .any(|(declaration_path, _, use_path, _)| {
+            Path::new(declaration_path).is_file() || Path::new(use_path).is_file()
+        })
         || ADDITIONAL_ROUTE_SOURCES
             .iter()
-            .any(|path| Path::new(path).is_file());
+            .any(|path| Path::new(path).is_file())
+        || Path::new(REGISTRY_SOURCE).is_file();
     let all_routes_present = ROUTE_DECLARATIONS
         .iter()
-        .all(|(path, _, _)| Path::new(path).is_file())
+        .all(|(declaration_path, _, use_path, _)| {
+            Path::new(declaration_path).is_file() && Path::new(use_path).is_file()
+        })
         && ADDITIONAL_ROUTE_SOURCES
             .iter()
-            .all(|path| Path::new(path).is_file());
+            .all(|path| Path::new(path).is_file())
+        && Path::new(REGISTRY_SOURCE).is_file();
     let route_scope_ok = if !any_route_present {
         true
     } else if !all_routes_present {
@@ -4023,10 +4166,12 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
     } else {
         let declarations_ok = ROUTE_DECLARATIONS
             .iter()
-            .map(|(path, declaration, use_marker)| {
-                fs::read_to_string(path).map(|source| {
-                    rust_non_public_declaration_count(&source, declaration) == 1
-                        && rust_code_marker_count(&source, use_marker) == 1
+            .map(|(declaration_path, declaration, use_path, use_marker)| {
+                fs::read_to_string(declaration_path).and_then(|declaration_source| {
+                    fs::read_to_string(use_path).map(|use_source| {
+                        rust_non_public_declaration_count(&declaration_source, declaration) == 1
+                            && rust_code_marker_count(&use_source, use_marker) == 1
+                    })
                 })
             })
             .collect::<Result<Vec<_>, _>>()?
@@ -4044,10 +4189,10 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         declarations_ok && production_markers_ok
     };
 
-    let registry_scope_ok = if !any_route_present {
+    let registry_scope_ok = if !any_route_present || !all_routes_present {
         true
     } else {
-        let registry = fs::read_to_string("../litchi-iwa/src/protobuf.rs")?;
+        let registry = fs::read_to_string(REGISTRY_SOURCE)?;
         REGISTRY_DECLARATIONS
             .iter()
             .all(|declaration| rust_code_marker_count(&registry, declaration) == 1)
@@ -4055,7 +4200,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
 
     if !canonical_scope_ok || !route_scope_ok || !registry_scope_ok {
         return Err(
-            "Pages native message provenance drifted: private Movie/audio 3007, Caption 633, FootnoteReference 2008, TextualAttachment 2004, legacy editor Document/Section (10000/10011), creation Document/Section/Settings (10000/10011/10012), package Document/Section/Settings (10000/10011/10012), or table-lock root (10000) routes no longer match their message-scoped canonical declarations and production decode/remap/write sites"
+            "Pages native message provenance drifted: private Movie/audio 3007, body-shape theme 10001, Caption 633, FootnoteReference 2008, TextualAttachment 2004, section template/storage (10143/2001/2022), legacy editor Document/Section (10000/10011), creation Document/Section/Settings (10000/10011/10012), package Document/Section/Settings (10000/10011/10012), or table-lock root (10000) routes no longer match their message-scoped canonical declarations and production decode/remap/write sites"
                 .into(),
         );
     }
