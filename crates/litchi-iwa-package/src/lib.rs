@@ -216,9 +216,23 @@ impl EntryStore {
     }
 
     /// Replace an entry payload without changing its name or position.
+    ///
+    /// An exact byte-identical replacement is treated as a no-op: the
+    /// existing payload allocation and copy-on-write state remain shared, and
+    /// the supplied vector is returned unchanged. This keeps a caller's
+    /// failed or empty publication from detaching an otherwise unchanged
+    /// package snapshot.
     pub fn replace_data(&mut self, position: usize, data: Vec<u8>) -> Option<Vec<u8>> {
         if position >= self.state.entries.len() {
             return None;
+        }
+        if self
+            .state
+            .entries
+            .get(position)
+            .is_some_and(|entry| entry.data() == data.as_slice())
+        {
+            return Some(data);
         }
         let entry = Arc::make_mut(&mut self.state).entries.get_mut(position)?;
         Some(std::mem::replace(entry.data_mut(), data))
@@ -598,6 +612,25 @@ mod tests {
                 .data(),
             [9]
         );
+    }
+
+    #[test]
+    fn identical_payload_replacement_preserves_copy_on_write_identity() {
+        let mut store = EntryStore::try_from_entries(vec![entry("a", &[1, 2, 3])])
+            .unwrap_or_else(|error| panic!("valid entry rejected: {error}"));
+        let sibling = store.clone();
+        let before = store
+            .get_at(0)
+            .unwrap_or_else(|| panic!("entry should exist"))
+            .clone();
+
+        assert_eq!(store.replace_data(0, vec![1, 2, 3]), Some(vec![1, 2, 3]));
+
+        let after = store
+            .get_at(0)
+            .unwrap_or_else(|| panic!("entry should still exist"));
+        assert!(std::sync::Arc::ptr_eq(&store.state, &sibling.state));
+        assert!(std::sync::Arc::ptr_eq(&before.data, &after.data));
     }
 
     #[test]
