@@ -586,6 +586,17 @@ fn select_transition(
     let (node_message_index, node_payload) = selected_message(node, SLIDE_NODE_MESSAGE_TYPE)?;
     let mut owner_work = 0usize;
     let slide_identifier = strict_node_slide_reference(node_payload, wire_limits, &mut owner_work)?;
+    // A native object identity may not serve two different rooted archive
+    // roles. Besides being malformed topology, a role alias would make the
+    // mutation verifier's identifier-based dispatch choose one role and skip
+    // validation of the other (for example, treating a SlideNode as only a
+    // SlideArchive when both messages share one object).
+    if show_identifier == node_identifier
+        || show_identifier == slide_identifier
+        || node_identifier == slide_identifier
+    {
+        return Err(Error::InvalidSource);
+    }
     let mut selected_slide_occurrences = 0usize;
     for candidate_node_identifier in node_identifiers {
         let candidate_slide_identifier = if *candidate_node_identifier == node_identifier {
