@@ -502,7 +502,6 @@ impl SourceCacheDiagnostics {
     /// or wrapped interval and returns an error. Callers collecting metrics
     /// should obtain both snapshots through
     /// [`SourceBackedPackage::try_cache_diagnostics`].
-    #[must_use]
     pub fn checked_counter_delta(
         before: Self,
         after: Self,
@@ -2270,7 +2269,6 @@ impl SourceBackedPackage {
     /// overflow as an error. Ordinary compatibility callers can continue to
     /// use the infallible method; benchmark and telemetry code should use this
     /// method so an invalid snapshot cannot be mistaken for a valid interval.
-    #[must_use]
     pub fn try_cache_diagnostics(
         &self,
     ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
