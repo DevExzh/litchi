@@ -700,6 +700,7 @@ pub(crate) fn from_in_process_observations(
         .iter()
         .enumerate()
         .map(|(sample_index, observation)| SampleEvidence {
+            child_process_id: None,
             sample_index,
             cache_state: "warm",
             elapsed_ns: observation.elapsed_ns,
@@ -1152,6 +1153,7 @@ mod tests {
         process_metrics: Option<crate::process_metrics::Delta>,
     ) -> SampleEvidence {
         SampleEvidence {
+            child_process_id: None,
             sample_index: index,
             cache_state,
             elapsed_ns,

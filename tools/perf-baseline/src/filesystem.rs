@@ -270,6 +270,10 @@ impl CacheSelection {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ChildResult {
+    /// Process identity captured by the actual `--filesystem-child` process.
+    /// This remains optional so older child/report payloads stay readable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    child_process_id: Option<u32>,
     elapsed_ns: u64,
     logical_read_counter_scope: String,
     logical_read_calls: u64,
@@ -313,6 +317,7 @@ struct ChildResult {
 impl ChildResult {
     fn ineligible_cold_verified(proof: cold_verified::Sample) -> Self {
         Self {
+            child_process_id: Some(std::process::id()),
             elapsed_ns: 0,
             logical_read_counter_scope: "cold_verified_ineligible".to_owned(),
             logical_read_calls: 0,
@@ -475,6 +480,10 @@ impl ChildMode {
 
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct SampleEvidence {
+    /// Process identity forwarded from the actual `--filesystem-child` that
+    /// produced this measured sample. Optional preserves older report shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child_process_id: Option<u32>,
     pub sample_index: usize,
     pub cache_state: &'static str,
     pub elapsed_ns: u64,
@@ -1614,6 +1623,7 @@ fn record_sample(
         });
     }
     samples.push(SampleEvidence {
+        child_process_id: invocation.child.child_process_id,
         sample_index,
         cache_state,
         elapsed_ns: invocation.child.elapsed_ns,
@@ -2215,6 +2225,7 @@ where
         .map(|bytes| u64::try_from(bytes.len()))
         .transpose()?;
     let result = ChildResult {
+        child_process_id: Some(std::process::id()),
         elapsed_ns,
         logical_read_counter_scope,
         logical_read_calls: snapshot.calls,
@@ -5116,6 +5127,7 @@ mod tests {
     #[test]
     fn child_output_keeps_allocation_sample_additive_and_omits_error_path_absence() {
         let child = |allocation_metrics| super::ChildResult {
+            child_process_id: None,
             elapsed_ns: 1,
             logical_read_counter_scope: "timed_read_at".to_owned(),
             logical_read_calls: 0,
