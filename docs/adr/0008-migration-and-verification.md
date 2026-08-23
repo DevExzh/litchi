@@ -11756,12 +11756,14 @@ is supplied by this amendment.
 
 Commit `0d5a523e6d3046a2d5ab2ee18755339ff7e1501b` records the compatibility
 boundary: `IWorkDrawableCommentEditor` remains the migration-host editor,
-while raw-ID Pages, Numbers, and Keynote direct drawable-comment and reply
-methods are advisory-deprecated. Signatures, identifiers, validation,
-publication, and bytes are unchanged; focused text comment/reply APIs and
-other semantic owners are not deprecated. Scoped `allow(deprecated)` keeps
-the migration-host examples compiling. No focused drop-in owner for direct
-drawable-comment CRUD is claimed.
+while raw-ID Pages direct drawable-comment CRUD methods and raw-ID Numbers and
+Keynote direct drawable-comment/reply methods are advisory-deprecated. Pages
+reply methods are typed and carry only scoped `allow(deprecated)` internally;
+they are not deprecated. Signatures, identifiers, validation, publication,
+and bytes are unchanged; focused text comment/reply APIs and other semantic
+owners are not deprecated. Scoped `allow(deprecated)` keeps the
+migration-host examples compiling. No focused drop-in owner for
+direct-drawable comment CRUD is claimed.
 
 The supplied native evidence is bounded application-reopen evidence only:
 the Pages footnote fixture
