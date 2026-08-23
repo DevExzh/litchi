@@ -1,5 +1,77 @@
 # Numbers tile-storage codec fuzzing
 
+## Numbers formula-archive codec
+
+`numbers_formula_archive` sends one bounded, caller-owned
+`TSCE.FormulaArchive` source through strict inspection and the visitor
+decoder. Successful inputs must agree on report bounds, node and precedent
+counts, semantic node values, and source-order callbacks. Failed inputs must
+not publish partial visitor facts. The target also constructs independent
+duplicate, missing-required, wrong-wire, non-canonical, invalid-UTF-8,
+aggregate-budget, and deep-recursion cases so those contracts do not depend on
+libFuzzer discovering a valid formula first.
+
+The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
+fields, 256 KiB of work, 2,048 nodes, 64 KiB of text, and recursion depth 32.
+The checked-in `corpus/numbers_formula_archive/empty_ast_array.hex` is a
+minimal empty AST envelope; generated cases cover the malformed and resource
+boundaries above. Corpus recipes use the `hex:` form and are hand-authored,
+not copied from a native Numbers package.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_formula_archive
+```
+
+Run a bounded smoke with mutable corpus, artifacts, and build output outside
+the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-formula-archive-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_formula_archive/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_formula_archive "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=1 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+## Pages section codec
+
+`pages_section_codec` compares strict pagination and section-settings
+projections for one unchanged source. Successful settings snapshots must agree
+between scalar and report paths, borrow non-empty section names from the source,
+and match generated `TP.SectionArchive` values when the complete message is
+decodable. Pagination intentionally keeps unrelated fields opaque, so malformed
+oracle-only fields are observed without weakening the selected-field checks.
+The target also probes finite byte, field, work, name, and recursion limits.
+
+The target accepts raw inputs up to 64 KiB and uses 8,192 fields, 256 KiB of
+work, 64 KiB of section-name text, and recursion depth 64. The checked-in
+recipes under `corpus/pages_section_codec/` cover canonical scalar settings,
+pagination scalars, optional and empty envelopes, duplicate and missing
+required fields, invalid UTF-8/NUL names, unknown scalar/group spans, wrong
+wire types, truncation, and deep groups. They are hand-authored `hex:` recipes,
+not copied from native Pages packages.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check pages_section_codec
+```
+
 ## Keynote chart-title codec
 
 `keynote_chart_title` sends one bounded, caller-owned generated

@@ -565,13 +565,15 @@ fn select_transition(
     let node_identifier = *node_identifiers
         .get(position.get())
         .ok_or(Error::SlidePositionNotFound { position })?;
-    if node_identifiers
-        .iter()
-        .filter(|candidate| **candidate == node_identifier)
-        .count()
-        != 1
-    {
-        return Err(Error::InvalidSource);
+    // Checking only the selected node's occurrence is not sufficient: a
+    // duplicate reference to any other node can make the rooted slide
+    // traversal ambiguous while leaving the selected node's count at one.
+    // Reject every repeated node identity before resolving any component-
+    // backed archive.
+    for (index, candidate) in node_identifiers.iter().enumerate() {
+        if node_identifiers[..index].contains(candidate) {
+            return Err(Error::InvalidSource);
+        }
     }
     let raw_node_identifiers = strict_show_slide_references(show_payload, wire_limits)?;
     if raw_node_identifiers.as_slice() != node_identifiers {
@@ -1791,6 +1793,20 @@ fn validate_requested_opaque_settings(
         validate_opaque_path(payload, limits).map_err(map_requested_opaque_error)?;
     }
     Ok(())
+}
+
+/// Validate opaque transition submessages for archive adapters.
+///
+/// The semantic settings intentionally retain color and timing-curve bytes
+/// without interpreting them. Native adapters that project those settings
+/// still need the package boundary's strict wire validation before exposing
+/// them. Keep this forwarding entry point alongside the validator so every
+/// adapter uses the same duplicate-field, wire-type, finite-scalar, and
+/// nested-required-field checks.
+pub fn validate_opaque_transition_settings(
+    settings: &Settings,
+) -> Result<(), Error> {
+    validate_requested_opaque_settings(settings, WireLimits::default())
 }
 
 fn map_requested_opaque_error(error: Error) -> Error {
