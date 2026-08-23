@@ -50,9 +50,9 @@ use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
 };
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
-    Relationships, SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics,
-    SourceCacheLimits, TargetMode,
+    BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, Part, PartData,
+    ReadLimits, Relationships, SourceBackedPackage, SourceCacheCounterDelta,
+    SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_pptx::shape::text::{
@@ -69,7 +69,7 @@ use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+use soapberry_zip::office::{ArchiveReader, LazyArchiveReader, StreamingArchiveWriter};
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
 const SCHEMA_VERSION: u32 = 1;
@@ -83,6 +83,10 @@ const OPC_CACHE_SLOW_SOURCE_DELAY_US: u64 = 10_000;
 const OPC_CACHE_COHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const CONTENT_TYPE: &str = "application/octet-stream";
 const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
+const OPC_RELATIONSHIP_CORPUS_GENERATOR: &str = "litchi-opc-relationship-heavy-v1";
+const OPC_RELATIONSHIP_PART_COUNT: usize = 256;
+const OPC_RELATIONSHIP_PART_BYTES: usize = 96;
+const OPC_RELATIONSHIP_TYPE: &str = "https://litchi.dev/performance/relationship-heavy";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
 const CFB_SELECTIVE_CORPUS_GENERATOR: &str = "litchi-cfb-selective-read-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
@@ -831,6 +835,7 @@ enum Case {
     ZipReadOne,
     OpcOpen,
     OpcOpenOwned,
+    OpcRelationshipOpen,
     OpcNoopSave,
     OpcMutatedSave,
     OpcSourceOpen,
@@ -1255,6 +1260,7 @@ impl Case {
             Self::ZipReadOne => "zip_read_one",
             Self::OpcOpen => "opc_open",
             Self::OpcOpenOwned => "opc_open_owned",
+            Self::OpcRelationshipOpen => "opc_relationship_open",
             Self::OpcNoopSave => "opc_noop_save",
             Self::OpcMutatedSave => "opc_mutated_save",
             Self::OpcSourceOpen => "opc_source_open",
@@ -1796,6 +1802,10 @@ impl Case {
                 | Self::OpcRangeSourceOpenMainRead
                 | Self::OpcOpenSessionScaling
         )
+    }
+
+    const fn is_opc_relationship_open(self) -> bool {
+        matches!(self, Self::OpcRelationshipOpen)
     }
 
     const fn is_fresh_writer(self) -> bool {
@@ -2841,6 +2851,16 @@ struct Corpus {
     xlsx: Option<XlsxCorpus>,
 }
 
+/// Fixed relationship-heavy OPC input used only by the opt-in structural
+/// open selector. The ordinary `Corpus` fields retain the compatibility
+/// manifest shape; the identity below records the ZIP members that change
+/// 0259 actually hands through `PackageReader`.
+#[derive(Debug)]
+struct OpcRelationshipCorpus {
+    corpus: Corpus,
+    identity: OpcRelationshipIdentity,
+}
+
 /// Fixed XML fragments for the hidden OOXML namespace-tracker selectors.
 ///
 /// The expected projections are produced by the independent `NsReader` oracle
@@ -3462,6 +3482,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     zip_index: Option<ZipIndexSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    opc_relationships: Option<OpcRelationshipSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
@@ -3533,6 +3555,59 @@ struct SourceSummary {
     doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_story_hyperlinks: Option<docx_story_hyperlinks::DocxStoryHyperlinkPlanSummary>,
+}
+
+/// Exact, untimed identity and per-sample count gates for the relationship
+/// heavy OPC corpus. These fields deliberately distinguish the complete ZIP
+/// source from its `[Content_Types].xml` and `.rels` structural subsets. The
+/// physical-member count vectors repeat the independent archive preflight for
+/// each retained sample because `PackageReader` exposes logical Part and
+/// relationship counts, not its private ZIP-member catalog.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct OpcRelationshipSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_bytes: u64,
+    source_sha256: String,
+    member_count: usize,
+    relationship_member_count: usize,
+    part_count: usize,
+    relationship_count: usize,
+    part_payload_bytes: usize,
+    member_names_sha256: String,
+    member_contents_sha256: String,
+    relationship_member_names_sha256: String,
+    relationship_member_contents_sha256: String,
+    content_types_member: String,
+    content_types_sha256: String,
+    all_members_deflated_verified: bool,
+    independent_archive_identity_verified: bool,
+    independent_lazy_identity_verified: bool,
+    package_identity_verified: bool,
+    observed_member_counts: Vec<usize>,
+    observed_relationship_member_counts: Vec<usize>,
+    observed_part_counts: Vec<usize>,
+    observed_relationship_counts: Vec<usize>,
+    observed_part_payload_bytes: Vec<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OpcRelationshipIdentity {
+    member_count: usize,
+    relationship_member_count: usize,
+    part_count: usize,
+    relationship_count: usize,
+    part_payload_bytes: usize,
+    member_names_sha256: String,
+    member_contents_sha256: String,
+    relationship_member_names_sha256: String,
+    relationship_member_contents_sha256: String,
+    content_types_member: String,
+    content_types_sha256: String,
+    all_members_deflated_verified: bool,
+    source_bytes: usize,
+    source_sha256: String,
 }
 
 /// Actual member-count evidence retained by the ZIP index selector.  The
@@ -7112,6 +7187,18 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     let options = parse_options()?;
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_relationship_open())
+        && (options.shapes.as_slice() != CorpusShape::ALL.as_slice()
+            || options.payloads.as_slice() != PayloadKind::ALL.as_slice())
+    {
+        return Err(
+            "opc_relationship_open uses a fixed relationship-heavy corpus; omit --shape and --payload"
+                .into(),
+        );
+    }
     let mut results = Vec::new();
     let filesystem_runs = filesystem::run_selected(
         &options.cases,
@@ -7283,6 +7370,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_detection()
                     && !case.is_cfb_selective()
                     && !case.is_cfb_open_stream_evidence()
+                    && !case.is_opc_relationship_open()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
                     cfb_corpus
@@ -7313,6 +7401,29 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     )?);
                 }
             }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_relationship_open())
+    {
+        let corpus = build_opc_relationship_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_opc_relationship_open())
+        {
+            if case != Case::OpcRelationshipOpen {
+                return Err("unsupported OPC relationship selector".into());
+            }
+            results.push(run_opc_relationship_open(
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
         }
     }
 
@@ -9053,6 +9164,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "zip_read_one" => Some(Case::ZipReadOne),
         "opc_open" => Some(Case::OpcOpen),
         "opc_open_owned" => Some(Case::OpcOpenOwned),
+        "opc_relationship_open" => Some(Case::OpcRelationshipOpen),
         "opc_noop_save" => Some(Case::OpcNoopSave),
         "opc_mutated_save" => Some(Case::OpcMutatedSave),
         "opc_source_open" => Some(Case::OpcSourceOpen),
@@ -9640,8 +9752,8 @@ fn parse_rtf_variant(value: &str) -> Option<RtfSemanticVariant> {
     }
 }
 
-fn print_usage() {
-    println!(
+fn usage_text() -> String {
+    format!(
         "Usage: cargo run --release --manifest-path tools/perf-baseline/Cargo.toml -- [OPTIONS]\n\n\
          Options:\n\
            --samples N                 Samples per case (default: {DEFAULT_SAMPLES})\n\
@@ -9649,6 +9761,7 @@ fn print_usage() {
            --filesystem-cache LIST     Filesystem states: warm,cold-requested,cold-verified\n\
            --filesystem-root PATH      Parent directory for filesystem samples\n\
            --case LIST                 zip_index,zip_read_one,opc_open,opc_open_owned,\n\
+                                       opc_relationship_open,\n\
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_concurrent_same_part,\n\
@@ -9942,7 +10055,11 @@ fn print_usage() {
            --corpus-manifest PATH      Write schema-2 corpus catalog sidecar and\n\
                                        include its additive reference in the report\n\
            --help                      Show this help"
-    );
+    )
+}
+
+fn print_usage() {
+    println!("{}", usage_text());
 }
 
 fn build_opc_corpus(
@@ -10010,6 +10127,168 @@ fn build_opc_corpus(
         target_payload,
         xlsx: None,
     })
+}
+
+/// Build a small, relationship-heavy OPC package whose ZIP members are all
+/// deflated. The archive is independently walked through both
+/// `ArchiveReader` and `LazyArchiveReader` before the timed runner is allowed
+/// to use it.  This keeps member names, payloads, and source identity from
+/// being inferred from the timed `PackageReader` result.
+fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Error>> {
+    let mut package = OpcPackage::new();
+    let mut target_name = None;
+    let mut target_payload = None;
+
+    for index in 0..OPC_RELATIONSHIP_PART_COUNT {
+        let name = format!("word/relationship-part-{index:04}.bin");
+        let payload = payload_bytes(
+            PayloadKind::Compressible,
+            100_000 + index,
+            OPC_RELATIONSHIP_PART_BYTES,
+        );
+        if index == OPC_RELATIONSHIP_PART_COUNT / 2 {
+            target_name = Some(name.clone());
+            target_payload = Some(payload.clone());
+        }
+        let mut part = BlobPart::new(
+            PackURI::new(format!("/{name}"))?,
+            CONTENT_TYPE.to_owned(),
+            payload,
+        );
+        let target = format!("https://example.invalid/litchi/relationship/{index:04}");
+        part.relate_to_ext(&target, OPC_RELATIONSHIP_TYPE);
+        package.try_add_part(Box::new(part))?;
+    }
+
+    let first_part = "word/relationship-part-0000.bin".to_owned();
+    package.rels_mut().try_add_relationship(
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        first_part,
+        "rIdBenchmarkMain".to_owned(),
+        TargetMode::Internal,
+    )?;
+
+    let archive = PackageWriter::to_bytes(&package)?;
+    let archive_reader = ArchiveReader::new(&archive)?;
+    let mut members = BTreeMap::new();
+    for name in archive_reader.file_names() {
+        let name = name.to_owned();
+        let payload = archive_reader.read(&name)?;
+        members.insert(name, payload);
+    }
+    if members.is_empty() {
+        return Err("relationship-heavy OPC corpus has no archive members".into());
+    }
+
+    let expected_names = members.keys().cloned().collect::<Vec<_>>();
+    let lazy_reader = LazyArchiveReader::new(&archive)?;
+    let mut lazy_names = lazy_reader
+        .file_names()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    lazy_names.sort();
+    if lazy_names != expected_names {
+        return Err("lazy OPC archive member names differ from independent archive names".into());
+    }
+    for (name, expected) in &members {
+        if lazy_reader.read_stored_borrowed(name)?.is_some() {
+            return Err(format!(
+                "relationship-heavy archive member is stored instead of deflated: {name}"
+            )
+            .into());
+        }
+        if lazy_reader.read(name)? != *expected {
+            return Err(format!(
+                "lazy OPC member payload differs from independent archive payload: {name}"
+            )
+            .into());
+        }
+    }
+
+    let relationship_members = members
+        .iter()
+        .filter(|(name, _)| name.ends_with(".rels"))
+        .map(|(name, payload)| (name.clone(), payload.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let part_members = members
+        .iter()
+        .filter(|(name, _)| *name != "[Content_Types].xml" && !name.ends_with(".rels"))
+        .map(|(name, payload)| (name.clone(), payload.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let content_types = members
+        .get("[Content_Types].xml")
+        .ok_or("relationship-heavy OPC corpus has no content-types member")?;
+    let target_name = target_name.ok_or("relationship-heavy OPC corpus has no target name")?;
+    let target_payload = target_payload.ok_or("relationship-heavy OPC corpus has no target")?;
+    if part_members.get(&target_name) != Some(&target_payload) {
+        return Err(
+            "relationship-heavy OPC target differs from independent archive payload".into(),
+        );
+    }
+
+    let parsed = OpcPackage::from_bytes(&archive)?;
+    let parsed_part_count = parsed.part_count();
+    let parsed_relationship_count = parsed.rels().len()
+        + parsed
+            .iter_parts()
+            .map(|part| part.rels().len())
+            .sum::<usize>();
+    let parsed_part_payload_bytes: usize = parsed.iter_parts().map(|part| part.blob().len()).sum();
+    if parsed_part_count != part_members.len()
+        || parsed_relationship_count != relationship_members.len()
+        || parsed_part_payload_bytes != part_members.values().map(Vec::len).sum::<usize>()
+    {
+        return Err("relationship-heavy OPC package identity differs from archive identity".into());
+    }
+
+    let identity = OpcRelationshipIdentity {
+        member_count: members.len(),
+        relationship_member_count: relationship_members.len(),
+        part_count: part_members.len(),
+        relationship_count: parsed_relationship_count,
+        part_payload_bytes: part_members.values().map(Vec::len).sum(),
+        member_names_sha256: member_name_digest(&members),
+        member_contents_sha256: named_member_digest(&members),
+        relationship_member_names_sha256: member_name_digest(&relationship_members),
+        relationship_member_contents_sha256: named_member_digest(&relationship_members),
+        content_types_member: "[Content_Types].xml".to_owned(),
+        content_types_sha256: sha256_hex(content_types),
+        all_members_deflated_verified: true,
+        source_bytes: archive.len(),
+        source_sha256: sha256_hex(&archive),
+    };
+
+    let entry_count_u64 = u64::try_from(identity.part_count)?;
+    let entry_bytes_u64 = u64::try_from(OPC_RELATIONSHIP_PART_BYTES)?;
+    let uncompressed_payload_bytes = entry_count_u64
+        .checked_mul(entry_bytes_u64)
+        .ok_or("relationship-heavy OPC payload byte count overflow")?;
+    let corpus = Corpus {
+        manifest: CorpusManifest {
+            name: "relationship-heavy".to_owned(),
+            generator: OPC_RELATIONSHIP_CORPUS_GENERATOR,
+            package_format: "OPC/ZIP",
+            shape: "relationship-heavy",
+            payload_kind: "relationship-heavy",
+            compression: "deflate",
+            entry_count: identity.part_count,
+            archive_member_count: identity.member_count,
+            entry_bytes: OPC_RELATIONSHIP_PART_BYTES,
+            uncompressed_payload_bytes: usize::try_from(uncompressed_payload_bytes)?,
+            archive_bytes: archive.len(),
+            archive_sha256: identity.source_sha256.clone(),
+            target_entry: target_name.clone(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name,
+        target_payload,
+        xlsx: None,
+    };
+    Ok(OpcRelationshipCorpus { corpus, identity })
 }
 
 fn build_cfb_corpus(
@@ -17454,6 +17733,9 @@ fn run_case_with_config(
         Case::ZipReadOne => run_zip_read_one(corpus, warmup_iterations, samples),
         Case::OpcOpen => run_opc_open(corpus, warmup_iterations, samples),
         Case::OpcOpenOwned => run_opc_open_owned(corpus, warmup_iterations, samples),
+        Case::OpcRelationshipOpen => {
+            Err("OPC relationship-heavy case uses its dedicated corpus runner".into())
+        },
         Case::OpcNoopSave => run_opc_noop_save(corpus, warmup_iterations, samples),
         Case::OpcMutatedSave => run_opc_mutated_save(corpus, warmup_iterations, samples),
         Case::OpcSourceOpen => run_opc_source_open(corpus, warmup_iterations, samples, false),
@@ -42018,6 +42300,95 @@ fn run_opc_open(
     Ok(result(Case::OpcOpen, corpus, elapsed, None))
 }
 
+fn run_opc_relationship_open(
+    corpus: &OpcRelationshipCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut observed_member_counts = Vec::with_capacity(samples);
+    let mut observed_relationship_member_counts = Vec::with_capacity(samples);
+    let mut observed_part_counts = Vec::with_capacity(samples);
+    let mut observed_relationship_counts = Vec::with_capacity(samples);
+    let mut observed_part_payload_bytes = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let package = OpcPackage::from_bytes(&corpus.corpus.archive)?;
+        let part_count = package.part_count();
+        let relationship_count = package.rels().len()
+            + package
+                .iter_parts()
+                .map(|part| part.rels().len())
+                .sum::<usize>();
+        let part_payload_bytes = package
+            .iter_parts()
+            .map(|part| part.blob().len())
+            .sum::<usize>();
+        let duration = started.elapsed();
+
+        if part_count != corpus.identity.part_count
+            || relationship_count != corpus.identity.relationship_count
+            || part_payload_bytes != corpus.identity.part_payload_bytes
+        {
+            return Err("relationship-heavy OPC PackageReader identity differs from source".into());
+        }
+        std::hint::black_box((part_count, relationship_count, part_payload_bytes));
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        if iteration >= warmup_iterations {
+            observed_member_counts.push(corpus.identity.member_count);
+            observed_relationship_member_counts.push(corpus.identity.relationship_member_count);
+            observed_part_counts.push(part_count);
+            observed_relationship_counts.push(relationship_count);
+            observed_part_payload_bytes.push(part_payload_bytes);
+        }
+    }
+
+    let identity = &corpus.identity;
+    let source = OpcRelationshipSummary {
+        implementation: "LazyArchiveReader/PackageReader",
+        timing_scope: "OpcPackage::from_bytes plus part/relationship count and payload gates",
+        performance_claim: "none",
+        source_bytes: u64::try_from(identity.source_bytes)?,
+        source_sha256: identity.source_sha256.clone(),
+        member_count: identity.member_count,
+        relationship_member_count: identity.relationship_member_count,
+        part_count: identity.part_count,
+        relationship_count: identity.relationship_count,
+        part_payload_bytes: identity.part_payload_bytes,
+        member_names_sha256: identity.member_names_sha256.clone(),
+        member_contents_sha256: identity.member_contents_sha256.clone(),
+        relationship_member_names_sha256: identity.relationship_member_names_sha256.clone(),
+        relationship_member_contents_sha256: identity.relationship_member_contents_sha256.clone(),
+        content_types_member: identity.content_types_member.clone(),
+        content_types_sha256: identity.content_types_sha256.clone(),
+        all_members_deflated_verified: identity.all_members_deflated_verified,
+        independent_archive_identity_verified: true,
+        independent_lazy_identity_verified: true,
+        package_identity_verified: true,
+        observed_member_counts,
+        observed_relationship_member_counts,
+        observed_part_counts,
+        observed_relationship_counts,
+        observed_part_payload_bytes,
+    };
+
+    Ok(CaseResult {
+        case: Case::OpcRelationshipOpen.name(),
+        cache_state: None,
+        corpus: corpus.corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source: Some(SourceSummary {
+            opc_relationships: Some(source),
+            ..SourceSummary::default()
+        }),
+        execution: None,
+        output_sha256: Some(identity.source_sha256.clone()),
+        operation_metrics: None,
+    })
+}
+
 fn run_opc_open_owned(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -44786,6 +45157,41 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
+fn member_name_digest(members: &BTreeMap<String, Vec<u8>>) -> String {
+    let mut hasher = Sha256::new();
+    for name in members.keys() {
+        let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+        hasher.update(name_len.to_le_bytes());
+        hasher.update(name.as_bytes());
+    }
+    let digest = hasher.finalize();
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ignored = write!(output, "{byte:02x}");
+    }
+    output
+}
+
+fn named_member_digest(members: &BTreeMap<String, Vec<u8>>) -> String {
+    let mut hasher = Sha256::new();
+    for (name, payload) in members {
+        let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+        let payload_len = u64::try_from(payload.len()).unwrap_or(u64::MAX);
+        hasher.update(name_len.to_le_bytes());
+        hasher.update(name.as_bytes());
+        hasher.update(payload_len.to_le_bytes());
+        hasher.update(payload);
+    }
+    let digest = hasher.finalize();
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ignored = write!(output, "{byte:02x}");
+    }
+    output
+}
+
 fn executable_profile() -> &'static str {
     if cfg!(debug_assertions) {
         "debug"
@@ -45001,7 +45407,7 @@ mod tests {
         build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
         build_odt_media_corpus, build_odt_repeated_text_corpus, build_odt_resource_batch_corpus,
         build_ole_common_corpus, build_ooxml_tracker_corpus, build_opc_corpus,
-        build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
+        build_opc_relationship_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
         build_pptx_slide_name_index_corpus, build_pptx_source_backed_cross_copy_corpus,
         build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
         build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
@@ -45227,6 +45633,97 @@ mod tests {
                 .membername(),
             first.target_name
         );
+    }
+
+    #[test]
+    fn opc_relationship_selector_is_opt_in_and_cross_checks_exact_identity() {
+        let first = build_opc_relationship_corpus().unwrap();
+        let second = build_opc_relationship_corpus().unwrap();
+        assert_eq!(first.corpus.archive, second.corpus.archive);
+        assert_eq!(first.identity, second.identity);
+        assert_eq!(first.identity.part_count, 256);
+        assert_eq!(first.identity.relationship_member_count, 257);
+        assert_eq!(first.identity.relationship_count, 257);
+        assert_eq!(first.identity.member_count, 514);
+        assert_eq!(first.identity.part_payload_bytes, 256 * 96);
+        assert_eq!(first.corpus.manifest.entry_count, 256);
+        assert_eq!(first.corpus.manifest.archive_member_count, 514);
+        assert_eq!(
+            first.corpus.manifest.archive_sha256,
+            first.identity.source_sha256
+        );
+        assert_eq!(
+            first.corpus.manifest.target_payload_sha256,
+            sha256_hex(&first.corpus.target_payload)
+        );
+        assert_eq!(
+            parse_case("opc_relationship_open"),
+            Some(Case::OpcRelationshipOpen)
+        );
+        assert_eq!(Case::OpcRelationshipOpen.name(), "opc_relationship_open");
+        assert!(!Case::DEFAULT.contains(&Case::OpcRelationshipOpen));
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        assert!(super::usage_text().contains("opc_relationship_open"));
+        assert_eq!(parse_case("opc_relationship_open:tiny"), None);
+        let error = match super::run_case_with_config(
+            Case::OpcRelationshipOpen,
+            &first.corpus,
+            0,
+            1,
+            RangeSimulationConfig::default(),
+        ) {
+            Ok(_) => panic!("relationship selector unexpectedly used the generic corpus"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("dedicated corpus runner"));
+        let measured = super::run_opc_relationship_open(&first, 0, 1).unwrap();
+        assert_eq!(
+            measured.corpus.generator,
+            super::OPC_RELATIONSHIP_CORPUS_GENERATOR
+        );
+        assert_eq!(
+            measured.output_sha256.as_deref(),
+            Some(first.identity.source_sha256.as_str())
+        );
+        let summary = measured
+            .source
+            .unwrap()
+            .opc_relationships
+            .expect("relationship identity evidence");
+        assert!(summary.independent_archive_identity_verified);
+        assert!(summary.independent_lazy_identity_verified);
+        assert!(summary.package_identity_verified);
+        assert_eq!(
+            summary.member_names_sha256,
+            first.identity.member_names_sha256
+        );
+        assert_eq!(
+            summary.member_contents_sha256,
+            first.identity.member_contents_sha256
+        );
+        assert_eq!(
+            summary.relationship_member_names_sha256,
+            first.identity.relationship_member_names_sha256
+        );
+        assert_eq!(
+            summary.relationship_member_contents_sha256,
+            first.identity.relationship_member_contents_sha256
+        );
+        assert_eq!(summary.content_types_member, "[Content_Types].xml");
+        assert_eq!(
+            summary.content_types_sha256,
+            first.identity.content_types_sha256
+        );
+        assert!(first.identity.all_members_deflated_verified);
+        assert!(summary.all_members_deflated_verified);
+        assert_eq!(summary.member_count, 514);
+        assert_eq!(summary.relationship_member_count, 257);
+        assert_eq!(summary.observed_member_counts, vec![514]);
+        assert_eq!(summary.observed_relationship_member_counts, vec![257]);
+        assert_eq!(summary.observed_part_counts, vec![256]);
+        assert_eq!(summary.observed_relationship_counts, vec![257]);
+        assert_eq!(summary.observed_part_payload_bytes, vec![256 * 96]);
     }
 
     #[test]
@@ -45508,7 +46005,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 380);
+        assert_eq!(selectable_count, 381);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

@@ -40,6 +40,18 @@ reproduce, all latency results are withheld and no claim-registry entry is
 added. Both compact packages are retained as non-reproducibility evidence;
 the landing is supported by correctness and source-preservation gates only.
 
+## Relationship-heavy lazy OPC structural open (change 0259)
+
+The opt-in `opc_relationship_open` selector raises the current selectable
+harness count to 381 while preserving the default 36-case / 198-record matrix.
+Its fixed corpus contains 256 tiny deflated Parts, 257 deflated relationship
+manifests, and `[Content_Types].xml`; independent archive, lazy-reader, and
+PackageReader identity gates cover names, counts, payload digests, and source
+hashes, with every ZIP member independently verified as deflated. This is
+unmeasured correctness and timing-boundary coverage only:
+`performance_claim` is `none`, and no latency, allocation, memory, I/O,
+decompression, or broad OOXML claim is made.
+
 ## DOCX owned-byte source-backed ingress (change 0257)
 
 [Change 0257](changes/0257-docx-owned-bytes-source-backed-ingress.md) routes
@@ -1129,7 +1141,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **380 selectable cases**; 200 was the count before the
+harness contains **381 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -2597,7 +2609,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 380 selectable cases. Change
+The current standalone harness provides 381 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

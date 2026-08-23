@@ -36,6 +36,9 @@ eligible structural member, but it is not a measured allocation, memory, RSS,
 latency, I/O, or end-to-end result. See
 [change 0259](changes/0259-opc-shared-structural-members.md); a fixed
 relationship-heavy corpus and controlled resource/ABBA evidence remain open.
+The opt-in `opc_relationship_open` harness selector raises the current
+selectable count to 381; it is unmeasured correctness/timing-boundary coverage
+only and makes no performance claim.
 
 ## Latest retained unified RTF byte-ingress evidence (change 0258)
 
@@ -870,7 +873,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**380 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**381 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
