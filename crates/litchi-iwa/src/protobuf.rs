@@ -23,7 +23,6 @@ const ARCHIVE_CODEC_RECURSION_LIMIT: u32 = 16;
 const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 const TEXT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 const STORAGE_TEXT_FIELD: u32 = 3;
-const TABLE_DATA_LIST_SEGMENT_CODEC_RECURSION_LIMIT: u32 = 64;
 
 /// One allocation-free wire summary for the text projection.
 ///
@@ -506,228 +505,10 @@ fn decode_table_data_list(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(TableDataListWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
-fn table_data_list_segment_codec_decode_options(
-    data: &[u8],
-) -> Result<litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeOptions> {
-    let source_bytes = data.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
-    let source_fields = data.len().clamp(1, WireLimits::MAX_FIELDS);
-    let source_work = data
-        .len()
-        .checked_mul(32)
-        .ok_or_else(|| {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::RewriteWork,
-                observed: usize::MAX,
-                limit: WireLimits::MAX_REWRITE_WORK,
-            })
-        })?
-        .clamp(1, WireLimits::MAX_REWRITE_WORK);
-    let source_references = data.len().clamp(1, WireLimits::MAX_FIELDS);
-    let source_text = data.len().clamp(1, WireLimits::MAX_OUTPUT_BYTES);
-    Ok(
-        litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeOptions::new(
-            source_bytes,
-            source_fields,
-            source_work,
-            TABLE_DATA_LIST_SEGMENT_CODEC_RECURSION_LIMIT,
-            source_references,
-            source_text,
-        ),
-    )
-}
-
-fn table_data_list_segment_codec_error(
-    error: litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeError,
-) -> Error {
-    use litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeLimit;
-
-    let Some(limit) = error.resource_limit() else {
-        return Error::InvalidFormat(
-            "iWork TableDataListSegment payload failed strict validation".to_owned(),
-        );
-    };
-    match limit {
-        DecodeLimit::Bytes { observed, maximum } => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::InputBytes,
-                observed,
-                limit: maximum,
-            })
-        }
-        DecodeLimit::Fields { observed, maximum } => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::Fields,
-                observed,
-                limit: maximum,
-            })
-        }
-        DecodeLimit::Work { observed, maximum } => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::RewriteWork,
-                observed,
-                limit: maximum,
-            })
-        }
-        DecodeLimit::Nesting { observed, maximum } => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::Nesting,
-                observed: usize::try_from(observed).unwrap_or(usize::MAX),
-                limit: usize::try_from(maximum).unwrap_or(usize::MAX),
-            })
-        }
-        DecodeLimit::References { observed, maximum } => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::Fields,
-                observed,
-                limit: maximum,
-            })
-        }
-        DecodeLimit::Text { observed, maximum } => {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::OutputBytes,
-                observed,
-                limit: maximum,
-            })
-        }
-        DecodeLimit::Allocation { requested } => {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "iWork TableDataListSegment text projection",
-                amount: requested,
-            })
-        }
-        _ => Error::InvalidFormat(
-            "iWork TableDataListSegment payload failed strict validation".to_owned(),
-        ),
-    }
-}
-
-#[derive(Debug, Default)]
-struct TableDataListSegmentTextVisitor {
-    text: Vec<String>,
-    output_bytes: usize,
-    staging_work_bytes: usize,
-    semantic_error: Option<Error>,
-}
-
-impl TableDataListSegmentTextVisitor {
-    fn record_semantic_error(&mut self, error: Error) {
-        if self.semantic_error.is_none() {
-            self.semantic_error = Some(error);
-        }
-    }
-
-    fn take_parts(self) -> (Vec<String>, usize, usize, Option<Error>) {
-        (
-            self.text,
-            self.output_bytes,
-            self.staging_work_bytes,
-            self.semantic_error,
-        )
-    }
-}
-
-impl litchi_iwa_protos::numbers_table_cell_storage_codec::StorageVisitor
-    for TableDataListSegmentTextVisitor
-{
-    fn visit_list_entry(
-        &mut self,
-        entry: litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
-    ) -> std::result::Result<(), litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeError>
-    {
-        let Some(value) = entry.string_value() else {
-            return Ok(());
-        };
-        if value.is_empty() || self.semantic_error.is_some() {
-            return Ok(());
-        }
-
-        let string_work = std::mem::size_of::<String>()
-            .checked_add(value.len())
-            .unwrap_or(usize::MAX);
-        let staging_work_bytes = self
-            .staging_work_bytes
-            .checked_add(string_work)
-            .unwrap_or(usize::MAX);
-        if staging_work_bytes > WireLimits::MAX_REWRITE_WORK {
-            self.record_semantic_error(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::RewriteWork,
-                observed: staging_work_bytes,
-                limit: WireLimits::MAX_REWRITE_WORK,
-            }));
-            return Ok(());
-        }
-
-        let output_bytes = self
-            .output_bytes
-            .checked_add(string_work)
-            .unwrap_or(usize::MAX);
-        if output_bytes > WireLimits::MAX_OUTPUT_BYTES {
-            self.record_semantic_error(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::OutputBytes,
-                observed: output_bytes,
-                limit: WireLimits::MAX_OUTPUT_BYTES,
-            }));
-            return Ok(());
-        }
-
-        let requested = self.text.len().checked_add(1).unwrap_or(usize::MAX);
-        if self.text.try_reserve_exact(1).is_err() {
-            self.record_semantic_error(Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "iWork TableDataListSegment text fragments",
-                amount: requested,
-            }));
-            return Ok(());
-        }
-        let mut owned = String::new();
-        if owned.try_reserve_exact(value.len()).is_err() {
-            self.record_semantic_error(Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "iWork TableDataListSegment text",
-                amount: value.len(),
-            }));
-            return Ok(());
-        }
-        owned.push_str(value);
-        self.text.push(owned);
-        self.output_bytes = output_bytes;
-        self.staging_work_bytes = staging_work_bytes;
-        Ok(())
-    }
-}
-
 /// Static decoder function for segmented TableDataList payloads.
 fn decode_table_data_list_segment(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let mut visitor = TableDataListSegmentTextVisitor::default();
-    let options = table_data_list_segment_codec_decode_options(data)?;
-    let (_snapshot, report) =
-        litchi_iwa_protos::numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
-            data,
-            options,
-            &mut visitor,
-        )
-        .map_err(table_data_list_segment_codec_error)?;
-    let (text, output_bytes, staging_work_bytes, semantic_error) = visitor.take_parts();
-    let total_work = report
-        .work_bytes()
-        .checked_add(staging_work_bytes)
-        .ok_or_else(|| {
-            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::RewriteWork,
-                observed: usize::MAX,
-                limit: WireLimits::MAX_REWRITE_WORK,
-            })
-        })?;
-    if total_work > WireLimits::MAX_REWRITE_WORK {
-        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-            kind: litchi_iwa_common::LimitKind::RewriteWork,
-            observed: total_work,
-            limit: WireLimits::MAX_REWRITE_WORK,
-        }));
-    }
-    if let Some(error) = semantic_error {
-        return Err(error);
-    }
-    debug_assert!(output_bytes <= WireLimits::MAX_OUTPUT_BYTES);
-    Ok(Box::new(TableDataListSegmentWrapper { text }) as Box<dyn DecodedMessage>)
+    let msg = tst::TableDataListSegment::decode(data)?;
+    Ok(Box::new(TableDataListSegmentWrapper(msg)) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for ShapeArchive messages
@@ -967,13 +748,17 @@ impl DecodedMessage for TableDataListWrapper {
 
 /// Wrapper for a segmented TableDataList payload.
 #[derive(Debug)]
-pub struct TableDataListSegmentWrapper {
-    text: Vec<String>,
-}
+pub struct TableDataListSegmentWrapper(pub tst::TableDataListSegment);
 
 impl DecodedMessage for TableDataListSegmentWrapper {
     fn extract_text(&self) -> Vec<String> {
-        self.text.clone()
+        self.0
+            .entries
+            .iter()
+            .filter_map(|entry| entry.string.as_ref())
+            .filter(|value| !value.is_empty())
+            .cloned()
+            .collect()
     }
 }
 
@@ -1345,7 +1130,7 @@ mod tests {
     }
 
     #[test]
-    fn table_data_list_segments_use_strict_owned_text_projection() {
+    fn table_data_list_segments_use_their_concrete_decoder() {
         let segment = tst::TableDataListSegment {
             list_type: tst::table_data_list::ListType::String as i32,
             key_range: tsp::Range {
@@ -1359,33 +1144,8 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut data = segment.encode_to_vec();
-        let decoded = decode_common(6011, &data).unwrap();
-        data.fill(0);
+        let decoded = decode_common(6011, &segment.encode_to_vec()).unwrap();
         assert_eq!(decoded.extract_text(), ["Segmented"]);
-    }
-
-    #[test]
-    fn table_data_list_segment_projection_rejects_later_malformed_entry_atomically() {
-        let segment = tst::TableDataListSegment {
-            list_type: tst::table_data_list::ListType::String as i32,
-            key_range: tsp::Range {
-                location: 7,
-                length: 2,
-            },
-            entries: vec![tst::table_data_list::ListEntry {
-                key: 7,
-                refcount: 1,
-                string: Some("retained only on success".to_owned()),
-                ..Default::default()
-            }],
-        };
-        let mut malformed = segment.encode_to_vec();
-        // The second entry has a key but omits required refcount. The first
-        // callback may already have staged text, but the neutral decoder must
-        // publish no wrapper when strict validation later fails.
-        malformed.extend_from_slice(&[0x1a, 0x02, 0x08, 0x08]);
-        assert!(decode_common(6011, &malformed).is_err());
     }
 
     #[test]
