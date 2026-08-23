@@ -28,6 +28,26 @@ pub(crate) fn zeroizing_password(password: impl Into<String>) -> Zeroizing<Strin
     Zeroizing::new(password.into())
 }
 
+/// Return whether a package member is a document or macro signature owner.
+///
+/// ODF producers may use any signature-owner filename below `META-INF/`; the
+/// writer deliberately treats every member with the conventional
+/// `signatures.xml` suffix as regenerated security metadata.  Keep this
+/// predicate in the common package owner so readers and writers cannot drift
+/// into different mutation policies.
+#[must_use]
+pub fn is_signature_owner_path(path: &str) -> bool {
+    let under_meta_inf = path
+        .split_once('/')
+        .is_some_and(|(first, _)| first.eq_ignore_ascii_case("META-INF"));
+    let suffix_start = path.len().saturating_sub("signatures.xml".len());
+    under_meta_inf
+        && path
+            .as_bytes()
+            .get(suffix_start..)
+            .is_some_and(|suffix| suffix.eq_ignore_ascii_case(b"signatures.xml"))
+}
+
 /// An ODF package (ZIP file containing XML documents).
 ///
 /// Uses soapberry-zip for efficient lazy decompression.
@@ -1527,6 +1547,16 @@ impl OwnedPackage {
             password: None,
             limits: self.limits,
         }
+    }
+
+    /// Return whether any ZIP member declares traditional ZIP encryption.
+    ///
+    /// This is separate from ODF manifest encryption.  Both classifications
+    /// must be considered before a writer rebuilds an owned package because a
+    /// ZIP-encrypted member cannot be copied through the ordinary ODF writer.
+    #[must_use]
+    pub fn has_zip_encrypted_entries(&self) -> bool {
+        self.index.has_encrypted_entries()
     }
 
     /// Return a stable identity for the retained archive index.
