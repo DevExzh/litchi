@@ -72,9 +72,10 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
     let mut previous_row = 0u32;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| invalid(format!("invalid worksheet extension XML: {error}")))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
         let decoder = reader.decoder();
         let resolver = reader.resolver();
         match event {
@@ -222,8 +223,8 @@ fn rewrite_descent_attributes(content: &[u8]) -> Result<Vec<u8>> {
     let mut writer = Writer::new(output);
 
     loop {
-        let (_, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| invalid(format!("invalid worksheet extension XML: {error}")))?;
         let resolver = reader.resolver();
         match event {

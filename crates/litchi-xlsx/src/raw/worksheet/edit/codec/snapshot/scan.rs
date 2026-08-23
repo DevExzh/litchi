@@ -207,9 +207,10 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
             return Err(invalid("worksheet XML exceeds event limit"));
         }
         let event_start = position(&reader)?;
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| invalid(error.to_string()))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
         let event_end = position(&reader)?;
         let decoder = reader.decoder();
         let resolver = reader.resolver();
