@@ -53,6 +53,65 @@ row order, labels, and digests, classifying 167 rows as 145 `historical`, 14
 `descriptive`, 8 `withheld`, and 0 `strict_claim`; no strict-claim link is
 present. CI runs the checker and focused tests. This is report-integrity
 evidence only and makes no latency, resource, or production claim.
+## Non-iWork release gate
+
+The workspace-wide CI still owns the complete all-features and iWork gates.
+The separate non-iWork gate derives its package and facade-feature closure from
+Cargo metadata, excludes the 17 iWork packages and the `litchi-py` facade
+consumer (18 packages total), and checks the remaining 45 workspace packages
+plus the 35 safe `litchi` features. It rejects any selected dependency tree that
+contains an excluded package or a `prost`/`protobuf` package. Bulk commands use
+`--all-features`; the facade is compiled with the exact safe-feature union, and
+the verifier checks that union in addition to each individual safe feature.
+The gate uses argv lists rather than shell-expanded package or feature strings.
+It intentionally does not pass Cargo `--locked`: the root `Cargo.lock` is
+ignored by this repository, so clean checkouts resolve the workspace normally.
+
+From a clean checkout, run the fast planner and tree checks with an isolated
+target directory:
+
+```sh
+export CARGO_TARGET_DIR=target/non-iwork-gate
+export CARGO_BUILD_JOBS=1
+export CARGO_INCREMENTAL=0
+export CARGO_PROFILE_DEV_DEBUG=0
+export CARGO_PROFILE_TEST_DEBUG=0
+python3 -m unittest tools.test_non_iwork_gate
+python3 tools/non_iwork_gate.py print
+python3 tools/non_iwork_gate.py verify
+```
+
+The exact serialized CI modes are:
+
+```sh
+python3 tools/non_iwork_gate.py check
+python3 tools/non_iwork_gate.py clippy
+python3 tools/non_iwork_gate.py doc
+python3 tools/non_iwork_gate.py lib-tests
+python3 tools/non_iwork_gate.py doc-tests
+python3 tools/non_iwork_gate.py deprecated
+```
+
+The command derives exclusions and safe facade features on every invocation;
+do not replace them with `--all-features`, which intentionally includes iWork.
+The six CI modes reuse this one isolated target sequentially with incremental
+compilation disabled and debug/test symbol retention reduced. These settings
+reduce duplicate and debug artifact size but do not impose a hard filesystem
+cap; monitor target size and available disk while running the complete suite.
+Clippy intentionally mirrors the repository lint alias: library targets only,
+`--no-deps`, and `-D warnings`.
+The `lib-tests` mode serializes all 45 bulk package test commands with
+`--all-features --lib --tests`, runs `cargo clean -p` for each completed bulk
+root, and then tests the exact safe facade union with both library and
+integration tests. This bounds retained package test artifacts while leaving
+shared dependencies reusable; a failed test stops before its cleanup command.
+
+Measured on 2026-08-24 with the debug/test settings above, one aggregate
+non-iWork `lib-tests` invocation failed while linking the `litchi-rtf`
+integration tests (`ld` bus error): exit 101 after 8:48.51, maximum RSS
+1,659,568 KiB, and approximately 6.3 GiB in the target directory. This is
+why the release-equivalent job uses the serialized package commands; the
+settings are measured mitigations, not a hard disk-space guarantee.
 
 ## Latest real-producer security correctness coverage (change 0264)
 
