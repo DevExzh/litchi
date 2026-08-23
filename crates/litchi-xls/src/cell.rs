@@ -616,10 +616,10 @@ mod tests {
         let cell_ref: &Cell = &cell;
 
         // Test that &Cell implements Cell trait correctly
-        assert_eq!(Cell::row(&cell_ref), 5);
-        assert_eq!(Cell::column(&cell_ref), 10);
-        assert_eq!(Cell::coordinate(&cell_ref), "K6");
-        assert!(!Cell::is_formula(&cell_ref));
+        assert_eq!(Cell::row(cell_ref), 5);
+        assert_eq!(Cell::column(cell_ref), 10);
+        assert_eq!(Cell::coordinate(cell_ref), "K6");
+        assert!(!Cell::is_formula(cell_ref));
     }
 
     #[test]
