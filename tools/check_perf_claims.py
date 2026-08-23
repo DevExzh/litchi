@@ -477,7 +477,7 @@ def _decompress_json(path: Path, *, location: str) -> tuple[Any, str, int]:
         raise ClaimInputError(f"cannot run zstd for {location}: {error}") from error
     digest = hashlib.sha256()
     size = 0
-    with tempfile.NamedTemporaryFile(prefix="litchi-claim-report-", suffix=".json") as temporary:
+    with process, tempfile.NamedTemporaryFile(prefix="litchi-claim-report-", suffix=".json") as temporary:
         assert process.stdout is not None
         while True:
             chunk = process.stdout.read(1024 * 1024)
