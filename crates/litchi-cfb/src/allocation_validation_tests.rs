@@ -81,7 +81,7 @@ fn mini_data_terminal_sector(bytes: &[u8]) -> u32 {
 fn assert_open_corrupted(bytes: Vec<u8>, expected: &str) {
     assert!(matches!(
         OleFile::open(Cursor::new(bytes)),
-        Err(crate::OleError::CorruptedFile(message)) if message.contains(expected)
+        Err(OleError::CorruptedFile(message)) if message.contains(expected)
     ));
 }
 
@@ -304,14 +304,14 @@ fn open_rejects_minifat_cycles_and_invalid_markers() {
     corrupt_first_data_mini_sector(&mut cycle, mini_start);
     assert!(matches!(
         OleFile::open(Cursor::new(cycle)),
-        Err(crate::OleError::CorruptedFile(message)) if message.contains("Cycle detected")
+        Err(OleError::CorruptedFile(message)) if message.contains("Cycle detected")
     ));
 
     let mut invalid_marker = mini_stream_file();
     corrupt_first_data_mini_sector(&mut invalid_marker, MAXREGSECT);
     assert!(matches!(
         OleFile::open(Cursor::new(invalid_marker)),
-        Err(crate::OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
+        Err(OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
     ));
 }
 
@@ -330,14 +330,14 @@ fn open_rejects_fat_stream_cycles_and_invalid_markers() {
     corrupt_first_data_sector(&mut cycle, data_start);
     assert!(matches!(
         OleFile::open(Cursor::new(cycle)),
-        Err(crate::OleError::CorruptedFile(message)) if message.contains("Cycle detected")
+        Err(OleError::CorruptedFile(message)) if message.contains("Cycle detected")
     ));
 
     let mut invalid_marker = regular_stream_file();
     corrupt_first_data_sector(&mut invalid_marker, MAXREGSECT);
     assert!(matches!(
         OleFile::open(Cursor::new(invalid_marker)),
-        Err(crate::OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
+        Err(OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
     ));
 }
 

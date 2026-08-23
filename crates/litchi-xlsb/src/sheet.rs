@@ -444,9 +444,10 @@ struct XlsbCellIterator<'a> {
 
 impl<'a> CellIterator<'a> for XlsbCellIterator<'a> {
     fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
-        self.cells
-            .next()
-            .map(|cell| Ok(Box::new(cell.clone()) as Box<dyn SheetCell + 'a>))
+        self.cells.next().map(|cell| {
+            let boxed: Box<dyn SheetCell + 'a> = Box::new(cell.clone());
+            Ok(boxed)
+        })
     }
 }
 

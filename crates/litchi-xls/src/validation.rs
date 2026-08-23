@@ -2256,6 +2256,10 @@ fn cfb_issue(
             "xls.cfb.missing_stream",
             "CFB ingress could not resolve a required structural stream.",
         ),
+        OleError::LimitExceeded { .. } | OleError::InvalidLimit { .. } => (
+            "xls.cfb.limit",
+            "CFB ingress rejected the source or caller limit bounds.",
+        ),
         OleError::Io(_)
         | OleError::Allocation { .. }
         | OleError::Committed { .. }

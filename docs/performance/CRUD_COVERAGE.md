@@ -2,7 +2,7 @@
 
 Date: 2026-08-22
 
-This is a coverage map, not a completion claim. It compares the 348 selectable
+This is a coverage map, not a completion claim. It compares the 350 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
