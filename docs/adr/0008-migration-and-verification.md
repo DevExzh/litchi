@@ -11555,9 +11555,10 @@ and custom markers before per-value owned strings are retained. The existing
 `MAX_BODY_FOOTNOTES` bound and fallible collection reservations remain in
 force, and per-value text/custom-marker limits still apply.
 
-The surrounding footnote text transaction and rewrite path use
-`TransactionBudget` for transaction and candidate work, while setters and
-commit retain per-value checks including `Footnote::with_custom_mark`.
+Section transaction paths use `TransactionBudget` for transaction and
+candidate work; this footnote-text transaction/rewrite seam uses its own
+wire/text limits and retains per-value checks, including
+`Footnote::with_custom_mark`.
 `FootnoteSemanticBudget` does not account for staged `set` text, `after`
 values, or candidate-package retention; this amendment makes no aggregate
 set/after_text/candidate-retention claim.
