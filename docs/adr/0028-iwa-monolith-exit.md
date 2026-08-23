@@ -3651,3 +3651,20 @@ provenance, and public-surface privacy; they do not move format ownership or
 mutation responsibility. No Cargo/build command or native application run
 was performed or admitted. This amendment makes no host-edge, ordered-debt,
 or monolith-exit claim and does not alter the deletion gate.
+
+## 2026-08-23 amendment: detached Keynote chart-title owner-scan hardening
+
+Detached commit `612bc0f26` is limited to the focused Keynote package's
+chart-title graph builder. With mutation guards enabled, it lazily constructs
+one package-wide `HashMap` of non-style owner counts and shares that map across
+all charts in the graph build. `ChartGraphScanBudget` accumulates component,
+object, message, payload, and parsed-field work once against the package-wide
+`WireWork` limit, replacing the prior repeated per-chart ownership scan while
+retaining the exactly-one-owner and nonzero-chart checks.
+
+This is package-level work hardening only. The aggregate `WireWork` accounting
+covers the owner scan and nested chart-reference parsing; it is not a bound on
+whole-chart CPU or latency, and no such result is claimed. No Cargo/build/test
+or native result is added. This amendment makes no dependency-edge,
+ordered-debt, migration-host, or monolith-exit claim, and it does not alter the
+deletion gate.
