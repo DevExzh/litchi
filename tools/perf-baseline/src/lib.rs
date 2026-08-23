@@ -10,6 +10,7 @@ pub mod allocation_metrics;
 mod cold_verified;
 mod corpus_manifest;
 mod docx_story_hyperlinks;
+mod docx_story_hyperlink_publication;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
@@ -893,6 +894,8 @@ enum Case {
     OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
     DocxStoryHyperlinkPlan,
+    DocxStoryHyperlinkNoopSave,
+    DocxStoryHyperlinkRedactionSave,
     PptxSourceBackedOneEditSave,
     OmmlFormulaRangeScan,
     OmmlFormulaExtract,
@@ -1334,6 +1337,8 @@ impl Case {
             Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::DocxStoryHyperlinkPlan => "docx_story_hyperlink_plan",
+            Self::DocxStoryHyperlinkNoopSave => "docx_story_hyperlink_noop_save",
+            Self::DocxStoryHyperlinkRedactionSave => "docx_story_hyperlink_redaction_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::OmmlFormulaRangeScan => "omml_formula_range_scan",
             Self::OmmlFormulaExtract => "omml_formula_extract",
@@ -2594,6 +2599,13 @@ impl Case {
         matches!(self, Self::DocxStoryHyperlinkPlan)
     }
 
+    const fn is_docx_story_hyperlink_publication(self) -> bool {
+        matches!(
+            self,
+            Self::DocxStoryHyperlinkNoopSave | Self::DocxStoryHyperlinkRedactionSave
+        )
+    }
+
     const fn is_ooxml_tracker_scan(self) -> bool {
         matches!(
             self,
@@ -3568,6 +3580,9 @@ struct SourceSummary {
     doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_story_hyperlinks: Option<docx_story_hyperlinks::DocxStoryHyperlinkPlanSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_story_hyperlink_publication:
+        Option<docx_story_hyperlink_publication::DocxStoryHyperlinkPublicationSummary>,
 }
 
 /// Exact, untimed identity and per-sample count gates for the relationship
@@ -7358,6 +7373,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
                     && !case.is_docx_story_hyperlink_plan()
+                    && !case.is_docx_story_hyperlink_publication()
                     && !case.is_ooxml_tracker_scan()
                     && !case.is_doc_owner_public_phases()
                     && !case.is_pptx_source_edit_save()
@@ -7783,6 +7799,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             options.warmup_iterations,
             options.samples,
         )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_docx_story_hyperlink_publication())
+    {
+        let corpus = docx_story_hyperlink_publication::build_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_docx_story_hyperlink_publication())
+        {
+            results.push(docx_story_hyperlink_publication::run(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
     }
 
     if options
@@ -9318,6 +9355,8 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "docx_story_hyperlink_plan" => Some(Case::DocxStoryHyperlinkPlan),
+        "docx_story_hyperlink_noop_save" => Some(Case::DocxStoryHyperlinkNoopSave),
+        "docx_story_hyperlink_redaction_save" => Some(Case::DocxStoryHyperlinkRedactionSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "omml_formula_range_scan" => Some(Case::OmmlFormulaRangeScan),
         "omml_formula_extract" => Some(Case::OmmlFormulaExtract),
@@ -9821,6 +9860,8 @@ fn usage_text() -> String {
                                        odt_file_source_open_full_text_lifecycle,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        docx_story_hyperlink_plan,\n\
+                                       docx_story_hyperlink_noop_save,\n\
+                                       docx_story_hyperlink_redaction_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        omml_formula_range_scan,\n\
                                        omml_formula_extract,\n\
@@ -18008,6 +18049,9 @@ fn run_case_with_config(
         },
         Case::DocxStoryHyperlinkPlan => {
             Err("DOCX story-hyperlink planning uses its dedicated corpus runner".into())
+        },
+        Case::DocxStoryHyperlinkNoopSave | Case::DocxStoryHyperlinkRedactionSave => {
+            Err("DOCX story-hyperlink publication uses its dedicated corpus runner".into())
         },
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
@@ -46097,7 +46141,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 381);
+        assert_eq!(selectable_count, 383);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
