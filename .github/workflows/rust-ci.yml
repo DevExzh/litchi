@@ -10,6 +10,7 @@ on:
       - 'clippy.toml'
       - '.pre-commit-config.yaml'
       - 'rustfmt.toml'
+      - 'rust-toolchain.toml'
       - '.github/workflows/rust-ci.yml'
       - 'README.md'
       - 'crates/**/README.md'
@@ -23,13 +24,17 @@ on:
       - 'test-data/ole/**'
       - 'test-data/ooxml/**'
       - 'test-data/poi/**'
+      - 'test-data/**'
       - 'tools/check_crate_boundaries.py'
       - 'tools/check_numbers_public_dependencies.py'
       - 'tools/crate_boundaries.json'
       - 'tools/test_check_crate_boundaries.py'
       - 'tools/test_check_numbers_public_dependencies.py'
+      - 'tools/non_iwork_gate.py'
+      - 'tools/test_non_iwork_gate.py'
       - 'tools/native_odf_resave.py'
       - 'tools/test_native_odf_resave.py'
+      - 'docs/performance/BASELINE.md'
     branches:
       - main
   pull_request:
@@ -41,6 +46,7 @@ on:
       - 'clippy.toml'
       - '.pre-commit-config.yaml'
       - 'rustfmt.toml'
+      - 'rust-toolchain.toml'
       - '.github/workflows/rust-ci.yml'
       - 'README.md'
       - 'crates/**/README.md'
@@ -54,13 +60,17 @@ on:
       - 'test-data/ole/**'
       - 'test-data/ooxml/**'
       - 'test-data/poi/**'
+      - 'test-data/**'
       - 'tools/check_crate_boundaries.py'
       - 'tools/check_numbers_public_dependencies.py'
       - 'tools/crate_boundaries.json'
       - 'tools/test_check_crate_boundaries.py'
       - 'tools/test_check_numbers_public_dependencies.py'
+      - 'tools/non_iwork_gate.py'
+      - 'tools/test_non_iwork_gate.py'
       - 'tools/native_odf_resave.py'
       - 'tools/test_native_odf_resave.py'
+      - 'docs/performance/BASELINE.md'
     branches:
       - main
 
@@ -97,6 +107,59 @@ jobs:
 
       - name: Verify checked native-resave evidence
         run: python3 -m unittest tools.test_native_odf_resave
+
+  non-iwork-release-gate:
+    name: non-iWork release gate
+    runs-on: ubuntu-latest
+    env:
+      # Keep this separate from the workspace-wide target; the gate is
+      # serialized to make its resource envelope predictable.
+      CARGO_TARGET_DIR: target/non-iwork-gate
+      CARGO_BUILD_JOBS: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install non-iWork system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: pkg-config libfreetype6-dev libfontconfig1-dev
+          version: 1.0
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+
+      - name: Test release-gate planner
+        run: python3 -m unittest tools.test_non_iwork_gate
+
+      - name: Print and verify non-iWork topology
+        run: |
+          python3 tools/non_iwork_gate.py print
+          python3 tools/non_iwork_gate.py verify
+
+      - name: Check non-iWork workspace and safe facade
+        run: python3 tools/non_iwork_gate.py check
+
+      - name: Lint non-iWork workspace and safe facade
+        run: python3 tools/non_iwork_gate.py clippy
+
+      - name: Build non-iWork documentation
+        run: python3 tools/non_iwork_gate.py doc
+
+      - name: Run non-iWork library and integration tests
+        run: python3 tools/non_iwork_gate.py lib-tests
+
+      - name: Run non-iWork documentation tests
+        run: python3 tools/non_iwork_gate.py doc-tests
+
+      - name: Reject deprecated non-iWork API use
+        run: python3 tools/non_iwork_gate.py deprecated
 
   portable-foundations:
     name: foundation tests (${{ matrix.os }})
