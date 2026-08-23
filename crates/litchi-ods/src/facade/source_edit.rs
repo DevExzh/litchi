@@ -552,20 +552,16 @@ impl<'source> SourceCellCommit<'source> {
                 },
                 other => SourceContentPublicationError::Core(other),
             })?;
-        let package = &self.patch.before.owner.package;
-        let content = if self.changed() {
-            package.write_content_xml_to_stream_with_known_change(
+        let content = self
+            .patch
+            .before
+            .owner
+            .package
+            .write_content_xml_to_stream_with_options(
                 writer,
                 self.snapshot.content_xml.as_bytes(),
                 options,
-            )?
-        } else {
-            package.write_content_xml_to_stream_with_options(
-                writer,
-                self.snapshot.content_xml.as_bytes(),
-                options,
-            )?
-        };
+            )?;
         Ok(SourceCellPublicationReport {
             changed_cells: self.changed_cells,
             content,

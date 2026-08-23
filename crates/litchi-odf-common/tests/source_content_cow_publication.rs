@@ -626,24 +626,6 @@ fn media_range(bytes: &[u8]) -> Range<u64> {
         .unwrap()
 }
 
-fn content_range(bytes: &[u8]) -> Range<u64> {
-    let archive = ZipArchive::from_slice(bytes).unwrap();
-    archive
-        .entries()
-        .find_map(|entry| {
-            let entry = entry.ok()?;
-            if entry.file_path().as_ref() != b"content.xml" {
-                return None;
-            }
-            let (start, end) = archive
-                .get_entry(entry.wayfinder())
-                .unwrap()
-                .compressed_data_range();
-            Some(start..end)
-        })
-        .unwrap()
-}
-
 fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
@@ -1597,7 +1579,7 @@ fn changed_publication_does_not_read_opaque_payload_before_output_begins() {
 }
 
 #[test]
-fn known_change_skips_content_probe_and_roundtrips_changed_member() {
+fn changed_publication_roundtrips_changed_member() {
     let bytes = zip_package(
         ZipCompressionMethod::Deflated,
         ZipCompressionMethod::Deflated,
@@ -1606,10 +1588,8 @@ fn known_change_skips_content_probe_and_roundtrips_changed_member() {
         false,
         true,
     );
-    let content = content_range(&bytes);
     let source = ProbeSource::new(bytes);
     let package = SourceBackedPackage::from_read_at(source_reader(&source)).unwrap();
-    source.forbid_range_until_output(content);
     let mut sink = MutatingSink {
         bytes: Vec::new(),
         source: Arc::clone(&source),
@@ -1617,12 +1597,8 @@ fn known_change_skips_content_probe_and_roundtrips_changed_member() {
         mutate_on_flush: false,
     };
     let report = package
-        .write_content_xml_to_stream_with_known_change(
-            &mut sink,
-            TARGET_CONTENT,
-            SourceContentPublicationOptions::default(),
-        )
-        .expect("known changed publication should not probe content before output");
+        .write_content_xml_to_stream(&mut sink, TARGET_CONTENT)
+        .expect("changed publication should roundtrip the replacement");
     assert!(!report.is_no_op());
     assert_eq!(report.bytes(), sink.bytes.len() as u64);
     let reopened = litchi_odf_common::core::OwnedPackage::from_bytes(sink.bytes).unwrap();
@@ -1630,7 +1606,7 @@ fn known_change_skips_content_probe_and_roundtrips_changed_member() {
 }
 
 #[test]
-fn known_change_keeps_signed_refusal_before_output() {
+fn changed_publication_keeps_signed_refusal_before_output() {
     let source = Arc::new(OwnedSource::new(zip_package(
         ZipCompressionMethod::Deflated,
         ZipCompressionMethod::Stored,
@@ -1642,11 +1618,7 @@ fn known_change_keeps_signed_refusal_before_output() {
     let package = SourceBackedPackage::from_read_at(source).unwrap();
     let mut output = Vec::new();
     let error = package
-        .write_content_xml_to_stream_with_known_change(
-            &mut output,
-            TARGET_CONTENT,
-            SourceContentPublicationOptions::default(),
-        )
+        .write_content_xml_to_stream(&mut output, TARGET_CONTENT)
         .expect_err("changed signed source must be refused");
     assert!(matches!(
         error,
@@ -1660,7 +1632,7 @@ fn known_change_keeps_signed_refusal_before_output() {
 }
 
 #[test]
-fn known_change_keeps_unsupported_manifest_refusal_before_output() {
+fn changed_publication_keeps_unsupported_manifest_refusal_before_output() {
     let source = Arc::new(OwnedSource::new(zip_package(
         ZipCompressionMethod::Deflated,
         ZipCompressionMethod::Stored,
@@ -1672,11 +1644,7 @@ fn known_change_keeps_unsupported_manifest_refusal_before_output() {
     let package = SourceBackedPackage::from_read_at(source).unwrap();
     let mut output = Vec::new();
     let error = package
-        .write_content_xml_to_stream_with_known_change(
-            &mut output,
-            TARGET_CONTENT,
-            SourceContentPublicationOptions::default(),
-        )
+        .write_content_xml_to_stream(&mut output, TARGET_CONTENT)
         .expect_err("sized content manifest remains outside raw replacement");
     assert!(matches!(
         error,
