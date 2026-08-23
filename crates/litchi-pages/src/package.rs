@@ -84,6 +84,58 @@ const MAX_BODY_FOOTNOTES: usize = 4096;
 /// Hard package-wide ceiling for native objects inspected by Pages ingress.
 pub const MAX_OBJECTS: usize = 1_000_000;
 
+/// Aggregate semantic bytes retained while projecting one rooted body-
+/// footnote collection.
+///
+/// [`Footnote::with_custom_mark`] protects one value at a time.  The package
+/// projection also needs to bound the complete collection before publishing
+/// any owned strings, otherwise many individually-valid notes could exceed
+/// the effective Pages text ceiling together.  The same small coordinator is
+/// used by the package reader and the footnote-text selector path.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct FootnoteSemanticBudget {
+    maximum_bytes: usize,
+    retained_bytes: usize,
+}
+
+impl FootnoteSemanticBudget {
+    pub(super) const fn new(maximum_bytes: usize) -> Self {
+        Self {
+            maximum_bytes,
+            retained_bytes: 0,
+        }
+    }
+
+    pub(super) fn charge(
+        &mut self,
+        text_bytes: usize,
+        custom_mark_bytes: usize,
+    ) -> PackageResult<()> {
+        let amount =
+            text_bytes
+                .checked_add(custom_mark_bytes)
+                .ok_or(PackageError::PayloadLimit {
+                    observed: usize::MAX,
+                    limit: self.maximum_bytes,
+                })?;
+        let observed =
+            self.retained_bytes
+                .checked_add(amount)
+                .ok_or(PackageError::PayloadLimit {
+                    observed: usize::MAX,
+                    limit: self.maximum_bytes,
+                })?;
+        if observed > self.maximum_bytes {
+            return Err(PackageError::PayloadLimit {
+                observed,
+                limit: self.maximum_bytes,
+            });
+        }
+        self.retained_bytes = observed;
+        Ok(())
+    }
+}
+
 /// Validate one native Pages text-storage payload through the focused,
 /// source-borrowing adapter.
 ///
@@ -453,7 +505,8 @@ impl Package {
     /// Returns [`PackageError::InvalidFormat`] when the body table, reference,
     /// footnote storage, or marker graph is malformed, or when a referenced
     /// object is missing. Returns a bounded semantic error when the projected
-    /// note text exceeds the package text budget.
+    /// note text or the aggregate footnote text/custom-marker collection
+    /// exceeds the package text budget.
     pub fn body_footnotes(&self) -> PackageResult<Vec<Footnote>> {
         project_body_footnotes(
             self.state.source.components(),
@@ -1197,6 +1250,7 @@ fn project_body_footnotes(
     limits: Limits,
     max_text_bytes: usize,
 ) -> PackageResult<Vec<Footnote>> {
+    let mut semantic_budget = FootnoteSemanticBudget::new(max_text_bytes);
     let root_references = root_references_with_limits(components, limits)?;
     let Some(body_identifier) = root_references.body else {
         return Ok(Vec::new());
@@ -1262,8 +1316,13 @@ fn project_body_footnotes(
         }
         seen_references.push(entry.identifier);
         validate_body_footnote_anchor(body_storage.text(), body_identifier, entry.character_index)?;
-        let (footnote, storage_identifier, marker_identifier) =
-            project_one_body_footnote(components, limits, max_text_bytes, entry)?;
+        let (footnote, storage_identifier, marker_identifier) = project_one_body_footnote(
+            components,
+            limits,
+            max_text_bytes,
+            entry,
+            &mut semantic_budget,
+        )?;
         if entry.identifier == storage_identifier
             || entry.identifier == marker_identifier
             || seen_storages.contains(&storage_identifier)
@@ -1342,6 +1401,7 @@ fn project_one_body_footnote(
     limits: Limits,
     max_text_bytes: usize,
     entry: NativeFootnoteReference,
+    semantic_budget: &mut FootnoteSemanticBudget,
 ) -> PackageResult<(Footnote, NonZeroU64, NonZeroU64)> {
     let reference_object = find_object(components, entry.identifier.get()).ok_or_else(|| {
         PackageError::InvalidFormat(format!(
@@ -1435,10 +1495,26 @@ fn project_one_body_footnote(
                 storage_identifier
             ))
         })?;
+    if text.len() > crate::footnote::body::MAX_TEXT_BYTES {
+        return Err(PackageError::InvalidFormat(format!(
+            "Pages footnote storage {storage_identifier} exceeds its semantic text budget"
+        )));
+    }
     let custom_mark = reference
         .custom_mark_string()
-        .map(str::to_owned)
-        .map(String::into_boxed_str);
+        .map(|value| {
+            if value.len() > crate::footnote::body::MAX_CUSTOM_MARK_BYTES {
+                return Err(PackageError::InvalidFormat(format!(
+                    "Pages footnote object {} exceeds its semantic custom-marker budget",
+                    entry.identifier
+                )));
+            }
+            Ok(value)
+        })
+        .transpose()?;
+    semantic_budget.charge(text.len(), custom_mark.map_or(0, str::len))?;
+    let text = try_owned_footnote_string(text)?;
+    let custom_mark = custom_mark.map(try_owned_footnote_string).transpose()?;
     let footnote = Footnote::with_custom_mark(
         Position::from_utf16_index(entry.character_index as usize).map_err(|error| {
             PackageError::InvalidFormat(format!(
@@ -1446,7 +1522,7 @@ fn project_one_body_footnote(
                 entry.character_index
             ))
         })?,
-        text.to_owned().into_boxed_str(),
+        text,
         custom_mark,
     )
     .map_err(|error| {
@@ -1456,6 +1532,17 @@ fn project_one_body_footnote(
         ))
     })?;
     Ok((footnote, storage_identifier, marker_identifier))
+}
+
+fn try_owned_footnote_string(value: &str) -> PackageResult<Box<str>> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|_error| PackageError::Allocation {
+            amount: value.len(),
+        })?;
+    owned.push_str(value);
+    Ok(owned.into_boxed_str())
 }
 
 fn validate_body_footnote_anchor(
