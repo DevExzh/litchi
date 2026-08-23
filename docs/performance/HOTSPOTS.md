@@ -70,10 +70,12 @@ broad ODS claim.)
 [change 0248 — CFB streaming release ABBA evidence](changes/0248-cfb-streaming-abba.md)
 (the independently audited 24-row package accepts only p50=1, mean=2,
 p95=2, and p99=2 cells; adverse-both counts are p50=14, mean=10, p95=7,
-p99=4. The production CFB optimization is not landed on latency evidence;
-the candidate is retained only for allocation follow-up. Actual-output oracle
-correctness landed in `66bb83abb`, and source-identity measurement projection
-was fixed in `cd21f7670`. No broad CFB claim.)
+p99=4. The selectors exercise `SharedOleFile`, not the direct `OleFile`
+payload-read code changed by the candidate, so neither population adjudicates
+that optimization. With no applicable measurement, `67a37235c` rolls it back
+pending a direct/native-path experiment. Actual-output oracle correctness
+landed in `66bb83abb`, and source-identity measurement projection was fixed in
+`cd21f7670`. No broad CFB claim.)
 [change 0247 — XLSX bytes-facade ABBA evidence (0230 package)](changes/0247-xlsx-bytes-abba-evidence.md)
 (the independently audited `0230-xlsx-bytes-20260821` package measures only
 in-memory `Workbook::from_bytes(Vec<u8>)` and its named lifecycle). The
