@@ -1027,6 +1027,12 @@ fn map_formula_envelope_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
+fn checked_formula_work_product(source_len: usize, passes: usize, maximum: usize) -> Result<usize> {
+    source_len
+        .checked_mul(passes)
+        .ok_or_else(|| formula_semantic_limit(SemanticLimitKind::FormulaWork, usize::MAX, maximum))
+}
+
 fn table_cell_decode_options(
     source: &[u8],
     max_references: usize,
@@ -5164,7 +5170,7 @@ impl FormulaReferenceBudget {
         // `charge_wire_bytes` already contributes the first source-length
         // pass to work, so charge the remaining three here.
         self.charge_wire_bytes(source_len)?;
-        self.charge_work(source_len.saturating_mul(3).max(1))?;
+        self.charge_work(checked_formula_work_product(source_len, 3, self.maximum_work)?.max(1))?;
         Ok(())
     }
 
@@ -5220,7 +5226,11 @@ fn build_formula_reference_maps(
 
     if let Some(root) = root_message {
         budget.charge_wire_bytes(root.data.len())?;
-        budget.charge_work(root.data.len().saturating_mul(7))?;
+        budget.charge_work(checked_formula_work_product(
+            root.data.len(),
+            7,
+            budget.maximum_work,
+        )?)?;
         let options = litchi_iwa_protos::numbers_sheet_order_codec::DecodeOptions::new(
             root.data.len().max(1),
             root.data.len().saturating_mul(2).max(1),
@@ -5249,7 +5259,11 @@ fn build_formula_reference_maps(
                 continue;
             };
             budget.charge_wire_bytes(sheet_message.data.len())?;
-            budget.charge_work(sheet_message.data.len().saturating_mul(7))?;
+            budget.charge_work(checked_formula_work_product(
+                sheet_message.data.len(),
+                7,
+                budget.maximum_work,
+            )?)?;
             let (sheet_name, drawables) = names::preflight_sheet_payload(
                 sheet_message.type_,
                 &sheet_message.data,
@@ -5331,6 +5345,12 @@ fn build_formula_reference_maps(
                 budget.charge_work(owner_cost)?;
                 let (key, table_identifier, _report) = match owner_preflight {
                     Ok(projection) => projection,
+                    Err(
+                        error @ Error::SemanticLimit {
+                            kind: SemanticLimitKind::FormulaWork,
+                            ..
+                        },
+                    ) => return Err(error),
                     Err(_) => continue,
                 };
                 let Some(name) = table_info_names.get(&table_identifier) else {
@@ -5417,7 +5437,11 @@ fn formula_table_name(
         };
         if let Some(message) = model_message {
             budget.charge_wire_bytes(message.data.len())?;
-            budget.charge_work(message.data.len().saturating_mul(7))?;
+            budget.charge_work(checked_formula_work_product(
+                message.data.len(),
+                7,
+                budget.maximum_work,
+            )?)?;
             let name = names::preflight_table_name(&message.data).map_err(|_error| {
                 Error::MalformedPayload {
                     path: SemanticPath::StructuredTables,
@@ -5842,6 +5866,28 @@ fn formula_owner_key(owner: &litchi_iwa_protos::tsp::Uuid) -> FormulaOwnerKey {
     ]
 }
 
+fn checked_formula_owner_work(work: &mut usize, amount: usize) -> litchi_iwa_common::Result<()> {
+    *work = work
+        .checked_add(amount)
+        .ok_or(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::RewriteWork,
+            observed: usize::MAX,
+            limit: MAX_FORMULA_WORK,
+        })?;
+    Ok(())
+}
+
+fn map_formula_owner_wire_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::RewriteWork,
+            observed,
+            limit,
+        } => formula_semantic_limit(SemanticLimitKind::FormulaWork, observed, limit),
+        other => Error::Common(other),
+    }
+}
+
 fn preflight_formula_owner(
     source: &[u8],
     // Aggregate selected-tree work is reported through this side channel so
@@ -5853,7 +5899,7 @@ fn preflight_formula_owner(
     // it survives a parse error.  `WirePreflight` is only returned on
     // success, while malformed owner candidates are intentionally skipped by
     // the compatibility scan below.
-    *work = work.saturating_add(source.len());
+    checked_formula_owner_work(work, source.len()).map_err(map_formula_owner_wire_error)?;
     let limits = WireLimits::default()
         .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
         .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
@@ -5865,7 +5911,7 @@ fn preflight_formula_owner(
         // the bounded work charge for a malformed field that aborts the
         // preflight, including malformed known fields and malformed trailing
         // descendants reached before the error.
-        *work = work.saturating_add(1);
+        checked_formula_owner_work(work, 1)?;
         if visit.path().is_empty() && visit.field().number() == 1 {
             if owner_key.is_some() || visit.field().wire_type() != 2 {
                 return Err(litchi_iwa_common::Error::InvalidFormat(
@@ -5878,7 +5924,7 @@ fn preflight_formula_owner(
             // The nested UUID message is scanned independently from the
             // owner root.  Charge its bounded byte walk before entering it so
             // malformed nested wire cannot discard the cost on error.
-            *work = work.saturating_add(visit.field().payload().len());
+            checked_formula_owner_work(work, visit.field().payload().len())?;
             let nested = preflight_wire_tree_with_limits(
                 visit.field().payload(),
                 WireLimits::default()
@@ -5892,7 +5938,7 @@ fn preflight_formula_owner(
                     .with_fields(8)?
                     .with_nesting(1)?,
                 |uuid| {
-                    *work = work.saturating_add(1);
+                    checked_formula_owner_work(work, 1)?;
                     if !uuid.path().is_empty() || uuid.field().wire_type() != 0 {
                         return Err(litchi_iwa_common::Error::InvalidFormat(
                             "invalid formula owner UUID".into(),
@@ -5963,11 +6009,12 @@ fn preflight_formula_owner(
             // wire walk but exposes only the decoded identifier.  Charge the
             // selected payload before invoking it so malformed local
             // references retain their scan cost as well.
-            *work = work.saturating_add(visit.field().payload().len());
+            checked_formula_owner_work(work, visit.field().payload().len())?;
             table = Some(names::preflight_local_reference(visit.field().payload())?);
         }
         Ok(WireDescent::Skip)
-    })?;
+    })
+    .map_err(map_formula_owner_wire_error)?;
     Ok((
         owner_key
             .ok_or_else(|| Error::InvalidFormat("Numbers formula owner has no UUID".to_owned()))?,
