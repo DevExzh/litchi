@@ -1008,7 +1008,21 @@ where
         &'archive self,
         scratch: &mut [u8],
     ) -> Result<PreservationIndex<'archive, R>, Error> {
-        PreservationIndex::new(&self.archive, scratch)
+        self.preservation_index_with_limits(scratch, ArchiveLimits::default())
+    }
+
+    /// Build a raw-member preservation index under explicit archive limits.
+    ///
+    /// Metadata and member-name limits are applied to every retained source
+    /// central record, including directory records, because preservation must
+    /// own their exact raw metadata even though ordinary file indexes exclude
+    /// directories. The file-count limit retains its non-directory meaning.
+    pub fn preservation_index_with_limits<'archive>(
+        &'archive self,
+        scratch: &mut [u8],
+        limits: ArchiveLimits,
+    ) -> Result<PreservationIndex<'archive, R>, Error> {
+        PreservationIndex::new_with_limits(&self.archive, scratch, limits)
     }
 
     /// Locate and index a positional ZIP source with default resource limits.
