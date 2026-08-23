@@ -11309,3 +11309,30 @@ nested chart-reference parsing; it is not a whole-chart CPU or latency bound,
 and no such bound is claimed. This is package-level work hardening only. No
 Cargo/build/test or native result is added, and this amendment makes no
 dependency-edge, ordered-debt, host-exit, or monolith-exit claim.
+
+## 2026-08-23 amendment: detached Pages output arithmetic and Numbers table-count bounds
+
+Detached commit `79b2a3267` changes only
+`crates/litchi-pages/src/package/footnote_text.rs`. Custom-mark rewrite output
+length now uses checked additions for the encoded field tag, length varint, and
+payload, propagating overflow as the existing typed `OutputBytes` limit error
+before output-capacity arithmetic. The existing output-byte, field-count, and
+rewrite-work checks remain the governing bounds; this records source-level
+arithmetic hardening only.
+
+Detached commit `5b82d9167` changes only
+`crates/litchi-numbers/src/package/extractor.rs`. `TableDataExtractor` retains
+the configured `max_tables` and clamps caller-provided limits to it. Before
+each fallible one-slot result reservation, a checked next-count supplies the
+allocation-error amount; the reservation itself does not enforce the table
+count. Candidate admission and table-count increments use checked counting,
+while checked `next_seen` likewise supplies the allocation-error amount for the
+fallible seen-object reservation rather than enforcing a count. Over-limit
+candidates retain the structured-table limit error and host-count overflow
+remains an invalid-format error. The compatibility table fallback is therefore
+bounded at admission and result collection without changing its ownership or
+projection scope.
+
+These two detached diffs are recorded as bounded source changes only. No
+Cargo, native, dependency-edge, ordered-debt, host-exit, or monolith result or
+claim is added by this amendment.
