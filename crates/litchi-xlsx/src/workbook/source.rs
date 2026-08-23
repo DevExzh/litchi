@@ -656,6 +656,37 @@ impl SourceWorksheet {
         Ok(values)
     }
 
+    /// Visit every stored cell selected by a checked range without cloning it.
+    ///
+    /// The callback receives the immutable semantic cell state owned by this
+    /// worksheet's parsed source snapshot. A callback may copy a cell if it
+    /// needs to retain it, but the ordinary full-scan path does not allocate a
+    /// result vector or clone formulas, shared-string text, or unknown-cell
+    /// diagnostics. Formula caches, shared strings, styles, and MCE-selected
+    /// worksheet markup have already been validated by [`Self::store`].
+    ///
+    /// Cancellation is checked between callbacks. The source version is
+    /// checked after the complete visit, so a source mutation during the
+    /// callback cannot publish a semantically stale scan as successful.
+    pub fn visit_cells<'a, F>(&self, area: impl Into<Area<'a>>, mut visit: F) -> Result<usize>
+    where
+        F: FnMut(Address, &Cell) -> Result<()>,
+    {
+        let range = area.into().resolve()?;
+        let store = self.store()?;
+        let mut visited = 0usize;
+        for (address, cell) in store.cells(range) {
+            self.owner.execution_check()?;
+            visit(address, cell)?;
+            visited = visited
+                .checked_add(1)
+                .ok_or_else(|| invalid("source-backed cell visit count overflow"))?;
+        }
+        self.owner.package.source_version()?;
+        self.owner.execution_check()?;
+        Ok(visited)
+    }
+
     /// Bounding rectangle of stored cell records.
     ///
     /// The worksheet payload is loaded and parsed on first use. `None` means
