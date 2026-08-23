@@ -2334,3 +2334,45 @@ atomically; native identifiers and protobuf/wire types remain private. The
 `litchi-iwa` slide-background adapter remains a compatibility consumer of this
 semantic seam. This is a focused ownership slice and does not claim removal of
 the migration-host facade or compatibility behavior outside this operation.
+
+## 2026-08-24 amendment: Numbers name-publication save-token semantics
+
+Commit `35c2ae281d40bc16c659c30dd3690a702a750ea0` gives the semantic Numbers
+name-edit transaction an explicit PackageMetadata publication boundary. The
+follow-up accounting hardening is commit
+`ba57356166e82ff37ee1cd5223b68acd484aac42`; it removes detached, unmetered
+candidate-size `Budget` work and makes candidate sizing and selector
+comparisons share the reported budget.
+
+A changed name commit requires exactly one `Index/Metadata.iwa` entry containing
+the type-11006 PackageMetadata archive. It advances the root
+`PackageMetadata.save_token` once, then writes that new root value only to the
+selected current `ComponentInfo` records. Selection is by component identifier
+and effective locator (explicit locator when present, otherwise preferred
+locator); versioned records and unselected current components remain raw and
+unchanged. `last_object_identifier` is left untouched. Missing, duplicate, or
+ambiguous metadata ownership fails closed before publication.
+
+The no-op path is byte-exact and bypasses metadata rewriting. A successful
+change stores exact source and target package artifacts, so applying the
+inverse restores the original bytes rather than decrementing a token in place.
+Diagnostics continue to count semantic native components in
+`touched_components`; the Metadata sidecar is not counted as an additional
+native component. No raw object-ID API was added to the semantic facade.
+
+The doc-hidden
+`litchi_iwa_protos::package_metadata_codec` owns the borrowed save-token wire
+seam, with private Buffa projection parity. Known root field 8 and component
+field 12 require canonical singular keys, canonical values, and the expected
+wire kind; malformed, duplicate, overflow, or selector-mismatch inputs are
+rejected. Unknown source bytes, including accepted unknown groups and
+noncanonical unknown scalar framing, remain source-owned and are retained.
+The codec performs bounded sizing/preflight and candidate validation before
+publication. A test-only aggregate proves every successful `Budget` charge
+equals `RewriteReport.work_bytes`, and a max-minus-one limit fails before
+candidate allocation. The package caller precharges decompressed type-11006
+payload bytes multiplied by the changed semantic-operation upper bound for
+visitor locator matching; compressed Snappy bytes are charged separately for
+publication. The package still owns semantic selection, native name edits,
+metadata locality, exact artifact capture, and patch/inverse behavior; wire
+and generated types do not cross the public semantic surface.

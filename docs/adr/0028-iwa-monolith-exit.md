@@ -4501,3 +4501,60 @@ dependency edges, generated schemas, normal Prost owners elsewhere, ordered
 debts, migration-host responsibilities, and the monolith all remain. This
 slice retires none of those owners or edges and satisfies no host-exit or
 monolith-deletion gate.
+
+## 2026-08-24 amendment: Wave57 Numbers name-publication bounded owner slice (not a monolith-exit gate)
+
+Commit `35c2ae281d40bc16c659c30dd3690a702a750ea0` adds one bounded semantic
+publication route to Numbers name edits. Follow-up accounting hardening is
+commit `ba57356166e82ff37ee1cd5223b68acd484aac42`; it removes detached,
+unmetered candidate-size `Budget` work and makes candidate sizing and selector
+comparisons share the reported `Budget`. `litchi-numbers` owns the transaction
+and its exact source/target patch artifacts; the hidden
+`litchi-iwa-protos::package_metadata_codec` owns strict borrowed save-token
+projection and validation. A changed transaction requires one exact
+type-11006 `Index/Metadata.iwa`, advances the root token once, and updates only
+selected current components matched by identifier plus effective locator.
+Versioned and unselected records, root `last_object_identifier`, and unknown
+metadata bytes remain unchanged. No-op edits bypass metadata and remain
+byte-exact; inverse application restores the original package bytes. The
+metadata member is an additional sidecar rewrite and is excluded from the
+semantic native `touched_components` count.
+
+The operation's source/physical-entry, metadata, selector, field, depth, work,
+component, output-size, and candidate-verification budgets are local to this
+route. Exact sizing and fallible reservation precede the single candidate
+allocation; a test-only aggregate proves successful budget charges equal
+`RewriteReport.work_bytes`, and max-minus-one fails before allocation. Before
+native rewrite/allocation, the Names caller precharges decompressed type-11006
+payload bytes times the changed semantic-operation upper bound for visitor
+locator matching; compressed Snappy bytes are separate publication accounting.
+This does not add a public raw-ID API, remove a manifest edge, or
+retire generated schemas or normal Prost owners; it is not evidence for a
+workspace-wide dependency or performance claim.
+
+Focused verification is recorded in ADR 0008: codec 19/19, names 19/19,
+Numbers package 37/37, boundary tests 369/369, and the scoped checks passed
+with the documented unrelated baselines. The live boundary checker retains
+exactly the 23 known Pages findings, and the full Numbers library retains one
+unrelated storage canonical-framing failure. No full-workspace green claim is
+made.
+
+Numbers 14.4 opened and rendered the final Rust candidate from
+`/private/tmp/litchi-wave57-final-native.x3zj8I/rust-renamed.numbers` (82,283
+bytes, SHA-256
+`770a4d593ceede1b14fdee7803d6de780c33d435f270ef572341e6cf4ec37830`) without
+repair; its inverse exactly matched the normalized duplicate source
+`/private/tmp/litchi-wave55-metadata-native.4D1yTa/duplicated.numbers`
+(139,219 bytes, SHA-256
+`790aa7386ad6f5bb641dda0aaef3a47236cbe727b9712a5a9cf581ffce6d6754`). A
+Numbers Save As emitted an artifact despite the known TSPersistence code-2
+alert, and that artifact reopened/rendered without repair. The normalized
+source also exhibits the alert while a pristine no-alias control saves; this
+is bounded open/render and emitted-artifact reopen/readback evidence only, not
+native save acceptance, durable publication, Rust/native parity, or native
+token-set acceptance.
+
+This amendment retires no `litchi-iwa` host edge, ordered debt, compatibility
+responsibility, generated schema, or monolith owner. The migration host and
+its existing host/edge/debt obligations remain, and this slice satisfies no
+host-exit or monolith-deletion gate.
