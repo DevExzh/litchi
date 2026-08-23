@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import io
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools import check_perf_claims
 
@@ -202,6 +204,49 @@ class ResourceReportShapeTests(unittest.TestCase):
                     resource_policy={"max_regression_percent": 5},
                     latency_result=None,
                 )
+
+
+class _FakeZstdProcess:
+    def __init__(self, stdout: bytes, *, returncode: int = 0, stderr: bytes = b"") -> None:
+        self.stdout = io.BytesIO(stdout)
+        self.stderr = io.BytesIO(stderr)
+        self.returncode = returncode
+        self.wait_calls = 0
+
+    def __enter__(self) -> _FakeZstdProcess:
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> bool:
+        self.wait()
+        self.stdout.close()
+        self.stderr.close()
+        return False
+
+    def wait(self) -> int:
+        self.wait_calls += 1
+        return self.returncode
+
+
+class DecompressJsonProcessCleanupTests(unittest.TestCase):
+    def test_popen_pipes_close_on_success_and_parse_failure(self) -> None:
+        cases = ((b'{"ok":true}', False), (b"not-json", True))
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "report.json.zst"
+            for payload, should_fail in cases:
+                with self.subTest(should_fail=should_fail):
+                    process = _FakeZstdProcess(payload)
+                    with patch.object(check_perf_claims.subprocess, "Popen", return_value=process):
+                        if should_fail:
+                            with self.assertRaises(check_perf_claims.ClaimInputError):
+                                check_perf_claims._decompress_json(source, location="test/report")
+                        else:
+                            report, digest, size = check_perf_claims._decompress_json(source, location="test/report")
+                            self.assertEqual(report, {"ok": True})
+                            self.assertEqual(digest, hashlib.sha256(payload).hexdigest())
+                            self.assertEqual(size, len(payload))
+                    self.assertGreaterEqual(process.wait_calls, 1)
+                    self.assertTrue(process.stdout.closed)
+                    self.assertTrue(process.stderr.closed)
 
 
 if __name__ == "__main__":
