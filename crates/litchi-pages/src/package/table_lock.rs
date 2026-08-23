@@ -652,7 +652,18 @@ fn native_body_table_targets_with_budget(
         source.limits(),
     )
     .map_err(map_package_error)?;
+    let body_message_info = body_location
+        .object
+        .archive_info
+        .message_infos
+        .get(body_message.0)
+        .ok_or(BodyTableLockError::InvalidSource)?;
     let Some(table_field) = unique_field(budget, &body_view, TABLE_BODY_FIELD, 2)? else {
+        // A missing payload table is a normal selector miss only when its
+        // rooted archive metadata also carries no field-9 attachment edges.
+        // Validate the empty inventory so stale declarations cannot be
+        // silently treated as an absent table.
+        validate_body_table_ownership(body_message_info, &[], budget)?;
         return Err(BodyTableLockError::TableNotFound);
     };
     let table_view = budget.parse(table_field.payload(), 1)?;
@@ -693,19 +704,13 @@ fn native_body_table_targets_with_budget(
     {
         return Err(BodyTableLockError::InvalidSource);
     }
-    if let Some(first_entry) = entries.first() {
-        let body_message_info = body_location
-            .object
-            .archive_info
-            .message_infos
-            .get(body_message.0)
-            .ok_or(BodyTableLockError::InvalidSource)?;
-        // The body archive header is shared by every table attachment. Prove
-        // its aggregate reference inventory once, before the per-table graph
-        // walk, so work and reference charges describe the transaction rather
-        // than multiplying with the number of selected tables.
-        validate_body_table_ownership(body_message_info, first_entry.identifier, &entries, budget)?;
-    }
+    // The body archive header is shared by every table attachment. Prove its
+    // aggregate reference inventory once, before the per-table graph walk, so
+    // work and reference charges describe the transaction rather than
+    // multiplying with the number of selected tables. The empty case is also
+    // checked: a field-9 declaration without a payload entry is malformed,
+    // not an ordinary selector miss.
+    validate_body_table_ownership(body_message_info, &entries, budget)?;
 
     let mut targets = Vec::new();
     budget.charge_payload_items(entries.len())?;
@@ -1639,16 +1644,30 @@ fn message_declares_reference(
 /// requirement for every table entry.
 fn validate_body_table_ownership(
     message: &litchi_iwa_core::MessageInfo,
-    selected_identifier: NonZeroU64,
     entries: &[BodyTableEntry],
     budget: &mut WireBudget,
 ) -> Result<(), BodyTableLockError> {
-    message_declares_reference_prefix(
-        message,
-        selected_identifier.get(),
-        &[TABLE_BODY_FIELD],
-        budget,
-    )?;
+    if let Some(first_entry) = entries.first() {
+        message_declares_reference_prefix(
+            message,
+            first_entry.identifier.get(),
+            &[TABLE_BODY_FIELD],
+            budget,
+        )?;
+    } else {
+        // There is no selected edge for the empty inventory, but the stale
+        // body header is still inspected below. Charge its complete
+        // reference metadata before retaining any declaration state.
+        budget.charge_payload_items(message.field_infos.len())?;
+        budget.charge_payload_references(message.object_references.len())?;
+        budget.charge_payload_references(message.data_references.len())?;
+        budget.charge_payload_work(message.field_infos.len())?;
+        for field in &message.field_infos {
+            budget.charge_payload_references(field.object_references.len())?;
+            budget.charge_payload_references(field.data_references.len())?;
+            budget.charge_payload_work(field.path.path.len())?;
+        }
+    }
 
     // Reserve for every possible field-9 declaration, rather than only the
     // selected entry inventory.  Malformed input may carry extra declaration
@@ -3085,6 +3104,26 @@ mod tests {
         // nested reference scan; the declaration-map reservation must not
         // charge or allocate before the reference ceiling rejects the input.
         assert_eq!(budget.total_work, 2);
+    }
+
+    #[test]
+    fn empty_body_inventory_charges_references_before_declaration_reserve() {
+        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
+        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        field.object_references.push(100);
+        message.object_references.push(100);
+        message.field_infos.push(field);
+
+        let mut budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        budget.maximum_payload_references = 0;
+        assert!(matches!(
+            validate_body_table_ownership(&message, &[], &mut budget),
+            Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::PayloadReferences,
+                ..
+            })
+        ));
+        assert_eq!(budget.total_work, 1);
     }
 
     #[test]
