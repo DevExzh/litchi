@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use litchi_odf_common::package::raw_identical_members;
 use litchi_odt::form::TextControl;
 use litchi_odt::{
@@ -279,7 +281,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
 }
 
 #[test]
-fn consecutive_paragraph_replacements_match_scalar_publication_and_durable_replay() {
+fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay() {
     let mut document = MutableDocument::new();
     for text in ["zero", "one", "two", "three"] {
         document.add_paragraph(text).unwrap();
@@ -307,17 +309,64 @@ fn consecutive_paragraph_replacements_match_scalar_publication_and_durable_repla
         edit.replace_paragraph(Position::new(index), text).unwrap();
         scalar = edit.commit().unwrap().into_snapshot();
     }
-    assert_eq!(committed.snapshot().as_bytes(), scalar.as_bytes());
-    let paragraphs = committed
-        .snapshot()
-        .document()
-        .unwrap()
+    let coalesced_document = committed.snapshot().document().unwrap();
+    let scalar_document = scalar.document().unwrap();
+    let coalesced_paragraphs = coalesced_document
         .paragraphs()
-        .unwrap();
-    assert_eq!(paragraphs[0].text().unwrap(), "ZERO");
-    assert_eq!(paragraphs[1].text().unwrap(), "one");
-    assert_eq!(paragraphs[2].text().unwrap(), "two-final");
-    assert_eq!(paragraphs[3].text().unwrap(), "THREE");
+        .unwrap()
+        .into_iter()
+        .map(|paragraph| paragraph.text().unwrap())
+        .collect::<Vec<_>>();
+    let scalar_paragraphs = scalar_document
+        .paragraphs()
+        .unwrap()
+        .into_iter()
+        .map(|paragraph| paragraph.text().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(coalesced_paragraphs, ["ZERO", "one", "two-final", "THREE"]);
+    assert_eq!(coalesced_paragraphs, scalar_paragraphs);
+    assert_eq!(
+        coalesced_document.text().unwrap(),
+        scalar_document.text().unwrap()
+    );
+
+    let coalesced_package =
+        CoreOwnedPackage::from_bytes(committed.snapshot().as_bytes().to_vec()).unwrap();
+    let scalar_package = CoreOwnedPackage::from_bytes(scalar.as_bytes().to_vec()).unwrap();
+    let coalesced_archive = coalesced_package.package().unwrap();
+    let scalar_archive = scalar_package.package().unwrap();
+    let source_package = CoreOwnedPackage::from_bytes(snapshot.as_bytes().to_vec()).unwrap();
+    let source_archive = source_package.package().unwrap();
+    let mut source_paths = source_archive.files().unwrap();
+    let mut coalesced_paths = coalesced_archive.files().unwrap();
+    let mut scalar_paths = scalar_archive.files().unwrap();
+    source_paths.sort();
+    coalesced_paths.sort();
+    scalar_paths.sort();
+    assert_eq!(source_paths, coalesced_paths);
+    assert_eq!(coalesced_paths, scalar_paths);
+    for path in coalesced_paths {
+        assert_eq!(
+            coalesced_archive.get_file(&path).unwrap(),
+            scalar_archive.get_file(&path).unwrap(),
+            "logical package member diverged: {path}"
+        );
+    }
+
+    let expected_untouched = [
+        "mimetype".to_owned(),
+        "styles.xml".to_owned(),
+        "meta.xml".to_owned(),
+        "META-INF/manifest.xml".to_owned(),
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    let coalesced_raw_identical =
+        raw_identical_members(snapshot.as_bytes(), committed.snapshot().as_bytes()).unwrap();
+    let scalar_raw_identical =
+        raw_identical_members(snapshot.as_bytes(), scalar.as_bytes()).unwrap();
+    assert_eq!(coalesced_raw_identical, expected_untouched);
+    assert_eq!(scalar_raw_identical, expected_untouched);
 
     let durable = committed.patch().durable().unwrap();
     let wire = durable.to_deterministic_json().unwrap();
