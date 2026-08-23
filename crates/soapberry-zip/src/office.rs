@@ -901,7 +901,7 @@ impl<'data> ArchiveReader<'data> {
             return Ok(None);
         }
 
-        let entry = self.archive.get_entry(info.wayfinder)?;
+        let entry = self.archive.get_entry_borrowed(info.wayfinder)?;
         let data = entry.data();
         entry.claim_verifier().valid(ZipVerification {
             crc: crate::crc32(data),

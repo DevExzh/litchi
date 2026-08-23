@@ -790,7 +790,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         },
         _ => return Err(unsupported("generated compression method")),
     }
-    let mut bytes = writer.finish()?;
+    let bytes = writer.finish()?;
     let (directory_offset, eocd_offset) = {
         let archive = ZipArchive::from_slice(&bytes)?;
         if archive.is_zip64() || archive.entries_hint() != 1 {
@@ -1462,7 +1462,21 @@ mod tests {
         assert_eq!(Arc::strong_count(&data), 2);
 
         let prepared = generated_entry(&entry).unwrap();
-        assert!(matches!(prepared.local, PreparedLocal::Generated(_)));
+        let PreparedLocal::Shared {
+            bytes: local_bytes,
+            ..
+        } = &prepared.local
+        else {
+            panic!("generated entry must retain the shared archive buffer");
+        };
+        let PreparedCentral::Shared {
+            bytes: central_bytes,
+            ..
+        } = &prepared.central
+        else {
+            panic!("generated entry must retain the shared archive buffer");
+        };
+        assert!(Arc::ptr_eq(local_bytes, central_bytes));
         assert_eq!(Arc::strong_count(&data), 2);
     }
 
@@ -1477,10 +1491,15 @@ mod tests {
             .compression_method(CompressionMethod::Deflate);
 
         let prepared = generated_entry(&entry).unwrap();
-        let PreparedLocal::Generated(local) = prepared.local else {
-            panic!("generated entry must retain generated local bytes");
+        let PreparedLocal::Shared {
+            bytes: local_bytes,
+            range: local_range,
+        } = &prepared.local
+        else {
+            panic!("generated entry must retain the shared archive buffer");
         };
-        let local_header = ZipLocalFileHeaderFixed::parse(&local).unwrap();
+        let local = &local_bytes[local_range.clone()];
+        let local_header = ZipLocalFileHeaderFixed::parse(local).unwrap();
         let central = prepared.central.bytes(&[]);
         let central_header = ZipFileHeaderFixed::parse(central).unwrap();
 
@@ -1504,8 +1523,8 @@ mod tests {
         let name = "n".repeat(u16::MAX as usize);
         let entry = RegeneratedEntry::new(name.clone(), Vec::new());
         let prepared = generated_entry(&entry).unwrap();
-        let PreparedLocal::Generated(bytes) = prepared.local else {
-            panic!("generated entry must retain generated local bytes");
+        let PreparedLocal::Shared { bytes, range } = &prepared.local else {
+            panic!("generated entry must retain the shared archive buffer");
         };
         let expected_capacity = name
             .len()
@@ -1513,7 +1532,7 @@ mod tests {
             .and_then(|size| size.checked_add(4 * 1024))
             .unwrap();
         assert!(bytes.capacity() >= expected_capacity);
-        assert!(bytes.len() <= expected_capacity);
+        assert!(range.end - range.start <= expected_capacity);
     }
 
     #[test]
