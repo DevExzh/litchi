@@ -123,6 +123,88 @@ pub enum CryptoCapability {
     Refused(CryptoRefusal),
 }
 
+/// Maximum package-media changes accepted by one atomic transaction batch.
+pub const MAX_MEDIA_CHANGES: usize = 256;
+
+/// One bounded change to an inert package-contained ODP media member.
+///
+/// Media is never opened, decoded, played, or fetched.  Replacements retain
+/// every existing `xlink:href` owner and only change the exact package member;
+/// removals are accepted only when no retained XML owner can reference the
+/// member.  All changes in one slice are preflighted before the transaction is
+/// modified and publish through the transaction's single package commit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MediaChange {
+    /// Add a new package member at an unused path.
+    Add {
+        /// Safe package-relative member path.
+        path: String,
+        /// Opaque payload bytes.
+        payload: Vec<u8>,
+        /// Manifest media type.
+        media_type: String,
+    },
+    /// Replace an existing package member without changing its path.
+    Replace {
+        /// Existing package-relative member path.
+        path: String,
+        /// Opaque replacement payload bytes.
+        payload: Vec<u8>,
+        /// Manifest media type.  Existing members retain their declared type.
+        media_type: String,
+    },
+    /// Remove an unreferenced package member.
+    Remove {
+        /// Existing package-relative member path.
+        path: String,
+    },
+}
+
+impl MediaChange {
+    /// Construct an add operation from owned or borrowed-compatible values.
+    #[must_use]
+    pub fn add(
+        path: impl Into<String>,
+        payload: impl Into<Vec<u8>>,
+        media_type: impl Into<String>,
+    ) -> Self {
+        Self::Add {
+            path: path.into(),
+            payload: payload.into(),
+            media_type: media_type.into(),
+        }
+    }
+
+    /// Construct a replacement operation from owned or borrowed-compatible values.
+    #[must_use]
+    pub fn replace(
+        path: impl Into<String>,
+        payload: impl Into<Vec<u8>>,
+        media_type: impl Into<String>,
+    ) -> Self {
+        Self::Replace {
+            path: path.into(),
+            payload: payload.into(),
+            media_type: media_type.into(),
+        }
+    }
+
+    /// Construct a removal operation.
+    #[must_use]
+    pub fn remove(path: impl Into<String>) -> Self {
+        Self::Remove { path: path.into() }
+    }
+
+    /// Borrow the path targeted by this change.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        match self {
+            Self::Add { path, .. } | Self::Replace { path, .. } | Self::Remove { path } => path,
+        }
+    }
+}
+
 impl CryptoCapability {
     /// Borrow the refusal reason, if any.
     #[must_use]
@@ -313,6 +395,8 @@ impl Snapshot {
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
+            non_media_changed: false,
+            media_changed: false,
             slide_order_changed: false,
             dependency_free_slide_copy_changed: false,
             dependency_free_slide_removal_changed: false,
@@ -383,6 +467,8 @@ pub struct Transaction {
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
+    non_media_changed: bool,
+    media_changed: bool,
     slide_order_changed: bool,
     dependency_free_slide_copy_changed: bool,
     dependency_free_slide_removal_changed: bool,
@@ -593,7 +679,7 @@ impl Transaction {
         self.draft
             .insert_slide(self.draft.slides().len(), title, text)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(())
     }
 
@@ -619,7 +705,7 @@ impl Transaction {
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
         self.draft.insert_slide(index, title, text)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -649,7 +735,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed, text_resource(title, text)?)?;
         self.draft.update_slide(index, title, text)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -671,7 +757,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed_bytes, 0)?;
         let removed = self.draft.remove_slide(index)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(removed))
     }
 
@@ -727,7 +813,7 @@ impl Transaction {
         self.draft.check_slide_move_supported()?;
         self.draft.move_slide(from, to)?;
         self.slide_order_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -782,7 +868,7 @@ impl Transaction {
         let copied_index = self.draft.apply_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(copied_index))
     }
 
@@ -895,7 +981,7 @@ impl Transaction {
             .apply_foreign_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(copied_index))
     }
 
@@ -954,7 +1040,7 @@ impl Transaction {
             .apply_dependency_free_blank_slide_removal(removal);
         self.resource_bytes = candidate;
         self.dependency_free_slide_removal_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(removed))
     }
 
@@ -982,7 +1068,7 @@ impl Transaction {
         )?;
         self.draft.add_shape(index, shape)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -1007,7 +1093,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed_bytes, 0)?;
         let removed = self.draft.remove_shape(slide_index, shape_index)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(removed))
     }
 
@@ -1033,7 +1119,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed, 0)?;
         self.draft.clear_slide(index)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -1065,8 +1151,37 @@ impl Transaction {
             try_owned_str(media_type, "ODP media type")?,
         )?;
         self.media_bytes = media_bytes;
-        self.changed = true;
+        self.mark_media_changed();
         Ok(reference)
+    }
+
+    /// Apply a bounded atomic batch of inert package-media changes.
+    ///
+    /// Additions use new paths, replacements preserve all existing XML
+    /// references, and removals require an unreferenced source member.  The
+    /// batch rejects duplicate paths and validates every payload before any
+    /// staged state changes.  A batch containing only exact replacement
+    /// no-ops leaves the transaction unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an oversized batch or payload, unsafe/colliding
+    /// paths, media-type changes, referenced removals, signed/encrypted
+    /// sources, or any invalid operation.  A failed batch leaves this
+    /// transaction unchanged.
+    pub fn apply_media_changes(&mut self, changes: &[MediaChange]) -> Result<usize> {
+        if changes.len() > MAX_MEDIA_CHANGES {
+            return invalid(format!(
+                "ODP media change batch exceeds {MAX_MEDIA_CHANGES} operations"
+            ));
+        }
+        let plan = self.draft.prepare_media_changes(changes)?;
+        self.check_projected(self.resource_bytes, plan.staged_media_bytes)?;
+        let changed = plan.changed;
+        self.draft.apply_media_plan(plan);
+        self.media_bytes = self.draft.staged_media_bytes()?;
+        self.refresh_media_changed();
+        Ok(changed)
     }
 
     /// Read arbitrary source-backed text-box, list, table, and form owners.
@@ -2221,6 +2336,7 @@ impl Transaction {
         }
         validate_compact_xml_parts(&reopened, &source_package)?;
         self.draft.verify_embedded_media(&reopened)?;
+        self.draft.verify_removed_media(&reopened)?;
         if let Some(rdf) = &self.rdf
             && crate::rdf::graphs(&reopened)? != rdf.graphs
         {
@@ -2725,6 +2841,21 @@ impl Transaction {
             MAX_PACKAGE_BYTES,
         )?;
         Ok(())
+    }
+
+    fn mark_non_media_changed(&mut self) {
+        self.non_media_changed = true;
+        self.changed = true;
+    }
+
+    fn mark_media_changed(&mut self) {
+        self.media_changed = true;
+        self.changed = true;
+    }
+
+    fn refresh_media_changed(&mut self) {
+        self.media_changed = self.draft.has_staged_media_changes();
+        self.changed = self.non_media_changed || self.media_changed;
     }
 }
 
@@ -3347,9 +3478,12 @@ fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
 
 fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
     let archive = package.package()?;
-    let encrypted = archive.manifest().has_encrypted_entries();
-    let signed = archive.has_file("META-INF/documentsignatures.xml")
-        || archive.has_file("META-INF/macrosignatures.xml");
+    let encrypted =
+        archive.manifest().has_encrypted_entries() || package.has_zip_encrypted_entries();
+    let signed = archive
+        .files()?
+        .iter()
+        .any(|path| crate::core::is_signature_owner_path(path));
     Ok(match (signed, encrypted) {
         (false, false) => SecurityPolicy::Editable,
         (false, true) => SecurityPolicy::EncryptedReadOnly,

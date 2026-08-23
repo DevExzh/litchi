@@ -8,6 +8,7 @@ use std::{
 use crate::constants;
 use crate::core::{
     AuthoredXmlFragment, OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication,
+    is_signature_owner_path,
 };
 use litchi_core::{Error, Result};
 use soapberry_zip::{
@@ -253,9 +254,7 @@ fn try_preserve_content_replacement(
             .manifest()
             .get_entry(constants::ODF_CONTENT)
             .is_some_and(|entry| entry.size.is_some())
-        || files
-            .iter()
-            .any(|path| path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
+        || files.iter().any(|path| is_signature_owner_path(path))
     {
         return None;
     }
