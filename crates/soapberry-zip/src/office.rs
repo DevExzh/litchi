@@ -875,6 +875,41 @@ impl<'data> ArchiveReader<'data> {
         }
     }
 
+    /// Borrow and verify a stored member without materializing a second copy.
+    ///
+    /// `Some` is returned only for ZIP Store members. Deflated and otherwise
+    /// unsupported members return `None`, allowing a caller to fall back to
+    /// [`Self::read`]. Before the borrowed slice is published, the local
+    /// header, data descriptor (when present), declared size, and CRC are
+    /// validated. The returned bytes borrow the source archive for the
+    /// lifetime of this reader and are never inserted into a decompression
+    /// cache.
+    ///
+    /// Archive limits are admission limits: the member's declared metadata
+    /// and size were checked by [`Self::new_with_limits`] before this method
+    /// can be called. Since this method does not allocate payload storage, it
+    /// does not create a separate materialization budget charge.
+    pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        let lookup = lookup_member_name(name);
+
+        let info = self
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+        if info.compression_method != CompressionMethod::Store {
+            return Ok(None);
+        }
+
+        let entry = self.archive.get_entry(info.wayfinder)?;
+        let data = entry.data();
+        entry.claim_verifier().valid(ZipVerification {
+            crc: crate::crc32(data),
+            uncompressed_size: data.len() as u64,
+        })?;
+        Ok(Some(data))
+    }
+
     /// Decompress and verify one member directly into a caller-owned sink.
     ///
     /// The sink receives at most the declared uncompressed member size. A
@@ -3582,6 +3617,17 @@ impl<'data> LazyArchiveReader<'data> {
     /// use `read_shared()` which returns an Arc.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
         self.read_shared(name).map(|arc| (*arc).clone())
+    }
+
+    /// Borrow and verify a stored member without populating the lazy cache.
+    ///
+    /// This is the zero-copy structural-ingress fast path for callers that
+    /// consume a stored XML member immediately. Deflated members return
+    /// `None` and should use [`Self::read`] instead. The returned slice remains
+    /// tied to the source bytes borrowed by this reader.
+    #[inline]
+    pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        self.inner.read_stored_borrowed(name)
     }
 
     /// Read and decompress a file, returning a shared reference.
