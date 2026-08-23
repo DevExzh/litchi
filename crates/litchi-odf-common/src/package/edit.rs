@@ -121,9 +121,11 @@ fn raw_member_is_identical(
 /// Replace only `content.xml`, raw-copying every other source ZIP member when
 /// the exact package layout and manifest make that preservation safe.
 ///
-/// Unsupported physical layouts, signatures, encryption, and size-bearing
-/// content manifest entries use the established logical rebuild instead. An
-/// exact semantic no-op returns the accepted source bytes unchanged.
+/// Unsupported physical layouts, signatures, and encryption use the
+/// established logical rebuild. The package writer refuses unencrypted
+/// `manifest:size` metadata with a typed [`Error::Unsupported`] error rather
+/// than silently dropping it. An exact semantic no-op returns the accepted
+/// source bytes unchanged.
 ///
 /// # Errors
 ///

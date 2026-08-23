@@ -460,7 +460,7 @@ fn generic_content_publication_raw_preserves_store_and_deflate_members() {
 }
 
 #[test]
-fn generic_content_publication_keeps_signature_fallback_and_manifest_size_fallback() {
+fn generic_content_publication_keeps_signature_fallback_and_refuses_manifest_size_edits() {
     let source_definition = chart_definition("before");
     let mut replacement = source_definition.clone();
     replacement.title = Some(Text::new("after"));
@@ -481,15 +481,17 @@ fn generic_content_publication_keeps_signature_fallback_and_manifest_size_fallba
     assert_eq!(signed_no_op.to_bytes(), signed_original);
 
     let sized = source_package(&source_definition, true, false, false);
-    let mut sized_document = Document::from_bytes(sized).unwrap();
-    sized_document.set_definition(&replacement).unwrap();
-    let sized_package = CoreOwnedPackage::from_bytes(sized_document.to_bytes()).unwrap();
-    let manifest =
-        String::from_utf8(sized_package.get_file("META-INF/manifest.xml").unwrap()).unwrap();
-    assert!(!manifest.contains(
-        "manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\" manifest:size="
+    let mut sized_document = Document::from_bytes(sized.clone()).unwrap();
+    let error = sized_document
+        .set_definition(&replacement)
+        .expect_err("manifest:size edit unexpectedly succeeded");
+    assert!(matches!(
+        error,
+        Error::Unsupported(message)
+            if message == "ODF unencrypted manifest:size metadata cannot be preserved by the package writer"
     ));
-    assert_eq!(sized_document.text(), "after");
+    assert_eq!(sized_document.to_bytes(), sized);
+    assert_eq!(sized_document.text(), "before");
 }
 
 #[test]
