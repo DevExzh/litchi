@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0260 — fresh-child XLSX filesystem roots](changes/0260-xlsx-fresh-child-filesystem-roots.md)
+(the existing path-open and open-plus-names/count/full-text selectors now run
+each sample in a fresh child over one pinned medium XLSX. Warm and explicit
+cold-verified modes retain exact source/semantic hashes and validate the exact
+timed object against typed XLSX and OPC/property oracles after operation-only
+snapshots. This is input-mode/cache-proof coverage only; no latency,
+allocation/RSS, physical-I/O, storage-media, or broad XLSX claim.)
+
 [change 0259 — shared lazy OPC structural members](changes/0259-opc-shared-structural-members.md)
 (private OPC catalog parsing now retains the lazy ZIP reader's existing shared
 decompression allocation for deflated content-types and relationship
