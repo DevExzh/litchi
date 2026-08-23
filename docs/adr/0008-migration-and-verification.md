@@ -11496,3 +11496,26 @@ not constitute full aggregate safety for every package graph, archive, or
 mutation operation. No Cargo/build/test or native result is admitted; no
 dependency edge or ordered debt is retired, and no migration-host or
 monolith-exit claim follows.
+
+## 2026-08-23 amendment: checked Numbers formula-work products and owner preflight
+
+Detached commit `711e2b517` changes only
+`crates/litchi-numbers/src/package/extractor.rs`. Formula-reference scans and
+the formula category, sheet-name, and table-name scans replace saturating
+source-length-by-pass estimates with checked products. Overflow is reported as
+the existing `SemanticLimitKind::FormulaWork` error against the active
+formula-work ceiling, rather than wrapping or under-counting the scan.
+
+The formula-owner preflight likewise uses checked additions for source bytes,
+field visits, nested UUID and local-reference payloads, and malformed-field
+charges. Wire `RewriteWork` failures from that selected preflight are mapped
+to the Numbers formula-work semantic limit. A formula-work limit failure is
+propagated out of the compatibility owner scan; unrelated malformed owner
+candidates retain the existing skip behavior. This is bounded accounting and
+error-propagation hardening only; it does not change formula ownership,
+rendering, or authoring scope.
+
+No Cargo/build/test or native result is admitted for this detached source
+change. It retires no dependency edge or ordered debt, makes no migration-host
+or host-exit claim, and does not satisfy or alter the IWA monolith-deletion
+gate.
