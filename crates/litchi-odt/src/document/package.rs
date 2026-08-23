@@ -142,8 +142,18 @@ impl Document {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let owned_package = OwnedPackage::from_bytes(bytes)?;
-        Self::from_owned_package(owned_package)
+        // Let the prepared detector perform the local MIME probe exactly
+        // once.  A matching ODT result transfers its indexed archive; a
+        // different ODF family still follows the historical package owner so
+        // its MIME error is reported at the same boundary; rejected probes
+        // recover the original allocation for the ordinary parser.
+        match litchi_odf_common::detect::prepared_or_original(bytes) {
+            Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Odt => {
+                Self::from_prepared_package(prepared)
+            },
+            Ok(prepared) => Self::from_owned_package(prepared.into_package()),
+            Err(bytes) => Self::from_owned_package(OwnedPackage::from_bytes(bytes)?),
+        }
     }
 
     /// Create a document from password-encrypted ODT bytes.

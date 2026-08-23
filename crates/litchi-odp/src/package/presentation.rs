@@ -59,7 +59,7 @@ impl Presentation {
     /// # }
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Package::open(path, ODF_PRESENTATION, BODY_MARKER, "ODP").map(|package| Self { package })
+        Self::from_bytes(std::fs::read(path.as_ref())?)
     }
 
     /// Open a password-encrypted ODP presentation.
@@ -96,8 +96,19 @@ impl Presentation {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Package::from_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
-            .map(|package| Self { package })
+        // Let the prepared detector perform the local MIME probe exactly
+        // once.  A matching ODP result transfers its indexed archive; a
+        // different ODF family still follows the historical package owner so
+        // its MIME error is reported at the same boundary; rejected probes
+        // recover the original allocation for the ordinary parser.
+        match litchi_odf_common::detect::prepared_or_original(bytes) {
+            Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Odp => {
+                Self::from_prepared_package(prepared)
+            },
+            Ok(prepared) => Self::from_owned_package(prepared.into_package()),
+            Err(bytes) => Package::from_bytes(bytes, ODF_PRESENTATION, BODY_MARKER, "ODP")
+                .map(|package| Self { package }),
+        }
     }
 
     /// Adopt the indexed package retained by smart ODF detection.
