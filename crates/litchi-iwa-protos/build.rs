@@ -3928,17 +3928,17 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "let root_payload = unique_message_payload(&root_object.messages, 10_000, \"Pages root object 1\")",
+            "let root = root_references_with_limits(components, package.state.source.limits())",
             1,
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "graph.reference_identifier,\n        FOOTNOTE_REFERENCE_MESSAGE_TYPE,\n        budget,",
+            "let payload = unique_message_payload(\n            &reference.messages,\n            FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
             1,
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "graph.marker_identifier,\n        TEXTUAL_ATTACHMENT_MESSAGE_TYPE,\n        budget,",
+            "let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
             1,
         ),
         (
@@ -3998,22 +3998,22 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "transaction::resolve_body_target(package, transaction_position, budget)",
+            "let body =\n        find_object(components, body_identifier.get())",
             1,
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "transaction::resolve_message_target(\n        package,\n        transaction_position,\n        graph.reference_identifier,\n        FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
+            ".object_mut(native_footnote.reference_identifier.get())",
             1,
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "transaction::resolve_storage_target(\n        package,\n        transaction_position,\n        graph.storage_identifier,\n        budget,",
+            ".object_mut(native_footnote.storage_identifier.get())",
             1,
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "transaction::resolve_message_target(\n        package,\n        transaction_position,\n        graph.marker_identifier,\n        TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
+            "let marker_identifier = footnote_marker_identifier(",
             1,
         ),
     ];

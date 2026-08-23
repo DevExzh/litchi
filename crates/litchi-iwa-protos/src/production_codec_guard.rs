@@ -801,4 +801,26 @@ mod oracle {
             );
         }
     }
+
+    #[test]
+    fn build_script_pins_pages_native_footnote_routes() {
+        let build_script = include_str!("../build.rs");
+        for marker in [
+            "fn enforce_pages_native_message_provenance(",
+            "const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 21]",
+            "const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 40]",
+            "let root = root_references_with_limits(components, package.state.source.limits())",
+            r"let payload = unique_message_payload(\n            &reference.messages,\n            FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
+            r"let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",
+            r"let body =\n        find_object(components, body_identifier.get())",
+            ".object_mut(native_footnote.reference_identifier.get())",
+            ".object_mut(native_footnote.storage_identifier.get())",
+            "let marker_identifier = footnote_marker_identifier(",
+        ] {
+            assert!(
+                build_script.contains(marker),
+                "build.rs lost Pages native footnote provenance marker: {marker}"
+            );
+        }
+    }
 }
