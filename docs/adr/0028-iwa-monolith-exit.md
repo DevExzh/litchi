@@ -4470,3 +4470,34 @@ Rust/native post-save parity.
 No manifest or public-API change, package-owner move, generated-schema or
 Prost retirement, ordered-debt retirement, migration-host exit, or
 `litchi-iwa` monolith-deletion claim follows from this bounded reader slice.
+
+## 2026-08-24 amendment: Wave56 Numbers exact-alias bounded owner slice (not a monolith-exit gate)
+
+Commit `e4952f7eeaa196263a28fac6cf86510c3e11a2f6` changes only the
+focused `litchi-numbers` physical ingress/index boundary, plus the neutral
+`litchi-iwa-core` source-content comparison it relies on. Exact copies of one
+identifier in distinct components may share one logical bare-ID resolver
+entry; the physical components and their bytes remain intact. Same-component,
+divergent, raw-header-divergent, and framing-divergent duplicates remain
+errors. The public focused API gains no raw object identity, and the boundary
+ratchet scans the complete Numbers package owner for any such reintroduction.
+
+This closes the Wave55 Rust reread debt for the observed eight exact aliases,
+not general component-qualified identity. The current resolver deliberately
+cannot choose between divergent owners. Mutating an aliased object therefore
+fails candidate reopen atomically, while unaliased semantic edits preserve the
+physical aliases. Owner-aware component routing, PackageMetadata provenance
+and save-token publication, and durable native resave remain future work.
+
+The focused core/package, all-target, scoped Clippy, and 361/361 boundary gates
+are recorded in ADR 0008. Numbers 14.4 opened and rendered the Rust and
+Numbers-emitted candidates, and the strict reader reopens both, but repeated
+autosave/resave returned `TSPersistence` code 2 while a pristine same-directory
+control saved. This is bounded reader/application evidence only and is not a
+native publication gate.
+
+No public semantic facade or manifest edge changed. `litchi-iwa` host and
+dependency edges, generated schemas, normal Prost owners elsewhere, ordered
+debts, migration-host responsibilities, and the monolith all remain. This
+slice retires none of those owners or edges and satisfies no host-exit or
+monolith-deletion gate.
