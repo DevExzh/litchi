@@ -2,19 +2,23 @@
 
 Date: 2026-08-21
 
-Status: latency evidence rejects landing the production CFB streaming
-optimization; the candidate is retained only for allocation follow-up
+Status: the performance claim is held because the retained ABBA workload is
+mis-scoped for the production candidate and cannot adjudicate it. The
+unmeasured candidate was rolled back in `67a37235c` pending applicable
+direct-payload-read or native-consumer evidence.
 
 Claim registry ID: `claim-0248-cfb-streaming`
 
 ## Evidence-package identity
 
-The independently audited package is retained outside the repository at
-`/home/zhuhe/CodeProjects/litchi-perf-evidence/0248-cfb-streaming-20260821/`.
-Its manifest is
-`0248-cfb-streaming-abba-manifest.json` with SHA-256
+The independently audited package is tracked with its
+[`manifest`](../results/0248-cfb-streaming-20260821/0248-cfb-streaming-abba-manifest.json).
+The historical external staging path was
+`/home/zhuhe/CodeProjects/litchi-perf-evidence/0248-cfb-streaming-20260821/`;
+it is provenance only and is not required to verify the repository copy. The
+manifest SHA-256 is
 `7ffd58b3252879713697244972284a44a40244f47090d8a5aa0ac07a709314ee`.
-The compressed `summary.json` SHA-256 is
+The `summary.json` file SHA-256 is
 `e652f3923d923579c86eab764958fb708ab60c1a9a732d66168cfbcf81e32f72`; its
 canonical SHA-256 is
 `ef2ce9ab577b959bd4bcc650e20d011a4f6e9a877cf2feefe71782d5196dfd9c`.
@@ -24,7 +28,7 @@ The package is schema version 1, has change ID
 
 The retained package members have these identities:
 
-| Member | Compressed/file SHA-256 | Canonical SHA-256 |
+| Member | File SHA-256 | Canonical SHA-256 |
 |---|---|---|
 | `0248-cfb-streaming-abba-manifest.json` | `7ffd58b3252879713697244972284a44a40244f47090d8a5aa0ac07a709314ee` | — |
 | `summary.json` | `e652f3923d923579c86eab764958fb708ab60c1a9a732d66168cfbcf81e32f72` | `ef2ce9ab577b959bd4bcc650e20d011a4f6e9a877cf2feefe71782d5196dfd9c` |
@@ -50,6 +54,15 @@ corpora:
 cfb_open_stream_mini_shared_{one_shot,repeat,repeat8,different_sid,bulk,concurrent}
 cfb_open_stream_mini_4095_shared_{one_shot,repeat,repeat8,different_sid,bulk,concurrent}
 ```
+
+These selectors exercise `SharedOleFile::open_stream` and the positional
+read paths in `shared.rs`. The measured candidate instead changed direct
+`OleFile` stream replay in `file.rs`. `SharedOleFile` uses `OleFile` only for
+structural parsing/index conversion in this workload, so the measured rows do
+not exercise the changed FAT/MiniFAT payload-read implementation. This scope
+mismatch was discovered during the current-code claim audit and makes the
+latency classification below descriptive of the frozen binaries/workload,
+not evidence for or against that production candidate.
 
 Drift ceilings are 5%/5%/10%/15% for p50/mean/p95/p99. The summary recomputes
 statistics from samples and verifies case/corpus, configuration, and stable
@@ -82,14 +95,19 @@ The seven accepted cells are limited to these rows and paired readings
 | `cfb_open_stream_mini_shared_repeat8` / many-small | p99 | 4.754913445268776% | 4.887215751356035% |
 
 All remaining cells are rejected by adverse paired directions, disagreement,
-or drift. The adverse-both population is too broad for these isolated accepted
-cells to support landing the production CFB optimization on latency evidence.
+or drift. These classifications remain an exact description of the retained
+package, but the workload mismatch means neither the accepted cells nor the
+adverse-both population can adjudicate the direct-`OleFile` optimization.
 
 ## Decision and landed oracle boundary
 
 Do not land the production CFB streaming optimization on this latency run.
-The candidate remains retained only for allocation follow-up; this record is
-not a latency approval, and it makes no aggregate CFB speedup claim.
+The run does not exercise the changed payload-read path, so it is neither a
+latency approval nor a valid latency rejection for that code. Because no
+applicable evidence for this candidate's direct payload-read/native-consumer
+path was retained, policy rollback `67a37235c` restores the validated control
+implementation. A future candidate requires an applicable workload before it
+can land; no aggregate CFB speedup or regression is claimed here.
 
 The independent actual-output oracle did land as
 `66bb83abbc4e7259ff66e83f5b911d94dca4fd40` (`66bb83abb`)
@@ -118,12 +136,14 @@ not be read as a retroactive output-identity claim for this package.
 
 ## Claim boundary
 
-This note is generic CFB/OLE2 substrate evidence only. It makes no claim about
-native DOC/XLS/PPT semantics or CRUD, source-backed filesystem behavior,
-physical I/O, decompression, cold-cache behavior, allocations, RSS, or a
-general CFB performance improvement. The candidate allocation follow-up is a
-separate question from the rejected latency decision.
+This note is generic `SharedOleFile` CFB/OLE2 substrate evidence only. It makes
+no claim about direct `OleFile` payload reads, native DOC/XLS/PPT semantics or
+CRUD, source-backed filesystem behavior, physical I/O, decompression,
+cold-cache behavior, allocations, RSS, or a general CFB performance
+improvement. Applicable direct-path allocation and latency evidence remains a
+separate prerequisite for any future version of the rolled-back candidate.
 
-Verification for this documentation-only update is Python package/hash/count
-and link checking plus `git diff --check`; no Cargo command or benchmark is
-part of this record.
+The evidence correction is checked by Python package/hash/count and link
+validation plus `git diff --check`. The production rollback separately passed
+the complete `litchi-cfb` test suite, focused strict Clippy/rustdoc, formatting,
+and independent review; no new benchmark result is introduced by the rollback.

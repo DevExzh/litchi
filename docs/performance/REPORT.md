@@ -160,11 +160,14 @@ replay counters are explicitly not physical-I/O evidence. No broad ODS claim.
 [Change 0248](changes/0248-cfb-streaming-abba.md) records the independently
 audited 24-row CFB MiniFAT streaming package. Accepted cells total only
 p50=1, mean=2, p95=2, and p99=2, while adverse-both cells total
-p50=14, mean=10, p95=7, and p99=4. The decision is not to land the
-production CFB optimization on latency evidence; its candidate is retained
-only for allocation follow-up. The independent actual-output oracle landed
-as `66bb83abb`, and source-identity measurement projection was fixed by
-`cd21f7670`. This is generic CFB/OLE2 evidence, not a broad performance claim.
+p50=14, mean=10, p95=7, and p99=4. A current-code audit found that those
+selectors exercise `SharedOleFile` in `shared.rs`, while the candidate changed
+direct `OleFile` payload replay in `file.rs`; the package therefore cannot
+accept or reject that candidate. With no applicable direct/native-path
+measurement, `67a37235c` rolls the unmeasured optimization back pending a
+representative experiment. The independent actual-output oracle landed as
+`66bb83abb`, and source-identity measurement projection was fixed by
+`cd21f7670`. No CFB speedup or regression is claimed from the mis-scoped run.
 
 ## XLSX bytes-facade ABBA evidence (documentation change 0247; 0230 package)
 

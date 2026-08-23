@@ -108,10 +108,11 @@
       "id": "claim-0248-cfb-streaming",
       "change_id": "0248-cfb-streaming-abba",
       "claim_class": "optimization",
-      "status": "rejected",
+      "status": "held",
       "code_state": "not_landed",
       "reason_codes": [
-        "adverse_both_latency_cells"
+        "mis_scoped_workload",
+        "no_applicable_production_measurement"
       ],
       "scope": {
         "format": "cfb",
