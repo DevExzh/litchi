@@ -2231,6 +2231,7 @@ fn scan_global_comment_cells(
     column_count: usize,
     storage: DecodedTableStorage<'_>,
     path: Path,
+    scan_work: &mut usize,
 ) -> Result<Vec<u32>, Error> {
     let tile_size = usize::try_from(
         storage
@@ -2257,7 +2258,6 @@ fn scan_global_comment_cells(
     if let Some(amount) = tiles.allocation_failed {
         return Err(Error::Allocation { amount, path });
     }
-    let mut scan_work = 0;
     let mut seen_tile_keys = HashSet::new();
     seen_tile_keys
         .try_reserve(tiles.tiles.len())
@@ -2267,7 +2267,7 @@ fn scan_global_comment_cells(
         })?;
     let mut comment_keys = Vec::new();
     for (tile_key, tile_id) in tiles.tiles.iter().copied() {
-        charge_scan_work(&mut scan_work, 1, path)?;
+        charge_scan_work(scan_work, 1, path)?;
         if tile_id == 0 || !seen_tile_keys.insert(tile_key) {
             return Err(Error::InvalidSource { path });
         }
@@ -2311,7 +2311,7 @@ fn scan_global_comment_cells(
         )
         .map_err(|error| map_wire_error(error, path))?;
         for (row_key, row_occurrence) in rows.rows.iter().copied() {
-            charge_scan_work(&mut scan_work, 1, path)?;
+            charge_scan_work(scan_work, 1, path)?;
             if !seen_row_keys.insert(row_key) {
                 return Err(Error::InvalidSource { path });
             }
@@ -2346,9 +2346,9 @@ fn scan_global_comment_cells(
                 row_info.has_wide_offsets().unwrap_or(false),
                 column_count,
                 path,
-                &mut scan_work,
+                scan_work,
             )?;
-            charge_scan_work(&mut scan_work, expected_cells, path)?;
+            charge_scan_work(scan_work, expected_cells, path)?;
             for cell_range in ranges.into_iter().flatten() {
                 let cell_source = storage_buffer
                     .get(cell_range)
@@ -2865,6 +2865,7 @@ fn census_models_and_cells(
     census: &mut CommentOwnershipCensus,
     path: Path,
 ) -> Result<(), Error> {
+    let mut scan_work = 0;
     for component in source.state.components.catalog().iter() {
         for object in component.archive().objects.iter() {
             for (message_index, message) in object.messages.iter().enumerate() {
@@ -2943,6 +2944,7 @@ fn census_models_and_cells(
                         .map_err(|_| Error::InvalidSource { path })?,
                     decoded,
                     path,
+                    &mut scan_work,
                 )?;
                 if comment_table.is_none() && !keys.is_empty() {
                     return Err(Error::InvalidSource { path });
