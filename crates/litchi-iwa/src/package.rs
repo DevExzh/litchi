@@ -1079,7 +1079,12 @@ impl Snapshot {
         let target = Self {
             state: Arc::new(state),
             limits: self.limits,
-            source: None,
+            // An exact no-op patch leaves both the ordered entry table and
+            // the physical package bytes unchanged. Preserve that source
+            // provenance so replaying a no-op remains byte-for-byte exact.
+            // Non-empty patches have no physical reassembly proof here and
+            // therefore intentionally lose preserve-mode provenance.
+            source: patch.is_empty().then(|| self.source.clone()).flatten(),
         };
         target.validate()?;
         Ok(target)
@@ -1897,6 +1902,47 @@ mod tests {
             reverted.entry("Data/original"),
             Some(b"original".as_slice())
         );
+        Ok(())
+    }
+
+    #[test]
+    fn applying_a_noop_patch_preserves_exact_source_and_inverse() -> crate::Result<()> {
+        let mut bytes = zip(&[("Data/original", b"original")]);
+        let end_of_central_directory = bytes.len() - 22;
+        let comment = b"snapshot-noop-comment\0\xfe";
+        bytes[end_of_central_directory + 20..end_of_central_directory + 22]
+            .copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(comment);
+
+        let source = IWorkPackage::from_bytes(&bytes)?.snapshot();
+        assert!(source.source.is_some());
+        let commit = source.edit_with(|_| Ok(()))?;
+        assert!(commit.patch().is_empty());
+
+        let replayed = source.apply(commit.patch())?;
+        assert!(replayed.source.is_some());
+        assert!(Arc::ptr_eq(
+            source.source.as_ref().expect("source provenance"),
+            replayed.source.as_ref().expect("replayed provenance")
+        ));
+        assert_eq!(replayed.to_bytes()?, bytes);
+
+        let inverse = commit.patch().inverse();
+        assert!(inverse.is_empty());
+        let reverted = replayed.apply(&inverse)?;
+        assert!(reverted.source.is_some());
+        assert!(Arc::ptr_eq(
+            source.source.as_ref().expect("source provenance"),
+            reverted.source.as_ref().expect("inverse provenance")
+        ));
+        assert_eq!(reverted.to_bytes()?, bytes);
+
+        let changed = source.edit_with(|edit| {
+            edit.insert_entry("Data/changed", b"changed".to_vec())?;
+            Ok(())
+        })?;
+        assert!(!changed.patch().is_empty());
+        assert!(source.apply(changed.patch())?.source.is_none());
         Ok(())
     }
 
