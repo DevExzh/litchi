@@ -220,6 +220,15 @@ const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES: usize = 512 * 1024;
+const XLSX_VENDOR_EXTENSION_XML_PART: &str = "/xl/vendor/litchi-extension.xml";
+const XLSX_VENDOR_EXTENSION_BIN_PART: &str = "/xl/vendor/litchi-extension.bin";
+const XLSX_VENDOR_EXTENSION_XML_CONTENT_TYPE: &str = "application/vnd.litchi.vendor-extension+xml";
+const XLSX_VENDOR_EXTENSION_BIN_CONTENT_TYPE: &str = "application/vnd.litchi.vendor-extension";
+const XLSX_VENDOR_EXTENSION_RELATIONSHIP_TYPE: &str = "urn:litchi:vendor-extension";
+const XLSX_VENDOR_EXTENSION_RELATIONSHIP_ID: &str = "rIdLitchiVendorExtension";
+const XLSX_VENDOR_EXTENSION_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?><litchiExtension xmlns="urn:litchi:vendor-extension" version="1" payload="litchi-extension.bin"/>"#;
+const XLSX_VENDOR_EXTENSION_BIN: &[u8] =
+    b"litchi-vendor-extension-bin-v1\x00deterministic-payload\x01";
 const ODP_MEDIA_TEXT_BOX_NAME: &str = "litchi-perf-media-text-box";
 const OLE_COMMON_CORPUS_GENERATOR: &str = "litchi-ole-common-copy-elision-v1";
 const OLE_COMMON_TARGET: &str = "ole_common_edit_target.bin";
@@ -354,6 +363,7 @@ impl XlsbShape {
 enum XlsxCellCrudShape {
     Medium,
     DenseSparse,
+    VendorExtension,
 }
 
 impl XlsxCellCrudShape {
@@ -363,6 +373,7 @@ impl XlsxCellCrudShape {
         match self {
             Self::Medium => "medium",
             Self::DenseSparse => "dense-sparse",
+            Self::VendorExtension => "vendor-extension",
         }
     }
 }
@@ -4622,6 +4633,8 @@ struct XlsxCellValuesSourceSummary {
     semantic_sha256: Vec<String>,
     untouched_member_count: usize,
     untouched_member_sha256: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    partial_sink_verified: Option<bool>,
     output_budget_refusal: XlsxCellValuesOutputRefusalEvidence,
 }
 
@@ -4801,6 +4814,7 @@ struct XlsxCellValuesIterationEvidence {
     semantic_sha256: String,
     untouched_member_count: usize,
     untouched_member_sha256: String,
+    partial_sink_verified: Option<bool>,
     output_budget_refusal: XlsxCellValuesOutputRefusalEvidence,
 }
 
@@ -6591,6 +6605,7 @@ impl SourceSummary {
                 cache_budget_managed: evidence.diagnostics.budget_managed,
                 cache_budget_memory_limit: evidence.diagnostics.budget_memory_limit,
                 untouched_member_count: evidence.untouched_member_count,
+                partial_sink_verified: evidence.partial_sink_verified,
                 output_budget_refusal: evidence.output_budget_refusal.clone(),
                 ..XlsxCellValuesSourceSummary::default()
             });
@@ -6602,6 +6617,7 @@ impl SourceSummary {
             || summary.cache_budget_managed != evidence.diagnostics.budget_managed
             || summary.cache_budget_memory_limit != evidence.diagnostics.budget_memory_limit
             || summary.untouched_member_count != evidence.untouched_member_count
+            || summary.partial_sink_verified != evidence.partial_sink_verified
             || summary.output_budget_refusal != evidence.output_budget_refusal
         {
             return Err("XLSX cell-values source evidence mixed incompatible controls".into());
@@ -9730,6 +9746,7 @@ fn parse_xlsx_cell_crud_shape(value: &str) -> Option<XlsxCellCrudShape> {
     match value {
         "medium" => Some(XlsxCellCrudShape::Medium),
         "dense-sparse" => Some(XlsxCellCrudShape::DenseSparse),
+        "vendor-extension" => Some(XlsxCellCrudShape::VendorExtension),
         _ => None,
     }
 }
@@ -10048,7 +10065,7 @@ fn usage_text() -> String {
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
            --xlsb-shape LIST           tiny,medium,large,sparse (only used by opt-in XLSB semantic cases)\n\
-           --xlsx-cell-crud-shape LIST medium,dense-sparse (used by matched scalar-cell and edit-composition cases)\n\
+           --xlsx-cell-crud-shape LIST medium,dense-sparse,vendor-extension (used by matched scalar-cell and edit-composition cases)\n\
            --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
            --rtf-variant LIST          plain,byte1252,lzfu,watermark (default: plain)\n\
@@ -15774,7 +15791,7 @@ fn xlsx_cell_crud_inventory(shape: XlsxCellCrudShape) -> Vec<Vec<XlsxCoordinate>
     for sheet in 0..sheet_count {
         let mut cells = Vec::new();
         match shape {
-            XlsxCellCrudShape::Medium => {
+            XlsxCellCrudShape::Medium | XlsxCellCrudShape::VendorExtension => {
                 for row in 0..48 {
                     for column in 0..48 {
                         cells.push(XlsxCoordinate { sheet, row, column });
@@ -15852,6 +15869,31 @@ fn xlsx_cell_crud_media_payload(index: usize) -> Vec<u8> {
     payload
 }
 
+fn add_xlsx_vendor_extension(package: &mut OpcPackage) -> Result<(), Box<dyn Error>> {
+    let xml_uri = PackURI::new(XLSX_VENDOR_EXTENSION_XML_PART)?;
+    let bin_uri = PackURI::new(XLSX_VENDOR_EXTENSION_BIN_PART)?;
+    package.try_add_part(Box::new(BlobPart::new(
+        xml_uri.clone(),
+        XLSX_VENDOR_EXTENSION_XML_CONTENT_TYPE.to_owned(),
+        XLSX_VENDOR_EXTENSION_XML.to_vec(),
+    )))?;
+    package.try_add_part(Box::new(BlobPart::new(
+        bin_uri,
+        XLSX_VENDOR_EXTENSION_BIN_CONTENT_TYPE.to_owned(),
+        XLSX_VENDOR_EXTENSION_BIN.to_vec(),
+    )))?;
+    package
+        .get_part_mut(&xml_uri)?
+        .rels_mut()
+        .try_add_relationship(
+            XLSX_VENDOR_EXTENSION_RELATIONSHIP_TYPE.to_owned(),
+            "litchi-extension.bin".to_owned(),
+            XLSX_VENDOR_EXTENSION_RELATIONSHIP_ID.to_owned(),
+            TargetMode::Internal,
+        )?;
+    Ok(())
+}
+
 fn strip_xlsx_cell_crud_calc_properties(package: &mut OpcPackage) -> Result<(), Box<dyn Error>> {
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let workbook_xml = package.get_part(&workbook_uri)?.blob();
@@ -15873,7 +15915,7 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     let inventory = xlsx_cell_crud_inventory(shape);
     let updates = xlsx_cell_crud_updates(&inventory)?;
     let (row_count, column_count) = match shape {
-        XlsxCellCrudShape::Medium => (48, 48),
+        XlsxCellCrudShape::Medium | XlsxCellCrudShape::VendorExtension => (48, 48),
         XlsxCellCrudShape::DenseSparse => (128, 128),
     };
     let spec = XlsxCorpus {
@@ -15894,9 +15936,18 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
             xlsx_cell_crud_media_payload(index),
         )))?;
     }
+    if shape == XlsxCellCrudShape::VendorExtension {
+        add_xlsx_vendor_extension(&mut package)?;
+    }
+    verify_xlsx_vendor_extension_package(&package, shape == XlsxCellCrudShape::VendorExtension)?;
     archive = PackageWriter::to_bytes(&package)?;
     let reopened = Workbook::from_bytes(archive.clone())?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
+    let reopened_package = OpcPackage::from_bytes(&archive)?;
+    verify_xlsx_vendor_extension_package(
+        &reopened_package,
+        shape == XlsxCellCrudShape::VendorExtension,
+    )?;
     let cell_count = xlsx_cell_count(&spec)?;
     let target = *spec
         .one_percent_updates
@@ -15906,26 +15957,40 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     let target_payload = xlsx_value(target).to_string().into_bytes();
     let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
+    let vendor_payload_bytes = (shape == XlsxCellCrudShape::VendorExtension)
+        .then_some(
+            XLSX_VENDOR_EXTENSION_XML
+                .len()
+                .checked_add(XLSX_VENDOR_EXTENSION_BIN.len())
+                .ok_or("XLSX vendor extension logical byte count overflows usize")?,
+        )
+        .unwrap_or(0);
+    let logical_payload_bytes = cell_count
+        .checked_mul(std::mem::size_of::<i32>())
+        .and_then(|bytes| {
+            bytes.checked_add(
+                XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT
+                    .checked_mul(XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES)?,
+            )
+        })
+        .and_then(|bytes| bytes.checked_add(vendor_payload_bytes))
+        .ok_or("XLSX cell CRUD logical byte count overflows usize")?;
     Ok(Corpus {
         manifest: CorpusManifest {
             name: format!("xlsx-cell-values-{}", shape.name()),
             generator: XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
             package_format: "XLSX/OPC/ZIP",
             shape: shape.name(),
-            payload_kind: "deterministic-multi-sheet-scalar-grid-with-media",
+            payload_kind: if shape == XlsxCellCrudShape::VendorExtension {
+                "deterministic-multi-sheet-scalar-grid-with-media-and-unknown-vendor-extension"
+            } else {
+                "deterministic-multi-sheet-scalar-grid-with-media"
+            },
             compression: "deflate",
             entry_count: cell_count,
             archive_member_count,
             entry_bytes: std::mem::size_of::<i32>(),
-            uncompressed_payload_bytes: cell_count
-                .checked_mul(std::mem::size_of::<i32>())
-                .and_then(|bytes| {
-                    bytes.checked_add(
-                        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT
-                            .checked_mul(XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES)?,
-                    )
-                })
-                .ok_or("XLSX cell CRUD logical byte count overflows usize")?,
+            uncompressed_payload_bytes: logical_payload_bytes,
             archive_bytes: archive.len(),
             archive_sha256: sha256_hex(&archive),
             target_entry: target_name.clone(),
@@ -16711,12 +16776,91 @@ fn verify_xlsx_cell_crud_output(
     verify_xlsx_cell_crud_package_identity(corpus, output)
 }
 
+fn verify_xlsx_vendor_extension_package(
+    package: &OpcPackage,
+    expected: bool,
+) -> Result<(), Box<dyn Error>> {
+    let xml_uri = PackURI::new(XLSX_VENDOR_EXTENSION_XML_PART)?;
+    let bin_uri = PackURI::new(XLSX_VENDOR_EXTENSION_BIN_PART)?;
+    let has_vendor_target = |relationships: &Relationships| {
+        relationships.iter().any(|relationship| {
+            relationship.reltype() == XLSX_VENDOR_EXTENSION_RELATIONSHIP_TYPE
+                || relationship
+                    .target_partname()
+                    .is_ok_and(|target| target == xml_uri || target == bin_uri)
+        })
+    };
+    let xml_part = package.get_part(&xml_uri).ok();
+    let bin_part = package.get_part(&bin_uri).ok();
+    if xml_part.is_none() {
+        if expected {
+            return Err("XLSX vendor-extension XML part is missing".into());
+        }
+        if bin_part.is_some()
+            || has_vendor_target(package.rels())
+            || package.iter_parts().any(|part| has_vendor_target(part.rels()))
+        {
+            return Err("XLSX non-vendor corpus contains stray vendor-extension topology".into());
+        }
+        return Ok(());
+    }
+    if !expected {
+        return Err("XLSX non-vendor corpus unexpectedly contains vendor-extension XML".into());
+    }
+    let xml_part = xml_part.expect("XLSX vendor-extension XML part was checked above");
+    let bin_part = bin_part
+        .ok_or("XLSX vendor-extension binary part is missing")?;
+    if xml_part.content_type() != XLSX_VENDOR_EXTENSION_XML_CONTENT_TYPE
+        || xml_part.blob() != XLSX_VENDOR_EXTENSION_XML
+    {
+        return Err("XLSX vendor-extension XML payload or content type changed".into());
+    }
+    if bin_part.content_type() != XLSX_VENDOR_EXTENSION_BIN_CONTENT_TYPE
+        || bin_part.blob() != XLSX_VENDOR_EXTENSION_BIN
+    {
+        return Err("XLSX vendor-extension binary payload or content type changed".into());
+    }
+    let relationships = xml_part.rels().iter().collect::<Vec<_>>();
+    if relationships.len() != 1 {
+        return Err("XLSX vendor-extension XML has an unexpected relationship count".into());
+    }
+    let relationship = relationships[0];
+    if relationship.r_id() != XLSX_VENDOR_EXTENSION_RELATIONSHIP_ID
+        || relationship.reltype() != XLSX_VENDOR_EXTENSION_RELATIONSHIP_TYPE
+        || relationship.target_ref() != "litchi-extension.bin"
+        || relationship.target_mode() != TargetMode::Internal
+        || relationship.target_partname()? != bin_uri
+    {
+        return Err("XLSX vendor-extension internal relationship changed".into());
+    }
+
+    if has_vendor_target(package.rels()) {
+        return Err("XLSX vendor-extension relationship leaked onto the package root".into());
+    }
+    for part in package.iter_parts() {
+        if part.partname() == &xml_uri {
+            continue;
+        }
+        if has_vendor_target(part.rels()) {
+            return Err(format!(
+                "XLSX vendor-extension relationship leaked from {}",
+                part.partname()
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
 fn verify_xlsx_cell_crud_package_identity(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
     let source = OpcPackage::from_bytes(&corpus.archive)?;
     let candidate = OpcPackage::from_bytes(output)?;
+    let has_vendor_extension = corpus.manifest.shape == XlsxCellCrudShape::VendorExtension.name();
+    verify_xlsx_vendor_extension_package(&source, has_vendor_extension)?;
+    verify_xlsx_vendor_extension_package(&candidate, has_vendor_extension)?;
     if source.part_count() != candidate.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
     {
@@ -16754,14 +16898,23 @@ fn xlsx_cell_crud_untouched_member_evidence(
         .map(|coordinate| format!("xl/worksheets/sheet{}.xml", coordinate.sheet + 1))
         .collect::<BTreeSet<_>>();
     let mut hasher = Sha256::new();
+    let mut candidate_hasher = Sha256::new();
     let mut untouched_count = 0usize;
     for (name, source_member) in source {
-        if !touched.contains(&name) && candidate.get(&name) != Some(&source_member) {
-            return Err(
-                format!("XLSX source CRUD changed raw unselected ZIP member {name}").into(),
-            );
-        }
         if !touched.contains(&name) {
+            let candidate_member = candidate
+                .get(&name)
+                .ok_or_else(|| format!("XLSX source CRUD lost raw unselected ZIP member {name}"))?;
+            if candidate_member != &source_member {
+                return Err(
+                    format!("XLSX source CRUD changed raw unselected ZIP member {name}").into(),
+                );
+            }
+            candidate_hasher.update(name.as_bytes());
+            candidate_hasher.update([0]);
+            candidate_hasher.update(&candidate_member.local);
+            candidate_hasher.update([0]);
+            candidate_hasher.update(&candidate_member.central_without_offset);
             untouched_count += 1;
             hasher.update(name.as_bytes());
             hasher.update([0]);
@@ -16771,6 +16924,10 @@ fn xlsx_cell_crud_untouched_member_evidence(
         }
     }
     let digest = hasher.finalize();
+    let candidate_digest = candidate_hasher.finalize();
+    if digest != candidate_digest {
+        return Err("XLSX source CRUD raw untouched-member identity digest changed".into());
+    }
     let mut untouched_sha256 = String::with_capacity(digest.len() * 2);
     for byte in digest {
         use std::fmt::Write as _;
@@ -16821,7 +16978,7 @@ fn xlsx_cell_values_output_semantic_hash(
 fn run_xlsx_cell_value_lifecycle_gates(
     corpus: &Corpus,
     spec: &XlsxCorpus,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Option<bool>, Box<dyn Error>> {
     let selectors = (0..spec.sheet_count)
         .map(litchi_xlsx::Selector::from)
         .collect::<Vec<_>>();
@@ -16892,7 +17049,50 @@ fn run_xlsx_cell_value_lifecycle_gates(
         let restored_workbook = Workbook::from_bytes(restored_bytes)?;
         verify_xlsx_cells(&restored_workbook, spec, &[])?;
     }
-    Ok(())
+    let partial_sink_verified = if corpus.manifest.shape == XlsxCellCrudShape::VendorExtension.name()
+    {
+        let partial_editor =
+            litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+                OwnedSource::new(corpus.archive.clone()),
+            ))?;
+        let mut partial_edit =
+            partial_editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
+        partial_edit.set(
+            target.sheet,
+            litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?,
+            xlsx_value(target) + 1,
+        )?;
+        let partial_commit = partial_edit.commit()?;
+        if !partial_commit.changed() || partial_commit.diagnostics().changed_cells() != 1 {
+            return Err("XLSX vendor-extension partial-sink replay did not change one cell".into());
+        }
+        let mut partial_sink = PrefixFailSink {
+            accepted: 0,
+            fail_after: 7,
+        };
+        let partial_error = partial_editor
+            .publish_multi_commit_to_stream(&mut partial_sink, &partial_commit)
+            .err();
+        let partial_sink_verified = matches!(
+            partial_error,
+            Some(litchi_xlsx::Error::Package(OpcError::IncompleteOutput {
+                written,
+                source,
+            })) if written == partial_sink.accepted
+                && written > 0
+                && matches!(source.as_ref(), OpcError::IoError(_))
+        );
+        if !partial_sink_verified {
+            return Err(
+                "XLSX vendor-extension partial sink did not report typed incomplete output"
+                    .into(),
+            );
+        }
+        Some(true)
+    } else {
+        None
+    };
+    Ok(partial_sink_verified)
 }
 
 fn verify_xlsx_cell_crud_lifecycle_state(
@@ -33561,7 +33761,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
     // public source-backed clear/remove API even for the eager pair so the
     // shared lifecycle contract is checked once without polluting samples;
     // eager-specific package and semantic checks are performed separately.
-    run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
+    let partial_sink_verified = run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
     let expected = if source_backed {
         xlsx_cell_lifecycle_source_output(corpus, spec, target, remove)?
     } else {
@@ -33668,6 +33868,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 semantic_sha256: expected_semantic.clone(),
                 untouched_member_count,
                 untouched_member_sha256: untouched_member_sha256.clone(),
+                partial_sink_verified,
                 output_budget_refusal: XlsxCellValuesOutputRefusalEvidence::default(),
             }
         } else {
@@ -33723,6 +33924,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 semantic_sha256: expected_semantic.clone(),
                 untouched_member_count: 0,
                 untouched_member_sha256: String::new(),
+                partial_sink_verified: None,
                 output_budget_refusal: XlsxCellValuesOutputRefusalEvidence::default(),
             }
         };
@@ -34086,7 +34288,7 @@ fn run_xlsx_cell_values_edit_save(
     }
     let spec = xlsx_spec(corpus)?;
     let updates = xlsx_cell_crud_updates_for_case(case, spec)?;
-    run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
+    let partial_sink_verified = run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
     let expected = xlsx_cell_crud_eager_output(corpus, &updates)?;
     let expected_digest = sha256_hex(&expected);
     let source_backed = case.is_xlsx_cell_values_source_backed();
@@ -34327,6 +34529,7 @@ fn run_xlsx_cell_values_edit_save(
                 semantic_sha256: String::new(),
                 untouched_member_count: 0,
                 untouched_member_sha256: String::new(),
+                partial_sink_verified,
                 output_budget_refusal: output_budget_refusal.clone().unwrap_or_default(),
             });
         } else {
@@ -51151,6 +51354,121 @@ mod tests {
         assert_eq!(xlsx_cell_count(dense_spec).unwrap(), 17_792);
         assert_eq!(dense_spec.one_percent_updates.len(), 178);
         assert!(dense_first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+    }
+
+    #[test]
+    fn xlsx_vendor_extension_cell_crud_shape_is_opt_in_and_preserved() {
+        let medium = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::VendorExtension).unwrap();
+        let second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::VendorExtension).unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(
+            super::parse_xlsx_cell_crud_shape("vendor-extension"),
+            Some(XlsxCellCrudShape::VendorExtension)
+        );
+        assert!(!XlsxCellCrudShape::ALL.contains(&XlsxCellCrudShape::VendorExtension));
+        assert_eq!(XlsxCellCrudShape::ALL.len(), 2);
+        assert_eq!(first.manifest.shape, "vendor-extension");
+        assert_eq!(
+            first.manifest.archive_member_count,
+            medium.manifest.archive_member_count + 3
+        );
+        assert_eq!(first.manifest.entry_count, medium.manifest.entry_count);
+        assert_eq!(
+            first.manifest.uncompressed_payload_bytes,
+            medium.manifest.uncompressed_payload_bytes
+                + super::XLSX_VENDOR_EXTENSION_XML.len()
+                + super::XLSX_VENDOR_EXTENSION_BIN.len()
+        );
+
+        let source_package = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let medium_package = super::OpcPackage::from_bytes(&medium.archive).unwrap();
+        assert_eq!(source_package.part_count(), medium_package.part_count() + 2);
+        super::verify_xlsx_vendor_extension_package(&source_package, true).unwrap();
+        let raw = super::raw_zip_members(&first.archive).unwrap();
+        assert!(raw.contains_key("xl/vendor/litchi-extension.xml"));
+        assert!(raw.contains_key("xl/vendor/litchi-extension.bin"));
+        assert!(raw.contains_key("xl/vendor/_rels/litchi-extension.xml.rels"));
+        assert!(
+            raw.get("xl/vendor/_rels/litchi-extension.xml.rels")
+                .is_some_and(
+                    |member| !member.local.is_empty() && !member.central_without_offset.is_empty()
+                )
+        );
+
+        let target = super::xlsx_cell_crud_updates_for_case(
+            Case::XlsxSourceBackedCellValuesOneEditSave,
+            first.xlsx.as_ref().unwrap(),
+        )
+        .unwrap();
+        let medium_budget = super::xlsx_cell_values_payload_budget(&medium, &target).unwrap();
+        let vendor_budget = super::xlsx_cell_values_payload_budget(&first, &target).unwrap();
+        assert_eq!(vendor_budget, medium_budget);
+
+        let source_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+            super::OwnedSource::new(first.archive.clone()),
+        ))
+        .unwrap();
+        let mut source_edit = source_editor
+            .edit_sheets([litchi_xlsx::Selector::from(target[0].sheet)])
+            .unwrap();
+        for coordinate in &target {
+            source_edit
+                .set(
+                    coordinate.sheet,
+                    litchi_xlsx::Address::at(
+                        u32::try_from(coordinate.row).unwrap(),
+                        u32::try_from(coordinate.column).unwrap(),
+                    )
+                    .unwrap(),
+                    super::xlsx_value(*coordinate) + 1,
+                )
+                .unwrap();
+        }
+        let source_commit = source_edit.commit().unwrap();
+        let mut expected = Vec::new();
+        source_editor
+            .publish_multi_commit_to_stream(&mut expected, &source_commit)
+            .unwrap();
+        let (untouched_count, untouched_digest) =
+            super::xlsx_cell_crud_untouched_member_evidence(&first, &expected, &target).unwrap();
+        assert_eq!(untouched_count, first.manifest.archive_member_count - 1);
+        assert!(!untouched_digest.is_empty());
+        let candidate_package = super::OpcPackage::from_bytes(&expected).unwrap();
+        super::verify_xlsx_vendor_extension_package(&candidate_package, true).unwrap();
+
+        let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();
+        let evidence = measured
+            .source
+            .unwrap()
+            .xlsx_cell_values
+            .expect("vendor-extension source evidence");
+        assert_eq!(evidence.payload_materializations, vec![3]);
+        assert_eq!(evidence.untouched_member_count, untouched_count);
+        assert_eq!(evidence.untouched_member_sha256, vec![untouched_digest]);
+        assert_eq!(evidence.semantic_sha256.len(), 1);
+        assert_eq!(evidence.output_sha256, vec![sha256_hex(&expected)]);
+        assert_eq!(evidence.partial_sink_verified, Some(true));
+
+        let managed = run_case(
+            Case::XlsxSourceBackedManagedCellValuesOneEditSave,
+            &first,
+            0,
+            1,
+        )
+        .unwrap();
+        let managed_evidence = managed
+            .source
+            .unwrap()
+            .xlsx_cell_values
+            .expect("vendor-extension managed source evidence");
+        assert_eq!(
+            managed_evidence.cache_budget_memory_limit,
+            Some(vendor_budget as u64)
+        );
+        assert_eq!(managed_evidence.payload_materializations, vec![3]);
+        assert_eq!(managed_evidence.untouched_member_count, untouched_count);
+        assert_eq!(managed_evidence.partial_sink_verified, Some(true));
     }
 
     #[test]
