@@ -4,6 +4,10 @@ use super::*;
 
 impl KeynoteEditor {
     /// Read the chart title shown by Keynote for one slide chart.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote chart-title API; use slide_chart_title_by_selector with ChartSelector; retained for migration-host compatibility"
+    )]
     pub fn slide_chart_title(
         &self,
         slide_index: usize,
@@ -13,6 +17,10 @@ impl KeynoteEditor {
     }
 
     /// Create or replace the native title shown by Keynote for one slide chart.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote chart-title API; use set_slide_chart_title_by_selector with ChartSelector; retained for migration-host compatibility"
+    )]
     pub fn set_slide_chart_title(
         &mut self,
         slide_index: usize,
@@ -25,6 +33,10 @@ impl KeynoteEditor {
     /// Remove the native title shown by Keynote for one slide chart.
     ///
     /// Returns whether a visible title was present.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote chart-title API; use remove_slide_chart_title_by_selector with ChartSelector; retained for migration-host compatibility"
+    )]
     pub fn remove_slide_chart_title(
         &mut self,
         slide_index: usize,
