@@ -50,6 +50,16 @@ pub(crate) const FORBIDDEN_BUFFA_OWNERSHIP_MARKERS: &[&str] = &[
     "decode_view_handle",
     "encode_to_bytes",
     "try_encode_to_bytes",
+    // Eager message/view entry points are not an ingress boundary. A focused
+    // codec may force a borrowed lazy view, but it must not decode an owned
+    // message, materialize an eager view, or bypass explicit lazy-view options
+    // through one of these convenience APIs.
+    "decode_from_slice",
+    "merge_from_slice",
+    "decode_reader",
+    "decode_length_delimited_reader",
+    "decode_view_with_options",
+    "decode_with_options",
 ];
 
 #[cfg(test)]
@@ -631,6 +641,48 @@ pub fn decode_projection(bytes: &[u8]) {{
             assert!(
                 has_forbidden_codec_marker(&source),
                 "generated Buffa helper {name} escaped the production ratchet"
+            );
+        }
+    }
+
+    #[test]
+    fn production_ratchet_rejects_generated_buffa_eager_decoders() {
+        let helpers = [
+            (
+                "message slice decoder",
+                "crate::buffa_generated::TSP::Archive::decode_from_slice(bytes)",
+            ),
+            (
+                "options slice decoder",
+                "options.decode_from_slice::<Archive>(bytes)",
+            ),
+            ("message merge decoder", "view.merge_from_slice(bytes)"),
+            ("reader decoder", "options.decode_reader::<Archive>(reader)"),
+            (
+                "length-delimited reader decoder",
+                "options.decode_length_delimited_reader::<Archive>(reader)",
+            ),
+            (
+                "eager view with options",
+                "options.decode_view_with_options::<ArchiveView>(bytes)",
+            ),
+            (
+                "eager message with options",
+                "options.decode_with_options::<Archive>(bytes)",
+            ),
+        ];
+
+        for (name, helper) in helpers {
+            let source = format!(
+                r#"
+pub fn decode_projection(bytes: &[u8]) {{
+    let _ = {helper};
+}}
+"#
+            );
+            assert!(
+                has_forbidden_codec_marker(&source),
+                "generated Buffa eager helper {name} escaped the production ratchet"
             );
         }
     }
