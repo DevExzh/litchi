@@ -1071,6 +1071,8 @@ enum Case {
     XlsxRangeSourceNarrowColumnRangeScan,
     OpcOpenSessionScaling,
     CfbBulkReadScaling,
+    RtfFileOpen,
+    RtfFileOpenLifecycle,
     RtfSemanticOpen,
     RtfSemanticParagraphCount,
     RtfSemanticListParagraphs,
@@ -1587,6 +1589,8 @@ impl Case {
             },
             Self::OpcOpenSessionScaling => "opc_open_session_scaling",
             Self::CfbBulkReadScaling => "cfb_bulk_read_scaling",
+            Self::RtfFileOpen => "rtf_file_open",
+            Self::RtfFileOpenLifecycle => "rtf_file_open_lifecycle",
             Self::RtfSemanticOpen => "rtf_semantic_open",
             Self::RtfSemanticParagraphCount => "rtf_semantic_paragraph_count",
             Self::RtfSemanticListParagraphs => "rtf_semantic_list_paragraphs",
@@ -1994,7 +1998,9 @@ impl Case {
     const fn uses_semantic_rtf(self) -> bool {
         matches!(
             self,
-            Self::RtfSemanticOpen
+            Self::RtfFileOpen
+                | Self::RtfFileOpenLifecycle
+                | Self::RtfSemanticOpen
                 | Self::RtfSemanticParagraphCount
                 | Self::RtfSemanticListParagraphs
                 | Self::RtfSemanticCollectParagraphs
@@ -2016,6 +2022,10 @@ impl Case {
                 | Self::RtfLogicalTailCommitNoopSave
                 | Self::RtfLogicalTailPlanNoopSave
         )
+    }
+
+    const fn is_rtf_root_file(self) -> bool {
+        matches!(self, Self::RtfFileOpen | Self::RtfFileOpenLifecycle)
     }
 
     const fn is_rtf_picture_crud(self) -> bool {
@@ -3513,6 +3523,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    rtf_root: Option<RtfRootSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     rtf_picture_crud: Option<RtfPictureCrudSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_paragraph_split_merge: Option<RtfParagraphSplitMergeSummary>,
@@ -3629,6 +3641,34 @@ struct RtfTailPublicationSummary {
     reopen_ns: Vec<u64>,
     lifecycle_ns: Vec<u64>,
     expected_output_sha256: String,
+}
+
+/// Evidence for the opt-in unified `litchi::Document` owned-byte RTF ingress.
+/// The facade's semantic projection is compared with an independently opened
+/// native `litchi_rtf::Document` before the timed loop and again after every
+/// timed construction.  The byte clone and all oracle setup stay outside the
+/// measured interval.  This is scoped to the named synthetic RTF corpus and
+/// makes no generic latency, allocation, I/O, or producer claim.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct RtfRootSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    transport_variant: &'static str,
+    source_bytes: u64,
+    source_sha256: String,
+    canonical_text_sha256: String,
+    paragraph_text_sha256: String,
+    paragraph_count: usize,
+    native_semantic_parity_verified: bool,
+    exact_source_hash_verified: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RtfRootSemanticProjection {
+    text: String,
+    paragraphs: Vec<String>,
 }
 
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
@@ -9367,6 +9407,8 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "opc_open_session_scaling" => Some(Case::OpcOpenSessionScaling),
         "cfb_bulk_read_scaling" => Some(Case::CfbBulkReadScaling),
+        "rtf_file_open" => Some(Case::RtfFileOpen),
+        "rtf_file_open_lifecycle" => Some(Case::RtfFileOpenLifecycle),
         "rtf_semantic_open" => Some(Case::RtfSemanticOpen),
         "rtf_semantic_paragraph_count" => Some(Case::RtfSemanticParagraphCount),
         "rtf_semantic_list_paragraphs" => Some(Case::RtfSemanticListParagraphs),
@@ -17771,6 +17813,9 @@ fn run_case_with_config(
                 range_simulation,
             )
         },
+        Case::RtfFileOpen | Case::RtfFileOpenLifecycle => {
+            run_rtf_root_access(case, corpus, warmup_iterations, samples)
+        },
         Case::RtfSemanticOpen
         | Case::RtfSemanticParagraphCount
         | Case::RtfSemanticListParagraphs
@@ -18224,6 +18269,148 @@ fn verify_semantic_rtf(
         }
     }
     Ok(())
+}
+
+fn rtf_root_semantic_projection(
+    document: &litchi::Document,
+) -> Result<RtfRootSemanticProjection, Box<dyn Error>> {
+    let text = document.text()?;
+    let paragraphs = document
+        .paragraphs()?
+        .into_iter()
+        .map(|paragraph| paragraph.text())
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(RtfRootSemanticProjection { text, paragraphs })
+}
+
+fn rtf_root_values_digest(values: &[String]) -> String {
+    let mut digest = Sha256::new();
+    for (index, value) in values.iter().enumerate() {
+        digest.update((index as u64).to_le_bytes());
+        digest.update((value.len() as u64).to_le_bytes());
+        digest.update(value.as_bytes());
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn rtf_root_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
+    match case {
+        Case::RtfFileOpen => Ok(false),
+        Case::RtfFileOpenLifecycle => Ok(true),
+        _ => Err("non-root RTF case passed to RTF root case parameters".into()),
+    }
+}
+
+fn run_rtf_root_access(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_rtf_root_file() {
+        return Err("non-root RTF case passed to RTF root runner".into());
+    }
+    let shape = semantic_shape(corpus)?;
+    let variant = semantic_rtf_variant(corpus)?;
+    let lifecycle = rtf_root_case_parameters(case)?;
+
+    // Build the native typed oracle before timing. It deliberately does not
+    // use the unified facade, so a facade ingress regression cannot certify
+    // itself through its own projection.
+    let native = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    verify_semantic_rtf(&native, shape, variant, &[])?;
+    let expected_projection = RtfRootSemanticProjection {
+        text: native.text().to_owned(),
+        paragraphs: native
+            .body()
+            .paragraphs()
+            .map(|paragraph| paragraph.to_text())
+            .collect(),
+    };
+    if native.to_bytes()? != corpus.archive {
+        return Err("RTF root native oracle changed exact source bytes".into());
+    }
+    let source_sha256 = sha256_hex(&corpus.archive);
+    if source_sha256 != corpus.manifest.archive_sha256
+        || corpus.archive.len() != corpus.manifest.archive_bytes
+    {
+        return Err("RTF root source hash differs from deterministic manifest".into());
+    }
+
+    // This preflight is also the independent semantic-parity gate for every
+    // selected transport. For the historical facade implementation, the
+    // default plain ASCII corpus succeeds; CP-1252/LZFu selectors become
+    // runnable as soon as the native byte ingress lands.
+    let facade = litchi::Document::from_bytes(corpus.archive.clone())?;
+    let facade_projection = rtf_root_semantic_projection(&facade)?;
+    if facade_projection != expected_projection {
+        return Err("RTF unified facade differs from native semantic oracle".into());
+    }
+    let paragraph_count = expected_projection.paragraphs.len();
+    if paragraph_count != semantic_rtf_paragraph_count(shape, variant)
+        || facade.paragraph_count()? != paragraph_count
+    {
+        return Err("RTF unified facade paragraph count differs from native oracle".into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Keep the owned-byte clone outside the measured native ingress. This
+        // isolates `Document::from_bytes(Vec<u8>)` from caller setup/copy cost.
+        let owned = corpus.archive.clone();
+        let started = Instant::now();
+        let document = litchi::Document::from_bytes(owned)?;
+        let lifecycle_text = lifecycle.then(|| document.text()).transpose()?;
+        let duration = started.elapsed();
+
+        // Semantic verification is intentionally outside the clock. It both
+        // protects each timed construction and keeps the interval limited to
+        // the selected open/open-plus-text lifecycle.
+        let measured_projection = rtf_root_semantic_projection(&document)?;
+        if measured_projection != expected_projection {
+            return Err("RTF timed unified facade differs from native oracle".into());
+        }
+        if let Some(text) = lifecycle_text {
+            if text != expected_projection.text {
+                return Err("RTF timed unified lifecycle text differs from oracle".into());
+            }
+            std::hint::black_box(text);
+        }
+        std::hint::black_box(document);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let summary = RtfRootSummary {
+        implementation: "unified_owned_bytes_facade",
+        phase: if lifecycle {
+            "owned_bytes_open_and_full_text_lifecycle"
+        } else {
+            "owned_bytes_open_only"
+        },
+        timing_scope: if lifecycle {
+            "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer"
+        } else {
+            "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer"
+        },
+        performance_claim: "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+        transport_variant: variant.name(),
+        source_bytes: u64::try_from(corpus.archive.len())?,
+        source_sha256,
+        canonical_text_sha256: sha256_hex(expected_projection.text.as_bytes()),
+        paragraph_text_sha256: rtf_root_values_digest(&expected_projection.paragraphs),
+        paragraph_count,
+        native_semantic_parity_verified: true,
+        exact_source_hash_verified: true,
+    };
+    Ok(result_with_source(
+        case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            rtf_root: Some(summary),
+            ..SourceSummary::default()
+        },
+    ))
 }
 
 fn semantic_rtf_lifecycle_projection(
@@ -45316,7 +45503,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 378);
+        assert_eq!(selectable_count, 380);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -47712,6 +47899,53 @@ mod tests {
 
         assert_eq!(result.case, "docx_semantic_one_percent_edit_save");
         assert!(result.sink.is_some());
+    }
+
+    #[test]
+    fn unified_rtf_owned_byte_selectors_are_opt_in_and_native_oracles_are_exact() {
+        let cases = [Case::RtfFileOpen, Case::RtfFileOpenLifecycle];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.is_rtf_root_file());
+            assert!(case.uses_semantic_rtf());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+
+        let plain =
+            build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Plain).unwrap();
+        for case in cases {
+            let result = run_case(case, &plain, 0, 1).unwrap();
+            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            let evidence = result
+                .source
+                .unwrap()
+                .rtf_root
+                .expect("unified RTF root evidence");
+            assert_eq!(evidence.transport_variant, "plain");
+            assert_eq!(evidence.source_bytes, plain.archive.len() as u64);
+            assert_eq!(evidence.source_sha256, plain.manifest.archive_sha256);
+            assert!(evidence.native_semantic_parity_verified);
+            assert!(evidence.exact_source_hash_verified);
+            assert!(evidence.performance_claim.starts_with("none:"));
+            assert_eq!(
+                evidence.paragraph_count,
+                SemanticShape::Tiny.rtf_paragraphs()
+            );
+        }
+
+        // Keep transport correctness independently testable on the historical
+        // control tree, where the unified facade still rejects non-UTF-8 RTF
+        // before the native byte-ingress change. Post-change runs can promote
+        // these same corpora to facade parity without changing the timed plain
+        // selector's scope.
+        for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
+            let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
+            let native = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+            super::verify_semantic_rtf(&native, SemanticShape::Tiny, variant, &[]).unwrap();
+            assert_eq!(native.to_bytes().unwrap(), corpus.archive);
+            assert_eq!(sha256_hex(&corpus.archive), corpus.manifest.archive_sha256);
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
     }
 
     #[test]

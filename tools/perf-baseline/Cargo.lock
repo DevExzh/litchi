@@ -905,6 +905,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 name = "litchi"
 version = "0.0.1"
 dependencies = [
+ "chrono",
  "fast-float2",
  "litchi-core",
  "litchi-docx",
@@ -916,6 +917,7 @@ dependencies = [
  "litchi-ooxml-common",
  "litchi-opc",
  "litchi-pptx",
+ "litchi-rtf",
  "litchi-sheet",
  "litchi-xlsb",
  "litchi-xlsx",
