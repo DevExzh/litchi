@@ -687,6 +687,25 @@ impl ArchiveObject {
         self.messages.first().map(|message| message.type_)
     }
 
+    /// Compare the source-authoritative contents of two physical objects.
+    ///
+    /// The comparison is allocation-free and ignores only the two offsets
+    /// whose values are relative to the containing component. It includes
+    /// decoded archive/message metadata, raw message bytes, retained raw and
+    /// canonical `ArchiveInfo` headers, and the recorded header/payload
+    /// framing lengths. In particular, objects with different length-prefix
+    /// widths are not aliases even when their decoded metadata and payloads
+    /// match.
+    #[must_use]
+    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {
+        self.archive_info == other.archive_info
+            && self.messages == other.messages
+            && self.header_length == other.header_length
+            && self.data_length == other.data_length
+            && self.original_header == other.original_header
+            && self.original_canonical_header == other.original_canonical_header
+    }
+
     /// Replace one payload and synchronize its physical metadata atomically.
     pub fn replace_message(&mut self, index: usize, message: RawMessage) -> Result<RawMessage> {
         self.replace_message_with_limits(index, message, Limits::default())
@@ -5568,6 +5587,106 @@ mod tests {
         assert!(object.original_header.is_none());
         assert!(object.original_canonical_header.is_none());
         assert_eq!(parsed.to_bytes()?, encoded);
+        Ok(())
+    }
+
+    #[test]
+    fn same_content_ignoring_offsets_accepts_identical_objects_at_different_offsets() -> Result<()>
+    {
+        let source = Archive {
+            objects: vec![ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 2,
+                    data: vec![3, 4],
+                }],
+            )?],
+        }
+        .to_bytes()?;
+        let object = Archive::parse(&source)?.objects[0].clone();
+        let mut alias = object.clone();
+        alias.header_offset = 4096;
+        alias.data_offset = alias.header_offset + alias.header_length;
+
+        assert!(object.same_content_ignoring_offsets(&alias));
+        assert_ne!(object.header_offset, alias.header_offset);
+        assert_ne!(object.data_offset, alias.data_offset);
+        Ok(())
+    }
+
+    #[test]
+    fn same_content_ignoring_offsets_rejects_divergent_published_content() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 2,
+                data: vec![3, 4],
+            }],
+        )?;
+        let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
+        let mut retained = canonical.clone();
+        retained.extend_from_slice(&[0xb5, 0x0c, 1, 2, 3, 4]);
+        object.original_header = Some(retained.into_boxed_slice());
+        object.original_canonical_header = Some(canonical.into_boxed_slice());
+
+        let mut payload = object.clone();
+        payload.messages[0].data[0] ^= 1;
+        assert!(!object.same_content_ignoring_offsets(&payload));
+
+        let mut metadata = object.clone();
+        metadata.archive_info.message_infos[0].type_ += 1;
+        assert!(!object.same_content_ignoring_offsets(&metadata));
+
+        let mut raw_header = object.clone();
+        raw_header.original_header.as_mut().expect("raw header")[0] ^= 1;
+        assert!(!object.same_content_ignoring_offsets(&raw_header));
+
+        let mut canonical_header = object.clone();
+        canonical_header
+            .original_canonical_header
+            .as_mut()
+            .expect("canonical header")[0] ^= 1;
+        assert!(!object.same_content_ignoring_offsets(&canonical_header));
+
+        let mut raw_header_state = object.clone();
+        raw_header_state.original_header = None;
+        assert!(!object.same_content_ignoring_offsets(&raw_header_state));
+
+        let mut framing = object.clone();
+        framing.header_length += 1;
+        assert!(!object.same_content_ignoring_offsets(&framing));
+
+        let mut payload_framing = object.clone();
+        payload_framing.data_length += 1;
+        assert!(!object.same_content_ignoring_offsets(&payload_framing));
+        Ok(())
+    }
+
+    #[test]
+    fn same_content_ignoring_offsets_distinguishes_new_and_canonical_provenance() -> Result<()> {
+        let fresh = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 2,
+                data: vec![3, 4],
+            }],
+        )?;
+        let mut fresh_alias = fresh.clone();
+        fresh_alias.header_offset = 128;
+        fresh_alias.data_offset = 256;
+        assert!(fresh.same_content_ignoring_offsets(&fresh_alias));
+
+        let encoded = Archive {
+            objects: vec![fresh.clone()],
+        }
+        .to_bytes()?;
+        let parsed = Archive::parse(&encoded)?.objects[0].clone();
+        assert!(!fresh.same_content_ignoring_offsets(&parsed));
+
+        let mut parsed_alias = parsed.clone();
+        parsed_alias.header_offset = 512;
+        parsed_alias.data_offset = 768;
+        assert!(parsed.same_content_ignoring_offsets(&parsed_alias));
         Ok(())
     }
 

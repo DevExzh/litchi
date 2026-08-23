@@ -2086,12 +2086,19 @@ IWA_NUMBERS_TABLE_INFO_SOURCE = (
 )
 NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
 NUMBERS_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package.rs"
+NUMBERS_INDEX_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "index.rs"
+NUMBERS_CORE_ARCHIVE_SOURCE = Path("crates/litchi-iwa-core/src/archive.rs")
 NUMBERS_PACKAGE_MANIFEST = Path("crates/litchi-numbers/Cargo.toml")
 NUMBERS_EXTRACTOR_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "extractor.rs"
 NUMBERS_NAMES_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "names.rs"
-NUMBERS_PACKAGE_TEST_MODULE = re.compile(
-    r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
-    re.MULTILINE,
+NUMBERS_INDEX_SEMANTIC_ALIAS_WORD = re.compile(
+    r"\b(?:alias\w*|coalesc\w*|dedup\w*|equivalent|unique|canonical)\b",
+    re.IGNORECASE,
+)
+NUMBERS_INDEX_RAW_ID_PUBLIC_METHOD = re.compile(
+    r"\bfn[ \t\r\n]+(?:r#)?(?:object_id|object_identifier|native_id|"
+    r"native_object(?:_id|_identifier)?|resolve_ref_id|resolve_object(?:_id)?|"
+    r"raw_object(?:_id|_identifier)|object_locator)\b"
 )
 NUMBERS_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS = (
     (
@@ -10492,6 +10499,242 @@ def audit_keynote_document_public_api(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_numbers_identity_boundary_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Numbers duplicate identities on the strict alias boundary.
+
+    Numbers 14.4 can emit an exact physical copy of an object in two
+    components after a sheet duplication.  The package may eventually
+    coalesce those copies, but an identifier is not a component-local key:
+    same-component duplicates and divergent cross-component objects must
+    still fail closed.  This source ratchet deliberately does not prescribe a
+    component-qualified public identity API.  It only checks the internal
+    admission boundary and keeps raw object identifiers out of ``Package``.
+
+    The existing reject-all implementation is valid.  Additional checks are
+    activated when the index starts retaining/deduplicating aliases, so a
+    future implementation cannot silently turn duplicate rejection into
+    first-wins behavior without also proving semantic equality, same-component
+    rejection, and physical-object accounting.
+    """
+
+    violations: list[str] = []
+    alias_mode = False
+    index_path = root / NUMBERS_INDEX_SOURCE
+    if index_path.is_file():
+        raw_index = index_path.read_text(encoding="utf-8")
+        index_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_index))
+
+        identifier_comparison = re.compile(
+            r"\b(?:identifier|id)\b[ \t\r\n]*(?:==|!=)[\s\S]{0,120}"
+            r"\b(?:identifier|id)\b"
+        )
+        duplicate_regions = [
+            index_code[max(0, match.start() - 500) : match.end() + 700]
+            for match in identifier_comparison.finditer(index_code)
+        ]
+        has_duplicate_rejection = any(
+            re.search(r"\breturn[ \t\r\n]+Err\b", region) is not None
+            for region in duplicate_regions
+        ) or re.search(
+            r"\b(?:duplicate|same_identifier|duplicate_identifier)\b"
+            r"[\s\S]{0,700}\breturn[ \t\r\n]+Err\b",
+            index_code,
+        ) is not None
+        if not has_duplicate_rejection:
+            violations.append(
+                "focused litchi-numbers index must reject duplicate object identities "
+                "unless strict alias admission is proven"
+            )
+
+        alias_action = re.compile(
+            r"\b(?:continue|retain|dedup|coalesc|or_insert|unique|alias)\w*\b",
+            re.IGNORECASE,
+        )
+        alias_mode = bool(NUMBERS_INDEX_SEMANTIC_ALIAS_WORD.search(index_code)) or any(
+            alias_action.search(region) is not None for region in duplicate_regions
+        )
+        if alias_mode:
+            # Alias admission must delegate to the core helper.  Inline
+            # ArchiveInfo/messages equality is intentionally insufficient:
+            # it can omit retained raw headers and framing widths.
+            has_trusted_content_call = any(
+                re.search(
+                    r"\bsame_content_ignoring_offsets\s*\(",
+                    region,
+                )
+                is not None
+                for region in duplicate_regions
+            )
+            if not has_trusted_content_call:
+                violations.append(
+                    "focused litchi-numbers index alias admission must call "
+                    "same_content_ignoring_offsets"
+                )
+
+            component_guard = re.compile(
+                r"\bcomponent(?:_index)?\b[\s\S]{0,180}"
+                r"(?:==|!=)[\s\S]{0,180}"
+                r"\bcomponent(?:_index)?\b[\s\S]{0,500}"
+                r"(?:return[ \t\r\n]+Err|continue|reject|InvalidFormat)",
+            )
+            if component_guard.search(index_code) is None:
+                violations.append(
+                    "focused litchi-numbers index alias admission must reject "
+                    "same-component duplicate identities"
+                )
+
+            index_struct = re.search(
+                r"\bstruct[ \t\r\n]+Index\b[ \t\r\n]*\{(?P<body>[\s\S]*?)\n\}",
+                index_code,
+            )
+            physical_field = None
+            if index_struct is not None:
+                physical_field = re.search(
+                    r"\b(?P<name>(?:physical|source|archive)"
+                    r"[A-Za-z0-9_]*(?:count|objects?))\b",
+                    index_struct.group("body"),
+                    re.IGNORECASE,
+                )
+            object_count_method = re.search(
+                r"\bfn[ \t\r\n]+object_count\b[^{]*\{(?P<body>[\s\S]*?)\}",
+                index_code,
+            )
+            if physical_field is None or object_count_method is None:
+                violations.append(
+                    "focused litchi-numbers index alias admission must retain a "
+                    "physical object count separate from unique locators"
+                )
+            elif physical_field.group("name") not in object_count_method.group("body"):
+                violations.append(
+                    "focused litchi-numbers Package::object_count must report the "
+                    "physical count, not unique locator length"
+                )
+            rebuild_work_method = re.search(
+                r"\bfn[ \t\r\n]+rebuild_work\b[^{]*\{(?P<body>[\s\S]*?)\}",
+                index_code,
+            )
+            if rebuild_work_method is None or physical_field is None:
+                violations.append(
+                    "focused litchi-numbers index rebuild_work must derive sort "
+                    "comparison work from the physical object count"
+                )
+            else:
+                rebuild_body = rebuild_work_method.group("body")
+                physical_name = physical_field.group("name")
+                if physical_name not in rebuild_body or re.search(
+                    r"\blookup_work\s*\(", rebuild_body
+                ) is not None:
+                    violations.append(
+                        "focused litchi-numbers index rebuild_work must derive sort "
+                        "comparison work from physical count, not unique lookup_work"
+                    )
+                if re.search(r"\bcomparison_work\s*\(", rebuild_body) is None:
+                    violations.append(
+                        "focused litchi-numbers index rebuild_work must retain an "
+                        "explicit physical comparison-work term"
+                    )
+            if re.search(
+                r"iter_objects\(\)[\s\S]{0,1200}max_objects",
+                index_code,
+            ) is None:
+                violations.append(
+                    "focused litchi-numbers index must apply the physical object "
+                    "limit before alias coalescing"
+                )
+
+    core_path = root / NUMBERS_CORE_ARCHIVE_SOURCE
+    if core_path.is_file():
+        raw_core = core_path.read_text(encoding="utf-8")
+        core_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_core))
+        helper_declaration = re.search(
+            r"\bfn[ \t\r\n]+same_content_ignoring_offsets\b",
+            core_code,
+        )
+        helper_body = None
+        if helper_declaration is not None:
+            opening = core_code.find("{", helper_declaration.end())
+            if opening >= 0:
+                depth = 1
+                cursor = opening + 1
+                while cursor < len(core_code) and depth:
+                    if core_code[cursor] == "{":
+                        depth += 1
+                    elif core_code[cursor] == "}":
+                        depth -= 1
+                    cursor += 1
+                if depth == 0:
+                    helper_body = core_code[opening + 1 : cursor - 1]
+        required_fields = (
+            "archive_info",
+            "messages",
+            "header_length",
+            "data_length",
+            "original_header",
+            "original_canonical_header",
+        )
+        if helper_body is None:
+            violations.append(
+                "focused litchi-iwa-core archive helper "
+                "same_content_ignoring_offsets is missing"
+            )
+        else:
+            for field_name in required_fields:
+                if re.search(rf"\b{re.escape(field_name)}\b", helper_body) is None:
+                    violations.append(
+                        "focused litchi-iwa-core archive helper "
+                        f"same_content_ignoring_offsets omits {field_name}"
+                    )
+            if re.search(r"\boffset\w*\b", helper_body, re.IGNORECASE) is not None:
+                violations.append(
+                    "focused litchi-iwa-core archive helper "
+                    "same_content_ignoring_offsets compares an offset"
+                )
+    elif alias_mode:
+        violations.append(
+            "focused litchi-iwa-core archive helper "
+            "same_content_ignoring_offsets is missing"
+        )
+
+    package_sources = [root / NUMBERS_PACKAGE_SOURCE]
+    package_root = root / NUMBERS_SOURCE_ROOT / "package"
+    if package_root.is_dir():
+        package_sources.extend(sorted(package_root.rglob("*.rs")))
+    for package_path in package_sources:
+        if not package_path.is_file():
+            continue
+        raw_package = package_path.read_text(encoding="utf-8")
+        package_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_package))
+        for declaration, line_number in _rust_public_declarations(package_code):
+            # ``_rust_public_declarations`` also returns public fields inside
+            # private or pub(super) structs.  Those fields are not a public
+            # Package API; only inspect function declarations for raw-ID
+            # parameters and method names.
+            if re.search(r"\bfn\b", declaration) is None:
+                continue
+            method_match = NUMBERS_INDEX_RAW_ID_PUBLIC_METHOD.search(declaration)
+            parameter_match = re.search(
+                r"\b(?:identifier|object_id|native_id|object_identifier)\b"
+                r"[ \t\r\n]*:[ \t\r\n]*(?:u32|u64|NonZeroU(?:32|64))\b",
+                declaration,
+            )
+            if method_match is None and parameter_match is None:
+                continue
+            leaked_name = (
+                method_match.group(0).split()[-1]
+                if method_match is not None
+                else parameter_match.group(0).split()[0]
+            )
+            violations.append(
+                "focused litchi-numbers Package public API exposes raw object "
+                f"identity {leaked_name}: "
+                f"{package_path.relative_to(root)}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -10501,20 +10744,15 @@ def audit_numbers_package_no_eager_prost_source_topology(
     ``litchi-numbers`` manifest.  Generated Prost fixtures remain available in
     test-only modules, but a normal dependency would make it possible to
     reintroduce generated reads into production without a boundary review.
-    The first ``cfg(test)`` module is excluded so canonical fixtures remain
-    available to differential tests without weakening the production gate.
+    The production source slice excludes cfg(test)-gated items individually;
+    cfg(test)-gated imports and helpers cannot hide later production code.
     """
 
     violations: list[str] = []
     source_path = root / NUMBERS_PACKAGE_SOURCE
     if source_path.is_file():
         raw_source = source_path.read_text(encoding="utf-8")
-        masked_source = _mask_rust_non_code(raw_source)
-        test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-        production_source = (
-            raw_source[: test_module.start()] if test_module is not None else raw_source
-        )
-        production_code = _mask_rust_non_code(production_source)
+        production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
         for label, pattern in NUMBERS_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS:
             for match in pattern.finditer(production_code):
                 line_number = production_code.count("\n", 0, match.start()) + 1
@@ -10568,12 +10806,7 @@ def audit_numbers_extractor_no_eager_rich_text_source_topology(
         return violations
 
     raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
     for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_RICH_TEXT_SOURCE_PATTERNS:
         for match in pattern.finditer(production_code):
             line_number = production_code.count("\n", 0, match.start()) + 1
@@ -10594,8 +10827,8 @@ def audit_numbers_extractor_no_eager_tile_source_topology(
     migration is completed.  This focused ratchet prevents production code from
     reconstructing complete ``tst::Tile`` or ``tst::TileRowInfo`` messages after
     the bounded tile projection has already validated the payload.  Test-only
-    Prost oracles and builders remain available below the first ``cfg(test)``
-    module.
+    Prost oracles and builders remain in cfg(test)-gated items outside the
+    production source slice.
     """
 
     violations: list[str] = []
@@ -10604,12 +10837,7 @@ def audit_numbers_extractor_no_eager_tile_source_topology(
         return violations
 
     raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
     for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_TILE_SOURCE_PATTERNS:
         for match in pattern.finditer(production_code):
             line_number = production_code.count("\n", 0, match.start()) + 1
@@ -10631,7 +10859,7 @@ def audit_numbers_extractor_no_eager_table_data_list_source_topology(
     ``TableDataList`` message in production would bypass those limits after
     projection and retain the complete legacy envelope.  The checker is
     intentionally scoped to the extractor's production slice: test-only
-    Prost oracles remain available below the first ``cfg(test)`` module, while
+    Prost oracles remain available in cfg(test)-gated items, while
     handwritten ``decode_table_data_list*`` helpers and unrelated generated
     readers are not part of this ratchet.
     """
@@ -10642,12 +10870,7 @@ def audit_numbers_extractor_no_eager_table_data_list_source_topology(
         return violations
 
     raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
     for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_TABLE_DATA_LIST_SOURCE_PATTERNS:
         for match in pattern.finditer(production_code):
             line_number = production_code.count("\n", 0, match.start()) + 1
@@ -11051,7 +11274,7 @@ def audit_numbers_extractor_no_eager_comment_storage_source_topology(
     envelope, including the unbounded replies vector, before the strict
     comment budgets are applied.  The audit is scoped to this extractor and
     its production slice: canonical generated fixtures remain available in
-    the test-only module, and the retired ``litchi-iwa`` implementation is
+    cfg(test)-gated items, and the retired ``litchi-iwa`` implementation is
     intentionally outside this focused boundary.
     """
 
@@ -11061,12 +11284,7 @@ def audit_numbers_extractor_no_eager_comment_storage_source_topology(
         return violations
 
     raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
     for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_COMMENT_STORAGE_SOURCE_PATTERNS:
         for match in pattern.finditer(production_code):
             line_number = production_code.count("\n", 0, match.start()) + 1
@@ -11119,8 +11337,8 @@ def audit_numbers_names_package_no_eager_prost_source_topology(
     reader.  Its wire projections must go through the bounded Buffa codecs;
     generated archive ``decode`` calls are retained only in an explicitly
     test-gated module for differential fixtures.  The source slice is
-    therefore stopped at the first ``cfg(test)`` item, matching the package
-    ingress ratchet above.
+    therefore excludes cfg(test)-gated items from the production source
+    slice, matching the package ingress ratchet above.
     """
 
     violations: list[str] = []
@@ -11129,12 +11347,7 @@ def audit_numbers_names_package_no_eager_prost_source_topology(
         return violations
 
     raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
     for label, pattern in NUMBERS_NAMES_NO_EAGER_PROST_SOURCE_PATTERNS:
         for match in pattern.finditer(production_code):
             line_number = production_code.count("\n", 0, match.start()) + 1
@@ -12572,6 +12785,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_chart_title_legacy_calls()
         + audit_iwa_keynote_chart_title_source_topology()
         + audit_keynote_document_public_api()
+        + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()

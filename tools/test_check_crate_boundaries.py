@@ -9860,6 +9860,359 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_numbers_identity_boundary_accepts_strict_reject_all_index(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { locators: Box<[Locator]> }\n"
+                "fn build(locators: &[Locator]) {\n"
+                "    if locators.windows(2).any(|pair| {\n"
+                "        pair[0].identifier == pair[1].identifier\n"
+                "    }) {\n"
+                "        return Err(Error::InvalidFormat);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_identity_boundary_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_rejects_first_wins_deduplication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { locators: Box<[Locator]> }\n"
+                "fn build(locators: &mut Vec<Locator>) {\n"
+                "    locators.dedup_by_key(|locator| locator.identifier);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must reject duplicate object identities" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must call same_content_ignoring_offsets" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("same-component duplicate identities" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("physical object count" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_accepts_exact_cross_component_alias_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index {\n"
+                "    physical_object_count: usize,\n"
+                "    locators: Box<[Locator]>,\n"
+                "}\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) {\n"
+                "            return Err(Error::Divergent);\n"
+                "        }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    let comparison_work = comparison_work(object_count);\n"
+                "    object_count.saturating_mul(comparison_work)\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.original_header == other.original_header\n"
+                "            && self.original_canonical_header == other.original_canonical_header\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_identity_boundary_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_rejects_decoded_only_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) { return Err(Error::Divergent); }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    let comparison_work = comparison_work(object_count);\n"
+                "    object_count.saturating_mul(comparison_work)\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("omits header_length" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("omits original_canonical_header" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_rejects_offset_comparison_in_core_helper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) { return Err(Error::Divergent); }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    let comparison_work = comparison_work(object_count);\n"
+                "    object_count.saturating_mul(comparison_work)\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.original_header == other.original_header\n"
+                "            && self.original_canonical_header == other.original_canonical_header\n"
+                "            && self.offset == other.offset\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("compares an offset", violations[0])
+
+    def test_numbers_identity_boundary_rejects_unique_rebuild_work_term(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) { return Err(Error::Divergent); }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    object_count.saturating_mul(self.lookup_work())\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.original_header == other.original_header\n"
+                "            && self.original_canonical_header == other.original_canonical_header\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("not unique lookup_work" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("explicit physical comparison-work term" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_requires_same_component_guard_and_semantics(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.archive_info != right.archive_info ||\n"
+                "            left.messages != right.messages { continue; }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn aliases() { locators.dedup_by_key(|locator| locator.identifier); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must call same_content_ignoring_offsets" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("same-component duplicate identities" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_rejects_public_raw_id_api_but_masks_cfg_test(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "pub fn object_id(&self) -> u64 { 1 }\n"
+                "pub fn object_id(&self) -> u64 { 2 }\n"
+                "pub fn semantic_sheet(&self) {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("raw object identity", violations[0])
+            self.assertIn(":3", violations[0])
+
+    def test_numbers_identity_boundary_scans_nested_package_owner_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_SOURCE_ROOT / "package" / "nested.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "pub fn object_identifier(&self) -> u64 { 1 }\n"
+                "pub fn resolve_ref_id(&self, identifier: u64) -> u64 { identifier }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("resolve_ref_id", violations[0])
+            self.assertIn("package/nested.rs", violations[0])
+
+    def test_numbers_package_test_import_cannot_hide_production_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use litchi_iwa_protos::tn;\n"
+                "fn production(bytes: &[u8]) {\n"
+                "    let _ = tn::DocumentArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_package_no_eager_prost_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("DocumentArchive::decode", violations[0])
+            self.assertIn(":4", violations[0])
+
     def test_focused_numbers_package_no_eager_prost_allows_dev_only_manifest(
         self,
     ) -> None:
