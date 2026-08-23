@@ -1282,6 +1282,15 @@ fn project_body_footnotes(
     max_text_bytes: usize,
 ) -> PackageResult<Vec<Footnote>> {
     let mut semantic_budget = FootnoteSemanticBudget::new(max_text_bytes);
+    project_body_footnotes_with_budget(components, limits, max_text_bytes, &mut semantic_budget)
+}
+
+fn project_body_footnotes_with_budget(
+    components: &ComponentCatalog,
+    limits: Limits,
+    max_text_bytes: usize,
+    semantic_budget: &mut FootnoteSemanticBudget,
+) -> PackageResult<Vec<Footnote>> {
     let root_references = root_references_with_limits(components, limits)?;
     let Some(body_identifier) = root_references.body else {
         return Ok(Vec::new());
@@ -1347,13 +1356,8 @@ fn project_body_footnotes(
         }
         seen_references.push(entry.identifier);
         validate_body_footnote_anchor(body_storage.text(), body_identifier, entry.character_index)?;
-        let (footnote, storage_identifier, marker_identifier) = project_one_body_footnote(
-            components,
-            limits,
-            max_text_bytes,
-            entry,
-            &mut semantic_budget,
-        )?;
+        let (footnote, storage_identifier, marker_identifier) =
+            project_one_body_footnote(components, limits, max_text_bytes, entry, semantic_budget)?;
         if entry.identifier == storage_identifier
             || entry.identifier == marker_identifier
             || seen_storages.contains(&storage_identifier)
@@ -3359,6 +3363,46 @@ mod tests {
         ));
         // A rejected charge must not consume the exact-cap allowance.
         budget.charge(0, 0)?;
+        Ok(())
+    }
+
+    #[test]
+    fn footnote_projection_budget_spans_source_and_candidate() -> PackageResult<()> {
+        let package = Package::from_bytes(&body_footnote_package_bytes()?)?;
+        let source_bytes = package.source_bytes().to_vec();
+        let maximum = 14;
+        let mut budget = FootnoteSemanticBudget::new(maximum);
+
+        let source = project_body_footnotes_with_budget(
+            package.state.source.components(),
+            package.state.source.limits(),
+            maximum,
+            &mut budget,
+        )?;
+        assert_eq!(source.len(), 2);
+        assert_eq!(budget.retained_bytes, maximum);
+
+        let error = project_body_footnotes_with_budget(
+            package.state.source.components(),
+            package.state.source.limits(),
+            maximum,
+            &mut budget,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("a second exact-cap projection must be rejected"));
+        assert!(matches!(
+            error,
+            PackageError::PayloadLimit {
+                observed: 19,
+                limit: 14,
+            }
+        ));
+        // The rejected next-byte charge does not consume the exact-cap
+        // allowance, and the immutable source was never modified.
+        budget.charge(0, 0)?;
+        assert_eq!(package.source_bytes(), source_bytes.as_slice());
+        assert_eq!(source[0].text.as_ref(), "First");
+        assert_eq!(package.body_footnotes()?[0].text.as_ref(), "First");
         Ok(())
     }
 

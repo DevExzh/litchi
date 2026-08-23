@@ -567,11 +567,11 @@ impl<'source> FootnoteObjectLocations<'source> {
         }
 
         let mut objects = HashMap::new();
-        objects.try_reserve_exact(object_count).map_err(|_error| {
-            FootnoteTextError::Allocation {
+        objects
+            .try_reserve(object_count)
+            .map_err(|_error| FootnoteTextError::Allocation {
                 amount: object_count,
-            }
-        })?;
+            })?;
         for component in components.iter() {
             for object in &component.archive().objects {
                 if let Some(identifier) = object.archive_info.identifier {
@@ -1441,8 +1441,27 @@ fn verify_candidate(
     // aggregate semantic refusal from a wire-level refusal.
     let source_graphs = native_footnotes(source)?;
     let candidate_graphs = native_footnotes(candidate)?;
-    let before = source.body_footnotes().map_err(map_package_error)?;
-    let after = candidate.body_footnotes().map_err(map_package_error)?;
+    // The source and candidate are both retained until the complete semantic
+    // readback below succeeds. Share one budget across their projections so
+    // two individually-valid collections cannot exceed the retained-text
+    // ceiling together. Each projection charges before it owns any footnote
+    // strings, and a rejected charge leaves the shared allowance unchanged.
+    let max_text_bytes = effective_text_limit(source.state.source.limits());
+    let mut semantic_budget = super::FootnoteSemanticBudget::new(max_text_bytes);
+    let before = super::project_body_footnotes_with_budget(
+        source.state.source.components(),
+        source.state.source.limits(),
+        max_text_bytes,
+        &mut semantic_budget,
+    )
+    .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::TextBytes))?;
+    let after = super::project_body_footnotes_with_budget(
+        candidate.state.source.components(),
+        candidate.state.source.limits(),
+        max_text_bytes,
+        &mut semantic_budget,
+    )
+    .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::TextBytes))?;
     if before.len() != after.len() {
         return Err(FootnoteTextError::Verification);
     }
@@ -1865,6 +1884,22 @@ mod tests {
                 maximum: 4,
             }
         );
+
+        let aggregate_error = map_package_error_with_kind(
+            PackageError::PayloadLimit {
+                observed: 19,
+                limit: 14,
+            },
+            FootnoteTextLimitKind::TextBytes,
+        );
+        assert_eq!(
+            aggregate_error,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: 19,
+                maximum: 14,
+            }
+        );
     }
 
     #[test]
@@ -2003,7 +2038,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("unrelated object: {error}"));
         let mut objects = HashMap::new();
         objects
-            .try_reserve_exact(3)
+            .try_reserve(3)
             .unwrap_or_else(|error| panic!("location reservation: {error}"));
         objects.entry(7).or_insert(&first);
         objects.entry(7).or_insert(&duplicate);
