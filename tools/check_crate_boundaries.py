@@ -2763,6 +2763,23 @@ IWA_NUMBERS_LEGACY_METHOD_SOURCE = (
 IWA_NUMBERS_LEGACY_METHODS = frozenset(
     {"cell_comment", "set_cell_comment", "clear_cell_comment"}
 )
+IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "selectors.rs"
+)
+IWA_NUMBERS_CELL_COMMENT_SOURCE_FILES = (
+    IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE,
+    IWA_NUMBERS_CELL_COMMENT_SELECTOR_SOURCE,
+    IWA_NUMBERS_SOURCE_ROOT / "editor.rs",
+)
+IWA_NUMBERS_CELL_COMMENT_HOST_METHOD = "set_cell_comment"
+IWA_NUMBERS_CELL_COMMENT_FOCUSED_METHOD = "set_table_cell_comment"
+IWA_NUMBERS_CELL_COMMENT_LEGACY_HELPER = "set_cell_comment_in_package"
+IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS = frozenset(
+    {"UnsupportedDependency", "CommentNotFound"}
+)
 RETIRED_IWA_NUMBERS_DOCUMENT_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "document.rs"
 RETIRED_IWA_NUMBERS_DOCUMENT_TYPES = (
     "NumbersDocument",
@@ -9825,6 +9842,225 @@ def audit_iwa_numbers_table_cell_mutation_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_cell_comment_delegation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retained Numbers comment writer on the focused owner seam.
+
+    ``NumbersEditor::set_cell_comment`` is a deprecated compatibility entry
+    point.  It may retain the old archive writer for comment graphs that the
+    focused package cannot yet own, but every supported existing-root
+    replacement must first cross the selector-first ``litchi-numbers`` seam.
+    This is deliberately a call-graph check: a disconnected helper or a
+    test-only focused call must not satisfy the migration boundary.
+
+    The companion Numbers identity audit rejects raw native identities from
+    the focused package's public declarations.  Here we additionally reject
+    native IDs at the host-to-focused call itself; only scoped selectors and a
+    semantic cell position may cross that seam.
+    """
+
+    source_paths = tuple(
+        root / relative
+        for relative in IWA_NUMBERS_CELL_COMMENT_SOURCE_FILES
+        if (root / relative).is_file()
+    )
+    if not source_paths:
+        return []
+
+    def function_bodies(
+        source: str,
+    ) -> dict[str, list[tuple[str, int]]]:
+        """Return every function body, including methods nested in impls."""
+
+        code = _mask_rust_non_code(source)
+        bodies: dict[str, list[tuple[str, int]]] = {}
+        for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+            opening = code.find("{", declaration.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            name = declaration.group(1)
+            bodies.setdefault(name, []).append(
+                (code[opening + 1 : cursor - 1], opening + 1)
+            )
+        return bodies
+
+    production_sources: dict[Path, str] = {}
+    functions: dict[str, list[tuple[Path, str, int]]] = {}
+    for path in source_paths:
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        production_sources[path] = source
+        for name, records in function_bodies(source).items():
+            functions.setdefault(name, []).extend(
+                (path, body, body_offset) for body, body_offset in records
+            )
+
+    violations: list[str] = []
+    host_records = functions.get(IWA_NUMBERS_CELL_COMMENT_HOST_METHOD, [])
+    if not host_records:
+        return [
+            "litchi-iwa Numbers cell-comment compatibility writer is missing "
+            f"production {IWA_NUMBERS_CELL_COMMENT_HOST_METHOD}: "
+            f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+        ]
+
+    # Resolve local helper calls from the deprecated host method.  Methods in
+    # ``selectors.rs`` are included even though they are not top-level Rust
+    # functions, while cfg(test) items were masked before this graph was built.
+    pending = [
+        (IWA_NUMBERS_CELL_COMMENT_HOST_METHOD, path, body, body_offset)
+        for path, body, body_offset in host_records
+    ]
+    reachable: list[tuple[str, Path, str, int]] = []
+    visited: set[tuple[str, Path, int]] = set()
+    while pending:
+        current_name, path, body, body_offset = pending.pop()
+        visit_key = (current_name, path, body_offset)
+        if visit_key in visited:
+            continue
+        visited.add(visit_key)
+        reachable.append((current_name, path, body, body_offset))
+        for helper_name, records in functions.items():
+            if helper_name == current_name:
+                continue
+            call = re.compile(
+                rf"(?<![A-Za-z0-9_:#])(?:"
+                rf"(?:crate|self|super|selectors|table)[ \t\r\n]*::[ \t\r\n]*"
+                rf")*(?:r#)?{re.escape(helper_name)}"
+                r"[ \t\r\n]*\("
+            )
+            if call.search(body) is None:
+                continue
+            pending.extend(
+                (helper_name, helper_path, helper_body, helper_offset)
+                for helper_path, helper_body, helper_offset in records
+            )
+
+    route_body = "\n".join(body for _name, _path, body, _offset in reachable)
+    focused_call = re.search(
+        rf"(?<![A-Za-z0-9_:#])(?:r#)?"
+        rf"{re.escape(IWA_NUMBERS_CELL_COMMENT_FOCUSED_METHOD)}"
+        r"[ \t\r\n]*\(",
+        route_body,
+    )
+    if focused_call is None:
+        path, _body, body_offset = host_records[0]
+        source = production_sources[path]
+        line_number = source.count("\n", 0, body_offset) + 1
+        violations.append(
+            "litchi-iwa Numbers cell-comment writer does not reach focused "
+            f"Package::{IWA_NUMBERS_CELL_COMMENT_FOCUSED_METHOD}: "
+            f"{path.relative_to(root)}:{line_number}"
+        )
+
+    if re.search(
+        r"(?<![A-Za-z0-9_])(?:litchi_numbers[ \t\r\n]*::[ \t\r\n]*)?"
+        r"(?:Package|FocusedNumbersPackage)[ \t\r\n]*::[ \t\r\n]*"
+        r"from_bytes[ \t\r\n]*\(",
+        route_body,
+    ) is None:
+        violations.append(
+            "litchi-iwa Numbers cell-comment focused route must parse through "
+            "litchi_numbers::Package::from_bytes"
+        )
+
+    selector_requirements = (
+        ("SheetSelector::index", r"\bSheetSelector[ \t\r\n]*::[ \t\r\n]*index\b"),
+        ("TableSelector::index", r"\bTableSelector[ \t\r\n]*::[ \t\r\n]*index\b"),
+        (
+            "CellPosition::try_from_usize",
+            r"\bCellPosition[ \t\r\n]*::[ \t\r\n]*try_from_usize\b",
+        ),
+    )
+    for label, pattern in selector_requirements:
+        if re.search(pattern, route_body) is not None:
+            continue
+        violations.append(
+            "litchi-iwa Numbers cell-comment focused route is missing "
+            f"selector-first {label} mapping"
+        )
+
+    if re.search(
+        rf"(?<![A-Za-z0-9_]){re.escape(IWA_NUMBERS_CELL_COMMENT_LEGACY_HELPER)}"
+        r"[ \t\r\n]*\(",
+        route_body,
+    ) is None:
+        violations.append(
+            "litchi-iwa Numbers cell-comment writer must retain the explicit "
+            f"{IWA_NUMBERS_CELL_COMMENT_LEGACY_HELPER} fallback"
+        )
+
+    for fallback in sorted(IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS):
+        if re.search(rf"\b{re.escape(fallback)}\b", route_body) is not None:
+            continue
+        violations.append(
+            "litchi-iwa Numbers cell-comment focused fallback must explicitly "
+            f"handle litchi-numbers comments::Error::{fallback}"
+        )
+
+    # A broad ``Err(_) => Ok(false)`` (or equivalent variable wildcard) would
+    # silently send malformed, limit, and patch-conflict sources through the
+    # old writer.  Only the two named compatibility cases may authorize the
+    # fallback.  Keep the check local to a short arm window so a legitimate
+    # unrelated error propagation elsewhere in the route is not rejected.
+    broad_fallback = re.compile(
+        r"Err[ \t\r\n]*\([ \t\r\n]*(?:_|\.\.\.|"
+        r"[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\)[ \t\r\n]*=>"
+        r"[\s\S]{0,220}?(?:"
+        r"\b(?:return[ \t\r\n]+)?Ok[ \t\r\n]*\([ \t\r\n]*false"
+        r"|\b(?:LegacyFallback|legacy_fallback)\b"
+        r")",
+    )
+    for match in broad_fallback.finditer(route_body):
+        snippet = route_body[match.start() : match.end()]
+        if any(
+            re.search(rf"\b{re.escape(allowed)}\b", snippet)
+            for allowed in IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS
+        ):
+            continue
+        violations.append(
+            "litchi-iwa Numbers cell-comment fallback must not treat every "
+            "focused error as legacy-compatible"
+        )
+
+    # The focused owner accepts only semantic selectors and CellPosition. A
+    # native table/object identifier in the actual method argument list would
+    # bypass the scoped mapping even if a selector helper exists elsewhere.
+    if focused_call is not None:
+        cursor = focused_call.end()
+        depth = 1
+        while cursor < len(route_body) and depth:
+            if route_body[cursor] == "(":
+                depth += 1
+            elif route_body[cursor] == ")":
+                depth -= 1
+            cursor += 1
+        if depth == 0:
+            arguments = route_body[focused_call.end() : cursor - 1]
+            raw_argument = re.search(
+                r"\b(?:table_id|native_id|object_id|object_identifier|"
+                r"raw_object_id|raw_object_identifier)\b",
+                arguments,
+            )
+            if raw_argument is not None:
+                violations.append(
+                    "litchi-iwa Numbers cell-comment focused call passes a raw "
+                    f"native identifier ({raw_argument.group(0)}) instead of selectors"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Numbers table-lock APIs out of their former host scopes."""
 
@@ -13277,6 +13513,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_cells_facade_source_topology()
         + audit_numbers_table_cells_mutation_facade_source_topology()
         + audit_iwa_numbers_table_cell_mutation_source_topology()
+        + audit_iwa_numbers_cell_comment_delegation_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_numbers_document_source_topology()
