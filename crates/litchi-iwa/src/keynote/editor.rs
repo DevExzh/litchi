@@ -101,7 +101,17 @@ const MAX_OPERATION_CACHED_DRAWABLE_STORAGES: usize = 1_024;
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeynoteSlideInfo {
     pub index: usize,
+    /// Native slide-node object identity retained for migration-host graph work.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy native Keynote slide-node object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility"
+    )]
     pub node_id: u64,
+    /// Native slide object identity retained for migration-host graph work.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy native Keynote slide object ID; use litchi_keynote::Package slide selectors for semantic slide reads and edits; retained for migration-host compatibility"
+    )]
     pub slide_id: u64,
     pub name: Option<String>,
     /// Theme layout currently selected for this slide.

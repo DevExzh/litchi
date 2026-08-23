@@ -1459,6 +1459,8 @@ class BoundaryPolicyTests(unittest.TestCase):
             host.parent.mkdir(parents=True)
             host.write_text(
                 "pub struct KeynoteSlideInfo {\n"
+                "    pub node_id: u64,\n"
+                "    pub slide_id: u64,\n"
                 "    pub title_storage_id: Option<TextStorageId>,\n"
                 "    #[allow(dead_code)]\n"
                 "    pub body_storage_id: Option<TextStorageId>,\n"
@@ -1473,15 +1475,25 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [
                     "litchi-iwa Keynote slide info native field must remain deprecated "
                     "body_storage_id: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:4",
+                    "crates/litchi-iwa/src/keynote/editor.rs:6",
+                    "litchi-iwa Keynote slide info native field must remain deprecated "
+                    "node_id: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:2",
+                    "litchi-iwa Keynote slide info native field must remain deprecated "
+                    "slide_id: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:3",
                     "litchi-iwa Keynote slide info native field must remain deprecated "
                     "title_storage_id: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:2",
+                    "crates/litchi-iwa/src/keynote/editor.rs:4",
                 ],
             )
 
             host.write_text(
                 "pub struct KeynoteSlideInfo {\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub node_id: u64,\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub slide_id: u64,\n"
                 "    #[deprecated(note = \"compatibility\")]\n"
                 "    pub title_storage_id: Option<TextStorageId>,\n"
                 "    #[deprecated(note = \"compatibility\")]\n"
