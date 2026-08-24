@@ -10065,7 +10065,16 @@ class BoundaryPolicyTests(unittest.TestCase):
                 + "\nimpl Package {\n"
                 "    pub fn slide_chart_caption(&self) {}\n"
                 "    pub fn edit_slide_chart_caption(&self) {}\n"
-                "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -10074,18 +10083,44 @@ class BoundaryPolicyTests(unittest.TestCase):
                 + "impl ChartCaptionEdit {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
-                "    pub fn commit(self) {}\n"
+                "    pub fn commit(self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        rewrite_chart_caption_operation(true, false, &mut budget);\n"
+                "    }\n"
                 "}\n"
-                "fn rewrite_chart_caption_operation(creating: bool, removing: bool) {\n"
+                "struct ChartCaptionPackageBudget;\n"
+                "impl ChartCaptionPackageBudget {\n"
+                "    fn new() -> Self { Self }\n"
+                "    fn charge_codec_report(&mut self, _report: ()) {}\n"
+                "    fn charge_archive_work(&mut self) {}\n"
+                "    fn charge_snappy_work(&mut self) {}\n"
+                "    fn charge_zip_work(&mut self) {}\n"
+                "    fn charge_reopen_work(&mut self) {}\n"
+                "    fn charge_artifact_work(&mut self) {}\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool, budget: &mut ChartCaptionPackageBudget) {\n"
                 "    if !creating && !removing {\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
                 "        rewrite_package_metadata_save_tokens();\n"
                 "        return Ok(());\n"
                 "    }\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
                 "    validate_canonical_object_framing();\n"
                 "}\n"
-                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64) {\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64, budget: &mut ChartCaptionPackageBudget) {\n"
                 "    validate_selected_message_metadata();\n"
                 "    let payload = object.messages[0].data.clone();\n"
+                "    budget.charge_codec_report(());\n"
                 "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
                 "    object.replace_message_transitioning_object_references_preserving_header_with_limits(payload);\n"
                 "}\n",
@@ -10123,7 +10158,16 @@ class BoundaryPolicyTests(unittest.TestCase):
                 + "\nimpl Package {\n"
                 "    pub fn slide_chart_caption(&self) {}\n"
                 "    pub fn edit_slide_chart_caption(&self) {}\n"
-                "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
                 "}\n"
                 "impl ChartCaptionEdit {\n"
                 "    pub fn set(self) {}\n"
@@ -10158,16 +10202,39 @@ class BoundaryPolicyTests(unittest.TestCase):
             owner.parent.mkdir(parents=True)
             canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
             helper = (
-                "fn rewrite_chart_caption_operation(creating: bool, removing: bool) {\n"
+                "struct ChartCaptionPackageBudget;\n"
+                "impl ChartCaptionPackageBudget {\n"
+                "    fn new() -> Self { Self }\n"
+                "    fn charge_codec_report(&mut self, _report: ()) {}\n"
+                "    fn charge_archive_work(&mut self) {}\n"
+                "    fn charge_snappy_work(&mut self) {}\n"
+                "    fn charge_zip_work(&mut self) {}\n"
+                "    fn charge_reopen_work(&mut self) {}\n"
+                "    fn charge_artifact_work(&mut self) {}\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool, budget: &mut ChartCaptionPackageBudget) {\n"
                 "    if !creating && !removing {\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
                 "        rewrite_package_metadata_save_tokens();\n"
                 "        return Ok(());\n"
                 "    }\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
                 "    validate_canonical_object_framing();\n"
                 "}\n"
-                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64) {\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64, budget: &mut ChartCaptionPackageBudget) {\n"
                 "    validate_selected_message_metadata();\n"
                 "    let payload = object.messages[0].data.clone();\n"
+                "    budget.charge_codec_report(());\n"
                 "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
                 "    object.replace_message_transitioning_object_references_preserving_header_with_limits(payload);\n"
                 "}\n"
@@ -10177,12 +10244,24 @@ class BoundaryPolicyTests(unittest.TestCase):
                 + "\nimpl Package {\n"
                 "    pub fn slide_chart_caption(&self) {}\n"
                 "    pub fn edit_slide_chart_caption(&self) {}\n"
-                "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
                 "}\n"
                 "impl ChartCaptionEdit {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
-                "    pub fn commit(self) {}\n"
+                "    pub fn commit(self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        rewrite_chart_caption_operation(true, false, &mut budget);\n"
+                "    }\n"
                 "}\n"
                 + helper,
                 encoding="utf-8",
@@ -10276,6 +10355,158 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertIn(
             "+ audit_keynote_chart_caption_facade_source_topology()", main_source
         )
+
+    def test_focused_keynote_chart_caption_requires_one_aggregate_budget_and_masks_decoys(
+        self,
+    ) -> None:
+        """Keep every publication path under one bounded package transaction."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
+            library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            owner.parent.mkdir(parents=True)
+            canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nstruct ChartCaptionPackageBudget;\n"
+                "impl ChartCaptionPackageBudget {\n"
+                "    fn new() -> Self { Self }\n"
+                "    fn charge_codec_report(&mut self, _report: ()) {}\n"
+                "    fn charge_archive_work(&mut self) {}\n"
+                "    fn charge_snappy_work(&mut self) {}\n"
+                "    fn charge_zip_work(&mut self) {}\n"
+                "    fn charge_reopen_work(&mut self) {}\n"
+                "    fn charge_artifact_work(&mut self) {}\n"
+                "}\n"
+                "impl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
+                "}\n"
+                "impl ChartCaptionEdit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        rewrite_chart_caption_operation(true, false, &mut budget);\n"
+                "    }\n"
+                "}\n"
+                "fn verify_caption_candidate(budget: &mut ChartCaptionPackageBudget) {\n"
+                "    budget.charge_reopen_work();\n"
+                "}\n"
+                "fn rewrite_existing_caption_text_with_metadata(budget: &mut ChartCaptionPackageBudget) {\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
+                "    rewrite_package_metadata_save_tokens();\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    if !creating && !removing {\n"
+                "        rewrite_existing_caption_text_with_metadata(budget);\n"
+                "        return Ok(());\n"
+                "    }\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
+                "    validate_canonical_object_framing();\n"
+                "    patch_chart_caption_edge(expected_identifier, replacement_identifier, budget);\n"
+                "}\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    validate_selected_message_metadata();\n"
+                "    budget.charge_codec_report(());\n"
+                "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header_with_limits(message);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "pub fn test_only_raw(native_resource_id: Option<u64>) {\n"
+                "    budget.charge_archive_work();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            exports = ", ".join(canonical)
+            package.write_text(
+                "mod slide_chart_caption;\n"
+                f"pub use slide_chart_caption::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            library.write_text(
+                f"pub use package::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root), []
+            )
+
+            invalid = owner.read_text(encoding="utf-8").replace(
+                "struct ChartCaptionPackageBudget;", "pub struct ChartCaptionPackageBudget;"
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertEqual(violations, [])
+            owner.write_text(invalid, encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("private aggregate package budget" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                invalid.replace("pub struct ChartCaptionPackageBudget;", "struct ChartCaptionPackageBudget;")
+                .replace("budget.charge_snappy_work();", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("prepublication snappy work" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "budget.charge_codec_report(());",
+                    "budget.charge_codec_report(());\n"
+                    "    budget.charge_snappy_work();",
+                ),
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_caption(native_resource_id: Option<u64>) -> ChartCaptionEdit { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("raw resource/native identifier" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn raw_caption(native_resource_id: Option<u64>) -> ChartCaptionEdit { todo!() }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root),
+                [],
+            )
 
     def test_focused_numbers_package_no_eager_prost_allows_test_only_usage(
         self,

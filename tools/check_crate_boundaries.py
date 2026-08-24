@@ -337,6 +337,8 @@ KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION_MARKERS = frozenset(
 )
 KEYNOTE_CHART_CAPTION_SAVE_TOKEN_REWRITE_MARKERS = frozenset(
     {
+        "prepare_package_metadata_additions_and_save_tokens",
+        "prepare_package_metadata_save_tokens",
         "rewrite_package_metadata_additions_and_save_tokens",
         "rewrite_package_metadata_save_tokens",
     }
@@ -356,6 +358,56 @@ KEYNOTE_CHART_CAPTION_EXTERNAL_REFERENCE_MARKERS = frozenset(
         "visit_external_reference",
         "external_ref",
     }
+)
+# The package owner is allowed to use physical/archive helpers privately, but
+# every graph transition must run under one transaction-local aggregate budget.
+# Keep these markers semantic rather than tying the ratchet to a concrete
+# implementation type: a future owner may call it ``ChartCaptionBudget`` or
+# ``CaptionPackageBudget`` while retaining the same accounting contract.
+KEYNOTE_CHART_CAPTION_PACKAGE_BUDGET_TYPE = re.compile(
+    r"(?m)^[ \t]*(?!pub(?:[ \t]+\([^)]*\))?[ \t]+)struct[ \t]+"
+    r"(?P<name>(?:Chart|Caption|Package)[A-Za-z0-9_]*Budget)\b"
+)
+KEYNOTE_CHART_CAPTION_CODEC_REPORT_CHARGE = re.compile(
+    r"\b(?:budget|package_budget|aggregate_budget|transaction_budget)"
+    r"[ \t]*(?:\.[ \t]*|::[ \t]*)"
+    r"(?:charge|account)[A-Za-z0-9_]*(?:codec|wire|graph|metadata)[A-Za-z0-9_]*report\b"
+    r"|\b(?:charge|account)_[A-Za-z0-9_]*(?:codec|wire|graph|metadata)"
+    r"[A-Za-z0-9_]*report\b"
+)
+KEYNOTE_CHART_CAPTION_RESOURCE_CHARGES = {
+    "archive": re.compile(
+        r"\b(?:charge|account|reserve)[A-Za-z0-9_]*(?:archive|iwa)"
+        r"[A-Za-z0-9_]*\b|\b(?:archive|iwa)[A-Za-z0-9_]*"
+        r"(?:charge|account|reserve)[A-Za-z0-9_]*\b"
+    ),
+    "snappy": re.compile(
+        r"\b(?:charge|account|reserve)[A-Za-z0-9_]*"
+        r"(?:snappy|compress|decompress)[A-Za-z0-9_]*\b|\b(?:snappy|compress|decompress)"
+        r"[A-Za-z0-9_]*(?:charge|account|reserve)[A-Za-z0-9_]*\b"
+    ),
+    "zip": re.compile(
+        r"\b(?:charge|account|reserve)[A-Za-z0-9_]*(?:zip|reassembl|entry)[A-Za-z0-9_]*\b"
+        r"|\b(?:zip|reassembl|entry)[A-Za-z0-9_]*(?:charge|account|reserve)[A-Za-z0-9_]*\b"
+    ),
+    "reopen": re.compile(
+        r"\b(?:charge|account|reserve)[A-Za-z0-9_]*(?:reopen|candidate|verify|reparse)"
+        r"[A-Za-z0-9_]*\b|\b(?:reopen|candidate|verify|reparse)[A-Za-z0-9_]*"
+        r"(?:charge|account|reserve)[A-Za-z0-9_]*\b"
+    ),
+    "artifact": re.compile(
+        r"\b(?:charge|account|reserve)[A-Za-z0-9_]*(?:artifact|exact)"
+        r"[A-Za-z0-9_]*\b|\b(?:artifact|exact)[A-Za-z0-9_]*"
+        r"(?:charge|account|reserve)[A-Za-z0-9_]*\b"
+    ),
+}
+KEYNOTE_CHART_CAPTION_RAW_RESOURCE_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|caption|storage|reference|placement|style|chart|"
+    r"resource|native|archive|message|component|entry|metadata|package|uuid)"
+    r"[A-Za-z_]*(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
 )
 KEYNOTE_CHART_CAPTION_GRAPH_MARKERS = frozenset(
     {
@@ -13869,6 +13921,188 @@ def audit_keynote_chart_caption_facade_source_topology(
         return bodies
 
     owner_functions = function_bodies(owner_code)
+    owner_function_map = {name: body for name, body, _offset in owner_functions}
+
+    def function_signature(name: str) -> str:
+        declaration = re.search(
+            rf"(?<![A-Za-z0-9_#])fn[ \t\r\n]+(?:r#)?{re.escape(name)}\b",
+            owner_code,
+        )
+        if declaration is None:
+            return ""
+        opening = owner_code.find("{", declaration.end())
+        return owner_code[declaration.start() : opening] if opening >= 0 else ""
+
+    def called_function_names(body: str) -> set[str]:
+        return {
+            match.group(1)
+            for match in re.finditer(
+                r"(?<![A-Za-z0-9_#])(?:self[ \t\r\n]*\.[ \t\r\n]*)?"
+                r"([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\(",
+                body,
+            )
+        }
+
+    def reachable_bodies(seed_names: set[str]) -> list[str]:
+        reachable: list[str] = []
+        visited: set[str] = set()
+        pending = list(seed_names)
+        while pending:
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            body = owner_function_map.get(name)
+            if body is None:
+                continue
+            # Retain the helper name as an accounting marker. Resource charge
+            # helpers deliberately keep their semantic category in the name,
+            # while their bodies may operate only on generic byte counters.
+            reachable.append(f"fn {name}\n{body}")
+            pending.extend(called_function_names(body) - visited)
+        return reachable
+
+    budget_declarations = list(
+        KEYNOTE_CHART_CAPTION_PACKAGE_BUDGET_TYPE.finditer(owner_code)
+    )
+    if not budget_declarations:
+        violations.append(
+            "focused litchi-keynote chart-caption owner is missing one private aggregate "
+            f"package budget: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
+        budget_name = None
+    else:
+        if len(budget_declarations) != 1:
+            violations.append(
+                "focused litchi-keynote chart-caption owner must define exactly one private "
+                f"aggregate package budget: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+            )
+        budget_name = budget_declarations[0].group("name")
+
+    def require_budget_thread(
+        name: str,
+        label: str,
+        *,
+        require_parameter: bool = True,
+    ) -> str | None:
+        body = owner_function_map.get(name)
+        if body is None:
+            violations.append(
+                "focused litchi-keynote chart-caption transaction is missing "
+                f"{label} function {name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+            )
+            return None
+        signature = function_signature(name)
+        if require_parameter and (
+            budget_name is None
+            or budget_name not in signature
+            or not re.search(
+                r"\b(?:budget|package_budget|aggregate_budget|transaction_budget)\b",
+                signature,
+            )
+        ):
+            violations.append(
+                "focused litchi-keynote chart-caption "
+                f"{label} must thread the private aggregate package budget: "
+                f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+            )
+        if not re.search(
+            r"\b(?:budget|package_budget|aggregate_budget|transaction_budget)\b",
+            body,
+        ):
+            violations.append(
+                "focused litchi-keynote chart-caption "
+                f"{label} must use the threaded aggregate package budget: "
+                f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+            )
+        return body
+
+    commit_body = require_budget_thread(
+        "commit", "commit", require_parameter=False
+    )
+    apply_body = require_budget_thread(
+        "apply_slide_chart_caption", "apply", require_parameter=False
+    )
+    if commit_body is not None and not re.search(
+        r"\brewrite_chart_caption_operation\b[^;{}]*\bbudget\b",
+        commit_body,
+        re.DOTALL,
+    ):
+        violations.append(
+            "focused litchi-keynote chart-caption commit must pass its one aggregate "
+            f"package budget into the graph/existing rewrite: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
+    if apply_body is not None and not re.search(
+        r"\bverify_caption_candidate\b[^;{}]*\bbudget\b",
+        apply_body,
+        re.DOTALL,
+    ):
+        violations.append(
+            "focused litchi-keynote chart-caption apply must pass its one aggregate "
+            f"package budget into candidate verification: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
+
+    def has_budget_charge(body: str, category: str) -> bool:
+        if KEYNOTE_CHART_CAPTION_RESOURCE_CHARGES[category].search(body):
+            return True
+        # Permit a generic charge method when the resource category is named
+        # in its argument.  This keeps the ratchet independent of whether the
+        # owner uses charge_archive_work or charge_bytes(archive_bytes, ...).
+        return re.search(
+            rf"(?is)\b(?:budget|package_budget|aggregate_budget|transaction_budget)\b"
+            rf".{{0,120}}\b(?:charge|account|reserve)\w*\b.{{0,120}}\b{category}\w*\b"
+            rf"|\b{category}\w*\b.{{0,120}}\b(?:charge|account|reserve)\w*\b",
+            body,
+        ) is not None
+
+    def require_transaction_charges(
+        path_label: str,
+        seed_names: set[str],
+        *,
+        require_codec_report: bool = True,
+        categories: tuple[str, ...] = ("archive", "snappy", "zip", "reopen", "artifact"),
+    ) -> None:
+        path_bodies = reachable_bodies(seed_names)
+        path_blob = "\n".join(path_bodies)
+        if require_codec_report and not KEYNOTE_CHART_CAPTION_CODEC_REPORT_CHARGE.search(path_blob):
+            violations.append(
+                "focused litchi-keynote chart-caption "
+                f"{path_label} must charge nested codec reports through the aggregate "
+                f"package budget: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+            )
+        for category in categories:
+            if not has_budget_charge(path_blob, category):
+                violations.append(
+                    "focused litchi-keynote chart-caption "
+                    f"{path_label} must charge prepublication {category} work through "
+                    f"the aggregate package budget: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+                )
+
+    for name, label in (
+        ("rewrite_chart_caption_operation", "graph create/remove"),
+    ):
+        if name in owner_function_map:
+            require_budget_thread(name, label)
+            require_transaction_charges(
+                label,
+                {name},
+                categories=("archive", "snappy", "zip", "reopen"),
+            )
+    if apply_body is not None:
+        require_transaction_charges(
+            "apply",
+            {"apply_slide_chart_caption"},
+            require_codec_report=False,
+            categories=("reopen", "artifact"),
+        )
+    if commit_body is not None and not has_budget_charge(
+        "\n".join(reachable_bodies({"commit"})), "artifact"
+    ):
+        violations.append(
+            "focused litchi-keynote chart-caption commit must charge exact-artifact work "
+            "through the aggregate package budget: "
+            f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
     operation = next(
         (
             (body, offset)
@@ -13929,11 +14163,17 @@ def audit_keynote_chart_caption_facade_source_topology(
                 )
             }
             reachable_branch_bodies = [branch_body]
-            reachable_branch_bodies.extend(
-                body
-                for name, body, _offset in owner_functions
-                if name in called_helpers
-            )
+            reachable_branch_bodies.extend(reachable_bodies(called_helpers))
+            existing_path_blob = "\n".join(reachable_branch_bodies)
+            if not re.search(
+                r"\b(?:budget|package_budget|aggregate_budget|transaction_budget)\b",
+                existing_path_blob,
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-caption existing-caption rewrite must "
+                    "thread the aggregate package budget: "
+                    f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+                )
             if not any(
                 marker in body
                 for body in reachable_branch_bodies
@@ -13947,6 +14187,19 @@ def audit_keynote_chart_caption_facade_source_topology(
                     "advance Metadata save tokens: "
                     f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
                 )
+            if not KEYNOTE_CHART_CAPTION_CODEC_REPORT_CHARGE.search(existing_path_blob):
+                violations.append(
+                    "focused litchi-keynote chart-caption existing-caption rewrite must "
+                    "charge nested codec reports through the aggregate package budget: "
+                    f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+                )
+            for category in ("archive", "snappy", "zip", "reopen"):
+                if not has_budget_charge(existing_path_blob, category):
+                    violations.append(
+                        "focused litchi-keynote chart-caption existing-caption rewrite "
+                        f"must charge prepublication {category} work through the aggregate "
+                        f"package budget: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+                    )
 
     transition = next(
         (
@@ -14108,6 +14361,14 @@ def audit_keynote_chart_caption_facade_source_topology(
                 violations.append(
                     "focused litchi-keynote chart-caption public API exposes "
                     f"raw identifier parameter {match.group(0).strip()}: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_CHART_CAPTION_RAW_RESOURCE_ID_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-caption public API exposes "
+                    f"raw resource/native identifier parameter {match.group(0).strip()}: "
                     f"{source_path.relative_to(root)}:{line_number}"
                 )
 

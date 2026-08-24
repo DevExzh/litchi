@@ -9,7 +9,9 @@ use litchi_iwa_core::{
     Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
-use litchi_keynote::{ChartCaptionError, ChartSelector, Package, Position, SlideSelector};
+use litchi_keynote::{
+    ChartCaptionError, ChartSelector, Package, Position, ReadOptions, SemanticLimits, SlideSelector,
+};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -443,7 +445,7 @@ fn synthetic_metadata_package_with_captions(
     let mut document = Archive::parse(&document_stream(&source)?)?;
     document
         .objects
-        .push(object(80, 9_001, caption_theme_payload()?)?);
+        .push(object(80, 10, caption_theme_payload()?)?);
     document.objects.push(object(81, 9_002, Vec::new())?);
     document.objects.push(object(82, 9_003, Vec::new())?);
     let source = replace_document_stream(&source, document)?;
@@ -472,7 +474,7 @@ fn synthetic_cross_component_metadata_package(
     let mut document = Archive::parse(&document_stream(&source)?)?;
     document
         .objects
-        .push(object(80, 9_001, caption_theme_payload()?)?);
+        .push(object(80, 10, caption_theme_payload()?)?);
     let source = replace_document_stream(&source, document)?;
     let stylesheet = component(vec![
         object(81, 9_002, Vec::new())?,
@@ -500,6 +502,179 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
     Ok(bytes)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PackageMetrics {
+    total_uncompressed_bytes: u64,
+    total_iwa_stream_bytes: u64,
+    max_entry_bytes: u64,
+    max_iwa_stream_bytes: usize,
+    total_objects: usize,
+    max_archive_objects: usize,
+    max_archive_messages: usize,
+    max_message_bytes: usize,
+}
+
+impl PackageMetrics {
+    fn total_bytes_limit(self) -> u64 {
+        self.total_uncompressed_bytes
+            .max(self.total_iwa_stream_bytes)
+    }
+}
+
+fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
+    let catalog = Catalog::from_bytes(package)?;
+    let mut metrics = PackageMetrics {
+        total_uncompressed_bytes: 0,
+        total_iwa_stream_bytes: 0,
+        max_entry_bytes: 0,
+        max_iwa_stream_bytes: 0,
+        total_objects: 0,
+        max_archive_objects: 0,
+        max_archive_messages: 0,
+        max_message_bytes: 0,
+    };
+    for entry in catalog.iter() {
+        metrics.total_uncompressed_bytes = metrics
+            .total_uncompressed_bytes
+            .checked_add(entry.metadata().uncompressed_size())
+            .ok_or_else(|| io::Error::other("synthetic package total overflow"))?;
+        metrics.max_entry_bytes = metrics
+            .max_entry_bytes
+            .max(entry.metadata().uncompressed_size());
+        if !entry.name().ends_with(".iwa") {
+            continue;
+        }
+        let stream = SnappyStream::decompress(entry.data())?;
+        metrics.total_iwa_stream_bytes = metrics
+            .total_iwa_stream_bytes
+            .checked_add(u64::try_from(stream.as_bytes().len())?)
+            .ok_or_else(|| io::Error::other("synthetic IWA stream total overflow"))?;
+        metrics.max_iwa_stream_bytes = metrics.max_iwa_stream_bytes.max(stream.as_bytes().len());
+        let archive = Archive::parse(stream.as_bytes())?;
+        metrics.total_objects = metrics
+            .total_objects
+            .checked_add(archive.objects.len())
+            .ok_or_else(|| io::Error::other("synthetic package object count overflow"))?;
+        metrics.max_archive_objects = metrics.max_archive_objects.max(archive.objects.len());
+        let message_count = archive
+            .objects
+            .iter()
+            .map(|object| object.messages.len())
+            .sum::<usize>();
+        metrics.max_archive_messages = metrics.max_archive_messages.max(message_count);
+        metrics.max_message_bytes = metrics.max_message_bytes.max(
+            archive
+                .objects
+                .iter()
+                .flat_map(|object| object.messages.iter())
+                .map(|message| message.data.len())
+                .max()
+                .unwrap_or(0),
+        );
+    }
+    Ok(metrics)
+}
+
+fn target_read_options(target: &[u8]) -> TestResult<ReadOptions> {
+    let metrics = package_metrics(target)?;
+    let defaults = Limits::default();
+    let max_input_bytes = u64::try_from(target.len())?;
+    let archive_limits = Limits::new(
+        max_input_bytes,
+        defaults.max_entries(),
+        metrics.max_entry_bytes,
+        metrics.total_bytes_limit(),
+        metrics.max_iwa_stream_bytes,
+    )?;
+    let iwa_limits = litchi_iwa_core::Limits::default()
+        .with_archive_bytes(metrics.max_iwa_stream_bytes)?
+        .with_objects(metrics.max_archive_objects)?
+        .with_messages(metrics.max_archive_messages)?
+        .with_message_bytes(metrics.max_message_bytes)?;
+    let archive_limits = archive_limits.with_archive_limits(iwa_limits)?;
+    let defaults = SemanticLimits::default();
+    let semantic_limits = SemanticLimits::new(
+        metrics.total_objects,
+        defaults.max_slides(),
+        defaults.max_references(),
+        defaults.max_text_storages(),
+        defaults.max_text_fragments(),
+        defaults.max_text_bytes(),
+    )?;
+    Ok(ReadOptions::new(archive_limits, semantic_limits))
+}
+
+fn replace_archive_limit(
+    options: ReadOptions,
+    max_input_bytes: u64,
+    max_entry_bytes: u64,
+    max_total_bytes: u64,
+    max_iwa_stream_bytes: usize,
+    max_archive_objects: usize,
+    max_archive_messages: usize,
+    max_message_bytes: usize,
+) -> TestResult<ReadOptions> {
+    let defaults = options.archive();
+    let archive_limits = Limits::new(
+        max_input_bytes,
+        defaults.max_entries(),
+        max_entry_bytes,
+        max_total_bytes,
+        max_iwa_stream_bytes,
+    )?;
+    let iwa_limits = litchi_iwa_core::Limits::default()
+        .with_archive_bytes(max_iwa_stream_bytes)?
+        .with_objects(max_archive_objects)?
+        .with_messages(max_archive_messages)?
+        .with_message_bytes(max_message_bytes)?;
+    Ok(ReadOptions::new(
+        archive_limits.with_archive_limits(iwa_limits)?,
+        options.semantic(),
+    ))
+}
+
+fn run_caption_create_with_options(
+    source: &[u8],
+    options: ReadOptions,
+) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
+    let package = Package::from_bytes_with_options(source, options)?;
+    let result = package
+        .edit_slide_chart_caption(0usize, 0usize)
+        .and_then(|edit| edit.set("aggregate budget caption"))
+        .and_then(|edit| edit.commit());
+    if result.is_err() {
+        assert_eq!(exact_bytes(&package)?, source);
+    }
+    match result {
+        Ok(commit) => Ok(Ok(exact_bytes(commit.package())?)),
+        Err(error) => Ok(Err(error)),
+    }
+}
+
+fn run_caption_apply_with_options(
+    source: &[u8],
+    patch: &litchi_keynote::ChartCaptionPatch,
+    options: ReadOptions,
+) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
+    let package = Package::from_bytes_with_options(source, options)?;
+    let result = package.apply_slide_chart_caption(patch);
+    if result.is_err() {
+        assert_eq!(exact_bytes(&package)?, source);
+    }
+    match result {
+        Ok(commit) => Ok(Ok(exact_bytes(commit.package())?)),
+        Err(error) => Ok(Err(error)),
+    }
+}
+
+fn assert_caption_limit(result: Result<Vec<u8>, ChartCaptionError>, label: &str) -> TestResult<()> {
+    assert!(
+        matches!(result, Err(ChartCaptionError::LimitExceeded { .. })),
+        "{label} did not return a bounded limit error: {result:?}"
+    );
+    Ok(())
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -766,6 +941,79 @@ fn with_document_preferred_locator(source: &[u8], preferred_locator: &str) -> Te
     replace_metadata_payload(source, rewritten)
 }
 
+#[derive(Clone, Copy)]
+enum MetadataReservedIdentifierKind {
+    UuidObject,
+    ExternalObject,
+    DataObject,
+    RootDataMetadataMap,
+    AmbiguousObject,
+}
+
+fn with_metadata_reserved_identifier(
+    source: &[u8],
+    identifier: u64,
+    kind: MetadataReservedIdentifierKind,
+) -> TestResult<Vec<u8>> {
+    let payload = metadata_message_payload(source)?;
+    let mut rewritten = Vec::with_capacity(payload.len().saturating_add(32));
+    let mut document_seen = false;
+    for field in WireView::parse(&payload)?.fields() {
+        if field.number() != 3 {
+            rewritten.extend_from_slice(field.raw());
+            continue;
+        }
+        let component = tsp::ComponentInfo::decode(field.payload())?;
+        if component.identifier != DOCUMENT_COMPONENT || document_seen {
+            rewritten.extend_from_slice(field.raw());
+            continue;
+        }
+        document_seen = true;
+        let mut component_payload = field.payload().to_vec();
+        match kind {
+            MetadataReservedIdentifierKind::UuidObject => {
+                let entry = metadata_uuid_entry(identifier).encode_to_vec();
+                append_length_delimited_field(&mut component_payload, 11, &entry)?;
+            },
+            MetadataReservedIdentifierKind::ExternalObject => {
+                let reference = external_reference(UNRELATED_COMPONENT, Some(identifier), None);
+                append_length_delimited_field(
+                    &mut component_payload,
+                    6,
+                    &reference.encode_to_vec(),
+                )?;
+            },
+            MetadataReservedIdentifierKind::DataObject => {
+                let reference = tsp::ComponentDataReference {
+                    data_identifier: 9_999,
+                    object_reference_list: vec![tsp::component_data_reference::ObjectReference {
+                        object_identifier: identifier,
+                        count: 1,
+                    }],
+                };
+                append_length_delimited_field(
+                    &mut component_payload,
+                    7,
+                    &reference.encode_to_vec(),
+                )?;
+            },
+            MetadataReservedIdentifierKind::RootDataMetadataMap
+            | MetadataReservedIdentifierKind::AmbiguousObject => {},
+        }
+        if matches!(kind, MetadataReservedIdentifierKind::AmbiguousObject) {
+            append_varint_field(&mut component_payload, 20, identifier)?;
+        }
+        append_length_delimited_field(&mut rewritten, 3, &component_payload)?;
+    }
+    if !document_seen {
+        return Err(io::Error::other("missing document metadata component").into());
+    }
+    if matches!(kind, MetadataReservedIdentifierKind::RootDataMetadataMap) {
+        append_length_delimited_field(&mut rewritten, 10, &reference(identifier).encode_to_vec())?;
+    }
+    replace_metadata_payload(source, rewritten)
+}
+
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let archive = Archive::parse(&document_stream(package)?)?;
     let object = archive
@@ -984,6 +1232,23 @@ fn assert_graph_change_rejected(source: &[u8]) -> TestResult<()> {
     Ok(())
 }
 
+fn assert_graph_or_ingress_rejected(source: &[u8]) -> TestResult<()> {
+    let package = match Package::from_bytes(source) {
+        Ok(package) => package,
+        Err(_) => return Ok(()),
+    };
+    let result = package
+        .edit_slide_chart_caption(0usize, 0usize)
+        .and_then(|edit| edit.set("fresh caption"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
 fn assert_replacement_rejected(source: &[u8]) -> TestResult<()> {
     let package = Package::from_bytes(source)?;
     let result = package
@@ -1014,6 +1279,25 @@ fn with_document_message_payload(
         .find(|message| message.type_ == type_)
         .ok_or_else(|| io::Error::other("missing synthetic document message"))?;
     message.data = data;
+    replace_document_stream(source, archive)
+}
+
+fn with_document_message_type(
+    source: &[u8],
+    identifier: u64,
+    type_: u32,
+    replacement_type: u32,
+) -> TestResult<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let object = archive
+        .object_mut(identifier)
+        .ok_or_else(|| io::Error::other("missing synthetic document object"))?;
+    let message = object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == type_)
+        .ok_or_else(|| io::Error::other("missing synthetic document message"))?;
+    message.type_ = replacement_type;
     replace_document_stream(source, archive)
 }
 
@@ -1577,8 +1861,7 @@ fn metadata_removal_allocates_fresh_standin_and_retains_old_graph() -> TestResul
 }
 
 #[test]
-fn metadata_missing_ambiguous_malformed_overflow_and_uuid_collision_fail_atomically()
--> TestResult<()> {
+fn metadata_missing_ambiguous_malformed_and_overflow_fail_atomically() -> TestResult<()> {
     let missing = synthetic_package_with_captions([None, Some("South")])?;
     assert_graph_change_rejected(&missing)?;
 
@@ -1596,12 +1879,68 @@ fn metadata_missing_ambiguous_malformed_overflow_and_uuid_collision_fail_atomica
     let overflow = synthetic_metadata_package_with_captions([None, Some("South")], u64::MAX, None)?;
     assert_graph_change_rejected(&overflow)?;
 
-    let collision = synthetic_metadata_package_with_captions(
+    Ok(())
+}
+
+#[test]
+fn metadata_owned_identifiers_beyond_watermark_are_not_reused() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_captions(
         [None, Some("South")],
         METADATA_LAST_IDENTIFIER,
-        Some(METADATA_LAST_IDENTIFIER + 1),
+        None,
     )?;
-    assert_graph_change_rejected(&collision)?;
+    let reserved = METADATA_LAST_IDENTIFIER + 1;
+    for kind in [
+        MetadataReservedIdentifierKind::UuidObject,
+        MetadataReservedIdentifierKind::ExternalObject,
+        MetadataReservedIdentifierKind::DataObject,
+        MetadataReservedIdentifierKind::RootDataMetadataMap,
+        MetadataReservedIdentifierKind::AmbiguousObject,
+    ] {
+        let hostile = with_metadata_reserved_identifier(&source, reserved, kind)?;
+        let package = Package::from_bytes(&hostile)?;
+        let commit = package
+            .edit_slide_chart_caption(0usize, 0usize)?
+            .set("reserved identifier safe")?
+            .commit()?;
+        let target = exact_bytes(commit.package())?;
+        assert_eq!(chart_reference_identifier(&target)?, Some(reserved + 2));
+        let document = Archive::parse(&document_stream(&target)?)?;
+        assert!(document.object(reserved).is_none());
+        for identifier in reserved + 1..=reserved + 4 {
+            assert!(document.object(identifier).is_some());
+        }
+        assert_eq!(
+            decoded_metadata(&target)?.last_object_identifier,
+            reserved + 4
+        );
+        let restored = commit
+            .package()
+            .apply_slide_chart_caption(&commit.patch().inverse())?;
+        assert_eq!(exact_bytes(restored.package())?, hostile);
+    }
+    Ok(())
+}
+
+#[test]
+fn extra_or_wrong_type_root_and_theme_candidates_fail_atomically() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_captions(
+        [None, Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let document_payload = archive
+        .object(1)
+        .and_then(|object| object.messages.first())
+        .map(|message| message.data.clone())
+        .ok_or_else(|| io::Error::other("missing synthetic root document"))?;
+    archive.objects.push(object(999, 1, document_payload)?);
+    let extra_root = replace_document_stream(&source, archive)?;
+    assert_graph_or_ingress_rejected(&extra_root)?;
+
+    let wrong_theme = with_document_message_type(&source, 80, 10, 9_004)?;
+    assert_graph_or_ingress_rejected(&wrong_theme)?;
     Ok(())
 }
 
@@ -1839,7 +2178,7 @@ fn known_caption_reference_theme_and_width_wire_variants_fail_closed() -> TestRe
         )?)?;
     }
 
-    let theme = message_payload(&source, 80, 9_001)?;
+    let theme = message_payload(&source, 80, 10)?;
     let theme_root = WireView::parse(&theme)?
         .fields()
         .find(|field| field.number() == 1)
@@ -1854,7 +2193,7 @@ fn known_caption_reference_theme_and_width_wire_variants_fail_closed() -> TestRe
         )?,
     ];
     for payload in theme_variants {
-        let hostile = with_document_message_payload(&source, 80, 9_001, payload)?;
+        let hostile = with_document_message_payload(&source, 80, 10, payload)?;
         assert_graph_change_rejected(&hostile)?;
     }
 
@@ -1932,5 +2271,195 @@ fn archive_headers_are_retained_and_noncanonical_object_prefixes_fail_closed() -
 
     let noncanonical = with_overlong_object_length_prefix(&active_source, CHARTS[0])?;
     assert_replacement_rejected(&noncanonical)?;
+    Ok(())
+}
+
+#[test]
+fn public_package_limits_bound_caption_creation_and_patch_apply_atomically() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_captions(
+        [None, Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let baseline = Package::from_bytes(&source)?
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("aggregate budget caption")?
+        .commit()?;
+    let target = exact_bytes(baseline.package())?;
+    let source_metrics = package_metrics(&source)?;
+    let target_metrics = package_metrics(&target)?;
+    assert!(target.len() > source.len());
+    assert!(target_metrics.total_uncompressed_bytes > source_metrics.total_uncompressed_bytes);
+    assert!(target_metrics.total_iwa_stream_bytes > source_metrics.total_iwa_stream_bytes);
+    assert!(target_metrics.max_iwa_stream_bytes > source_metrics.max_iwa_stream_bytes);
+    assert!(target_metrics.total_objects > source_metrics.total_objects);
+    assert!(target_metrics.max_archive_objects > source_metrics.max_archive_objects);
+    assert!(target_metrics.max_archive_messages > source_metrics.max_archive_messages);
+
+    let exact = target_read_options(&target)?;
+    let exact_result = run_caption_create_with_options(&source, exact)?;
+    assert_eq!(
+        exact_result
+            .map_err(|error| io::Error::other(format!("exact create failed: {error:?}")))?,
+        target
+    );
+    let exact_apply = run_caption_apply_with_options(&source, baseline.patch(), exact)?;
+    assert_eq!(
+        exact_apply.map_err(|error| io::Error::other(format!("exact apply failed: {error:?}")))?,
+        target
+    );
+
+    let under_output = replace_archive_limit(
+        exact,
+        u64::try_from(target.len() - 1)?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes,
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_output)?,
+        "output max-minus-one",
+    )?;
+    assert_caption_limit(
+        run_caption_apply_with_options(&source, baseline.patch(), under_output)?,
+        "patch output max-minus-one",
+    )?;
+
+    let under_entry = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes.saturating_sub(1),
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes,
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_entry)?,
+        "entry-byte max-minus-one",
+    )?;
+
+    let under_total = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit().saturating_sub(1),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes,
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_total)?,
+        "total-byte max-minus-one",
+    )?;
+
+    let under_iwa = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes.saturating_sub(1),
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes,
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_iwa)?,
+        "decompressed-IWA max-minus-one",
+    )?;
+
+    let under_objects = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects.saturating_sub(1),
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes,
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_objects)?,
+        "IWA-object max-minus-one",
+    )?;
+
+    let under_messages = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages.saturating_sub(1),
+        target_metrics.max_message_bytes,
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_messages)?,
+        "IWA-message max-minus-one",
+    )?;
+
+    let under_message_bytes = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes.saturating_sub(1),
+    )?;
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_message_bytes)?,
+        "message-byte max-minus-one",
+    )?;
+
+    let under_semantic_objects = ReadOptions::new(
+        exact.archive(),
+        SemanticLimits::new(
+            target_metrics.total_objects.saturating_sub(1),
+            exact.semantic().max_slides(),
+            exact.semantic().max_references(),
+            exact.semantic().max_text_storages(),
+            exact.semantic().max_text_fragments(),
+            exact.semantic().max_text_bytes(),
+        )?,
+    );
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_semantic_objects)?,
+        "semantic-object max-minus-one",
+    )?;
+
+    let under_references = ReadOptions::new(
+        exact.archive(),
+        SemanticLimits::new(
+            exact.semantic().max_objects(),
+            exact.semantic().max_slides(),
+            4,
+            exact.semantic().max_text_storages(),
+            exact.semantic().max_text_fragments(),
+            exact.semantic().max_text_bytes(),
+        )?,
+    );
+    assert_caption_limit(
+        run_caption_create_with_options(&source, under_references)?,
+        "semantic-reference max-minus-one",
+    )?;
+
+    let under_input = replace_archive_limit(
+        exact,
+        u64::try_from(source.len() - 1)?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        target_metrics.max_message_bytes,
+    )?;
+    assert!(Package::from_bytes_with_options(&source, under_input).is_err());
     Ok(())
 }

@@ -2125,8 +2125,12 @@ impl Archive {
     /// Serialize this archive under explicit resource limits.
     pub fn to_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
         let limits = limits.validate()?;
+        let expected_length = self.encoded_len_with_limits(limits)?;
         validate_object_set(self.objects.iter(), limits)?;
         let mut output = Vec::new();
+        output
+            .try_reserve_exact(expected_length)
+            .map_err(|_| Error::allocation("IWA archive output", expected_length))?;
         for object in &self.objects {
             let mut info = object.archive_info.clone();
             for (message_info, message) in info.message_infos.iter_mut().zip(&object.messages) {
@@ -2188,7 +2192,27 @@ impl Archive {
                 output.extend_from_slice(&message.data);
             }
         }
+        debug_assert_eq!(output.len(), expected_length);
         Ok(output)
+    }
+
+    /// Return the exact decompressed IWA length produced by serialization.
+    ///
+    /// This preflight performs no heap allocation and applies the same
+    /// source-preserving header rule as [`Self::to_bytes_with_limits`]. It is
+    /// suitable for checking an aggregate output budget before constructing
+    /// the serialized buffer.
+    pub fn encoded_len(&self) -> Result<usize> {
+        self.encoded_len_with_limits(Limits::default())
+    }
+
+    /// Return the exact decompressed IWA length produced under `limits`.
+    ///
+    /// The calculation validates object/message/header/archive ceilings,
+    /// checked arithmetic, duplicate identifiers, and retained raw-header
+    /// selection without allocating an encoded header or output buffer.
+    pub fn encoded_len_with_limits(&self, limits: Limits) -> Result<usize> {
+        encoded_archive_len_preflight(&self.objects, limits)
     }
 
     /// Validate all objects under the default resource limits.
@@ -5295,6 +5319,534 @@ fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<usize> {
     .map_err(|_| Error::invalid_archive(0, "ArchiveInfo header length exceeds usize"))
 }
 
+/// A no-allocation sink for the canonical ArchiveInfo encoding.
+///
+/// When `target` is absent this only counts bytes. When present it also
+/// compares the bytes emitted by the neutral projection with the retained
+/// canonical header, which is the source-authoritative test used by
+/// `to_bytes_with_limits` to decide whether an original raw header remains
+/// valid after an in-memory mutation.
+struct CanonicalHeaderProbe<'a> {
+    target: Option<&'a [u8]>,
+    offset: usize,
+    matches: bool,
+}
+
+impl<'a> CanonicalHeaderProbe<'a> {
+    fn new(target: Option<&'a [u8]>) -> Self {
+        Self {
+            target,
+            offset: 0,
+            matches: target.is_some(),
+        }
+    }
+
+    fn bytes(&mut self, bytes: &[u8]) -> Result<()> {
+        let end = self
+            .offset
+            .checked_add(bytes.len())
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo encoded length overflow"))?;
+        if self.matches {
+            let equal = self
+                .target
+                .and_then(|target| target.get(self.offset..end))
+                .is_some_and(|target| target == bytes);
+            if !equal {
+                self.matches = false;
+            }
+        }
+        self.offset = end;
+        Ok(())
+    }
+
+    fn varint(&mut self, value: u64) -> Result<()> {
+        let mut encoded = [0u8; MAX_VARINT_BYTES];
+        self.bytes(encode_varint(value, &mut encoded))
+    }
+
+    fn field_key(&mut self, number: u32, wire_type: u8) -> Result<()> {
+        self.varint((u64::from(number) << 3) | u64::from(wire_type))
+    }
+
+    fn varint_field(&mut self, number: u32, value: u64) -> Result<()> {
+        self.field_key(number, 0)?;
+        self.varint(value)
+    }
+
+    fn length_delimited_field<F>(
+        &mut self,
+        number: u32,
+        payload_length: usize,
+        write_payload: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut Self) -> Result<()>,
+    {
+        self.field_key(number, 2)?;
+        self.varint(
+            u64::try_from(payload_length)
+                .map_err(|_| Error::invalid_archive(0, "ArchiveInfo field length exceeds u64"))?,
+        )?;
+        let payload_start = self.offset;
+        write_payload(self)?;
+        if self.offset.checked_sub(payload_start) != Some(payload_length) {
+            return Err(Error::invalid_archive(
+                0,
+                "ArchiveInfo nested encoded length mismatch",
+            ));
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> (usize, bool) {
+        let matches = self
+            .target
+            .is_some_and(|target| self.matches && self.offset == target.len());
+        (self.offset, matches)
+    }
+}
+
+fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> Result<usize> {
+    let limits = limits.validate()?;
+    let mut archive_length = 0usize;
+    let mut total_messages = 0usize;
+
+    for (object_index, object) in objects.iter().enumerate() {
+        if object_index >= limits.max_objects() {
+            return Err(limit(
+                LimitKind::Objects,
+                object_index.saturating_add(1),
+                limits.max_objects(),
+            ));
+        }
+        let identifier = object.archive_info.identifier.ok_or_else(|| {
+            Error::invalid_archive(object_index, "object is missing its archive identifier")
+        })?;
+        if objects[..object_index]
+            .iter()
+            .any(|previous| previous.archive_info.identifier == Some(identifier))
+        {
+            return Err(Error::invalid_archive(
+                object_index,
+                "duplicate object identifier",
+            ));
+        }
+        if object.archive_info.message_infos.len() != object.messages.len() {
+            return Err(Error::invalid_archive(
+                object_index,
+                "message metadata and payload counts differ",
+            ));
+        }
+        object.archive_info.validate_with_limits(limits)?;
+        add_limited(
+            &mut total_messages,
+            object.messages.len(),
+            LimitKind::Messages,
+            limits.max_messages(),
+        )?;
+
+        let canonical_header_length = canonical_archive_info_length_for_object(object)?;
+        check_header_length(canonical_header_length, limits)?;
+        let header_length = retained_header_length_for_object(object, canonical_header_length)?;
+        check_header_length(header_length, limits)?;
+
+        let mut payload_length = 0usize;
+        for message in &object.messages {
+            check_message_length(message.data.len(), limits)?;
+            add_limited(
+                &mut payload_length,
+                message.data.len(),
+                LimitKind::ObjectBytes,
+                limits.max_object_bytes(),
+            )?;
+        }
+        let object_length = varint_len(header_length)?
+            .checked_add(header_length)
+            .and_then(|length| length.checked_add(payload_length))
+            .ok_or_else(|| Error::invalid_archive(object_index, "object length overflow"))?;
+        if object_length > limits.max_object_bytes() {
+            return Err(limit(
+                LimitKind::ObjectBytes,
+                object_length,
+                limits.max_object_bytes(),
+            ));
+        }
+        add_limited(
+            &mut archive_length,
+            object_length,
+            LimitKind::ArchiveBytes,
+            limits.max_archive_bytes(),
+        )?;
+    }
+    Ok(archive_length)
+}
+
+fn canonical_archive_info_length_for_object(object: &ArchiveObject) -> Result<usize> {
+    let mut probe = CanonicalHeaderProbe::new(None);
+    emit_canonical_archive_info(&mut probe, object)?;
+    Ok(probe.finish().0)
+}
+
+fn retained_header_length_for_object(
+    object: &ArchiveObject,
+    canonical_length: usize,
+) -> Result<usize> {
+    let Some((original, original_canonical)) = object
+        .original_header
+        .as_deref()
+        .zip(object.original_canonical_header.as_deref())
+    else {
+        return Ok(canonical_length);
+    };
+
+    let mut probe = CanonicalHeaderProbe::new(Some(original_canonical));
+    emit_canonical_archive_info(&mut probe, object)?;
+    let (emitted_length, canonical_matches) = probe.finish();
+    if emitted_length != canonical_length {
+        return Err(Error::invalid_archive(
+            0,
+            "ArchiveInfo preflight length mismatch",
+        ));
+    }
+    Ok(if canonical_matches {
+        original.len()
+    } else {
+        canonical_length
+    })
+}
+
+fn emit_canonical_archive_info(
+    probe: &mut CanonicalHeaderProbe<'_>,
+    object: &ArchiveObject,
+) -> Result<()> {
+    let info = &object.archive_info;
+    if let Some(identifier) = info.identifier {
+        probe.varint_field(1, identifier)?;
+    }
+    for (message_info, message) in info.message_infos.iter().zip(&object.messages) {
+        let payload_length =
+            encoded_message_info_length(message_info, message.type_, message.data.len())?;
+        probe.length_delimited_field(2, payload_length, |probe| {
+            emit_canonical_message_info(probe, message_info, message.type_, message.data.len())
+        })?;
+    }
+    if let Some(should_merge) = info.should_merge {
+        probe.varint_field(3, u64::from(should_merge))?;
+    }
+    Ok(())
+}
+
+fn emit_canonical_message_info(
+    probe: &mut CanonicalHeaderProbe<'_>,
+    info: &MessageInfo,
+    type_: u32,
+    length: usize,
+) -> Result<()> {
+    probe.varint_field(1, u64::from(type_))?;
+    emit_packed_u32(probe, 2, &info.versions)?;
+    probe.varint_field(
+        3,
+        u64::from(
+            u32::try_from(length)
+                .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?,
+        ),
+    )?;
+    for field_info in &info.field_infos {
+        let payload_length = encoded_field_info_length(field_info)?;
+        probe.length_delimited_field(4, payload_length, |probe| {
+            emit_canonical_field_info(probe, field_info)
+        })?;
+    }
+    emit_packed_u64(probe, 5, &info.object_references)?;
+    emit_packed_u64(probe, 6, &info.data_references)?;
+    if let Some(base_message_index) = info.base_message_index {
+        probe.varint_field(7, u64::from(base_message_index))?;
+    }
+    emit_packed_u32(probe, 8, &info.diff_merge_version)?;
+    if let Some(path) = &info.diff_field_path {
+        let payload_length = encoded_field_path_length(path)?;
+        probe.length_delimited_field(9, payload_length, |probe| {
+            emit_canonical_field_path(probe, path)
+        })?;
+    }
+    for path in &info.fields_to_remove {
+        let payload_length = encoded_field_path_length(path)?;
+        probe.length_delimited_field(10, payload_length, |probe| {
+            emit_canonical_field_path(probe, path)
+        })?;
+    }
+    emit_packed_u32(probe, 11, &info.diff_read_version)
+}
+
+fn emit_canonical_field_info(probe: &mut CanonicalHeaderProbe<'_>, info: &FieldInfo) -> Result<()> {
+    let payload_length = encoded_field_path_length(&info.path)?;
+    probe.length_delimited_field(1, payload_length, |probe| {
+        emit_canonical_field_path(probe, &info.path)
+    })?;
+    if let Some(value) = info.r#type {
+        emit_enum_or_unknown(
+            probe,
+            2,
+            value.raw_value(),
+            matches!(value, FieldType::Unrecognized(_)),
+        )?;
+    }
+    if let Some(value) = info.unknown_field_rule {
+        emit_enum_or_unknown(
+            probe,
+            3,
+            value.raw_value(),
+            matches!(value, UnknownFieldRule::Unrecognized(_)),
+        )?;
+    }
+    emit_packed_u64(probe, 4, &info.object_references)?;
+    emit_packed_u64(probe, 5, &info.data_references)?;
+    if let Some(value) = info.known_field_rule {
+        emit_enum_or_unknown(
+            probe,
+            6,
+            value.raw_value(),
+            matches!(value, KnownFieldRule::Unrecognized(_)),
+        )?;
+    }
+    emit_packed_u32(probe, 7, &info.known_field_version)?;
+    if let Some(feature_identifier) = &info.known_field_feature_identifier {
+        probe.length_delimited_field(8, feature_identifier.len(), |probe| {
+            probe.bytes(feature_identifier.as_bytes())
+        })?;
+    }
+    if let Some(value) = info.r#type {
+        if matches!(value, FieldType::Unrecognized(_)) {
+            probe.varint_field(2, enum_wire_value(value.raw_value()))?;
+        }
+    }
+    if let Some(value) = info.unknown_field_rule {
+        if matches!(value, UnknownFieldRule::Unrecognized(_)) {
+            probe.varint_field(3, enum_wire_value(value.raw_value()))?;
+        }
+    }
+    if let Some(value) = info.known_field_rule {
+        if matches!(value, KnownFieldRule::Unrecognized(_)) {
+            probe.varint_field(6, enum_wire_value(value.raw_value()))?;
+        }
+    }
+    Ok(())
+}
+
+fn emit_canonical_field_path(probe: &mut CanonicalHeaderProbe<'_>, path: &FieldPath) -> Result<()> {
+    emit_packed_u32(probe, 1, &path.path)
+}
+
+fn emit_enum_or_unknown(
+    probe: &mut CanonicalHeaderProbe<'_>,
+    number: u32,
+    value: i32,
+    unknown: bool,
+) -> Result<()> {
+    if unknown {
+        return Ok(());
+    }
+    probe.varint_field(number, enum_wire_value(value))
+}
+
+fn emit_packed_u32(
+    probe: &mut CanonicalHeaderProbe<'_>,
+    number: u32,
+    values: &[u32],
+) -> Result<()> {
+    if values.is_empty() {
+        return Ok(());
+    }
+    let payload_length = packed_u32_length(values)?;
+    probe.length_delimited_field(number, payload_length, |probe| {
+        for value in values {
+            probe.varint(u64::from(*value))?;
+        }
+        Ok(())
+    })
+}
+
+fn emit_packed_u64(
+    probe: &mut CanonicalHeaderProbe<'_>,
+    number: u32,
+    values: &[u64],
+) -> Result<()> {
+    if values.is_empty() {
+        return Ok(());
+    }
+    let payload_length = packed_u64_length(values)?;
+    probe.length_delimited_field(number, payload_length, |probe| {
+        for value in values {
+            probe.varint(*value)?;
+        }
+        Ok(())
+    })
+}
+
+fn encoded_message_info_length(info: &MessageInfo, type_: u32, length: usize) -> Result<usize> {
+    let mut total = varint_field_length(1, u64::from(type_))?;
+    total = checked_encoded_add(total, packed_u32_field_length(2, &info.versions)?)?;
+    let length = u32::try_from(length)
+        .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
+    total = checked_encoded_add(total, varint_field_length(3, u64::from(length))?)?;
+    for field_info in &info.field_infos {
+        let payload_length = encoded_field_info_length(field_info)?;
+        total = checked_encoded_add(total, length_delimited_field_length(4, payload_length)?)?;
+    }
+    total = checked_encoded_add(total, packed_u64_field_length(5, &info.object_references)?)?;
+    total = checked_encoded_add(total, packed_u64_field_length(6, &info.data_references)?)?;
+    if let Some(value) = info.base_message_index {
+        total = checked_encoded_add(total, varint_field_length(7, u64::from(value))?)?;
+    }
+    total = checked_encoded_add(total, packed_u32_field_length(8, &info.diff_merge_version)?)?;
+    if let Some(path) = &info.diff_field_path {
+        total = checked_encoded_add(
+            total,
+            length_delimited_field_length(9, encoded_field_path_length(path)?)?,
+        )?;
+    }
+    for path in &info.fields_to_remove {
+        total = checked_encoded_add(
+            total,
+            length_delimited_field_length(10, encoded_field_path_length(path)?)?,
+        )?;
+    }
+    checked_encoded_add(total, packed_u32_field_length(11, &info.diff_read_version)?)
+}
+
+fn encoded_field_info_length(info: &FieldInfo) -> Result<usize> {
+    let mut total = length_delimited_field_length(1, encoded_field_path_length(&info.path)?)?;
+    if let Some(value) = info.r#type {
+        if !matches!(value, FieldType::Unrecognized(_)) {
+            total = checked_encoded_add(
+                total,
+                varint_field_length(2, enum_wire_value(value.raw_value()))?,
+            )?;
+        }
+    }
+    if let Some(value) = info.unknown_field_rule {
+        if !matches!(value, UnknownFieldRule::Unrecognized(_)) {
+            total = checked_encoded_add(
+                total,
+                varint_field_length(3, enum_wire_value(value.raw_value()))?,
+            )?;
+        }
+    }
+    total = checked_encoded_add(total, packed_u64_field_length(4, &info.object_references)?)?;
+    total = checked_encoded_add(total, packed_u64_field_length(5, &info.data_references)?)?;
+    if let Some(value) = info.known_field_rule {
+        if !matches!(value, KnownFieldRule::Unrecognized(_)) {
+            total = checked_encoded_add(
+                total,
+                varint_field_length(6, enum_wire_value(value.raw_value()))?,
+            )?;
+        }
+    }
+    total = checked_encoded_add(
+        total,
+        packed_u32_field_length(7, &info.known_field_version)?,
+    )?;
+    if let Some(feature_identifier) = &info.known_field_feature_identifier {
+        total = checked_encoded_add(
+            total,
+            length_delimited_field_length(8, feature_identifier.len())?,
+        )?;
+    }
+    if let Some(value) = info.r#type {
+        if matches!(value, FieldType::Unrecognized(_)) {
+            total = checked_encoded_add(
+                total,
+                varint_field_length(2, enum_wire_value(value.raw_value()))?,
+            )?;
+        }
+    }
+    if let Some(value) = info.unknown_field_rule {
+        if matches!(value, UnknownFieldRule::Unrecognized(_)) {
+            total = checked_encoded_add(
+                total,
+                varint_field_length(3, enum_wire_value(value.raw_value()))?,
+            )?;
+        }
+    }
+    if let Some(value) = info.known_field_rule {
+        if matches!(value, KnownFieldRule::Unrecognized(_)) {
+            total = checked_encoded_add(
+                total,
+                varint_field_length(6, enum_wire_value(value.raw_value()))?,
+            )?;
+        }
+    }
+    Ok(total)
+}
+
+fn encoded_field_path_length(path: &FieldPath) -> Result<usize> {
+    packed_u32_field_length(1, &path.path)
+}
+
+fn packed_u32_field_length(number: u32, values: &[u32]) -> Result<usize> {
+    if values.is_empty() {
+        return Ok(0);
+    }
+    length_delimited_field_length(number, packed_u32_length(values)?)
+}
+
+fn packed_u64_field_length(number: u32, values: &[u64]) -> Result<usize> {
+    if values.is_empty() {
+        return Ok(0);
+    }
+    length_delimited_field_length(number, packed_u64_length(values)?)
+}
+
+fn packed_u32_length(values: &[u32]) -> Result<usize> {
+    values.iter().try_fold(0usize, |total, value| {
+        checked_encoded_add(total, u64_varint_length(u64::from(*value)))
+    })
+}
+
+fn packed_u64_length(values: &[u64]) -> Result<usize> {
+    values.iter().try_fold(0usize, |total, value| {
+        checked_encoded_add(total, u64_varint_length(*value))
+    })
+}
+
+fn varint_field_length(number: u32, value: u64) -> Result<usize> {
+    checked_encoded_add(
+        u64_varint_length(u64::from(number) << 3),
+        u64_varint_length(value),
+    )
+}
+
+fn length_delimited_field_length(number: u32, payload_length: usize) -> Result<usize> {
+    let payload_length = u64::try_from(payload_length)
+        .map_err(|_| Error::invalid_archive(0, "ArchiveInfo field length exceeds u64"))?;
+    let total = checked_encoded_add(
+        u64_varint_length((u64::from(number) << 3) | 2),
+        u64_varint_length(payload_length),
+    )?;
+    checked_encoded_add(
+        total,
+        usize::try_from(payload_length)
+            .map_err(|_| Error::invalid_archive(0, "ArchiveInfo field length exceeds usize"))?,
+    )
+}
+
+fn checked_encoded_add(left: usize, right: usize) -> Result<usize> {
+    left.checked_add(right)
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo encoded length overflow"))
+}
+
+const fn u64_varint_length(value: u64) -> usize {
+    if value == 0 {
+        1
+    } else {
+        (u64::BITS as usize - value.leading_zeros() as usize).div_ceil(7)
+    }
+}
+
+const fn enum_wire_value(value: i32) -> u64 {
+    u64::from_ne_bytes((value as i64).to_ne_bytes())
+}
+
 fn buffa_decode_options(preflight: WirePreflight, limits: Limits) -> archive_codec::DecodeOptions {
     archive_codec::DecodeOptions::new(
         limits.max_header_bytes(),
@@ -5773,9 +6325,9 @@ mod tests {
     use super::{
         Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
         ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
-        DataReferencePruning, Error, FieldInfo, FieldObjectReferenceTransition,
-        ObjectReferenceTransition, RawMessage, encode_archive_info, encode_varint,
-        encode_varint_with_width, varint_len,
+        DataReferencePruning, Error, FieldInfo, FieldObjectReferenceTransition, FieldPath,
+        FieldType, KnownFieldRule, ObjectReferenceTransition, RawMessage, UnknownFieldRule,
+        encode_archive_info, encode_varint, encode_varint_with_width, varint_len,
     };
     use crate::{LimitKind, Limits, Result};
 
@@ -5952,6 +6504,77 @@ mod tests {
         assert!(object.original_header.is_none());
         assert!(object.original_canonical_header.is_none());
         assert_eq!(parsed.to_bytes()?, encoded);
+        Ok(())
+    }
+
+    #[test]
+    fn encoded_len_matches_serialization_for_full_metadata() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: 0x1234,
+                data: vec![3, 4, 5, 6],
+            }],
+        )?;
+        object.archive_info.should_merge = Some(false);
+        let message = &mut object.archive_info.message_infos[0];
+        message.versions = vec![0, 127, 128, u32::MAX];
+        message.object_references = vec![1, 128, u64::MAX];
+        message.data_references = vec![2, 129];
+        message.base_message_index = Some(u32::MAX);
+        message.diff_merge_version = vec![3, 130];
+        message.diff_field_path = Some(FieldPath::new(vec![1, 128, u32::MAX]));
+        message.fields_to_remove = vec![FieldPath::new(vec![4, 5]), FieldPath::default()];
+        message.diff_read_version = vec![6, 7];
+
+        let mut field = FieldInfo::new(vec![9, 10]);
+        field.r#type = Some(FieldType::Unrecognized(99));
+        field.unknown_field_rule = Some(UnknownFieldRule::NotSupported);
+        field.object_references = vec![11, 12];
+        field.data_references = vec![13];
+        field.known_field_rule = Some(KnownFieldRule::Unrecognized(-8));
+        field.known_field_version = vec![14, 15];
+        field.known_field_feature_identifier = Some("feature".to_owned());
+        message.field_infos.push(field);
+
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let encoded = archive.to_bytes()?;
+        assert_eq!(archive.encoded_len()?, encoded.len());
+        assert_eq!(
+            archive.encoded_len_with_limits(Limits::default())?,
+            encoded.len()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn encoded_len_matches_retained_unknown_header_and_exact_limits() -> Result<()> {
+        let fixture = reference_pruning_fixture()?;
+        let archive = Archive::parse(&fixture.source)?;
+        assert_eq!(archive.encoded_len()?, fixture.source.len());
+
+        let exact_limits = Limits::default().with_archive_bytes(fixture.source.len())?;
+        assert_eq!(
+            archive.encoded_len_with_limits(exact_limits)?,
+            fixture.source.len()
+        );
+        assert_eq!(archive.to_bytes_with_limits(exact_limits)?, fixture.source);
+
+        let below_limits = Limits::default().with_archive_bytes(fixture.source.len() - 1)?;
+        let error = archive
+            .encoded_len_with_limits(below_limits)
+            .expect_err("one byte below the exact archive length must fail");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::ArchiveBytes | LimitKind::ObjectBytes,
+                observed,
+                maximum
+            } if observed == fixture.source.len() && maximum == fixture.source.len() - 1
+        ));
+        assert!(archive.to_bytes_with_limits(below_limits).is_err());
         Ok(())
     }
 
