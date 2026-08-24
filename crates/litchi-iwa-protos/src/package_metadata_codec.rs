@@ -839,6 +839,39 @@ impl<'source> ExternalReferenceDescriptor<'source> {
     }
 }
 
+/// Borrowed existing component data-owner record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataReferenceOwnerDescriptor<'source> {
+    component: ComponentDescriptor<'source>,
+    data_identifier: u64,
+    object_identifier: u64,
+    count: u32,
+    unknown_fields: bool,
+}
+
+impl<'source> DataReferenceOwnerDescriptor<'source> {
+    #[must_use]
+    pub const fn component(self) -> ComponentDescriptor<'source> {
+        self.component
+    }
+    #[must_use]
+    pub const fn data_identifier(self) -> u64 {
+        self.data_identifier
+    }
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+    #[must_use]
+    pub const fn count(self) -> u32 {
+        self.count
+    }
+    #[must_use]
+    pub const fn has_unknown_fields(self) -> bool {
+        self.unknown_fields
+    }
+}
+
 /// Fallible streaming sink for strict PackageMetadata inspection.
 ///
 /// Callers must discard observations if inspection returns an error.
@@ -857,6 +890,29 @@ pub trait PackageMetadataVisitor {
     fn visit_external_reference(
         &mut self,
         _reference: ExternalReferenceDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        Ok(())
+    }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        _owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        Ok(())
+    }
+
+    fn visit_ambiguous_object_identifier(
+        &mut self,
+        _component: ComponentDescriptor<'_>,
+        _identifier: u64,
+    ) -> Result<(), RewriteError> {
+        Ok(())
+    }
+
+    fn visit_data_metadata_map(
+        &mut self,
+        _object_identifier: u64,
+        _has_unknown_fields: bool,
     ) -> Result<(), RewriteError> {
         Ok(())
     }
@@ -1206,6 +1262,9 @@ mod tests {
         components: Vec<(u64, String, String, bool)>,
         uuids: Vec<(u64, u64, UuidBits, bool)>,
         references: Vec<(u64, u64, Option<u64>, Option<bool>, bool)>,
+        data_owners: Vec<(u64, u64, u64, u32, bool, bool)>,
+        ambiguous: Vec<(u64, u64, bool)>,
+        root_maps: Vec<(u64, bool)>,
     }
 
     impl PackageMetadataVisitor for Facts {
@@ -1248,26 +1307,72 @@ mod tests {
             ));
             Ok(())
         }
+
+        fn visit_data_reference_owner(
+            &mut self,
+            owner: DataReferenceOwnerDescriptor<'_>,
+        ) -> Result<(), RewriteError> {
+            self.data_owners.push((
+                owner.component().identifier(),
+                owner.data_identifier(),
+                owner.object_identifier(),
+                owner.count(),
+                owner.component().is_current(),
+                owner.has_unknown_fields(),
+            ));
+            Ok(())
+        }
+
+        fn visit_ambiguous_object_identifier(
+            &mut self,
+            component: ComponentDescriptor<'_>,
+            identifier: u64,
+        ) -> Result<(), RewriteError> {
+            self.ambiguous
+                .push((component.identifier(), identifier, component.is_current()));
+            Ok(())
+        }
+
+        fn visit_data_metadata_map(
+            &mut self,
+            object_identifier: u64,
+            has_unknown_fields: bool,
+        ) -> Result<(), RewriteError> {
+            self.root_maps.push((object_identifier, has_unknown_fields));
+            Ok(())
+        }
     }
 
     #[test]
     fn inspection_streams_current_and_versioned_collision_facts() {
-        let current = component(
+        let mut current = component(
             1,
             "preferred-a",
             Some("effective-a"),
             &[(4, UuidBits::new(1, 2))],
             &[(6, 2, Some(5), Some(0)), (18, 2, Some(6), Some(1))],
         );
-        let versioned = component(9, "versioned", None, &[(3, UuidBits::new(7, 8))], &[]);
-        let source = metadata(10, &[current], &[versioned]);
+        bytes_field(&mut current, 7, &data_reference(70, &[(5, 2)], false));
+        put_varint_field(&mut current, 20, 81);
+        let mut packed = Vec::new();
+        put_varint(&mut packed, 82);
+        put_varint(&mut packed, 83);
+        bytes_field(&mut current, 20, &packed);
+        let mut versioned = component(9, "versioned", None, &[(3, UuidBits::new(7, 8))], &[]);
+        bytes_field(&mut versioned, 7, &data_reference(71, &[(6, 3)], false));
+        let mut source = metadata(10, &[current], &[versioned]);
+        bytes_field(
+            &mut source,
+            10,
+            &root_data_metadata_reference(90, None, None, true),
+        );
         let mut facts = Facts::default();
         let inspection =
             inspect_package_metadata_with_visitor(&source, options(&source), &mut facts).unwrap();
         assert_eq!(inspection.last_object_identifier(), 10);
         assert_eq!(inspection.report().input_bytes(), source.len());
         assert_eq!(inspection.report().components_scanned(), 4);
-        assert_eq!(inspection.report().references_scanned(), 8);
+        assert_eq!(inspection.report().references_scanned(), 20);
         assert_eq!(
             facts.components,
             vec![
@@ -1289,6 +1394,15 @@ mod tests {
                 (1, 2, Some(6), Some(true), true)
             ]
         );
+        assert_eq!(
+            facts.data_owners,
+            vec![(1, 70, 5, 2, true, false), (9, 71, 6, 3, false, false)]
+        );
+        assert_eq!(
+            facts.ambiguous,
+            vec![(1, 81, true), (1, 82, true), (1, 83, true)]
+        );
+        assert_eq!(facts.root_maps, vec![(90, true)]);
     }
 
     #[test]
@@ -4996,6 +5110,10 @@ fn inspect_metadata_pass<V: PackageMetadataVisitor>(
         match field.number {
             1 => set_once(&mut last, field.varint()?)?,
             3 | 11 => inspect_component(field.bytes()?, field.number == 3, budget, visitor, 2)?,
+            10 => {
+                let reference = decode_root_data_metadata_map(field.bytes()?, budget, 2)?;
+                visitor.visit_data_metadata_map(reference.identifier, reference.unknown_fields)?;
+            },
             _ => {},
         }
     }
@@ -5084,10 +5202,76 @@ fn inspect_component<V: PackageMetadataVisitor>(
                     uuid: binding.uuid,
                 })?;
             },
+            7 => inspect_data_reference(field.bytes()?, descriptor, budget, visitor, child_depth)?,
+            20 => inspect_ambiguous_identifiers(field, descriptor, budget, visitor)?,
             _ => {},
         }
     }
     Ok(())
+}
+
+fn inspect_data_reference<V: PackageMetadataVisitor>(
+    source: &[u8],
+    component: ComponentDescriptor<'_>,
+    budget: &mut Budget,
+    visitor: &mut V,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.message(source, depth)?;
+    let child_depth = depth
+        .checked_add(1)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let mut data_identifier = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut data_identifier, field.varint()?)?,
+            2 => {},
+            _ => {},
+        }
+    }
+    let data_identifier = data_identifier
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 2 {
+            continue;
+        }
+        let (object_identifier, count, unknown_fields) =
+            decode_data_owner(field.bytes()?, budget, child_depth)?;
+        visitor.visit_data_reference_owner(DataReferenceOwnerDescriptor {
+            component,
+            data_identifier,
+            object_identifier,
+            count,
+            unknown_fields,
+        })?;
+    }
+    Ok(())
+}
+
+fn inspect_ambiguous_identifiers<V: PackageMetadataVisitor>(
+    field: Field<'_>,
+    component: ComponentDescriptor<'_>,
+    budget: &mut Budget,
+    visitor: &mut V,
+) -> Result<(), RewriteError> {
+    match field.wire {
+        0 => {
+            budget.reference()?;
+            visitor.visit_ambiguous_object_identifier(component, field.varint()?)
+        },
+        2 => {
+            let mut packed = field.bytes()?;
+            while !packed.is_empty() {
+                budget.reference()?;
+                visitor.visit_ambiguous_object_identifier(component, take_varint(&mut packed)?)?;
+            }
+            Ok(())
+        },
+        _ => Err(RewriteError::invalid(InvalidReason::MalformedWire)),
+    }
 }
 
 /// Strictly rewrite one PackageMetadata payload and verify the complete result.
