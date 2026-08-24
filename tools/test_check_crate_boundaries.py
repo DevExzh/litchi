@@ -10453,6 +10453,181 @@ class BoundaryPolicyTests(unittest.TestCase):
             "+ audit_keynote_chart_caption_facade_source_topology()", main_source
         )
 
+    def _write_movie_caption_facade_fixture(self, root: Path) -> tuple[Path, Path, Path, Path]:
+        owner = root / boundaries.KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE
+        selector = root / boundaries.KEYNOTE_MOVIE_CAPTION_SELECTOR_SOURCE
+        package = root / boundaries.KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[0]
+        library = root / boundaries.KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[1]
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        selector.parent.mkdir(parents=True, exist_ok=True)
+        canonical = sorted(boundaries.KEYNOTE_MOVIE_CAPTION_CANONICAL_TYPES)
+        owner.write_text(
+            "\n".join(f"pub struct {name};" for name in canonical)
+            + "\nimpl Package {\n"
+            "    pub fn slide_movie_caption(&self, selector: MovieSelector) -> Option<String> { let _ = selector; None }\n"
+            "    pub fn edit_slide_movie_caption(&self, selector: MovieSelector) -> SlideMovieCaptionEdit { let _ = selector; SlideMovieCaptionEdit }\n"
+            "    pub fn apply_slide_movie_caption(&self, patch: SlideMovieCaptionPatch) -> SlideMovieCaptionCommit { let _ = patch; SlideMovieCaptionCommit }\n"
+            "}\n"
+            "impl SlideMovieCaptionEdit {\n"
+            "    pub fn set(self, caption: &str) -> Self { let _ = caption; self }\n"
+            "    pub fn clear(self) -> Self { self }\n"
+            "    pub fn commit(self) -> SlideMovieCaptionCommit { let _ = self; SlideMovieCaptionCommit }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        selector.write_text(
+            "pub enum MovieSelector { Index(usize) }\n",
+            encoding="utf-8",
+        )
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            "mod slide_movie_caption;\n"
+            + "pub use slide_movie_caption::{"
+            + ", ".join(canonical)
+            + "};\n",
+            encoding="utf-8",
+        )
+        library.write_text(
+            "pub use package::{"
+            + ", ".join(canonical)
+            + "};\n"
+            "pub use slide::movie::MovieSelector;\n",
+            encoding="utf-8",
+        )
+        return owner, selector, package, library
+
+    def test_focused_keynote_movie_caption_facade_requires_selector_owner_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_caption_facade_source_topology(root),
+                [
+                    "focused litchi-keynote movie-caption owner source is missing: "
+                    f"{boundaries.KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+                ],
+            )
+            owner, selector, package, library = self._write_movie_caption_facade_fixture(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_caption_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_movie_caption(bytes: &[u8]) -> MovieCaptionSnapshot<'_> { todo!() }\n"
+                + "pub use litchi_iwa_protos::WireView;\n"
+                + "pub type MovieCaptionEdit = SlideMovieCaptionEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "selector: MovieSelector", "movie_id: u64"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_movie_caption;", "pub mod slide_movie_caption;"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+            selector.write_text("pub struct WrongSelector;\n", encoding="utf-8")
+            library.write_text(
+                library.read_text(encoding="utf-8").replace(
+                    "pub use slide::movie::MovieSelector;", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("missing canonical MovieSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical MovieSelector re-export" in item for item in violations), violations)
+
+    def test_focused_keynote_movie_caption_owner_masks_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_caption_facade_fixture(root)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "pub fn cfg_only_bad(bytes: &[u8], movie_id: u64) -> MovieCaptionSnapshot<'static> { todo!() }\n"
+                + owner.read_text(encoding="utf-8")
+                + "pub fn production_bad(bytes: &[u8], movie_id: u64) -> MovieCaptionSnapshot<'static> { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
+            self.assertEqual(sum("raw byte slice" in item for item in violations), 1)
+            self.assertEqual(sum("raw identifier parameter" in item for item in violations), 1)
+
+    def test_keynote_movie_caption_host_audit_is_dormant_until_replacement_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_MOVIE_CAPTION_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "pub fn set_slide_movie_caption(&mut self, slide_index: usize, drawable_object_id: u64, caption: &str) {}\n"
+                "pub fn remove_slide_movie_caption(&mut self, slide_index: usize, drawable_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_movie_caption_source_topology(root), []
+            )
+
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { self.slide_movie_caption(selector); }\n"
+                "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: MovieSelector, caption: &str) { self.set_slide_movie_caption(selector, caption); }\n"
+                "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: MovieSelector) { self.remove_slide_movie_caption(selector); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_caption_source_topology(root)
+            self.assertTrue(any("focused Package operation" in item for item in violations), violations)
+
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
+                "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: impl Into<MovieSelector>, caption: &str) { package.edit_slide_movie_caption(selector).set(caption).commit(); }\n"
+                "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: impl Into<MovieSelector>) { package.edit_slide_movie_caption(selector).clear().commit(); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_movie_caption_source_topology(root), []
+            )
+
+            source.write_text(
+                "#[cfg(test)]\n"
+                "fn cfg_only_bridge(selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
+                "pub fn set_slide_movie_caption(&mut self, slide_index: usize, drawable_object_id: u64, caption: &str) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_movie_caption_source_topology(root), []
+            )
+
+    def test_keynote_movie_caption_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_movie_caption_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_keynote_movie_caption_facade_source_topology()", main_source
+        )
+
     def test_pages_and_numbers_chart_caption_audits_require_neutral_edge_and_mask_tests(
         self,
     ) -> None:

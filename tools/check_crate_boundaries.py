@@ -537,6 +537,108 @@ KEYNOTE_CHART_CAPTION_PACKAGE_METHODS = frozenset(
         "apply_slide_chart_caption",
     }
 )
+
+# Keynote movie-caption replacement is the next focused package owner.  Keep
+# this ratchet deliberately narrower than the chart-caption graph audit:
+# phase 1 owns the selector-first existing-caption transaction, while the
+# compatibility host may retain its title/graph creation/removal methods.
+KEYNOTE_MOVIE_CAPTION_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
+KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_movie_caption.rs"
+)
+KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_MOVIE_CAPTION_CANONICAL_TYPES = frozenset(
+    {
+        "SlideMovieCaptionCommit",
+        "SlideMovieCaptionDiagnostics",
+        "SlideMovieCaptionEdit",
+        "SlideMovieCaptionError",
+        "SlideMovieCaptionLimitKind",
+        "SlideMovieCaptionPatch",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_SELECTOR_TYPES = frozenset({"MovieSelector"})
+KEYNOTE_MOVIE_CAPTION_PACKAGE_METHODS = frozenset(
+    {
+        "slide_movie_caption",
+        "edit_slide_movie_caption",
+        "apply_slide_movie_caption",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_EDIT_METHODS = frozenset({"set", "clear", "commit"})
+KEYNOTE_MOVIE_CAPTION_FLAT_ALIASES = frozenset(
+    {
+        "Caption",
+        "CaptionCommit",
+        "CaptionDiagnostics",
+        "CaptionEdit",
+        "CaptionError",
+        "CaptionLimitKind",
+        "CaptionPatch",
+        "MovieCaption",
+        "MovieCaptionCommit",
+        "MovieCaptionDiagnostics",
+        "MovieCaptionEdit",
+        "MovieCaptionError",
+        "MovieCaptionLimitKind",
+        "MovieCaptionPatch",
+        "MovieCaptionSnapshot",
+        "MovieCaptionWrite",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "MovieCaptionSnapshot",
+        "MovieCaptionWrite",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsp", "tsd", "litchi_iwa_protos"}
+)
+KEYNOTE_MOVIE_CAPTION_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|caption|storage|reference|placement|style|"
+    r"native|archive|message|component|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+IWA_KEYNOTE_MOVIE_CAPTION_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_movies" / "caption.rs"
+)
+IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS = frozenset(
+    {
+        "slide_movie_caption_by_selector",
+        "set_slide_movie_caption_by_selector",
+        "remove_slide_movie_caption_by_selector",
+    }
+)
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -15371,6 +15473,307 @@ def audit_keynote_chart_caption_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_keynote_movie_caption_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the selector-first Keynote movie-caption package boundary.
+
+    Movie graph creation/removal remains a compatibility-host concern in the
+    first owner slice.  The package boundary is nevertheless checked as a
+    complete semantic surface: a typed movie selector, a private package
+    module, canonical transaction types, and the three package operations.
+    Physical archive/wire types and native identifiers may remain inside the
+    private owner, but cannot cross its public declarations or re-exports.
+    """
+
+    owner_path = root / KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE
+    selector_path = root / KEYNOTE_MOVIE_CAPTION_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[1]
+    if not owner_path.is_file():
+        return [
+            "focused litchi-keynote movie-caption owner source is missing: "
+            f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        ]
+
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    selector = (
+        _mask_rust_cfg_test_items(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+    package_code = _mask_rust_non_code(package)
+    package_library_code = _mask_rust_non_code(package + library)
+    if re.search(r"(?m)^mod[ \t]+slide_movie_caption[ \t]*;", package_code) is None:
+        violations.append(
+            "focused litchi-keynote movie-caption owner module is missing: "
+            f"{KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[0]}"
+        )
+    if re.search(r"(?m)^pub[ \t]+mod[ \t]+slide_movie_caption\b", package_library_code):
+        violations.append(
+            "focused litchi-keynote movie-caption owner module must remain private: "
+            f"{KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[0]}"
+        )
+
+    canonical_names = frozenset(KEYNOTE_MOVIE_CAPTION_CANONICAL_TYPES)
+    owner_exports = _rust_canonical_exports(owner, canonical_names)
+    package_exports = _rust_canonical_exports(package, canonical_names)
+    lib_exports = _rust_canonical_exports(library, canonical_names)
+    for name in sorted(canonical_names):
+        if name not in owner_exports or name not in package_exports or name not in lib_exports:
+            violations.append(
+                "focused litchi-keynote movie-caption public API is missing canonical type "
+                f"{name}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+            )
+
+    selector_names = frozenset(KEYNOTE_MOVIE_CAPTION_SELECTOR_TYPES)
+    selector_exports = _rust_canonical_exports(selector, selector_names)
+    lib_selector_exports = _rust_canonical_exports(library, selector_names)
+    if "MovieSelector" not in selector_exports:
+        violations.append(
+            "focused litchi-keynote movie-caption selector source is missing canonical "
+            f"MovieSelector: {KEYNOTE_MOVIE_CAPTION_SELECTOR_SOURCE}"
+        )
+    if "MovieSelector" not in lib_selector_exports:
+        violations.append(
+            "focused litchi-keynote movie-caption public API is missing canonical "
+            f"MovieSelector re-export: {KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[1]}"
+        )
+
+    owner_code = _mask_rust_non_code(owner)
+    method_names = {
+        match.group(1)
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+            r"([A-Za-z_][A-Za-z0-9_]*)\b",
+            owner_code,
+        )
+    }
+    for name in sorted(KEYNOTE_MOVIE_CAPTION_PACKAGE_METHODS - method_names):
+        violations.append(
+            "focused litchi-keynote movie-caption Package method is missing "
+            f"{name}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+
+    # Keep the edit lifecycle typed as well.  This prevents a public Package
+    # setter from becoming the only mutation path while clear/apply semantics
+    # silently fall back to a raw graph helper.
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?SlideMovieCaptionEdit\b",
+        owner_code,
+    )
+    if edit_impl is None:
+        edit_names: set[str] = set()
+    else:
+        opening = owner_code.find("{", edit_impl.end())
+        depth = 1
+        cursor = opening + 1 if opening >= 0 else len(owner_code)
+        while opening >= 0 and cursor < len(owner_code) and depth:
+            if owner_code[cursor] == "{":
+                depth += 1
+            elif owner_code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        edit_body = owner_code[opening + 1 : cursor - 1] if depth == 0 else ""
+        edit_names = {
+            match.group(1)
+            for match in re.finditer(
+                r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+                r"([A-Za-z_][A-Za-z0-9_]*)\b",
+                edit_body,
+            )
+        }
+    for name in sorted(KEYNOTE_MOVIE_CAPTION_EDIT_METHODS - edit_names):
+        violations.append(
+            "focused litchi-keynote movie-caption SlideMovieCaptionEdit method is missing "
+            f"{name}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+
+    # Public declarations in package.rs/lib.rs are filtered to this facade;
+    # the owner and selector files are dedicated sources and are scanned in
+    # full.  cfg(test) items are already masked item-by-item above.
+    facade_names = (
+        canonical_names
+        | selector_names
+        | KEYNOTE_MOVIE_CAPTION_PACKAGE_METHODS
+        | KEYNOTE_MOVIE_CAPTION_FLAT_ALIASES
+        | {"SlideMovieCaptionEdit"}
+    )
+    for source, source_path in (
+        (owner, owner_path),
+        (selector, selector_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = source_path in {owner_path, selector_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_MOVIE_CAPTION_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_MOVIE_CAPTION_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_MOVIE_CAPTION_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote movie-caption public API exposes "
+                        f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote movie-caption public API exposes raw byte slice "
+                    f"{byte_slice}: {source_path.relative_to(root)}:{line_number}"
+                )
+
+            for match in KEYNOTE_MOVIE_CAPTION_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote movie-caption public API exposes raw identifier "
+                    f"parameter {match.group(0).strip()}: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+
+            for alias in sorted(identifiers & KEYNOTE_MOVIE_CAPTION_FLAT_ALIASES):
+                if alias in canonical_names:
+                    continue
+                violations.append(
+                    "focused litchi-keynote movie-caption public API retains flat alias "
+                    f"{alias}: {source_path.relative_to(root)}:{line_number}"
+                )
+
+            if "pub use" in declaration or re.search(r"\bpub[ \t]+type\b", declaration):
+                aliases = {
+                    match.group(1)
+                    for match in RUST_IDENTIFIER.finditer(declaration)
+                    if match.group(1) in KEYNOTE_MOVIE_CAPTION_FLAT_ALIASES
+                }
+                for alias in sorted(aliases):
+                    if alias in canonical_names:
+                        continue
+                    violations.append(
+                        "focused litchi-keynote movie-caption public API retains flat alias "
+                        f"{alias}: {source_path.relative_to(root)}:{line_number}"
+                    )
+                for match in re.finditer(
+                    r"(?<![A-Za-z0-9_#])(?:r#)?([A-Za-z_][A-Za-z0-9_]*)"
+                    r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+                    declaration,
+                ):
+                    original, public_name = match.groups()
+                    if (
+                        original in canonical_names | selector_names
+                        and public_name != original
+                    ):
+                        violations.append(
+                            "focused litchi-keynote movie-caption public API retains "
+                            f"alternate alias {public_name} for {original}: "
+                            f"{source_path.relative_to(root)}:{line_number}"
+                        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_movie_caption_source_topology(root: Path = ROOT) -> list[str]:
+    """Audit only a future selector-based movie-caption replacement bridge.
+
+    Existing title and graph create/remove methods intentionally remain in the
+    compatibility host during this phase.  Until selector-suffixed replacement
+    methods appear, this audit is a no-op.  Once they do appear, each method
+    must accept ``MovieSelector`` and route the focused read/edit operation to
+    the Keynote package owner rather than silently reimplementing the edge.
+    """
+
+    path = root / IWA_KEYNOTE_MOVIE_CAPTION_SOURCE
+    if not path.is_file():
+        return []
+    production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    source = _mask_rust_non_code(production_source)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    matches = list(declaration.finditer(source))
+    declared = {match.group(1) for match in matches}
+    if not declared.intersection(IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS):
+        return []
+
+    violations: list[str] = []
+
+    def body_after(match: re.Match[str]) -> str:
+        opening = source.find("{", match.end())
+        if opening < 0:
+            return ""
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(source) and depth:
+            if source[cursor] == "{":
+                depth += 1
+            elif source[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        return source[opening + 1 : cursor - 1] if depth == 0 else ""
+
+    for name in sorted(IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS - declared):
+        violations.append(
+            "litchi-iwa Keynote movie-caption selector bridge is missing "
+            f"{name}: {IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}"
+        )
+    for match in matches:
+        name = match.group(1)
+        if name not in IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS:
+            continue
+        line_number = source.count("\n", 0, match.start()) + 1
+        opening = source.find("{", match.end())
+        signature = source[match.start() : opening if opening >= 0 else len(source)]
+        if not re.search(
+            r"\bselector\b[ \t\r\n]*:[^,)]*\bMovieSelector\b", signature
+        ):
+            violations.append(
+                "litchi-iwa Keynote movie-caption selector bridge must accept a "
+                f"MovieSelector parameter {name}: "
+                f"{IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}:{line_number}"
+            )
+        body = body_after(match)
+        if name == "slide_movie_caption_by_selector":
+            routed = re.search(r"\bslide_movie_caption\b[ \t\r\n]*\(", body)
+        else:
+            routed = re.search(
+                r"\b(?:edit_slide_movie_caption|apply_slide_movie_caption)\b"
+                r"[ \t\r\n]*\(",
+                body,
+            )
+        if routed is None:
+            violations.append(
+                "litchi-iwa Keynote movie-caption selector bridge must route through "
+                f"the focused Package operation {name}: "
+                f"{IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -17272,6 +17675,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_chart_caption_legacy_calls()
         + audit_iwa_keynote_chart_caption_source_topology()
         + audit_keynote_chart_caption_facade_source_topology()
+        + audit_iwa_keynote_movie_caption_source_topology()
+        + audit_keynote_movie_caption_facade_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

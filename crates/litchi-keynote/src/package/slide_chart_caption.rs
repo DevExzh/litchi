@@ -1229,7 +1229,7 @@ fn caption_selection(
     })
 }
 
-fn require_private_object(
+pub(super) fn require_private_object(
     package: &Package,
     identifier: u64,
     message_type: u32,
@@ -1247,7 +1247,7 @@ fn require_private_object(
     validate_selected_message_metadata(object, 0)
 }
 
-fn validate_selected_message_metadata(
+pub(super) fn validate_selected_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
 ) -> Result<(), ChartCaptionError> {
@@ -1268,7 +1268,7 @@ fn validate_selected_message_metadata(
     Ok(())
 }
 
-fn prove_exclusive_caption_storage(
+pub(super) fn prove_exclusive_caption_storage(
     package: &Package,
     chart_identifier: u64,
     caption_info_identifier: u64,
@@ -1375,7 +1375,7 @@ fn prove_exclusive_caption_storage(
     }
 }
 
-fn prove_exclusive_caption_standin(
+pub(super) fn prove_exclusive_caption_standin(
     package: &Package,
     chart_identifier: u64,
     standin_identifier: u64,
@@ -1677,8 +1677,14 @@ fn rewrite_chart_caption_operation(
             return Err(ChartCaptionError::UnsupportedDependency);
         }
         if metadata_member_name(physical_catalog(source)?, source).is_ok() {
-            return rewrite_existing_caption_text_with_metadata(
-                source, selection, storage, end, desired, budget,
+            return rewrite_existing_caption_text_with_metadata_budget(
+                source,
+                storage,
+                selection.slide_node_identifier,
+                &selection.slide_component_name,
+                end,
+                desired,
+                budget,
             );
         }
         return Err(ChartCaptionError::InvalidSource);
@@ -1726,6 +1732,7 @@ fn rewrite_chart_caption_operation(
             .ok_or(ChartCaptionError::InvalidSource)?,
     )?;
     let slide_selector = metadata_facts.selector()?;
+    prove_metadata_selector_component(source, &slide_name, slide_selector)?;
     let first_identifier = next_caption_identifier(source, &metadata_facts)?;
     let (new_identifiers, replacement_identifier, graph_objects) = if creating {
         let first = first_identifier;
@@ -1851,10 +1858,36 @@ fn rewrite_chart_caption_operation(
     Ok((candidate, 2, previews.len()))
 }
 
-fn rewrite_existing_caption_text_with_metadata(
+/// Rewrite an existing caption storage and update the owning Metadata save
+/// token. This physical seam is shared by movie captions, whose native edge
+/// codec and graph selection differ from charts but whose storage/metadata
+/// transaction is identical.
+pub(super) fn rewrite_existing_storage_text_with_metadata(
     source: &Package,
-    selection: &CaptionSelection,
     storage_identifier: u64,
+    slide_node_identifier: u64,
+    slide_component_name: &str,
+    end: usize,
+    desired: &str,
+) -> Result<(Package, usize, usize), ChartCaptionError> {
+    let mut budget = CaptionBudget::for_package(source)?;
+    budget.charge_catalog_scan(source)?;
+    rewrite_existing_caption_text_with_metadata_budget(
+        source,
+        storage_identifier,
+        slide_node_identifier,
+        slide_component_name,
+        end,
+        desired,
+        &mut budget,
+    )
+}
+
+fn rewrite_existing_caption_text_with_metadata_budget(
+    source: &Package,
+    storage_identifier: u64,
+    slide_node_identifier: u64,
+    slide_component_name: &str,
     end: usize,
     desired: &str,
     budget: &mut CaptionBudget,
@@ -1866,7 +1899,7 @@ fn rewrite_existing_caption_text_with_metadata(
     let (native_candidate, touched) = super::slide_text::rewrite_owned_storage_text(
         source,
         storage_identifier,
-        selection.slide_node_identifier,
+        slide_node_identifier,
         0..end,
         desired,
     )
@@ -1876,7 +1909,7 @@ fn rewrite_existing_caption_text_with_metadata(
     let metadata_facts = caption_metadata_facts(
         &native_candidate,
         &metadata_source.2,
-        metadata_locator(&selection.slide_component_name),
+        metadata_locator(slide_component_name),
         budget,
     )?;
     budget.charge_metadata_report(
@@ -1884,14 +1917,24 @@ fn rewrite_existing_caption_text_with_metadata(
             .inspection_report
             .ok_or(ChartCaptionError::InvalidSource)?,
     )?;
-    let selector = metadata_facts.selector()?;
-    if selector.identifier() != metadata_facts.selected_identifier.unwrap_or_default() {
+    let touched_component_names = exact_component_names_for_identifiers(
+        &native_candidate,
+        &[storage_identifier, slide_node_identifier],
+    )?;
+    if !touched_component_names
+        .iter()
+        .any(|name| name == slide_component_name)
+    {
         return Err(ChartCaptionError::InvalidSource);
     }
-    let selectors = [selector];
+    let selectors = metadata_selectors_for_component_names(
+        &native_candidate,
+        &metadata_facts,
+        &touched_component_names,
+    )?;
     let prepared_metadata = prepare_package_metadata_save_tokens(
         &metadata_source.2,
-        SaveTokenBatch::new(&selectors),
+        SaveTokenBatch::new(selectors.as_slice()),
         metadata_options(&native_candidate, budget, 0)?,
     )
     .map_err(map_metadata_error)?;
@@ -2067,6 +2110,89 @@ fn metadata_locator(name: &str) -> &str {
     name.strip_prefix("Index/")
         .and_then(|name| name.strip_suffix(".iwa"))
         .unwrap_or(name)
+}
+
+fn prove_metadata_selector_component(
+    package: &Package,
+    component_name: &str,
+    selector: ComponentSelector<'_>,
+) -> Result<(), ChartCaptionError> {
+    if selector.locator() != metadata_locator(component_name) {
+        return Err(ChartCaptionError::InvalidSource);
+    }
+    let mut owners = 0usize;
+    for component in package.state.source.components().iter() {
+        if component.archive().object(selector.identifier()).is_none() {
+            continue;
+        }
+        if component.name() != component_name {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        owners = owners
+            .checked_add(1)
+            .ok_or(ChartCaptionError::InvalidSource)?;
+    }
+    if owners == 1 {
+        Ok(())
+    } else {
+        Err(ChartCaptionError::InvalidSource)
+    }
+}
+
+fn exact_component_names_for_identifiers(
+    package: &Package,
+    identifiers: &[u64],
+) -> Result<Vec<String>, ChartCaptionError> {
+    let mut names = Vec::new();
+    names
+        .try_reserve_exact(identifiers.len())
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: identifiers.len(),
+        })?;
+    for identifier in identifiers {
+        let mut owners = package
+            .state
+            .source
+            .components()
+            .iter()
+            .filter(|component| component.archive().object(*identifier).is_some());
+        let owner = owners.next().ok_or(ChartCaptionError::InvalidSource)?;
+        if owners.next().is_some() {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        if !names.iter().any(|name| name == owner.name()) {
+            names.push(owner.name().to_owned());
+        }
+    }
+    Ok(names)
+}
+
+fn metadata_selectors_for_component_names<'facts>(
+    package: &Package,
+    facts: &'facts CaptionMetadataFacts,
+    component_names: &[String],
+) -> Result<Vec<ComponentSelector<'facts>>, ChartCaptionError> {
+    let mut selectors = Vec::new();
+    selectors
+        .try_reserve_exact(component_names.len())
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: component_names.len(),
+        })?;
+    for component_name in component_names {
+        let locator = metadata_locator(component_name);
+        let mut matches = facts
+            .components
+            .iter()
+            .filter(|component| component.current && component.locator == locator);
+        let component = matches.next().ok_or(ChartCaptionError::InvalidSource)?;
+        if matches.next().is_some() {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        let selector = ComponentSelector::new(component.identifier, component.locator.as_str());
+        prove_metadata_selector_component(package, component_name, selector)?;
+        selectors.push(selector);
+    }
+    Ok(selectors)
 }
 
 fn metadata_options(
@@ -3035,7 +3161,7 @@ fn verify_caption_candidate(
     Ok(())
 }
 
-fn verify_existing_text_metadata_candidate(
+pub(super) fn verify_existing_text_metadata_candidate(
     source: &Package,
     candidate: &Package,
     storage_identifier: u64,
@@ -3227,7 +3353,7 @@ fn chart_caption_rewrite_options(
     .with_max_output_bytes(limits.max_output_bytes().min(budget.remaining_output())))
 }
 
-fn caption_info_decode_options(
+pub(super) fn caption_info_decode_options(
     package: &Package,
     payload: &[u8],
 ) -> Result<pages_movie_caption_codec::DecodeOptions, ChartCaptionError> {
@@ -3595,7 +3721,7 @@ fn map_chart_caption_codec_error(
     ChartCaptionError::InvalidSource
 }
 
-fn map_caption_info_codec_error(
+pub(super) fn map_caption_info_codec_error(
     error: pages_movie_caption_codec::DecodeError,
 ) -> ChartCaptionError {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
@@ -3622,7 +3748,7 @@ fn map_caption_info_codec_error(
     ChartCaptionError::InvalidSource
 }
 
-fn map_slide_text_error(error: super::slide_text::SlideTextError) -> ChartCaptionError {
+pub(super) fn map_slide_text_error(error: super::slide_text::SlideTextError) -> ChartCaptionError {
     match error {
         super::slide_text::SlideTextError::UnsupportedSource => {
             ChartCaptionError::UnsupportedSource

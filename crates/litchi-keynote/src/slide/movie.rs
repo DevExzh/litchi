@@ -1,10 +1,67 @@
-//! Archive-free options for inserting a file-backed movie on a slide.
+//! Archive-free selectors and options for semantic slide movies.
 
 use std::time::Duration;
 
+use litchi_core::Position;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 
 use crate::{Error, Result};
+
+/// Selects one movie by its zero-based position in the slide's source order.
+///
+/// The selector is deliberately archive-free: it contains a typed semantic
+/// position only. Native object identifiers, component names, and protobuf
+/// values remain in the adapter that resolves the selector against a package.
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "MovieSelector keeps the selected Keynote domain explicit at the public boundary"
+)]
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MovieSelector {
+    /// Select the movie at this zero-based source-order position.
+    Index(Position),
+}
+
+impl MovieSelector {
+    /// Create a selector from a zero-based source-order index.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::Index(Position::new(index))
+    }
+
+    /// Create a selector from a typed zero-based source-order position.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self::Index(position)
+    }
+
+    /// Return the selected typed source-order position.
+    #[must_use]
+    pub const fn as_position(self) -> Position {
+        match self {
+            Self::Index(position) => position,
+        }
+    }
+
+    /// Return the selected zero-based source-order index.
+    #[must_use]
+    pub const fn as_index(self) -> usize {
+        self.as_position().get()
+    }
+}
+
+impl From<usize> for MovieSelector {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
+impl From<Position> for MovieSelector {
+    fn from(position: Position) -> Self {
+        Self::position(position)
+    }
+}
 
 /// Validated placement, dimensions, and duration for a new slide movie.
 ///
@@ -125,6 +182,27 @@ mod tests {
         width: 1_280.0,
         height: 720.0,
     };
+
+    #[test]
+    fn selector_stays_typed_and_source_ordered() {
+        const POSITION: Position = Position::new(3);
+        const SELECTOR: MovieSelector = MovieSelector::position(POSITION);
+
+        assert_eq!(SELECTOR, MovieSelector::Index(POSITION));
+        assert_eq!(SELECTOR.as_position(), POSITION);
+        assert_eq!(SELECTOR.as_index(), 3);
+    }
+
+    #[test]
+    fn selector_constructors_and_conversions_do_not_introduce_native_identity() {
+        let from_index = MovieSelector::index(5);
+        let from_position = MovieSelector::from(Position::new(5));
+        let from_usize = MovieSelector::from(5usize);
+
+        assert_eq!(from_index, from_position);
+        assert_eq!(from_index, from_usize);
+        assert_eq!(from_index.as_position(), Position::new(5));
+    }
 
     #[test]
     fn stores_validated_movie_options_without_heap_state() {

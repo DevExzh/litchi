@@ -1259,6 +1259,20 @@ mod tests {
             expected
         );
 
+        editor
+            .set_slide_movie_caption(0, movie.drawable_object_id, "Updated revenue overview")
+            .unwrap();
+        let replaced = crate::DrawableTitleCaption {
+            title: Some("Quarterly highlight".to_owned()),
+            caption: Some("Updated revenue overview".to_owned()),
+        };
+        assert_eq!(
+            editor
+                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .unwrap(),
+            replaced
+        );
+
         let duplicate = editor
             .duplicate_slide_movie(0, movie.drawable_object_id)
             .unwrap();
@@ -1266,7 +1280,7 @@ mod tests {
             editor
                 .slide_movie_title_caption(0, duplicate.drawable_object_id)
                 .unwrap(),
-            expected
+            replaced
         );
 
         editor
@@ -1299,7 +1313,7 @@ mod tests {
             reopened
                 .slide_movie_title_caption(0, duplicate.drawable_object_id)
                 .unwrap(),
-            expected
+            replaced
         );
         editor = reopened;
         editor
