@@ -490,6 +490,7 @@ struct Located {
     comment: Option<Comment>,
     entry: Option<CommentEntryLocation>,
     storage: Option<MessageRoute>,
+    tile: Option<MessageRoute>,
     cell_bytes: Option<Arc<[u8]>>,
     comment_key: Option<u32>,
     comment_table_id: Option<u64>,
@@ -537,9 +538,47 @@ struct MessageRoute {
 }
 
 #[derive(Debug, Clone)]
-struct Mutation {
-    route: MessageRoute,
-    data: Vec<u8>,
+enum ArchiveMutation {
+    ReplaceMessage {
+        route: MessageRoute,
+        data: Vec<u8>,
+        pruned_object_references: Vec<u64>,
+    },
+    DeleteObject {
+        component_index: usize,
+        object_identifier: u64,
+    },
+}
+
+struct PreparedRootClear {
+    cell: Vec<u8>,
+    mutations: Vec<ArchiveMutation>,
+}
+
+impl ArchiveMutation {
+    const fn component_index(&self) -> usize {
+        match self {
+            Self::ReplaceMessage { route, .. } => route.component_index,
+            Self::DeleteObject {
+                component_index, ..
+            } => *component_index,
+        }
+    }
+
+    const fn ordering_key(&self) -> (usize, usize, usize, u64) {
+        match self {
+            Self::ReplaceMessage { route, .. } => (
+                route.component_index,
+                route.object_index,
+                route.message_index,
+                0,
+            ),
+            Self::DeleteObject {
+                component_index,
+                object_identifier,
+            } => (*component_index, usize::MAX, usize::MAX, *object_identifier),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -954,6 +993,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment: None,
             entry: None,
             storage: None,
+            tile: None,
             cell_bytes: None,
             comment_key: None,
             comment_table_id: None,
@@ -1001,6 +1041,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment: None,
             entry: None,
             storage: None,
+            tile: Some(tile_route),
             cell_bytes: None,
             comment_key: None,
             comment_table_id: None,
@@ -1053,6 +1094,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment: None,
             entry: None,
             storage: None,
+            tile: Some(tile_route),
             cell_bytes: None,
             comment_key: None,
             comment_table_id: None,
@@ -1071,6 +1113,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment: None,
             entry: None,
             storage: None,
+            tile: Some(tile_route),
             cell_bytes: Some(copy_bytes(cell_source, path)?),
             comment_key: None,
             comment_table_id: None,
@@ -1125,6 +1168,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
         comment: Some(details.comment),
         entry: Some(entry),
         storage: Some(storage_route),
+        tile: Some(tile_route),
         cell_bytes: Some(copy_bytes(cell_source, path)?),
         comment_key: Some(comment_key),
         comment_table_id: Some(comment_table_id),
@@ -1419,6 +1463,17 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     // graph inspection or archive mutation so segmented/shared entries are
     // rejected uniformly and publication can never become a cell-only clear.
     if edit.before.is_some() && edit.after.is_none() {
+        let located = resolve_comment_native(edit.source, edit.target.clone())?;
+        if located.comment != edit.before {
+            return Err(Error::InvalidSource {
+                path: edit.target.path,
+            });
+        }
+        prove_global_comment_ownership(edit.source, &located)?;
+        let prepared = prepare_root_clear(edit.source, &located)?;
+        if prepared.cell.is_empty() || prepared.mutations.len() != 3 {
+            return Err(Error::Verification);
+        }
         return Err(Error::UnsupportedDependency {
             path: edit.target.path,
         });
@@ -1539,9 +1594,10 @@ fn rewrite_existing(
         amount: 1,
         path: located.target.path,
     })?;
-    mutations.push(Mutation {
+    mutations.push(ArchiveMutation::ReplaceMessage {
         route: storage,
         data,
+        pruned_object_references: Vec::new(),
     });
     let (bytes, touched) = rewrite_archives(source, &mut mutations, located.target.path)?;
     let deleted = root_preview_deletions(source_catalog)?;
@@ -1561,23 +1617,71 @@ fn rewrite_existing(
     Ok((package, Arc::clone(cell), touched, deleted.len()))
 }
 
+fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRootClear, Error> {
+    let path = located.target.path;
+    let entry = located
+        .entry
+        .as_ref()
+        .filter(|entry| matches!(entry.owner, EntryOwner::Root))
+        .ok_or(Error::UnsupportedDependency { path })?;
+    let storage = located.storage.ok_or(Error::InvalidSource { path })?;
+    let tile = located.tile.ok_or(Error::InvalidSource { path })?;
+    let key = located.comment_key.ok_or(Error::InvalidSource { path })?;
+    let cell_source = located
+        .cell_bytes
+        .as_deref()
+        .ok_or(Error::InvalidSource { path })?;
+    let cell = crate::cell::wire::BncCellView::parse(cell_source)
+        .map_err(|_| Error::InvalidSource { path })?
+        .clear_comment_with_limit(key, WireLimits::MAX_OUTPUT_BYTES)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let list_source = message_at_route(source, entry.route, path)?.data.as_slice();
+    let list_data = numbers_table_cell_storage_codec::remove_table_data_list_entry(
+        list_source,
+        numbers_table_cell_storage_codec::TableDataListEntryRemoval::new(
+            key,
+            entry.entry.refcount,
+            entry.entry.storage_id,
+        ),
+        table_cell_decode_options(
+            source,
+            list_source.len(),
+            source.state.options.semantic().max_references(),
+        ),
+    )
+    .map_err(|error| map_table_codec_error(error, path))?;
+    let mut mutations = Vec::new();
+    mutations
+        .try_reserve_exact(3)
+        .map_err(|_| Error::Allocation { amount: 3, path })?;
+    mutations.push(ArchiveMutation::ReplaceMessage {
+        route: tile,
+        data: Vec::new(),
+        pruned_object_references: Vec::new(),
+    });
+    mutations.push(ArchiveMutation::ReplaceMessage {
+        route: entry.route,
+        data: list_data,
+        pruned_object_references: vec![entry.entry.storage_id],
+    });
+    mutations.push(ArchiveMutation::DeleteObject {
+        component_index: storage.component_index,
+        object_identifier: entry.entry.storage_id,
+    });
+    Ok(PreparedRootClear { cell, mutations })
+}
+
 fn rewrite_archives(
     source: &Package,
-    mutations: &mut [Mutation],
+    mutations: &mut [ArchiveMutation],
     path: Path,
 ) -> Result<(Vec<(String, Vec<u8>)>, usize), Error> {
-    mutations.sort_by_key(|mutation| {
-        (
-            mutation.route.component_index,
-            mutation.route.object_index,
-            mutation.route.message_index,
-        )
-    });
+    mutations.sort_by_key(ArchiveMutation::ordering_key);
     let mut outputs = Vec::new();
     let mut touched = 0usize;
     let mut mutation_cursor = 0usize;
     while mutation_cursor < mutations.len() {
-        let component_index = mutations[mutation_cursor].route.component_index;
+        let component_index = mutations[mutation_cursor].component_index();
         let component = source
             .state
             .components
@@ -1614,26 +1718,41 @@ fn rewrite_archives(
             .map_err(|_| Error::InvalidSource { path })?;
         let start_mutations = mutation_cursor;
         while mutation_cursor < mutations.len()
-            && mutations[mutation_cursor].route.component_index == component_index
+            && mutations[mutation_cursor].component_index() == component_index
         {
-            let mutation = &mut mutations[mutation_cursor];
-            let object = archive
-                .objects
-                .get_mut(mutation.route.object_index)
-                .ok_or(Error::InvalidSource { path })?;
-            if object.archive_info.identifier.is_none() {
-                return Err(Error::InvalidSource { path });
+            match &mut mutations[mutation_cursor] {
+                ArchiveMutation::ReplaceMessage {
+                    route,
+                    data,
+                    pruned_object_references,
+                } => {
+                    let object = archive
+                        .objects
+                        .get_mut(route.object_index)
+                        .ok_or(Error::InvalidSource { path })?;
+                    if object.archive_info.identifier.is_none() {
+                        return Err(Error::InvalidSource { path });
+                    }
+                    object
+                        .replace_message_pruning_object_references_preserving_header_with_limits(
+                            route.message_index,
+                            RawMessage {
+                                type_: route.message_type,
+                                data: std::mem::take(data),
+                            },
+                            pruned_object_references,
+                            archive_limits,
+                        )
+                        .map_err(|_| Error::InvalidSource { path })?;
+                },
+                ArchiveMutation::DeleteObject {
+                    object_identifier, ..
+                } => {
+                    archive
+                        .remove_object_checked_with_limits(*object_identifier, archive_limits)
+                        .map_err(|_| Error::InvalidSource { path })?;
+                },
             }
-            object
-                .replace_message_preserving_header_with_limits(
-                    mutation.route.message_index,
-                    RawMessage {
-                        type_: mutation.route.message_type,
-                        data: std::mem::take(&mut mutation.data),
-                    },
-                    archive_limits,
-                )
-                .map_err(|_| Error::InvalidSource { path })?;
             mutation_cursor += 1;
         }
         if mutation_cursor == start_mutations {
@@ -3191,7 +3310,37 @@ fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> 
 
 #[cfg(test)]
 mod tests {
-    use super::{Comment, Error, LimitKind, Path, WireLimits, cell_ranges};
+    use super::{
+        ArchiveMutation, Comment, Error, LimitKind, MessageRoute, Path, WireLimits, cell_ranges,
+    };
+
+    #[test]
+    fn archive_mutations_order_replacements_before_object_deletion() {
+        let route = MessageRoute {
+            component_index: 2,
+            object_index: 4,
+            message_index: 1,
+            message_type: 6_005,
+        };
+        let mut mutations = [
+            ArchiveMutation::DeleteObject {
+                component_index: 2,
+                object_identifier: 51,
+            },
+            ArchiveMutation::ReplaceMessage {
+                route,
+                data: vec![1],
+                pruned_object_references: vec![51],
+            },
+        ];
+        mutations.sort_by_key(ArchiveMutation::ordering_key);
+
+        assert!(matches!(
+            mutations[0],
+            ArchiveMutation::ReplaceMessage { .. }
+        ));
+        assert!(matches!(mutations[1], ArchiveMutation::DeleteObject { .. }));
+    }
 
     #[test]
     fn cell_ranges_precompute_sparse_offsets_in_one_pass() {
