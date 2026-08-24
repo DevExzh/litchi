@@ -457,16 +457,22 @@ impl Package {
     ) -> Result<BodyTableLockCommit, BodyTableLockError> {
         let source = physical_source(self)?;
         let mut budget = WireBudget::new(source.limits())?;
-        if fingerprint(source.source_bytes(), &mut budget)? != patch.source_fingerprint
-            || source.source_bytes() != patch.source.as_ref()
-            || body_table_lock_at_target_with_budget(self, &patch.proof, &mut budget)?
-                != patch.before
-        {
+        if fingerprint(source.source_bytes(), &mut budget)? != patch.source_fingerprint {
+            return Err(BodyTableLockError::PatchConflict);
+        }
+        if !bytes_equal_with_budget(source.source_bytes(), patch.source.as_ref(), &mut budget)? {
+            return Err(BodyTableLockError::PatchConflict);
+        }
+        if body_table_lock_at_target_with_budget(self, &patch.proof, &mut budget)? != patch.before {
             return Err(BodyTableLockError::PatchConflict);
         }
         if patch.is_noop() {
-            if patch.source.as_ref() != patch.target.as_ref()
-                || patch.source_fingerprint != patch.target_fingerprint
+            if patch.source_fingerprint != patch.target_fingerprint
+                || !bytes_equal_with_budget(
+                    patch.source.as_ref(),
+                    patch.target.as_ref(),
+                    &mut budget,
+                )?
             {
                 return Err(BodyTableLockError::PatchConflict);
             }
@@ -512,20 +518,28 @@ impl Package {
         budget.charge_source_catalog(source)?;
         let targets = native_body_table_targets_with_budget(self, budget)?;
         match selector {
-            BodyTableSelector::Position(position) => targets
-                .into_iter()
-                .nth(position.get())
-                .ok_or(BodyTableLockError::TableNotFound),
-            BodyTableSelector::Name(name) => {
-                let mut matching = targets
+            BodyTableSelector::Position(position) => {
+                budget.charge_payload_work(position.get().saturating_add(1).min(targets.len()))?;
+                targets
                     .into_iter()
-                    .filter(|target| target.table_name.as_ref() == name);
-                let Some(first) = matching.next() else {
+                    .nth(position.get())
+                    .ok_or(BodyTableLockError::TableNotFound)
+            },
+            BodyTableSelector::Name(name) => {
+                let mut first = None;
+                for target in targets {
+                    budget
+                        .charge_payload_work(target.table_name.len().saturating_add(name.len()))?;
+                    if target.table_name.as_ref() != name {
+                        continue;
+                    }
+                    if first.replace(target).is_some() {
+                        return Err(BodyTableLockError::AmbiguousTableName);
+                    }
+                }
+                let Some(first) = first else {
                     return Err(BodyTableLockError::TableNotFound);
                 };
-                if matching.next().is_some() {
-                    return Err(BodyTableLockError::AmbiguousTableName);
-                }
                 Ok(first)
             },
         }
@@ -1194,16 +1208,22 @@ fn rewrite_lock_state(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    // Account for the compressed component scan before decompression and for
-    // the decoded archive inventory before Archive::parse can reserve it.
+    // Account for the compressed component scan and the complete decoded
+    // archive inventory before Snappy decompression or Archive::parse can
+    // reserve output. The already-parsed source catalog retains the exact
+    // decompressed object extents needed for this allocation-free preflight.
     budget.charge_payload_work(entry.data().len())?;
+    let expected_stream_length = parsed_archive_source_length(component.archive())?;
+    budget.charge_archive_inventory(expected_stream_length, component.archive())?;
     let stream = SnappyStream::decompress_with_limits(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
     let stream_length = stream.as_bytes().len();
-    budget.charge_archive_inventory(stream_length, component.archive())?;
+    if stream_length != expected_stream_length {
+        return Err(BodyTableLockError::InvalidSource);
+    }
     let mut archive =
         Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive, budget)?;
@@ -1883,6 +1903,17 @@ fn validate_selected_metadata(
     Ok(())
 }
 
+fn parsed_archive_source_length(archive: &Archive) -> Result<usize, BodyTableLockError> {
+    let Some(last) = archive.objects.last() else {
+        return Ok(0);
+    };
+    let length = last
+        .data_offset
+        .checked_add(last.data_length)
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    usize::try_from(length).map_err(|_| BodyTableLockError::InvalidSource)
+}
+
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
@@ -1976,6 +2007,18 @@ fn charge_reopen_work(
         }
     }
     Ok(())
+}
+
+fn bytes_equal_with_budget(
+    left: &[u8],
+    right: &[u8],
+    budget: &mut WireBudget,
+) -> Result<bool, BodyTableLockError> {
+    if left.len() != right.len() {
+        return Ok(false);
+    }
+    budget.charge_payload_work(left.len())?;
+    Ok(left == right)
 }
 
 fn fingerprint(bytes: &[u8], budget: &mut WireBudget) -> Result<u64, BodyTableLockError> {
@@ -2707,6 +2750,54 @@ mod tests {
             format!("{edit:?}"),
             "BodyTableLockEdit { before: Unlocked, state: Locked, .. }"
         );
+    }
+
+    #[test]
+    fn parsed_archive_source_length_matches_exact_stream_extent() {
+        let archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 10_000,
+                        data: vec![1, 2, 3],
+                    }],
+                )
+                .expect("first object"),
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 2_001,
+                        data: vec![4, 5, 6, 7],
+                    }],
+                )
+                .expect("second object"),
+            ],
+        };
+        let source = archive.to_bytes().expect("archive bytes");
+        let parsed = Archive::parse(&source).expect("parsed archive");
+        assert_eq!(
+            parsed_archive_source_length(&parsed).expect("source extent"),
+            source.len()
+        );
+        assert_eq!(
+            parsed_archive_source_length(&Archive {
+                objects: Vec::new()
+            })
+            .expect("empty extent"),
+            0
+        );
+    }
+
+    #[test]
+    fn exact_byte_comparisons_charge_only_equal_length_scans() {
+        let mut budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        assert!(!bytes_equal_with_budget(b"abc", b"abcd", &mut budget).expect("different lengths"));
+        assert_eq!(budget.payload_work, 0);
+        assert!(bytes_equal_with_budget(b"abc", b"abc", &mut budget).expect("equal bytes"));
+        assert_eq!(budget.payload_work, 3);
+        assert!(!bytes_equal_with_budget(b"abc", b"abd", &mut budget).expect("different bytes"));
+        assert_eq!(budget.payload_work, 6);
     }
 
     #[test]
