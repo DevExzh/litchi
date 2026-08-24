@@ -9,6 +9,7 @@
 mod codec;
 pub mod footnote_columns;
 mod inventory;
+pub mod layout;
 mod model;
 
 #[cfg(test)]
@@ -20,4 +21,9 @@ pub use inventory::{
 };
 pub use model::{
     Column, Columns, Emu, Margins, Orientation, PageSize, Reference, Section, Sections, Start,
+};
+
+pub use layout::{
+    Commit as LayoutCommit, Edit as LayoutEdit, Patch as LayoutPatch,
+    Publication as LayoutPublication, Snapshot as LayoutSnapshot,
 };

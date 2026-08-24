@@ -1,11 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest DOCX section-layout closure (change 0273)
+
+[Change 0273](changes/0273-docx-source-backed-section-layout.md) adds one
+opt-in typed existing-main-story section layout selector covering
+PageSize/Margins/Start/Columns snapshot/edit/commit, durable patch/inverse, and
+sequential publication. The current selectable matrix is **393 names** and
+the default remains **36 cases / 198 records**. This is correctness/CRUD
+closure with `performance_claim: none`; dirty five-sample timing/profile and
+whole-process counters are descriptive only. The remaining evidence gap is a
+clean retained performance package; no physical-I/O, allocator/RSS, or broad
+DOCX claim follows.
+
 ## Current matrix and gap (change 0272)
 
 [Change 0272](changes/0272-opc-source-overlay-multi-part-matrix.md) adds three
 opt-in source-overlay multi-part selectors and 27 benchmark records: changed,
 equal-payload no-op, and mixed, each across sizes 2/8/32 and
-small/large/media-incompressible payloads. The selectable matrix is **392
+small/large/media-incompressible payloads. The selectable matrix is **393
 names**; the default remains **36 cases / 198 records**. This is
 benchmark-only correctness/evidence coverage with `performance_claim: none`.
 The dirty five-sample profile is only prioritization evidence; the current gap
@@ -1152,7 +1164,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**392 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**393 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

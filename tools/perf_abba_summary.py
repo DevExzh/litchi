@@ -210,6 +210,56 @@ _XLSX_REPEAT_STORE_PROJECTION_SHA256 = (
     "01c253bf3fc611835e0806414c6417a9cfbb012ff6e01f9bb55cec94236a6235"
 )
 
+# The DOCX section-layout selector uses one fixed, non-CLI corpus.  Keep its
+# static manifest and section identity separate from the compiled smoke pins.
+DOCX_SECTION_LAYOUT_CASE = "docx_source_backed_existing_section_layout_edit_save"
+DOCX_SECTION_LAYOUT_FIXED_CORPUS_FIELDS: dict[str, Any] = {
+    "name": "docx-source-backed-existing-section-layout",
+    "generator": "litchi-docx-section-layout-source-v1",
+    "package_format": "DOCX/OPC/ZIP",
+    "shape": "existing-section-layout",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 7,
+    "archive_member_count": 10,
+    "entry_bytes": 512 * 1024,
+    "target_entry": "word/document.xml",
+    "xlsx": None,
+}
+DOCX_SECTION_LAYOUT_CORPUS_IDENTITY: dict[str, Any] = {
+    **DOCX_SECTION_LAYOUT_FIXED_CORPUS_FIELDS,
+    # Pinned from the compiled change-0273 smoke report.
+    "uncompressed_payload_bytes": 2_116_441,
+    "archive_bytes": 2_101_427,
+    "archive_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+    "target_payload_bytes": 18_855,
+    "target_payload_sha256": "67cb9066f112bfee6905a23f3eabdc76b65c86cd0c6613dd60a5a18895ceac81",
+}
+DOCX_SECTION_LAYOUT_HASH_FIELDS = (
+    "uncompressed_payload_bytes",
+    "archive_bytes",
+    "archive_sha256",
+    "target_payload_bytes",
+    "target_payload_sha256",
+)
+# Pinned from the deterministic source generator used by the compiled
+# change-0273 smoke report. The report schema exposes the archive binding but
+# not individual media members, so these values are independently derived
+# from the four generator payloads.
+DOCX_SECTION_LAYOUT_MEDIA_PAYLOAD_SHA256: tuple[str | None, ...] = (
+    "e9f29948f8df63fcf0239ac1302d0da879ffc1025f62d87ab233ac31ce823e5e",
+    "dd755641a26e08aea79988769fe1240d309e2467d7f57b1351647f78ed814e20",
+    "68691a8c911bdd6660d475f31e80bce46ed06f3f38037e698c270d93ecb7b86c",
+    "7f21c0cb8c0dee91242cf66e9c72feeb21c89422ce9e6a8efeff7c335c7e9417",
+)
+# Pinned from the deterministic changed-publication output in the compiled
+# change-0273 smoke report.
+DOCX_SECTION_LAYOUT_EXPECTED_OUTPUT_SHA256: str | None = (
+    "5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec"
+)
+DOCX_SECTION_LAYOUT_EXPECTED_OUTPUT_BYTES = 2_101_446
+DOCX_SECTION_LAYOUT_HASHES_PENDING = False
+
 # These selectors use a fixed, non-CLI corpus.  Its shape therefore cannot be
 # listed in any of the configurable ``*_shapes`` fields emitted by the
 # historical schema-1 harness.  Keep this exception exact and case-local so an
@@ -273,6 +323,7 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
         "generator": "litchi-xls-rk-mulrk-publication-v1",
         "shape": "one-rk-one-mulrk",
     },
+    DOCX_SECTION_LAYOUT_CASE: DOCX_SECTION_LAYOUT_FIXED_CORPUS_FIELDS,
 }
 
 OPC_SOURCE_OVERLAY_MULTI_PART_CASES = frozenset(
@@ -2734,6 +2785,7 @@ def _validate_report(
     _validate_configuration(configuration, label)
     indexed = _index_results(root, label)
     _validate_opc_source_overlay_result_rows(indexed, configuration, label)
+    _validate_docx_section_layout_result_rows(indexed, configuration, label)
     _validate_xls_numeric_source_summary(indexed, label)
     _validate_xls_numeric_operation_evidence(
         indexed,
@@ -2925,6 +2977,125 @@ _OPC_SOURCE_OVERLAY_SINK_BUCKET_KEYS = frozenset(
     }
 )
 
+_DOCX_SECTION_LAYOUT_TIMING_SCOPE = (
+    "preparation, source-backed open, section query, columns edit, commit, "
+    "and sequential publication; correctness, reopen, patch, refusal, cache, "
+    "source, sink, and ZIP gates are excluded"
+)
+_DOCX_SECTION_LAYOUT_PHASE_VECTOR_FIELDS = (
+    "preparation_ns",
+    "open_ns",
+    "query_ns",
+    "edit_ns",
+    "commit_ns",
+    "publication_ns",
+)
+_DOCX_SECTION_LAYOUT_COUNTER_VECTOR_FIELDS = (
+    "source_read_calls",
+    "source_read_bytes",
+    "ordinary_payload_materializations",
+    "source_cache_before_publication_after_commit_hits",
+    "source_cache_before_publication_after_commit_cold_loads",
+    "source_cache_before_publication_after_commit_successful_loads",
+    "source_cache_before_publication_after_commit_retained_entries",
+    "source_cache_before_publication_after_commit_retained_bytes",
+)
+_DOCX_SECTION_LAYOUT_DYNAMIC_FIELDS = frozenset(
+    {
+        "sample_order",
+        *_DOCX_SECTION_LAYOUT_PHASE_VECTOR_FIELDS,
+        *_DOCX_SECTION_LAYOUT_COUNTER_VECTOR_FIELDS,
+    }
+)
+_DOCX_SECTION_LAYOUT_ROOT_SOURCE_VECTOR_FIELDS = (
+    "read_calls",
+    "read_bytes",
+    "ordinary_payload_read_calls",
+    "ordinary_payload_read_bytes",
+    "max_in_flight_reads",
+    "ordinary_payload_materializations",
+)
+_DOCX_SECTION_LAYOUT_GATE_FIELDS = (
+    "phase_sum_verified",
+    "semantic_reopen_all_sections_verified",
+    "table_cell_sectpr_excluded_verified",
+    "raw_untouched_members_verified",
+    "raw_member_order_and_comment_verified",
+    "header_footer_relationships_verified",
+    "source_immutability_verified",
+    "patch_forward_inverse_verified",
+    "publication_inverse_exact_source_verified",
+    "stale_foreign_signed_noop_limits_partial_sink_verified",
+    "cache_counters_verified",
+    "sink_counters_verified",
+)
+_DOCX_SECTION_LAYOUT_KEYS = frozenset(
+    {
+        "implementation",
+        "timing_scope",
+        "performance_claim",
+        "source_bytes",
+        "source_sha256",
+        "expected_output_sha256",
+        "total_main_story_paragraph_count",
+        "section_count",
+        "paragraph_owned_section_positions",
+        "selected_paragraph",
+        "columns_before",
+        "columns_after",
+        "media_count",
+        "media_bytes",
+        "sample_order",
+        *_DOCX_SECTION_LAYOUT_PHASE_VECTOR_FIELDS,
+        *_DOCX_SECTION_LAYOUT_COUNTER_VECTOR_FIELDS,
+        "output_sha256",
+        *_DOCX_SECTION_LAYOUT_GATE_FIELDS,
+    }
+)
+
+
+def _docx_section_layout_static_corpus_match(corpus: Any) -> bool:
+    return isinstance(corpus, Mapping) and all(
+        corpus.get(field) == value
+        for field, value in DOCX_SECTION_LAYOUT_FIXED_CORPUS_FIELDS.items()
+    )
+
+
+def _validate_docx_section_layout_corpus_identity(
+    corpus: Mapping[str, Any],
+    location: str,
+    *,
+    allow_pending_hashes: bool = False,
+) -> None:
+    if not _docx_section_layout_static_corpus_match(corpus):
+        raise AbbaSummaryInputError(
+            f"{location} does not match the fixed DOCX section-layout corpus"
+        )
+    if set(corpus) != set(DOCX_SECTION_LAYOUT_CORPUS_IDENTITY):
+        raise AbbaSummaryInputError(
+            f"{location} schema does not match the fixed DOCX section-layout manifest"
+        )
+    for field in DOCX_SECTION_LAYOUT_HASH_FIELDS:
+        value = corpus[field]
+        if field.endswith("_sha256"):
+            _validate_output_sha256(value, f"{location}.{field}")
+        else:
+            _u64(value, f"{location}.{field}", positive=True)
+    pending = DOCX_SECTION_LAYOUT_HASHES_PENDING or any(
+        value is None for value in DOCX_SECTION_LAYOUT_MEDIA_PAYLOAD_SHA256
+    ) or DOCX_SECTION_LAYOUT_EXPECTED_OUTPUT_SHA256 is None
+    if pending and not allow_pending_hashes:
+        raise AbbaSummaryInputError(
+            "DOCX section-layout fixed identity is pending "
+            "change-0273-smoke archive/document/media/output hashes"
+        )
+    if not pending:
+        for field in DOCX_SECTION_LAYOUT_HASH_FIELDS:
+            if corpus[field] != DOCX_SECTION_LAYOUT_CORPUS_IDENTITY[field]:
+                raise AbbaSummaryInputError(
+                    f"{location}.{field} disagrees with the pinned DOCX section-layout identity"
+                )
+
 
 def _validate_opc_source_overlay(
     value: Any,
@@ -2953,6 +3124,10 @@ def _validate_opc_source_overlay(
         or samples_per_case <= 0
     ):
         raise AbbaSummaryInputError(f"{location} samples_per_case must be positive")
+    if not isinstance(elapsed_samples, list):
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.samples must be a list"
+        )
     elapsed = [
         _u64(item, f"{location}.elapsed_ns.samples[{index}]")
         for index, item in enumerate(elapsed_samples)
@@ -3252,6 +3427,311 @@ def _validate_opc_source_overlay(
         )
 
 
+def _validate_docx_section_layout(
+    value: Any,
+    location: str,
+    *,
+    corpus: Mapping[str, Any],
+    samples_per_case: int,
+    elapsed_samples: Sequence[Any],
+    sample_order: Sequence[Any],
+    source: Mapping[str, Any],
+    sink: Mapping[str, Any],
+    output_sha256: Any,
+    allow_pending_hashes: bool = False,
+) -> None:
+    overlay = _require_object(value, location)
+    if set(overlay) != _DOCX_SECTION_LAYOUT_KEYS:
+        missing = sorted(_DOCX_SECTION_LAYOUT_KEYS - set(overlay))
+        unknown = sorted(set(overlay) - _DOCX_SECTION_LAYOUT_KEYS)
+        raise AbbaSummaryInputError(
+            f"{location} schema mismatch (missing={missing!r}, unknown={unknown!r})"
+        )
+    _validate_docx_section_layout_corpus_identity(
+        corpus,
+        f"{location}.corpus",
+        allow_pending_hashes=allow_pending_hashes,
+    )
+    if (
+        isinstance(samples_per_case, bool)
+        or not isinstance(samples_per_case, int)
+        or samples_per_case <= 0
+    ):
+        raise AbbaSummaryInputError(f"{location} samples_per_case must be positive")
+    elapsed = [
+        _u64(item, f"{location}.elapsed_ns.samples[{index}]")
+        for index, item in enumerate(elapsed_samples)
+    ]
+    if len(elapsed) != samples_per_case:
+        raise AbbaSummaryInputError(
+            f"{location} vectors must contain exactly {samples_per_case} samples"
+        )
+    if elapsed != sorted(elapsed):
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.samples must be sorted ascending"
+        )
+
+    def exact_permutation(raw: Any, field: str) -> list[int]:
+        if (
+            not isinstance(raw, list)
+            or len(raw) != samples_per_case
+            or any(
+                isinstance(item, bool)
+                or not isinstance(item, int)
+                or item < 0
+                or item >= samples_per_case
+                for item in raw
+            )
+            or sorted(raw) != list(range(samples_per_case))
+        ):
+            raise AbbaSummaryInputError(
+                f"{location}.{field} must be an exact sample permutation"
+            )
+        return raw
+
+    elapsed_order = exact_permutation(sample_order, "elapsed_ns.sample_order")
+    nested_order = exact_permutation(overlay["sample_order"], "sample_order")
+    if nested_order != elapsed_order:
+        raise AbbaSummaryInputError(
+            f"{location}.sample_order disagrees with elapsed_ns.sample_order"
+        )
+    if overlay["implementation"] != "litchi-docx-source-backed-section-layout":
+        raise AbbaSummaryInputError(f"{location}.implementation does not match the publisher")
+    if overlay["timing_scope"] != _DOCX_SECTION_LAYOUT_TIMING_SCOPE:
+        raise AbbaSummaryInputError(f"{location}.timing_scope does not match the named phases")
+    if overlay["performance_claim"] != "none":
+        raise AbbaSummaryInputError(f"{location}.performance_claim must be 'none'")
+
+    source_bytes = _u64(overlay["source_bytes"], f"{location}.source_bytes", positive=True)
+    if source_bytes != corpus["archive_bytes"]:
+        raise AbbaSummaryInputError(f"{location}.source_bytes disagrees with corpus.archive_bytes")
+    source_digest = _validate_output_sha256(
+        overlay["source_sha256"], f"{location}.source_sha256"
+    )
+    if source_digest != corpus["archive_sha256"]:
+        raise AbbaSummaryInputError(f"{location}.source_sha256 disagrees with corpus.archive_sha256")
+    expected_output_digest = _validate_output_sha256(
+        overlay["expected_output_sha256"], f"{location}.expected_output_sha256"
+    )
+    result_output_digest = _validate_output_sha256(
+        output_sha256, f"{location}.result.output_sha256"
+    )
+    if expected_output_digest != result_output_digest:
+        raise AbbaSummaryInputError(
+            f"{location}.expected_output_sha256 disagrees with result.output_sha256"
+        )
+    if not DOCX_SECTION_LAYOUT_HASHES_PENDING:
+        if DOCX_SECTION_LAYOUT_EXPECTED_OUTPUT_SHA256 is None:
+            raise AbbaSummaryInputError(
+                f"{location} has no pinned DOCX section-layout output digest"
+            )
+        if expected_output_digest != DOCX_SECTION_LAYOUT_EXPECTED_OUTPUT_SHA256:
+            raise AbbaSummaryInputError(
+                f"{location}.expected_output_sha256 disagrees with the pinned identity"
+            )
+
+    static_integers = {
+        "total_main_story_paragraph_count": 257,
+        "section_count": 3,
+        "selected_paragraph": 64,
+        "columns_before": 2,
+        "columns_after": 3,
+        "media_count": 4,
+        "media_bytes": 512 * 1024,
+    }
+    for field, expected in static_integers.items():
+        if _u64(overlay[field], f"{location}.{field}") != expected:
+            raise AbbaSummaryInputError(
+                f"{location}.{field} disagrees with the fixed section-layout identity"
+            )
+    positions = overlay["paragraph_owned_section_positions"]
+    if (
+        not isinstance(positions, list)
+        or len(positions) != 2
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in positions)
+        or positions != [64, 129]
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.paragraph_owned_section_positions disagrees with the fixed identity"
+        )
+
+    def vector(field: str) -> list[int]:
+        raw = overlay[field]
+        if not isinstance(raw, list) or len(raw) != samples_per_case:
+            raise AbbaSummaryInputError(
+                f"{location}.{field} must contain exactly {samples_per_case} samples"
+            )
+        return [
+            _u64(item, f"{location}.{field}[{index}]")
+            for index, item in enumerate(raw)
+        ]
+
+    phases = {field: vector(field) for field in _DOCX_SECTION_LAYOUT_PHASE_VECTOR_FIELDS}
+    counters = {field: vector(field) for field in _DOCX_SECTION_LAYOUT_COUNTER_VECTOR_FIELDS}
+    for index in range(samples_per_case):
+        phase_sum = sum(
+            phases[field][index] for field in _DOCX_SECTION_LAYOUT_PHASE_VECTOR_FIELDS
+        )
+        if phase_sum > U64_MAX or phase_sum != elapsed[index]:
+            raise AbbaSummaryInputError(
+                f"{location} phase vectors must bind to sorted elapsed_ns.samples"
+            )
+
+    for field in _DOCX_SECTION_LAYOUT_ROOT_SOURCE_VECTOR_FIELDS:
+        raw = source.get(field)
+        if not isinstance(raw, list) or len(raw) != samples_per_case:
+            raise AbbaSummaryInputError(
+                f"{location}.source.{field} must contain exactly {samples_per_case} samples"
+            )
+        for index, item in enumerate(raw):
+            _u64(item, f"{location}.source.{field}[{index}]")
+    for nested_field, root_field in (
+        ("source_read_calls", "read_calls"),
+        ("source_read_bytes", "read_bytes"),
+        ("ordinary_payload_materializations", "ordinary_payload_materializations"),
+    ):
+        if counters[nested_field] != source[root_field]:
+            raise AbbaSummaryInputError(
+                f"{location}.{nested_field} disagrees with source.{root_field}"
+            )
+    if any(value != 1 for value in counters["ordinary_payload_materializations"]):
+        raise AbbaSummaryInputError(
+            f"{location}.ordinary_payload_materializations must prove one retained main Part"
+        )
+    cache_fields = _DOCX_SECTION_LAYOUT_COUNTER_VECTOR_FIELDS[3:]
+    if any(len(set(counters[field])) != 1 for field in cache_fields):
+        raise AbbaSummaryInputError(f"{location} source cache diagnostics are not deterministic")
+    for field, expected in (
+        ("source_cache_before_publication_after_commit_cold_loads", 1),
+        ("source_cache_before_publication_after_commit_successful_loads", 1),
+        ("source_cache_before_publication_after_commit_retained_entries", 1),
+    ):
+        if any(value != expected for value in counters[field]):
+            raise AbbaSummaryInputError(
+                f"{location}.{field} disagrees with the one-main-Part cache contract"
+            )
+    if any(
+        value == 0
+        for value in counters[
+            "source_cache_before_publication_after_commit_retained_bytes"
+        ]
+    ):
+        raise AbbaSummaryInputError(f"{location} retained source cache bytes are empty")
+    expected_retained_bytes = corpus["target_payload_bytes"]
+    if any(
+        value != expected_retained_bytes
+        for value in counters[
+            "source_cache_before_publication_after_commit_retained_bytes"
+        ]
+    ):
+        raise AbbaSummaryInputError(
+            f"{location} retained source cache bytes differ from the accessed document part"
+        )
+    if any(
+        source[field][index] == 0
+        for field in ("read_calls", "read_bytes", "ordinary_payload_read_calls", "ordinary_payload_read_bytes")
+        for index in range(samples_per_case)
+    ):
+        raise AbbaSummaryInputError(f"{location} source read evidence is empty")
+
+    output_digests = overlay["output_sha256"]
+    if not isinstance(output_digests, list) or len(output_digests) != samples_per_case:
+        raise AbbaSummaryInputError(
+            f"{location}.output_sha256 must contain exactly {samples_per_case} samples"
+        )
+    for index, digest in enumerate(output_digests):
+        if _validate_output_sha256(digest, f"{location}.output_sha256[{index}]") != result_output_digest:
+            raise AbbaSummaryInputError(
+                f"{location}.output_sha256 disagrees with result.output_sha256"
+            )
+
+    sink_object = _require_object(sink, f"{location}.result.sink")
+    if set(sink_object) != _OPC_SOURCE_OVERLAY_SINK_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink schema does not match the bounded sink"
+        )
+    sink_accepted_bytes = _u64(
+        sink_object["accepted_bytes"], f"{location}.result.sink.accepted_bytes", positive=True
+    )
+    sink_write_calls = _u64(
+        sink_object["write_calls"], f"{location}.result.sink.write_calls", positive=True
+    )
+    sink_largest_write = _u64(sink_object["largest_write"], f"{location}.result.sink.largest_write")
+    if sink_largest_write > 65_536:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink.largest_write exceeds the configured sink ceiling"
+        )
+    buckets = _require_object(
+        sink_object["write_size_buckets"], f"{location}.result.sink.write_size_buckets"
+    )
+    if set(buckets) != _OPC_SOURCE_OVERLAY_SINK_BUCKET_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink.write_size_buckets schema is incomplete"
+        )
+    bucket_counts = {
+        field: _u64(value, f"{location}.result.sink.write_size_buckets.{field}")
+        for field, value in buckets.items()
+    }
+    if sum(bucket_counts.values()) != sink_write_calls:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink write-size buckets disagree with write_calls"
+        )
+    if bucket_counts["bytes_over_65536"] != 0:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink observed a write above the configured ceiling"
+        )
+    if sink_accepted_bytes == 0:
+        raise AbbaSummaryInputError(f"{location}.result.sink accepted no output bytes")
+    if sink_accepted_bytes != DOCX_SECTION_LAYOUT_EXPECTED_OUTPUT_BYTES:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink accepted bytes differ from the pinned output"
+        )
+
+    for field in _DOCX_SECTION_LAYOUT_GATE_FIELDS:
+        if not _required_bool(overlay[field], location, field):
+            raise AbbaSummaryInputError(f"{location}.{field} must be true")
+
+
+def _validate_docx_section_layout_result_rows(
+    indexed: Mapping[tuple[str, str], dict[str, Any]],
+    configuration: Mapping[str, Any],
+    label: str,
+) -> None:
+    samples_per_case = _required_positive_integer(
+        configuration.get("samples_per_case"),
+        f"{label}.configuration",
+        "samples_per_case",
+    )
+    for (case, corpus_identity), row in indexed.items():
+        source = row.get("source")
+        if case != DOCX_SECTION_LAYOUT_CASE:
+            if isinstance(source, dict) and source.get("docx_section_layout") is not None:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.docx_section_layout is only valid for its fixed selector"
+                )
+            continue
+        source_object = _require_object(source, f"{label}.{case}.source")
+        overlay = _require_object(
+            source_object.get("docx_section_layout"),
+            f"{label}.{case}.source.docx_section_layout",
+        )
+        sink_object = _require_object(row.get("sink"), f"{label}.{case}.sink")
+        elapsed_object = _require_object(
+            row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns"
+        )
+        _validate_docx_section_layout(
+            overlay,
+            f"{label}.{case}.source.docx_section_layout",
+            corpus=json.loads(corpus_identity),
+            samples_per_case=samples_per_case,
+            elapsed_samples=elapsed_object.get("samples"),
+            sample_order=elapsed_object.get("sample_order"),
+            source=source_object,
+            sink=sink_object,
+            output_sha256=row.get("output_sha256"),
+        )
+
+
 def _validate_opc_source_overlay_result_rows(
     indexed: Mapping[tuple[str, str], dict[str, Any]],
     configuration: Mapping[str, Any],
@@ -3338,6 +3818,20 @@ def _validate_configuration_rows(
         if len(actual_pairs) != len(expected_multi_part_pairs) or set(actual_pairs) != expected_multi_part_pairs:
             raise AbbaSummaryInputError(
                 f"{label}.{case} must cover the complete multi-Part OPC 3-shape x 3-count matrix"
+            )
+    if DOCX_SECTION_LAYOUT_CASE in cases:
+        docx_pairs = [
+            json.loads(corpus_identity)
+            for case, corpus_identity in indexed
+            if case == DOCX_SECTION_LAYOUT_CASE
+        ]
+        if len(docx_pairs) != 1:
+            raise AbbaSummaryInputError(
+                f"{label}.{DOCX_SECTION_LAYOUT_CASE} must have exactly one fixed corpus identity"
+            )
+        if not _docx_section_layout_static_corpus_match(docx_pairs[0]):
+            raise AbbaSummaryInputError(
+                f"{label}.{DOCX_SECTION_LAYOUT_CASE} corpus does not match the fixed identity"
             )
     declared_shapes = {
         shape
@@ -4501,6 +4995,14 @@ def _source_identity_projection(value: Any) -> Any:
             projected_overlay.pop(field, None)
         projected["opc_source_overlay"] = projected_overlay
         for field in _OPC_SOURCE_OVERLAY_SOURCE_VECTOR_FIELDS:
+            projected.pop(field, None)
+    docx_section_layout = projected.get("docx_section_layout")
+    if isinstance(docx_section_layout, dict):
+        projected_docx = dict(docx_section_layout)
+        for field in _DOCX_SECTION_LAYOUT_DYNAMIC_FIELDS:
+            projected_docx.pop(field, None)
+        projected["docx_section_layout"] = projected_docx
+        for field in _DOCX_SECTION_LAYOUT_ROOT_SOURCE_VECTOR_FIELDS:
             projected.pop(field, None)
     return projected
 

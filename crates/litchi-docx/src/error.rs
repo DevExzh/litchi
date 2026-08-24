@@ -164,6 +164,30 @@ pub enum Error {
     #[error("DOCX document-variable patch conflicts with the supplied source")]
     DocumentVariablesConflict,
 
+    /// A section-layout patch was applied to byte-different source XML.
+    #[error("DOCX section-layout patch conflicts with the supplied source bytes")]
+    SectionLayoutStaleSource,
+
+    /// A section-layout patch was applied across source revisions.
+    #[error("DOCX section-layout patch conflicts with the supplied source revision")]
+    SectionLayoutRevisionConflict,
+
+    /// A section-layout patch was applied across package lineages.
+    #[error("DOCX section-layout patch belongs to a different package lineage")]
+    SectionLayoutForeignSource,
+
+    /// A section-layout patch was applied to a different complete artifact.
+    #[error("DOCX section-layout patch conflicts with the supplied source artifact")]
+    SectionLayoutFingerprintConflict,
+
+    /// A section-layout patch was applied under a different bounded policy.
+    #[error("DOCX section-layout patch conflicts with the supplied limits policy")]
+    SectionLayoutPolicyConflict,
+
+    /// A detached section-layout patch was applied to a source-backed target.
+    #[error("DOCX detached section-layout authorization cannot target a source-backed package")]
+    SectionLayoutAuthorizationConflict,
+
     /// A changed document-variable publication cannot preserve selected markup.
     #[error("unsafe DOCX document-variable edit rejected: {0}")]
     DocumentVariablesPreservation(&'static str),

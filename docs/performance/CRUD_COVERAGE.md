@@ -1,6 +1,15 @@
 # Performance CRUD coverage
 
-Change 0272 brings the selectable benchmark matrix to **392 names** through
+Change 0273 brings the current selectable benchmark matrix to **393 names**
+through one opt-in DOCX existing-main-story section-layout selector. Its typed
+PageSize/Margins/Start/Columns snapshot/edit/commit, durable patch/inverse,
+sequential publication, refusal, and namespace-source gates are
+correctness/CRUD coverage only. The default remains **36 cases / 198 records**;
+the dirty five-sample profile and whole-process counters are descriptive, and
+clean retained performance, physical-I/O, allocator/RSS, and broad DOCX
+evidence remain open.
+
+Change 0272 brings the selectable benchmark matrix to **393 names** through
 three opt-in source-overlay multi-part selectors and 27 records; the default
 remains **36 cases / 198 records**. The changed, equal-payload no-op, and mixed
 records are benchmark-only evidence coverage with `performance_claim: none`,
@@ -20,7 +29,7 @@ claims withheld.
 
 Date: 2026-08-24
 
-This is a coverage map, not a completion claim. It compares the 392 selectable
+This is a coverage map, not a completion claim. It compares the 393 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a

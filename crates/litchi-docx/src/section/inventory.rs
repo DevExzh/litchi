@@ -1,7 +1,7 @@
 //! Immutable, bounded inventory of main-document section boundaries.
 
 use super::codec::{validate_element_qname, validate_namespace_declaration, validate_qname};
-use super::{Margins, PageSize, Reference, Section, Start};
+use super::{Columns, Margins, PageSize, Reference, Section, Start};
 use crate::error::{Error, Result};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::{Position, SourceVersion};
@@ -183,6 +183,8 @@ pub enum Property {
     Margins,
     /// Locally authored section-break start policy.
     Start,
+    /// Locally authored newspaper-style columns.
+    Columns,
     /// Inert local header relationship references.
     Headers,
     /// Inert local footer relationship references.
@@ -190,7 +192,7 @@ pub enum Property {
 }
 
 /// Borrowed value returned for one typed section property query.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum PropertyValue<'a> {
     /// Section-property ownership.
@@ -203,6 +205,8 @@ pub enum PropertyValue<'a> {
     Margins(Option<Margins>),
     /// Optional locally authored break policy.
     Start(Option<Start>),
+    /// Optional locally authored columns.
+    Columns(Option<Columns>),
     /// Borrowed inert relationship references.
     Headers(&'a [Reference]),
     /// Borrowed inert relationship references.
@@ -218,6 +222,7 @@ pub struct Descriptor {
     page_size: Option<PageSize>,
     margins: Option<Margins>,
     start: Option<Start>,
+    columns: Option<Columns>,
     headers: Box<[Reference]>,
     footers: Box<[Reference]>,
 }
@@ -259,6 +264,12 @@ impl Descriptor {
         self.start
     }
 
+    /// Locally authored newspaper-style columns, if present.
+    #[must_use]
+    pub fn columns(&self) -> Option<Columns> {
+        self.columns.clone()
+    }
+
     /// Inert header relationship references; targets are not resolved.
     #[must_use]
     pub fn headers(&self) -> &[Reference] {
@@ -278,6 +289,7 @@ impl Descriptor {
             Property::PageSize => PropertyValue::PageSize(self.page_size),
             Property::Margins => PropertyValue::Margins(self.margins),
             Property::Start => PropertyValue::Start(self.start),
+            Property::Columns => PropertyValue::Columns(self.columns.clone()),
             Property::Headers => PropertyValue::Headers(&self.headers),
             Property::Footers => PropertyValue::Footers(&self.footers),
         }
@@ -289,6 +301,30 @@ impl Descriptor {
 pub struct Inventory {
     sections: Arc<[Descriptor]>,
     paragraph_count: usize,
+    sources: Arc<[Option<SourceSpan>]>,
+}
+
+/// The private source range for one locally authored main-story `w:sectPr`.
+///
+/// It is deliberately not part of the public section descriptor: physical XML
+/// identity remains an implementation detail of the source-backed layout
+/// transaction.
+#[derive(Clone, Debug)]
+pub(crate) struct SourceSpan {
+    start: usize,
+    end: usize,
+    relationship_bindings: Box<[RelationshipBinding]>,
+    namespace_bindings: Box<[RelationshipBinding]>,
+}
+
+impl SourceSpan {
+    pub(crate) const fn range(&self) -> (usize, usize) {
+        (self.start, self.end)
+    }
+
+    pub(crate) fn namespace_bindings(&self) -> &[RelationshipBinding] {
+        &self.namespace_bindings
+    }
 }
 
 impl Inventory {
@@ -340,8 +376,82 @@ impl Inventory {
     /// Whether two inventories share the immutable descriptor allocation.
     #[must_use]
     pub fn shares_allocation_with(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.sections, &other.sections)
+        Arc::ptr_eq(&self.sections, &other.sections) && Arc::ptr_eq(&self.sources, &other.sources)
     }
+
+    pub(crate) fn topology_matches(&self, other: &Self) -> bool {
+        self.paragraph_count == other.paragraph_count
+            && self.sections.len() == other.sections.len()
+            && self.sources.len() == other.sources.len()
+            && self
+                .sections
+                .iter()
+                .zip(other.sections.iter())
+                .all(|(left, right)| {
+                    left.position == right.position
+                        && left.ownership == right.ownership
+                        && left.paragraphs == right.paragraphs
+                        && left.headers == right.headers
+                        && left.footers == right.footers
+                })
+            && self
+                .sources
+                .iter()
+                .zip(other.sources.iter())
+                .all(|(left, right)| match (left, right) {
+                    (None, None) => true,
+                    (Some(left), Some(right)) => relationship_bindings_match(
+                        &left.relationship_bindings,
+                        &right.relationship_bindings,
+                    ),
+                    _ => false,
+                })
+    }
+
+    pub(crate) fn source_span(&self, selector: impl Into<Selector>) -> Option<&SourceSpan> {
+        let position = self.section(selector)?.position.get();
+        self.sources.get(position)?.as_ref()
+    }
+
+    pub(crate) fn source_fragment(
+        &self,
+        xml: &[u8],
+        selector: impl Into<Selector>,
+        max_section_bytes: usize,
+    ) -> Result<Option<(SourceSpan, Vec<u8>)>> {
+        let Some(source) = self.source_span(selector) else {
+            return Ok(None);
+        };
+        let (start, end) = source.range();
+        let bytes = xml.get(start..end).ok_or_else(|| {
+            Error::InvalidFormat("section source span is outside document XML".into())
+        })?;
+        Ok(Some((
+            source.clone(),
+            self_contained_fragment(bytes, &source.namespace_bindings, max_section_bytes)?,
+        )))
+    }
+}
+
+fn relationship_bindings_match(
+    left: &[RelationshipBinding],
+    right: &[RelationshipBinding],
+) -> bool {
+    left.iter()
+        .filter(|binding| is_relationship_namespace(&binding.namespace))
+        .map(|binding| (&binding.prefix, &binding.namespace))
+        .eq(right
+            .iter()
+            .filter(|binding| is_relationship_namespace(&binding.namespace))
+            .map(|binding| (&binding.prefix, &binding.namespace)))
+}
+
+fn is_relationship_namespace(namespace: &[u8]) -> bool {
+    matches!(
+        namespace,
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            | b"http://purl.oclc.org/ooxml/officeDocument/relationships"
+    )
 }
 
 /// An immutable inventory optionally bound to an exact positional source.
@@ -430,15 +540,87 @@ struct Capture {
     reference_count: usize,
     reference_bytes: usize,
     relationship_bindings: Vec<RelationshipBinding>,
+    root_namespace_bindings: Vec<RelationshipBinding>,
 }
 
-struct RelationshipBinding {
-    prefix: Vec<u8>,
-    namespace: &'static str,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationshipBinding {
+    pub(crate) prefix: Vec<u8>,
+    pub(crate) namespace: Vec<u8>,
+}
+
+#[derive(Default)]
+struct NamespaceContext {
+    active: Vec<RelationshipBinding>,
+    scopes: Vec<Vec<(Vec<u8>, Option<RelationshipBinding>)>>,
+}
+
+impl NamespaceContext {
+    fn enter(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: quick_xml::encoding::Decoder,
+    ) -> Result<()> {
+        let declarations = namespace_declarations(element, decoder)?;
+        let mut changes = Vec::new();
+        changes
+            .try_reserve(declarations.len())
+            .map_err(|source| Error::Allocation {
+                resource: "section namespace scope changes",
+                source,
+            })?;
+        for declaration in declarations {
+            let prefix = declaration.prefix.clone();
+            if let Some(index) = self
+                .active
+                .iter()
+                .position(|binding| binding.prefix == prefix)
+            {
+                let previous = self.active[index].clone();
+                self.active[index] = declaration;
+                changes.push((prefix, Some(previous)));
+            } else {
+                self.active.push(declaration);
+                changes.push((prefix, None));
+            }
+        }
+        self.scopes.push(changes);
+        Ok(())
+    }
+
+    fn exit(&mut self) -> Result<()> {
+        let changes = self
+            .scopes
+            .pop()
+            .ok_or_else(|| Error::InvalidFormat("section namespace scope underflow".into()))?;
+        for (prefix, previous) in changes.into_iter().rev() {
+            if let Some(index) = self
+                .active
+                .iter()
+                .position(|binding| binding.prefix == prefix)
+            {
+                if let Some(previous) = previous {
+                    self.active[index] = previous;
+                } else {
+                    self.active.remove(index);
+                }
+            } else {
+                return Err(Error::InvalidFormat(
+                    "section namespace scope restoration failed".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Vec<RelationshipBinding> {
+        self.active.clone()
+    }
 }
 
 struct ScanState {
     sections: Vec<Descriptor>,
+    sources: Vec<Option<SourceSpan>>,
     paragraphs: usize,
     next_section_start: usize,
     reference_bytes: usize,
@@ -478,8 +660,10 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     let mut root_closed = false;
     let mut paragraphs = Vec::<ParagraphContext>::new();
     let mut capture = None::<Capture>;
+    let mut namespace_context = NamespaceContext::default();
     let mut state = ScanState {
         sections: Vec::new(),
+        sources: Vec::new(),
         paragraphs: 0,
         next_section_start: 0,
         reference_bytes: 0,
@@ -514,6 +698,12 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
                 validate_namespace_bindings(&element, &namespace, &resolver, reader.decoder())?;
+                namespace_context.enter(&element, reader.decoder())?;
+                let namespace_bindings = if word && local.as_ref() == b"sectPr" {
+                    namespace_context.snapshot()
+                } else {
+                    Vec::new()
+                };
                 inspect_reference(
                     &element,
                     &namespace,
@@ -540,6 +730,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     &mut paragraphs,
                     &mut capture,
                     &mut state,
+                    namespace_bindings,
                 )?;
                 element_stack
                     .try_reserve(1)
@@ -563,6 +754,12 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 let word = is_wordprocessing_namespace(&namespace);
                 let local = element.local_name();
                 validate_namespace_bindings(&element, &namespace, &resolver, reader.decoder())?;
+                namespace_context.enter(&element, reader.decoder())?;
+                let namespace_bindings = if word && local.as_ref() == b"sectPr" {
+                    namespace_context.snapshot()
+                } else {
+                    Vec::new()
+                };
                 inspect_reference(
                     &element,
                     &namespace,
@@ -589,7 +786,9 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                     &mut paragraphs,
                     &mut capture,
                     &mut state,
+                    namespace_bindings,
                 )?;
+                namespace_context.exit()?;
             },
             Event::End(element) => {
                 let expected = element_stack.pop().ok_or_else(|| {
@@ -640,6 +839,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
                 depth = depth
                     .checked_sub(1)
                     .ok_or_else(|| Error::InvalidFormat("invalid section XML nesting".into()))?;
+                namespace_context.exit()?;
             },
             Event::Eof if depth != 0 || capture.is_some() || !element_stack.is_empty() => {
                 return Err(Error::InvalidFormat(
@@ -682,6 +882,7 @@ fn scan_visible_document(xml: &[u8], limits: &Limits) -> Result<Inventory> {
     Ok(Inventory {
         sections: Arc::from(state.sections.into_boxed_slice()),
         paragraph_count: state.paragraphs,
+        sources: Arc::from(state.sources.into_boxed_slice()),
     })
 }
 
@@ -702,6 +903,7 @@ fn inspect_element(
     paragraphs: &mut Vec<ParagraphContext>,
     capture: &mut Option<Capture>,
     state: &mut ScanState,
+    namespace_bindings: Vec<RelationshipBinding>,
 ) -> Result<()> {
     if child_depth == 1 {
         if *root_seen || !word || local != b"document" {
@@ -842,6 +1044,7 @@ fn inspect_element(
                             reference_count: 0,
                             reference_bytes: 0,
                             relationship_bindings: Vec::new(),
+                            root_namespace_bindings: namespace_bindings,
                         },
                         limits,
                         state,
@@ -854,6 +1057,7 @@ fn inspect_element(
                         reference_count: 0,
                         reference_bytes: 0,
                         relationship_bindings: Vec::new(),
+                        root_namespace_bindings: namespace_bindings,
                     });
                 }
                 return Ok(());
@@ -875,6 +1079,7 @@ fn inspect_element(
                         reference_count: 0,
                         reference_bytes: 0,
                         relationship_bindings: Vec::new(),
+                        root_namespace_bindings: namespace_bindings,
                     },
                     limits,
                     state,
@@ -887,6 +1092,7 @@ fn inspect_element(
                     reference_count: 0,
                     reference_bytes: 0,
                     relationship_bindings: Vec::new(),
+                    root_namespace_bindings: namespace_bindings,
                 });
             }
             return Ok(());
@@ -917,11 +1123,9 @@ fn append_section(
     let source = xml.get(capture.start..end).ok_or_else(|| {
         Error::InvalidFormat("section fragment is outside main-document XML".into())
     })?;
-    let fragment = self_contained_fragment(
-        source,
-        &capture.relationship_bindings,
-        limits.max_section_bytes,
-    )?;
+    let relationship_bindings = capture.relationship_bindings.clone();
+    let namespace_bindings = capture.root_namespace_bindings.clone();
+    let fragment = self_contained_fragment(source, &namespace_bindings, limits.max_section_bytes)?;
     let mut section = Section::from_xml_bytes(fragment)?;
     let semantic = section.local_state()?;
     let added_reference_bytes = semantic
@@ -965,6 +1169,13 @@ fn append_section(
             resource: "section inventory descriptors",
             source,
         })?;
+    state
+        .sources
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "section inventory source spans",
+            source,
+        })?;
     state.sections.push(Descriptor {
         position: Position::new(state.sections.len()),
         ownership: capture.ownership,
@@ -975,9 +1186,16 @@ fn append_section(
         page_size: semantic.page_size,
         margins: semantic.margins,
         start: semantic.start,
+        columns: semantic.columns,
         headers: semantic.headers.into_boxed_slice(),
         footers: semantic.footers.into_boxed_slice(),
     });
+    state.sources.push(Some(SourceSpan {
+        start: capture.start,
+        end,
+        relationship_bindings: relationship_bindings.into_boxed_slice(),
+        namespace_bindings: namespace_bindings.into_boxed_slice(),
+    }));
     state.next_section_start = boundary;
     Ok(())
 }
@@ -992,7 +1210,7 @@ fn validate_namespace_bindings(
     if let ResolveResult::Unknown(prefix) = namespace {
         return Err(Error::InvalidFormat(format!(
             "main-document element uses unbound namespace prefix '{}'",
-            String::from_utf8_lossy(prefix)
+            String::from_utf8_lossy(prefix.as_ref())
         )));
     }
     for attribute in element.attributes() {
@@ -1019,7 +1237,7 @@ fn validate_namespace_bindings(
         if let ResolveResult::Unknown(prefix) = attribute_namespace {
             return Err(Error::InvalidFormat(format!(
                 "main-document attribute uses unbound namespace prefix '{}'",
-                String::from_utf8_lossy(&prefix)
+                String::from_utf8_lossy(prefix.as_ref())
             )));
         }
     }
@@ -1117,7 +1335,7 @@ fn inspect_reference(
                 })?;
             capture.relationship_bindings.push(RelationshipBinding {
                 prefix: owned_prefix,
-                namespace,
+                namespace: namespace.as_bytes().to_vec(),
             });
         }
     }
@@ -1137,6 +1355,41 @@ fn relationship_namespace(namespace: &ResolveResult<'_>) -> Option<&'static str>
         },
         ResolveResult::Bound(_) | ResolveResult::Unknown(_) | ResolveResult::Unbound => None,
     }
+}
+
+fn namespace_declarations(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Vec<RelationshipBinding>> {
+    let mut bindings = Vec::new();
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute_prefix = attribute
+            .key
+            .prefix()
+            .map_or_else(Vec::new, |prefix| prefix.as_ref().to_vec());
+        let prefix = if attribute_prefix.as_slice() == b"xmlns" {
+            attribute.key.local_name().as_ref().to_vec()
+        } else if attribute_prefix.is_empty() && attribute.key.local_name().as_ref() == b"xmlns" {
+            Vec::new()
+        } else {
+            continue;
+        };
+        let namespace = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        bindings
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "section namespace declarations",
+                source,
+            })?;
+        bindings.push(RelationshipBinding {
+            prefix,
+            namespace: namespace.as_bytes().to_vec(),
+        });
+    }
+    Ok(bindings)
 }
 
 fn self_contained_fragment(
@@ -1179,10 +1432,14 @@ fn self_contained_fragment(
         if root_declares_prefix(source, &binding.prefix)? {
             continue;
         }
-        fragment.extend_from_slice(b" xmlns:");
-        fragment.extend_from_slice(&binding.prefix);
-        fragment.extend_from_slice(b"=\"");
-        fragment.extend_from_slice(binding.namespace.as_bytes());
+        if binding.prefix.is_empty() {
+            fragment.extend_from_slice(b" xmlns=\"");
+        } else {
+            fragment.extend_from_slice(b" xmlns:");
+            fragment.extend_from_slice(&binding.prefix);
+            fragment.extend_from_slice(b"=\"");
+        }
+        fragment.extend_from_slice(&binding.namespace);
         fragment.push(b'"');
     }
     fragment.extend_from_slice(&source[insertion..]);
@@ -1229,12 +1486,17 @@ fn root_declares_prefix(source: &[u8], prefix: &[u8]) -> Result<bool> {
             Event::Start(element) | Event::Empty(element) => {
                 for attribute in element.attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                    if attribute
-                        .key
-                        .prefix()
-                        .is_some_and(|value| value.as_ref() == b"xmlns")
-                        && attribute.key.local_name().as_ref() == prefix
-                    {
+                    let declares_prefix = if prefix.is_empty() {
+                        attribute.key.prefix().is_none()
+                            && attribute.key.local_name().as_ref() == b"xmlns"
+                    } else {
+                        attribute
+                            .key
+                            .prefix()
+                            .is_some_and(|value| value.as_ref() == b"xmlns")
+                            && attribute.key.local_name().as_ref() == prefix
+                    };
+                    if declares_prefix {
                         return Ok(true);
                     }
                 }
@@ -1270,6 +1532,13 @@ fn append_implicit(state: &mut ScanState, limits: &Limits) -> Result<()> {
             resource: "section inventory descriptors",
             source,
         })?;
+    state
+        .sources
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "section inventory source spans",
+            source,
+        })?;
     state.sections.push(Descriptor {
         position: Position::new(state.sections.len()),
         ownership: Ownership::Implicit,
@@ -1280,9 +1549,11 @@ fn append_implicit(state: &mut ScanState, limits: &Limits) -> Result<()> {
         page_size: None,
         margins: None,
         start: None,
+        columns: None,
         headers: Box::default(),
         footers: Box::default(),
     });
+    state.sources.push(None);
     Ok(())
 }
 

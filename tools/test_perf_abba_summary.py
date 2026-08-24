@@ -273,6 +273,139 @@ def opc_multi_sink():
     }
 
 
+def docx_section_layout_sink():
+    return {
+        "accepted_bytes": 2_101_446,
+        "write_calls": 105,
+        "largest_write": 32_768,
+        "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_1_to_512": 40,
+            "bytes_513_to_4096": 1,
+            "bytes_4097_to_16384": 0,
+            "bytes_16385_to_65536": 64,
+            "bytes_over_65536": 0,
+        },
+    }
+
+
+def docx_section_layout_corpus():
+    corpus = copy.deepcopy(perf_abba_summary.DOCX_SECTION_LAYOUT_CORPUS_IDENTITY)
+    corpus.update(
+        uncompressed_payload_bytes=2_116_441,
+        archive_bytes=2_101_427,
+        archive_sha256="183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+        target_payload_bytes=18_855,
+        target_payload_sha256="67cb9066f112bfee6905a23f3eabdc76b65c86cd0c6613dd60a5a18895ceac81",
+    )
+    corpus["name"] = perf_abba_summary.DOCX_SECTION_LAYOUT_FIXED_CORPUS_FIELDS["name"]
+    return corpus
+
+
+def docx_section_layout_source(
+    samples,
+    *,
+    offset=0,
+    output_digest="5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+):
+    samples = list(samples)
+    preparation = [1] * len(samples)
+    opened = [2] * len(samples)
+    query = [1] * len(samples)
+    edit = [1] * len(samples)
+    commit = [1] * len(samples)
+    publication = [
+        sample
+        - preparation[index]
+        - opened[index]
+        - query[index]
+        - edit[index]
+        - commit[index]
+        for index, sample in enumerate(samples)
+    ]
+    phase_vectors = {
+        "preparation_ns": preparation,
+        "open_ns": opened,
+        "query_ns": query,
+        "edit_ns": edit,
+        "commit_ns": commit,
+        "publication_ns": publication,
+    }
+    read_calls = [3 + offset] * len(samples)
+    read_bytes = [10_000 + offset] * len(samples)
+    materializations = [1] * len(samples)
+    overlay = {
+        "implementation": "litchi-docx-source-backed-section-layout",
+        "timing_scope": perf_abba_summary._DOCX_SECTION_LAYOUT_TIMING_SCOPE,
+        "performance_claim": "none",
+        "source_bytes": 2_101_427,
+        "source_sha256": "183204a832a3518bf1d4474e9b7ff347ad7d0dc95ad2e9b1dbdde405837a29e8",
+        "expected_output_sha256": output_digest,
+        "total_main_story_paragraph_count": 257,
+        "section_count": 3,
+        "paragraph_owned_section_positions": [64, 129],
+        "selected_paragraph": 64,
+        "columns_before": 2,
+        "columns_after": 3,
+        "media_count": 4,
+        "media_bytes": 512 * 1024,
+        "sample_order": list(range(len(samples))),
+        **phase_vectors,
+        "source_read_calls": read_calls.copy(),
+        "source_read_bytes": read_bytes.copy(),
+        "ordinary_payload_materializations": materializations.copy(),
+        "source_cache_before_publication_after_commit_hits": [0] * len(samples),
+        "source_cache_before_publication_after_commit_cold_loads": [1] * len(samples),
+        "source_cache_before_publication_after_commit_successful_loads": [1] * len(samples),
+        "source_cache_before_publication_after_commit_retained_entries": [1] * len(samples),
+        "source_cache_before_publication_after_commit_retained_bytes": [18_855]
+        * len(samples),
+        "output_sha256": [output_digest] * len(samples),
+        "phase_sum_verified": True,
+        "semantic_reopen_all_sections_verified": True,
+        "table_cell_sectpr_excluded_verified": True,
+        "raw_untouched_members_verified": True,
+        "raw_member_order_and_comment_verified": True,
+        "header_footer_relationships_verified": True,
+        "source_immutability_verified": True,
+        "patch_forward_inverse_verified": True,
+        "publication_inverse_exact_source_verified": True,
+        "stale_foreign_signed_noop_limits_partial_sink_verified": True,
+        "cache_counters_verified": True,
+        "sink_counters_verified": True,
+    }
+    return {
+        "read_calls": read_calls.copy(),
+        "read_bytes": read_bytes.copy(),
+        "ordinary_payload_read_calls": [2] * len(samples),
+        "ordinary_payload_read_bytes": [4_096] * len(samples),
+        "max_in_flight_reads": [1] * len(samples),
+        "ordinary_payload_materializations": materializations.copy(),
+        "docx_section_layout": overlay,
+    }
+
+
+def docx_section_layout_row(
+    samples,
+    *,
+    offset=0,
+    output_digest="5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+):
+    samples = list(samples)
+    elapsed_ns = elapsed(samples)
+    elapsed_ns["sample_order"] = list(range(len(samples)))
+    return {
+        "case": perf_abba_summary.DOCX_SECTION_LAYOUT_CASE,
+        "corpus": docx_section_layout_corpus(),
+        "elapsed_ns": elapsed_ns,
+        "source": docx_section_layout_source(
+            samples, offset=offset, output_digest=output_digest
+        ),
+        "sink": docx_section_layout_sink(),
+        "output_sha256": output_digest,
+    }
+
+
 def reports_for_values(values):
     revisions = ("control-revision", "candidate-revision", "candidate-revision", "control-revision")
     return [
@@ -2502,6 +2635,119 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 output_sha256=output_digest,
                 allow_pending_hashes=True,
             )
+
+    def test_docx_section_layout_fixed_identity_and_shape_are_exact(self):
+        reports = four_legs()
+        samples = [20 + index for index in range(15)]
+        for leg_index, leg in enumerate(reports):
+            leg["configuration"]["cases"] = [perf_abba_summary.DOCX_SECTION_LAYOUT_CASE]
+            leg["configuration"]["corpus_shapes"] = ["unlisted-shape"]
+            leg["results"] = [docx_section_layout_row(samples, offset=leg_index)]
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(summary["verification"]["result_count"], 1)
+
+        corpus = docx_section_layout_corpus()
+        identity = perf_abba_summary._canonical_json(corpus, "test.corpus")
+        indexed = {
+            (
+                perf_abba_summary.DOCX_SECTION_LAYOUT_CASE,
+                identity,
+            ): {"elapsed_ns": {"samples": [1] * 15}}
+        }
+        configuration = {
+            "cases": [perf_abba_summary.DOCX_SECTION_LAYOUT_CASE],
+            "corpus_shapes": ["unlisted-shape"],
+            "samples_per_case": 15,
+        }
+        perf_abba_summary._validate_configuration_rows(
+            configuration, indexed, "test"
+        )
+
+        duplicate = copy.deepcopy(corpus)
+        duplicate["archive_sha256"] = "c" * 64
+        duplicate_identity = perf_abba_summary._canonical_json(duplicate, "test.corpus")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "exactly one fixed corpus identity"
+        ):
+            perf_abba_summary._validate_configuration_rows(
+                configuration,
+                {(
+                    perf_abba_summary.DOCX_SECTION_LAYOUT_CASE,
+                    identity,
+                ): {"elapsed_ns": {"samples": [1] * 15}}, (
+                    perf_abba_summary.DOCX_SECTION_LAYOUT_CASE,
+                    duplicate_identity,
+                ): {"elapsed_ns": {"samples": [1] * 15}}},
+                "test",
+            )
+
+    def test_docx_section_layout_schema_projection_and_mutations(self):
+        samples = [10, 12]
+        source = docx_section_layout_source(samples, offset=5)
+        corpus = docx_section_layout_corpus()
+        overlay = source["docx_section_layout"]
+        sink = docx_section_layout_sink()
+
+        def validate(value=overlay, *, source_value=source, sink_value=sink, order=(0, 1)):
+            perf_abba_summary._validate_docx_section_layout(
+                value,
+                "test.source.docx_section_layout",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=samples,
+                sample_order=list(order),
+                source=source_value,
+                sink=sink_value,
+                output_sha256="5e87e9ca9fd6b9a98933c36d9aee1e848bc97eb7693229f7949514830121c4ec",
+                allow_pending_hashes=True,
+            )
+
+        validate()
+        projected = perf_abba_summary._source_identity_projection(source)
+        projected_overlay = projected["docx_section_layout"]
+        for field in perf_abba_summary._DOCX_SECTION_LAYOUT_DYNAMIC_FIELDS:
+            self.assertNotIn(field, projected_overlay)
+        self.assertIn("expected_output_sha256", projected_overlay)
+        self.assertIn("output_sha256", projected_overlay)
+        for field in perf_abba_summary._DOCX_SECTION_LAYOUT_ROOT_SOURCE_VECTOR_FIELDS:
+            self.assertNotIn(field, projected)
+
+        mutations = (
+            (lambda value: value.pop("publication_ns"), "schema mismatch"),
+            (lambda value: value["publication_ns"].pop(), "exactly 2 samples"),
+            (lambda value: value["publication_ns"].__setitem__(1, 7), "bind to sorted elapsed_ns"),
+            (lambda value: value.__setitem__("sample_order", [1, 0]), "disagrees with elapsed"),
+            (lambda value: value.__setitem__("phase_sum_verified", False), "phase_sum_verified must be true"),
+            (lambda value: value.__setitem__("source_sha256", "f" * 64), "source_sha256 disagrees"),
+            (lambda value: value.__setitem__("expected_output_sha256", "f" * 64), "expected_output_sha256 disagrees"),
+            (lambda value: value.__setitem__("total_main_story_paragraph_count", 256), "total_main_story_paragraph_count"),
+        )
+        for mutate, message in mutations:
+            malformed = copy.deepcopy(overlay)
+            mutate(malformed)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                validate(malformed)
+
+        bad_source = copy.deepcopy(source)
+        bad_source["read_calls"][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source_read_calls disagrees"
+        ):
+            validate(source_value=bad_source)
+
+        bad_sink = copy.deepcopy(sink)
+        bad_sink["largest_write"] = 65_537
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "largest_write exceeds"
+        ):
+            validate(sink_value=bad_sink)
+
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "exact sample permutation"
+        ):
+            validate(order=(0, 0))
 
     def test_allocator_binary_identity_is_not_accepted_for_latency_abba(self):
         legs = four_legs()

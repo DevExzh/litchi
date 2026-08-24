@@ -1,11 +1,22 @@
 # Performance program phase report
 
+## Latest DOCX section-layout closure (change 0273)
+
+[Change 0273](changes/0273-docx-source-backed-section-layout.md) adds one
+opt-in typed existing-main-story section layout selector for
+PageSize/Margins/Start/Columns snapshot/edit/commit, durable patch/inverse, and
+sequential publication. The current selectable matrix is **393 names** and
+the default remains **36 cases / 198 records**. This is correctness/CRUD
+closure with `performance_claim: none`; the dirty five-sample timing/profile
+and whole-process counters are descriptive only. Clean retained evidence is
+still open, with no physical-I/O, allocator/RSS, or broad DOCX claim.
+
 ## Current matrix and gap (change 0272)
 
 [Change 0272](changes/0272-opc-source-overlay-multi-part-matrix.md) records
 three opt-in changed/equal-payload-no-op/mixed source-overlay selectors, nine
 records each over sizes 2/8/32 and small/large/media-incompressible payloads.
-The selectable matrix is **392 names** and the default remains **36 cases /
+The selectable matrix is **393 names** and the default remains **36 cases /
 198 records**. It has `performance_claim: none`; the dirty five-sample
 profile is a prioritization observation only. Clean retained evidence and
 explicit-context/scaling evidence for any recompression, parallel, or
@@ -1389,7 +1400,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 
 The original stage-1 results below remain historical and descriptive evidence;
 the rows below are not current performance claims. The current
-harness contains **392 selectable cases**; 200 was the count before the
+harness contains **393 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -2869,7 +2880,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 392 selectable cases. Change
+The current standalone harness provides 393 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

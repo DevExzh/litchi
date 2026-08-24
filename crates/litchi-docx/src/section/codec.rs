@@ -1101,10 +1101,26 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
                     Error::InvalidFormat("section XML nesting is too deep".into())
                 })?;
             },
-            Event::Empty(element) if depth == 1 => output.push((
-                String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
-                xml[event_start..event_end].to_vec(),
-            )),
+            Event::Empty(element) => {
+                if depth == 0 {
+                    let _ = xml.get(event_start..event_end).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "section child XML range is outside the fragment".into(),
+                        )
+                    })?;
+                    root = true;
+                } else if depth == 1 {
+                    let raw = xml.get(event_start..event_end).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "section child XML range is outside the fragment".into(),
+                        )
+                    })?;
+                    output.push((
+                        String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+                        raw.to_vec(),
+                    ));
+                }
+            },
             Event::End(_) => {
                 depth = depth
                     .checked_sub(1)
@@ -1113,12 +1129,16 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
                     let (name, start) = start.take().ok_or_else(|| {
                         Error::InvalidFormat("section child tracking failed".into())
                     })?;
-                    output.push((name, xml[start..event_end].to_vec()));
+                    let raw = xml.get(start..event_end).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "section child XML range is outside the fragment".into(),
+                        )
+                    })?;
+                    output.push((name, raw.to_vec()));
                 }
             },
             Event::Eof => break,
-            Event::Empty(_)
-            | Event::Text(_)
+            Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
