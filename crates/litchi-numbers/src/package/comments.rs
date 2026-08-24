@@ -539,6 +539,7 @@ struct Mutation {
 #[derive(Debug, Clone)]
 struct CommentEntryLocation {
     owner: EntryOwner,
+    route: MessageRoute,
     entry: EntryFact,
     storage_occurrences: usize,
 }
@@ -558,7 +559,7 @@ impl EntryOwner {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct EntryFact {
     refcount: u32,
     storage_id: u64,
@@ -1108,6 +1109,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
     let details = decode_comment_storage(source, storage_message.data.as_slice(), target.path)?;
     let entry = CommentEntryLocation {
         owner: list_location.owner,
+        route: list_location.route,
         entry: list_location.entry,
         storage_occurrences: list_location.storage_occurrences,
     };
@@ -2095,6 +2097,7 @@ fn validate_comment_segment_key_range(
 #[derive(Debug, Clone)]
 struct ListLocation {
     owner: EntryOwner,
+    route: MessageRoute,
     entry: EntryFact,
     storage_id: u64,
     storage_occurrences: usize,
@@ -2137,7 +2140,7 @@ fn comment_table_entry(
             probe,
         ));
     }
-    let (_table_route, mut root_probe) = selected.ok_or(Error::InvalidSource { path })?;
+    let (table_route, mut root_probe) = selected.ok_or(Error::InvalidSource { path })?;
     let mut selected_entry = root_probe
         .target_entry
         .map(|entry| (entry, EntryOwner::Root));
@@ -2197,6 +2200,7 @@ fn comment_table_entry(
     }
     Ok(ListLocation {
         owner,
+        route: table_route,
         entry,
         storage_id: entry.storage_id,
         storage_occurrences,
@@ -2400,6 +2404,27 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
         || selected.replies != 0
     {
         return Err(Error::UnsupportedDependency {
+            path: selected.target.path,
+        });
+    }
+    let root_list = message_at_route(source, entry.route, selected.target.path)?;
+    if !TABLE_DATA_LIST_MESSAGE_TYPES.contains(&root_list.type_) {
+        return Err(Error::InvalidSource {
+            path: selected.target.path,
+        });
+    }
+    let (root_probe, root_type) = decode_list_probe(
+        source,
+        root_list.data.as_slice(),
+        selected.comment_key.unwrap_or(0),
+        selected.target.path,
+        false,
+        None,
+    )?;
+    if root_type != tst::table_data_list::ListType::CommentStorage as i32
+        || root_probe.target_entry != Some(entry.entry)
+    {
+        return Err(Error::InvalidSource {
             path: selected.target.path,
         });
     }
