@@ -4578,3 +4578,36 @@ No manifest edge, generated schema, Buffa/Prost owner, ordered debt, or other
 `litchi-iwa` responsibility is retired. Wave58 therefore satisfies no
 monolith-exit, host-removal, dependency-removal, or publication-completeness
 gate.
+
+## 2026-08-24 amendment: Wave60 Numbers root comment-clear bounded owner slice (not a monolith-exit gate)
+
+The Wave60 implementation series culminates in commit
+`895ef17848516cf201e717239c44c119eae5da87`. `litchi-numbers` now owns the
+selector-first clear of one exact, unshared, reply-free root cell-comment
+graph, including cell/list mutation, unshared storage deletion, archive
+reference pruning, Metadata save-token publication, preview invalidation,
+candidate verification, and exact patch/inverse artifacts. Supporting neutral
+archive-reference and doc-hidden PackageMetadata codecs provide strict,
+source-preserving inspection and rewrite seams without exposing raw object IDs
+through the semantic API.
+
+This is intentionally narrower than general comment deletion. Shared or
+segmented storage, replies, exact aliases, unknown archive owners, registered
+Metadata UUID/external/data/root-map ownership, missing or ambiguous Metadata,
+comment creation, and wider graph cleanup remain refused by the focused owner.
+The deprecated `litchi-iwa` raw-ID clear still exists: metadata-bearing
+accepted sources delegate through semantic selectors, while sources with no
+Metadata sidecar retain the legacy compatibility writer. Focused errors on a
+metadata-bearing source fail hard rather than falling back.
+
+The focused codec/package/host and 387/387 boundary gates, along with bounded
+Numbers 14.4 open/render/save/close/reopen evidence, are recorded in ADR 0008.
+The live checker retains exactly the 23 known Pages table-lock findings. No
+full-workspace green, arbitrary comment-graph publication, native byte-parity,
+or performance claim is made.
+
+No manifest edge, generated-schema owner, normal Prost owner, ordered debt,
+migration-host API, or `litchi-iwa` crate responsibility is retired. The host
+adapter, no-Metadata fallback, unsupported comment graphs, Pages table-lock
+baseline, and the monolith itself remain. Wave60 therefore satisfies no
+host-exit, dependency-removal, or monolith-deletion gate.

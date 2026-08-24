@@ -2376,3 +2376,44 @@ visitor locator matching; compressed Snappy bytes are charged separately for
 publication. The package still owns semantic selection, native name edits,
 metadata locality, exact artifact capture, and patch/inverse behavior; wire
 and generated types do not cross the public semantic surface.
+
+## 2026-08-24 amendment: Numbers root cell-comment clear ownership
+
+The Wave60 implementation series, culminating in commit
+`895ef17848516cf201e717239c44c119eae5da87`, extends the selector-first
+Numbers comment transaction with a deliberately narrow changed-clear seam.
+`Package::{clear_table_cell_comment, clear_table_cell_comment_a1}` and
+`Edit::clear` use the existing `SheetSelector`, `TableSelector`, and
+`CellPosition` vocabulary. `TableCellCommentPatch` retains exact source and
+target artifacts, and `Package::apply_table_cell_comment` applies the same
+semantic patch/inverse contract as replacement. Clearing an already-empty
+cell is an exact no-op.
+
+A changed clear is admitted only for one existing root-list comment entry with
+`refcount == 1`, one global cell occurrence, one list occurrence, one storage
+occurrence, no segment ownership, and no replies. The storage UUID and all
+archive aggregate/field reference metadata must be exact and unambiguous. The
+selected BNC cell reference and root list entry are removed, the unshared
+storage object is deleted, affected message metadata is pruned, and the three
+root previews are invalidated. Shared, segmented, reply-bearing, aliased,
+metadata-owned, unknown-owner, or otherwise ambiguous graphs fail closed.
+
+Changed publication also requires the exact type-11006
+`Index/Metadata.iwa` sidecar. The focused owner proves that the deleted storage
+is absent from UUID, external-reference, data-owner, ambiguous-owner, and root
+data-metadata-map ownership before deleting it. It advances the root save
+token once and writes that value only to the current components changed by the
+native mutation; `last_object_identifier`, unselected/versioned components,
+and unknown source fields remain unchanged. The package reopens and verifies
+the candidate before returning a commit, while inverse application restores
+the original package bytes.
+
+The deprecated raw-ID `litchi-iwa` clear remains a migration-host adapter. It
+maps the native table owner to scoped sheet/table selectors and delegates
+metadata-bearing sources to the focused owner, then reopens and checks legacy
+readback before assignment. A package with no Metadata sidecar retains the
+pre-existing compatibility implementation. Once Metadata is present, focused
+parse, selector, ownership, limit, and verification errors are hard failures;
+there is no cell-only fallback that could bypass the sidecar contract. Native
+IDs, archive routes, protobuf messages, and wire types remain outside the
+focused public API.

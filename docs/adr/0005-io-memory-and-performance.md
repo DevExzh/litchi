@@ -899,3 +899,40 @@ Prost ownership: the hidden codec uses the existing Buffa projection as a
 parity boundary, while unrelated generated mutation/writer paths and normal
 workspace Prost owners remain. It makes no workspace-wide dependency-removal
 claim.
+
+## 2026-08-24 amendment: Wave60 Numbers root comment-clear resource record
+
+The Wave60 implementation series culminates in commit
+`895ef17848516cf201e717239c44c119eae5da87`. The changed-clear transaction
+keeps the existing package, archive, semantic-reference, wire-byte, field,
+nesting, work, materialized-cell, text, and output ceilings. Selected tile,
+root-list, comment-storage, PackageMetadata, and archive-header operations use
+their explicit finite codec profiles; fallible reservations precede retained
+census collections and publication artifacts.
+
+The global ownership pass charges complete BNC cell payload bytes before the
+handwritten cell parser runs. Archive-owner inspection accumulates header work
+and reference occurrences across every physical component instead of resetting
+the effective budget at each object. The comment graph census applies one
+aggregate semantic-reference ceiling before allocating its lookup sets, and
+source identity, reply, list, storage, cell-key, and UUID checks use bounded
+`HashSet` membership rather than repeated quadratic scans. Candidate archive
+mutation validates canonical object framing, rejects multi-message storage
+objects, preserves supported raw headers/unknown fields, and refuses opaque
+future owners before deletion.
+
+The PackageMetadata codecs preflight source scanning, exact output sizing,
+selected-field work, candidate verification, and root-map/combined-removal
+support before their output allocation. The current comment-clear route uses
+the dedicated ownership visitor and save-token rewrite because an admitted
+storage object must have no metadata ownership; it does not claim to delete an
+arbitrary registered resource graph. Native component compression, Metadata
+rewriting, ZIP reassembly, and candidate reopen remain separately staged
+fallible buffers under their existing package/archive ceilings. This amendment
+therefore records bounded operation-local work, not a single-allocation design
+or a measurement of peak memory, allocation count, latency, throughput, or
+RSS.
+
+No manifest edge changed. Generated schemas and normal Prost owners elsewhere
+remain, and this resource record makes no package-wide performance,
+workspace-wide dependency-removal, or publication-completeness claim.
