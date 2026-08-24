@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+}
+
+message DrawableArchive {
+  optional .LitchiIwaProjection.Reference title = 10;
+  optional .LitchiIwaProjection.Reference caption = 11;
+}
+
+message MovieArchive {
+  required .LitchiIwaProjection.DrawableArchive super = 1;
+}

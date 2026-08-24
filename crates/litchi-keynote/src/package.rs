@@ -12,6 +12,7 @@ mod slide_background;
 mod slide_chart_caption;
 mod slide_chart_title;
 pub(crate) mod slide_delete;
+mod slide_movie_caption;
 mod slide_notes;
 mod slide_order;
 
@@ -78,6 +79,10 @@ pub use slide_chart_caption::{
 pub use slide_chart_title::{
     ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
     ChartTitlePatch,
+};
+pub use slide_movie_caption::{
+    SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
+    SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
 };
 pub use slide_notes::{
     SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,

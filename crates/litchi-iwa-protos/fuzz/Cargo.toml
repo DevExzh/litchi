@@ -85,6 +85,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_movie_caption"
+path = "fuzz_targets/keynote_movie_caption.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

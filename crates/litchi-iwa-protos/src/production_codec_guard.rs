@@ -364,6 +364,10 @@ mod tests {
             include_str!("keynote_chart_caption_codec.rs"),
         ),
         (
+            "keynote_movie_caption",
+            include_str!("keynote_movie_caption_codec.rs"),
+        ),
+        (
             "keynote_chart_title",
             include_str!("keynote_chart_title_codec.rs"),
         ),

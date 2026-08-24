@@ -335,7 +335,9 @@ pub use package::{
     MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind, ReadError,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
     SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
-    SlideBackgroundLimitKind, SlideBackgroundPatch, SlideNotesCommit, SlideNotesDiagnostics,
+    SlideBackgroundLimitKind, SlideBackgroundPatch, SlideMovieCaptionCommit,
+    SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
+    SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
     SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
@@ -343,6 +345,7 @@ pub use package::{
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
+pub use slide::movie::MovieSelector;
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
 pub(crate) use transition::Effect;

@@ -80,6 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_media_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_background_codec.rs");
@@ -109,6 +110,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_chart_caption_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_movie_caption_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -298,6 +303,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_chart_caption_projection_budget(&buffa_keynote_chart_caption_out_directory)?;
+
+    // Keynote movie title/caption reads need only the required drawable
+    // envelope and its two optional references. Keep the MovieArchive
+    // extension closure out of generated code; strict raw traversal owns all
+    // unrelated fields and source preservation.
+    let buffa_keynote_movie_caption_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-movie-caption");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNMovieCaptionArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_movie_caption_out_directory)
+        .include_file("iwa_keynote_movie_caption_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_movie_caption_projection_budget(&buffa_keynote_movie_caption_out_directory)?;
 
     // Keynote chart-title reads need only the two scalar fields from the
     // generated ChartNonStyleArchive extension. Keep the outer non-style
@@ -814,6 +840,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "d4dba9f6a73a35531e9c8bb9731504891000d415bb981b74f783710998630236",
         ),
         (
+            "KNMovieCaptionArchive.proto",
+            330,
+            "9cd1e92b3a0c41a3d3431c26ece99496dd2fac4e1d8eca460758adc3a437b646",
+        ),
+        (
             "KNPlaceholderTextOwnerArchive.proto",
             1108,
             "2f076952a2f963ab9fa410f2625f3eac7f5ee1f26f5b1c49f833266016f13d8c",
@@ -1061,6 +1092,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_chart_caption_codec.rs",
             "crate::buffa_keynote_chart_caption_generated::",
             "mod buffa_keynote_chart_caption_generated {",
+        ),
+        (
+            "src/keynote_movie_caption_codec.rs",
+            "crate::buffa_keynote_movie_caption_generated::",
+            "mod buffa_keynote_movie_caption_generated {",
         ),
         (
             "src/keynote_chart_title_codec.rs",
@@ -2100,6 +2136,81 @@ optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
     {
         return Err(
             "derived Keynote chart-caption projection/router drifted from canonical TSCH/TSD/TSP fields, exposed chart extensions, or introduced generated/production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_movie_caption_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSD_MOVIE: &str = "message MovieArchive {";
+    const TSD_SUPER: &str = "required .TSD.DrawableArchive super = 1;";
+    const TSD_TITLE: &str = "optional .TSP.Reference title = 10;";
+    const TSD_CAPTION: &str = "optional .TSP.Reference caption = 11;";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message Reference {\n\
+required uint64 identifier = 1;\n\
+}\n\
+message DrawableArchive {\n\
+optional .LitchiIwaProjection.Reference title = 10;\n\
+optional .LitchiIwaProjection.Reference caption = 11;\n\
+}\n\
+message MovieArchive {\n\
+required .LitchiIwaProjection.DrawableArchive super = 1;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 7] = [
+        "const MOVIE_DRAWABLE_SUPER_FIELD: u32 = 1;",
+        "const DRAWABLE_TITLE_FIELD: u32 = 10;",
+        "const DRAWABLE_CAPTION_FIELD: u32 = 11;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "pub fn decode_movie_caption(",
+        "fn preflight_movie_caption(",
+        "fn next_strict_field<",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_movie_caption_generated {",
+        "\"/buffa-keynote-movie-caption/iwa_keynote_movie_caption_buffa_protos.rs\"",
+    ];
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("KNMovieCaptionArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let codec = fs::read_to_string("src/keynote_movie_caption_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if tsd.matches(TSD_MOVIE).count() != 1
+        || !tsd
+            .split_once(TSD_MOVIE)
+            .is_some_and(|(_, movie)| movie.contains(TSD_SUPER))
+        || tsd.matches(TSD_TITLE).count() != 1
+        || tsd.matches(TSD_CAPTION).count() != 1
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote movie-caption projection/router drifted from canonical TSD MovieArchive title/caption fields, exposed repeated storage, or introduced generated/production encoding"
                 .into(),
         );
     }
@@ -5396,6 +5507,42 @@ fn enforce_keynote_chart_caption_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Keynote chart-caption projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_movie_caption_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote movie-caption projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }
