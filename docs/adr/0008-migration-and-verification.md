@@ -12554,3 +12554,57 @@ Numbers changed the package bytes during save, so this is bounded native
 open/render/save/close/reopen acceptance for the clear semantics—not
 Rust/native byte parity, exact post-save preservation, a performance/RSS
 measurement, or a full publication gate for unsupported comment graphs.
+
+## 2026-08-24 amendment: Wave61 Pages body-table lock verification record
+
+The focused ownership, compatibility, and resource series is recorded by
+commits `a27a22c9cf95d548da7634167d6bac7190b8321a`,
+`887c4a9c87a21012b1bebfc3f7e93a1577522e21`,
+`11c9550f9003da5e9c19f7976dbca132d3e21272`,
+`d6988d5ae279bb10a7d43e47746bf1a91bf5baf5`, and
+`ca3fbd21a24f7195ef9b2d8d169e286339fc274e`. Boundary hardening is commit
+`4742e20107f29a1990d6a1886d8046a9333133b5`. Final scoped gates were:
+
+- `cargo test -p litchi-pages --lib package::table_lock::tests:: --quiet`:
+  15/15 passed;
+- `cargo test -p litchi-pages --test table_lock --quiet`: 17/17 passed;
+- `cargo test -p litchi-pages --all-targets --quiet`: 203 aggregate tests
+  passed across the library and integration targets;
+- `cargo check -p litchi-pages --all-targets --quiet`: passed;
+- `cargo clippy -p litchi-pages --all-targets --quiet -- -D warnings`:
+  passed;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 389/389 passed;
+  `py_compile` and `git diff --check` passed for the boundary slice.
+
+The live `python3 tools/check_crate_boundaries.py --explain` audit still exits
+1 for exactly three findings, all from the user-owned untracked retired host
+source `crates/litchi-iwa/src/pages/editor/tables/lock.rs`: the source itself
+and its two legacy state methods. It reports no tracked Pages facade or
+body-table-lock finding. These scoped gates are not a full-workspace green
+claim.
+
+The bounded native record used Pages 14.4 and these disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| `/private/tmp/litchi-wave61-pages-native-source.pages` | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Rust locked artifact before native save | 108,844 | `0eb3f7d5c06e4dd6c9edf593eb0ec795f6c245a3e6c5e5f2df3e32c0e3e5566c` |
+| Pages-normalized `/private/tmp/litchi-wave61-pages-native-locked.pages` | 108,788 | `58496868ec59bca7a7c625a082650dbb7d70616a929ddedfe78bc67a901055fd` |
+| `/private/tmp/litchi-wave61-pages-native-inverse.pages` | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| `/private/tmp/litchi-wave61-pages-native-reread.pages` | 108,788 | `58496868ec59bca7a7c625a082650dbb7d70616a929ddedfe78bc67a901055fd` |
+
+The native source contained one unlocked body table named `Table 1`. The Rust
+transaction set it to locked and produced an exact pre-native inverse matching
+the source bytes. Pages opened the Rust candidate without repair and exposed
+`Locked, Table 1` together with `Locked items cannot be edited`. Command-S
+completed without an alert; Pages closed and reopened its normalized artifact
+with the table still locked. The strict Rust owner then reopened that artifact,
+read `Locked`, and produced a byte-exact no-op reread candidate with the same
+normalized hash.
+
+Pages changed the package bytes during save. The evidence is therefore bounded
+native open/render/save/close/reopen acceptance for the body-table lock
+semantics, plus strict Rust reread and an exact pre-native inverse. It is not
+Rust/native byte parity, exact post-save source preservation, a performance or
+RSS measurement, host-retirement evidence, or a full publication/workspace
+gate.

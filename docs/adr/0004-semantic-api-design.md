@@ -2417,3 +2417,39 @@ parse, selector, ownership, limit, and verification errors are hard failures;
 there is no cell-only fallback that could bypass the sidecar contract. Native
 IDs, archive routes, protobuf messages, and wire types remain outside the
 focused public API.
+
+## 2026-08-24 amendment: Pages body-table lock canonical semantic vocabulary
+
+The Wave61 implementation series is commits
+`a27a22c9cf95d548da7634167d6bac7190b8321a`,
+`887c4a9c87a21012b1bebfc3f7e93a1577522e21`,
+`11c9550f9003da5e9c19f7976dbca132d3e21272`, and
+`d6988d5ae279bb10a7d43e47746bf1a91bf5baf5`. The selector-first Pages owner
+uses `Package::{body_table_lock, edit_body_table_lock,
+apply_body_table_lock}`, `BodyTableSelector`, and the transaction types
+`BodyTableLock{Edit,Patch,Commit,Diagnostics,Error,LimitKind}`. Semantic state
+lives under `table::lock` as `BodyTableLockState`; no native table or object
+identifier crosses this public surface.
+
+The former flat `TableLock{Edit,Patch,Commit,Diagnostics,Error,LimitKind}`,
+`TableLockState`, and `TableSelector` aliases were removed intentionally from
+the unpublished `0.0.1` facade. They did not identify a distinct semantic
+operation and made the application-owned body-table scope ambiguous. Callers
+now use only the canonical body-table vocabulary above.
+
+The package owner resolves the selected body attachment and table model,
+cross-checks the rooted ownership graph, rewrites the selected lock field,
+reopens the candidate, and returns exact source/target patch artifacts. Native
+Pages packages commonly describe these known edges only in aggregate
+`MessageInfo.object_references`; field-local reference metadata is optional.
+When field-local declarations are present, they must be exact, unique, and
+consistent with the payload and aggregate owner. Contradictory, duplicate,
+wrong-path, or unknown ownership continues to fail closed. Patch inverse and
+no-op application retain the exact-byte transaction contract.
+
+Commit `4742e20107f29a1990d6a1886d8046a9333133b5` ratchets that vocabulary over
+the complete `litchi-pages` source tree and the retained Pages migration host,
+including alternate aliases, wildcard exports, relocated modules, renamed
+host methods, and every host example. Individual `cfg(test)` items are masked
+without hiding later production declarations. The `litchi-iwa` host remains a
+compatibility concern; this semantic amendment does not claim its deletion.
