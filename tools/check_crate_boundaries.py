@@ -2976,6 +2976,40 @@ IWA_PAGES_TABLE_TITLE_README_CALLS = (
         r"[ \t\r\n]*\(",
     ),
 )
+# Body-table header/footer settings are owned by litchi-pages.  The host
+# layout module also contains the unrelated row/column dimension helpers, so
+# retirement is expressed as a method/import/call ratchet rather than deleting
+# the whole file.
+RETIRED_IWA_PAGES_TABLE_HEADER_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "layout.rs"
+)
+RETIRED_IWA_PAGES_TABLE_HEADER_METHODS = (
+    "table_header_settings",
+    "set_table_header_settings",
+)
+RETIRED_IWA_PAGES_TABLE_HEADER_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_HEADER_METHODS
+)
+IWA_PAGES_TABLE_HEADER_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"(?:litchi_numbers|numbers)[^;\n]*"
+        r"(?:table[ \t]*::[ \t]*headers|HeaderSettings|table_header_settings)"
+    ),
+)
+IWA_PAGES_TABLE_HEADER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>table_header_settings|"
+    r"set_table_header_settings)\b[ \t\r\n]*\(",
+)
+IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_TABLE_HEADER_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_header_settings|set_table_header_settings)\b"
+        r"[ \t\r\n]*\(",
+    ),
+)
 PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
 PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
     PAGES_SOURCE_ROOT / "document.rs",
@@ -3298,6 +3332,126 @@ PAGES_TABLE_TITLE_WIRE_TYPES = frozenset(
     }
 )
 PAGES_TABLE_TITLE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
+)
+PAGES_TABLE_HEADERS_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "headers.rs"
+PAGES_TABLE_HEADERS_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_headers.rs"
+)
+PAGES_TABLE_HEADERS_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_headers"
+)
+PAGES_TABLE_HEADERS_IMPLEMENTATION_SOURCES = (
+    PAGES_TABLE_HEADERS_OWNER_SOURCE,
+    PAGES_TABLE_HEADERS_SEMANTIC_SOURCE,
+)
+PAGES_TABLE_HEADERS_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_HEADERS_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_TABLE_HEADERS_SEMANTIC_TYPES = ("Count", "Error", "Settings")
+PAGES_TABLE_HEADERS_CANONICAL_TYPES = (
+    "BodyTableHeaderSettingsEdit",
+    "BodyTableHeaderSettingsPatch",
+    "BodyTableHeaderSettingsCommit",
+    "BodyTableHeaderSettingsDiagnostics",
+    "BodyTableHeaderSettingsError",
+    "BodyTableHeaderSettingsInvalidReason",
+    "BodyTableHeaderSettingsLimitKind",
+)
+PAGES_TABLE_HEADERS_SHORT_NAMES = frozenset(
+    PAGES_TABLE_HEADERS_CANONICAL_TYPES + PAGES_TABLE_HEADERS_SEMANTIC_TYPES
+)
+PAGES_TABLE_HEADERS_FOCUSED_MARKERS = frozenset(
+    PAGES_TABLE_HEADERS_CANONICAL_TYPES + ("Count", "Settings", "BodyTableHeaderSettings")
+)
+PAGES_TABLE_HEADERS_PUBLIC_NAMES = (
+    PAGES_TABLE_HEADERS_SHORT_NAMES | {"BodyTableHeaderSettings"}
+)
+PAGES_TABLE_HEADERS_PACKAGE_METHODS = (
+    "body_table_header_settings",
+    "edit_body_table_header_settings",
+    "apply_body_table_header_settings",
+)
+PAGES_TABLE_HEADERS_FLAT_METHODS = frozenset(
+    {"table_header_settings", "edit_table_headers", "apply_table_headers"}
+)
+PAGES_TABLE_HEADERS_FLAT_ALIASES = frozenset(
+    {
+        "HeaderSettings",
+        "TableHeaderSettings",
+        "TableHeaders",
+        "TableHeadersEdit",
+        "TableHeadersPatch",
+        "TableHeadersCommit",
+        "TableHeadersDiagnostics",
+        "TableHeadersError",
+        "TableHeadersLimitKind",
+        "HeaderEdit",
+        "HeaderPatch",
+        "HeaderCommit",
+        "HeaderDiagnostics",
+        "HeaderError",
+        "HeaderLimitKind",
+    }
+)
+PAGES_TABLE_HEADERS_ALIAS_TARGETS = frozenset(
+    PAGES_TABLE_HEADERS_CANONICAL_TYPES + ("Count", "Settings")
+)
+PAGES_TABLE_HEADERS_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_headers|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?headers)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_TABLE_HEADERS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?headers\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_PACKAGE_TABLE_HEADERS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body_table_headers\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_TABLE_HEADERS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_table_headers\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_TABLE_HEADERS_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "DrawableArchive",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableHeaderSettingsArchive",
+        "TableHeaderSettingsSnapshot",
+        "TableHeadersArchive",
+    }
+)
+PAGES_TABLE_HEADERS_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_TABLE_HEADERS_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
 )
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
@@ -5503,6 +5657,8 @@ def _is_numbers_sheet_order_public_declaration(
 def _numbers_table_header_settings_public_leak(identifier: str) -> str | None:
     """Classify implementation vocabulary forbidden in header transactions."""
 
+    if identifier == "litchi_iwa_common":
+        return None
     if identifier in NUMBERS_TABLE_HEADER_SETTINGS_PHYSICAL_TYPES:
         return "archive/IWA type"
     if (
@@ -5863,6 +6019,56 @@ def _is_pages_table_title_public_declaration(
     return bool(
         identifiers & (PAGES_TABLE_TITLE_FLAT_ALIASES | PAGES_TABLE_TITLE_PUBLIC_NAMES)
     ) or _pages_table_title_owner_declaration(declaration)
+
+
+def _pages_table_headers_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in Pages table headers."""
+
+    if identifier in PAGES_TABLE_HEADERS_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_TABLE_HEADERS_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_TABLE_HEADERS_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_table_headers_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_TABLE_HEADERS_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_TABLE_HEADERS_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_table_headers_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers & (PAGES_TABLE_HEADERS_FLAT_ALIASES | PAGES_TABLE_HEADERS_FOCUSED_MARKERS)
+    ) or _pages_table_headers_owner_declaration(declaration)
 
 
 def _is_pages_table_lock_public_declaration(
@@ -10701,6 +10907,88 @@ def audit_iwa_pages_table_title_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_iwa_pages_table_headers_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the retired Pages table-header host surface out of litchi-iwa.
+
+    ``layout.rs`` still owns unrelated row/column dimensions, therefore the
+    header retirement is deliberately item-scoped.  Test-gated declarations
+    are masked one at a time so a fixture/oracle cannot hide a later
+    production method or import.
+    """
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            code = _mask_rust_non_code(source)
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_TABLE_HEADER_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages table-header method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for pattern in IWA_PAGES_TABLE_HEADER_IMPORTS:
+                for match in pattern.finditer(code):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-header import: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_TABLE_HEADER_CALL.finditer(code):
+                # Declarations are already reported above; this catches a
+                # compatibility helper calling the retired host route under a
+                # different function name.
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    code[line_start:line_end],
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-header call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            # The umbrella examples intentionally keep Numbers and Keynote
+            # branches alive.  Their Numbers-only examples use the same
+            # legacy method spelling but are outside the Pages retirement.
+            stem = example_path.stem.lower()
+            if "numbers" in stem and "pages" not in stem:
+                continue
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            )
+            for match in IWA_PAGES_TABLE_HEADER_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-header example call "
+                    f"{match.group('method')}: "
+                    f"{example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_TABLE_HEADER_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-header README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -13600,6 +13888,10 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
                     target in PAGES_TABLE_TITLE_ALIAS_TARGETS
                     or "body_table_title" in target_identifiers
                 ) and alias and alias != target:
+                    # A sibling table-settings semantic alias is not a title
+                    # route; keep the title ratchet scoped to its own facade.
+                    if alias == "BodyTableHeaderSettings":
+                        continue
                     if path == semantic_path and alias in {
                         "Commit",
                         "Diagnostics",
@@ -13622,6 +13914,8 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
                     target in PAGES_TABLE_TITLE_ALIAS_TARGETS
                     or "body_table_title" in target_identifiers
                 ) and alias != target:
+                    if alias == "BodyTableHeaderSettings":
+                        continue
                     violations.append(
                         "focused litchi-pages table-title public API retains "
                         f"alternate alias {alias} for {target}: "
@@ -13687,6 +13981,294 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
                 )
                 violations.append(
                     "focused litchi-pages table-title public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_headers_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Enforce the selector-first, archive-free Pages table-header API."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_TABLE_HEADERS_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_TABLE_HEADERS_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_TABLE_HEADERS_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / PAGES_TABLE_HEADERS_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(PAGES_TABLE_HEADERS_SEMANTIC_TYPES)
+    )
+    for name in PAGES_TABLE_HEADERS_SEMANTIC_TYPES:
+        if name in semantic_exports:
+            continue
+        violations.append(
+            "focused litchi-pages table-headers public API is missing "
+            f"semantic table::headers type {name}: "
+            f"{PAGES_TABLE_HEADERS_SEMANTIC_SOURCE}"
+        )
+
+    selector_path = root / PAGES_TABLE_HEADERS_SELECTOR_SOURCE
+    selector_source = (
+        _mask_rust_non_code(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        selector_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-headers public API is missing canonical "
+            f"BodyTableSelector: {PAGES_TABLE_HEADERS_SELECTOR_SOURCE}"
+        )
+
+    package_path = root / PAGES_TABLE_HEADERS_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    owner_path = root / PAGES_TABLE_HEADERS_OWNER_SOURCE
+    owner_present = owner_path.is_file() or (
+        PAGES_PACKAGE_TABLE_HEADERS_MODULE.search(package_source) is not None
+    )
+    if owner_present:
+        if helper_root.is_dir():
+            dedicated_sources.update(helper_root.rglob("*.rs"))
+        if owner_path.is_file():
+            dedicated_sources.add(owner_path)
+        export_sources.add(package_path)
+        canonical_exports = _rust_canonical_exports(
+            owner_path.read_text(encoding="utf-8") if owner_path.is_file() else "",
+            frozenset(PAGES_TABLE_HEADERS_CANONICAL_TYPES),
+        )
+    else:
+        canonical_exports = frozenset()
+    for name in PAGES_TABLE_HEADERS_CANONICAL_TYPES:
+        if owner_present and name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-pages table-headers public API is missing "
+            f"canonical package type {name}: {PAGES_TABLE_HEADERS_OWNER_SOURCE}"
+        )
+
+    lib_path = root / PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages table-headers public API is missing canonical "
+            f"root table module: {PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]}"
+        )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        lib_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-headers public API is missing root "
+            f"BodyTableSelector re-export: {PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]}"
+        )
+
+    table_path = root / PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_HEADERS_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-pages table-headers public API is missing canonical "
+            "table::headers module: "
+            f"{PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]}"
+        )
+
+    if owner_present:
+        if PAGES_PACKAGE_TABLE_HEADERS_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-pages table-headers public API is missing private "
+                f"package owner module: {PAGES_TABLE_HEADERS_EXPORT_SOURCES[1]}"
+            )
+        for match in PUBLIC_PAGES_PACKAGE_TABLE_HEADERS_MODULE.finditer(package_source):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages table-headers public API exposes duplicate "
+                "package::body_table_headers module: "
+                f"{PAGES_TABLE_HEADERS_EXPORT_SOURCES[1]}:{line_number}"
+            )
+        if not owner_path.is_file():
+            violations.append(
+                "focused litchi-pages table-headers public API is missing private "
+                f"package owner source: {PAGES_TABLE_HEADERS_OWNER_SOURCE}"
+            )
+        owner_source = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+        owner_methods = {
+            name
+            for declaration, _line_number in _rust_public_declarations(owner_source)
+            for name, _nested_line in _rust_function_declarations(declaration)
+        }
+        for method in PAGES_TABLE_HEADERS_PACKAGE_METHODS:
+            if method in owner_methods:
+                continue
+            violations.append(
+                "focused litchi-pages table-headers public API is missing Package "
+                f"method {method}: {PAGES_TABLE_HEADERS_OWNER_SOURCE}"
+            )
+        for method in sorted(PAGES_TABLE_HEADERS_FLAT_METHODS & owner_methods):
+            violations.append(
+                "focused litchi-pages table-headers public API retains flat Package "
+                f"method {method}: {PAGES_TABLE_HEADERS_OWNER_SOURCE}"
+            )
+
+    # Scan every facade file so a new sibling module cannot hide a second
+    # public route.  cfg(test) declarations are masked item-by-item.
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "body_table_headers"]:
+                violations.append(
+                    "focused litchi-pages table-headers public API exposes duplicate "
+                    f"body_table_headers module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if (
+                    "body_table_headers" in identifiers
+                    or "headers" in identifiers
+                    or "package" in identifiers
+                ):
+                    glob_label = (
+                        "table::headers glob" if path == table_path else "owner glob"
+                    )
+                    violations.append(
+                        "focused litchi-pages table-headers public API retains root "
+                        f"aliases via {glob_label}: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_HEADERS_ALIAS_TARGETS
+                    or "body_table_headers" in target_identifiers
+                    or "headers" in target_identifiers
+                ) and alias and alias != target:
+                    if alias in PAGES_TABLE_HEADERS_PUBLIC_NAMES:
+                        continue
+                    if path == semantic_path and alias in {
+                        "Commit",
+                        "Diagnostics",
+                        "Edit",
+                        "Error",
+                        "LimitKind",
+                        "Patch",
+                        "Count",
+                        "Settings",
+                    }:
+                        continue
+                    violations.append(
+                        "focused litchi-pages table-headers public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_HEADERS_ALIAS_TARGETS
+                    or "body_table_headers" in target_identifiers
+                    or "headers" in target_identifiers
+                ) and alias != target:
+                    if alias in PAGES_TABLE_HEADERS_PUBLIC_NAMES:
+                        continue
+                    violations.append(
+                        "focused litchi-pages table-headers public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, public_declaration, complete_source_scope in declarations:
+            if not _is_pages_table_headers_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages table-headers public API retains root "
+                    f"aliases via table::headers glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_TABLE_HEADERS_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages table-headers public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_table_headers_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-pages table-headers public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages table-headers public API exposes raw byte "
                     f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
                 )
 
@@ -14706,6 +15288,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_lock_facade_source_topology()
         + audit_iwa_pages_table_title_source_topology()
         + audit_pages_table_title_facade_source_topology()
+        + audit_iwa_pages_table_headers_source_topology()
+        + audit_pages_table_headers_facade_source_topology()
         + audit_iwa_pages_document_settings_source_topology()
         + audit_pages_document_settings_facade_source_topology()
         + audit_iwa_pages_section_settings_source_topology()
