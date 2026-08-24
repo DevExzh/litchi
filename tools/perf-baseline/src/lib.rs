@@ -180,6 +180,12 @@ const XLS_COMMENTS_SOURCE_COUNT: usize = 256;
 const XLS_COMMENTS_BATCH_COUNT: usize = 256;
 const XLS_COMMENTS_OPAQUE_STREAM_COUNT: usize = 8;
 const XLS_COMMENTS_OPAQUE_STREAM_BYTES: usize = 2 * 1024 * 1024;
+const XLS_SOURCE_SELECTED_WORKSHEET: usize = 1;
+const XLS_SOURCE_SELECTED_ROW: u32 = 20;
+const XLS_SOURCE_SELECTED_COLUMN: u32 = 4;
+const XLS_SOURCE_SELECTED_VALUE: f64 = 42.0;
+const XLS_SOURCE_MIN_ARCHIVE_BYTES: usize = 16 * 1024 * 1024;
+const XLS_SOURCE_MIN_WORKBOOK_BYTES: usize = 64 * 1024;
 const XLS_VISIBILITY_CORPUS_GENERATOR: &str = "litchi-xls-visibility-opaque-v1";
 const XLS_VISIBILITY_SHEET_COUNT: usize = litchi_xls::sheet_visibility::MAX_VISIBILITY_CHANGES + 2;
 const XLS_VISIBILITY_BATCH_COUNT: usize = litchi_xls::sheet_visibility::MAX_VISIBILITY_CHANGES;
@@ -1101,6 +1107,11 @@ enum Case {
     XlsSemanticFullCellScan,
     XlsSemanticNoopEditSave,
     XlsSemanticOneEditSave,
+    XlsSourceBackedOpen,
+    XlsEagerOpenListWorksheets,
+    XlsSourceBackedOpenListWorksheets,
+    XlsEagerOpenOneCell,
+    XlsSourceBackedOpenOneCell,
     XlsbSemanticOpen,
     XlsbSemanticListWorksheets,
     XlsbSemanticOneCell,
@@ -1620,6 +1631,13 @@ impl Case {
             Self::XlsSemanticFullCellScan => "xls_semantic_full_cell_scan",
             Self::XlsSemanticNoopEditSave => "xls_semantic_noop_edit_save",
             Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
+            Self::XlsSourceBackedOpen => "xls_source_backed_open",
+            Self::XlsEagerOpenListWorksheets => "xls_eager_open_list_worksheets",
+            Self::XlsSourceBackedOpenListWorksheets => {
+                "xls_source_backed_open_list_worksheets"
+            },
+            Self::XlsEagerOpenOneCell => "xls_eager_open_one_cell",
+            Self::XlsSourceBackedOpenOneCell => "xls_source_backed_open_one_cell",
             Self::XlsbSemanticOpen => "xlsb_semantic_open",
             Self::XlsbSemanticListWorksheets => "xlsb_semantic_list_worksheets",
             Self::XlsbSemanticOneCell => "xlsb_semantic_one_cell",
@@ -1964,6 +1982,17 @@ impl Case {
                 | Self::XlsSemanticFullCellScan
                 | Self::XlsSemanticNoopEditSave
                 | Self::XlsSemanticOneEditSave
+        )
+    }
+
+    const fn is_xls_source_backed_case(self) -> bool {
+        matches!(
+            self,
+            Self::XlsSourceBackedOpen
+                | Self::XlsEagerOpenListWorksheets
+                | Self::XlsSourceBackedOpenListWorksheets
+                | Self::XlsEagerOpenOneCell
+                | Self::XlsSourceBackedOpenOneCell
         )
     }
 
@@ -3657,6 +3686,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    xls: Option<XlsSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_edit_composition: Option<XlsxEditCompositionSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_cell_values: Option<XlsxCellValuesSourceSummary>,
@@ -4841,6 +4872,54 @@ struct XlsxSourceSummary {
     styles_read_bytes: Vec<u64>,
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+struct XlsSourceSummary {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    source_counter_scope: &'static str,
+    materialization_scope: &'static str,
+    source_retained_bytes: Vec<u64>,
+    complete_archive_materialized_bytes: Vec<u64>,
+    parsed_sheet_counts: Vec<usize>,
+    parsed_cell_counts: Vec<usize>,
+    source_version_checks: Vec<u64>,
+    source_version_stability_verified: Vec<bool>,
+    cfb_structural_read_calls: Vec<u64>,
+    cfb_structural_read_bytes: Vec<u64>,
+    workbook_global_read_calls: Vec<u64>,
+    workbook_global_read_bytes: Vec<u64>,
+    selected_worksheet_read_calls: Vec<u64>,
+    selected_worksheet_read_bytes: Vec<u64>,
+    unselected_worksheet_read_calls: Vec<u64>,
+    unselected_worksheet_read_bytes: Vec<u64>,
+    opaque_payload_read_calls: Vec<u64>,
+    opaque_payload_read_bytes: Vec<u64>,
+    open_reads_zero_worksheet_payload: Vec<bool>,
+    selected_query_reads_only_selected_worksheet: Vec<bool>,
+    archive_sha256: String,
+    workbook_stream_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+struct XlsSourceIterationEvidence {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    source_counter_scope: &'static str,
+    materialization_scope: &'static str,
+    source_retained_bytes: u64,
+    complete_archive_materialized_bytes: u64,
+    parsed_sheet_count: usize,
+    parsed_cell_count: usize,
+    source_version_checks: u64,
+    source_version_stability_verified: bool,
+    open_reads_zero_worksheet_payload: bool,
+    selected_query_reads_only_selected_worksheet: bool,
+    archive_sha256: String,
+    workbook_stream_sha256: String,
+}
+
 /// Evidence specific to the matched source-backed scalar-cell controls.
 /// Timing segments are intentionally kept separate from the generic source
 /// counters so publication and verification cannot be mistaken for one
@@ -5093,6 +5172,15 @@ struct XlsxSourceSnapshot {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct XlsSourceSnapshot {
+    cfb_structural: RangeSnapshot,
+    workbook_global: RangeSnapshot,
+    selected_worksheet: RangeSnapshot,
+    unselected_worksheets: RangeSnapshot,
+    opaque_payload: RangeSnapshot,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct OdfSourceSnapshot {
     content: RangeSnapshot,
     untouched: RangeSnapshot,
@@ -5111,6 +5199,7 @@ struct SourceSnapshot {
     ordinary_payload_read_bytes: u64,
     max_in_flight_reads: u64,
     xlsx: XlsxSourceSnapshot,
+    xls: XlsSourceSnapshot,
     odf: OdfSourceSnapshot,
 }
 
@@ -5121,6 +5210,15 @@ struct XlsxTrackedRanges {
     unselected_worksheets: Vec<Range<u64>>,
     shared_strings: Vec<Range<u64>>,
     styles: Vec<Range<u64>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct XlsTrackedRanges {
+    cfb_structural: Vec<Range<u64>>,
+    workbook_global: Vec<Range<u64>>,
+    selected_worksheet: Vec<Range<u64>>,
+    unselected_worksheets: Vec<Range<u64>>,
+    opaque_payload: Vec<Range<u64>>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5142,6 +5240,7 @@ struct InstrumentedSource {
     version: SourceVersion,
     ordinary_payload_ranges: Vec<Range<u64>>,
     xlsx_ranges: XlsxTrackedRanges,
+    xls_ranges: XlsTrackedRanges,
     odf_ranges: OdfTrackedRanges,
     track_read_ranges: bool,
     read_calls: AtomicU64,
@@ -5158,6 +5257,11 @@ struct InstrumentedSource {
     xlsx_unselected_worksheets: AtomicRangeCounter,
     xlsx_shared_strings: AtomicRangeCounter,
     xlsx_styles: AtomicRangeCounter,
+    xls_cfb_structural: AtomicRangeCounter,
+    xls_workbook_global: AtomicRangeCounter,
+    xls_selected_worksheet: AtomicRangeCounter,
+    xls_unselected_worksheets: AtomicRangeCounter,
+    xls_opaque_payload: AtomicRangeCounter,
     odf_content: AtomicRangeCounter,
     odf_untouched: AtomicRangeCounter,
     odf_pictures: AtomicRangeCounter,
@@ -6360,6 +6464,7 @@ impl InstrumentedSource {
             ),
             ordinary_payload_ranges,
             xlsx_ranges,
+            xls_ranges: XlsTrackedRanges::default(),
             odf_ranges: OdfTrackedRanges::default(),
             track_read_ranges: false,
             read_calls: AtomicU64::new(0),
@@ -6376,10 +6481,22 @@ impl InstrumentedSource {
             xlsx_unselected_worksheets: AtomicRangeCounter::default(),
             xlsx_shared_strings: AtomicRangeCounter::default(),
             xlsx_styles: AtomicRangeCounter::default(),
+            xls_cfb_structural: AtomicRangeCounter::default(),
+            xls_workbook_global: AtomicRangeCounter::default(),
+            xls_selected_worksheet: AtomicRangeCounter::default(),
+            xls_unselected_worksheets: AtomicRangeCounter::default(),
+            xls_opaque_payload: AtomicRangeCounter::default(),
             odf_content: AtomicRangeCounter::default(),
             odf_untouched: AtomicRangeCounter::default(),
             odf_pictures: AtomicRangeCounter::default(),
         }
+    }
+
+    fn new_xls(bytes: Vec<u8>, xls_ranges: XlsTrackedRanges) -> Self {
+        let mut source = Self::new_xlsx(bytes, Vec::new(), XlsxTrackedRanges::default());
+        source.xls_ranges = xls_ranges;
+        source.track_read_ranges = true;
+        source
     }
 
     fn new_with_range_tracking(bytes: Vec<u8>) -> Self {
@@ -6402,6 +6519,13 @@ impl InstrumentedSource {
                 unselected_worksheets: self.xlsx_unselected_worksheets.snapshot(),
                 shared_strings: self.xlsx_shared_strings.snapshot(),
                 styles: self.xlsx_styles.snapshot(),
+            },
+            xls: XlsSourceSnapshot {
+                cfb_structural: self.xls_cfb_structural.snapshot(),
+                workbook_global: self.xls_workbook_global.snapshot(),
+                selected_worksheet: self.xls_selected_worksheet.snapshot(),
+                unselected_worksheets: self.xls_unselected_worksheets.snapshot(),
+                opaque_payload: self.xls_opaque_payload.snapshot(),
             },
             odf: OdfSourceSnapshot {
                 content: self.odf_content.snapshot(),
@@ -6432,6 +6556,11 @@ impl InstrumentedSource {
         self.xlsx_unselected_worksheets.reset();
         self.xlsx_shared_strings.reset();
         self.xlsx_styles.reset();
+        self.xls_cfb_structural.reset();
+        self.xls_workbook_global.reset();
+        self.xls_selected_worksheet.reset();
+        self.xls_unselected_worksheets.reset();
+        self.xls_opaque_payload.reset();
         self.odf_content.reset();
         self.odf_untouched.reset();
         self.odf_pictures.reset();
@@ -6574,6 +6703,31 @@ impl ReadAt for InstrumentedSource {
         ));
         self.xlsx_styles
             .observe(range_overlap_bytes(&self.xlsx_ranges.styles, offset, end));
+        self.xls_cfb_structural.observe(range_overlap_bytes(
+            &self.xls_ranges.cfb_structural,
+            offset,
+            end,
+        ));
+        self.xls_workbook_global.observe(range_overlap_bytes(
+            &self.xls_ranges.workbook_global,
+            offset,
+            end,
+        ));
+        self.xls_selected_worksheet.observe(range_overlap_bytes(
+            &self.xls_ranges.selected_worksheet,
+            offset,
+            end,
+        ));
+        self.xls_unselected_worksheets.observe(range_overlap_bytes(
+            &self.xls_ranges.unselected_worksheets,
+            offset,
+            end,
+        ));
+        self.xls_opaque_payload.observe(range_overlap_bytes(
+            &self.xls_ranges.opaque_payload,
+            offset,
+            end,
+        ));
         self.odf_content
             .observe(range_overlap_bytes(&self.odf_ranges.content, offset, end));
         self.odf_untouched
@@ -6846,6 +7000,82 @@ impl SourceSummary {
         summary
             .styles_read_bytes
             .push(snapshot.xlsx.styles.read_bytes);
+    }
+
+    fn record_xls(
+        &mut self,
+        snapshot: SourceSnapshot,
+        source: &XlsSourceIterationEvidence,
+    ) {
+        self.record(snapshot);
+        let summary = self.xls.get_or_insert_with(XlsSourceSummary::default);
+        summary.materialization_scope = source.materialization_scope;
+        summary
+            .source_retained_bytes
+            .push(source.source_retained_bytes);
+        summary
+            .complete_archive_materialized_bytes
+            .push(source.complete_archive_materialized_bytes);
+        summary.parsed_sheet_counts.push(source.parsed_sheet_count);
+        summary.parsed_cell_counts.push(source.parsed_cell_count);
+        summary.source_version_checks.push(source.source_version_checks);
+        summary
+            .source_version_stability_verified
+            .push(source.source_version_stability_verified);
+        summary
+            .cfb_structural_read_calls
+            .push(snapshot.xls.cfb_structural.read_calls);
+        summary
+            .cfb_structural_read_bytes
+            .push(snapshot.xls.cfb_structural.read_bytes);
+        summary
+            .workbook_global_read_calls
+            .push(snapshot.xls.workbook_global.read_calls);
+        summary
+            .workbook_global_read_bytes
+            .push(snapshot.xls.workbook_global.read_bytes);
+        summary
+            .selected_worksheet_read_calls
+            .push(snapshot.xls.selected_worksheet.read_calls);
+        summary
+            .selected_worksheet_read_bytes
+            .push(snapshot.xls.selected_worksheet.read_bytes);
+        summary
+            .unselected_worksheet_read_calls
+            .push(snapshot.xls.unselected_worksheets.read_calls);
+        summary
+            .unselected_worksheet_read_bytes
+            .push(snapshot.xls.unselected_worksheets.read_bytes);
+        summary
+            .opaque_payload_read_calls
+            .push(snapshot.xls.opaque_payload.read_calls);
+        summary
+            .opaque_payload_read_bytes
+            .push(snapshot.xls.opaque_payload.read_bytes);
+        summary
+            .open_reads_zero_worksheet_payload
+            .push(source.open_reads_zero_worksheet_payload);
+        summary
+            .selected_query_reads_only_selected_worksheet
+            .push(source.selected_query_reads_only_selected_worksheet);
+        if summary.archive_sha256.is_empty() {
+            summary.archive_sha256 = source.archive_sha256.clone();
+            summary.workbook_stream_sha256 = source.workbook_stream_sha256.clone();
+            summary.implementation = source.implementation;
+            summary.operation = source.operation;
+            summary.timing_scope = source.timing_scope;
+            summary.source_counter_scope = source.source_counter_scope;
+            summary.materialization_scope = source.materialization_scope;
+        } else if summary.archive_sha256 != source.archive_sha256
+            || summary.workbook_stream_sha256 != source.workbook_stream_sha256
+            || summary.implementation != source.implementation
+            || summary.operation != source.operation
+            || summary.timing_scope != source.timing_scope
+            || summary.source_counter_scope != source.source_counter_scope
+            || summary.materialization_scope != source.materialization_scope
+        {
+            debug_assert!(false, "XLS source evidence changed across iterations");
+        }
     }
 
     fn record_xlsx_cell_values(
@@ -7495,6 +7725,50 @@ fn validate_docx_section_layout_options(
     Ok(())
 }
 
+fn validate_xls_source_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+    writer_shapes: &[WriterShape],
+) -> Result<(), Box<dyn Error>> {
+    if cases.iter().any(|case| case.is_xls_source_backed_case())
+        && (shapes != CorpusShape::ALL.as_slice()
+            || payloads != PayloadKind::ALL.as_slice()
+            || writer_shapes != WriterShape::ALL.as_slice())
+    {
+        return Err(
+            "XLS source-backed selectors use the fixed comments opaque-heavy corpus; omit --shape, --payload, and --writer-shape"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn xls_source_family_dispatch_cases(cases: &[Case]) -> Vec<Case> {
+    if !cases.iter().any(|case| case.is_xls_source_backed_case()) {
+        return Vec::new();
+    }
+    let mut dispatch = Vec::new();
+    let mut eager_open_added = false;
+    for case in cases.iter().copied() {
+        if case.is_xls_source_backed_case() {
+            dispatch.push(case);
+        } else if case == Case::XlsSemanticOpen && !eager_open_added {
+            dispatch.push(case);
+            eager_open_added = true;
+        }
+    }
+    dispatch
+}
+
+fn xls_writer_semantic_dispatch_selected(case: Case, selected_cases: &[Case]) -> bool {
+    case.uses_semantic_xls()
+        && !(case == Case::XlsSemanticOpen
+            && selected_cases
+                .iter()
+                .any(|selected| selected.is_xls_source_backed_case()))
+}
+
 pub fn run() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -7518,6 +7792,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         &options.payloads,
     )?;
     validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
+    validate_xls_source_options(
+        &options.cases,
+        &options.shapes,
+        &options.payloads,
+        &options.writer_shapes,
+    )?;
     let mut results = Vec::new();
     let filesystem_runs = filesystem::run_selected(
         &options.cases,
@@ -7683,6 +7963,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xls_comments_edit_save()
                     && !case.is_xls_numeric_edit_save()
                     && !case.is_xls_visibility_edit_save()
+                    && !case.is_xls_source_backed_case()
+                    && !(**case == Case::XlsSemanticOpen
+                        && options
+                            .cases
+                            .iter()
+                            .any(|selected| selected.is_xls_source_backed_case()))
                     && !case.uses_validation_xls()
                     && !case.uses_validation_rtf()
                     && !case.uses_validation_docx()
@@ -7882,6 +8168,22 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         {
             results.push(run_xls_comments_edit_save(
                 *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xls_source_backed_case())
+    {
+        let corpus = build_xls_comments_edit_corpus()?;
+        for case in xls_source_family_dispatch_cases(&options.cases) {
+            results.push(run_xls_source_backed_case(
+                case,
                 &corpus,
                 options.warmup_iterations,
                 options.samples,
@@ -8387,7 +8689,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
         if options.cases.iter().any(|case| case.uses_semantic_xls()) {
             let corpus = build_writer_corpus(Case::XlsFreshWriteTo, *shape)?;
-            for case in options.cases.iter().filter(|case| case.uses_semantic_xls()) {
+            for case in options
+                .cases
+                .iter()
+                .filter(|case| xls_writer_semantic_dispatch_selected(**case, &options.cases))
+            {
                 results.push(run_case_with_config(
                     *case,
                     &corpus,
@@ -9855,6 +10161,13 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_semantic_full_cell_scan" => Some(Case::XlsSemanticFullCellScan),
         "xls_semantic_noop_edit_save" => Some(Case::XlsSemanticNoopEditSave),
         "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
+        "xls_source_backed_open" => Some(Case::XlsSourceBackedOpen),
+        "xls_eager_open_list_worksheets" => Some(Case::XlsEagerOpenListWorksheets),
+        "xls_source_backed_open_list_worksheets" => {
+            Some(Case::XlsSourceBackedOpenListWorksheets)
+        },
+        "xls_eager_open_one_cell" => Some(Case::XlsEagerOpenOneCell),
+        "xls_source_backed_open_one_cell" => Some(Case::XlsSourceBackedOpenOneCell),
         "xlsb_semantic_open" => Some(Case::XlsbSemanticOpen),
         "xlsb_semantic_list_worksheets" => Some(Case::XlsbSemanticListWorksheets),
         "xlsb_semantic_one_cell" => Some(Case::XlsbSemanticOneCell),
@@ -10322,6 +10635,11 @@ fn usage_text() -> String {
                                        xls_semantic_open,xls_semantic_list_worksheets,\n\
                                        xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
+                                       xls_source_backed_open,\n\
+                                       xls_eager_open_list_worksheets,\n\
+                                       xls_source_backed_open_list_worksheets,\n\
+                                       xls_eager_open_one_cell,\n\
+                                       xls_source_backed_open_one_cell,\n\
                                        xlsb_semantic_open,xlsb_semantic_list_worksheets,\n\
                                        xlsb_semantic_one_cell,xlsb_semantic_full_cell_scan,\n\
                                        xls_comments_eager_edit_save,\n\
@@ -18834,13 +19152,26 @@ fn run_case_with_config(
         Case::DocOwnerPublicPhases => {
             run_doc_owner_public_phases(corpus, warmup_iterations, samples)
         },
-        Case::XlsSemanticOpen
-        | Case::XlsSemanticListWorksheets
+        Case::XlsSemanticOpen => {
+            if corpus.manifest.generator == XLS_COMMENTS_EDIT_CORPUS_GENERATOR {
+                run_xls_source_backed_case(case, corpus, warmup_iterations, samples)
+            } else {
+                run_semantic_xls(case, corpus, warmup_iterations, samples)
+            }
+        },
+        Case::XlsSemanticListWorksheets
         | Case::XlsSemanticOneCell
         | Case::XlsSemanticFullCellScan
         | Case::XlsSemanticNoopEditSave
         | Case::XlsSemanticOneEditSave => {
             run_semantic_xls(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsSourceBackedOpen
+        | Case::XlsEagerOpenListWorksheets
+        | Case::XlsSourceBackedOpenListWorksheets
+        | Case::XlsEagerOpenOneCell
+        | Case::XlsSourceBackedOpenOneCell => {
+            run_xls_source_backed_case(case, corpus, warmup_iterations, samples)
         },
         Case::XlsbSemanticOpen
         | Case::XlsbSemanticListWorksheets
@@ -21670,6 +22001,870 @@ fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
         target_payload,
         xlsx: None,
     })
+}
+
+#[derive(Clone, Debug)]
+struct XlsSourceLayout {
+    ranges: XlsTrackedRanges,
+    worksheet_names: Vec<String>,
+    selected_worksheet_index: usize,
+    selected_row: u32,
+    selected_column: u32,
+    selected_value_bits: u64,
+    parsed_sheet_count: usize,
+    parsed_cell_count: usize,
+    archive_sha256: String,
+    workbook_stream_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+struct XlsBoundSheet {
+    offset: u64,
+    worksheet: bool,
+    name: String,
+}
+
+const CFB_END_OF_CHAIN: u32 = 0xffff_fffe;
+const CFB_FREE_SECTOR: u32 = 0xffff_ffff;
+
+fn cfb_read_u16(bytes: &[u8], offset: usize, field: &str) -> Result<u16, Box<dyn Error>> {
+    let slice = bytes
+        .get(offset..offset.saturating_add(2))
+        .ok_or_else(|| format!("CFB {field} is outside the archive"))?;
+    Ok(u16::from_le_bytes([slice[0], slice[1]]))
+}
+
+fn cfb_read_u32(bytes: &[u8], offset: usize, field: &str) -> Result<u32, Box<dyn Error>> {
+    let slice = bytes
+        .get(offset..offset.saturating_add(4))
+        .ok_or_else(|| format!("CFB {field} is outside the archive"))?;
+    Ok(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
+}
+
+fn cfb_sector_range(
+    bytes: &[u8],
+    sector_size: usize,
+    sector: u32,
+) -> Result<std::ops::Range<usize>, Box<dyn Error>> {
+    let start = 512_usize
+        .checked_add(
+            usize::try_from(sector)
+                .map_err(|_| "CFB sector ID does not fit usize")?
+                .checked_mul(sector_size)
+                .ok_or("CFB sector offset overflows usize")?,
+        )
+        .ok_or("CFB sector offset overflows usize")?;
+    let end = start
+        .checked_add(sector_size)
+        .ok_or("CFB sector end overflows usize")?;
+    if end > bytes.len() {
+        return Err("CFB sector is outside the archive".into());
+    }
+    Ok(start..end)
+}
+
+fn cfb_physical_sector_range(
+    sector_size: usize,
+    sector: u32,
+) -> Result<Range<u64>, Box<dyn Error>> {
+    let start = 512_u64
+        .checked_add(
+            u64::from(sector)
+                .checked_mul(u64::try_from(sector_size)?)
+                .ok_or("CFB physical sector offset overflows u64")?,
+        )
+        .ok_or("CFB physical sector offset overflows u64")?;
+    let end = start
+        .checked_add(u64::try_from(sector_size)?)
+        .ok_or("CFB physical sector end overflows u64")?;
+    Ok(start..end)
+}
+
+fn cfb_collect_chain(
+    fat: &[u32],
+    sector_count: usize,
+    start: u32,
+) -> Result<Vec<u32>, Box<dyn Error>> {
+    if start == CFB_END_OF_CHAIN || start == CFB_FREE_SECTOR {
+        return Ok(Vec::new());
+    }
+    let mut chain = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut current = start;
+    loop {
+        if usize::try_from(current).ok().is_none_or(|value| value >= sector_count) {
+            return Err("CFB stream chain points outside the archive".into());
+        }
+        if !seen.insert(current) {
+            return Err("CFB stream chain contains a cycle".into());
+        }
+        chain.push(current);
+        let index = usize::try_from(current).map_err(|_| "CFB FAT index does not fit usize")?;
+        let next = *fat
+            .get(index)
+            .ok_or("CFB FAT does not contain the stream sector")?;
+        if next == CFB_END_OF_CHAIN {
+            return Ok(chain);
+        }
+        if next == CFB_FREE_SECTOR {
+            return Err("CFB stream chain terminates at a free sector".into());
+        }
+        current = next;
+        if chain.len() > sector_count {
+            return Err("CFB stream chain exceeds its bounded sector budget".into());
+        }
+    }
+}
+
+fn cfb_stream_ranges(
+    chain: &[u32],
+    sector_size: usize,
+    start: u64,
+    end: u64,
+) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
+    if end < start {
+        return Err("CFB logical stream range is reversed".into());
+    }
+    let sector_size_u64 = u64::try_from(sector_size)?;
+    let mut ranges = Vec::new();
+    for (ordinal, sector) in chain.iter().copied().enumerate() {
+        let logical_start = u64::try_from(ordinal)?
+            .checked_mul(sector_size_u64)
+            .ok_or("CFB logical stream offset overflows u64")?;
+        let logical_end = logical_start
+            .checked_add(sector_size_u64)
+            .ok_or("CFB logical stream end overflows u64")?;
+        let overlap_start = start.max(logical_start);
+        let overlap_end = end.min(logical_end);
+        if overlap_end <= overlap_start {
+            continue;
+        }
+        let physical_sector = 512_u64
+            .checked_add(
+                u64::from(sector)
+                    .checked_mul(sector_size_u64)
+                    .ok_or("CFB physical stream offset overflows u64")?,
+            )
+            .ok_or("CFB physical stream offset overflows u64")?;
+        ranges.push(
+            physical_sector + overlap_start - logical_start
+                ..physical_sector + overlap_end - logical_start,
+        );
+    }
+    let covered = ranges
+        .iter()
+        .map(|range| range.end.saturating_sub(range.start))
+        .sum::<u64>();
+    if covered != end.saturating_sub(start) {
+        return Err("CFB logical stream range exceeds its sector chain".into());
+    }
+    Ok(ranges)
+}
+
+#[derive(Debug)]
+struct CfbArchiveLayout {
+    sector_size: usize,
+    fat: Vec<u32>,
+    directory: Vec<u8>,
+    structural_ranges: Vec<Range<u64>>,
+}
+
+fn cfb_fat_and_directory(archive: &[u8]) -> Result<CfbArchiveLayout, Box<dyn Error>> {
+    if archive.len() < 512
+        || archive.get(..8) != Some(&[0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
+    {
+        return Err("XLS source corpus is not a CFB archive".into());
+    }
+    let sector_size = 1_usize
+        .checked_shl(u32::from(cfb_read_u16(archive, 30, "sector shift")?))
+        .ok_or("CFB sector size overflows usize")?;
+    if !matches!(sector_size, 512 | 4096) {
+        return Err("XLS source corpus has an unsupported CFB sector size".into());
+    }
+    if (archive.len() - 512) % sector_size != 0 {
+        return Err("XLS source corpus has a partial CFB sector".into());
+    }
+    let sector_count = (archive.len() - 512) / sector_size;
+    let fat_sector_count = usize::try_from(cfb_read_u32(archive, 44, "FAT sector count")?)?;
+    let first_difat = cfb_read_u32(archive, 68, "first DIFAT sector")?;
+    let difat_sector_count = usize::try_from(cfb_read_u32(archive, 72, "DIFAT sector count")?)?;
+    let mut structural_ranges = vec![0_u64..512_u64];
+    let mut fat_sectors = Vec::with_capacity(fat_sector_count);
+    for index in 0..109 {
+        let sector = cfb_read_u32(archive, 76 + index * 4, "header DIFAT entry")?;
+        if sector != CFB_FREE_SECTOR {
+            fat_sectors.push(sector);
+        }
+    }
+    let mut difat = first_difat;
+    for _ in 0..difat_sector_count {
+        if difat == CFB_END_OF_CHAIN || difat == CFB_FREE_SECTOR {
+            return Err("CFB DIFAT chain ended before its declared length".into());
+        }
+        structural_ranges.push(cfb_physical_sector_range(sector_size, difat)?);
+        let sector = cfb_sector_range(archive, sector_size, difat)?;
+        let entries = sector_size / 4 - 1;
+        for index in 0..entries {
+            let entry = cfb_read_u32(archive, sector.start + index * 4, "DIFAT sector entry")?;
+            if entry != CFB_FREE_SECTOR {
+                fat_sectors.push(entry);
+            }
+        }
+        difat = cfb_read_u32(archive, sector.start + entries * 4, "next DIFAT sector")?;
+    }
+    if fat_sectors.len() < fat_sector_count {
+        return Err("CFB DIFAT does not list all FAT sectors".into());
+    }
+    fat_sectors.truncate(fat_sector_count);
+    let mut fat = vec![CFB_FREE_SECTOR; sector_count];
+    let entries_per_sector = sector_size / 4;
+    for (fat_ordinal, sector) in fat_sectors.into_iter().enumerate() {
+        structural_ranges.push(cfb_physical_sector_range(sector_size, sector)?);
+        let range = cfb_sector_range(archive, sector_size, sector)?;
+        for index in 0..entries_per_sector {
+            let target = fat_ordinal
+                .checked_mul(entries_per_sector)
+                .and_then(|value| value.checked_add(index))
+                .ok_or("CFB FAT index overflows usize")?;
+            if target < fat.len() {
+                fat[target] = cfb_read_u32(archive, range.start + index * 4, "FAT entry")?;
+            }
+        }
+    }
+    let directory_start = cfb_read_u32(archive, 48, "directory start sector")?;
+    let directory_chain = cfb_collect_chain(&fat, sector_count, directory_start)?;
+    if directory_chain.is_empty() {
+        return Err("XLS source corpus has no CFB directory stream".into());
+    }
+    let mut directory = Vec::new();
+    for sector in directory_chain {
+        structural_ranges.push(cfb_physical_sector_range(sector_size, sector)?);
+        directory.extend_from_slice(&archive[cfb_sector_range(archive, sector_size, sector)?]);
+    }
+    let mini_fat_sector_count = usize::try_from(cfb_read_u32(
+        archive,
+        64,
+        "MiniFAT sector count",
+    )?)?;
+    if mini_fat_sector_count != 0 {
+        let mini_fat_start = cfb_read_u32(archive, 60, "MiniFAT start sector")?;
+        let mini_fat_chain = cfb_collect_chain(&fat, sector_count, mini_fat_start)?;
+        if mini_fat_chain.len() < mini_fat_sector_count {
+            return Err("CFB MiniFAT chain is shorter than its declared length".into());
+        }
+        for sector in mini_fat_chain.into_iter().take(mini_fat_sector_count) {
+            structural_ranges.push(cfb_physical_sector_range(sector_size, sector)?);
+        }
+    }
+    Ok(CfbArchiveLayout {
+        sector_size,
+        fat,
+        directory,
+        structural_ranges,
+    })
+}
+
+fn cfb_workbook_chain(
+    archive: &[u8],
+    sector_size: usize,
+    fat: &[u32],
+    directory: &[u8],
+) -> Result<(Vec<u32>, u64), Box<dyn Error>> {
+    let mut workbook = None;
+    for entry in directory.chunks_exact(128) {
+        let name_length = usize::from(u16::from_le_bytes([entry[64], entry[65]]));
+        if !(2..=64).contains(&name_length) || name_length % 2 != 0 {
+            continue;
+        }
+        let code_units = entry[..name_length - 2]
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        let name = String::from_utf16_lossy(&code_units);
+        if entry[66] == 2 && name.eq_ignore_ascii_case("Workbook") {
+            let start = u32::from_le_bytes([entry[116], entry[117], entry[118], entry[119]]);
+            let size = u64::from_le_bytes([
+                entry[120], entry[121], entry[122], entry[123], entry[124], entry[125],
+                entry[126], entry[127],
+            ]);
+            workbook = Some((start, size));
+            break;
+        }
+    }
+    let (start, size) = workbook.ok_or("XLS source corpus has no Workbook stream")?;
+    if size < 4096 {
+        return Err("XLS source corpus Workbook stream is not a regular CFB stream".into());
+    }
+    let sector_count = (archive.len() - 512) / sector_size;
+    let chain = cfb_collect_chain(fat, sector_count, start)?;
+    let capacity = u64::try_from(chain.len())?
+        .checked_mul(u64::try_from(sector_size)?)
+        .ok_or("XLS Workbook chain capacity overflows u64")?;
+    if size > capacity {
+        return Err("XLS Workbook stream exceeds its CFB sector chain".into());
+    }
+    Ok((chain, size))
+}
+
+fn cfb_directory_entry_name(entry: &[u8]) -> Option<String> {
+    let name_length = usize::from(u16::from_le_bytes([entry[64], entry[65]]));
+    if !(2..=64).contains(&name_length) || name_length % 2 != 0 {
+        return None;
+    }
+    let code_units = entry[..name_length - 2]
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    Some(String::from_utf16_lossy(&code_units))
+}
+
+fn cfb_opaque_payload_ranges(
+    archive: &[u8],
+    sector_size: usize,
+    fat: &[u32],
+    directory: &[u8],
+) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
+    let sector_count = (archive.len() - 512) / sector_size;
+    let mini_stream_cutoff = u64::from(cfb_read_u32(
+        archive,
+        56,
+        "mini stream cutoff",
+    )?);
+    let mut opaque_ranges = Vec::new();
+    let mut root_mini_stream = None;
+    for entry in directory.chunks_exact(128) {
+        let object_type = entry[66];
+        let start = u32::from_le_bytes([entry[116], entry[117], entry[118], entry[119]]);
+        let size = u64::from_le_bytes([
+            entry[120],
+            entry[121],
+            entry[122],
+            entry[123],
+            entry[124],
+            entry[125],
+            entry[126],
+            entry[127],
+        ]);
+        if object_type == 5 {
+            root_mini_stream = Some((start, size));
+            continue;
+        }
+        if object_type != 2
+            || cfb_directory_entry_name(entry)
+                .is_some_and(|name| name.eq_ignore_ascii_case("Workbook"))
+            || size < mini_stream_cutoff
+        {
+            continue;
+        }
+        let chain = cfb_collect_chain(fat, sector_count, start)?;
+        opaque_ranges.extend(cfb_stream_ranges(&chain, sector_size, 0, size)?);
+    }
+    if let Some((start, size)) = root_mini_stream
+        && size != 0
+    {
+        let chain = cfb_collect_chain(fat, sector_count, start)?;
+        opaque_ranges.extend(cfb_stream_ranges(&chain, sector_size, 0, size)?);
+    }
+    Ok(opaque_ranges)
+}
+
+fn parse_xls_bound_sheets(workbook: &[u8]) -> Result<(u64, Vec<XlsBoundSheet>), Box<dyn Error>> {
+    let mut offset = 0_usize;
+    let mut bounds = Vec::new();
+    let mut global_end = None;
+    loop {
+        let header = workbook
+            .get(offset..offset.saturating_add(4))
+            .ok_or("XLS Workbook globals end without an EOF record")?;
+        let kind = u16::from_le_bytes([header[0], header[1]]);
+        let length = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        let payload_start = offset.checked_add(4).ok_or("XLS record offset overflows")?;
+        let end = payload_start
+            .checked_add(length)
+            .ok_or("XLS record end overflows")?;
+        let payload = workbook
+            .get(payload_start..end)
+            .ok_or("XLS record exceeds the Workbook stream")?;
+        if kind == 0x0085 {
+            if payload.len() < 8 {
+                return Err("XLS BoundSheet8 record is too short".into());
+            }
+            let stream_offset = u64::from(u32::from_le_bytes([
+                payload[0], payload[1], payload[2], payload[3],
+            ]));
+            let worksheet = payload[5] == 0;
+            let name_length = usize::from(payload[6]);
+            let unicode = payload[7] & 0x01 != 0;
+            let name_units = if unicode {
+                let byte_length = name_length.checked_mul(2).ok_or("XLS sheet name overflows")?;
+                payload
+                    .get(8..8 + byte_length)
+                    .ok_or("XLS Unicode sheet name exceeds BoundSheet8")?
+                    .chunks_exact(2)
+                    .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                    .collect::<Vec<_>>()
+            } else {
+                payload
+                    .get(8..8 + name_length)
+                    .ok_or("XLS compressed sheet name exceeds BoundSheet8")?
+                    .iter()
+                    .map(|byte| u16::from(*byte))
+                    .collect::<Vec<_>>()
+            };
+            let name = String::from_utf16_lossy(&name_units);
+            global_end = Some(global_end.map_or(stream_offset, |current: u64| {
+                current.min(stream_offset)
+            }));
+            bounds.push(XlsBoundSheet {
+                offset: stream_offset,
+                worksheet,
+                name,
+            });
+        }
+        offset = end;
+        if kind == 0x000A {
+            break;
+        }
+        if offset >= workbook.len() {
+            return Err("XLS Workbook globals do not contain EOF".into());
+        }
+    }
+    let global_end = global_end.ok_or("XLS Workbook globals have no BoundSheet8 records")?;
+    if bounds.is_empty() || bounds.windows(2).any(|pair| pair[0].offset >= pair[1].offset) {
+        return Err("XLS BoundSheet8 offsets are not strictly increasing".into());
+    }
+    if bounds
+        .iter()
+        .any(|bound| bound.offset < global_end || bound.offset >= workbook.len() as u64)
+    {
+        return Err("XLS BoundSheet8 offset is outside the Workbook stream".into());
+    }
+    Ok((global_end, bounds))
+}
+
+fn build_xls_source_layout(corpus: &Corpus) -> Result<XlsSourceLayout, Box<dyn Error>> {
+    if corpus.manifest.generator != XLS_COMMENTS_EDIT_CORPUS_GENERATOR {
+        return Err("XLS source-backed selectors require the fixed comments corpus".into());
+    }
+    if corpus.archive.len() < XLS_SOURCE_MIN_ARCHIVE_BYTES
+        || corpus.target_payload.len() < XLS_SOURCE_MIN_WORKBOOK_BYTES
+    {
+        return Err("XLS source-backed corpus failed its large-workbook locality guard".into());
+    }
+    let cfb = cfb_fat_and_directory(&corpus.archive)?;
+    let sector_size = cfb.sector_size;
+    let fat = cfb.fat;
+    let directory = cfb.directory;
+    let opaque_payload_ranges = cfb_opaque_payload_ranges(
+        &corpus.archive,
+        sector_size,
+        &fat,
+        &directory,
+    )?;
+    if opaque_payload_ranges.is_empty() {
+        return Err("XLS source-backed corpus has no opaque payload ranges".into());
+    }
+    let (workbook_chain, workbook_size) =
+        cfb_workbook_chain(&corpus.archive, sector_size, &fat, &directory)?;
+    let workbook_length = usize::try_from(workbook_size)?;
+    let workbook_ranges = cfb_stream_ranges(&workbook_chain, sector_size, 0, workbook_size)?;
+    let mut workbook_bytes = Vec::with_capacity(workbook_length);
+    for range in &workbook_ranges {
+        workbook_bytes.extend_from_slice(
+            corpus
+                .archive
+                .get(usize::try_from(range.start)?..usize::try_from(range.end)?)
+                .ok_or("XLS Workbook physical range is outside the archive")?,
+        );
+    }
+    workbook_bytes.truncate(workbook_length);
+    if workbook_bytes != corpus.target_payload {
+        return Err("XLS Workbook physical ranges do not reproduce the target stream".into());
+    }
+    let (global_end, bounds) = parse_xls_bound_sheets(&workbook_bytes)?;
+    let global_ranges = cfb_stream_ranges(&workbook_chain, sector_size, 0, global_end)?;
+    let ordinary_bounds = bounds
+        .iter()
+        .enumerate()
+        .filter(|(_, bound)| bound.worksheet)
+        .collect::<Vec<_>>();
+    if ordinary_bounds.len() < 2 || XLS_SOURCE_SELECTED_WORKSHEET >= ordinary_bounds.len() {
+        return Err("XLS source-backed locality corpus needs two worksheets".into());
+    }
+    let mut selected_ranges = Vec::new();
+    let mut unselected_ranges = Vec::new();
+    for (worksheet_index, (bound_index, _)) in ordinary_bounds.iter().enumerate() {
+        let bound = &bounds[*bound_index];
+        let end = bounds
+            .get(*bound_index + 1)
+            .map_or(workbook_size, |next| next.offset);
+        let ranges = cfb_stream_ranges(&workbook_chain, sector_size, bound.offset, end)?;
+        if worksheet_index == XLS_SOURCE_SELECTED_WORKSHEET {
+            selected_ranges.extend(ranges);
+        } else {
+            unselected_ranges.extend(ranges);
+        }
+    }
+
+    use litchi_core::sheet::{Cell as _, Worksheet as _};
+    let eager = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+    let mut worksheet_names = Vec::new();
+    let mut parsed_cell_count = 0_usize;
+    for metadata in eager.sheets() {
+        let Some(index) = metadata.parsed_worksheet_index() else {
+            continue;
+        };
+        worksheet_names.push(metadata.name().to_owned());
+        let worksheet = eager.xls_worksheet(index)?;
+        let mut cells = worksheet.cells();
+        while let Some(cell) = cells.next() {
+            let _ = cell.map_err(|error| io::Error::other(error.to_string()))?;
+            parsed_cell_count = parsed_cell_count
+                .checked_add(1)
+                .ok_or("XLS source-backed cell count overflows usize")?;
+        }
+    }
+    let source_names = ordinary_bounds
+        .iter()
+        .map(|(_, bound)| bound.name.clone())
+        .collect::<Vec<_>>();
+    if worksheet_names != source_names {
+        return Err("XLS source-backed worksheet names disagree with BoundSheet8".into());
+    }
+    let selected = eager
+        .xls_worksheet(XLS_SOURCE_SELECTED_WORKSHEET)?
+        .get_cell(XLS_SOURCE_SELECTED_ROW, XLS_SOURCE_SELECTED_COLUMN)
+        .ok_or("XLS source-backed selected cell is missing")?;
+    let selected_value = selected
+        .value()
+        .as_float()
+        .ok_or("XLS source-backed selected cell is not numeric")?;
+    if selected_value.to_bits() != XLS_SOURCE_SELECTED_VALUE.to_bits() {
+        return Err("XLS source-backed selected cell differs from the corpus witness".into());
+    }
+    Ok(XlsSourceLayout {
+        ranges: XlsTrackedRanges {
+            cfb_structural: cfb.structural_ranges,
+            workbook_global: global_ranges,
+            selected_worksheet: selected_ranges,
+            unselected_worksheets: unselected_ranges,
+            opaque_payload: opaque_payload_ranges,
+        },
+        worksheet_names,
+        selected_worksheet_index: XLS_SOURCE_SELECTED_WORKSHEET,
+        selected_row: XLS_SOURCE_SELECTED_ROW,
+        selected_column: XLS_SOURCE_SELECTED_COLUMN,
+        selected_value_bits: selected_value.to_bits(),
+        parsed_sheet_count: source_names.len(),
+        parsed_cell_count,
+        archive_sha256: corpus.manifest.archive_sha256.clone(),
+        workbook_stream_sha256: corpus.manifest.target_payload_sha256.clone(),
+    })
+}
+
+fn xls_source_names_digest(names: &[String]) -> String {
+    let mut digest = Sha256::new();
+    for name in names {
+        digest.update((name.len() as u64).to_le_bytes());
+        digest.update(name.as_bytes());
+    }
+    let bytes: [u8; 32] = digest.finalize().into();
+    fingerprint_hex(&bytes)
+}
+
+fn validate_xls_source_locality(
+    case: Case,
+    metrics: &SourceSnapshot,
+) -> Result<(), Box<dyn Error>> {
+    let open_zero = metrics.xls.selected_worksheet.read_bytes == 0
+        && metrics.xls.unselected_worksheets.read_bytes == 0;
+    let selected_only = case == Case::XlsSourceBackedOpenOneCell
+        && metrics.xls.selected_worksheet.read_bytes > 0
+        && metrics.xls.unselected_worksheets.read_bytes == 0;
+    if metrics.xls.cfb_structural.read_bytes == 0
+        || metrics.xls.workbook_global.read_bytes == 0
+        || metrics.xls.opaque_payload.read_bytes != 0
+        || metrics.read_bytes == 0
+        || (!open_zero && case != Case::XlsSourceBackedOpenOneCell)
+        || (case == Case::XlsSourceBackedOpenOneCell && !selected_only)
+    {
+        return Err("XLS source-backed read locality gates failed".into());
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+enum XlsMeasuredOperation {
+    Open { worksheet_count: usize },
+    List { worksheet_names: Vec<String> },
+    OneCell { value_bits: u64 },
+}
+
+fn xls_operation_digest(operation: &XlsMeasuredOperation, layout: &XlsSourceLayout) -> String {
+    match operation {
+        XlsMeasuredOperation::Open { .. } => layout.archive_sha256.clone(),
+        XlsMeasuredOperation::List { worksheet_names } => xls_source_names_digest(worksheet_names),
+        XlsMeasuredOperation::OneCell { value_bits } => sha256_hex(&value_bits.to_le_bytes()),
+    }
+}
+
+fn validate_xls_measured_operation(
+    operation: &XlsMeasuredOperation,
+    layout: &XlsSourceLayout,
+) -> Result<(), Box<dyn Error>> {
+    match operation {
+        XlsMeasuredOperation::Open { worksheet_count } => {
+            if *worksheet_count != layout.parsed_sheet_count {
+                return Err("XLS open worksheet count differs from the oracle".into());
+            }
+        },
+        XlsMeasuredOperation::List { worksheet_names } => {
+            if worksheet_names != &layout.worksheet_names {
+                return Err("XLS worksheet list differs from the oracle".into());
+            }
+        },
+        XlsMeasuredOperation::OneCell { value_bits } => {
+            if *value_bits != layout.selected_value_bits {
+                return Err("XLS selected cell differs from the oracle".into());
+            }
+        },
+    }
+    Ok(())
+}
+
+fn run_xls_source_backed_case(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_core::sheet::Cell as _;
+
+    if !case.is_xls_source_backed_case() && case != Case::XlsSemanticOpen {
+        return Err("non-XLS source-backed case passed to its dedicated runner".into());
+    }
+    let layout = build_xls_source_layout(corpus)?;
+    if layout.parsed_cell_count == 0 {
+        return Err("XLS source-backed corpus has no authoritative cell inventory".into());
+    }
+    let expected_digest = match case {
+        Case::XlsSemanticOpen | Case::XlsSourceBackedOpen => layout.archive_sha256.clone(),
+        Case::XlsEagerOpenListWorksheets | Case::XlsSourceBackedOpenListWorksheets => {
+            xls_source_names_digest(&layout.worksheet_names)
+        },
+        Case::XlsEagerOpenOneCell | Case::XlsSourceBackedOpenOneCell => {
+            sha256_hex(&layout.selected_value_bits.to_le_bytes())
+        },
+        _ => return Err("unsupported XLS source-backed case".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source_case = matches!(
+            case,
+            Case::XlsSourceBackedOpen
+                | Case::XlsSourceBackedOpenListWorksheets
+                | Case::XlsSourceBackedOpenOneCell
+        );
+        let (duration, operation, metrics, evidence) = if source_case {
+            let source = Arc::new(InstrumentedSource::new_xls(
+                corpus.archive.clone(),
+                layout.ranges.clone(),
+            ));
+            let source_read_at: Arc<dyn ReadAt> = source.clone();
+            let source_version_before = source.version()?;
+            let started = Instant::now();
+            let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source_read_at)?;
+            let operation = match case {
+                Case::XlsSourceBackedOpen => XlsMeasuredOperation::Open {
+                    worksheet_count: std::hint::black_box(workbook.worksheet_count()?),
+                },
+                Case::XlsSourceBackedOpenListWorksheets => {
+                    let worksheet_names = workbook.worksheet_names()?;
+                    XlsMeasuredOperation::List {
+                        worksheet_names: std::hint::black_box(worksheet_names),
+                    }
+                },
+                Case::XlsSourceBackedOpenOneCell => {
+                    let value = workbook
+                        .cell_value_by_index(
+                            layout.selected_worksheet_index,
+                            layout.selected_row,
+                            layout.selected_column,
+                        )?
+                        .ok_or("source-backed XLS selected cell is missing")?;
+                    let actual = value
+                        .as_float()
+                        .ok_or("source-backed XLS selected cell is not numeric")?;
+                    XlsMeasuredOperation::OneCell {
+                        value_bits: std::hint::black_box(actual).to_bits(),
+                    }
+                },
+                _ => return Err("invalid source-backed XLS case".into()),
+            };
+            let duration = started.elapsed();
+            if case == Case::XlsSourceBackedOpen
+                && workbook.worksheet_names()? != layout.worksheet_names
+            {
+                return Err("source-backed XLS open names differ from the oracle".into());
+            }
+            validate_xls_measured_operation(&operation, &layout)?;
+            let source_version_after = source.version()?;
+            let source_version_stability_verified =
+                source_version_before == source_version_after;
+            if !source_version_stability_verified {
+                return Err("XLS source-backed source version changed during the operation".into());
+            }
+            let metrics = source.snapshot();
+            validate_xls_source_locality(case, &metrics)?;
+            let open_zero = metrics.xls.selected_worksheet.read_bytes == 0
+                && metrics.xls.unselected_worksheets.read_bytes == 0;
+            let selected_only = case == Case::XlsSourceBackedOpenOneCell
+                && metrics.xls.selected_worksheet.read_bytes > 0
+                && metrics.xls.unselected_worksheets.read_bytes == 0;
+            let operation_name = match case {
+                Case::XlsSourceBackedOpen => "open",
+                Case::XlsSourceBackedOpenListWorksheets => "open+list",
+                Case::XlsSourceBackedOpenOneCell => "open+one-cell",
+                _ => unreachable!(),
+            };
+            let evidence = XlsSourceIterationEvidence {
+                implementation: "source-backed",
+                operation: operation_name,
+                timing_scope: operation_name,
+                source_counter_scope:
+                    "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+                materialization_scope:
+                    "complete archive only; parser-owned Workbook globals/SST are materialized but not counted",
+                source_retained_bytes: u64::try_from(corpus.archive.len())?,
+                complete_archive_materialized_bytes: 0,
+                parsed_sheet_count: layout.parsed_sheet_count,
+                parsed_cell_count: if matches!(operation, XlsMeasuredOperation::OneCell { .. }) {
+                    1
+                } else {
+                    0
+                },
+                source_version_checks: source.version_calls(),
+                source_version_stability_verified,
+                open_reads_zero_worksheet_payload: open_zero,
+                selected_query_reads_only_selected_worksheet: selected_only,
+                archive_sha256: layout.archive_sha256.clone(),
+                workbook_stream_sha256: layout.workbook_stream_sha256.clone(),
+            };
+            (duration, operation, metrics, evidence)
+        } else {
+            let owned = corpus.archive.clone();
+            let started = Instant::now();
+            let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
+            let operation = match case {
+                Case::XlsSemanticOpen => XlsMeasuredOperation::Open {
+                    worksheet_count: std::hint::black_box(
+                        workbook
+                            .sheets()
+                            .iter()
+                            .filter(|sheet| sheet.parsed_worksheet_index().is_some())
+                            .count(),
+                    ),
+                },
+                Case::XlsEagerOpenListWorksheets => {
+                    let worksheet_names = workbook
+                        .sheets()
+                        .iter()
+                        .filter(|sheet| sheet.parsed_worksheet_index().is_some())
+                        .map(|sheet| sheet.name().to_owned())
+                        .collect::<Vec<_>>();
+                    XlsMeasuredOperation::List {
+                        worksheet_names: std::hint::black_box(worksheet_names),
+                    }
+                },
+                Case::XlsEagerOpenOneCell => {
+                    let value = workbook
+                        .xls_worksheet(layout.selected_worksheet_index)?
+                        .get_cell(layout.selected_row, layout.selected_column)
+                        .ok_or("eager XLS selected cell is missing")?
+                        .value()
+                        .as_float()
+                        .ok_or("eager XLS selected cell is not numeric")?;
+                    XlsMeasuredOperation::OneCell {
+                        value_bits: std::hint::black_box(value).to_bits(),
+                    }
+                },
+                _ => return Err("invalid eager XLS source-backed case".into()),
+            };
+            let duration = started.elapsed();
+            if case == Case::XlsSemanticOpen {
+                let names = workbook
+                    .sheets()
+                    .iter()
+                    .filter(|sheet| sheet.parsed_worksheet_index().is_some())
+                    .map(|sheet| sheet.name().to_owned())
+                    .collect::<Vec<_>>();
+                if names != layout.worksheet_names {
+                    return Err("eager XLS open names differ from the oracle".into());
+                }
+            }
+            validate_xls_measured_operation(&operation, &layout)?;
+            let operation_name = match case {
+                Case::XlsSemanticOpen => "open",
+                Case::XlsEagerOpenListWorksheets => "open+list",
+                Case::XlsEagerOpenOneCell => "open+one-cell",
+                _ => unreachable!(),
+            };
+            let evidence = XlsSourceIterationEvidence {
+                implementation: "eager",
+                operation: operation_name,
+                timing_scope: operation_name,
+                source_counter_scope: "not applicable",
+                materialization_scope: "not applicable",
+                source_retained_bytes: 0,
+                complete_archive_materialized_bytes: 0,
+                parsed_sheet_count: layout.parsed_sheet_count,
+                parsed_cell_count: if matches!(operation, XlsMeasuredOperation::OneCell { .. }) {
+                    1
+                } else {
+                    0
+                },
+                source_version_checks: 0,
+                source_version_stability_verified: false,
+                open_reads_zero_worksheet_payload: false,
+                selected_query_reads_only_selected_worksheet: false,
+                archive_sha256: layout.archive_sha256.clone(),
+                workbook_stream_sha256: layout.workbook_stream_sha256.clone(),
+            };
+            (duration, operation, SourceSnapshot::default(), evidence)
+        };
+        validate_xls_measured_operation(&operation, &layout)?;
+        let digest = xls_operation_digest(&operation, &layout);
+        if digest != expected_digest {
+            return Err("XLS source-backed lifecycle digest differs from the oracle".into());
+        }
+        if source_case && iteration >= warmup_iterations {
+            source_summary.record_xls(metrics, &evidence);
+        }
+        if iteration >= warmup_iterations {
+            measured_digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    if measured_digests.iter().any(|digest| digest != &expected_digest) {
+        return Err("XLS source-backed lifecycle digest is unstable".into());
+    }
+    let mut output = result(case, corpus, elapsed, None);
+    output.output_sha256 = Some(expected_digest);
+    if source_case_for_case(case) {
+        output.source = Some(source_summary);
+    }
+    Ok(output)
+}
+
+const fn source_case_for_case(case: Case) -> bool {
+    matches!(
+        case,
+        Case::XlsSourceBackedOpen
+            | Case::XlsSourceBackedOpenListWorksheets
+            | Case::XlsSourceBackedOpenOneCell
+    )
 }
 
 fn xls_visibility_opaque_stream_name(index: usize) -> String {
@@ -47509,7 +48704,9 @@ mod tests {
         run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
         simulated_request_delay, statistics, updated_writer_text, usage_text, verify_xlsx_cells,
-        writer_shape, xlsb_cells_digest, xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
+        validate_xls_source_locality, validate_xls_source_options, writer_shape,
+        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected,
+        xlsb_cells_digest, xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
@@ -48080,7 +49277,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 393);
+        assert_eq!(selectable_count, 398);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -49261,6 +50458,178 @@ mod tests {
                 assert!(comments.target_fingerprints.is_none());
             }
         }
+    }
+
+    #[test]
+    fn xls_source_backed_lifecycle_selectors_are_matched_and_local() {
+        let cases = [
+            Case::XlsSourceBackedOpen,
+            Case::XlsEagerOpenListWorksheets,
+            Case::XlsSourceBackedOpenListWorksheets,
+            Case::XlsEagerOpenOneCell,
+            Case::XlsSourceBackedOpenOneCell,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(case.is_xls_source_backed_case());
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_xls_comments_edit_corpus().unwrap();
+        assert!(corpus.archive.len() >= super::XLS_SOURCE_MIN_ARCHIVE_BYTES);
+        assert!(corpus.target_payload.len() >= super::XLS_SOURCE_MIN_WORKBOOK_BYTES);
+        let layout = super::build_xls_source_layout(&corpus).unwrap();
+        assert_eq!(layout.parsed_sheet_count, 2);
+        assert!(layout.parsed_cell_count > 0);
+        assert_eq!(layout.worksheet_names, ["Comments", "Untouched"]);
+        assert_eq!(
+            layout.archive_sha256,
+            corpus.manifest.archive_sha256
+        );
+        assert_eq!(
+            layout.workbook_stream_sha256,
+            corpus.manifest.target_payload_sha256
+        );
+        assert!(!layout.ranges.opaque_payload.is_empty());
+        let regression_source = InstrumentedSource::new_xls(
+            corpus.archive.clone(),
+            layout.ranges.clone(),
+        );
+        let opaque_range = layout.ranges.opaque_payload[0].clone();
+        let mut opaque_byte = [0_u8; 1];
+        regression_source
+            .read_at(opaque_range.start, &mut opaque_byte)
+            .unwrap();
+        let regression_metrics = regression_source.snapshot();
+        assert!(regression_metrics.xls.opaque_payload.read_bytes > 0);
+        assert!(
+            validate_xls_source_locality(Case::XlsSourceBackedOpen, &regression_metrics)
+                .is_err()
+        );
+
+        let eager_open = run_case(Case::XlsSemanticOpen, &corpus, 0, 1).unwrap();
+        let source_open = run_case(Case::XlsSourceBackedOpen, &corpus, 0, 1).unwrap();
+        assert_eq!(
+            eager_open.output_sha256,
+            source_open.output_sha256,
+            "eager/source open corpus identity"
+        );
+        let source = source_open
+            .source
+            .as_ref()
+            .and_then(|summary| summary.xls.as_ref())
+            .expect("source-backed XLS open evidence");
+        assert_eq!(source.source_retained_bytes, vec![corpus.archive.len() as u64]);
+        assert_eq!(source.complete_archive_materialized_bytes, vec![0]);
+        assert_eq!(source.parsed_sheet_counts, vec![2]);
+        assert_eq!(source.parsed_cell_counts, vec![0]);
+        assert_eq!(source.source_version_stability_verified, vec![true]);
+        assert_eq!(source.open_reads_zero_worksheet_payload, vec![true]);
+        assert!(source.cfb_structural_read_bytes[0] > 0);
+        assert!(source.workbook_global_read_bytes[0] > 0);
+        assert_eq!(source.selected_worksheet_read_bytes, vec![0]);
+        assert_eq!(source.unselected_worksheet_read_bytes, vec![0]);
+        assert_eq!(source.opaque_payload_read_bytes, vec![0]);
+
+        for (eager_case, source_case) in [
+            (
+                Case::XlsEagerOpenListWorksheets,
+                Case::XlsSourceBackedOpenListWorksheets,
+            ),
+            (
+                Case::XlsEagerOpenOneCell,
+                Case::XlsSourceBackedOpenOneCell,
+            ),
+        ] {
+            let eager = run_case(eager_case, &corpus, 0, 1).unwrap();
+            let source = run_case(source_case, &corpus, 0, 1).unwrap();
+            assert_eq!(eager.output_sha256, source.output_sha256);
+            assert_eq!(eager.elapsed_ns.samples.len(), 1);
+            let evidence = source
+                .source
+                .as_ref()
+                .and_then(|summary| summary.xls.as_ref())
+                .expect("source-backed XLS lifecycle evidence");
+            assert_eq!(evidence.source_version_stability_verified, vec![true]);
+            if source_case == Case::XlsSourceBackedOpenListWorksheets {
+                assert_eq!(evidence.parsed_cell_counts, vec![0]);
+                assert_eq!(evidence.open_reads_zero_worksheet_payload, vec![true]);
+                assert_eq!(evidence.selected_worksheet_read_bytes, vec![0]);
+                assert_eq!(evidence.opaque_payload_read_bytes, vec![0]);
+            } else {
+                assert_eq!(evidence.parsed_cell_counts, vec![1]);
+                assert_eq!(
+                    evidence.selected_query_reads_only_selected_worksheet,
+                    vec![true]
+                );
+                assert!(evidence.selected_worksheet_read_bytes[0] > 0);
+                assert_eq!(evidence.unselected_worksheet_read_bytes, vec![0]);
+                assert_eq!(evidence.opaque_payload_read_bytes, vec![0]);
+            }
+        }
+    }
+
+    #[test]
+    fn xls_source_family_dispatch_is_dedicated_and_rejects_overrides() {
+        let selected = [
+            Case::XlsSourceBackedOpen,
+            Case::XlsSemanticOpen,
+            Case::XlsSemanticOpen,
+            Case::XlsSourceBackedOpenListWorksheets,
+        ];
+        let dispatch = xls_source_family_dispatch_cases(&selected);
+        assert_eq!(
+            dispatch
+                .iter()
+                .filter(|case| **case == Case::XlsSemanticOpen)
+                .count(),
+            1
+        );
+        assert!(dispatch.contains(&Case::XlsSourceBackedOpen));
+        assert!(dispatch.contains(&Case::XlsSourceBackedOpenListWorksheets));
+        assert!(xls_source_family_dispatch_cases(&[Case::XlsSemanticOpen]).is_empty());
+        assert!(!xls_writer_semantic_dispatch_selected(
+            Case::XlsSemanticOpen,
+            &selected
+        ));
+        assert!(xls_writer_semantic_dispatch_selected(
+            Case::XlsSemanticListWorksheets,
+            &selected
+        ));
+        assert!(xls_writer_semantic_dispatch_selected(
+            Case::XlsSemanticOpen,
+            &[Case::XlsSemanticOpen]
+        ));
+
+        assert!(validate_xls_source_options(
+            &selected,
+            CorpusShape::ALL.as_slice(),
+            PayloadKind::ALL.as_slice(),
+            WriterShape::ALL.as_slice(),
+        )
+        .is_ok());
+        assert!(validate_xls_source_options(
+            &selected,
+            &[CorpusShape::Tiny],
+            PayloadKind::ALL.as_slice(),
+            WriterShape::ALL.as_slice(),
+        )
+        .is_err());
+        assert!(validate_xls_source_options(
+            &selected,
+            CorpusShape::ALL.as_slice(),
+            &[PayloadKind::Compressible],
+            WriterShape::ALL.as_slice(),
+        )
+        .is_err());
+        assert!(validate_xls_source_options(
+            &selected,
+            CorpusShape::ALL.as_slice(),
+            PayloadKind::ALL.as_slice(),
+            &[WriterShape::Tiny],
+        )
+        .is_err());
     }
 
     #[test]

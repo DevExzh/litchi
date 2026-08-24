@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## Source-backed XLS selective-read closure (change 0275)
+
+[Change 0275](changes/0275-xls-source-backed-selective-read.md) lands a
+format-owned BIFF8 positional source reader and routes facade filesystem XLS
+opens into it without changing byte-backed eager construction. Open/list avoid
+all worksheet and opaque payloads; one-cell scans only the selected worksheet
+through EOF. Five matched opt-in selectors raise the matrix to **398 names**;
+the default remains **36 cases / 198 records**. The dirty release smoke records
+the intended logical locality but materially worse latency from 401-429
+fine-grained reads. It is prioritization evidence with `performance_claim:
+none`, not an accepted latency or resource result.
+
 ## Rejected DOC owner-public-phases hypothesis (change 0274)
 
 [Change 0274](changes/0274-doc-owner-public-phases-abba.md) is retained

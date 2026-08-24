@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest source-backed XLS selective-read closure (change 0275)
+
+[Change 0275](changes/0275-xls-source-backed-selective-read.md) adds a BIFF8
+source owner, facade filesystem routing, and five matched opt-in lifecycle
+selectors. Open/list read CFB metadata plus Workbook globals and zero worksheet
+or opaque payload bytes; one-cell additionally reads only the selected sheet.
+The matrix is now **398 names** and the default remains **36 cases / 198
+records**. A dirty five-sample release smoke is prioritization evidence only:
+fine-grained source reads are materially slower than eager open, so
+`performance_claim: none`; no physical-I/O, allocation/RSS, or broad XLS claim
+follows.
+
 ## Latest rejected DOC owner-public-phases hypothesis (change 0274)
 
 [Change 0274](changes/0274-doc-owner-public-phases-abba.md) records a clean

@@ -1,4 +1,4 @@
-//! Unified workbook implementation for Apple Numbers.
+//! Unified workbook implementation for supported spreadsheet formats.
 
 use super::types::Result;
 use super::workbook_types::WorkbookImpl;
@@ -7,7 +7,11 @@ use crate::sheet::WorkbookTrait;
 use litchi_core::{Error, Metadata};
 #[cfg(feature = "xls")]
 use litchi_ole_common::property_set::PropertySetReader;
+#[cfg(all(feature = "xls", any(unix, windows)))]
+use litchi_ole_common::property_set::SharedPropertySetReader;
 use std::path::Path;
+#[cfg(all(feature = "xls", any(unix, windows)))]
+use std::{io::Cursor, sync::Arc, sync::OnceLock};
 
 const MAX_WORKBOOK_PATH_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
@@ -106,25 +110,136 @@ fn append_cell_text(out: &mut String, cell: &litchi_core::sheet::CellValue) {
     }
 }
 
-/// A unified workbook interface for Apple Numbers spreadsheets.
+#[cfg(all(feature = "xls", any(unix, windows)))]
+/// Internal filesystem XLS adapter. The positional source is retained so
+/// source-backed selectors and metadata never need to reopen the path.
+pub(super) struct XlsSource {
+    workbook: crate::xls::SourceBackedWorkbook,
+    source: Arc<dyn litchi_core::ReadAt>,
+    eager: OnceLock<crate::xls::Workbook<Cursor<Vec<u8>>>>,
+    metadata: OnceLock<Metadata>,
+}
+
+#[cfg(all(feature = "xls", any(unix, windows)))]
+impl XlsSource {
+    fn new(
+        workbook: crate::xls::SourceBackedWorkbook,
+        source: Arc<dyn litchi_core::ReadAt>,
+    ) -> Self {
+        Self {
+            workbook,
+            source,
+            eager: OnceLock::new(),
+            metadata: OnceLock::new(),
+        }
+    }
+
+    fn ensure_current(&self) -> Result<()> {
+        self.workbook
+            .source_version()
+            .map(|_| ())
+            .map_err(map_xls_source_error)
+    }
+
+    fn with_eager<T>(
+        &self,
+        operation: impl FnOnce(&crate::xls::Workbook<Cursor<Vec<u8>>>) -> Result<T>,
+    ) -> Result<T> {
+        self.ensure_current()?;
+        if self.eager.get().is_none() {
+            let eager = self
+                .workbook
+                .materialize_eager()
+                .map_err(map_xls_source_error)?;
+            self.ensure_current()?;
+            let _ = self.eager.set(eager);
+        }
+
+        let eager = self.eager.get().ok_or_else(|| {
+            Box::new(Error::ParseError(
+                "XLS eager compatibility materialization was not published".to_owned(),
+            )) as Box<dyn std::error::Error + Send + Sync>
+        })?;
+        let result = operation(eager);
+        self.ensure_current()?;
+        result
+    }
+
+    fn metadata(&self) -> Result<Metadata> {
+        self.ensure_current()?;
+        if let Some(metadata) = self.metadata.get() {
+            let metadata = metadata.clone();
+            self.ensure_current()?;
+            return Ok(metadata);
+        }
+
+        let ole = litchi_cfb::SharedOleFile::open(Arc::clone(&self.source))
+            .map_err(|error| map_xls_source_error(normalize_xls_metadata_error(error)))?;
+        let metadata = match ole.get_metadata() {
+            Ok(metadata) => litchi_core::Metadata::from(metadata),
+            Err(error) if xls_metadata_error_is_soft(&error) => Metadata::default(),
+            Err(error) => {
+                return Err(map_xls_source_error(normalize_xls_metadata_error(error)));
+            },
+        };
+        self.ensure_current()?;
+        let _ = self.metadata.set(metadata);
+        let metadata = self.metadata.get().ok_or_else(|| {
+            Box::new(Error::ParseError(
+                "XLS metadata was not published".to_owned(),
+            )) as Box<dyn std::error::Error + Send + Sync>
+        })?;
+        let metadata = metadata.clone();
+        self.ensure_current()?;
+        Ok(metadata)
+    }
+}
+
+#[cfg(all(feature = "xls", any(unix, windows)))]
+fn map_xls_source_error(
+    error: crate::xls::SourceBackedError,
+) -> Box<dyn std::error::Error + Send + Sync> {
+    Box::new(error)
+}
+
+#[cfg(all(feature = "xls", any(unix, windows)))]
+fn normalize_xls_metadata_error(error: litchi_cfb::OleError) -> crate::xls::SourceBackedError {
+    error.into()
+}
+
+#[cfg(all(feature = "xls", any(unix, windows)))]
+fn xls_metadata_error_is_soft(error: &litchi_cfb::OleError) -> bool {
+    matches!(
+        error,
+        litchi_cfb::OleError::InvalidFormat(_)
+            | litchi_cfb::OleError::InvalidData(_)
+            | litchi_cfb::OleError::NotOleFile
+            | litchi_cfb::OleError::CorruptedFile(_)
+            | litchi_cfb::OleError::StreamNotFound
+    )
+}
+
+/// A unified workbook interface for supported spreadsheet formats.
 ///
-/// This struct provides a high-level API for working with Apple Numbers files,
-/// following the same pattern as the unified `Document` and `Presentation` APIs.
+/// The selected format is detected from the file signature. Filesystem XLS
+/// opens retain a checked positional source for lazy worksheet names/counts;
+/// text extraction uses bounded on-demand compatibility materialization.
 ///
 /// # Supported Formats
 ///
-/// - `.numbers` - Apple Numbers (iWork Archive)
-///
-/// **Note**: For Excel formats (.xls, .xlsx, .xlsb), use the format-specific
-/// APIs directly from `crate::xls` or `crate::xlsx`.
+/// - `.numbers` - Apple Numbers (when the `numbers` feature is enabled)
+/// - `.xls` - legacy Excel workbooks (when the `xls` feature is enabled)
+/// - `.xlsx` - Office Open XML workbooks (when the `xlsx` feature is enabled)
+/// - `.xlsb` - Office Open XML binary workbooks (when the `xlsb` feature is enabled)
+/// - `.ods` - OpenDocument spreadsheets (when the `ods` feature is enabled)
 ///
 /// # Examples
 ///
 /// ```rust,no_run
 /// use litchi::sheet::Workbook;
 ///
-/// // Open a Numbers spreadsheet
-/// let workbook = Workbook::open("spreadsheet.numbers")?;
+/// // Open a supported spreadsheet
+/// let workbook = Workbook::open("spreadsheet.xlsx")?;
 ///
 /// // Get worksheet names
 /// let names = workbook.worksheet_names()?;
@@ -157,11 +272,14 @@ impl Workbook {
     /// ```rust,no_run
     /// use litchi::sheet::Workbook;
     ///
-    /// let workbook = Workbook::open("data.numbers")?;
+    /// let workbook = Workbook::open("spreadsheet.xlsx")?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        #[cfg(all(any(feature = "xlsx", feature = "ods"), any(unix, windows)))]
+        #[cfg(all(
+            any(feature = "xlsx", feature = "ods", feature = "xls"),
+            any(unix, windows)
+        ))]
         {
             match crate::detection_smart::detected::detect_workbook_source_path(path.as_ref())? {
                 #[cfg(feature = "xlsx")]
@@ -182,6 +300,14 @@ impl Workbook {
                         cached_metadata: metadata,
                     })
                 },
+                #[cfg(feature = "xls")]
+                crate::detection_smart::detected::WorkbookSourcePathDetection::Xls {
+                    workbook,
+                    source,
+                } => Ok(Self {
+                    inner: WorkbookImpl::XlsSource(XlsSource::new(workbook, source)),
+                    cached_metadata: Metadata::default(),
+                }),
                 crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml {
                     format: _,
                     bytes,
@@ -197,7 +323,10 @@ impl Workbook {
             }
         }
 
-        #[cfg(not(all(any(feature = "xlsx", feature = "ods"), any(unix, windows))))]
+        #[cfg(not(all(
+            any(feature = "xlsx", feature = "ods", feature = "xls"),
+            any(unix, windows)
+        )))]
         {
             // Read once into owned memory; detection transfers that ownership
             // into the selected format path.
@@ -216,7 +345,7 @@ impl Workbook {
     /// use litchi::sheet::Workbook;
     /// use std::fs;
     ///
-    /// let bytes = fs::read("data.numbers")?;
+    /// let bytes = fs::read("spreadsheet.xlsx")?;
     /// let workbook = Workbook::from_bytes(bytes)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
@@ -378,7 +507,7 @@ impl Workbook {
     /// ```rust,no_run
     /// use litchi::sheet::Workbook;
     ///
-    /// let workbook = Workbook::open("data.numbers")?;
+    /// let workbook = Workbook::open("spreadsheet.xlsx")?;
     /// let names = workbook.worksheet_names()?;
     /// for name in names {
     ///     println!("Sheet: {}", name);
@@ -408,6 +537,12 @@ impl Workbook {
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_names().to_vec()),
 
+            #[cfg(all(feature = "xls", any(unix, windows)))]
+            WorkbookImpl::XlsSource(source) => source
+                .workbook
+                .worksheet_names()
+                .map_err(map_xls_source_error),
+
             #[cfg(feature = "ods")]
             WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().sheet_names()),
 
@@ -428,7 +563,7 @@ impl Workbook {
     /// ```rust,no_run
     /// use litchi::sheet::Workbook;
     ///
-    /// let workbook = Workbook::open("data.numbers")?;
+    /// let workbook = Workbook::open("spreadsheet.xlsx")?;
     /// println!("Number of sheets: {}", workbook.worksheet_count()?);
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
@@ -447,6 +582,11 @@ impl Workbook {
             WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_count()),
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsMem(xls) => Ok(xls.worksheet_count()),
+            #[cfg(all(feature = "xls", any(unix, windows)))]
+            WorkbookImpl::XlsSource(source) => source
+                .workbook
+                .worksheet_count()
+                .map_err(map_xls_source_error),
             #[cfg(feature = "ods")]
             WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().sheet_count()),
             #[cfg(all(feature = "ods", any(unix, windows)))]
@@ -465,7 +605,7 @@ impl Workbook {
     /// ```rust,no_run
     /// use litchi::sheet::Workbook;
     ///
-    /// let workbook = Workbook::open("data.numbers")?;
+    /// let workbook = Workbook::open("spreadsheet.xlsx")?;
     /// let text = workbook.text()?;
     /// println!("{}", text);
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
@@ -565,6 +705,26 @@ impl Workbook {
                 Ok(out)
             },
 
+            #[cfg(all(feature = "xls", any(unix, windows)))]
+            WorkbookImpl::XlsSource(source) => source.with_eager(|xls| {
+                let mut out = String::new();
+                for i in 0..xls.worksheet_count() {
+                    let ws = xls.worksheet_by_index(i)?;
+                    let mut rows = ws.rows();
+                    while let Some(row) = rows.next() {
+                        let row = row?;
+                        for (idx, cell) in row.iter().enumerate() {
+                            if idx > 0 {
+                                out.push('\t');
+                            }
+                            append_cell_text(&mut out, cell);
+                        }
+                        out.push('\n');
+                    }
+                }
+                Ok(out)
+            }),
+
             #[cfg(feature = "ods")]
             WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().text()?),
 
@@ -587,7 +747,7 @@ impl Workbook {
     /// ```rust,no_run
     /// use litchi::sheet::Workbook;
     ///
-    /// let workbook = Workbook::open("data.numbers")?;
+    /// let workbook = Workbook::open("spreadsheet.xlsx")?;
     /// let metadata = workbook.metadata()?;
     /// if let Some(title) = metadata.title {
     ///     println!("Title: {}", title);
@@ -602,6 +762,10 @@ impl Workbook {
         #[cfg(all(feature = "ods", any(unix, windows)))]
         if let WorkbookImpl::OdsSource(spreadsheet) = &self.inner {
             return Ok(spreadsheet.metadata()?.clone());
+        }
+        #[cfg(all(feature = "xls", any(unix, windows)))]
+        if let WorkbookImpl::XlsSource(source) = &self.inner {
+            return source.metadata();
         }
         Ok(self.cached_metadata.clone())
     }
@@ -1472,5 +1636,311 @@ mod tests {
             let names = wb.worksheet_names().expect("Failed to get names");
             assert!(!names.is_empty(), "Expected worksheets with hyperlinks");
         }
+    }
+}
+
+#[cfg(all(test, feature = "xls", any(unix, windows)))]
+mod source_xls_path_tests {
+    use super::{Workbook, WorkbookImpl, XlsSource};
+    use litchi_cfb::OleWriter;
+    use litchi_core::{FileSource, OwnedSource, ReadAt};
+    use litchi_xls::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook};
+    use std::io::{Cursor, Write};
+    use std::sync::Arc;
+
+    fn fixture_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/Simple.xls")
+    }
+
+    fn write_temporary(bytes: &[u8]) -> tempfile::NamedTempFile {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), bytes).unwrap();
+        file
+    }
+
+    fn cfb_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = OleWriter::new();
+        for (name, bytes) in streams {
+            writer.create_stream(&[*name], bytes).unwrap();
+        }
+        let mut output = Vec::new();
+        writer.write_to(&mut Cursor::new(&mut output)).unwrap();
+        output
+    }
+
+    fn frame_bytes(kind: u16, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(4 + payload.len());
+        bytes.extend_from_slice(&kind.to_le_bytes());
+        bytes.extend_from_slice(&(u16::try_from(payload.len()).unwrap()).to_le_bytes());
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    fn legacy_biff_corpus() -> Vec<u8> {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(OwnedSource::new(std::fs::read(fixture_path()).unwrap()));
+        let mut stream = litchi_cfb::SharedOleFile::open(source)
+            .unwrap()
+            .open_stream(&["Workbook"])
+            .unwrap();
+        stream[4..6].copy_from_slice(&0x0500_u16.to_le_bytes());
+        cfb_with_streams(&[("Workbook", &stream)])
+    }
+
+    #[test]
+    fn filesystem_open_retains_xls_source_until_text() {
+        let path = fixture_path();
+        let workbook = Workbook::open(&path).expect("failed to open XLS source");
+        let WorkbookImpl::XlsSource(source) = &workbook.inner else {
+            panic!("filesystem XLS did not select the source-backed facade variant");
+        };
+        assert!(source.eager.get().is_none());
+
+        let names = workbook
+            .worksheet_names()
+            .expect("failed to enumerate source-backed XLS sheets");
+        assert!(!names.is_empty());
+        assert_eq!(workbook.worksheet_count().unwrap(), names.len());
+        assert!(source.eager.get().is_none());
+    }
+
+    #[test]
+    fn source_xls_matches_eager_names_text_and_metadata() {
+        let path = fixture_path();
+        let source = Workbook::open(&path).expect("failed to open source-backed XLS");
+        let WorkbookImpl::XlsSource(source_adapter) = &source.inner else {
+            panic!("filesystem XLS did not select the source-backed facade variant");
+        };
+        assert!(source_adapter.eager.get().is_none());
+        let source_metadata = source.metadata().unwrap();
+        assert!(source_metadata.application.is_some());
+        assert!(source_adapter.eager.get().is_none());
+
+        let eager =
+            Workbook::from_bytes(std::fs::read(&path).unwrap()).expect("failed to open eager XLS");
+        let eager_metadata = eager.metadata().unwrap();
+
+        assert_eq!(
+            source.worksheet_names().unwrap(),
+            eager.worksheet_names().unwrap()
+        );
+        assert_eq!(
+            source.worksheet_count().unwrap(),
+            eager.worksheet_count().unwrap()
+        );
+        assert_eq!(source_metadata.application, eager_metadata.application);
+        assert_eq!(source_metadata.author, eager_metadata.author);
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        assert!(source_adapter.eager.get().is_some());
+    }
+
+    #[test]
+    fn from_bytes_remains_eager_xls_memory_variant() {
+        let workbook = Workbook::from_bytes(std::fs::read(fixture_path()).unwrap())
+            .expect("failed to open eager XLS");
+        assert!(matches!(workbook.inner, WorkbookImpl::XlsMem(_)));
+    }
+
+    #[test]
+    fn legacy_biff_path_matches_from_bytes_and_owner_error() {
+        let bytes = legacy_biff_corpus();
+        let file = write_temporary(&bytes);
+        let path_workbook = Workbook::open(file.path()).expect("legacy BIFF path fallback");
+        let bytes_workbook = Workbook::from_bytes(bytes.clone()).expect("legacy BIFF bytes");
+        assert!(matches!(&path_workbook.inner, WorkbookImpl::XlsMem(_)));
+        assert_eq!(
+            path_workbook.worksheet_names().unwrap(),
+            bytes_workbook.worksheet_names().unwrap()
+        );
+        assert_eq!(
+            path_workbook.worksheet_count().unwrap(),
+            bytes_workbook.worksheet_count().unwrap()
+        );
+        assert_eq!(
+            path_workbook.text().unwrap(),
+            bytes_workbook.text().unwrap()
+        );
+
+        let owner_error = match SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(
+            legacy_biff_corpus(),
+        ))) {
+            Ok(_) => panic!("legacy BIFF unexpectedly opened by source owner"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            owner_error,
+            SourceBackedError::UnsupportedBiffVersion(0x0500)
+        ));
+    }
+
+    #[test]
+    fn source_xls_refuses_stale_path() {
+        let fixture = std::fs::read(fixture_path()).unwrap();
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), fixture).unwrap();
+        let workbook = Workbook::open(file.path()).expect("failed to open temporary XLS");
+
+        let mut changed = std::fs::OpenOptions::new()
+            .append(true)
+            .open(file.path())
+            .unwrap();
+        changed.write_all(&[0]).unwrap();
+        changed.flush().unwrap();
+
+        let error = workbook.worksheet_names().unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<SourceBackedError>(),
+            Some(SourceBackedError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn source_xls_refuses_encrypted_filepass_without_eager_fallback() {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls"),
+        )
+        .unwrap();
+        let file = write_temporary(&bytes);
+        let error = match Workbook::open(file.path()) {
+            Ok(_) => panic!("encrypted XLS unexpectedly opened through the facade"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.downcast_ref::<SourceBackedError>(),
+            Some(SourceBackedError::EncryptedUnsupported)
+        ));
+    }
+
+    #[test]
+    fn source_xls_refuses_malformed_biff_without_eager_fallback() {
+        let stream = frame_bytes(0x0809, &[0; 16]);
+        let file = write_temporary(&cfb_with_streams(&[("Workbook", &stream)]));
+        let error = match Workbook::open(file.path()) {
+            Ok(_) => panic!("malformed XLS unexpectedly opened through the facade"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.downcast_ref::<SourceBackedError>(),
+            Some(
+                SourceBackedError::Cfb(_)
+                    | SourceBackedError::Parse(_)
+                    | SourceBackedError::InvalidData(_)
+            )
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn source_xls_pins_open_file_across_atomic_path_replacement() {
+        let original = write_temporary(&std::fs::read(fixture_path()).unwrap());
+        let workbook = Workbook::open(original.path()).expect("failed to open source XLS");
+        let names = workbook.worksheet_names().unwrap();
+
+        let replacement = write_temporary(b"not an XLS workbook");
+        std::fs::rename(replacement.path(), original.path()).unwrap();
+
+        // The already-open descriptor remains pinned to the original inode;
+        // it must not retarget to the replacement pathname contents.
+        assert_eq!(workbook.worksheet_names().unwrap(), names);
+        assert!(Workbook::open(original.path()).is_err());
+    }
+
+    #[cfg(feature = "xlsx")]
+    #[test]
+    fn xls_source_probe_preserves_xlsx_precedence() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ooxml/xlsx/DateFormatTests.xlsx");
+        let workbook = Workbook::open(path).unwrap();
+        assert!(matches!(workbook.inner, WorkbookImpl::Xlsx(_)));
+    }
+
+    #[test]
+    fn metadata_ole_errors_use_source_owner_normalization() {
+        let source = FileSource::open(fixture_path()).unwrap();
+        let expected = source.version().unwrap();
+        let observed = expected;
+        let changed = super::normalize_xls_metadata_error(litchi_cfb::OleError::SourceChanged {
+            expected,
+            observed,
+        });
+        assert!(matches!(
+            changed,
+            SourceBackedError::SourceChanged {
+                expected: left,
+                observed: right
+            } if left == expected && right == observed
+        ));
+
+        let limited = super::normalize_xls_metadata_error(litchi_cfb::OleError::LimitExceeded {
+            resource: "input bytes",
+            observed: 9,
+            maximum: 8,
+        });
+        assert!(matches!(
+            limited,
+            SourceBackedError::ResourceLimit {
+                resource: "input bytes",
+                observed: 9,
+                maximum: 8,
+            }
+        ));
+    }
+
+    #[test]
+    fn ole_host_stream_precedence_is_catalog_only_and_ordered() {
+        let cases: Vec<(
+            Vec<(&str, &[u8])>,
+            Option<crate::detection_smart::detected::OleHostStream>,
+        )> = vec![
+            (
+                vec![
+                    ("WordDocument", b"word".as_slice()),
+                    ("PowerPoint Document", b"ppt".as_slice()),
+                    ("Workbook", b"xls".as_slice()),
+                ],
+                Some(crate::detection_smart::detected::OleHostStream::WordDocument),
+            ),
+            (
+                vec![
+                    ("PowerPoint Document", b"ppt".as_slice()),
+                    ("Workbook", b"xls".as_slice()),
+                ],
+                Some(crate::detection_smart::detected::OleHostStream::PowerPointDocument),
+            ),
+            (
+                vec![("Book", b"xls".as_slice()), ("Workbook", b"xls".as_slice())],
+                Some(crate::detection_smart::detected::OleHostStream::Workbook),
+            ),
+            (vec![("Other", b"ole".as_slice())], None),
+        ];
+        for (streams, expected) in cases {
+            let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(cfb_with_streams(&streams)));
+            let version = source.version().unwrap();
+            assert_eq!(
+                crate::detection_smart::detected::classify_ole_host_stream(
+                    Arc::clone(&source),
+                    version,
+                )
+                .unwrap(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn source_xls_materialization_limit_stays_typed() {
+        let source: Arc<dyn ReadAt> = Arc::new(FileSource::open(fixture_path()).unwrap());
+        let owner = SourceBackedWorkbook::from_read_at_with_limits(
+            Arc::clone(&source),
+            SourceBackedLimits::default().with_max_materialize_bytes(1),
+        )
+        .unwrap();
+        let adapter = XlsSource::new(owner, source);
+        let error = adapter.with_eager(|_| Ok(())).unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<SourceBackedError>(),
+            Some(SourceBackedError::ResourceLimit { .. })
+        ));
     }
 }

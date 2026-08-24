@@ -202,6 +202,48 @@ or ABBA claim. They are opt-in and leave the default 36 cases / 198 records
 unchanged. Before change 0259, the exhaustive `Case` registry/count tests
 covered 380 selectable names.
 
+## XLS source-backed lifecycle and locality selectors
+
+The following five selectors are an opt-in matched family for the public
+`litchi_xls::SourceBackedWorkbook` API:
+
+```text
+xls_source_backed_open
+xls_eager_open_list_worksheets
+xls_source_backed_open_list_worksheets
+xls_eager_open_one_cell
+xls_source_backed_open_one_cell
+```
+
+The source-backed open selector can be paired with the existing
+`xls_semantic_open` selector. The list and one-cell selectors are explicit
+eager/source pairs; both sides include a fresh open in the timed interval.
+The fixed corpus is `litchi-xls-comments-opaque-heavy-v1`, the same
+deterministic comments workbook used by the existing XLS comments controls.
+It has two worksheets, an opaque-heavy CFB archive of at least 16 MiB, and a
+regular `Workbook` stream of at least 64 KiB. The harness independently
+reconstructs the Workbook stream, checks the BoundSheet8 inventory, and
+retains archive and Workbook-stream SHA-256 identities. Shape, payload, and
+writer-shape overrides are rejected for these selectors; a tiny or synthetic
+shape cannot demonstrate worksheet locality.
+
+Each source-backed sample uses a caller-provided counting `ReadAt`. Its
+logical overlap counters distinguish actual CFB structural metadata, Workbook
+globals, the selected worksheet, unselected worksheets, and opaque payload
+streams. Untimed gates require eager and source worksheet names/counts/value
+parity, stable source version, exact corpus identity, zero worksheet-payload
+reads for open/list, selected-only worksheet reads for the one-cell lifecycle,
+and zero opaque-payload reads for every operation; a regression that reads an
+opaque stream fails the case. Reports expose retained source bytes and
+`complete_archive_materialized_bytes`, whose exact scope is a complete owned
+copy of the archive. Parser-owned Workbook globals and SST data are
+materialized as part of parsing but are intentionally excluded from that
+whole-archive counter, along with authoritative parsed sheet/cell counts.
+These fields are source evidence only: the selectors make no physical-I/O,
+allocation, RSS, throughput, latency, or ABBA claim, and do not define an
+ABBA schema. The selectors raise the current selectable registry from 393 to
+398; the default remains 36 cases / 198 records.
+
 ## Change 0259 relationship-heavy OPC structural open
 
 At change 0259's landing, the opt-in `opc_relationship_open` selector raised

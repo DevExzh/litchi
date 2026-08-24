@@ -20,7 +20,11 @@ use super::{ReadAt, SourceVersion};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FileVersionPolicy {
-    /// Unix device/inode, length, modification time, and status-change time.
+    /// Unix device/inode, length, and modification time.
+    ///
+    /// The open descriptor remains pinned to its original inode across an
+    /// atomic pathname replacement; a new [`FileSource`] opened by pathname
+    /// observes the replacement instead.
     UnixMetadata,
     /// Windows length, creation time, and last-write time.
     ///
@@ -335,22 +339,21 @@ struct MetadataFingerprint {
     length: u64,
     modified_seconds: i64,
     modified_nanoseconds: i64,
-    changed_seconds: i64,
-    changed_nanoseconds: i64,
 }
 
 #[cfg(unix)]
 fn metadata_fingerprint(metadata: &Metadata) -> MetadataFingerprint {
     use std::os::unix::fs::MetadataExt;
 
+    // Keep a pinned descriptor readable across atomic pathname replacement.
+    // Unlinking the old inode changes ctime even though its contents do not;
+    // length and mtime still detect ordinary in-place writes.
     MetadataFingerprint {
         device: metadata.dev(),
         inode: metadata.ino(),
         length: metadata.len(),
         modified_seconds: metadata.mtime(),
         modified_nanoseconds: metadata.mtime_nsec(),
-        changed_seconds: metadata.ctime(),
-        changed_nanoseconds: metadata.ctime_nsec(),
     }
 }
 
