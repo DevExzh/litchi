@@ -1135,3 +1135,27 @@ This is a focused chart-caption transaction contract, not a package-wide
 peak-memory, allocation-count, RSS, latency, throughput, or performance
 measurement. No manifest edge, generated schema, Buffa owner, normal Prost
 owner, or workspace dependency changed.
+
+## 2026-08-24 amendment: Wave69 shared chart-caption edge resource record
+
+Commit `cd382f95dad52fecdfdb17a7fbb1565c489e6de1` gives the shared
+chart-caption edge finite input, output, field, work, and nesting ceilings.
+The host helper derives those ceilings from the owning package's finite IWA
+stream and archive-message limits and maps codec byte, output, field, work,
+nesting, and allocation failures back to the existing typed host error
+surface.
+
+The strict codec meters source projection, selected-field validation, exact
+output sizing, raw emission, and candidate readback. Rewrite preflight covers
+the complete emission and verification passes before the single exact output
+reservation. Its reports expose measured input/output bytes, fields, work,
+maximum depth, allocation, retained/scratch, and changed-state facts; direct
+tests prove exact ceilings and max-minus-one output, field, work, and depth
+failure before output allocation.
+
+These are operation-local codec and helper bounds. Wave69 does not establish
+one aggregate transaction budget across chart graph ownership, archive
+serialization, Snappy compression, ZIP reassembly, Metadata, or package
+publication, and it makes no peak-memory, RSS, latency, throughput, or
+zero-copy claim. No manifest dependency, generated schema, Buffa owner,
+normal Prost owner, or workspace dependency changed.
