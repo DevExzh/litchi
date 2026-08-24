@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## XLS source-global coalescing result and next hotspot (change 0276)
+
+[Change 0276](changes/0276-xls-source-global-coalescing.md) removes the
+header-plus-frame duplication from source-backed Workbook globals and reuses
+one facade CFB catalog. Global calls fall `136 -> 69`; open/list calls fall
+`401 -> 334`, with all 24 source-backed statistics improving across the two
+paired 30-sample legs. Equal logical bytes and zero opaque/unselected-sheet
+overlap are retained. The instrumented path remains roughly 11-12x eager, so
+the next hotspot is a bounded monotonic CFB stream reader or validated span
+batcher for repeated chain walks, source-version probes, and selected-sheet
+frames. `performance_claim: none`; the matrix remains **398 names** and
+**36 cases / 198 default records**.
+
 ## Source-backed XLS selective-read boundary (change 0275)
 
 Change 0275 closes the production ownership and matched-measurement boundary

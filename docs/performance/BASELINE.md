@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLS source-global coalescing (change 0276)
+
+[Change 0276](changes/0276-xls-source-global-coalescing.md) retains bounded
+two-pass global parsing, one-catalog facade reuse, and a CFB range-error
+freshness fix. On the pinned opaque-heavy corpus, global logical ranges fall
+`136 -> 69`, open/list total ranges `401 -> 334`, and all 24 source-backed
+p50/mean/p95/p99 cells improve in the clean CPU-2 30-sample A1/B1/B2/A2
+decision smoke. The instrumented source remains roughly 11-12x eager and the
+run is below the 500-sample strict protocol, so `performance_claim: none`;
+no physical-I/O, FileSource, allocation/RSS, or broad XLS claim follows.
+The matrix remains **398 names** and **36 cases / 198 default records**.
+
 ## Latest source-backed XLS selective-read closure (change 0275)
 
 [Change 0275](changes/0275-xls-source-backed-selective-read.md) adds a BIFF8

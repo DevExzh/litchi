@@ -1,0 +1,62 @@
+{
+  "artifacts": [
+    {
+      "bytes": 64394,
+      "path": "a1-control.json",
+      "role": "a1",
+      "sha256": "2a0911bc5d6324e1337c23a93a498625bcce44b6333ad354a96aa8ae71a75d8f"
+    },
+    {
+      "bytes": 64293,
+      "path": "b1-candidate.json",
+      "role": "b1",
+      "sha256": "ed9468b1e1ba8e7e37547f554b664e3e425c76b96b4542c42d0faa9e66e0d5c8"
+    },
+    {
+      "bytes": 64300,
+      "path": "b2-candidate.json",
+      "role": "b2",
+      "sha256": "680401e46f5490387ec8618d2f6537985b8e12026cc78a58139b0bd0f5b8c743"
+    },
+    {
+      "bytes": 64392,
+      "path": "a2-control.json",
+      "role": "a2",
+      "sha256": "d221953ebcc0a7c65a83f2207356229f845aac5c26a4820227c4d4539bd0a965"
+    }
+  ],
+  "candidate": {
+    "binary_bytes": 51051864,
+    "binary_sha256": "e046fa377f6e3e4f712a124d454e434e7da2b7c0af72ccd02aefa84673b22017",
+    "revision": "ebaaf057ad7773da7d9e061594c4c5100ff327ae"
+  },
+  "change": "0276-xls-source-global-coalescing",
+  "claim_boundary": {
+    "performance_claim": "none",
+    "reason": "Clean 30-sample decision smoke with an instrumented logical-range source; no 500-sample strict comparator package, uninstrumented FileSource latency, physical-I/O, or resource evidence."
+  },
+  "control": {
+    "binary_bytes": 51058840,
+    "binary_sha256": "104e863a2467ecb7484f78f2f19bca00c45a88c5db1ae838bf991da6ace8624a",
+    "revision": "c60c67d39ead9e40f5c02067c5f91ebbab8b099c"
+  },
+  "corpus": {
+    "archive_bytes": 16995840,
+    "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+    "generator": "litchi-xls-comments-opaque-heavy-v1",
+    "workbook_stream_bytes": 80946,
+    "workbook_stream_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+  },
+  "manifest_kind": "litchi-perf-exploratory-abba-artifacts",
+  "protocol": {
+    "cpu_affinity": "2",
+    "fresh_isolated_child_per_sample": true,
+    "legs": ["a1", "b1", "b2", "a2"],
+    "samples_per_case": 30,
+    "selectors_per_leg": 6,
+    "warmup_iterations_per_case": 3,
+    "workers": 1
+  },
+  "schema_version": 1,
+  "self_excluded": true
+}

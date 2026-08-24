@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+Change 0276 changes no CRUD surface or selector count. It preserves the
+read-only BIFF8 owner while coalescing only the already validated Workbook-
+global span, reusing one facade CFB catalog, and fencing CFB range errors after
+I/O. FILEPASS, malformed/truncated globals, stale/limited sources, OLE host
+precedence, selected-sheet locality, and eager compatibility remain typed and
+tested. The clean 30-sample decision smoke retains
+`performance_claim: none`; the matrix remains **398 names** and the default
+remains **36 cases / 198 records**.
+
 Change 0275 adds a read-only source-backed BIFF8 XLS owner and five matched
 open/list/one-cell selectors, taking the matrix to **398 names** while leaving
 the default at **36 cases / 198 records**. It covers typed sheet descriptors,

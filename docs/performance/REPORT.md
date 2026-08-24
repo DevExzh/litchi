@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## XLS source-global coalescing (change 0276)
+
+[Change 0276](changes/0276-xls-source-global-coalescing.md) changes the
+source-backed global pass from `2G` ranges to `G + 1`, reuses the facade's
+classified CFB catalog through XLS metadata, and closes the CFB range-error
+freshness fence. On the fixed opaque-heavy corpus, global calls are
+`136 -> 69`, open/list total calls are `401 -> 334`, and both clean
+30-sample paired legs improve every source-backed p50/mean/p95/p99 statistic.
+The eager guards have no adverse movement in both directions. The logical-
+range source is instrumented and remains 11-12x eager; the package is retained
+for the production keep/revert decision but is below strict 500-sample claim
+acceptance. `performance_claim: none`; the selector/default matrix remains
+**398 names** and **36 cases / 198 records**.
+
 ## Source-backed XLS selective-read closure (change 0275)
 
 [Change 0275](changes/0275-xls-source-backed-selective-read.md) lands a
