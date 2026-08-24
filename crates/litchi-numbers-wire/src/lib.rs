@@ -1267,6 +1267,36 @@ impl<'a> BncCellView<'a> {
             .map(ClearValue::Retain)
     }
 
+    /// Remove exactly one expected comment identifier while preserving every
+    /// other encoded field, prefix byte, and opaque tail byte.
+    ///
+    /// The exact output length is checked before one fallible allocation. A
+    /// missing or different comment identifier is rejected so callers cannot
+    /// accidentally authorize a stale graph deletion.
+    pub fn clear_comment_with_limit(
+        &self,
+        expected_identifier: u32,
+        max_output_bytes: usize,
+    ) -> Result<Vec<u8>> {
+        if expected_identifier == 0 || self.comment_identifier() != Some(expected_identifier) {
+            return Err(Error::InvalidFormat(
+                "Numbers comment clear targeted a different cell comment".to_owned(),
+            ));
+        }
+        let output =
+            self.rewrite_selected_fields_many(self.cell_type, COMMENT_FLAG, &[], max_output_bytes)?;
+        let candidate = BncCellView::parse(&output)?;
+        if candidate.comment_identifier().is_some()
+            || candidate.stored_value() != self.stored_value()
+            || candidate.tail != self.tail
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers comment clear readback differs from the request".to_owned(),
+            ));
+        }
+        Ok(output)
+    }
+
     /// Return whether a formula cell already carries the requested supported
     /// display cache.
     ///
@@ -2273,6 +2303,36 @@ mod tests {
         assert_eq!(cell.comment_identifier(), Some(9));
         cell.set_comment_identifier(None);
         assert_eq!(cell.comment_identifier(), None);
+    }
+
+    #[test]
+    fn bounded_comment_clear_preserves_value_metadata_and_tail() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(42.5).unwrap();
+        cell.set_style_identifier(Some(17));
+        cell.set_comment_identifier(Some(9));
+        cell.tail.extend_from_slice(b"opaque-tail");
+        let source = cell.encode();
+        let view = BncCellView::parse(&source).unwrap();
+
+        let output = view.clear_comment_with_limit(9, source.len()).unwrap();
+        let candidate = BncCellView::parse(&output).unwrap();
+        assert_eq!(candidate.comment_identifier(), None);
+        assert_eq!(candidate.stored_value(), view.stored_value());
+        assert_eq!(candidate.tail, b"opaque-tail");
+        assert_eq!(output.len(), source.len() - 4);
+        assert!(matches!(
+            view.clear_comment_with_limit(9, output.len() - 1),
+            Err(Error::OutputLimitExceeded { .. })
+        ));
+        assert!(view.clear_comment_with_limit(8, usize::MAX).is_err());
+        let no_comment = BncCell::minimal().encode();
+        assert!(
+            BncCellView::parse(&no_comment)
+                .unwrap()
+                .clear_comment_with_limit(9, usize::MAX)
+                .is_err()
+        );
     }
 
     #[test]
