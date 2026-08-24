@@ -42525,6 +42525,13 @@ fn run_opc_relationship_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
         let package = OpcPackage::from_bytes(&corpus.corpus.archive)?;
+        let duration = started.elapsed();
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+
+        // Keep the correctness oracle outside the timed production-open phase.
+        // `PackageReader` has already validated and materialized these members;
+        // the counts below independently prove that the selected corpus was
+        // actually opened without charging their traversal to elapsed_ns.
         let part_count = package.part_count();
         let relationship_count = package.rels().len()
             + package
@@ -42535,7 +42542,6 @@ fn run_opc_relationship_open(
             .iter_parts()
             .map(|part| part.blob().len())
             .sum::<usize>();
-        let duration = started.elapsed();
 
         if part_count != corpus.identity.part_count
             || relationship_count != corpus.identity.relationship_count
@@ -42544,7 +42550,6 @@ fn run_opc_relationship_open(
             return Err("relationship-heavy OPC PackageReader identity differs from source".into());
         }
         std::hint::black_box((part_count, relationship_count, part_payload_bytes));
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
         if iteration >= warmup_iterations {
             observed_member_counts.push(corpus.identity.member_count);
             observed_relationship_member_counts.push(corpus.identity.relationship_member_count);
@@ -42557,7 +42562,8 @@ fn run_opc_relationship_open(
     let identity = &corpus.identity;
     let source = OpcRelationshipSummary {
         implementation: "LazyArchiveReader/PackageReader",
-        timing_scope: "OpcPackage::from_bytes plus part/relationship count and payload gates",
+        timing_scope:
+            "OpcPackage::from_bytes only; post-timing part/relationship/payload identity gates excluded",
         performance_claim: "none",
         source_bytes: u64::try_from(identity.source_bytes)?,
         source_sha256: identity.source_sha256.clone(),
@@ -45901,6 +45907,11 @@ mod tests {
             .unwrap()
             .opc_relationships
             .expect("relationship identity evidence");
+        assert_eq!(
+            summary.timing_scope,
+            "OpcPackage::from_bytes only; post-timing part/relationship/payload identity gates excluded"
+        );
+        assert_eq!(summary.performance_claim, "none");
         assert!(summary.independent_archive_identity_verified);
         assert!(summary.independent_lazy_identity_verified);
         assert!(summary.package_identity_verified);
