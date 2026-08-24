@@ -994,3 +994,28 @@ own bounded internal allocations; this amendment does not claim one global
 allocation for every candidate stage. No manifest edge, generated schema,
 Buffa owner, or Prost owner changed, and no workspace-wide dependency-removal
 claim follows.
+
+## 2026-08-24 amendment: Wave63 Pages body-table header resource record
+
+The Wave63 resource owner culminates in `7bc68903e`, following the shared
+semantics, strict codec, focused package, host cutover, boundary, and
+dependency-neutral edits `6f35a3d88`, `dd9e7f25c`, `58f04cd90`, `2bf7598d7`,
+`c93598d22`, `7261dd1c4`, and `30207fa47`.
+
+The hidden neutral `table_header_settings_codec` derives finite source-byte,
+field, work, nesting, and candidate-output ceilings. Strict preflight validates
+the selected scalar projection, measures exact rewritten payload size before
+output allocation, performs one fallible output reservation, preserves unknown
+source spans, and verifies candidate readback. Package reference/dependency
+scans charge aggregate and optional field-local references before ownership
+decisions; non-local, external, data-reference, duplicate, malformed, and
+unsupported group/dependency cases are rejected rather than normalized.
+
+The Pages package joins those charges to source-catalog/member bytes, decoded
+archive extent, physical object/message inventory, selection, compression,
+root-preview deletion, ZIP reassembly, and candidate-reopen ceilings.
+Candidate reservation and verification remain operation-local and fallible;
+generic ZIP/catalog staging retains its own bounded allocations. This is a
+finite resource contract, not a package-wide peak-memory, allocation-count,
+RSS, latency, throughput, or performance claim. No manifest edge, generated
+schema, Buffa owner, or normal Prost owner changed.

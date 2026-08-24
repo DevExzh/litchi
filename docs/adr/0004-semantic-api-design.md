@@ -2486,3 +2486,34 @@ package. The tracked raw-`u64` Pages host title methods were removed
 intentionally from the unpublished `0.0.1` compatibility surface, and the
 retained host examples now use the semantic package owner. The Keynote title
 host and other `litchi-iwa` operations are unrelated and remain.
+
+## 2026-08-24 amendment: Pages body-table header semantic ownership
+
+The Wave63 body-table header owner is finalized by commit
+`7bc68903ef8f107b4473843945c908856988215f` after the shared semantic,
+codec, package, host, boundary, and dependency-neutral hardening commits
+`6f35a3d88`, `dd9e7f25c`, `58f04cd90`, `2bf7598d7`, `c93598d22`,
+`7261dd1c4`, and `30207fa47`.
+
+The selector-first surface is
+`Package::{body_table_header_settings, edit_body_table_header_settings,
+apply_body_table_header_settings}`, `BodyTableSelector`, the
+presence-preserving `table::headers::{Count, Settings}` values, and the
+`BodyTableHeaderSettings*` transaction types. Header/footer counts, freeze,
+and repeating-header settings remain semantic values; native identifiers,
+archive routes, wire fields, and generated messages remain private.
+
+The package proves the rooted body-table/model graph and accepts aggregate
+reference metadata emitted by Pages only when optional field-local
+declarations are exact and consistent. Canonical nonzero local references,
+external/data-reference rejection, duplicate/contradictory ownership checks,
+malformed dependency scalars, and deprecated protobuf groups at package
+ingress fail closed. The doc-hidden
+`litchi_iwa_protos::table_header_settings_codec` owns borrowed
+strict snapshots and raw-preserving rewrites behind private Buffa types.
+Changed transactions preserve unknown source bytes, invalidate only changed
+root previews, reopen the candidate, and retain exact source/target inverse
+artifacts; no-ops remain exact.
+
+The tracked raw-identifier Pages header methods were retired in favor of this
+owner. Remaining migration-host compatibility operations are not removed.

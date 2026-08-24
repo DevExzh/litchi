@@ -12668,3 +12668,60 @@ settings-only edit because it introduced or removed no IDs or references.
 This is bounded native open/render/reopen acceptance plus an exact pre-native
 inverse—not Rust/native byte parity, exact native byte stability, a
 performance/RSS measurement, or a full publication/workspace gate.
+
+## 2026-08-24 amendment: Wave63 Pages body-table header verification record
+
+The implementation and hardening chain is
+`6f35a3d886c7a189381614d18cfc745c3aeca9e9`,
+`dd9e7f25c1ffb02551440e9c8855fa302b2aa267`,
+`58f04cd90a61a07592f8fec783aaceecaffdf293`,
+`2bf7598d728531777a6692362a6a513bb9d28b02`,
+`c93598d22aed6ca705e656c979d33b974d367e5e`,
+`7261dd1c44dbe0b62545d3563d8880033cbbad66`,
+`30207fa4711264eb41eea68f0c4f5c025e6128bb`, and final hardening commit
+`7bc68903ef8f107b4473843945c908856988215f`.
+
+The exact scoped gates were:
+
+- `cargo test -p litchi-pages --test body_table_header_settings --quiet`:
+  9/9 passed;
+- `cargo test -p litchi-pages --all-targets --quiet`: 109 library tests and
+  every integration target passed;
+- codec target `numbers_table_header_settings_codec`: 11/11 passed with
+  `cargo test -p litchi-iwa-protos numbers_table_header_settings_codec --lib --quiet`;
+- `cargo test -p litchi-iwa --lib pages::editor::tables::tests --quiet`:
+  38/38 passed;
+- scoped Pages all-target check and warning-denied Clippy passed;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 406/406 passed;
+  `py_compile` and `git diff --check` passed.
+
+Repository hooks were intentionally skipped because unrelated formatting
+remains in `crates/litchi-iwa/src/protobuf.rs` and
+`crates/litchi-iwa-protos/src/table_info_codec.rs`, while unrelated Numbers
+warning debt retains two deprecated `object_count` uses and one
+`manual_contains` finding. These scoped results do not constitute a
+full-workspace green claim. The live
+`python3 tools/check_crate_boundaries.py --explain` command exits 1 only for
+exactly three findings in the user-owned untracked
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`: the retired source and
+its two legacy methods. No tracked body-table-header or focused Pages finding
+remains.
+
+The bounded native record used Pages 14.4 and disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| `/private/tmp/litchi-wave61-pages-native-source.pages` | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Rust candidate before Pages | 81,205 | `3eda94aa2eb327ff893ddb4018ed7550a90e84bcc494a0ced66dffee63e8db6b` |
+| exact inverse | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Pages-saved normalized artifact | 108,649 | `b51f33b8bf883856819ba874fce5fdaeab6e9e2220be2a4f8d832157b828d4d1` |
+
+Pages 14.4 opened and rendered the Rust candidate without repair, showing a
+5-by-4 `Table 1` with one header row, zero header columns, and zero footer
+rows. Save, close, and reopen succeeded. The strict Rust reread preserved
+`header_rows_frozen == Some(true)` and the other semantic settings. The UI did
+not directly expose freeze state, so no native visual freeze-state claim is
+made. Pages normalized the package bytes during save; this is bounded
+no-repair open/render/save/close/reopen evidence plus an exact pre-native
+inverse, not Rust/native byte parity, exact post-save preservation, a general
+publication gate, a performance/RSS result, or full-workspace verification.
