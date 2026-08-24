@@ -1582,11 +1582,7 @@ fn message_declares_reference(
     if aggregate_occurrences != 1 {
         return Err(BodyTableLockError::InvalidSource);
     }
-    if message
-        .data_references
-        .iter()
-        .any(|candidate| *candidate == identifier)
-    {
+    if message.data_references.contains(&identifier) {
         return Err(BodyTableLockError::InvalidSource);
     }
     let mut field_declarations = 0usize;
@@ -1595,11 +1591,7 @@ fn message_declares_reference(
         budget.charge_payload_references(field.object_references.len())?;
         budget.charge_payload_references(field.data_references.len())?;
         budget.charge_payload_work(field.path.path.len())?;
-        if field
-            .data_references
-            .iter()
-            .any(|candidate| *candidate == identifier)
-        {
+        if field.data_references.contains(&identifier) {
             return Err(BodyTableLockError::InvalidSource);
         }
         let occurrences = field
@@ -1771,11 +1763,7 @@ fn message_declares_reference_prefix(
     if declarations.get(&identifier).map_or(0, |counts| counts.1) != 1 {
         return Err(BodyTableLockError::InvalidSource);
     }
-    if message
-        .data_references
-        .iter()
-        .any(|candidate| *candidate == identifier)
-    {
+    if message.data_references.contains(&identifier) {
         return Err(BodyTableLockError::InvalidSource);
     }
     let mut field_declarations = 0usize;
