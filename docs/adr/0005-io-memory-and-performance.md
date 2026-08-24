@@ -1275,3 +1275,27 @@ candidate-accounting facts. They do not establish a package-wide memory,
 peak-RSS, latency, throughput, zero-copy, or performance measurement, nor a
 single allocation for every format transaction. No manifest edge, generated
 schema, Buffa owner, normal Prost owner, or workspace dependency changed.
+
+## 2026-08-25 amendment: Wave75 Keynote movie-title resource record
+
+Implementation commit `ad7fc362036fa81c70c3e8ac373d7901e7689179` extends the
+private aggregate `CaptionBudget` through the selector, graph, archive, and
+metadata phases of the movie-title lifecycle. It charges the shared movie-edge
+codec Title slot, typed inline title-graph scans and allocations, native
+archive scans and exact sizing, UUID/watermark/save-token metadata work,
+Snappy compression, ZIP reassembly, preview invalidation, candidate reopen and
+locality verification, and retained exact source/target patch artifacts.
+
+The four-object stand-in-to-title creation and active-to-fresh-stand-in
+removal use fallible, collision-checked identifier work and retain old removal
+graphs for inverse/history semantics. Aggregate fields and work are charged
+across the private stages, observed nesting uses the maximum, and all output,
+scratch, retained, and candidate allocations remain bounded before publication.
+This records publication atomicity for private staged candidates; it does not
+claim one allocation or one output-free preflight for the entire transaction.
+
+These are operation-local resource facts. They establish no package-wide
+peak-memory, RSS, latency, throughput, zero-copy, or performance result. No
+manifest dependency, generated schema, Buffa owner, normal Prost owner, or
+workspace dependency edge changed; the hidden codec and generated projection
+remain private implementation details.

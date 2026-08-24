@@ -2812,3 +2812,34 @@ retains its legacy raw-ID methods; this amendment does not claim a full movie
 or Keynote-host retirement. The selected MovieArchive caption edge continues
 through the hidden strict handwritten codec; generated schemas, Buffa
 projections, and Prost types do not cross the public Keynote facade.
+
+## 2026-08-25 amendment: full Keynote movie-title lifecycle ownership
+
+Implementation commit `ad7fc362036fa81c70c3e8ac373d7901e7689179` moves the
+canonical file-movie title lifecycle behind the selector-first Keynote package
+owner. The public surface is
+`Package::{slide_movie_title, edit_slide_movie_title, apply_slide_movie_title}`
+with `SlideSelector`, `MovieSelector`, and the semantic
+`SlideMovieTitle{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` transaction
+types. Title `None` is the canonical empty stand-in and `Some(text)` is the
+inline title graph; the Wave74 movie-caption surface remains the owner for
+caption values.
+
+The title owner admits exact no-ops, existing-title replacement,
+stand-in-to-four-object title creation, and active-title-to-fresh-stand-in
+removal. Creation allocates the style, info, storage, and placement graph;
+removal retains the old graph and UUID registrations while retargeting the
+movie to the fresh stand-in. Both transitions update the exact current
+Metadata selector, UUID registry, root object-ID watermark, root save token,
+and selected component save token, then verify previews, locality, candidate
+reopen, and exact inverse artifacts. Shared, aliased, cross-component,
+malformed, noncanonical, or otherwise unproven graphs fail closed.
+
+The selected MovieArchive title edge uses the shared hidden
+`keynote_movie_caption_codec` Title slot, and the graph writer is typed as
+`CaptionGraphKind::Title` with `CaptionGraphProfile::Inline`. Those physical
+and generated values remain private; no native ID or wire record crosses the
+public facade. The compatibility host now delegates title reads, replacement,
+creation, and removal through typed selectors, retiring its raw-ID title
+mutators and legacy title graph fallback. Broader movie/media/build/theme
+compatibility remains a separate host responsibility.

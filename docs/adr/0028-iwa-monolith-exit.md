@@ -4990,3 +4990,31 @@ open/render/save/close/reopen acceptance and Rust structural reread of the
 normalized packages. It does not establish byte parity, arbitrary native graph
 acceptance, performance/RSS, full-workspace health, or a host/edge/debt/
 monolith retirement gate.
+
+## 2026-08-25 amendment: Wave75 full Keynote movie-title owner (not a monolith-exit gate)
+
+Implementation commit `ad7fc362036fa81c70c3e8ac373d7901e7689179` moves the
+canonical file-movie title lifecycle into the selector-first Keynote package:
+read, no-op, replacement, stand-in-to-four-object creation,
+active-to-fresh-stand-in removal, Metadata UUID/watermark/save-token updates,
+preview/locality verification, exact inverse, and candidate reopen. The
+compatibility host now routes title reads and mutations through typed
+slide/movie selectors; its raw-ID title mutators and legacy title graph
+fallback are retired. Wave74 remains the separate full caption owner.
+
+This is a bounded vertical owner slice, not deletion of the migration host.
+Movie caption, media, build, theme, and other Keynote compatibility work must
+remain at their recorded owners until independently migrated. The
+`litchi-iwa -> litchi-keynote` dependency edge and debt 014 remain open because
+the ledger exit requires completion of all Keynote package editing plus its
+examples and tests. The generated schema, hidden Buffa projection, normal
+Prost owners, remaining host responsibilities, and IWA monolith remain; no
+crate, dependency edge, debt item, generated owner, or normal Prost edge is
+deleted by Wave75.
+
+The fresh Keynote 14.4 record provides bounded title replacement, removal, and
+creation open/render/save/close/reopen acceptance. The normalized active
+title/caption packages do not satisfy the narrow focused re-ingress policy, so
+this is not Rust/native byte parity, arbitrary graph acceptance,
+performance/RSS, durable publication, full-workspace health, or a host,
+dependency-edge, debt, or monolith-exit gate.
