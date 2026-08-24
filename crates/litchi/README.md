@@ -138,7 +138,11 @@ assert_eq!(
 let restored = commit
     .package()
     .apply_section_settings(&commit.patch().inverse())?;
-assert_eq!(restored.package().source_bytes(), package.source_bytes());
+let mut original = Vec::new();
+package.write_to(&mut original)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 

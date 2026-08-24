@@ -22,6 +22,12 @@ fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/pages/basic.pages")
 }
 
+fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 #[test]
 fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
@@ -74,13 +80,13 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
 #[test]
 fn section_name_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = package_bytes(&package)?;
 
     let mut noop = package.edit_section_name(SectionSelector::index(0))?;
     noop.set_name(Some("Blank"))?;
     let noop = noop.commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package_bytes(noop.package())?, source);
 
     let mut edit = package.edit_section_name(SectionSelector::name("Blank"))?;
     edit.set_name(Some("Facade Section"))?;
@@ -92,14 +98,14 @@ fn section_name_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::er
     let restored = commit
         .package()
         .apply_section_name(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package())?, source);
     Ok(())
 }
 
 #[test]
 fn section_pagination_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = package_bytes(&package)?;
 
     let mut noop = package.edit_section_pagination(SectionSelector::index(0))?;
     noop.set_start(Some(Start::NextPage))?;
@@ -107,7 +113,7 @@ fn section_pagination_transaction_reaches_pages_facade() -> Result<(), Box<dyn s
     noop.set_starting_page_number(Some(PageNumber::new(1)?));
     let noop = noop.commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package_bytes(noop.package())?, source);
 
     let mut edit = package.edit_section_pagination(SectionSelector::name("Blank"))?;
     edit.set_start(Some(Start::LeftPage))?;
@@ -127,7 +133,7 @@ fn section_pagination_transaction_reaches_pages_facade() -> Result<(), Box<dyn s
     let restored = commit
         .package()
         .apply_section_pagination(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package())?, source);
     Ok(())
 }
 
@@ -148,8 +154,7 @@ fn section_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std
     assert_send_sync::<Path>();
 
     let package = Package::open(fixture_path())?;
-    let source = package.source_bytes().to_vec();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = package_bytes(&package)?;
     let selector = SectionSelector::index(0);
     let before = package.section_settings(selector)?;
 
@@ -170,16 +175,11 @@ fn section_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std
     assert_eq!(noop.diagnostics().touched_components(), 0);
     assert_eq!(noop.diagnostics().deleted_previews(), 0);
     assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
-    assert_eq!(noop.package().source_bytes(), source);
+    assert_eq!(package_bytes(noop.package())?, source);
 
     let replayed_noop = package.apply_section_settings(noop.patch())?;
     assert!(replayed_noop.patch().is_noop());
-    assert_eq!(
-        replayed_noop.package().source_bytes().as_ptr(),
-        source_pointer
-    );
-    assert_eq!(replayed_noop.package().source_bytes(), source);
+    assert_eq!(package_bytes(replayed_noop.package())?, source);
 
     let mut after = before.clone();
     after.set_first_page_hides_header_footer(Some(
@@ -196,9 +196,8 @@ fn section_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std
     assert!(changed.diagnostics().changed());
     assert!(changed.diagnostics().touched_components() >= 1);
     assert!(changed.diagnostics().full_reparse_performed());
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
-    assert_eq!(package.source_bytes(), source);
-    assert_ne!(changed.package().source_bytes(), source);
+    assert_eq!(package_bytes(&package)?, source);
+    assert_ne!(package_bytes(changed.package())?, source);
     assert_eq!(changed.package().section_settings(selector)?, after);
 
     let patch_debug = format!("{:?}", changed.patch());
@@ -210,8 +209,8 @@ fn section_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std
 
     let applied = package.apply_section_settings(changed.patch())?;
     assert_eq!(
-        applied.package().source_bytes(),
-        changed.package().source_bytes()
+        package_bytes(applied.package())?,
+        package_bytes(changed.package())?
     );
     assert_eq!(applied.package().section_settings(selector)?, after);
 
@@ -229,7 +228,7 @@ fn section_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn std
     assert!(matches!(inverse_conflict, Error::PatchConflict));
 
     let restored = changed.package().apply_section_settings(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), source);
+    assert_eq!(package_bytes(restored.package())?, source);
     assert_eq!(restored.package().section_settings(selector)?, before);
     Ok(())
 }
@@ -247,13 +246,13 @@ fn section_text_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::er
     let package = Package::open(fixture_path())?;
     let selector = SectionSelector::index(0);
     let original = package.section_text(selector)?.to_owned();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = package_bytes(&package)?;
 
     let mut noop = package.edit_section_text(selector)?;
     noop.set(&original)?;
     let noop = noop.commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package_bytes(noop.package())?, source);
 
     let prefix = "Facade section: ";
     let mut edit = package.edit_section_text(SectionSelector::name("Blank"))?;
@@ -267,7 +266,7 @@ fn section_text_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::er
 
     let inverse = commit.patch().inverse();
     let restored = commit.package().apply_section_text(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package())?, source);
     Ok(())
 }
 
@@ -282,8 +281,7 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     assert_send_sync::<PageLayoutPatch>();
 
     let package = Package::open(fixture_path())?;
-    let source_bytes = package.source_bytes();
-    let source_pointer = source_bytes.as_ptr();
+    let source = package_bytes(&package)?;
     let before = package.page_layout()?;
     assert!(before.page_width().is_some_and(|width| width > 0.0));
     assert!(before.page_height().is_some_and(|height| height > 0.0));
@@ -313,9 +311,8 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     assert!(changed.diagnostics().changed());
     assert!(changed.diagnostics().touched_components() >= 1);
     assert!(changed.diagnostics().full_reparse_performed());
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
-    assert_eq!(package.source_bytes(), source_bytes);
-    assert_ne!(changed.package().source_bytes(), source_bytes);
+    assert_eq!(package_bytes(&package)?, source);
+    assert_ne!(package_bytes(changed.package())?, source);
 
     let patch_debug = format!("{:?}", changed.patch());
     assert!(patch_debug.contains("PageLayoutPatch"));
@@ -327,7 +324,7 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     let restored = changed
         .package()
         .apply_page_layout(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(package_bytes(restored.package())?, source);
     assert_eq!(restored.package().page_layout()?, before);
     Ok(())
 }
@@ -343,8 +340,7 @@ fn document_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn st
     assert_send_sync::<LimitKind>();
 
     let package = Package::open(fixture_path())?;
-    let source_bytes = package.source_bytes();
-    let source_pointer = source_bytes.as_ptr();
+    let source = package_bytes(&package)?;
     let before = package.document_settings()?;
 
     let noop = package.edit_document_settings()?.set(before).commit()?;
@@ -354,7 +350,7 @@ fn document_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn st
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.diagnostics().touched_components(), 0);
     assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package_bytes(noop.package())?, source);
 
     let mut options = before.options();
     options.set_automatic_hyphenation(Some(!options.uses_automatic_hyphenation()));
@@ -369,14 +365,13 @@ fn document_settings_transaction_reaches_pages_facade() -> Result<(), Box<dyn st
     assert!(changed.diagnostics().changed());
     assert!(changed.diagnostics().touched_components() >= 1);
     assert!(changed.diagnostics().full_reparse_performed());
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
-    assert_eq!(package.source_bytes(), source_bytes);
-    assert_ne!(changed.package().source_bytes(), source_bytes);
+    assert_eq!(package_bytes(&package)?, source);
+    assert_ne!(package_bytes(changed.package())?, source);
 
     let restored = changed
         .package()
         .apply_document_settings(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source_bytes);
+    assert_eq!(package_bytes(restored.package())?, source);
     assert_eq!(restored.package().document_settings()?, before);
     Ok(())
 }

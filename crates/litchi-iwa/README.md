@@ -1379,7 +1379,11 @@ assert_eq!(commit.package().document_settings()?, settings);
 let restored = commit
     .package()
     .apply_document_settings(&commit.patch().inverse())?;
-assert_eq!(restored.package().source_bytes(), package.source_bytes());
+let mut original_bytes = Vec::new();
+package.write_to(&mut original_bytes)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original_bytes);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -1418,7 +1422,11 @@ assert_eq!(commit.package().page_layout()?, layout);
 let restored = commit
     .package()
     .apply_page_layout(&commit.patch().inverse())?;
-assert_eq!(restored.package().source_bytes(), package.source_bytes());
+let mut original_bytes = Vec::new();
+package.write_to(&mut original_bytes)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original_bytes);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -1466,7 +1474,11 @@ assert_eq!(
 let restored = commit
     .package()
     .apply_section_settings(&commit.patch().inverse())?;
-assert_eq!(restored.package().source_bytes(), package.source_bytes());
+let mut original_bytes = Vec::new();
+package.write_to(&mut original_bytes)?;
+let mut restored_bytes = Vec::new();
+restored.package().write_to(&mut restored_bytes)?;
+assert_eq!(restored_bytes, original_bytes);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 

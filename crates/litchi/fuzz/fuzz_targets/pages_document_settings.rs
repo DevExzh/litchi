@@ -73,6 +73,7 @@ fn native_package() -> &'static Package {
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
+    let source = package_bytes(package);
     exercise_section_settings(package, data);
 
     let before = match package.document_settings() {
@@ -170,10 +171,11 @@ fn exercise_package(package: &Package, data: &[u8]) {
             }),
         before,
     );
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package()), source);
 }
 
 fn exercise_section_settings(package: &Package, data: &[u8]) {
+    let source = package_bytes(package);
     observe_result(
         package.section_settings(SectionSelector::index(usize::from(read_u16(data, 12)))),
     );
@@ -236,17 +238,11 @@ fn exercise_section_settings(package: &Package, data: &[u8]) {
     assert_eq!(no_op_diagnostics.touched_components(), 0);
     assert_eq!(no_op_diagnostics.deleted_previews(), 0);
     assert!(!no_op_diagnostics.full_reparse_performed());
-    assert_eq!(
-        no_op_commit.package().source_bytes(),
-        package.source_bytes()
-    );
+    assert_eq!(package_bytes(no_op_commit.package()), source);
     let no_op_applied = package
         .apply_section_settings(&no_op_patch)
         .unwrap_or_else(|error| panic!("fresh no-op section-settings patch must apply: {error}"));
-    assert_eq!(
-        no_op_applied.package().source_bytes(),
-        package.source_bytes()
-    );
+    assert_eq!(package_bytes(no_op_applied.package()), source);
 
     let after = changed_section_settings(&before, data);
     assert_ne!(after, before);
@@ -313,7 +309,7 @@ fn exercise_section_settings(package: &Package, data: &[u8]) {
         .package()
         .apply_section_settings(&inverse)
         .unwrap_or_else(|error| panic!("fresh section-settings inverse must apply: {error}"));
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package()), source);
     assert_eq!(
         restored
             .package()
@@ -449,6 +445,14 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 fn control(data: &[u8], index: usize) -> u8 {
     data.get(index).copied().unwrap_or_default()
+}
+
+fn package_bytes(package: &Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("writing a Pages package to memory must succeed: {error}"));
+    bytes
 }
 
 fn observe_result<T, E>(result: Result<T, E>)

@@ -114,8 +114,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
 }
 
 fn exercise_direct_set_clear(package: &Package, data: &[u8]) {
-    let source_before = package.source_bytes().to_vec();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_before = package_bytes(package);
     let current = match package.section_text(SectionSelector::index(0)) {
         Ok(text) => text,
         Err(error) => {
@@ -133,14 +132,12 @@ fn exercise_direct_set_clear(package: &Package, data: &[u8]) {
         1 => package.set_section_text(SectionSelector::index(0), replacement.as_ref()),
         _ => package.clear_section_text(SectionSelector::index(0)),
     };
-    assert_eq!(package.source_bytes(), source_before.as_slice());
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package_bytes(package), source_before);
 
     match result {
         Ok(commit) => {
             if commit.patch().is_noop() {
-                assert_eq!(commit.package().source_bytes(), source_before.as_slice());
-                assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+                assert_eq!(package_bytes(commit.package()), source_before);
             }
             publish_and_reverse(package, Ok(commit));
         },
@@ -188,21 +185,18 @@ fn exercise_operation(package: &Package, data: &[u8]) {
 }
 
 fn publish_and_reverse(package: &Package, result: Result<SectionTextCommit, SectionTextError>) {
-    let source_before = package.source_bytes().to_vec();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_before = package_bytes(package);
     let commit = match result {
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
-            assert_eq!(package.source_bytes(), source_before.as_slice());
-            assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+            assert_eq!(package_bytes(package), source_before);
             return;
         },
     };
     let patch = commit.patch().clone();
     let diagnostics = *commit.diagnostics();
-    assert_eq!(package.source_bytes(), source_before.as_slice());
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(package_bytes(package), source_before);
     assert_eq!(diagnostics.changed(), !patch.is_noop());
     assert_eq!(
         diagnostics.touched_components(),
@@ -232,8 +226,8 @@ fn publish_and_reverse(package: &Package, result: Result<SectionTextCommit, Sect
         .apply_section_text(&patch)
         .unwrap_or_else(|error| panic!("fresh section-text patch must apply: {error}"));
     assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
+        package_bytes(applied.package()),
+        package_bytes(commit.package())
     );
     assert_eq!(
         applied
@@ -260,8 +254,7 @@ fn publish_and_reverse(package: &Package, result: Result<SectionTextCommit, Sect
         .package()
         .apply_section_text(&inverse)
         .unwrap_or_else(|error| panic!("fresh section-text inverse must apply: {error}"));
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
-    assert_eq!(restored.package().source_bytes(), source_before.as_slice());
+    assert_eq!(package_bytes(restored.package()), source_before);
     assert_eq!(
         restored
             .package()
@@ -353,14 +346,14 @@ fn exercise_input_limit() {
 fn exercise_resource_limits() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let source_bytes = u64::try_from(NATIVE_PAGES.len())
+        let native_size = u64::try_from(NATIVE_PAGES.len())
             .unwrap_or_else(|error| unreachable!("native Pages size fits u64: {error}"));
         let defaults = fuzz_limits();
 
         // The source itself is one byte above this profile, so the ingress
         // limit is deterministic and reached before semantic projection.
         let input_limited = Limits::new(
-            source_bytes.saturating_sub(1),
+            native_size.saturating_sub(1),
             defaults.max_entries(),
             defaults.max_entry_bytes(),
             defaults.max_total_bytes(),
@@ -413,7 +406,7 @@ fn exercise_resource_limits() {
         // unlikely to hide the output ceiling; success is still accepted and
         // must satisfy the same exact-source inverse checks.
         let exact_source_limits = Limits::new(
-            source_bytes,
+            native_size,
             defaults.max_entries(),
             defaults.max_entry_bytes(),
             defaults.max_total_bytes(),
@@ -427,13 +420,13 @@ fn exercise_resource_limits() {
                 return;
             },
         };
-        let before = package.source_bytes().to_vec();
+        let before = package_bytes(&package);
         let replacement = resource_replacement();
         match package.set_section_text(SectionSelector::index(0), &replacement) {
             Ok(commit) => publish_and_reverse(&package, Ok(commit)),
             Err(error) => observe_error(error),
         }
-        assert_eq!(package.source_bytes(), before.as_slice());
+        assert_eq!(package_bytes(&package), before);
     });
 }
 
@@ -516,6 +509,14 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 fn control(data: &[u8], index: usize) -> u8 {
     data.get(index).copied().unwrap_or_default()
+}
+
+fn package_bytes(package: &Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("writing a Pages package to memory must succeed: {error}"));
+    bytes
 }
 
 fn observe_result<T, E>(result: Result<T, E>)

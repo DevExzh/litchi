@@ -19,6 +19,12 @@ const SECTION_MESSAGE_TYPE: u32 = 10_011;
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
 
 fn assert_type_send_sync<T: Send + Sync>() {}
@@ -411,7 +417,7 @@ fn native_fixture_renames_by_position_and_name_with_clear_and_empty() -> TestRes
 fn selector_first_name_convenience_methods_share_transaction_boundaries() -> TestResult<()> {
     let bytes = synthetic_package("Alpha", "Beta")?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = exact_bytes(&package)?;
 
     let renamed = package.set_section_name(SectionSelector::name("Alpha"), Some("Renamed"))?;
     assert_eq!(
@@ -422,8 +428,7 @@ fn selector_first_name_convenience_methods_share_transaction_boundaries() -> Tes
         renamed.package().section_name(SectionSelector::index(1))?,
         Some("Beta")
     );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(&package)?, source);
     assert!(!renamed.patch().is_noop());
 
     let cleared = renamed
@@ -438,10 +443,8 @@ fn selector_first_name_convenience_methods_share_transaction_boundaries() -> Tes
         .package()
         .clear_section_name(SectionSelector::index(0))?;
     assert!(noop.patch().is_noop());
-    assert_eq!(
-        noop.package().source_bytes().as_ptr(),
-        cleared.package().source_bytes().as_ptr()
-    );
+    let cleared_bytes = exact_bytes(cleared.package())?;
+    assert_eq!(exact_bytes(noop.package())?, cleared_bytes);
 
     assert!(matches!(
         package.set_section_name(SectionSelector::name("Missing"), Some("x")),
@@ -451,7 +454,7 @@ fn selector_first_name_convenience_methods_share_transaction_boundaries() -> Tes
         package.set_section_name(SectionSelector::name("Alpha"), Some("bad\0name")),
         Err(SectionNameError::InvalidName(_))
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -494,7 +497,7 @@ fn selector_and_name_validation_fail_before_publication() -> TestResult<()> {
         Err(SectionNameError::InvalidName(_))
     ));
     assert_eq!(edit.name(), Some("Same"));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -502,7 +505,7 @@ fn selector_and_name_validation_fail_before_publication() -> TestResult<()> {
 fn no_op_reuses_exact_source_and_applies_to_legacy_source() -> TestResult<()> {
     let bytes = synthetic_package("Alpha", "Beta")?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = exact_bytes(&package)?;
 
     let mut edit = package.edit_section_name(SectionSelector::name("Alpha"))?;
     edit.set_name(Some("Alpha"))?;
@@ -515,13 +518,9 @@ fn no_op_reuses_exact_source_and_applies_to_legacy_source() -> TestResult<()> {
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.diagnostics().touched_components(), 0);
     assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(noop.package().source_bytes(), bytes);
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(noop.package())?, source);
     assert_eq!(
-        package
-            .apply_section_name(noop.patch())?
-            .package()
-            .source_bytes(),
+        exact_bytes(package.apply_section_name(noop.patch())?.package())?,
         bytes
     );
 
@@ -531,12 +530,13 @@ fn no_op_reuses_exact_source_and_applies_to_legacy_source() -> TestResult<()> {
     legacy_noop_edit.set_name(Some("Alpha"))?;
     let legacy_noop_commit = legacy_noop_edit.commit()?;
     assert!(legacy_noop_commit.patch().is_noop());
-    assert_eq!(legacy_noop_commit.package().source_bytes(), legacy);
+    assert_eq!(exact_bytes(legacy_noop_commit.package())?, legacy);
     assert_eq!(
-        legacy_package
-            .apply_section_name(legacy_noop_commit.patch())?
-            .package()
-            .source_bytes(),
+        exact_bytes(
+            legacy_package
+                .apply_section_name(legacy_noop_commit.patch())?
+                .package(),
+        )?,
         legacy
     );
 
@@ -577,7 +577,7 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         commit.patch().source_fingerprint(),
         commit.patch().target_fingerprint()
     );
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     assert_eq!(commit.package().text()?, source_text);
     assert_eq!(
         commit.package().sections()[0].name(),
@@ -593,10 +593,10 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         source_sections[1].1
     );
 
-    let target = commit.package().source_bytes();
+    let target = exact_bytes(commit.package())?;
     let target_first_payload =
-        message_payload(target, FIRST_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?;
-    let target_first_header = object_header(target, FIRST_SECTION_IDENTIFIER)?;
+        message_payload(&target, FIRST_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?;
+    let target_first_header = object_header(&target, FIRST_SECTION_IDENTIFIER)?;
     assert_eq!(
         fields_except_name(&target_first_payload)?,
         fields_except_name(&source_first_payload)?
@@ -617,17 +617,17 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
             .any(|field| field.number() == 99)
     );
     assert_eq!(
-        message_payload(target, SECOND_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?,
+        message_payload(&target, SECOND_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?,
         source_second_payload
     );
     assert_eq!(
-        message_payload(target, BODY_IDENTIFIER, 2_001)?,
+        message_payload(&target, BODY_IDENTIFIER, 2_001)?,
         source_body_payload
     );
-    assert_untouched_zip_members(&bytes, target)?;
+    assert_untouched_zip_members(&bytes, &target)?;
 
     let applied = package.apply_section_name(commit.patch())?;
-    assert_eq!(applied.package().source_bytes(), target);
+    assert_eq!(exact_bytes(applied.package())?, target);
 
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.before(), Some(replacement.as_str()));
@@ -641,7 +641,7 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         commit.patch().source_fingerprint()
     );
     let restored = commit.package().apply_section_name(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(section_snapshot(restored.package()), source_sections);
 
     let unrelated = Package::from_bytes(&synthetic_package("Other", "Beta")?)?;
@@ -680,6 +680,6 @@ fn changed_name_respects_retained_tight_output_limit() -> TestResult<()> {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }

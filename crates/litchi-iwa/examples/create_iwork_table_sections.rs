@@ -152,7 +152,9 @@ fn set_pages_table_headers(
         .edit_body_table_header_settings(BodyTableSelector::index(0))?
         .set(settings)
         .commit()?;
-    *editor = litchi_iwa::pages::PagesEditor::from_bytes(commit.package().source_bytes())?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = litchi_iwa::pages::PagesEditor::from_bytes(&bytes)?;
     Ok(())
 }
 

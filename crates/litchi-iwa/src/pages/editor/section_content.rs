@@ -1,5 +1,6 @@
 //! Section-scoped body text reading and mutation.
 
+use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -394,21 +395,15 @@ impl PagesEditor {
         budget: &mut FocusedBridgeBudget,
     ) -> Result<()> {
         let source_limits = self.package().limits();
-        let target_source = commit.package().source_bytes();
-        budget.charge_scaled(
-            target_source.len(),
-            FOCUSED_READBACK_FACTOR,
-            "candidate readback",
-        )?;
-        let mut target_bytes = Vec::new();
-        target_bytes
-            .try_reserve_exact(target_source.len())
-            .map_err(|_| {
-                Error::InvalidFormat(
-                    "Pages focused section-text candidate allocation was refused".to_owned(),
-                )
-            })?;
-        target_bytes.extend_from_slice(target_source);
+        // Charge every emitted chunk before reserving or retaining it. The
+        // exact package writer currently supplies the whole retained artifact
+        // in one call, while this sink remains correct if that implementation
+        // later streams smaller chunks. A limit failure therefore leaves no
+        // package-sized candidate allocation behind and preserves the former
+        // one-pass target-work accounting.
+        let mut writer = FocusedCandidateWriter::new(budget);
+        let write_result = commit.package().write_to(&mut writer);
+        let target_bytes = writer.finish(write_result)?;
         let target: Arc<[u8]> = target_bytes.into();
         let candidate =
             crate::package::IWorkPackage::from_shared_bytes_with_limits(target, source_limits)?;
@@ -550,6 +545,65 @@ impl PagesEditor {
 struct FocusedSectionPackage {
     package: Package,
     budget: FocusedBridgeBudget,
+}
+
+#[derive(Debug)]
+struct FocusedCandidateWriter<'a> {
+    budget: &'a mut FocusedBridgeBudget,
+    bytes: Vec<u8>,
+    failure: Option<Error>,
+}
+
+impl<'a> FocusedCandidateWriter<'a> {
+    fn new(budget: &'a mut FocusedBridgeBudget) -> Self {
+        Self {
+            budget,
+            bytes: Vec::new(),
+            failure: None,
+        }
+    }
+
+    fn finish(
+        mut self,
+        result: std::result::Result<(), litchi_pages::WriteError>,
+    ) -> Result<Vec<u8>> {
+        match result {
+            Ok(()) => Ok(self.bytes),
+            Err(error) => match self.failure.take() {
+                Some(failure) => Err(failure),
+                None => Err(Error::Io(error.into_io_error())),
+            },
+        }
+    }
+}
+
+impl Write for FocusedCandidateWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if let Err(error) = self.budget.charge_scaled(
+            bytes.len(),
+            FOCUSED_READBACK_FACTOR,
+            "candidate output streaming",
+        ) {
+            self.failure = Some(error);
+            return Err(io::Error::other(
+                "Pages focused candidate exceeded its work budget",
+            ));
+        }
+        if self.bytes.try_reserve_exact(bytes.len()).is_err() {
+            self.failure = Some(Error::InvalidFormat(
+                "Pages focused section-text candidate allocation was refused".to_owned(),
+            ));
+            return Err(io::Error::other(
+                "Pages focused candidate allocation was refused",
+            ));
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -702,7 +756,9 @@ fn map_section_text_error(error: SectionTextError) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::FocusedBridgeBudget;
+    use std::io::Write as _;
+
+    use super::{FOCUSED_READBACK_FACTOR, FocusedBridgeBudget, FocusedCandidateWriter};
     use crate::package::PackageLimits;
 
     #[test]
@@ -725,5 +781,28 @@ mod tests {
                 .is_ok()
         );
         assert!(budget.charge(1, "test").is_err());
+    }
+
+    #[test]
+    fn focused_candidate_writer_charges_once_before_retaining_output() {
+        const PAYLOAD: &[u8] = b"focused Pages candidate";
+        let exact_work = PAYLOAD.len() * FOCUSED_READBACK_FACTOR;
+        let exact_limits =
+            PackageLimits::new_with_limits(1, 1, 1, u64::try_from(exact_work).unwrap(), 1).unwrap();
+        let mut exact_budget = FocusedBridgeBudget::new(exact_limits, 0).unwrap();
+        let mut exact_writer = FocusedCandidateWriter::new(&mut exact_budget);
+        assert_eq!(exact_writer.write(PAYLOAD).unwrap(), PAYLOAD.len());
+        assert_eq!(exact_writer.bytes, PAYLOAD);
+        assert_eq!(exact_writer.budget.consumed, exact_work);
+
+        let under_limits =
+            PackageLimits::new_with_limits(1, 1, 1, u64::try_from(exact_work - 1).unwrap(), 1)
+                .unwrap();
+        let mut under_budget = FocusedBridgeBudget::new(under_limits, 0).unwrap();
+        let mut under_writer = FocusedCandidateWriter::new(&mut under_budget);
+        assert!(under_writer.write(PAYLOAD).is_err());
+        assert!(under_writer.bytes.is_empty());
+        assert!(under_writer.failure.is_some());
+        assert_eq!(under_writer.budget.consumed, 0);
     }
 }

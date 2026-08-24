@@ -38,6 +38,9 @@ fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::e
     );
 
     let bytes = std::fs::read(path)?;
+    let mut streamed = Vec::new();
+    package.write_to(&mut streamed)?;
+    assert_eq!(streamed, bytes);
     let from_bytes = Package::from_bytes(&bytes)?;
     from_bytes.validate()?;
     assert_eq!(from_bytes.text()?, text);

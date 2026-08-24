@@ -26,7 +26,11 @@
 //!     .commit()?;
 //! let inverse = commit.patch().inverse();
 //! let restored = commit.package().apply_section_settings(&inverse)?;
-//! assert_eq!(restored.package().source_bytes(), package.source_bytes());
+//! let mut source_bytes = Vec::new();
+//! package.write_to(&mut source_bytes)?;
+//! let mut restored_bytes = Vec::new();
+//! restored.package().write_to(&mut restored_bytes)?;
+//! assert_eq!(restored_bytes, source_bytes);
 //! # Ok(())
 //! # }
 //! ```

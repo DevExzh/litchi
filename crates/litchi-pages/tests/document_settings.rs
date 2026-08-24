@@ -46,6 +46,12 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
 fn assert_type_send_sync<T: Send + Sync>() {}
 
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn fixture_path() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/basic.pages")
@@ -650,7 +656,7 @@ fn assert_invalid_settings_source(bytes: &[u8]) -> TestResult {
         package.document_settings(),
         Err(SettingsError::InvalidSource)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -664,7 +670,7 @@ fn assert_changed_settings_refused_atomically(bytes: &[u8], before: Settings) ->
             .commit(),
         Err(SettingsError::InvalidSource)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -673,7 +679,6 @@ fn semantic_groups_presence_unknowns_gap_and_exact_noop_are_lossless() -> TestRe
     let expected = mixed_settings()?;
     let bytes = synthetic_package(expected, true, true)?;
     let package = Package::from_bytes(&bytes)?;
-    let pointer = package.source_bytes().as_ptr();
     let actual = package.document_settings()?;
     assert_eq!(actual, expected);
     assert_eq!(actual.options().body_enabled(), Some(false));
@@ -690,27 +695,21 @@ fn semantic_groups_presence_unknowns_gap_and_exact_noop_are_lossless() -> TestRe
     assert_eq!(commit.diagnostics().touched_components(), 0);
     assert_eq!(commit.diagnostics().deleted_previews(), 0);
     assert!(!commit.diagnostics().full_reparse_performed());
-    assert_eq!(commit.package().source_bytes().as_ptr(), pointer);
-    assert_eq!(commit.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(commit.package())?, bytes);
     assert_eq!(
-        entry_names(commit.package().source_bytes())?,
+        entry_names(&exact_bytes(commit.package())?)?,
         entry_names(&bytes)?
     );
     let replay = package.apply_document_settings(commit.patch())?;
     assert!(replay.patch().is_noop());
-    assert_eq!(replay.package().source_bytes().as_ptr(), pointer);
+    assert_eq!(exact_bytes(replay.package())?, bytes);
 
     // Exact-source matching also admits an independently reopened copy while
-    // the no-op result reuses that caller's own source allocation.
+    // the no-op result preserves that caller's exact source bytes.
     let reopened = Package::from_bytes(&bytes)?;
-    let reopened_pointer = reopened.source_bytes().as_ptr();
     let reopened_replay = reopened.apply_document_settings(commit.patch())?;
     assert!(reopened_replay.patch().is_noop());
-    assert_eq!(
-        reopened_replay.package().source_bytes().as_ptr(),
-        reopened_pointer
-    );
-    assert_eq!(reopened_replay.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(reopened_replay.package())?, bytes);
     Ok(())
 }
 
@@ -769,13 +768,14 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     assert_eq!(changed.diagnostics().touched_components(), 2);
     assert_eq!(changed.diagnostics().deleted_previews(), 3);
     assert!(changed.diagnostics().full_reparse_performed());
+    let changed_bytes = exact_bytes(changed.package())?;
     assert_locality(
         &bytes,
-        changed.package().source_bytes(),
+        &changed_bytes,
         &[SETTINGS_MEMBER, VIEW_STATE_MEMBER],
     )?;
     let target_settings = message_payload(
-        changed.package().source_bytes(),
+        &changed_bytes,
         SETTINGS_MEMBER,
         SETTINGS_IDENTIFIER,
         SETTINGS_MESSAGE_TYPE,
@@ -786,36 +786,22 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     );
     assert_eq!(
         raw_fields(
-            &object_header(
-                changed.package().source_bytes(),
-                SETTINGS_MEMBER,
-                SETTINGS_IDENTIFIER,
-            )?,
+            &object_header(&changed_bytes, SETTINGS_MEMBER, SETTINGS_IDENTIFIER)?,
             99,
         )?,
         raw_fields(&source_header, 99)?
     );
     assert_eq!(
-        message_payload(
-            changed.package().source_bytes(),
-            SETTINGS_MEMBER,
-            SETTINGS_IDENTIFIER,
-            777,
-        )?,
+        message_payload(&changed_bytes, SETTINGS_MEMBER, SETTINGS_IDENTIFIER, 777,)?,
         source_before
     );
     assert_eq!(
-        message_payload(
-            changed.package().source_bytes(),
-            SETTINGS_MEMBER,
-            SETTINGS_IDENTIFIER,
-            778,
-        )?,
+        message_payload(&changed_bytes, SETTINGS_MEMBER, SETTINGS_IDENTIFIER, 778,)?,
         source_after
     );
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             SETTINGS_MEMBER,
             DETACHED_SETTINGS_IDENTIFIER,
             SETTINGS_MESSAGE_TYPE,
@@ -823,7 +809,7 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
         detached_settings
     );
     let target_view = message_payload(
-        changed.package().source_bytes(),
+        &changed_bytes,
         VIEW_STATE_MEMBER,
         VIEW_STATE_ROOT_IDENTIFIER,
         VIEW_STATE_ROOT_MESSAGE_TYPE,
@@ -832,7 +818,7 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     assert_eq!(raw_fields(&target_view, 98)?, raw_fields(&source_view, 98)?);
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             VIEW_STATE_ROOT_IDENTIFIER,
             779,
@@ -841,7 +827,7 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     );
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             VIEW_STATE_ROOT_IDENTIFIER,
             780,
@@ -850,17 +836,15 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     );
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             LAYOUT_STATE_IDENTIFIER,
             10_148,
         )?,
         source_cache
     );
-    let changed_view_archive = Archive::parse(&component_stream(
-        changed.package().source_bytes(),
-        VIEW_STATE_MEMBER,
-    )?)?;
+    let changed_view_archive =
+        Archive::parse(&component_stream(&changed_bytes, VIEW_STATE_MEMBER)?)?;
     let changed_view_object = changed_view_archive
         .object(VIEW_STATE_ROOT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("changed rooted view state is missing"))?;
@@ -882,7 +866,7 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     );
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             DETACHED_VIEW_ROOT_IDENTIFIER,
             VIEW_STATE_ROOT_MESSAGE_TYPE,
@@ -891,7 +875,7 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
     );
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             DETACHED_LAYOUT_STATE_IDENTIFIER,
             10_148,
@@ -899,16 +883,13 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
         detached_cache
     );
     let applied = package.apply_document_settings(changed.patch())?;
-    assert_eq!(
-        applied.package().source_bytes(),
-        changed.package().source_bytes()
-    );
+    assert_eq!(exact_bytes(applied.package())?, changed_bytes);
     let inverse = changed.patch().inverse();
     assert_eq!(inverse.inverse(), changed.patch().clone());
     let restored = changed.package().apply_document_settings(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(restored.package().document_settings()?, before);
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -928,11 +909,12 @@ fn shared_component_combined_change_touches_one_component_and_restores() -> Test
         .edit_document_settings()?
         .set(changed_both(before)?)
         .commit()?;
+    let changed_bytes = exact_bytes(changed.package())?;
     assert_eq!(changed.diagnostics().touched_components(), 1);
-    assert_locality(&bytes, changed.package().source_bytes(), &[DOCUMENT_MEMBER])?;
+    assert_locality(&bytes, &changed_bytes, &[DOCUMENT_MEMBER])?;
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             DOCUMENT_MEMBER,
             DOCUMENT_IDENTIFIER,
             DOCUMENT_MESSAGE_TYPE,
@@ -940,11 +922,7 @@ fn shared_component_combined_change_touches_one_component_and_restores() -> Test
         document_payload
     );
     assert_eq!(
-        object_header(
-            changed.package().source_bytes(),
-            DOCUMENT_MEMBER,
-            DOCUMENT_IDENTIFIER,
-        )?,
+        object_header(&changed_bytes, DOCUMENT_MEMBER, DOCUMENT_IDENTIFIER,)?,
         document_header
     );
     let detached_settings = message_payload(
@@ -955,7 +933,7 @@ fn shared_component_combined_change_touches_one_component_and_restores() -> Test
     )?;
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             DOCUMENT_MEMBER,
             DETACHED_SETTINGS_IDENTIFIER,
             SETTINGS_MESSAGE_TYPE,
@@ -965,7 +943,7 @@ fn shared_component_combined_change_touches_one_component_and_restores() -> Test
     let restored = changed
         .package()
         .apply_document_settings(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     Ok(())
 }
 
@@ -1076,11 +1054,12 @@ fn root_reference_and_header_ownership_must_be_exact() -> TestResult {
         changed_both(before)?
     );
     assert_eq!(
-        changed
-            .package()
-            .apply_document_settings(&changed.patch().inverse())?
-            .package()
-            .source_bytes(),
+        exact_bytes(
+            changed
+                .package()
+                .apply_document_settings(&changed.patch().inverse())?
+                .package(),
+        )?,
         optional_path_absent
     );
     Ok(())
@@ -1119,7 +1098,7 @@ fn unrelated_observer_references_do_not_claim_settings_ownership_and_stay_exact(
     );
     assert_eq!(
         object_bytes(
-            changed.package().source_bytes(),
+            &exact_bytes(changed.package())?,
             SETTINGS_MEMBER,
             OBSERVER_IDENTIFIER,
         )?,
@@ -1127,13 +1106,13 @@ fn unrelated_observer_references_do_not_claim_settings_ownership_and_stay_exact(
     );
     assert_eq!(
         object_header(
-            changed.package().source_bytes(),
+            &exact_bytes(changed.package())?,
             SETTINGS_MEMBER,
             OBSERVER_IDENTIFIER,
         )?,
         observer_header
     );
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -1195,13 +1174,8 @@ fn stale_rooted_cache_headers_and_no_layout_merge_diff_fail_atomically() -> Test
     // ownership. They retain the source bytes even when the cache is stale;
     // only a changed edit must fail closed on that state.
     let stale_noop = Package::from_bytes(&stale_view_root)?;
-    let stale_pointer = stale_noop.source_bytes().as_ptr();
     let stale_noop_commit = stale_noop.edit_document_settings()?.set(before).commit()?;
-    assert_eq!(stale_noop_commit.package().source_bytes(), stale_view_root);
-    assert_eq!(
-        stale_noop_commit.package().source_bytes().as_ptr(),
-        stale_pointer
-    );
+    assert_eq!(exact_bytes(stale_noop_commit.package())?, stale_view_root);
     assert!(!stale_noop_commit.diagnostics().changed());
 
     for adversarial in [
@@ -1281,7 +1255,7 @@ fn unknown_groups_are_read_but_changed_splice_fails_closed() -> TestResult {
             .commit(),
         Err(SettingsError::InvalidSource)
     ));
-    assert_eq!(package.source_bytes(), grouped);
+    assert_eq!(exact_bytes(&package)?, grouped);
     Ok(())
 }
 
@@ -1354,7 +1328,7 @@ fn noncanonical_prefix_and_all_merge_diff_metadata_are_refused_atomically() -> T
             .commit(),
         Err(SettingsError::InvalidSource)
     ));
-    assert_eq!(prefix_package.source_bytes(), prefix);
+    assert_eq!(exact_bytes(&prefix_package)?, prefix);
 
     for malformed in [
         should_merge,
@@ -1376,11 +1350,9 @@ fn legacy_noop_is_exact_but_changed_edit_is_unsupported() -> TestResult {
     let bytes = legacy_package(&flat)?;
     let package = Package::from_bytes(&bytes)?;
     assert_eq!(package.document_settings()?, before);
-    let pointer = package.source_bytes().as_ptr();
     let noop = package.edit_document_settings()?.set(before).commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes().as_ptr(), pointer);
-    assert_eq!(noop.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(noop.package())?, bytes);
     assert!(matches!(
         package
             .edit_document_settings()?
@@ -1388,7 +1360,7 @@ fn legacy_noop_is_exact_but_changed_edit_is_unsupported() -> TestResult {
             .commit(),
         Err(SettingsError::UnsupportedSource)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -1433,7 +1405,7 @@ fn patches_reject_replay_inverse_on_source_tamper_and_competing_targets() -> Tes
         tampered.apply_document_settings(first.patch()),
         Err(SettingsError::PatchConflict)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -1476,7 +1448,7 @@ fn output_limit_is_typed_and_failure_is_atomic() -> TestResult {
         .edit_document_settings()?
         .set(after)
         .commit()?;
-    assert!(grown.package().source_bytes().len() > bytes.len());
+    assert!(exact_bytes(grown.package())?.len() > bytes.len());
 
     let limits = Limits::new(
         u64::try_from(bytes.len())?,
@@ -1493,7 +1465,7 @@ fn output_limit_is_typed_and_failure_is_atomic() -> TestResult {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -1566,6 +1538,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
         .count();
     let after = changed_both(before)?;
     let changed = package.edit_document_settings()?.set(after).commit()?;
+    let changed_bytes = exact_bytes(changed.package())?;
     assert_eq!(changed.package().document_settings()?, after);
     assert_eq!(changed.package().text()?, text);
     assert!(changed.diagnostics().changed());
@@ -1574,7 +1547,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
     assert!(changed.diagnostics().full_reparse_performed());
 
     let (target_settings_component, target_settings_object) =
-        object_location(changed.package().source_bytes(), settings_identifier)?;
+        object_location(&changed_bytes, settings_identifier)?;
     assert_eq!(target_settings_component, settings_component);
     let target_settings_index = target_settings_object
         .messages
@@ -1588,7 +1561,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
     assert_eq!(normalized_target_settings, settings_info);
     assert_eq!(
         header_without_message_lengths(&object_header(
-            changed.package().source_bytes(),
+            &changed_bytes,
             &settings_component,
             settings_identifier,
         )?)?,
@@ -1596,7 +1569,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
     );
 
     let (target_view_component, target_view_root) =
-        object_location(changed.package().source_bytes(), view_root_identifier)?;
+        object_location(&changed_bytes, view_root_identifier)?;
     assert_eq!(target_view_component, view_component);
     let target_view_index = target_view_root
         .messages
@@ -1617,7 +1590,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
     assert_eq!(*target_view_info, expected_view_info);
     for preview in PREVIEW_NAMES {
         assert!(
-            Catalog::from_bytes(changed.package().source_bytes())?
+            Catalog::from_bytes(&changed_bytes)?
                 .iter()
                 .all(|entry| entry.name() != preview)
         );
@@ -1625,7 +1598,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
     let restored = changed
         .package()
         .apply_document_settings(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(restored.package().document_settings()?, before);
     assert_eq!(restored.package().text()?, text);
     Ok(())
@@ -1636,7 +1609,7 @@ fn transactions_are_redacted_send_sync_and_concurrent_changes_are_independent() 
     let before = mixed_settings()?;
     let bytes = synthetic_package(before, true, true)?;
     let package = Arc::new(Package::from_bytes(&bytes)?);
-    let pointer = package.source_bytes().as_ptr();
+    let original_bytes = exact_bytes(package.as_ref())?;
     let options_package = Arc::clone(&package);
     let footnotes_package = Arc::clone(&package);
     let options = std::thread::spawn(move || {
@@ -1665,12 +1638,10 @@ fn transactions_are_redacted_send_sync_and_concurrent_changes_are_independent() 
         footnotes.package().document_settings()?.options(),
         before.options()
     );
-    assert_ne!(
-        options.package().source_bytes(),
-        footnotes.package().source_bytes()
-    );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), pointer);
+    let options_bytes = exact_bytes(options.package())?;
+    let footnotes_bytes = exact_bytes(footnotes.package())?;
+    assert_ne!(options_bytes, footnotes_bytes);
+    assert_eq!(original_bytes, bytes);
 
     let edit_debug = format!("{:?}", package.edit_document_settings()?);
     let patch_debug = format!("{:?}", options.patch());

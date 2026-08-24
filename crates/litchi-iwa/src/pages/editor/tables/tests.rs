@@ -61,7 +61,12 @@ fn set_pages_table_header_settings(
             .set(settings)
             .commit()
             .map_err(|error| Error::InvalidFormat(format!("Pages header settings: {error}")))?;
-        commit.package().source_bytes().to_vec()
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        bytes
     };
     *editor = PagesEditor::from_bytes(&bytes)?;
     Ok(())

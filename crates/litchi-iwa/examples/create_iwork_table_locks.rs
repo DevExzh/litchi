@@ -1,6 +1,5 @@
 //! Create Pages, Numbers, and Keynote files with locked native tables.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
@@ -52,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         focused_pages.edit_body_table_lock(BodyTableSelector::name("Locked Table"))?;
     pages_lock.lock();
     let locked_pages = pages_lock.commit()?;
-    write_bytes_new(&pages_path, locked_pages.package().source_bytes())?;
+    write_package_new(&pages_path, locked_pages.package())?;
     assert_eq!(
         PagesPackage::open(&pages_path)?
             .body_table_lock(BodyTableSelector::name("Locked Table"))?,
@@ -102,13 +101,16 @@ fn write_new(path: &Path, package: &NumbersPackage) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-fn write_bytes_new(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+fn write_package_new(
+    path: &Path,
+    package: &PagesPackage,
+) -> Result<(), Box<dyn std::error::Error>> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
-    temporary.as_file_mut().write_all(bytes)?;
+    package.write_to(temporary.as_file_mut())?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)

@@ -39,6 +39,12 @@ const SETTINGS_FIELDS: [u32; 8] = [17, 18, 19, 20, 21, 22, 26, 28];
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn fixture_path() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/basic.pages")
@@ -651,8 +657,7 @@ fn native_fixture_reads_all_fields_and_exact_transaction_contract() -> TestResul
         package.section_settings(SectionSelector::name("Blank"))?,
         before
     );
-    let source = package.source_bytes().to_vec();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source = exact_bytes(&package)?;
 
     let noop_edit = package.edit_section_settings(SectionSelector::index(0))?;
     assert_eq!(noop_edit.settings(), &before);
@@ -662,13 +667,10 @@ fn native_fixture_reads_all_fields_and_exact_transaction_contract() -> TestResul
     assert_eq!(noop.diagnostics().touched_components(), 0);
     assert_eq!(noop.diagnostics().deleted_previews(), 0);
     assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(noop.package())?, source);
     let replayed_noop = package.apply_section_settings(noop.patch())?;
     assert!(replayed_noop.patch().is_noop());
-    assert_eq!(
-        replayed_noop.package().source_bytes().as_ptr(),
-        source_pointer
-    );
+    assert_eq!(exact_bytes(replayed_noop.package())?, source);
 
     let after = changed_settings()?;
     let changed = package
@@ -687,14 +689,12 @@ fn native_fixture_reads_all_fields_and_exact_transaction_contract() -> TestResul
     assert_eq!(changed.diagnostics().touched_components(), 1);
     assert_eq!(changed.diagnostics().deleted_previews(), 0);
     assert!(changed.diagnostics().full_reparse_performed());
-    assert_one_iwa_member_changed(&source, changed.package().source_bytes())?;
-    assert_previews(changed.package().source_bytes(), true)?;
+    let changed_bytes = exact_bytes(changed.package())?;
+    assert_one_iwa_member_changed(&source, &changed_bytes)?;
+    assert_previews(&changed_bytes, true)?;
 
     let applied = package.apply_section_settings(changed.patch())?;
-    assert_eq!(
-        applied.package().source_bytes(),
-        changed.package().source_bytes()
-    );
+    assert_eq!(exact_bytes(applied.package())?, changed_bytes);
     assert!(matches!(
         changed.package().apply_section_settings(changed.patch()),
         Err(Error::PatchConflict)
@@ -708,7 +708,7 @@ fn native_fixture_reads_all_fields_and_exact_transaction_contract() -> TestResul
         Err(Error::PatchConflict)
     ));
     let restored = changed.package().apply_section_settings(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), source);
+    assert_eq!(exact_bytes(restored.package())?, source);
     assert_eq!(
         restored
             .package()
@@ -745,14 +745,12 @@ fn all_boolean_presence_states_preserve_name_and_pagination() -> TestResult {
                         package.section_settings(SectionSelector::index(0))?,
                         expected
                     );
-                    let pointer = package.source_bytes().as_ptr();
                     let noop = package
                         .edit_section_settings(SectionSelector::name("Alpha"))?
                         .set(expected.clone())?
                         .commit()?;
                     assert!(noop.patch().is_noop());
-                    assert_eq!(noop.package().source_bytes(), bytes);
-                    assert_eq!(noop.package().source_bytes().as_ptr(), pointer);
+                    assert_eq!(exact_bytes(noop.package())?, bytes);
                     assert_eq!(
                         noop.package().section_settings(SectionSelector::index(0))?,
                         expected
@@ -794,7 +792,7 @@ fn first_section_inheritance_changes_fail_before_template_traversal() -> TestRes
                 kind: DependencyKind::PreviousSectionTemplates,
             }
         );
-        assert_eq!(package.source_bytes(), bytes);
+        assert_eq!(exact_bytes(&package)?, bytes);
     }
     Ok(())
 }
@@ -837,7 +835,8 @@ fn changed_aggregate_preserves_opaque_locality_and_inverts_exactly() -> TestResu
     assert_eq!(commit.patch().path().position(), Some(Position::new(0)));
     assert_eq!(commit.patch().before(), &before);
     assert_eq!(commit.patch().after(), &after);
-    assert_changed_locality(&bytes, commit.package().source_bytes())?;
+    let changed_bytes = exact_bytes(commit.package())?;
+    assert_changed_locality(&bytes, &changed_bytes)?;
     assert_eq!(
         commit
             .package()
@@ -848,8 +847,9 @@ fn changed_aggregate_preserves_opaque_locality_and_inverts_exactly() -> TestResu
     let restored = commit
         .package()
         .apply_section_settings(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
-    assert_previews(restored.package().source_bytes(), true)?;
+    let restored_bytes = exact_bytes(restored.package())?;
+    assert_eq!(restored_bytes, bytes);
+    assert_previews(&restored_bytes, true)?;
     Ok(())
 }
 
@@ -872,7 +872,7 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
         Err(Error::AmbiguousSelector { first, duplicate })
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
 
     let first = settings(Some("Alpha"), [None; 4], None, None, None)?;
     let second = settings(Some("Beta"), [None; 4], None, None, None)?;
@@ -888,7 +888,7 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
         .set(first.clone())?
         .commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes(), legacy);
+    assert_eq!(exact_bytes(noop.package())?, legacy);
 
     let changed = settings(
         Some("Alpha"),
@@ -904,7 +904,7 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
             .commit(),
         Err(Error::UnsupportedSource { .. })
     ));
-    assert_eq!(legacy_package.source_bytes(), legacy);
+    assert_eq!(exact_bytes(&legacy_package)?, legacy);
     Ok(())
 }
 
@@ -927,7 +927,7 @@ fn assert_malformed_fails_closed(payload: Vec<u8>, second: &Settings) -> TestRes
         package.edit_section_settings(SectionSelector::index(0)),
         Err(Error::InvalidSource { .. })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
