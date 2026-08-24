@@ -25,6 +25,7 @@ use litchi_iwa_archive::{
     package::{EntryEdit, ExactArtifacts},
 };
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len, wire::WireView};
+use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
     self as metadata_codec, AdditionSaveTokenBatch, Batch as MetadataBatch, ComponentDescriptor,
@@ -812,6 +813,7 @@ fn prove_exclusive_caption_storage(
     caption_info_identifier: u64,
     storage_identifier: u64,
 ) -> Result<(), ChartCaptionError> {
+    prove_exclusive_caption_info_owner(package, chart_identifier, caption_info_identifier)?;
     let mut payload_owner_seen = false;
     let mut metadata_owner_seen = false;
     let mut chart_edge_seen = false;
@@ -917,6 +919,7 @@ fn prove_exclusive_caption_standin(
     chart_identifier: u64,
     standin_identifier: u64,
 ) -> Result<(), ChartCaptionError> {
+    prove_exclusive_caption_info_owner(package, chart_identifier, standin_identifier)?;
     let mut payload_edges = 0usize;
     let mut aggregate_edges = 0usize;
     let mut field_edges = 0usize;
@@ -1006,6 +1009,111 @@ fn prove_exclusive_caption_standin(
     }
 }
 
+/// Prove that the chart-caption edge and its physical metadata owner are
+/// exclusive.  A future message or nested FieldInfo that points at CaptionInfo
+/// is not safe to ignore: replacing the chart edge would otherwise orphan a
+/// live owner or leave an unaccounted alias in the graph.
+fn prove_exclusive_caption_info_owner(
+    package: &Package,
+    chart_identifier: u64,
+    caption_info_identifier: u64,
+) -> Result<(), ChartCaptionError> {
+    let mut payload_edges = 0usize;
+    let mut aggregate_edges = 0usize;
+    let mut field_edges = 0usize;
+    for component in package.state.source.components().iter() {
+        for object in &component.archive().objects {
+            let owner_identifier = object
+                .archive_info
+                .identifier
+                .ok_or(ChartCaptionError::InvalidSource)?;
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ == CHART_MESSAGE_TYPE
+                    && chart_caption_reference(package, &message.data)?
+                        == Some(caption_info_identifier)
+                {
+                    payload_edges = payload_edges
+                        .checked_add(1)
+                        .ok_or(ChartCaptionError::InvalidSource)?;
+                    if owner_identifier != chart_identifier || payload_edges > 1 {
+                        return Err(ChartCaptionError::UnsupportedDependency);
+                    }
+                }
+                let info = object
+                    .archive_info
+                    .message_infos
+                    .get(message_index)
+                    .ok_or(ChartCaptionError::InvalidSource)?;
+                let aggregate_count = info
+                    .object_references
+                    .iter()
+                    .filter(|identifier| **identifier == caption_info_identifier)
+                    .count();
+                let aggregate_data = info
+                    .data_references
+                    .iter()
+                    .filter(|identifier| **identifier == caption_info_identifier)
+                    .count();
+                if aggregate_data != 0 {
+                    return Err(ChartCaptionError::UnsupportedDependency);
+                }
+                let mut local_field_edges = 0usize;
+                for field in &info.field_infos {
+                    let field_count = field
+                        .object_references
+                        .iter()
+                        .filter(|identifier| **identifier == caption_info_identifier)
+                        .count();
+                    let field_data = field
+                        .data_references
+                        .iter()
+                        .filter(|identifier| **identifier == caption_info_identifier)
+                        .count();
+                    if field_data != 0 {
+                        return Err(ChartCaptionError::UnsupportedDependency);
+                    }
+                    if field_count != 0 {
+                        if owner_identifier != chart_identifier
+                            || message.type_ != CHART_MESSAGE_TYPE
+                            || field_count != 1
+                            || !matches!(
+                                field.path.path.as_slice(),
+                                [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
+                            )
+                        {
+                            return Err(ChartCaptionError::UnsupportedDependency);
+                        }
+                        local_field_edges = local_field_edges
+                            .checked_add(field_count)
+                            .ok_or(ChartCaptionError::InvalidSource)?;
+                    }
+                }
+                if aggregate_count != 0 {
+                    if owner_identifier != chart_identifier
+                        || message.type_ != CHART_MESSAGE_TYPE
+                        || aggregate_count != 1
+                    {
+                        return Err(ChartCaptionError::UnsupportedDependency);
+                    }
+                }
+                if aggregate_count != 0 || local_field_edges != 0 {
+                    aggregate_edges = aggregate_edges
+                        .checked_add(aggregate_count)
+                        .ok_or(ChartCaptionError::InvalidSource)?;
+                    field_edges = field_edges
+                        .checked_add(local_field_edges)
+                        .ok_or(ChartCaptionError::InvalidSource)?;
+                }
+            }
+        }
+    }
+    if payload_edges == 1 && aggregate_edges == 1 && field_edges <= 1 {
+        Ok(())
+    } else {
+        Err(ChartCaptionError::InvalidSource)
+    }
+}
+
 fn chart_caption_reference(
     package: &Package,
     payload: &[u8],
@@ -1026,18 +1134,38 @@ fn chart_caption_reference(
     let reference = unique_payload_field(&drawable, 11)?.ok_or(ChartCaptionError::InvalidSource)?;
     let projected = super::validate_reference_payload(reference, limits, "Keynote chart caption")
         .map_err(map_wire_error)?;
-    if projected != identifier {
+    let strict_identifier = reference_identifier(reference, limits)?;
+    if projected != identifier || strict_identifier != identifier {
         return Err(ChartCaptionError::InvalidSource);
     }
-    let view = WireView::parse_with_limits(reference, limits).map_err(map_wire_error)?;
-    for field in view.fields().filter(|field| field.number() == 3) {
+    Ok(Some(identifier))
+}
+
+fn validate_reference_optional_fields(view: &WireView<'_>) -> Result<(), ChartCaptionError> {
+    let mut deprecated_type_seen = false;
+    let mut deprecated_external_seen = false;
+    for field in view.fields() {
+        if !matches!(field.number(), 2 | 3) {
+            continue;
+        }
+        if field.wire_type() != 0 {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        field.validate_canonical_key().map_err(map_wire_error)?;
         let (value, bytes) = decode_varint_from_bytes(field.payload())
             .map_err(|_error| ChartCaptionError::InvalidSource)?;
         if bytes != field.payload().len() || bytes != encoded_len(value) || value != 0 {
             return Err(ChartCaptionError::InvalidSource);
         }
+        if field.number() == 2 {
+            if std::mem::replace(&mut deprecated_type_seen, true) {
+                return Err(ChartCaptionError::InvalidSource);
+            }
+        } else if std::mem::replace(&mut deprecated_external_seen, true) {
+            return Err(ChartCaptionError::InvalidSource);
+        }
     }
-    Ok(Some(identifier))
+    Ok(())
 }
 
 fn unique_payload_field<'a>(
@@ -1049,6 +1177,7 @@ fn unique_payload_field<'a>(
         if selected.is_some() || field.wire_type() != 2 {
             return Err(ChartCaptionError::InvalidSource);
         }
+        field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         selected = Some(field.payload());
     }
@@ -1085,16 +1214,12 @@ fn rewrite_chart_caption_operation(
         {
             return Err(ChartCaptionError::UnsupportedDependency);
         }
-        let deleted = physical_catalog(source).map(preview_count)?;
-        let (package, touched) = super::slide_text::rewrite_owned_storage_text(
-            source,
-            storage,
-            selection.slide_node_identifier,
-            0..end,
-            desired,
-        )
-        .map_err(map_slide_text_error)?;
-        return Ok((package, touched, deleted));
+        if metadata_member_name(physical_catalog(source)?, source).is_ok() {
+            return rewrite_existing_caption_text_with_metadata(
+                source, selection, storage, end, desired,
+            );
+        }
+        return Err(ChartCaptionError::InvalidSource);
     }
 
     let catalog = physical_catalog(source)?;
@@ -1122,18 +1247,25 @@ fn rewrite_chart_caption_operation(
             .map_err(map_core_error)?;
         let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
+        validate_canonical_object_framing(&archive, stream.as_bytes())?;
         archives.push((name.clone(), archive));
     }
 
     let metadata_source = metadata_payload(archive_ref(&archives, &metadata_name)?)?;
     let metadata_facts =
         caption_metadata_facts(source, &metadata_source.2, metadata_locator(&slide_name))?;
-    let slide_selector = metadata_facts.selector(metadata_locator(&slide_name))?;
+    let slide_selector = metadata_facts.selector()?;
     let first_identifier = next_caption_identifier(source, metadata_facts.last_identifier)?;
     let (new_identifiers, replacement_identifier, graph_objects) = if creating {
         let first = first_identifier;
         let ids = CaptionGraphIds::allocate(first)?;
         let theme = caption_theme(source, selection)?;
+        prove_caption_dependencies(
+            source,
+            &metadata_facts,
+            &slide_name,
+            [theme.stylesheet, theme.paragraph_style],
+        )?;
         let width = caption_drawable_width(source, selection)?;
         let objects = caption_graph_objects(
             source,
@@ -1221,6 +1353,86 @@ fn rewrite_chart_caption_operation(
     Ok((candidate, 2, previews.len()))
 }
 
+fn rewrite_existing_caption_text_with_metadata(
+    source: &Package,
+    selection: &CaptionSelection,
+    storage_identifier: u64,
+    end: usize,
+    desired: &str,
+) -> Result<(Package, usize, usize), ChartCaptionError> {
+    let catalog = physical_catalog(source)?;
+    let metadata_name = metadata_member_name(catalog, source)?;
+    let deleted = preview_count(catalog);
+    let (native_candidate, touched) = super::slide_text::rewrite_owned_storage_text(
+        source,
+        storage_identifier,
+        selection.slide_node_identifier,
+        0..end,
+        desired,
+    )
+    .map_err(map_slide_text_error)?;
+    let metadata_archive = archive_for_member(&native_candidate, &metadata_name)?;
+    let metadata_source = metadata_payload(&metadata_archive)?;
+    let metadata_facts = caption_metadata_facts(
+        &native_candidate,
+        &metadata_source.2,
+        metadata_locator(&selection.slide_component_name),
+    )?;
+    let selector = metadata_facts.selector()?;
+    if selector.identifier() != metadata_facts.selected_identifier.unwrap_or_default() {
+        return Err(ChartCaptionError::InvalidSource);
+    }
+    let selectors = [selector];
+    let output = metadata_codec::rewrite_package_metadata_save_tokens(
+        &metadata_source.2,
+        SaveTokenBatch::new(&selectors),
+        metadata_options(&native_candidate, 0)?,
+    )
+    .map_err(map_metadata_error)?
+    .into_bytes();
+    let mut metadata_archive = metadata_archive;
+    replace_metadata_payload(
+        &mut metadata_archive,
+        metadata_source.0,
+        metadata_source.1,
+        output,
+        native_candidate
+            .state
+            .options
+            .archive()
+            .effective_archive_limits()
+            .map_err(map_archive_error)?,
+    )?;
+    let metadata_bytes = metadata_archive
+        .to_bytes_with_limits(
+            native_candidate
+                .state
+                .options
+                .archive()
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
+        .map_err(map_core_error)?;
+    let metadata_compressed = SnappyStream::compress(&metadata_bytes).map_err(map_core_error)?;
+    let edit = EntryEdit::new(metadata_name.as_str(), metadata_compressed.as_slice());
+    let candidate_bytes = physical_catalog(&native_candidate)?
+        .package()
+        .reassemble_with_deletions_to_bytes(
+            std::slice::from_ref(&edit),
+            &[],
+            native_candidate.state.options.archive(),
+        )
+        .map_err(map_archive_error)?;
+    let candidate = Package::from_source_with_options(candidate_bytes.into(), source.state.options)
+        .map_err(map_read_error)?;
+    candidate.validate().map_err(map_read_error)?;
+    // Reopen the metadata route once more before this candidate is returned;
+    // this also enforces canonical object-length prefixes on the changed
+    // metadata member.
+    let _ = archive_for_member(&candidate, &metadata_name)?;
+    Ok((candidate, touched.saturating_add(1), deleted))
+}
+
 fn archive_ref<'a>(
     archives: &'a [(String, Archive)],
     name: &str,
@@ -1268,6 +1480,7 @@ fn metadata_member_name(
             .map_err(map_core_error)?;
         let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
+        validate_canonical_object_framing(&archive, stream.as_bytes())?;
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE {
@@ -1362,20 +1575,58 @@ fn metadata_options(
 struct CaptionMetadataFacts {
     target_locator: String,
     selected_identifier: Option<u64>,
+    selected_locator: Option<String>,
     selected_count: usize,
     uuids: HashSet<(u64, u64)>,
+    components: Vec<CaptionMetadataComponent>,
+    external_references: Vec<CaptionMetadataExternalReference>,
     last_identifier: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CaptionMetadataComponent {
+    identifier: u64,
+    locator: String,
+    current: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CaptionMetadataExternalReference {
+    source_identifier: u64,
+    source_locator: String,
+    source_current: bool,
+    target_component_identifier: u64,
+    object_identifier: Option<u64>,
+    weak: Option<bool>,
+    versioned: bool,
+}
+
 impl CaptionMetadataFacts {
-    fn selector<'a>(&self, locator: &'a str) -> Result<ComponentSelector<'a>, ChartCaptionError> {
+    fn selector(&self) -> Result<ComponentSelector<'_>, ChartCaptionError> {
         if self.selected_count != 1 {
             return Err(ChartCaptionError::InvalidSource);
         }
+        let locator = self
+            .selected_locator
+            .as_deref()
+            .ok_or(ChartCaptionError::InvalidSource)?;
         Ok(ComponentSelector::new(
             self.selected_identifier
                 .ok_or(ChartCaptionError::InvalidSource)?,
             locator,
+        ))
+    }
+
+    fn selected_component(&self) -> Result<(u64, &str), ChartCaptionError> {
+        if self.selected_count != 1 {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        Ok((
+            self.selected_identifier
+                .ok_or(ChartCaptionError::InvalidSource)?,
+            self.selected_locator
+                .as_deref()
+                .ok_or(ChartCaptionError::InvalidSource)?,
         ))
     }
 }
@@ -1385,11 +1636,15 @@ impl PackageMetadataVisitor for CaptionMetadataFacts {
         &mut self,
         component: ComponentDescriptor<'_>,
     ) -> Result<(), metadata_codec::RewriteError> {
-        // The exact locator is checked by `selector`; retain every current
-        // component identifier only through the selected-component callback
-        // installed by `caption_metadata_facts`.
-        if component.is_current() && component.effective_locator() == self.target_locator {
+        let locator = component.effective_locator();
+        self.components.push(CaptionMetadataComponent {
+            identifier: component.identifier(),
+            locator: locator.to_owned(),
+            current: component.is_current(),
+        });
+        if component.is_current() && locator == self.target_locator {
             self.selected_identifier = Some(component.identifier());
+            self.selected_locator = Some(locator.to_owned());
             self.selected_count = self.selected_count.saturating_add(1);
         }
         Ok(())
@@ -1403,6 +1658,24 @@ impl PackageMetadataVisitor for CaptionMetadataFacts {
             .insert((binding.uuid().lower(), binding.uuid().upper()));
         Ok(())
     }
+
+    fn visit_external_reference(
+        &mut self,
+        reference: metadata_codec::ExternalReferenceDescriptor<'_>,
+    ) -> Result<(), metadata_codec::RewriteError> {
+        let source = reference.source();
+        self.external_references
+            .push(CaptionMetadataExternalReference {
+                source_identifier: source.identifier(),
+                source_locator: source.effective_locator().to_owned(),
+                source_current: source.is_current(),
+                target_component_identifier: reference.target_component_identifier(),
+                object_identifier: reference.object_identifier(),
+                weak: reference.is_weak(),
+                versioned: reference.is_versioned(),
+            });
+        Ok(())
+    }
 }
 
 fn caption_metadata_facts(
@@ -1414,14 +1687,102 @@ fn caption_metadata_facts(
     let mut facts = CaptionMetadataFacts {
         target_locator: target_locator.to_owned(),
         selected_identifier: None,
+        selected_locator: None,
         selected_count: 0,
         uuids: HashSet::new(),
+        components: Vec::new(),
+        external_references: Vec::new(),
         last_identifier: 0,
     };
     let inspection = inspect_package_metadata_with_visitor(source, options, &mut facts)
         .map_err(map_metadata_error)?;
     facts.last_identifier = inspection.last_object_identifier();
     Ok(facts)
+}
+
+/// Prove that every caption graph dependency which leaves the selected slide
+/// component is already represented by one exact current Metadata external
+/// reference.  Graph creation is intentionally not allowed to manufacture
+/// registry edges: an unregistered foreign stylesheet/theme/paragraph object
+/// would leave a package whose physical graph and metadata disagree.
+fn prove_caption_dependencies(
+    package: &Package,
+    facts: &CaptionMetadataFacts,
+    slide_component_name: &str,
+    dependencies: [u64; 2],
+) -> Result<(), ChartCaptionError> {
+    let (selected_identifier, selected_locator) = facts.selected_component()?;
+    let mut seen = HashSet::new();
+    for dependency in dependencies {
+        if dependency == 0 || !seen.insert(dependency) {
+            continue;
+        }
+        let mut owner_names = Vec::new();
+        for component in package.state.source.components().iter() {
+            if component
+                .archive()
+                .objects
+                .iter()
+                .any(|object| object.archive_info.identifier == Some(dependency))
+            {
+                owner_names.push(component.name());
+            }
+        }
+        if owner_names.len() != 1 {
+            return Err(ChartCaptionError::UnsupportedDependency);
+        }
+        let owner_name = owner_names[0];
+        if owner_name == slide_component_name {
+            continue;
+        }
+        let (_component_name, _object) = package
+            .object_with_component(dependency)
+            .ok_or(ChartCaptionError::InvalidSource)?;
+        let target_locator = metadata_locator(owner_name);
+        let target_components = facts
+            .components
+            .iter()
+            .filter(|component| component.current && component.locator == target_locator)
+            .collect::<Vec<_>>();
+        // The component identifier is obtained from metadata rather than the
+        // package object index.  There must be one current component at the
+        // exact effective locator; versioned records never authorize a write.
+        if target_components.len() != 1 {
+            return Err(ChartCaptionError::UnsupportedDependency);
+        }
+        let target_identifier = target_components[0].identifier;
+        if facts
+            .components
+            .iter()
+            .filter(|component| component.current && component.identifier == target_identifier)
+            .count()
+            != 1
+        {
+            return Err(ChartCaptionError::UnsupportedDependency);
+        }
+        let mut matching = 0usize;
+        let mut prohibited = false;
+        for reference in &facts.external_references {
+            if reference.source_identifier != selected_identifier
+                || reference.source_locator != selected_locator
+                || reference.target_component_identifier != target_identifier
+                || reference.object_identifier != Some(dependency)
+            {
+                continue;
+            }
+            if !reference.source_current || reference.versioned || reference.weak == Some(true) {
+                prohibited = true;
+            } else {
+                matching = matching
+                    .checked_add(1)
+                    .ok_or(ChartCaptionError::InvalidSource)?;
+            }
+        }
+        if prohibited || matching != 1 {
+            return Err(ChartCaptionError::UnsupportedDependency);
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1667,18 +2028,21 @@ fn reference_identifier(
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<u64, ChartCaptionError> {
     let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
-    let field = view
-        .fields()
-        .find(|field| field.number() == 1)
-        .ok_or(ChartCaptionError::InvalidSource)?;
-    if field.wire_type() != 0 {
-        return Err(ChartCaptionError::InvalidSource);
+    let mut selected = None;
+    for field in view.fields().filter(|field| field.number() == 1) {
+        if selected.is_some() || field.wire_type() != 0 {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        field.validate_canonical_key().map_err(map_wire_error)?;
+        selected = Some(field);
     }
+    let field = selected.ok_or(ChartCaptionError::InvalidSource)?;
     let (value, bytes) =
         decode_varint_from_bytes(field.payload()).map_err(|_| ChartCaptionError::InvalidSource)?;
     if bytes != field.payload().len() || bytes != encoded_len(value) || value == 0 {
         return Err(ChartCaptionError::InvalidSource);
     }
+    validate_reference_optional_fields(&view)?;
     Ok(value)
 }
 
@@ -1692,6 +2056,7 @@ fn first_reference_identifier(
         if field.wire_type() != 2 {
             return Err(ChartCaptionError::InvalidSource);
         }
+        field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         let identifier = reference_identifier(field.payload(), limits)?;
         if first.is_none() {
@@ -1722,10 +2087,15 @@ fn caption_drawable_width(
     let geometry_view = WireView::parse_with_limits(geometry, limits).map_err(map_wire_error)?;
     let size = unique_payload_field(&geometry_view, 2)?.ok_or(ChartCaptionError::InvalidSource)?;
     let size_view = WireView::parse_with_limits(size, limits).map_err(map_wire_error)?;
-    let width = size_view
-        .fields()
-        .find(|field| field.number() == 1 && field.wire_type() == 5)
-        .ok_or(ChartCaptionError::InvalidSource)?;
+    let mut width = None;
+    for field in size_view.fields().filter(|field| field.number() == 1) {
+        if width.is_some() || field.wire_type() != 5 {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        field.validate_canonical_key().map_err(map_wire_error)?;
+        width = Some(field);
+    }
+    let width = width.ok_or(ChartCaptionError::InvalidSource)?;
     if width.payload().len() != 4 {
         return Err(ChartCaptionError::InvalidSource);
     }
@@ -1748,64 +2118,73 @@ fn patch_chart_caption_edge(
     if expected_identifier == replacement_identifier || replacement_identifier == 0 {
         return Err(ChartCaptionError::InvalidSource);
     }
-    let object = archive
-        .object_mut(chart_identifier)
+    let source_object = archive
+        .object(chart_identifier)
         .ok_or(ChartCaptionError::InvalidSource)?;
-    if object.messages.len() != 1 || object.messages[0].type_ != CHART_MESSAGE_TYPE {
+    if source_object.messages.len() != 1 || source_object.messages[0].type_ != CHART_MESSAGE_TYPE {
         return Err(ChartCaptionError::InvalidSource);
     }
-    validate_selected_message_metadata(object, 0)?;
+    validate_selected_message_metadata(source_object, 0)?;
+    let info = source_object
+        .archive_info
+        .message_infos
+        .first()
+        .ok_or(ChartCaptionError::InvalidSource)?;
+    if info.data_references.contains(&expected_identifier)
+        || info.data_references.contains(&replacement_identifier)
+        || info
+            .object_references
+            .iter()
+            .filter(|identifier| **identifier == expected_identifier)
+            .count()
+            != 1
+        || info.object_references.contains(&replacement_identifier)
     {
-        let info = object
-            .archive_info
-            .message_infos
-            .get_mut(0)
-            .ok_or(ChartCaptionError::InvalidSource)?;
-        if info.data_references.contains(&expected_identifier)
-            || info.data_references.contains(&replacement_identifier)
-            || info
-                .object_references
-                .iter()
-                .filter(|identifier| **identifier == expected_identifier)
-                .count()
-                != 1
-            || info.object_references.contains(&replacement_identifier)
+        return Err(ChartCaptionError::UnsupportedDependency);
+    }
+    struct OwnedFieldTransition {
+        path: Vec<u32>,
+        before: Vec<u64>,
+        after: Vec<u64>,
+    }
+    let mut field_states = Vec::new();
+    field_states
+        .try_reserve_exact(info.field_infos.len())
+        .map_err(|_error| ChartCaptionError::Allocation {
+            amount: info.field_infos.len(),
+        })?;
+    for field in &info.field_infos {
+        let count = field
+            .object_references
+            .iter()
+            .filter(|identifier| **identifier == expected_identifier)
+            .count();
+        if field.data_references.contains(&expected_identifier)
+            || field.data_references.contains(&replacement_identifier)
+            || field.object_references.contains(&replacement_identifier)
         {
             return Err(ChartCaptionError::UnsupportedDependency);
         }
-        for field in &mut info.field_infos {
-            let count = field
-                .object_references
-                .iter()
-                .filter(|identifier| **identifier == expected_identifier)
-                .count();
-            if count == 0 {
-                if field.data_references.contains(&expected_identifier) {
-                    return Err(ChartCaptionError::UnsupportedDependency);
-                }
-                continue;
-            }
-            if !matches!(
+        if count != 0
+            && (!matches!(
                 field.path.path.as_slice(),
                 [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
-            ) || count != 1
-                || field.data_references.contains(&expected_identifier)
-            {
-                return Err(ChartCaptionError::UnsupportedDependency);
-            }
-            for identifier in &mut field.object_references {
-                if *identifier == expected_identifier {
-                    *identifier = replacement_identifier;
-                }
-            }
+            ) || count != 1)
+        {
+            return Err(ChartCaptionError::UnsupportedDependency);
         }
-        for identifier in &mut info.object_references {
-            if *identifier == expected_identifier {
-                *identifier = replacement_identifier;
-            }
+        let mut after = field.object_references.clone();
+        after.retain(|identifier| *identifier != expected_identifier);
+        if count != 0 {
+            after.push(replacement_identifier);
         }
+        field_states.push(OwnedFieldTransition {
+            path: field.path.path.clone(),
+            before: field.object_references.clone(),
+            after,
+        });
     }
-    let payload = object.messages[0].data.clone();
+    let payload = source_object.messages[0].data.clone();
     let options = chart_caption_decode_options(package, &payload)?;
     let (rewritten, _) = keynote_chart_caption_codec::rewrite_chart_caption_with_report(
         &payload,
@@ -1813,16 +2192,40 @@ fn patch_chart_caption_edge(
         options,
     )
     .map_err(map_chart_caption_codec_error)?;
-    object
-        .replace_message_preserving_header_with_limits(
+    let aggregate_before = info.object_references.clone();
+    let mut aggregate_after = aggregate_before.clone();
+    aggregate_after.retain(|identifier| *identifier != expected_identifier);
+    aggregate_after.push(replacement_identifier);
+    let fields = field_states
+        .iter()
+        .enumerate()
+        .map(|(field_info_index, field)| FieldObjectReferenceTransition {
+            field_info_index,
+            expected_path: field.path.as_slice(),
+            before: field.before.as_slice(),
+            after: field.after.as_slice(),
+        })
+        .collect::<Vec<_>>();
+    let transition = ObjectReferenceTransition {
+        aggregate_before: aggregate_before.as_slice(),
+        aggregate_after: aggregate_after.as_slice(),
+        fields: fields.as_slice(),
+    };
+    let mut rewritten_object = source_object.clone();
+    rewritten_object
+        .replace_message_transitioning_object_references_preserving_header_with_limits(
             0,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
                 data: rewritten,
             },
+            transition,
             archive_limits,
         )
         .map_err(map_core_error)?;
+    *archive
+        .object_mut(chart_identifier)
+        .ok_or(ChartCaptionError::InvalidSource)? = rewritten_object;
     Ok(())
 }
 
@@ -1949,13 +2352,24 @@ fn archive_for_member(package: &Package, name: &str) -> Result<Archive, ChartCap
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    Archive::parse_with_limits(
+    let archive = Archive::parse_with_limits(
         stream.as_bytes(),
         physical_limits
             .effective_archive_limits()
             .map_err(map_archive_error)?,
     )
-    .map_err(map_core_error)
+    .map_err(map_core_error)?;
+    validate_canonical_object_framing(&archive, stream.as_bytes())?;
+    Ok(archive)
+}
+
+fn validate_canonical_object_framing(
+    archive: &Archive,
+    source: &[u8],
+) -> Result<(), ChartCaptionError> {
+    archive
+        .validate_canonical_object_framing(source)
+        .map_err(map_core_error)
 }
 
 fn verify_caption_candidate(
@@ -2002,14 +2416,24 @@ fn verify_caption_candidate(
         if storage_identifier != target_storage {
             return Err(ChartCaptionError::Verification);
         }
-        super::slide_text::verify_owned_storage_candidate(
-            source,
-            candidate,
-            storage_identifier,
-            before.slide_node_identifier,
-            require_invalidated_previews,
-        )
-        .map_err(map_slide_text_error)?;
+        if metadata_member_name(physical_catalog(source)?, source).is_ok() {
+            verify_existing_text_metadata_candidate(
+                source,
+                candidate,
+                storage_identifier,
+                before.slide_node_identifier,
+                require_invalidated_previews,
+            )?;
+        } else {
+            super::slide_text::verify_owned_storage_candidate(
+                source,
+                candidate,
+                storage_identifier,
+                before.slide_node_identifier,
+                require_invalidated_previews,
+            )
+            .map_err(map_slide_text_error)?;
+        }
     } else {
         verify_graph_transition(source, candidate, before, target)?;
         if require_invalidated_previews
@@ -2022,6 +2446,157 @@ fn verify_caption_candidate(
         }
     }
     Ok(())
+}
+
+fn verify_existing_text_metadata_candidate(
+    source: &Package,
+    candidate: &Package,
+    storage_identifier: u64,
+    slide_node_identifier: u64,
+    require_invalidated_previews: bool,
+) -> Result<(), ChartCaptionError> {
+    let source_catalog = physical_catalog(source)?;
+    let candidate_catalog = physical_catalog(candidate)?;
+    let metadata_name = metadata_member_name(source_catalog, source)?;
+    if metadata_member_name(candidate_catalog, candidate)? != metadata_name
+        || source_catalog.components().len() != candidate_catalog.components().len()
+    {
+        return Err(ChartCaptionError::Verification);
+    }
+    let source_metadata = metadata_payload(&archive_for_member(source, &metadata_name)?)?;
+    let candidate_metadata = metadata_payload(&archive_for_member(candidate, &metadata_name)?)?;
+    if source_metadata.2 == candidate_metadata.2 {
+        return Err(ChartCaptionError::Verification);
+    }
+    let mut storage_seen = false;
+    let mut slide_node_seen = false;
+    let mut metadata_seen = false;
+    for (source_component, candidate_component) in source_catalog
+        .components()
+        .iter()
+        .zip(candidate_catalog.components().iter())
+    {
+        if source_component.name() != candidate_component.name()
+            || source_component.archive().objects.len()
+                != candidate_component.archive().objects.len()
+        {
+            return Err(ChartCaptionError::Verification);
+        }
+        for (source_object, candidate_object) in source_component
+            .archive()
+            .objects
+            .iter()
+            .zip(&candidate_component.archive().objects)
+        {
+            let identifier = source_object
+                .archive_info
+                .identifier
+                .ok_or(ChartCaptionError::Verification)?;
+            if candidate_object.archive_info.identifier != Some(identifier) {
+                return Err(ChartCaptionError::Verification);
+            }
+            if identifier == storage_identifier {
+                if std::mem::replace(&mut storage_seen, true) {
+                    return Err(ChartCaptionError::Verification);
+                }
+                verify_replaced_caption_object(source_object, candidate_object, true)?;
+            } else if identifier == slide_node_identifier {
+                if std::mem::replace(&mut slide_node_seen, true) {
+                    return Err(ChartCaptionError::Verification);
+                }
+                if !source_object.same_content_ignoring_offsets(candidate_object) {
+                    verify_replaced_caption_object(source_object, candidate_object, true)?;
+                }
+                if require_invalidated_previews
+                    && !super::slide_preview::is_invalidated(
+                        candidate_object,
+                        candidate.wire_limits().map_err(map_wire_error)?,
+                    )
+                    .map_err(map_slide_preview_error)?
+                {
+                    return Err(ChartCaptionError::Verification);
+                }
+            } else if identifier == source_metadata.0 {
+                if std::mem::replace(&mut metadata_seen, true) {
+                    return Err(ChartCaptionError::Verification);
+                }
+                verify_replaced_caption_object(source_object, candidate_object, true)?;
+            } else if !source_object.same_content_ignoring_offsets(candidate_object) {
+                return Err(ChartCaptionError::Verification);
+            }
+        }
+    }
+    if !storage_seen || !slide_node_seen || !metadata_seen {
+        return Err(ChartCaptionError::Verification);
+    }
+    if require_invalidated_previews
+        && PREVIEW_ENTRY_NAMES.iter().any(|name| {
+            candidate_catalog
+                .package()
+                .iter()
+                .any(|entry| entry.name() == *name)
+        })
+    {
+        return Err(ChartCaptionError::Verification);
+    }
+    Ok(())
+}
+
+fn verify_replaced_caption_object(
+    source: &ArchiveObject,
+    candidate: &ArchiveObject,
+    require_changed: bool,
+) -> Result<(), ChartCaptionError> {
+    if source.archive_info.identifier != candidate.archive_info.identifier
+        || source.archive_info.should_merge != candidate.archive_info.should_merge
+        || source.messages.len() != candidate.messages.len()
+        || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
+    {
+        return Err(ChartCaptionError::Verification);
+    }
+    let mut changed = 0usize;
+    for ((source_message, candidate_message), (source_info, candidate_info)) in
+        source.messages.iter().zip(&candidate.messages).zip(
+            source
+                .archive_info
+                .message_infos
+                .iter()
+                .zip(&candidate.archive_info.message_infos),
+        )
+    {
+        if source_message.type_ != candidate_message.type_
+            || !message_info_equal_except_length(source_info, candidate_info)
+        {
+            return Err(ChartCaptionError::Verification);
+        }
+        if source_message.data != candidate_message.data {
+            changed = changed
+                .checked_add(1)
+                .ok_or(ChartCaptionError::Verification)?;
+        } else if source_info.length != candidate_info.length {
+            return Err(ChartCaptionError::Verification);
+        }
+    }
+    if require_changed && changed != 1 {
+        return Err(ChartCaptionError::Verification);
+    }
+    Ok(())
+}
+
+fn message_info_equal_except_length(
+    source: &litchi_iwa_core::MessageInfo,
+    candidate: &litchi_iwa_core::MessageInfo,
+) -> bool {
+    source.type_ == candidate.type_
+        && source.versions == candidate.versions
+        && source.field_infos == candidate.field_infos
+        && source.object_references == candidate.object_references
+        && source.data_references == candidate.data_references
+        && source.base_message_index == candidate.base_message_index
+        && source.diff_merge_version == candidate.diff_merge_version
+        && source.diff_field_path == candidate.diff_field_path
+        && source.fields_to_remove == candidate.fields_to_remove
+        && source.diff_read_version == candidate.diff_read_version
 }
 
 fn chart_caption_decode_options(
@@ -2153,6 +2728,14 @@ fn map_rendering_error(
     _error: super::rendering_invalidation::RenderingInvalidationError,
 ) -> ChartCaptionError {
     ChartCaptionError::InvalidSource
+}
+
+fn map_slide_preview_error(error: super::slide_preview::InvalidationError) -> ChartCaptionError {
+    match error {
+        super::slide_preview::InvalidationError::InvalidSource => ChartCaptionError::InvalidSource,
+        super::slide_preview::InvalidationError::Wire(error) => map_wire_error(error),
+        super::slide_preview::InvalidationError::Archive(error) => map_core_error(error),
+    }
 }
 
 fn map_read_error(error: ReadError) -> ChartCaptionError {

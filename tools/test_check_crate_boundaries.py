@@ -10075,6 +10075,19 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "    pub fn commit(self) {}\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool) {\n"
+                "    if !creating && !removing {\n"
+                "        rewrite_package_metadata_save_tokens();\n"
+                "        return Ok(());\n"
+                "    }\n"
+                "    validate_canonical_object_framing();\n"
+                "}\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64) {\n"
+                "    validate_selected_message_metadata();\n"
+                "    let payload = object.messages[0].data.clone();\n"
+                "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header_with_limits(payload);\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -10135,6 +10148,122 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
             self.assertTrue(any("protobuf type" in item for item in violations), violations)
             self.assertTrue(any("alternate alias" in item for item in violations), violations)
+
+    def test_focused_keynote_chart_caption_owner_guards_mask_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
+            library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            owner.parent.mkdir(parents=True)
+            canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+            helper = (
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool) {\n"
+                "    if !creating && !removing {\n"
+                "        rewrite_package_metadata_save_tokens();\n"
+                "        return Ok(());\n"
+                "    }\n"
+                "    validate_canonical_object_framing();\n"
+                "}\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64) {\n"
+                "    validate_selected_message_metadata();\n"
+                "    let payload = object.messages[0].data.clone();\n"
+                "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header_with_limits(payload);\n"
+                "}\n"
+            )
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nimpl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "}\n"
+                "impl ChartCaptionEdit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {}\n"
+                "}\n"
+                + helper,
+                encoding="utf-8",
+            )
+            exports = ", ".join(canonical)
+            package.write_text(
+                "mod slide_chart_caption;\n"
+                f"pub use slide_chart_caption::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            library.write_text(
+                f"pub use package::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "rewrite_package_metadata_save_tokens();", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("advance Metadata save tokens" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "validate_canonical_object_framing();", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("canonical object framing" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn cross_component_caption() { cross_component(); }\n"
+                + "#[cfg(test)]\n"
+                + "fn test_only_bad_transition() {\n"
+                + "    info.object_references.push(7);\n"
+                + "    object.replace_message_preserving_header(message);\n"
+                + "}\n"
+                + "fn bad_transition() {\n"
+                + "    info.object_references.push(7);\n"
+                + "    object.replace_message_preserving_header(message);\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("external-reference attribution" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("MessageInfo reference mutation" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "fn bad_transition() {\n"
+                    "    info.object_references.push(7);\n"
+                    "    object.replace_message_preserving_header(message);\n"
+                    "}\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertFalse(
+                any("MessageInfo reference mutation" in item for item in violations),
+                violations,
+            )
 
     def test_keynote_chart_caption_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
