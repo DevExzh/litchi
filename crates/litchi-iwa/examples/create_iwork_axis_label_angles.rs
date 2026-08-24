@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis label angles")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Axis label angles")?;
     set_keynote_angles(&mut keynote, chart.drawable_object_id)?;
     keynote.save(output.join("axis-label-angles-crate.key"))?;
 

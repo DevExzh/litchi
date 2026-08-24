@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 760.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "One visible leader line")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "One visible leader line")?;
     keynote.set_slide_chart_pie_leader_line_visibilities(
         0,
         chart.drawable_object_id,

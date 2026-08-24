@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 760.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "315.5° radar rotation")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "315.5° radar rotation")?;
     keynote.set_slide_chart_radar_start_angle(
         0,
         chart.drawable_object_id,

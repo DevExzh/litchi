@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Scatter connections")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Scatter connections")?;
     keynote.set_slide_chart_series_connection_lines(
         0,
         chart.drawable_object_id,

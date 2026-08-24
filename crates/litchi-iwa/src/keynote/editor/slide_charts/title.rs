@@ -1,50 +1,8 @@
-//! Native title CRUD for Keynote slide charts.
+//! Selector-first native title CRUD for Keynote slide charts.
 
 use super::*;
 
 impl KeynoteEditor {
-    /// Read the chart title shown by Keynote for one slide chart.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Keynote chart-title API; use slide_chart_title_by_selector with ChartSelector; retained for migration-host compatibility"
-    )]
-    pub fn slide_chart_title(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<Option<String>> {
-        slide_chart_title(self, slide_index, drawable_object_id)
-    }
-
-    /// Create or replace the native title shown by Keynote for one slide chart.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Keynote chart-title API; use set_slide_chart_title_by_selector with ChartSelector; retained for migration-host compatibility"
-    )]
-    pub fn set_slide_chart_title(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        title: impl AsRef<str>,
-    ) -> Result<()> {
-        set_slide_chart_title(self, slide_index, drawable_object_id, title)
-    }
-
-    /// Remove the native title shown by Keynote for one slide chart.
-    ///
-    /// Returns whether a visible title was present.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Keynote chart-title API; use remove_slide_chart_title_by_selector with ChartSelector; retained for migration-host compatibility"
-    )]
-    pub fn remove_slide_chart_title(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<bool> {
-        remove_slide_chart_title(self, slide_index, drawable_object_id)
-    }
-
     /// Read the chart title for a chart selected on one slide.
     ///
     /// The host graph is checked first so malformed ownership or title
@@ -147,83 +105,4 @@ fn map_focused_chart_title_read_error(error: litchi_keynote::ReadError) -> Error
     Error::InvalidFormat(format!(
         "focused Keynote chart title source failed: {error}"
     ))
-}
-
-pub(super) fn slide_chart_title(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<Option<String>> {
-    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
-    focused_chart_title_package(editor)?
-        .slide_chart_title(
-            litchi_core::Position::new(slide_index),
-            ChartSelector::index(chart_position),
-        )
-        .map_err(map_focused_chart_title_error)
-}
-
-fn set_slide_chart_title(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-    title: impl AsRef<str>,
-) -> Result<()> {
-    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
-    let package = focused_chart_title_package(editor)?;
-    let edit = package
-        .edit_slide_chart_title(
-            litchi_core::Position::new(slide_index),
-            ChartSelector::index(chart_position),
-        )
-        .map_err(map_focused_chart_title_error)?
-        .set(title)
-        .map_err(map_focused_chart_title_error)?;
-    let commit = edit.commit().map_err(map_focused_chart_title_error)?;
-    if commit.patch().is_noop() {
-        return Ok(());
-    }
-    replace_from_focused_chart_title_commit(editor, commit)
-}
-
-fn remove_slide_chart_title(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<bool> {
-    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
-    let package = focused_chart_title_package(editor)?;
-    let edit = package
-        .edit_slide_chart_title(
-            litchi_core::Position::new(slide_index),
-            ChartSelector::index(chart_position),
-        )
-        .map_err(map_focused_chart_title_error)?;
-    let had_visible_title = edit.before().is_some();
-    let commit = edit
-        .clear()
-        .map_err(map_focused_chart_title_error)?
-        .commit()
-        .map_err(map_focused_chart_title_error)?;
-    if commit.patch().is_noop() {
-        return Ok(false);
-    }
-    replace_from_focused_chart_title_commit(editor, commit)?;
-    Ok(had_visible_title)
-}
-
-fn chart_position_for_identifier(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<usize> {
-    editor
-        .slide_charts(slide_index)?
-        .iter()
-        .position(|chart| chart.drawable_object_id == drawable_object_id)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote slide {slide_index} has no chart {drawable_object_id}"
-            ))
-        })
 }

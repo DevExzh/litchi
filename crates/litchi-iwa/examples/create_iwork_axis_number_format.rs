@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis number format")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Axis number format")?;
     assert_eq!(
         keynote.slide_chart_axis_number_format(0, chart.drawable_object_id, Axis::Value)?,
         NumberFormat::AXIS_NATIVE_DEFAULT

@@ -287,6 +287,27 @@ IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS = frozenset(
         "remove_slide_chart_title_by_selector",
     }
 )
+IWA_KEYNOTE_CHART_TITLE_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|chart|native)[A-Za-z_]*(?:id|identifier))"
+    r"[ \t\r\n]*:[ \t\r\n]*u64\b"
+)
+IWA_KEYNOTE_CHART_TITLE_RAW_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_chart_title|"
+    r"set_slide_chart_title|remove_slide_chart_title)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_CHART_TITLE_IDENTIFIER_POSITION_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"chart_position_for_identifier|chart_position_from_identifier|"
+    r"chart_index_for_identifier|chart_index_from_identifier|"
+    r"position_for_identifier|position_from_identifier|"
+    r"index_for_identifier|index_from_identifier"
+    r")(?![A-Za-z0-9_])|"
+    r"\.position[ \t\r\n]*\([ \t\r\n]*\|[^{}\n|]{0,400}\b(?:"
+    r"drawable_object_id|chart_object_id|native_id|object_id|identifier"
+    r")[^{}\n|]{0,400}\)"
+)
 KEYNOTE_CHART_CAPTION_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_caption|"
     r"remove_slide_chart_caption)(?![A-Za-z0-9_])[ \t\r\n]*\("
@@ -13527,19 +13548,29 @@ def audit_keynote_chart_title_legacy_calls(root: Path = ROOT) -> list[str]:
 
 
 def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str]:
-    """Keep raw-ID chart titles deprecated beside the typed selector facade."""
+    """Require a selector-first chart-title bridge in the compatibility host.
+
+    The focused package owns chart-title semantics now, so the host must not
+    retain either public or private raw-ID wrappers.  This audit deliberately
+    works on the production slice of ``title.rs``: source-built regressions may
+    keep compatibility helpers under ``#[cfg(test)]``, but those items must not
+    be able to hide a later production declaration or call.
+    """
 
     path = root / IWA_KEYNOTE_CHART_TITLE_SOURCE
     if not path.is_file():
         return []
 
-    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+    production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    source = _mask_rust_non_code(production_source)
     violations: list[str] = []
     declaration = re.compile(
-        r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
-        r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
     )
-    declarations = {match.group(1) for match in declaration.finditer(source)}
+    declaration_matches = list(declaration.finditer(source))
+    declarations = {match.group(1) for match in declaration_matches}
 
     for name in sorted(IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS - declarations):
         violations.append(
@@ -13547,32 +13578,71 @@ def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str
             f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}"
         )
 
-    for name in sorted(IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS - declarations):
-        violations.append(
-            "litchi-iwa Keynote chart-title legacy method is missing "
-            f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}"
-        )
-
-    for match in declaration.finditer(source):
+    for match in declaration_matches:
         name = match.group(1)
-        if name not in IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS:
-            continue
-
-        prefix = source[: match.start()]
-        attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
-        nearest = attributes[-1] if attributes else None
-        deprecated = False
-        if nearest is not None:
-            attribute = prefix[nearest.start() :]
-            if re.match(r"[ \t]*#[ \t]*\[[ \t]*deprecated\b", attribute):
-                closing = attribute.find("]")
-                deprecated = closing >= 0 and not attribute[closing + 1 :].strip()
-        if not deprecated:
-            line_number = source.count("\n", 0, match.start()) + 1
+        line_number = source.count("\n", 0, match.start()) + 1
+        if name in IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS:
             violations.append(
-                "litchi-iwa Keynote chart-title legacy method must remain deprecated "
+                "litchi-iwa Keynote chart-title raw-ID method must be retired "
                 f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
             )
+
+        if name not in IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS:
+            continue
+        opening = source.find("{", match.end())
+        signature = source[match.start() : opening if opening >= 0 else len(source)]
+        if not re.search(
+            r"\bselector\b[ \t\r\n]*:[^,)]*\bChartSelector\b", signature
+        ):
+            violations.append(
+                "litchi-iwa Keynote chart-title selector method must accept a "
+                f"ChartSelector parameter {name}: "
+                f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+            )
+
+    for match in IWA_KEYNOTE_CHART_TITLE_RAW_ID_PARAMETER.finditer(source):
+        line_number = source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote chart-title raw identifier parameter must be retired "
+            f"{match.group(0).strip()}: "
+            f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+        )
+
+    for match in IWA_KEYNOTE_CHART_TITLE_IDENTIFIER_POSITION_FALLBACK.finditer(source):
+        line_number = source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote chart-title identifier-to-position fallback must be "
+            f"retired {match.group(0).strip()}: "
+            f"{IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+        )
+
+    for match in IWA_KEYNOTE_CHART_TITLE_RAW_ID_CALL.finditer(source):
+        line_start = source.rfind("\n", 0, match.start()) + 1
+        line_end = source.find("\n", match.end())
+        if line_end < 0:
+            line_end = len(source)
+        line = source[line_start:line_end]
+        # A declaration is already reported above.  The focused Package's
+        # selector getter has the same semantic name as the old host getter;
+        # recognize that qualified call only when it is visibly fed the
+        # borrowed selector, never a raw object identifier or position.
+        if re.search(r"\bfn[ \t\r\n]+slide_chart_title\b", line):
+            continue
+        if match.group("method") == "slide_chart_title":
+            prefix = source[max(0, match.start() - 160) : match.start()]
+            suffix = source[match.end() : match.end() + 320]
+            if (
+                "focused_chart_title_package" in prefix
+                and re.search(r"\bselector\b", suffix)
+                and "drawable_object_id" not in suffix
+                and "chart_position" not in suffix
+            ):
+                continue
+        line_number = source.count("\n", 0, match.start("method")) + 1
+        violations.append(
+            "litchi-iwa Keynote chart-title raw-ID call must be retired "
+            f"{match.group('method')}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+        )
 
     return sorted(set(violations))
 

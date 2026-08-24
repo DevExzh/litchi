@@ -147,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Typed data symbols")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Typed data symbols")?;
     keynote.set_slide_chart_series_symbols(0, chart.drawable_object_id, &symbols)?;
     keynote.set_slide_chart_series_symbol_fills(0, chart.drawable_object_id, &fills)?;
     keynote.set_slide_chart_series_symbol_outlines(0, chart.drawable_object_id, &outlines)?;

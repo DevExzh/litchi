@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Every third category")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Every third category")?;
     keynote.set_slide_chart_category_label_layout(0, chart.drawable_object_id, layout)?;
     assert_eq!(
         keynote.slide_chart_category_label_layout(0, chart.drawable_object_id)?,

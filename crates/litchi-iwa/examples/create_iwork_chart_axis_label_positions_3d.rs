@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Leading axis labels")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Leading axis labels")?;
     keynote.set_slide_chart_3d_value_axis_label_position(
         0,
         chart.drawable_object_id,
