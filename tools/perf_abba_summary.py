@@ -2786,6 +2786,7 @@ def _validate_report(
     indexed = _index_results(root, label)
     _validate_opc_source_overlay_result_rows(indexed, configuration, label)
     _validate_docx_section_layout_result_rows(indexed, configuration, label)
+    _validate_doc_owner_public_phases_result_rows(indexed, configuration, label)
     _validate_xls_numeric_source_summary(indexed, label)
     _validate_xls_numeric_operation_evidence(
         indexed,
@@ -3051,6 +3052,170 @@ _DOCX_SECTION_LAYOUT_KEYS = frozenset(
         "output_sha256",
         *_DOCX_SECTION_LAYOUT_GATE_FIELDS,
     }
+)
+
+DOC_OWNER_PUBLIC_PHASES_CASE = "doc_owner_public_phases"
+DOC_OWNER_PUBLIC_PHASES_SHAPES = ("tiny", "large", "payload-heavy")
+DOC_OWNER_PUBLIC_PHASES_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
+    "tiny": {
+        "name": "doc-tiny",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "tiny",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 4096,
+        "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "uncompressed_payload_bytes": 189,
+        "archive_bytes": 15360,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "xlsx": None,
+    },
+    "large": {
+        "name": "doc-large",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "large",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 512,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 81920,
+        "target_payload_sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+        "uncompressed_payload_bytes": 32256,
+        "archive_bytes": 97792,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "xlsx": None,
+    },
+    "payload-heavy": {
+        "name": "doc-payload-heavy",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "payload-heavy",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 128,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 5128192,
+        "target_payload_sha256": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+        "uncompressed_payload_bytes": 2560000,
+        "archive_bytes": 5179904,
+        "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "xlsx": None,
+    },
+}
+DOC_OWNER_PUBLIC_PHASES_EXPECTED_OUTPUT_SHA256 = {
+    "tiny": "838050ed6cf58507379f3d53a9024e8496d10cf44f545c9801ca9a5603c842c1",
+    "large": "0431135835e409f7eff13a9ced95e193e1379586d2b421f34c2ab7faaf8c318d",
+    "payload-heavy": "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4",
+}
+DOC_OWNER_PUBLIC_PHASES_EXPECTED_CANDIDATE_BYTES = {
+    "tiny": 16896,
+    "large": 108032,
+    "payload-heavy": 5183488,
+}
+DOC_OWNER_PUBLIC_PHASES_EXPECTED_FINGERPRINTS = {
+    "tiny": (18209643003370848766, 15087050281001945538),
+    "large": (10943782394183765603, 9002277428075739775),
+    "payload-heavy": (8038895374813630357, 10924298101297215626),
+}
+_DOC_OWNER_PUBLIC_PHASES_IMPLEMENTATION = (
+    "litchi-doc::body_text::Snapshot/Edit profiled owner-public seam"
+)
+_DOC_OWNER_PUBLIC_PHASES_TIMING_SCOPE = (
+    "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions"
+)
+_DOC_OWNER_PUBLIC_PHASES_PERFORMANCE_CLAIM = (
+    "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made"
+)
+_DOC_OWNER_PUBLIC_PHASE_VECTOR_FIELDS = (
+    "open_owner_ns",
+    "open_public_ns",
+    "open_retain_ns",
+    "edit_authoring_ns",
+    "edit_new_ns",
+    "edit_replacement_ns",
+    "edit_finish_ns",
+    "edit_final_owner_ns",
+    "edit_final_public_ns",
+    "edit_final_retain_ns",
+    "edit_patch_ns",
+    "edit_commit_outer_ns",
+    "edit_output_materialization_ns",
+    "open_attributed_total_ns",
+    "edit_attributed_total_ns",
+    "open_outer_ns",
+    "edit_total_ns",
+    "measured_total_ns",
+    "same_lineage_apply_ns",
+    "deferred_fingerprint_ns",
+    "workflow_no_diagnostic_ns",
+    "workflow_with_fingerprint_demand_ns",
+    "attributed_total_ns",
+    "unattributed_ns",
+)
+_DOC_OWNER_PUBLIC_PHASE_IDENTITY_VECTOR_FIELDS = (
+    "source_fingerprints",
+    "target_fingerprints",
+    "output_sha256",
+)
+_DOC_OWNER_PUBLIC_PHASE_GATE_FIELDS = (
+    "event_order_cardinality_verified",
+    "source_semantics_verified",
+    "changed_semantics_verified",
+    "exact_noop_verified",
+    "patch_round_trip_verified",
+    "same_lineage_apply_verified",
+    "reopened_source_apply_verified",
+    "independent_fingerprints_verified",
+    "workflow_arithmetic_verified",
+    "inverse_round_trip_verified",
+    "stale_source_refusal_verified",
+    "malformed_source_refusal_verified",
+    "typed_edit_refusal_verified",
+    "output_hash_verified",
+    "untouched_streams_verified",
+)
+_DOC_OWNER_PUBLIC_PHASE_ROOT_SOURCE_VECTOR_FIELDS = (
+    "read_calls",
+    "read_bytes",
+    "ordinary_payload_read_calls",
+    "ordinary_payload_read_bytes",
+    "max_in_flight_reads",
+)
+_DOC_OWNER_PUBLIC_PHASE_SOURCE_KEYS = frozenset(
+    {
+        DOC_OWNER_PUBLIC_PHASES_CASE,
+        *_DOC_OWNER_PUBLIC_PHASE_ROOT_SOURCE_VECTOR_FIELDS,
+    }
+)
+_DOC_OWNER_PUBLIC_PHASE_KEYS = frozenset(
+    {
+        "implementation",
+        "timing_scope",
+        "performance_claim",
+        "selected_paragraph",
+        "source_bytes",
+        "candidate_bytes",
+        "source_archive_sha256",
+        "expected_output_sha256",
+        "expected_source_fingerprint",
+        "expected_target_fingerprint",
+        *_DOC_OWNER_PUBLIC_PHASE_VECTOR_FIELDS,
+        *_DOC_OWNER_PUBLIC_PHASE_IDENTITY_VECTOR_FIELDS,
+        "gates",
+    }
+)
+_DOC_OWNER_PUBLIC_PHASE_DYNAMIC_FIELDS = frozenset(
+    _DOC_OWNER_PUBLIC_PHASE_VECTOR_FIELDS
 )
 
 
@@ -3732,6 +3897,356 @@ def _validate_docx_section_layout_result_rows(
         )
 
 
+def _validate_doc_owner_public_phases_corpus(
+    corpus: Mapping[str, Any], location: str
+) -> str:
+    shape = corpus.get("shape")
+    expected = DOC_OWNER_PUBLIC_PHASES_CORPUS_IDENTITIES.get(shape)
+    if expected is None:
+        raise AbbaSummaryInputError(
+            f"{location} shape must be one of {list(DOC_OWNER_PUBLIC_PHASES_SHAPES)!r}"
+        )
+    if set(corpus) != set(expected):
+        missing = sorted(set(expected) - set(corpus))
+        unknown = sorted(set(corpus) - set(expected))
+        raise AbbaSummaryInputError(
+            f"{location} schema mismatch (missing={missing!r}, unknown={unknown!r})"
+        )
+    for field, expected_value in expected.items():
+        if corpus[field] != expected_value:
+            raise AbbaSummaryInputError(
+                f"{location}.{field} disagrees with the pinned DOC owner/public identity"
+            )
+    return shape
+
+
+def _validate_doc_owner_public_phases(
+    value: Any,
+    location: str,
+    *,
+    corpus: Mapping[str, Any],
+    samples_per_case: int,
+    elapsed_samples: Sequence[Any],
+    sample_order: Sequence[Any],
+    source: Mapping[str, Any],
+    sink: Any,
+    output_sha256: Any,
+) -> None:
+    overlay = _require_object(value, location)
+    if set(overlay) != _DOC_OWNER_PUBLIC_PHASE_KEYS:
+        missing = sorted(_DOC_OWNER_PUBLIC_PHASE_KEYS - set(overlay))
+        unknown = sorted(set(overlay) - _DOC_OWNER_PUBLIC_PHASE_KEYS)
+        raise AbbaSummaryInputError(
+            f"{location} schema mismatch (missing={missing!r}, unknown={unknown!r})"
+        )
+    shape = _validate_doc_owner_public_phases_corpus(
+        corpus, f"{location}.corpus"
+    )
+    expected_corpus = DOC_OWNER_PUBLIC_PHASES_CORPUS_IDENTITIES[shape]
+    expected_output = DOC_OWNER_PUBLIC_PHASES_EXPECTED_OUTPUT_SHA256[shape]
+    expected_source_fingerprint, expected_target_fingerprint = (
+        DOC_OWNER_PUBLIC_PHASES_EXPECTED_FINGERPRINTS[shape]
+    )
+
+    if (
+        isinstance(samples_per_case, bool)
+        or not isinstance(samples_per_case, int)
+        or samples_per_case <= 0
+    ):
+        raise AbbaSummaryInputError(f"{location} samples_per_case must be positive")
+    if not isinstance(elapsed_samples, list):
+        raise AbbaSummaryInputError(f"{location}.elapsed_ns.samples must be a list")
+    elapsed = [
+        _u64(item, f"{location}.elapsed_ns.samples[{index}]")
+        for index, item in enumerate(elapsed_samples)
+    ]
+    if len(elapsed) != samples_per_case:
+        raise AbbaSummaryInputError(
+            f"{location} vectors must contain exactly {samples_per_case} samples"
+        )
+    if elapsed != sorted(elapsed):
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.samples must be sorted ascending"
+        )
+
+    def exact_permutation(raw: Any, field: str) -> list[int]:
+        if (
+            not isinstance(raw, list)
+            or len(raw) != samples_per_case
+            or any(
+                isinstance(item, bool)
+                or not isinstance(item, int)
+                or item < 0
+                or item >= samples_per_case
+                for item in raw
+            )
+            or sorted(raw) != list(range(samples_per_case))
+        ):
+            raise AbbaSummaryInputError(
+                f"{location}.{field} must be an exact sample permutation"
+            )
+        return raw
+
+    elapsed_order = exact_permutation(sample_order, "elapsed_ns.sample_order")
+    source_object = _require_object(source, f"{location}.result.source")
+    if set(source_object) != _DOC_OWNER_PUBLIC_PHASE_SOURCE_KEYS:
+        missing = sorted(_DOC_OWNER_PUBLIC_PHASE_SOURCE_KEYS - set(source_object))
+        unknown = sorted(set(source_object) - _DOC_OWNER_PUBLIC_PHASE_SOURCE_KEYS)
+        raise AbbaSummaryInputError(
+            f"{location}.result.source schema mismatch "
+            f"(missing={missing!r}, unknown={unknown!r})"
+        )
+    for field in _DOC_OWNER_PUBLIC_PHASE_ROOT_SOURCE_VECTOR_FIELDS:
+        raw = source_object[field]
+        if raw != []:
+            raise AbbaSummaryInputError(
+                f"{location}.result.source.{field} must be empty for the DOC owner/public selector"
+            )
+    if sink is not None:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink must be null for the DOC owner/public selector"
+        )
+
+    if overlay["implementation"] != _DOC_OWNER_PUBLIC_PHASES_IMPLEMENTATION:
+        raise AbbaSummaryInputError(
+            f"{location}.implementation does not match the DOC owner/public publisher"
+        )
+    if overlay["timing_scope"] != _DOC_OWNER_PUBLIC_PHASES_TIMING_SCOPE:
+        raise AbbaSummaryInputError(
+            f"{location}.timing_scope does not match the named phases"
+        )
+    if overlay["performance_claim"] != _DOC_OWNER_PUBLIC_PHASES_PERFORMANCE_CLAIM:
+        raise AbbaSummaryInputError(
+            f"{location}.performance_claim does not match the attribution-only claim"
+        )
+    selected_paragraph = _u64(
+        overlay["selected_paragraph"], f"{location}.selected_paragraph"
+    )
+    if selected_paragraph != expected_corpus["entry_count"] // 2:
+        raise AbbaSummaryInputError(
+            f"{location}.selected_paragraph disagrees with the fixed corpus identity"
+        )
+    source_bytes = _u64(
+        overlay["source_bytes"], f"{location}.source_bytes", positive=True
+    )
+    if source_bytes != expected_corpus["archive_bytes"]:
+        raise AbbaSummaryInputError(
+            f"{location}.source_bytes disagrees with corpus.archive_bytes"
+        )
+    candidate_bytes = _u64(
+        overlay["candidate_bytes"], f"{location}.candidate_bytes", positive=True
+    )
+    if candidate_bytes != DOC_OWNER_PUBLIC_PHASES_EXPECTED_CANDIDATE_BYTES[shape]:
+        raise AbbaSummaryInputError(
+            f"{location}.candidate_bytes disagrees with the pinned output identity"
+        )
+    if candidate_bytes <= source_bytes:
+        raise AbbaSummaryInputError(
+            f"{location}.candidate_bytes must exceed source_bytes for the changed edit"
+        )
+    source_digest = _validate_output_sha256(
+        overlay["source_archive_sha256"], f"{location}.source_archive_sha256"
+    )
+    if source_digest != expected_corpus["archive_sha256"]:
+        raise AbbaSummaryInputError(
+            f"{location}.source_archive_sha256 disagrees with corpus.archive_sha256"
+        )
+    expected_output_digest = _validate_output_sha256(
+        overlay["expected_output_sha256"], f"{location}.expected_output_sha256"
+    )
+    if expected_output_digest != expected_output:
+        raise AbbaSummaryInputError(
+            f"{location}.expected_output_sha256 disagrees with the pinned output identity"
+        )
+    result_output_digest = _validate_output_sha256(
+        output_sha256, f"{location}.result.output_sha256"
+    )
+    if result_output_digest != expected_output_digest:
+        raise AbbaSummaryInputError(
+            f"{location}.expected_output_sha256 disagrees with result.output_sha256"
+        )
+    source_fingerprint = _u64(
+        overlay["expected_source_fingerprint"],
+        f"{location}.expected_source_fingerprint",
+    )
+    target_fingerprint = _u64(
+        overlay["expected_target_fingerprint"],
+        f"{location}.expected_target_fingerprint",
+    )
+    if source_fingerprint != expected_source_fingerprint:
+        raise AbbaSummaryInputError(
+            f"{location}.expected_source_fingerprint disagrees with the pinned identity"
+        )
+    if target_fingerprint != expected_target_fingerprint:
+        raise AbbaSummaryInputError(
+            f"{location}.expected_target_fingerprint disagrees with the pinned identity"
+        )
+
+    vectors: dict[str, list[Any]] = {}
+
+    def vector(field: str) -> list[Any]:
+        raw = overlay[field]
+        if not isinstance(raw, list) or len(raw) != samples_per_case:
+            raise AbbaSummaryInputError(
+                f"{location}.{field} must contain exactly {samples_per_case} samples"
+            )
+        values: list[Any] = []
+        for index, item in enumerate(raw):
+            if field in {"output_sha256"}:
+                values.append(
+                    _validate_output_sha256(item, f"{location}.{field}[{index}]")
+                )
+            else:
+                values.append(_u64(item, f"{location}.{field}[{index}]"))
+        vectors[field] = values
+        return values
+
+    for field in _DOC_OWNER_PUBLIC_PHASE_VECTOR_FIELDS:
+        vector(field)
+    for field in _DOC_OWNER_PUBLIC_PHASE_IDENTITY_VECTOR_FIELDS:
+        vector(field)
+    if any(
+        value != expected_source_fingerprint
+        for value in vectors["source_fingerprints"]
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.source_fingerprints disagrees with expected_source_fingerprint"
+        )
+    if any(
+        value != expected_target_fingerprint
+        for value in vectors["target_fingerprints"]
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.target_fingerprints disagrees with expected_target_fingerprint"
+        )
+    if any(value != expected_output_digest for value in vectors["output_sha256"]):
+        raise AbbaSummaryInputError(
+            f"{location}.output_sha256 disagrees with result.output_sha256"
+        )
+
+    gates = _require_object(overlay["gates"], f"{location}.gates")
+    if set(gates) != set(_DOC_OWNER_PUBLIC_PHASE_GATE_FIELDS):
+        missing = sorted(set(_DOC_OWNER_PUBLIC_PHASE_GATE_FIELDS) - set(gates))
+        unknown = sorted(set(gates) - set(_DOC_OWNER_PUBLIC_PHASE_GATE_FIELDS))
+        raise AbbaSummaryInputError(
+            f"{location}.gates schema mismatch "
+            f"(missing={missing!r}, unknown={unknown!r})"
+        )
+    for field in _DOC_OWNER_PUBLIC_PHASE_GATE_FIELDS:
+        if not _required_bool(gates[field], f"{location}.gates", field):
+            raise AbbaSummaryInputError(f"{location}.gates.{field} must be true")
+
+    def ordered(field: str, index: int) -> int:
+        return vectors[field][elapsed_order[index]]
+
+    def phase_sum(target: str, parts: Sequence[str], index: int) -> None:
+        total = sum(ordered(field, index) for field in parts)
+        if total > U64_MAX or ordered(target, index) != total:
+            raise AbbaSummaryInputError(
+                f"{location}.{target} phase sum does not match its component phases"
+            )
+
+    for index, elapsed_value in enumerate(elapsed):
+        measured = ordered("measured_total_ns", index)
+        if measured != elapsed_value:
+            raise AbbaSummaryInputError(
+                f"{location}.measured_total_ns must bind to sorted elapsed_ns.samples"
+            )
+        phase_sum(
+            "open_attributed_total_ns",
+            ("open_owner_ns", "open_public_ns", "open_retain_ns"),
+            index,
+        )
+        phase_sum(
+            "edit_authoring_ns", ("edit_new_ns", "edit_replacement_ns"), index
+        )
+        phase_sum(
+            "edit_attributed_total_ns",
+            (
+                "edit_authoring_ns",
+                "edit_finish_ns",
+                "edit_final_owner_ns",
+                "edit_final_public_ns",
+                "edit_final_retain_ns",
+                "edit_patch_ns",
+                "edit_output_materialization_ns",
+            ),
+            index,
+        )
+        phase_sum(
+            "edit_total_ns",
+            ("edit_authoring_ns", "edit_commit_outer_ns", "edit_output_materialization_ns"),
+            index,
+        )
+        phase_sum(
+            "attributed_total_ns",
+            ("open_attributed_total_ns", "edit_attributed_total_ns"),
+            index,
+        )
+        attributed = ordered("attributed_total_ns", index)
+        if attributed > measured or ordered("unattributed_ns", index) != measured - attributed:
+            raise AbbaSummaryInputError(
+                f"{location}.unattributed_ns does not complete measured_total_ns"
+            )
+        if ordered("open_attributed_total_ns", index) > ordered("open_outer_ns", index):
+            raise AbbaSummaryInputError(
+                f"{location}.open_attributed_total_ns exceeds open_outer_ns"
+            )
+        if ordered("edit_attributed_total_ns", index) > ordered("edit_total_ns", index):
+            raise AbbaSummaryInputError(
+                f"{location}.edit_attributed_total_ns exceeds edit_total_ns"
+            )
+        phase_sum(
+            "workflow_no_diagnostic_ns",
+            ("measured_total_ns", "same_lineage_apply_ns"),
+            index,
+        )
+        phase_sum(
+            "workflow_with_fingerprint_demand_ns",
+            ("workflow_no_diagnostic_ns", "deferred_fingerprint_ns"),
+            index,
+        )
+
+
+def _validate_doc_owner_public_phases_result_rows(
+    indexed: Mapping[tuple[str, str], dict[str, Any]],
+    configuration: Mapping[str, Any],
+    label: str,
+) -> None:
+    samples_per_case = _required_positive_integer(
+        configuration.get("samples_per_case"),
+        f"{label}.configuration",
+        "samples_per_case",
+    )
+    for (case, corpus_identity), row in indexed.items():
+        source = row.get("source")
+        if case != DOC_OWNER_PUBLIC_PHASES_CASE:
+            if isinstance(source, dict) and source.get(DOC_OWNER_PUBLIC_PHASES_CASE) is not None:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.{DOC_OWNER_PUBLIC_PHASES_CASE} is only valid for its selector"
+                )
+            continue
+        source_object = _require_object(source, f"{label}.{case}.source")
+        overlay = _require_object(
+            source_object.get(DOC_OWNER_PUBLIC_PHASES_CASE),
+            f"{label}.{case}.source.{DOC_OWNER_PUBLIC_PHASES_CASE}",
+        )
+        elapsed_object = _require_object(
+            row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns"
+        )
+        _validate_doc_owner_public_phases(
+            overlay,
+            f"{label}.{case}.source.{DOC_OWNER_PUBLIC_PHASES_CASE}",
+            corpus=json.loads(corpus_identity),
+            samples_per_case=samples_per_case,
+            elapsed_samples=elapsed_object.get("samples"),
+            sample_order=elapsed_object.get("sample_order"),
+            source=source_object,
+            sink=row.get("sink"),
+            output_sha256=row.get("output_sha256"),
+        )
+
+
 def _validate_opc_source_overlay_result_rows(
     indexed: Mapping[tuple[str, str], dict[str, Any]],
     configuration: Mapping[str, Any],
@@ -3797,6 +4312,31 @@ def _validate_configuration_rows(
         raise AbbaSummaryInputError(
             f"{label}.configuration.cases does not match result cases"
         )
+    if DOC_OWNER_PUBLIC_PHASES_CASE in cases:
+        doc_owner_shapes = [
+            json.loads(corpus_identity).get("shape")
+            for case, corpus_identity in indexed
+            if case == DOC_OWNER_PUBLIC_PHASES_CASE
+        ]
+        expected_doc_owner_shapes = set(DOC_OWNER_PUBLIC_PHASES_SHAPES)
+        if (
+            len(doc_owner_shapes) != len(expected_doc_owner_shapes)
+            or set(doc_owner_shapes) != expected_doc_owner_shapes
+        ):
+            raise AbbaSummaryInputError(
+                f"{label}.{DOC_OWNER_PUBLIC_PHASES_CASE} must cover the exact "
+                "tiny/large/payload-heavy shape matrix"
+            )
+        writer_shapes = configuration.get("writer_shapes")
+        if (
+            not isinstance(writer_shapes, list)
+            or len(writer_shapes) != len(expected_doc_owner_shapes)
+            or set(writer_shapes) != expected_doc_owner_shapes
+        ):
+            raise AbbaSummaryInputError(
+                f"{label}.configuration.writer_shapes must cover the exact "
+                "tiny/large/payload-heavy DOC owner/public matrix"
+            )
     multi_part_pairs: dict[str, list[tuple[str, int]]] = {}
     for case, corpus_identity in indexed:
         if case not in OPC_SOURCE_OVERLAY_MULTI_PART_CASES:
@@ -4995,6 +5535,14 @@ def _source_identity_projection(value: Any) -> Any:
             projected_overlay.pop(field, None)
         projected["opc_source_overlay"] = projected_overlay
         for field in _OPC_SOURCE_OVERLAY_SOURCE_VECTOR_FIELDS:
+            projected.pop(field, None)
+    doc_owner_public_phases = projected.get(DOC_OWNER_PUBLIC_PHASES_CASE)
+    if isinstance(doc_owner_public_phases, dict):
+        projected_doc_owner = dict(doc_owner_public_phases)
+        for field in _DOC_OWNER_PUBLIC_PHASE_DYNAMIC_FIELDS:
+            projected_doc_owner.pop(field, None)
+        projected[DOC_OWNER_PUBLIC_PHASES_CASE] = projected_doc_owner
+        for field in _DOC_OWNER_PUBLIC_PHASE_ROOT_SOURCE_VECTOR_FIELDS:
             projected.pop(field, None)
     docx_section_layout = projected.get("docx_section_layout")
     if isinstance(docx_section_layout, dict):

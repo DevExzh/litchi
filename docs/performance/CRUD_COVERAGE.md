@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+Change 0274 adds no CRUD selector or production optimization. Its clean ABBA
+rejection evidence covers the DOC owner public phases across tiny, large, and
+payload-heavy shapes; only large lifecycle p50 passed, while tiny/payload-heavy
+and mean/tail outcomes were rejected. The candidate was reverted, and the
+current 393-name / 36-case, 198-record matrix is unchanged. No allocator/RSS,
+physical-I/O, or broad DOC performance claim follows.
+
 Change 0273 brings the current selectable benchmark matrix to **393 names**
 through one opt-in DOCX existing-main-story section-layout selector. Its typed
 PageSize/Margins/Start/Columns snapshot/edit/commit, durable patch/inverse,
