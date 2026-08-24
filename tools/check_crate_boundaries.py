@@ -2833,6 +2833,9 @@ IWA_NUMBERS_CELL_COMMENT_LEGACY_HELPER = "set_cell_comment_in_package"
 IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS = frozenset(
     {"UnsupportedDependency", "CommentNotFound"}
 )
+IWA_NUMBERS_CELL_COMMENT_CLEAR_HOST_METHOD = "clear_cell_comment"
+IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD = "clear_table_cell_comment"
+IWA_NUMBERS_CELL_COMMENT_CLEAR_LEGACY_HELPER = "clear_cell_comment_in_package"
 RETIRED_IWA_NUMBERS_DOCUMENT_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "document.rs"
 RETIRED_IWA_NUMBERS_DOCUMENT_TYPES = (
     "NumbersDocument",
@@ -10114,6 +10117,81 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_cell_comment_clear_delegation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep supported host clears on the focused, metadata-safe owner seam."""
+
+    path = root / IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+    if not path.is_file():
+        return []
+    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(source)
+
+    def body(name: str) -> str | None:
+        for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+            if declaration.group(1) != name:
+                continue
+            opening = code.find("{", declaration.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                depth += code[cursor] == "{"
+                depth -= code[cursor] == "}"
+                cursor += 1
+            if depth == 0:
+                return code[opening + 1 : cursor - 1]
+        return None
+
+    host = body(IWA_NUMBERS_CELL_COMMENT_CLEAR_HOST_METHOD)
+    helper = body("clear_cell_comment_with_focused_owner")
+    violations: list[str] = []
+    if host is None or helper is None:
+        return [
+            "litchi-iwa Numbers cell-comment clear is missing its focused host route: "
+            f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+        ]
+    route = host + "\n" + helper
+    required = (
+        ("selector mapping", r"\bfocused_table_location\s*\("),
+        ("semantic position", r"\bCellPosition\s*::\s*try_from_usize\b"),
+        ("focused package parse", r"\bFocusedNumbersPackage\s*::\s*from_bytes\s*\("),
+        (
+            "focused clear",
+            rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD)}\s*\(",
+        ),
+        (
+            "legacy fallback",
+            rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_LEGACY_HELPER)}\s*\(",
+        ),
+        ("metadata gate", r"\bhas_metadata\b"),
+        ("typed unsupported case", r"\bUnsupportedDependency\b"),
+        ("verified reopen", r"\bNumbersEditor\s*::\s*from_bytes\s*\("),
+    )
+    for label, pattern in required:
+        if re.search(pattern, route) is None:
+            violations.append(
+                f"litchi-iwa Numbers cell-comment clear is missing {label}: "
+                f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+            )
+    if re.search(
+        r"Err\s*\(\s*TableCellCommentError\s*::\s*UnsupportedDependency[\s\S]{0,160}"
+        r"if\s*!\s*has_metadata",
+        helper,
+    ) is None:
+        violations.append(
+            "litchi-iwa Numbers cell-comment clear may fall back only for an "
+            "unsupported graph without PackageMetadata"
+        )
+    if re.search(r"Err\s*\(\s*_\s*\)[\s\S]{0,160}LegacyFallback", helper):
+        violations.append(
+            "litchi-iwa Numbers cell-comment clear must not broadly fall back on focused errors"
+        )
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_table_lock_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Numbers table-lock APIs out of their former host scopes."""
 
@@ -12207,7 +12285,8 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
             r"[ \t\r\n]*\(",
             reachable_code,
         )
-        has_combined_route = combined_call is not None
+        prepared_route = re.search(r"\bprepare_root_clear[ \t\r\n]*\(", reachable_code)
+        has_combined_route = combined_call is not None or prepared_route is not None
 
         unsupported = commit_body.find(NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR)
         rewrite = commit_body.find("rewrite_existing")
@@ -12228,10 +12307,12 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
             # removal-only or token-only call can otherwise make the native
             # clear appear atomic while leaving the other side of the graph
             # stale.
-            for function_name in (
-                PACKAGE_METADATA_REMOVE_FUNCTION,
-                PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
-            ):
+            forbidden_standalone = (
+                (PACKAGE_METADATA_REMOVE_FUNCTION,)
+                if prepared_route is not None
+                else (PACKAGE_METADATA_REMOVE_FUNCTION, PACKAGE_METADATA_SAVE_TOKEN_FUNCTION)
+            )
+            for function_name in forbidden_standalone:
                 if re.search(
                     rf"\b{re.escape(function_name)}\b[ \t\r\n]*\(",
                     reachable_code,
@@ -12317,6 +12398,8 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
                         and NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR not in guard_region
                     )
                 ):
+                    if not requires_unsupported and "map_err" in guard_region:
+                        continue
                     guard_requirement = (
                         f"for {label} with {NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR}: "
                         if requires_unsupported
@@ -12368,13 +12451,16 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
         rf"\b{re.escape(PACKAGE_METADATA_COMBINED_FUNCTION)}"
         r"[ \t\r\n]*\(",
         reachable_code,
-    ) is not None
+    ) is not None or re.search(r"\bprepare_root_clear[ \t\r\n]*\(", reachable_code) is not None
     for function_name in (
         PACKAGE_METADATA_REMOVE_FUNCTION,
         PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
         PACKAGE_METADATA_COMBINED_FUNCTION,
     ):
-        if has_combined_route and function_name == PACKAGE_METADATA_COMBINED_FUNCTION:
+        if has_combined_route:
+            # A complete combined route may share private helpers/imports with
+            # replacement and inspection paths.  The reachable clear graph was
+            # checked above to forbid standalone removal/token publication.
             continue
         if re.search(
             rf"\b{re.escape(function_name)}\b[ \t\r\n]*\(", comment_code
@@ -13941,6 +14027,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_cells_mutation_facade_source_topology()
         + audit_iwa_numbers_table_cell_mutation_source_topology()
         + audit_iwa_numbers_cell_comment_delegation_source_topology()
+        + audit_iwa_numbers_cell_comment_clear_delegation_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_numbers_document_source_topology()

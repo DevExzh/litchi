@@ -14984,6 +14984,46 @@ class BoundaryPolicyTests(unittest.TestCase):
                 violations,
             )
 
+    def test_iwa_numbers_cell_comment_clear_delegation_requires_metadata_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_text(
+                "fn clear_cell_comment_with_focused_owner(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Result<Route> {\n"
+                "    let (sheet, table) = focused_table_location(editor, table_id)?;\n"
+                "    let position = CellPosition::try_from_usize(row, column)?;\n"
+                "    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)?;\n"
+                "    let has_metadata = editor.package().contains_entry(\"Index/Metadata.iwa\");\n"
+                "    match source.clear_table_cell_comment(sheet, table, position) {\n"
+                "        Ok(commit) => { let bytes = commit.to_bytes()?; let _ = NumbersEditor::from_bytes(&bytes)?; Ok(Route::Published) },\n"
+                "        Err(TableCellCommentError::UnsupportedDependency { .. }) if !has_metadata => Ok(Route::LegacyFallback),\n"
+                "        Err(error) => Err(error.into()),\n"
+                "    }\n"
+                "}\n"
+                "impl NumbersEditor {\n"
+                "    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {\n"
+                "        match clear_cell_comment_with_focused_owner(self, table_id, row, column)? {\n"
+                "            Route::Published => Ok(()),\n"
+                "            Route::LegacyFallback => clear_cell_comment_in_package(&mut self.package, table_id, row, column),\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root),
+                [],
+            )
+            table.write_text(
+                table.read_text(encoding="utf-8").replace(
+                    " if !has_metadata", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
+            self.assertTrue(any("without PackageMetadata" in item for item in violations), violations)
+
     def test_iwa_numbers_table_cell_fixture_helpers_stay_test_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
