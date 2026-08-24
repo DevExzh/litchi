@@ -1059,6 +1059,82 @@ fn explicit_limits_and_filepass_are_typed() {
 }
 
 #[test]
+fn filepass_header_scan_never_reads_its_payload_or_worksheets() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let filepass_offset = global_eof_offset(&original) as u64;
+    let worksheet_positions = workbook_bound_sheet_positions(&original);
+    let mut worksheet_boundaries = worksheet_positions.clone();
+    worksheet_boundaries.sort_unstable();
+    for payload in [vec![0xA5; 8_192], vec![0xA5; 2]] {
+        let mut filepass = Vec::with_capacity(6 + payload.len());
+        filepass.extend_from_slice(&0x002F_u16.to_le_bytes());
+        filepass.extend_from_slice(&8_192_u16.to_le_bytes());
+        filepass.extend_from_slice(&payload);
+        let modified = insert_before_global_eof(&original, &filepass);
+        let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+        let source = Arc::new(CountingSource::new(bytes));
+
+        let header_ranges = physical_ranges_for_stream_range(&source, filepass_offset, 4);
+        let payload_ranges =
+            physical_ranges_for_stream_range(&source, filepass_offset + 4, payload.len());
+        let worksheet_ranges = worksheet_positions
+            .iter()
+            .map(|start| {
+                let end = worksheet_boundaries
+                    .iter()
+                    .copied()
+                    .find(|boundary| *boundary > *start)
+                    .unwrap_or(original.len());
+                physical_ranges_for_stream_range(
+                    &source,
+                    u64::try_from(*start + filepass.len()).unwrap(),
+                    end - start,
+                )
+            })
+            .collect::<Vec<_>>();
+        source.clear_ranges();
+
+        assert!(matches!(
+            SourceBackedWorkbook::from_read_at(source.clone()),
+            Err(SourceBackedError::EncryptedUnsupported)
+        ));
+        let actual = source.ranges();
+        assert!(overlaps_any(&actual, &header_ranges));
+        assert!(!overlaps_any(&actual, &payload_ranges));
+        assert!(worksheet_ranges.iter().flatten().copied().all(|worksheet| {
+            actual
+                .iter()
+                .copied()
+                .all(|read| !ranges_overlap(read, worksheet))
+        }));
+    }
+}
+
+#[test]
+fn truncated_global_header_is_rejected_without_overread() {
+    let mut stream = frame_bytes(0x0809, &[0; 16]);
+    stream.extend_from_slice(&[0x42, 0]);
+    let bytes = cfb_with_streams(&[("Workbook", &stream)]);
+    let source = Arc::new(CountingSource::new(bytes));
+    let retained: Arc<dyn ReadAt> = source.clone();
+    let cfb = SharedOleFile::open(Arc::clone(&retained)).unwrap();
+    let catalog_ranges = source.ranges();
+    drop(cfb);
+    source.clear_ranges();
+    let first_header_ranges = physical_ranges_for_stream_range(&source, 0, 4);
+    source.clear_ranges();
+
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(source.clone()),
+        Err(SourceBackedError::InvalidData(message))
+            if message == "truncated BIFF global record header"
+    ));
+    let mut expected = catalog_ranges;
+    expected.extend(first_header_ranges);
+    assert_eq!(source.ranges(), expected);
+}
+
+#[test]
 fn workbook_and_book_selection_only_falls_back_for_missing_stream() {
     let stream = workbook_stream(fixture("Simple.xls"), "Workbook");
     let book_only = cfb_with_streams(&[("Book", &stream)]);
@@ -1097,6 +1173,105 @@ fn worksheet_bof_version_and_substream_type_are_deferred_to_selected_access() {
             assert!(matches!(result, Err(SourceBackedError::InvalidData(_))));
         }
     }
+}
+
+#[test]
+fn raw_handoff_reads_global_headers_then_one_exact_global_range() {
+    let workbook = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let global_end = global_eof_offset(&workbook) + 4;
+    let mut header_offsets = Vec::new();
+    let mut offset = 0_usize;
+    loop {
+        header_offsets.push(offset);
+        let kind = u16::from_le_bytes([workbook[offset], workbook[offset + 1]]);
+        let length = usize::from(u16::from_le_bytes([
+            workbook[offset + 2],
+            workbook[offset + 3],
+        ]));
+        offset += 4 + length;
+        if kind == 0x000A {
+            break;
+        }
+    }
+
+    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook", &workbook,
+    )])));
+    let retained: Arc<dyn ReadAt> = source.clone();
+    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+    source.clear_ranges();
+    let _owner = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
+        cfb,
+        SourceBackedLimits::default(),
+    )
+    .unwrap();
+    let actual = source.ranges();
+
+    let mut expected = Vec::new();
+    for header_offset in header_offsets {
+        expected.extend(physical_ranges_for_stream_range(
+            &source,
+            header_offset as u64,
+            4,
+        ));
+    }
+    expected.extend(physical_ranges_for_stream_range(&source, 0, global_end));
+    assert_eq!(actual, expected);
+
+    let sheet_ranges = physical_ranges_for_workbook_sheets(&source, &workbook);
+    assert!(actual.iter().all(|range| {
+        sheet_ranges
+            .iter()
+            .flatten()
+            .copied()
+            .all(|sheet| !ranges_overlap(*range, sheet))
+    }));
+}
+
+#[test]
+fn shared_cfb_source_arc_preserves_pointer_identity() {
+    let source: Arc<dyn ReadAt> = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let cfb = SharedOleFile::open(Arc::clone(&source)).unwrap();
+    let retained = cfb.source_arc();
+    assert!(Arc::ptr_eq(&source, &retained));
+}
+
+#[test]
+fn raw_handoff_rejects_a_stale_retained_source_before_global_reads() {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let retained: Arc<dyn ReadAt> = source.clone();
+    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+    source.clear_ranges();
+    source.bump();
+    assert!(matches!(
+        litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
+            cfb,
+            SourceBackedLimits::default(),
+        ),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+    assert!(source.ranges().is_empty());
+}
+
+#[test]
+fn raw_handoff_enforces_input_limit_against_existing_cfb_size() {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let retained: Arc<dyn ReadAt> = source.clone();
+    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+    let maximum = cfb.file_size().saturating_sub(1);
+    assert!(maximum > 0);
+    source.clear_ranges();
+    assert!(matches!(
+        litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
+            cfb,
+            SourceBackedLimits::default().with_max_input_bytes(maximum),
+        ),
+        Err(SourceBackedError::ResourceLimit {
+            resource: "input bytes",
+            ..
+        })
+    ));
+    assert!(source.ranges().is_empty());
 }
 
 fn frame_bytes(kind: u16, payload: &[u8]) -> Vec<u8> {

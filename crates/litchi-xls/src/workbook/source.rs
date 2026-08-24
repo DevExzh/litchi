@@ -483,7 +483,7 @@ impl SourceBackedWorkbook {
             SharedOleFileLimits::new(limits.max_input_bytes).map_err(SourceBackedError::Cfb)?;
         let cfb = SharedOleFile::open_with_limits(Arc::clone(&source), cfb_limits)
             .map_err(SourceBackedError::from)?;
-        Self::from_shared_ole_file_with_limits_and_source(Arc::new(cfb), source, limits)
+        Self::from_shared_ole_file_with_limits(Arc::new(cfb), limits)
     }
 
     /// Opens a filesystem path through the positional `FileSource` adapter.
@@ -616,12 +616,22 @@ impl SourceBackedWorkbook {
     }
 
     /// Adopts an already-indexed positional CFB file.
-    fn from_shared_ole_file_with_limits_and_source(
+    pub(crate) fn from_shared_ole_file_with_limits(
         cfb: Arc<SharedOleFile>,
-        source: Arc<dyn ReadAt>,
         limits: SourceBackedLimits,
     ) -> Result<Self> {
+        limits.validate()?;
+        let source = cfb.source_arc();
         let expected_version = cfb.source_version().map_err(SourceBackedError::from)?;
+        ensure_current_parts(&source, &cfb, expected_version)?;
+        let file_size = cfb.file_size();
+        if file_size > limits.max_input_bytes {
+            return Err(SourceBackedError::ResourceLimit {
+                resource: "input bytes",
+                observed: file_size,
+                maximum: limits.max_input_bytes,
+            });
+        }
         let (workbook_path, workbook_stream_len) =
             select_workbook_stream(&cfb, &source, expected_version)?;
         let mut parsed = parse_globals(&cfb, &workbook_path, workbook_stream_len, limits)?;
@@ -1097,18 +1107,36 @@ fn parse_globals(
     limits: SourceBackedLimits,
 ) -> Result<ParsedGlobals> {
     let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
-    let mut bytes = Vec::new();
     let mut offset = 0_u64;
     let mut record_count = 0_usize;
+
+    // The first pass reads only BIFF headers.  Besides avoiding payload reads
+    // for encrypted workbooks, this establishes the exact global boundary so
+    // the semantic pass below can issue one bounded logical range read.
     loop {
+        let header_end = offset.checked_add(4).ok_or_else(|| {
+            SourceBackedError::InvalidData("BIFF global header offset overflows".into())
+        })?;
+        if header_end > stream_len {
+            return Err(SourceBackedError::InvalidData(
+                "truncated BIFF global record header".into(),
+            ));
+        }
         let header = read_range(cfb, &refs, offset, 4)?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         if kind == FILEPASS {
             return Err(SourceBackedError::EncryptedUnsupported);
         }
-        let payload_len = u64::from(u16::from_le_bytes([header[2], header[3]]));
+        let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        if payload_len > litchi_biff::MAX_RECORD_BYTES {
+            return Err(SourceBackedError::ResourceLimit {
+                resource: "BIFF record bytes",
+                observed: payload_len as u64,
+                maximum: litchi_biff::MAX_RECORD_BYTES as u64,
+            });
+        }
         let frame_len = 4_u64
-            .checked_add(payload_len)
+            .checked_add(payload_len as u64)
             .ok_or_else(|| SourceBackedError::InvalidData("BIFF global frame overflows".into()))?;
         let end = offset
             .checked_add(frame_len)
@@ -1132,36 +1160,31 @@ fn parse_globals(
                 maximum: limits.max_global_records as u64,
             });
         }
-        let next_size = bytes
-            .len()
-            .checked_add(usize::try_from(frame_len).map_err(|_error| {
-                SourceBackedError::InvalidData("BIFF global frame is too large".into())
-            })?)
-            .ok_or_else(|| SourceBackedError::InvalidData("BIFF globals overflow".into()))?;
-        if next_size as u64 > limits.max_global_bytes {
+        if end > limits.max_global_bytes {
             return Err(SourceBackedError::ResourceLimit {
                 resource: "global bytes",
-                observed: next_size as u64,
+                observed: end,
                 maximum: limits.max_global_bytes,
             });
         }
-        let frame = read_range(
-            cfb,
-            &refs,
-            offset,
-            usize::try_from(frame_len).map_err(|_| {
-                SourceBackedError::InvalidData("BIFF global frame is too large".into())
-            })?,
-        )?;
-        bytes
-            .try_reserve(frame.len())
-            .map_err(|_error| SourceBackedError::InvalidData("global allocation failed".into()))?;
-        bytes.extend_from_slice(&frame);
         offset = end;
         if kind == EOF {
+            if payload_len != 0 {
+                return Err(SourceBackedError::InvalidData(
+                    "Workbook globals EOF has a non-empty payload".into(),
+                ));
+            }
             break;
         }
     }
+
+    let global_len =
+        usize::try_from(offset).map_err(|_error| SourceBackedError::ResourceLimit {
+            resource: "global address space",
+            observed: offset,
+            maximum: usize::MAX as u64,
+        })?;
+    let bytes = read_range(cfb, &refs, 0, global_len)?;
 
     let biff_limits = BiffLimits {
         max_records: limits.max_global_records,
@@ -1169,10 +1192,16 @@ fn parse_globals(
         max_input_bytes: usize::try_from(limits.max_global_bytes).unwrap_or(usize::MAX),
         max_output_bytes: usize::MAX,
     };
-    let records = BiffRecords::with_limits(&bytes, biff_limits)
-        .map_err(map_biff_error)?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(map_biff_error)?;
+    let mut records = Vec::new();
+    records
+        .try_reserve(record_count)
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "global records",
+            requested: record_count as u64,
+        })?;
+    for record in BiffRecords::with_limits(&bytes, biff_limits).map_err(map_biff_error)? {
+        records.push(record.map_err(map_biff_error)?);
+    }
     let first = records
         .first()
         .ok_or_else(|| SourceBackedError::InvalidData("Workbook globals are empty".into()))?;
@@ -1246,6 +1275,12 @@ fn parse_globals(
                         maximum: limits.max_sheet_count as u64,
                     });
                 }
+                bound_payloads
+                    .try_reserve(1)
+                    .map_err(|_error| SourceBackedError::Allocation {
+                        resource: "BoundSheet8 payloads",
+                        requested: 1,
+                    })?;
                 bound_payloads.push(record.payload());
             },
             SST => {
@@ -1299,12 +1334,23 @@ fn parse_globals(
             "Workbook globals contain no BoundSheet8 records".into(),
         ));
     }
-    let bounds = bound_payloads
-        .into_iter()
-        .map(|payload| BoundSheetRecord::parse(payload, &encoding))
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(SourceBackedError::Parse)?;
-    let mut names = HashSet::with_capacity(bounds.len());
+    let mut bounds = Vec::new();
+    bounds
+        .try_reserve(bound_payloads.len())
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "BoundSheet8 records",
+            requested: bound_payloads.len() as u64,
+        })?;
+    for payload in bound_payloads {
+        bounds.push(BoundSheetRecord::parse(payload, &encoding).map_err(SourceBackedError::Parse)?);
+    }
+    let mut names = HashSet::new();
+    names
+        .try_reserve(bounds.len())
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "BoundSheet8 names",
+            requested: bounds.len() as u64,
+        })?;
     for bound in &bounds {
         if !names.insert(bound.name.to_lowercase()) {
             return Err(SourceBackedError::Parse(Error::InvalidRecord {
@@ -1327,7 +1373,13 @@ fn parse_globals(
             .strings
     };
 
-    let mut sheets = Vec::with_capacity(bounds.len());
+    let mut sheets = Vec::new();
+    sheets
+        .try_reserve(bounds.len())
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "source-backed sheet descriptors",
+            requested: bounds.len() as u64,
+        })?;
     let mut worksheet_index = 0_usize;
     for (workbook_index, sheet) in bounds.into_iter().enumerate() {
         let (visibility, kind) = (
@@ -1401,7 +1453,14 @@ fn validate_sheet_offsets(
 }
 
 fn read_range(cfb: &SharedOleFile, path: &[&str], offset: u64, length: usize) -> Result<Vec<u8>> {
-    let mut output = vec![0_u8; length];
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "source-backed range buffer",
+            requested: length as u64,
+        })?;
+    output.resize(length, 0);
     cfb.read_stream_range(path, offset, &mut output)
         .map_err(SourceBackedError::from)?;
     Ok(output)

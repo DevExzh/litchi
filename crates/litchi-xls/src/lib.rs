@@ -578,6 +578,9 @@ pub use pivot_table::{
 /// Sheet protection parsing (PROTECT, OBJECTPROTECT, SCENPROTECT, PASSWORD)
 pub mod protection;
 
+/// Low-level handoffs for already-indexed positional CFB sources.
+pub mod raw;
+
 /// XLS file writing
 #[allow(
     clippy::expect_used,
