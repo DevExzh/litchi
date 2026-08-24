@@ -21,6 +21,34 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest XLSX repeated-store cache ABBA (change 0269)
+
+[Change 0269](changes/0269-xlsx-repeated-store-cache-abba.md) is the direct
+same-selector release ABBA result for the two primary repeated-store cases.
+Control revision `18633404d27bc4c442c09915972e7655cdae813b` is compared with
+landed candidate `8a0ca40b1a9d77a9494c74c0cdca38dd61ee68b1` on the pinned
+medium and oversized four-sheet XLSX/OPC/ZIP corpora. Each sample repeats
+`cell`, `cells`, `visit`, and `stored_extent` eight times in the exact
+`semantic_query_only; explicit PartData reacquisition excluded` interval,
+using fresh warm children, CPU 2, 20 warmups, and 500 samples. All eight
+p50/mean/p95/p99 cells are accepted and zero are adverse-both. This is a
+latency-only claim; no resource guardrail, allocation/RSS, physical-I/O,
+cold-cache, publication/save, producer, or broad XLSX claim is retained.
+See [change 0269](changes/0269-xlsx-repeated-store-cache-abba.md).
+
+## Latest XLS owned-source publication ABBA (change 0268)
+
+[Change 0268](changes/0268-xls-owned-source-publication-abba.md) is the direct
+same-selector release ABBA result for the landed owned-source XLS numeric
+publication path. Control revision
+`1dabd40976d94abdd30ad03bbad6cae0b1a24bf5` is compared with candidate
+`6a93ded5dbc14e4b823555bd453740643ce6af10` on the pinned opaque-heavy
+comment and RK/MulRK XLS/CFB corpora. CPU-2 A1/B1/B2/A2 legs use 20 warmups
+and 500 samples; all eight p50/mean/p95/p99 cells are accepted and zero are
+adverse-both. This is a latency-only claim; no resource guardrail,
+allocation/RSS, physical-I/O, cold-cache, producer, or broad XLS claim is
+retained. See [change 0268](changes/0268-xls-owned-source-publication-abba.md).
+
 ## Latest XLSX repeated-store strict schema and harness (change 0267)
 
 The four opt-in selectors from [change 0267](changes/0267-xlsx-repeated-store-strict-harness.md)

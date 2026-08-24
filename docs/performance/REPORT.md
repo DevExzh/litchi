@@ -11,6 +11,50 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## XLSX repeated-store cache ABBA (change 0269)
+
+[Change 0269](changes/0269-xlsx-repeated-store-cache-abba.md) records the
+direct same-selector release ABBA comparison for the two primary selectors
+introduced by change 0267. The control is
+`18633404d27bc4c442c09915972e7655cdae813b` and the landed candidate is
+`8a0ca40b1a9d77a9494c74c0cdca38dd61ee68b1`. The pinned medium and oversized
+XLSX/OPC/ZIP corpora use
+`litchi-xlsx-source-repeated-store-corpus-v1`, four 48-by-48 worksheets, and
+9,216 scalar entries; their archive hashes are
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036` and
+`3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec`.
+
+The exact `semantic_query_only; explicit PartData reacquisition excluded`
+interval repeats `cell`, `cells`, `visit`, and `stored_extent` eight times in
+fresh warm children. A1/B1/B2/A2 runs use CPU 2, one worker, 20 warmups, and
+500 samples. All eight p50/mean/p95/p99 cells are accepted in both pairings,
+with zero adverse-both cells: medium reductions are 50.786266%-56.781541%
+and oversized reductions are 99.846436%-99.892285%. This is the landed,
+latency-only claim `claim-0269-xlsx-repeated-store-cache`; no resource,
+allocation/RSS, physical-I/O, cold-cache, save/publication, producer, or broad
+XLSX claim follows. Structural reacquisition controls remain excluded from
+the latency comparison.
+
+## XLS owned-source publication ABBA (change 0268)
+
+[Change 0268](changes/0268-xls-owned-source-publication-abba.md) records the
+direct same-selector release ABBA comparison for the landed owned-source XLS
+numeric publication path. The control is
+`1dabd40976d94abdd30ad03bbad6cae0b1a24bf5` and the candidate is
+`6a93ded5dbc14e4b823555bd453740643ce6af10`. The two pinned XLS/CFB corpora
+are `xls-comments-opaque-heavy`
+(`6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53`) and
+`xls-rk-mulrk-deterministic`
+(`61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594`).
+
+The A1/B1/B2/A2 release run uses CPU 2, one worker, 20 warmups, and 500
+samples per selector and leg. All eight p50/mean/p95/p99 cells are accepted
+in both pairings, with zero adverse-both cells: the Number selector reduces
+elapsed time by 50.079647%-50.602333%, and the RK/MulRK selector by
+49.531741%-52.515937%. This is the landed, latency-only claim
+`claim-0268-xls-owned-source`; no resource, allocation/RSS, physical-I/O,
+cold-cache, producer, or broad XLS claim follows.
+
 ## XLSX repeated-store strict schema and harness (change 0267)
 
 [Change 0267](changes/0267-xlsx-repeated-store-strict-harness.md), landed in

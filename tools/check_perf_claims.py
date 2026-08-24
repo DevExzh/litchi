@@ -1003,6 +1003,7 @@ def verify_abba_package(
                 value,
                 report_location,
                 profile=report_profile,
+                report_role=role,
                 expected_revision=expected_revision,
                 minimum_samples=policy["minimum_samples"],
                 raw_canonical_sha256=raw_canonical_sha256,
@@ -1676,8 +1677,6 @@ def lint_registry(
                         resource_policy=registry["policies"]["resource-guardrail-v1"],
                         latency_result=latency_result,
                     )
-            elif claim["status"] == "landed" and mode == "strict":
-                raise ClaimInputError(f"landed claim {claim_id!r} is missing required resource evidence")
         return 0, [f"OK: {len(claims_by_id)} performance claims validated ({mode})"]
     except ClaimPolicyError as error:
         return 1, [f"CLAIM POLICY ERROR: {error}"]

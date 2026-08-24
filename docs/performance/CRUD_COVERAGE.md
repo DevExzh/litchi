@@ -52,6 +52,15 @@ structural cache/read evidence only. Pinned corpus, semantic projection,
 cache/read/Budget, fresh-child, allocator, and result-channel checks are strict
 correctness gates. No latency, production, or broad XLSX CRUD claim follows.
 
+Change 0268 lands a narrow XLS owned-source numeric publication result: the
+Number and RK/MulRK source-backed selectors accept all eight ABBA latency cells
+with zero adverse-both cells on their pinned XLS/CFB corpora. Change 0269
+lands the corresponding direct ABBA result for the two primary XLSX
+repeated-store semantic-query selectors, also with eight accepted and zero
+adverse-both cells. Both are latency-only evidence with no resource guardrail;
+allocation/RSS, physical-I/O, cold-cache, producer, and broad format CRUD
+claims remain out of scope.
+
 | Required scenario | Current status | Coverage evidence |
 |---|---|---|
 | Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX/ODT open; the separate opt-in XLSB binary now checks facade identification and owner open over a fixed real POI fixture. Opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input. Change 0120 adds matched eager/source-path PPTX ordinary-root open controls using `litchi::Presentation::open(path)` and full untimed parity checks. Change 0187 routes high-level `litchi::Workbook::open(path)` for XLSX through its source-backed owner and adds open/open-plus-projection evidence; change 0188 adds matched warm DOCX/PPTX fresh-open-plus-query lifecycle evidence over fixed media-rich corpora but accepts no latency statistic because drift gates fail. Change 0191 routes high-level `litchi::Document::open(path)` for ODT through one retained source-backed owner while preserving OOXML precedence and typed source errors; change 0192 closes the withheld open-only warm p50/p99 latency evidence for that path on a bit-identical-binary rerun while mean/p95 remain withheld. Change 0257 routes normal owned-byte DOCX ingress through the source-backed owner, defers ordinary Part payloads, and preserves typed limits plus ODT/OOXML arbitration without making a measured speedup claim. Change 0258 routes normal owned-byte RTF ingress directly to the native byte parser, admits literal CP-1252/LZFu/MELA transport, and preserves ZIP/OLE2 precedence; its back-to-back facade ABBA captures do not reproduce an accepted latency set, so this remains correctness-only. Broader smart-detection handoff coverage remains incomplete |

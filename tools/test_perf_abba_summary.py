@@ -1263,6 +1263,42 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(structural_constant)
 
+    def test_xlsx_projection_separates_abba_role_from_diagnostic_location(self):
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        projections = {
+            role: perf_abba_summary._project_report(
+                report,
+                f"package/abba-0269/{role}",
+                profile=perf_abba_summary.detect_report_profile(report, role),
+                report_role=role,
+            )
+            for role, report in zip(perf_abba_summary.LEG_ORDER, reports)
+        }
+        self.assertEqual(
+            perf_abba_summary._summarize_projected_reports(projections),
+            perf_abba_summary.summarize_reports(reports),
+        )
+
+        malformed = copy.deepcopy(reports[0])
+        for sample in malformed["filesystem_evidence"][0]["samples"]:
+            repeated_store = sample["xlsx_repeat_store"]
+            repeated_store["diagnostics_delta"] = {
+                field: 0 for field in repeated_store["diagnostics_delta"]
+            }
+            repeated_store["diagnostics_after"] = copy.deepcopy(
+                repeated_store["diagnostics_before"]
+            )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            r"package/abba-0269/a1.*positive control evidence",
+        ):
+            perf_abba_summary._project_report(
+                malformed,
+                "package/abba-0269/a1",
+                profile=perf_abba_summary.detect_report_profile(malformed, "a1"),
+                report_role="a1",
+            )
+
     def test_xlsx_repeated_store_timing_binds_to_sample_order_and_result(self):
         reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
         primary_sample = reports[0]["filesystem_evidence"][0]["samples"][0]
@@ -2495,6 +2531,37 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             perf_abba_summary.AbbaSummaryInputError, "ABBA implementation-role"
         ):
             perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_projection_separates_abba_role_from_diagnostic_location(self):
+        reports = xls_numeric_legs()
+        projections = {
+            role: perf_abba_summary._project_report(
+                report,
+                f"package/abba-0268/{role}",
+                profile=perf_abba_summary.detect_report_profile(report, role),
+                report_role=role,
+            )
+            for role, report in zip(perf_abba_summary.LEG_ORDER, reports)
+        }
+        self.assertEqual(
+            perf_abba_summary._summarize_projected_reports(projections),
+            perf_abba_summary.summarize_reports(reports),
+        )
+
+        malformed = copy.deepcopy(reports[0])
+        malformed["results"][0]["source"]["xls_numeric"]["operation_evidence"][0][
+            "source_mode"
+        ] = "owned_immutable_arc"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            r"package/abba-0268/a1.*ABBA implementation-role",
+        ):
+            perf_abba_summary._project_report(
+                malformed,
+                "package/abba-0268/a1",
+                profile=perf_abba_summary.detect_report_profile(malformed, "a1"),
+                report_role="a1",
+            )
 
     def test_xls_numeric_top_level_contract_tampering_is_rejected(self):
         for field, value, message in (

@@ -32,7 +32,15 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
         )
         self.assertEqual(
             set(evidence),
-            {"abba-0248", "abba-0249", "abba-0250", "abba-0251", "resource-0251"},
+            {
+                "abba-0248",
+                "abba-0249",
+                "abba-0250",
+                "abba-0251",
+                "resource-0251",
+                "abba-0268-xls-owned-source",
+                "abba-0269-xlsx-repeated-store-cache",
+            },
         )
         self.assertEqual(
             set(claims),
@@ -41,6 +49,8 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
                 "claim-0249-ods-known-change",
                 "claim-0250-zip-ordering",
                 "claim-0251-xlsx-xml-borrowed",
+                "claim-0268-xls-owned-source",
+                "claim-0269-xlsx-repeated-store-cache",
             },
         )
         claim = claims["claim-0251-xlsx-xml-borrowed"]["value"]
@@ -56,6 +66,61 @@ class ClaimRegistryStructuralTests(unittest.TestCase):
             mode="strict",
         )
         self.assertEqual(status, 0, messages)
+
+    def test_strict_mode_accepts_landed_latency_only_claim(self) -> None:
+        for evidence_id, claim_id in (
+            ("abba-0268-xls-owned-source", "claim-0268-xls-owned-source"),
+            (
+                "abba-0269-xlsx-repeated-store-cache",
+                "claim-0269-xlsx-repeated-store-cache",
+            ),
+        ):
+            with self.subTest(claim_id=claim_id):
+                registry = load_seed()
+                registry["evidence"] = [
+                    next(
+                        item for item in registry["evidence"] if item["id"] == evidence_id
+                    )
+                ]
+                registry["claims"] = [
+                    next(
+                        item for item in registry["claims"] if item["id"] == claim_id
+                    )
+                ]
+                self.assertNotIn("resource_guardrail", registry["claims"][0])
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "registry.json"
+                    path.write_text(json.dumps(registry), encoding="utf-8")
+                    with patch.object(
+                        check_perf_claims,
+                        "verify_abba_package",
+                        return_value={},
+                    ) as verify_abba:
+                        status, messages = check_perf_claims.lint_registry(
+                            path,
+                            repo_root=REPO_ROOT,
+                            evidence_root=REPO_ROOT,
+                            mode="strict",
+                        )
+                self.assertEqual(status, 0, messages)
+                verify_abba.assert_called_once()
+
+    def test_landed_declared_resource_guardrail_still_requires_evidence(self) -> None:
+        registry = load_seed()
+        claim = next(
+            item
+            for item in registry["claims"]
+            if item["id"] == "claim-0268-xls-owned-source"
+        )
+        claim["resource_guardrail"] = {
+            "required": True,
+            "metrics": ["time.max_rss_kib"],
+        }
+        with self.assertRaisesRegex(
+            check_perf_claims.ClaimPolicyError,
+            "landed claim requires a resource evidence_id",
+        ):
+            check_perf_claims.validate_registry(registry, repo_root=REPO_ROOT)
 
     def test_canonical_registry_digest_is_deterministic(self) -> None:
         registry = load_seed()
