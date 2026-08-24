@@ -15,7 +15,8 @@ use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeTyp
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
 use litchi_numbers::{
-    CellPosition, Document, Package, TableCellCommentError, TableCellCommentPath,
+    CellPosition, Document, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits,
+    TableCellCommentError, TableCellCommentPath,
 };
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
@@ -1201,5 +1202,39 @@ fn metadata_backed_root_comment_clear_reopens_and_inverts_exactly() -> TestResul
     let mut restored_bytes = Vec::new();
     restored.package().write_to(&mut restored_bytes)?;
     assert_eq!(restored_bytes, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_clear_supersedes_a_failed_staged_replacement() -> TestResult {
+    let source = include_bytes!("fixtures/comment-edit-root.numbers").as_slice();
+    let semantic = PackageSemanticLimits::default()
+        .with_projection_limits(PackageSemanticLimits::MAX_MATERIALIZED_CELLS, 64)?;
+    let package = Package::from_bytes_with_options(
+        source,
+        PackageReadOptions::new(PackageLimits::default(), semantic),
+    )?;
+    let sheet = package
+        .sheets()
+        .first()
+        .ok_or_else(|| std::io::Error::other("fixture sheet is missing"))?;
+    let table = sheet
+        .tables()
+        .next()
+        .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
+    let position = CellPosition::new(1, 1);
+
+    let cleared = package
+        .edit_table_cell_comment(sheet.name(), table.name(), position)?
+        .set("x".repeat(65))
+        .clear()
+        .commit()?;
+
+    assert_eq!(
+        cleared
+            .package()
+            .table_cell_comment(sheet.name(), table.name(), position)?,
+        None
+    );
     Ok(())
 }

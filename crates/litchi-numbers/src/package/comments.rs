@@ -345,12 +345,13 @@ impl Edit<'_> {
 
     /// Stage removal of the selected comment.
     ///
-    /// A changed clear is rejected by [`Edit::commit`].  The operation is
-    /// retained as a staging convenience so callers can detect the typed
-    /// [`Error::UnsupportedDependency`] result without any partial rewrite.
+    /// A changed clear is admitted only for the exact, globally unshared root
+    /// graph described by [`Package::clear_table_cell_comment`]. Re-staging a
+    /// clear supersedes any earlier setter validation error on this edit.
     #[must_use]
     pub fn clear(mut self) -> Self {
         self.after = None;
+        self.staging_error = None;
         self
     }
 
