@@ -913,7 +913,7 @@ fn parse_body_table_entry(
     };
     Ok(BodyTableEntry {
         character_index,
-        identifier: parse_reference(budget, reference.payload(), 3)?,
+        identifier: parse_local_reference(budget, reference.payload(), 3)?,
     })
 }
 
@@ -924,7 +924,7 @@ fn parse_drawable_attachment(
     let view = budget.parse(source, 2)?;
     let field =
         unique_field(budget, &view, DRAWABLE_FIELD, 2)?.ok_or(BodyTableLockError::InvalidSource)?;
-    parse_reference(budget, field.payload(), 3)
+    parse_local_reference(budget, field.payload(), 3)
 }
 
 fn decode_table_model_name(
@@ -946,16 +946,50 @@ fn decode_table_model_name(
     Ok(owned.into_boxed_str())
 }
 
-fn parse_reference(
+pub(crate) fn parse_local_reference(
     budget: &mut WireBudget,
     source: &[u8],
     depth: usize,
 ) -> Result<NonZeroU64, BodyTableLockError> {
     budget.charge_payload_references(1)?;
     let view = budget.parse(source, depth)?;
-    let field = unique_field(budget, &view, 1, 0)?.ok_or(BodyTableLockError::InvalidSource)?;
-    let value = decode_varint(field.payload())?;
-    NonZeroU64::new(value).ok_or(BodyTableLockError::InvalidSource)
+    let mut identifier = None;
+    let mut deprecated_type_seen = false;
+    let mut external_seen = false;
+    for field in view.fields() {
+        field
+            .validate_canonical_framing()
+            .map_err(|_| BodyTableLockError::InvalidSource)?;
+        match field.number() {
+            1 => {
+                if field.wire_type() != 0 || identifier.is_some() {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+                identifier = NonZeroU64::new(decode_varint(field.payload())?);
+                if identifier.is_none() {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+            },
+            2 => {
+                if field.wire_type() != 0 || deprecated_type_seen {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+                deprecated_type_seen = true;
+                let _deprecated_type = decode_varint(field.payload())?;
+            },
+            3 => {
+                if field.wire_type() != 0 || external_seen {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+                external_seen = true;
+                if decode_varint(field.payload())? > 0 {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+            },
+            _ => {},
+        }
+    }
+    identifier.ok_or(BodyTableLockError::InvalidSource)
 }
 
 fn parse_u32(field: WireFieldView<'_>) -> Result<u32, BodyTableLockError> {
@@ -1110,7 +1144,7 @@ fn decode_table_info(
     let drawable = budget.parse(super_field.payload(), 1)?;
     let parent = unique_field(budget, &drawable, DRAWABLE_PARENT_FIELD, 2)?
         .ok_or(BodyTableLockError::InvalidSource)?;
-    if parse_reference(budget, parent.payload(), 3)? != body_identifier {
+    if parse_local_reference(budget, parent.payload(), 3)? != body_identifier {
         return Err(BodyTableLockError::InvalidSource);
     }
     let locked = unique_field(budget, &drawable, DRAWABLE_LOCKED_FIELD, 0)?
@@ -1120,7 +1154,7 @@ fn decode_table_info(
             _ => Err(BodyTableLockError::InvalidSource),
         })
         .transpose()?;
-    let table_model = parse_reference(budget, model_field.payload(), 1)?;
+    let table_model = parse_local_reference(budget, model_field.payload(), 1)?;
     Ok(TableInfoSnapshot {
         table_model,
         locked,
@@ -2180,6 +2214,110 @@ impl WireBudget {
 
     pub(crate) fn wire_limits(&self) -> WireLimits {
         self.limits
+    }
+
+    pub(crate) fn remaining_wire_fields(&self) -> usize {
+        self.limits.max_fields().saturating_sub(self.total_fields)
+    }
+
+    pub(crate) fn remaining_wire_work(&self) -> usize {
+        self.limits
+            .max_rewrite_work()
+            .saturating_sub(self.total_work)
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "candidate reservation needs the exact selected archive/message bounds"
+    )]
+    pub(crate) fn precharge_candidate_reopen(
+        &mut self,
+        source: &SourceCatalog,
+        candidate_package_bound: usize,
+        changed_component_index: usize,
+        changed_entry_bound: usize,
+        changed_archive_bound: usize,
+        changed_object_index: usize,
+        changed_message_index: usize,
+        changed_message_bound: usize,
+    ) -> Result<(), BodyTableLockError> {
+        self.charge_input_bytes(candidate_package_bound)?;
+        self.charge_entries(source.package().len())?;
+        let changed_component = source
+            .components()
+            .get_index(changed_component_index)
+            .ok_or(BodyTableLockError::InvalidSource)?;
+        for entry in source.package().iter() {
+            let entry_bytes = if entry.name() == changed_component.name() {
+                changed_entry_bound
+            } else {
+                entry.data().len()
+            };
+            self.charge_entry_bytes(entry_bytes)?;
+            self.charge_total_entry_bytes(entry_bytes)?;
+            self.charge_payload_work(entry_bytes)?;
+            let metadata_bytes = entry
+                .raw_name()
+                .len()
+                .checked_add(entry.metadata().local().name().len())
+                .and_then(|value| value.checked_add(entry.metadata().local().extra().len()))
+                .and_then(|value| value.checked_add(entry.metadata().local().comment().len()))
+                .and_then(|value| value.checked_add(entry.metadata().central().name().len()))
+                .and_then(|value| value.checked_add(entry.metadata().central().extra().len()))
+                .and_then(|value| value.checked_add(entry.metadata().central().comment().len()))
+                .ok_or(BodyTableLockError::LimitExceeded {
+                    kind: BodyTableLockLimitKind::PackageBytes,
+                    observed: u64::MAX,
+                    maximum: self.physical_limits.max_input_bytes(),
+                })?;
+            self.charge_package_bytes(metadata_bytes)?;
+            self.charge_payload_work(metadata_bytes)?;
+        }
+
+        let components = source.components();
+        self.charge_payload_work(components.len())?;
+        for (component_index, component) in components.iter().enumerate() {
+            let archive = component.archive();
+            let archive_bytes = if component_index == changed_component_index {
+                changed_archive_bound
+            } else {
+                parsed_archive_source_length(archive)?
+            };
+            self.charge_archive_inventory(archive_bytes, archive)?;
+            self.charge_payload_work(archive.objects.len())?;
+            for (object_index, object) in archive.objects.iter().enumerate() {
+                self.charge_payload_work(object.messages.len())?;
+                for (message_index, (message, info)) in object
+                    .messages
+                    .iter()
+                    .zip(&object.archive_info.message_infos)
+                    .enumerate()
+                {
+                    let message_bytes = if component_index == changed_component_index
+                        && object_index == changed_object_index
+                        && message_index == changed_message_index
+                    {
+                        changed_message_bound
+                    } else {
+                        message.data.len()
+                    };
+                    self.charge_payload_work(message_bytes)?;
+                    if message.type_ == ROOT_MESSAGE_TYPE {
+                        self.charge_payload_work(message_bytes)?;
+                    } else if matches!(message.type_, 2_001 | 2_022) {
+                        self.charge_payload_work(message_bytes)?;
+                        self.charge_payload_work(message_bytes)?;
+                    }
+                    self.charge_payload_work(
+                        info.field_infos
+                            .len()
+                            .saturating_add(info.object_references.len())
+                            .saturating_add(info.data_references.len()),
+                    )?;
+                }
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn maximum_payload_references(&self) -> usize {

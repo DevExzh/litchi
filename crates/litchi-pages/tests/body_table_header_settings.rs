@@ -315,6 +315,53 @@ fn append_dependency_field(package: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+fn append_table_info_raw(package: &[u8], raw: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document_archive(package, |archive| {
+        let drawable = archive
+            .object_mut(FIRST_DRAWABLE_IDENTIFIER)
+            .ok_or("missing table-info object")?;
+        let message_index = drawable
+            .messages
+            .iter()
+            .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            .ok_or("missing table-info message")?;
+        let mut data = drawable.messages[message_index].data.clone();
+        data.extend_from_slice(raw);
+        drawable.replace_message_preserving_header(
+            message_index,
+            RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn make_table_model_reference_external(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document_archive(package, |archive| {
+        let drawable = archive
+            .object_mut(FIRST_DRAWABLE_IDENTIFIER)
+            .ok_or("missing table-info object")?;
+        let message_index = drawable
+            .messages
+            .iter()
+            .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            .ok_or("missing table-info message")?;
+        let mut info =
+            tst::TableInfoArchive::decode(drawable.messages[message_index].data.as_slice())?;
+        info.table_model.deprecated_is_external = Some(true);
+        drawable.replace_message_preserving_header(
+            message_index,
+            RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPE,
+                data: info.encode_to_vec(),
+            },
+        )?;
+        Ok(())
+    })
+}
+
 fn sentinel(package: &[u8]) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(package)?;
     Ok(catalog
@@ -470,13 +517,14 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
     ));
 
     for raw in [
-        &[0x48, 0][..],          // header rows = zero
-        &[0x50, 7][..],          // header columns exceed the model
-        &[0x58, 0][..],          // footer rows = zero
-        &[0x60, 2][..],          // bool is neither false nor true
-        &[0x48, 1, 0x48, 2][..], // duplicate header rows
-        &[0x4d, 0, 0, 0, 0][..], // selected field has wrong wire type
-        &[0x48, 0x80, 0][..],    // selected value is non-canonical
+        &[0x48, 0][..],                            // header rows = zero
+        &[0x50, 7][..],                            // header columns exceed the model
+        &[0x58, 0][..],                            // footer rows = zero
+        &[0x60, 2][..],                            // bool is neither false nor true
+        &[0x48, 1, 0x48, 2][..],                   // duplicate header rows
+        &[0x4d, 0, 0, 0, 0][..],                   // selected field has wrong wire type
+        &[0x48, 0x80, 0][..],                      // selected value is non-canonical
+        &[0xa3, 0x06, 0x08, 0x01, 0xa4, 0x06][..], // package ingress rejects groups
     ] {
         let malformed_source = append_selected_model_raw(&source, raw)?;
         let Ok(malformed) = Package::from_bytes(&malformed_source) else {
@@ -527,6 +575,46 @@ fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze()
         commit.package().body_table_header_settings(0usize)?,
         freeze_only
     );
+    Ok(())
+}
+
+#[test]
+fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestResult<()> {
+    let source = synthetic_package(["Revenue", "Costs"], None)?;
+    let mut malformed_model_dependency = Vec::new();
+    let mut category_group = Vec::new();
+    category_group.extend_from_slice(&[0x30, 0x81, 0x00]);
+    let mut category_owner = Vec::new();
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut category_owner,
+        2,
+        &category_group,
+    )?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut malformed_model_dependency,
+        81,
+        &category_owner,
+    )?;
+    for malformed_source in [
+        append_table_info_raw(&source, &[0x38, 0x01])?,
+        append_table_info_raw(&source, &[0x80, 0x01, 0x81, 0x00])?,
+        append_selected_model_raw(&source, &malformed_model_dependency)?,
+        make_table_model_reference_external(&source)?,
+    ] {
+        let package = Package::from_bytes(&malformed_source)?;
+        let before = package.source_bytes().to_vec();
+        let result = package
+            .edit_body_table_header_settings(0usize)
+            .and_then(|edit| {
+                let settings = Settings {
+                    header_rows_frozen: Some(true),
+                    ..edit.settings()
+                };
+                edit.set(settings).commit()
+            });
+        assert!(matches!(result, Err(Error::InvalidSource)));
+        assert_eq!(package.source_bytes(), before.as_slice());
+    }
     Ok(())
 }
 
