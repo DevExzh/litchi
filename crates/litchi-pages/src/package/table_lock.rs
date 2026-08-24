@@ -383,28 +383,6 @@ impl BodyTableLockCommit {
     }
 }
 
-// Keep the historical, flattened transaction vocabulary source-compatible
-// while making the Pages-owned body-table spelling explicit.  These are type
-// aliases rather than duplicate definitions, so selectors, ownership proof,
-// exact-source patch identity, and limit/error values all remain one type.
-/// Compatibility alias for [`BodyTableLockLimitKind`].
-pub type TableLockLimitKind = BodyTableLockLimitKind;
-
-/// Compatibility alias for [`BodyTableLockError`].
-pub type TableLockError = BodyTableLockError;
-
-/// Compatibility alias for [`BodyTableLockEdit`].
-pub type TableLockEdit<'a> = BodyTableLockEdit<'a>;
-
-/// Compatibility alias for [`BodyTableLockPatch`].
-pub type TableLockPatch = BodyTableLockPatch;
-
-/// Compatibility alias for [`BodyTableLockDiagnostics`].
-pub type TableLockDiagnostics = BodyTableLockDiagnostics;
-
-/// Compatibility alias for [`BodyTableLockCommit`].
-pub type TableLockCommit = BodyTableLockCommit;
-
 #[derive(Clone, PartialEq, Eq)]
 struct BodyTableTarget {
     table_position: usize,
@@ -2670,16 +2648,6 @@ mod tests {
             .and_then(|limits| limits.with_rewrite_work(rewrite_work))
             .expect("test wire limits");
         budget
-    }
-
-    #[test]
-    fn flattened_table_lock_aliases_are_exact_body_table_types() {
-        let _: Option<TableLockLimitKind> = None::<BodyTableLockLimitKind>;
-        let _: Option<TableLockError> = None::<BodyTableLockError>;
-        let _: Option<TableLockEdit<'static>> = None::<BodyTableLockEdit<'static>>;
-        let _: Option<TableLockPatch> = None::<BodyTableLockPatch>;
-        let _: Option<TableLockDiagnostics> = None::<BodyTableLockDiagnostics>;
-        let _: Option<TableLockCommit> = None::<BodyTableLockCommit>;
     }
 
     #[test]
