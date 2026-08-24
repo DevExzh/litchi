@@ -9,6 +9,7 @@ mod limits;
 mod rendering_invalidation;
 pub(crate) mod show_settings;
 mod slide_background;
+mod slide_chart_caption;
 mod slide_chart_title;
 pub(crate) mod slide_delete;
 mod slide_notes;
@@ -69,6 +70,10 @@ pub use limits::{
 pub use slide_background::{
     SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
     SlideBackgroundLimitKind, SlideBackgroundPatch,
+};
+pub use slide_chart_caption::{
+    ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit, ChartCaptionError,
+    ChartCaptionLimitKind, ChartCaptionPatch,
 };
 pub use slide_chart_title::{
     ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,

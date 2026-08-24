@@ -621,11 +621,11 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
     );
 
     editor
-        .set_slide_chart_caption(0, source.drawable_object_id, "Updated source caption")
+        .set_slide_chart_caption_by_selector(0, ChartSelector::index(0), "Updated source caption")
         .unwrap();
     assert!(
         editor
-            .remove_slide_chart_caption(0, source.drawable_object_id)
+            .remove_slide_chart_caption_by_selector(0, ChartSelector::index(0))
             .unwrap()
     );
     assert!(
@@ -635,7 +635,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
     );
     assert_eq!(
         editor
-            .slide_chart_caption(0, source.drawable_object_id)
+            .slide_chart_caption_by_selector(0, ChartSelector::index(0))
             .unwrap(),
         None
     );
@@ -643,7 +643,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .slide_chart_caption(0, duplicate.drawable_object_id)
+            .slide_chart_caption_by_selector(0, ChartSelector::index(1))
             .unwrap(),
         Some("Revenue by region".to_owned())
     );

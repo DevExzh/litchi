@@ -9934,6 +9934,130 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
+    def test_focused_keynote_chart_caption_rejects_legacy_calls_and_ignores_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package/chart_caption.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// editor.set_slide_chart_caption(0, id, caption);\n"
+                'const NOTE: &str = "editor.remove_slide_chart_caption(0, id)";\n'
+                "fn set_slide_chart_caption_by_selector() {}\n"
+                "fn remove_slide_chart_caption_for_test() {}\n"
+                "fn set_slide_chart_caption() {}\n"
+                "fn remove_slide_chart_caption() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_legacy_calls(root),
+                [
+                    "focused litchi-keynote chart-caption source retains legacy call "
+                    "remove_slide_chart_caption: "
+                    "crates/litchi-keynote/src/package/chart_caption.rs:6",
+                    "focused litchi-keynote chart-caption source retains legacy call "
+                    "set_slide_chart_caption: "
+                    "crates/litchi-keynote/src/package/chart_caption.rs:5",
+                ],
+            )
+
+    def test_iwa_keynote_chart_caption_requires_typed_facade_and_deprecated_ids(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_CHART_CAPTION_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_caption(&self, id: u64) {}\n"
+                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
+                "    pub fn remove_slide_chart_caption(&mut self, id: u64) {}\n"
+                "    pub fn slide_chart_caption_by_selector(&self) {}\n"
+                "    pub fn set_slide_chart_caption_by_selector(&mut self) {}\n"
+                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_chart_caption_source_topology(root)
+            self.assertEqual(len(violations), 3)
+            for method in boundaries.IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS:
+                self.assertTrue(
+                    any(
+                        "chart-caption legacy method must remain deprecated " + method
+                        in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub fn slide_chart_caption(&self, id: u64) {}\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub fn remove_slide_chart_caption(&mut self, id: u64) {}\n"
+                "    pub fn slide_chart_caption_by_selector(&self) {}\n"
+                "    pub fn set_slide_chart_caption_by_selector(&mut self) {}\n"
+                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_caption_source_topology(root), []
+            )
+
+    def test_focused_keynote_chart_caption_facade_requires_semantic_owner_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
+            library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            owner.parent.mkdir(parents=True)
+            canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nimpl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            exports = ", ".join(canonical)
+            package.write_text(
+                "mod slide_chart_caption;\n"
+                f"pub use slide_chart_caption::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            library.write_text(
+                f"pub use package::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_caption(bytes: &[u8]) -> ChartCaptionSnapshot<'_> { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("public method exposes physical type" in item for item in violations),
+                violations,
+            )
+
     def test_focused_numbers_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:
