@@ -3043,8 +3043,43 @@ IWA_NUMBERS_CHART_CAPTION_REWRITE_FUNCTIONS = (
 IWA_CHART_CAPTION_CODEC_HELPER_SOURCE = Path(
     "crates/litchi-iwa/src/charts/caption_edge.rs"
 )
+# Pages and Numbers must consume the format-neutral hidden seam, rather than
+# importing the compatibility-named implementation directly.  Keep the
+# alias/API check here (instead of relying on Cargo) so a local helper cannot
+# satisfy the owner ratchet by merely importing similarly named functions.
+IWA_CHART_CAPTION_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+IWA_CHART_CAPTION_CODEC_IMPLEMENTATION_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_chart_caption_codec.rs"
+)
+IWA_CHART_CAPTION_CODEC_MODULE = "chart_caption_codec"
+IWA_CHART_CAPTION_CODEC_REQUIRED_APIS = (
+    "decode_chart_caption_identifier",
+    "rewrite_chart_caption_with_report",
+)
+IWA_CHART_CAPTION_CODEC_HIDDEN_ALIAS = re.compile(
+    r"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]"
+    r"\s*pub\s+mod\s+chart_caption_codec\s*\{(?P<body>.*?)\n\s*\}"
+)
 IWA_CHART_CAPTION_EDGE_API_NAMES = frozenset(
     {"chart_caption_identifier", "rewrite_chart_caption_identifier"}
+)
+IWA_CHART_CAPTION_EDGE_API_TARGETS = {
+    "chart_caption_identifier": "decode_chart_caption_identifier",
+    "rewrite_chart_caption_identifier": "rewrite_chart_caption_with_report",
+}
+# These are the only broader generated owners allowed inside the two host
+# caption modules.  They are graph/theme discovery, not selected-edge wire
+# access.  Keep this explicit: a new generated decoder must either move to the
+# graph/theme owner or be rejected by this boundary.
+IWA_CHART_CAPTION_ALLOWED_GRAPH_THEME_FUNCTIONS = frozenset(
+    {
+        "body_chart_graph",
+        "chart_graph",
+        "body_chart_caption_theme",
+        "sheet_chart_caption_theme",
+    }
 )
 IWA_CHART_CAPTION_GENERATED_DECODE_PATTERNS = (
     (
@@ -3078,6 +3113,32 @@ IWA_CHART_CAPTION_GENERATED_DECODE_PATTERNS = (
             r"(?:[ \t\r\n]*::)?[ \t\r\n]*(?:<|\()"
         ),
     ),
+    (
+        "generated IWorkThemeArchive decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?IWorkThemeArchive"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+)
+IWA_CHART_CAPTION_MANUAL_WIRE_MARKERS = frozenset(
+    {
+        "DecodeOptions",
+        "WireError",
+        "WireView",
+        "WireDescent",
+        "WireLimits",
+        "WireResourceLimit",
+        "append_varint",
+        "next_field",
+        "parse_field",
+        "parse_wire_field",
+        "parse_wire_message",
+        "prost",
+        "prost_types",
+        "read_wire_field",
+        "take_varint",
+    }
 )
 IWA_CHART_CAPTION_LEGACY_CODEC_MARKERS = frozenset(
     {
@@ -5661,6 +5722,48 @@ def _rust_named_function_body(source: str, name: str) -> tuple[str, int] | None:
     """Return one top-level Rust function body and its source offset."""
 
     return _rust_top_level_function_bodies(source).get(name)
+
+
+def _rust_mask_named_function_bodies(
+    source: str, names: frozenset[str]
+) -> str:
+    """Mask top-level function bodies whose ownership is explicitly allowed.
+
+    The returned text keeps offsets and newlines, which lets the normal
+    marker scanners report useful source locations.  Nested functions are not
+    allowed to opt a surrounding production function out of the ratchet.
+    """
+
+    code = _mask_rust_non_code(source)
+    masked = list(source)
+
+    def blank(start: int, end: int) -> None:
+        for offset in range(start, end):
+            if masked[offset] != "\n":
+                masked[offset] = " "
+
+    for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+        name = declaration.group(1)
+        if name not in names:
+            continue
+        if code.count("{", 0, declaration.start()) != code.count(
+            "}", 0, declaration.start()
+        ):
+            continue
+        opening = code.find("{", declaration.end())
+        if opening < 0:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth == 0:
+            blank(declaration.start(), cursor)
+    return "".join(masked)
 
 
 def _numbers_table_cell_storage_codec_call_patterns(
@@ -11596,6 +11699,48 @@ def _audit_iwa_chart_caption_source_topology(
     production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
     source = _mask_rust_non_code(production_source)
 
+    codec_lib_path = root / IWA_CHART_CAPTION_CODEC_PUBLIC_SOURCE
+    codec_impl_path = root / IWA_CHART_CAPTION_CODEC_IMPLEMENTATION_SOURCE
+    codec_lib_source = ""
+    codec_impl_source = ""
+    if not codec_lib_path.is_file():
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source is missing the "
+            f"hidden neutral {IWA_CHART_CAPTION_CODEC_MODULE} module: "
+            f"{IWA_CHART_CAPTION_CODEC_PUBLIC_SOURCE}"
+        )
+    else:
+        codec_lib_source = codec_lib_path.read_text(encoding="utf-8")
+        alias = IWA_CHART_CAPTION_CODEC_HIDDEN_ALIAS.search(codec_lib_source)
+        if alias is None or not re.search(
+            r"\bpub\s+use\s+super\s*::\s*keynote_chart_caption_codec\s*::\s*\*",
+            alias.group("body") if alias is not None else "",
+        ):
+            violations.append(
+                f"focused litchi-iwa {family} chart-caption source requires the "
+                f"#[doc(hidden)] neutral {IWA_CHART_CAPTION_CODEC_MODULE} alias: "
+                f"{IWA_CHART_CAPTION_CODEC_PUBLIC_SOURCE}"
+            )
+    if not codec_impl_path.is_file():
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source is missing the strict "
+            f"codec implementation: {IWA_CHART_CAPTION_CODEC_IMPLEMENTATION_SOURCE}"
+        )
+    else:
+        codec_impl_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(codec_impl_path.read_text(encoding="utf-8"))
+        )
+        for api in IWA_CHART_CAPTION_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"(?m)^\s*pub\s+fn\s+{re.escape(api)}\b",
+                codec_impl_source,
+            ) is None:
+                violations.append(
+                    f"focused litchi-iwa {family} chart-caption neutral codec is "
+                    f"missing strict API {api}: "
+                    f"{IWA_CHART_CAPTION_CODEC_IMPLEMENTATION_SOURCE}"
+                )
+
     helper_path = root / IWA_CHART_CAPTION_CODEC_HELPER_SOURCE
     helper_source = ""
     if not helper_path.is_file():
@@ -11609,7 +11754,7 @@ def _audit_iwa_chart_caption_source_topology(
         )
         neutral_helper = re.search(
             r"\blitchi_iwa_protos\b[ \t\r\n]*::[ \t\r\n]*"
-            r"chart_caption_codec\b|\bchart_caption_codec\b",
+            r"chart_caption_codec\b",
             helper_source,
         )
         if neutral_helper is None:
@@ -11619,6 +11764,29 @@ def _audit_iwa_chart_caption_source_topology(
                 f"neutral chart_caption_codec: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}:"
                 f"{line_number}"
             )
+        else:
+            helper_functions = _rust_top_level_function_bodies(helper_source)
+            for helper_name, codec_api in IWA_CHART_CAPTION_EDGE_API_TARGETS.items():
+                helper_body = helper_functions.get(helper_name)
+                if helper_body is None:
+                    violations.append(
+                        f"focused litchi-iwa {family} chart-caption helper is missing "
+                        f"{helper_name}: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}"
+                    )
+                    continue
+                body, body_offset = helper_body
+                if re.search(
+                    rf"(?<![A-Za-z0-9_#]){IWA_CHART_CAPTION_CODEC_MODULE}"
+                    rf"[ \t\r\n]*::[ \t\r\n]*{re.escape(codec_api)}"
+                    rf"[ \t\r\n]*\(",
+                    body,
+                ) is None:
+                    line_number = helper_source.count("\n", 0, body_offset) + 1
+                    violations.append(
+                        f"focused litchi-iwa {family} chart-caption helper {helper_name} "
+                        f"must call strict {IWA_CHART_CAPTION_CODEC_MODULE}::{codec_api}: "
+                        f"{IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}:{line_number}"
+                    )
 
     edge_import = re.search(
         r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?use[ \t\r\n]+"
@@ -11647,9 +11815,15 @@ def _audit_iwa_chart_caption_source_topology(
     # These are deliberately checked only in the caption source and shared
     # edge helper.  Generated decodes in pages/.../charts/graph.rs and
     # numbers/.../sheet_charts/graph.rs are broader chart ownership and are
-    # outside this focused edge ratchet.
+    # outside this focused edge ratchet.  The named graph/theme functions in
+    # the caption modules are the other explicit exception: they remain the
+    # compatibility owner for chart discovery and theme decoding.  Everything
+    # else is the selected-edge boundary and must stay generated-free.
+    forbidden_source = _rust_mask_named_function_bodies(
+        source, IWA_CHART_CAPTION_ALLOWED_GRAPH_THEME_FUNCTIONS
+    )
     generated_type = re.search(
-        r"(?<![A-Za-z0-9_#])(?:r#)?IWorkChartArchive\b", source
+        r"(?<![A-Za-z0-9_#])(?:r#)?IWorkChartArchive\b", forbidden_source
     )
     if generated_type is not None:
         line_number = source.count("\n", 0, generated_type.start()) + 1
@@ -11658,15 +11832,28 @@ def _audit_iwa_chart_caption_source_topology(
             f"IWorkChartArchive type: {relative}:{line_number}"
         )
     for label, pattern in IWA_CHART_CAPTION_GENERATED_DECODE_PATTERNS:
-        for match in pattern.finditer(source):
+        for match in pattern.finditer(forbidden_source):
             line_number = source.count("\n", 0, match.start()) + 1
             violations.append(
                 f"focused litchi-iwa {family} chart-caption source retains generated "
                 f"{label}: {relative}:{line_number}"
             )
+    for marker in sorted(IWA_CHART_CAPTION_MANUAL_WIRE_MARKERS):
+        marker_match = re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+            forbidden_source,
+        )
+        if marker_match is None:
+            continue
+        line_number = source.count("\n", 0, marker_match.start()) + 1
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source retains manual "
+            f"wire marker {marker}: {relative}:{line_number}"
+        )
     for marker in sorted(IWA_CHART_CAPTION_LEGACY_CODEC_MARKERS):
         marker_match = re.search(
-            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", source
+            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+            forbidden_source,
         )
         if marker_match is None:
             continue
@@ -11677,7 +11864,8 @@ def _audit_iwa_chart_caption_source_topology(
         )
     for marker in sorted(legacy_rewrite_markers):
         marker_match = re.search(
-            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", source
+            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+            forbidden_source,
         )
         if marker_match is None:
             continue

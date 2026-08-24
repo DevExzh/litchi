@@ -78,6 +78,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_chart_caption"
+path = "fuzz_targets/keynote_chart_caption.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

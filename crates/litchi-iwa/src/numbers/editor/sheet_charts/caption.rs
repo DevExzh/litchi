@@ -5,8 +5,9 @@ use crate::charts::caption_edge::{chart_caption_identifier, rewrite_chart_captio
 use crate::image_caption::{
     CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
     componentized_caption_objects, drawable_caption_slot, insert_componentized_caption_style,
-    replace_object_reference, standin_caption_object,
+    standin_caption_object,
 };
+use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 
@@ -359,10 +360,10 @@ fn retarget_sheet_chart_caption_edge(
     old_reference_id: u64,
     replacement_id: u64,
 ) -> Result<()> {
-    let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
+    let source_object = archive.object(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
     })?;
-    let message_indexes = object
+    let message_indexes = source_object
         .messages
         .iter()
         .enumerate()
@@ -373,7 +374,95 @@ fn retarget_sheet_chart_caption_edge(
             "Numbers chart {drawable_object_id} must have exactly one chart payload"
         )));
     };
-    let original = object.messages[*message_index].data.as_slice();
+    let message_info = source_object
+        .archive_info
+        .message_infos
+        .get(*message_index)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers chart {drawable_object_id} has no metadata for chart payload"
+            ))
+        })?;
+    if old_reference_id == replacement_id || replacement_id == 0 {
+        return Err(Error::InvalidFormat(
+            "Numbers chart caption reference transition is invalid".to_owned(),
+        ));
+    }
+    if message_info.data_references.contains(&old_reference_id)
+        || message_info.data_references.contains(&replacement_id)
+        || message_info
+            .object_references
+            .iter()
+            .filter(|identifier| **identifier == old_reference_id)
+            .count()
+            != 1
+        || message_info.object_references.contains(&replacement_id)
+    {
+        return Err(Error::InvalidFormat(
+            "Numbers chart caption reference metadata is ambiguous".to_owned(),
+        ));
+    }
+
+    struct OwnedFieldTransition {
+        path: Vec<u32>,
+        before: Vec<u64>,
+        after: Vec<u64>,
+    }
+    let mut field_states = Vec::new();
+    field_states
+        .try_reserve_exact(message_info.field_infos.len())
+        .map_err(|_| {
+            Error::InvalidFormat("Numbers chart FieldInfo allocation failed".to_owned())
+        })?;
+    let mut field_edges = 0usize;
+    for field in &message_info.field_infos {
+        let count = field
+            .object_references
+            .iter()
+            .filter(|identifier| **identifier == old_reference_id)
+            .count();
+        if field.data_references.contains(&old_reference_id)
+            || field.data_references.contains(&replacement_id)
+            || field.object_references.contains(&replacement_id)
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers chart caption FieldInfo references are ambiguous".to_owned(),
+            ));
+        }
+        if count != 0
+            && (count != 1
+                || !matches!(
+                    field.path.path.as_slice(),
+                    [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
+                ))
+        {
+            return Err(Error::InvalidFormat(
+                "Numbers chart caption FieldInfo path is unsupported".to_owned(),
+            ));
+        }
+        if count != 0 {
+            field_edges = field_edges.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("Numbers chart FieldInfo count overflow".to_owned())
+            })?;
+            if field_edges > 1 {
+                return Err(Error::InvalidFormat(
+                    "Numbers chart caption FieldInfo reference is duplicated".to_owned(),
+                ));
+            }
+        }
+        let mut after = field.object_references.clone();
+        after.retain(|identifier| *identifier != old_reference_id);
+        if count != 0 {
+            after.push(replacement_id);
+        }
+        field_states.push(OwnedFieldTransition {
+            path: field.path.path.clone(),
+            before: field.object_references.clone(),
+            after,
+        });
+    }
+
+    let original = source_object.messages[*message_index].data.as_slice();
     let current_reference_id = chart_caption_identifier(limits, original)?;
     if current_reference_id != Some(old_reference_id) {
         return Err(Error::InvalidFormat(format!(
@@ -387,17 +476,39 @@ fn retarget_sheet_chart_caption_edge(
             "Numbers chart caption reference patch failed validation".to_owned(),
         ));
     }
-    object.replace_message(
-        *message_index,
-        RawMessage {
-            type_: CHART_MESSAGE_TYPE,
-            data,
-        },
-    )?;
-    replace_object_reference(
-        &mut object.archive_info.message_infos[*message_index].object_references,
-        old_reference_id,
-        replacement_id,
-    );
+
+    let aggregate_before = message_info.object_references.clone();
+    let mut aggregate_after = aggregate_before.clone();
+    aggregate_after.retain(|identifier| *identifier != old_reference_id);
+    aggregate_after.push(replacement_id);
+    let fields = field_states
+        .iter()
+        .enumerate()
+        .map(|(field_info_index, field)| FieldObjectReferenceTransition {
+            field_info_index,
+            expected_path: field.path.as_slice(),
+            before: field.before.as_slice(),
+            after: field.after.as_slice(),
+        })
+        .collect::<Vec<_>>();
+    let transition = ObjectReferenceTransition {
+        aggregate_before: aggregate_before.as_slice(),
+        aggregate_after: aggregate_after.as_slice(),
+        fields: fields.as_slice(),
+    };
+    let mut rewritten_object = source_object.clone();
+    rewritten_object
+        .replace_message_transitioning_object_references_preserving_header_with_limits(
+            *message_index,
+            RawMessage {
+                type_: CHART_MESSAGE_TYPE,
+                data,
+            },
+            transition,
+            limits.archive_limits(),
+        )?;
+    *archive.object_mut(drawable_object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("Numbers chart {drawable_object_id} is missing"))
+    })? = rewritten_object;
     Ok(())
 }

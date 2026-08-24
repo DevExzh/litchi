@@ -243,6 +243,413 @@ fn raw_fields(data: &[u8], number: u32) -> Vec<Vec<u8>> {
         .collect()
 }
 
+const UNKNOWN_ARCHIVE_INFO_FIELD: u32 = 4_095;
+
+fn test_encode_varint(mut value: u64) -> Vec<u8> {
+    let mut encoded = Vec::new();
+    while value >= 0x80 {
+        encoded.push((value as u8) | 0x80);
+        value >>= 7;
+    }
+    encoded.push(value as u8);
+    encoded
+}
+
+fn test_varint_width(value: u64) -> usize {
+    test_encode_varint(value).len()
+}
+
+fn pages_chart_caption_reference(editor: &PagesEditor, drawable_object_id: u64) -> u64 {
+    let data = pages_chart_caption_data(editor, drawable_object_id);
+    pages_chart_caption_reference_from_data(&data)
+}
+
+fn pages_chart_caption_reference_from_data(data: &[u8]) -> u64 {
+    IWorkChartArchive::decode(&data)
+        .unwrap()
+        .drawable
+        .super_
+        .unwrap()
+        .caption
+        .unwrap()
+        .identifier
+}
+
+fn pages_chart_caption_reference_in_archive(
+    editor: &PagesEditor,
+    archive_name: &str,
+    drawable_object_id: u64,
+) -> u64 {
+    let archive = editor.package().archive(archive_name).unwrap();
+    let data = archive
+        .object(drawable_object_id)
+        .unwrap()
+        .messages
+        .iter()
+        .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+        .unwrap()
+        .data
+        .as_slice();
+    pages_chart_caption_reference_from_data(data)
+}
+
+fn pages_chart_message_info(
+    editor: &PagesEditor,
+    drawable_object_id: u64,
+) -> crate::archive::MessageInfo {
+    let graph = body_chart_graph(editor, drawable_object_id).unwrap();
+    let archive = editor.package().archive(&graph.archive_name).unwrap();
+    let object = archive.object(drawable_object_id).unwrap();
+    let message_index = object
+        .messages
+        .iter()
+        .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+        .unwrap();
+    object.archive_info.message_infos[message_index].clone()
+}
+
+fn pages_archive_header(
+    editor: &PagesEditor,
+    archive_name: &str,
+    object_identifier: u64,
+) -> Vec<u8> {
+    let compressed = editor.package().entry(archive_name).unwrap();
+    let source = crate::snappy::SnappyStream::decompress(compressed)
+        .unwrap()
+        .into_bytes();
+    let archive = crate::archive::Archive::parse(&source).unwrap();
+    let object = archive.object(object_identifier).unwrap();
+    let object_start = usize::try_from(object.header_offset).unwrap();
+    let prefix_length = test_decode_varint(&source[object_start..]).1;
+    let header_start = object_start + prefix_length;
+    let header_end = usize::try_from(object.data_offset).unwrap();
+    source[header_start..header_end].to_vec()
+}
+
+fn test_decode_varint(source: &[u8]) -> (usize, usize) {
+    let mut value = 0usize;
+    let mut shift = 0usize;
+    for (index, byte) in source.iter().copied().enumerate() {
+        value |= usize::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return (value, index + 1);
+        }
+        shift += 7;
+    }
+    panic!("truncated test varint")
+}
+
+fn inject_pages_archive_unknown_header(
+    editor: &mut PagesEditor,
+    archive_name: &str,
+    object_identifier: u64,
+) -> Vec<u8> {
+    let mut package = editor.package().clone();
+    let compressed = package.entry(archive_name).unwrap().to_vec();
+    let source = crate::snappy::SnappyStream::decompress(&compressed)
+        .unwrap()
+        .into_bytes();
+    let archive = crate::archive::Archive::parse(&source).unwrap();
+    let object = archive.object(object_identifier).unwrap();
+    let object_start = usize::try_from(object.header_offset).unwrap();
+    let (header_length, prefix_length) = test_decode_varint(&source[object_start..]);
+    let header_start = object_start + prefix_length;
+    let header_end = usize::try_from(object.data_offset).unwrap();
+    assert_eq!(header_end - header_start, header_length);
+    let payload_end = header_end + usize::try_from(object.data_length).unwrap();
+
+    let mut unknown = Vec::new();
+    append_varint_field(&mut unknown, UNKNOWN_ARCHIVE_INFO_FIELD, 42).unwrap();
+    let rewritten_header_length = header_length + unknown.len();
+    let mut rewritten = Vec::with_capacity(source.len() + unknown.len());
+    rewritten.extend_from_slice(&source[..object_start]);
+    rewritten.extend_from_slice(&test_encode_varint(rewritten_header_length as u64));
+    rewritten.extend_from_slice(&source[header_start..header_end]);
+    rewritten.extend_from_slice(&unknown);
+    rewritten.extend_from_slice(&source[header_end..payload_end]);
+    rewritten.extend_from_slice(&source[payload_end..]);
+    package
+        .insert_entry(
+            archive_name,
+            crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
+        )
+        .unwrap();
+    *editor = PagesEditor::from_package(package).unwrap();
+    unknown
+}
+
+fn reserve_pages_three_byte_caption_identifier(editor: &mut PagesEditor, archive_name: &str) {
+    let next = crate::package_metadata::next_object_identifier(editor.package()).unwrap();
+    if next < 16_383 {
+        let mut package = editor.package().clone();
+        package
+            .update_archive(archive_name, |archive| {
+                archive.insert_object(crate::archive::ArchiveObject::new(
+                    16_383,
+                    vec![RawMessage {
+                        type_: 65_534,
+                        data: vec![0],
+                    }],
+                )?)?;
+                Ok(())
+            })
+            .unwrap();
+        *editor = PagesEditor::from_package(package).unwrap();
+    }
+}
+
+fn mutate_pages_caption_metadata(
+    editor: &mut PagesEditor,
+    drawable_object_id: u64,
+    old_reference_id: u64,
+    replacement_id: u64,
+    mode: PagesCaptionMetadataMode,
+) {
+    let graph = body_chart_graph(editor, drawable_object_id).unwrap();
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&graph.archive_name, |archive| {
+            let object = archive.object_mut(drawable_object_id).unwrap();
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                .unwrap();
+            let info = &mut object.archive_info.message_infos[message_index];
+            match mode {
+                PagesCaptionMetadataMode::AggregateDuplicate => {
+                    info.object_references.push(old_reference_id);
+                },
+                PagesCaptionMetadataMode::FieldOnly => {
+                    info.object_references.retain(|id| *id != old_reference_id);
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        object_references: vec![old_reference_id],
+                        ..Default::default()
+                    });
+                },
+                PagesCaptionMetadataMode::WrongFieldPath => {
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![9, 9]),
+                        object_references: vec![old_reference_id],
+                        ..Default::default()
+                    });
+                },
+                PagesCaptionMetadataMode::DuplicateField => {
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        object_references: vec![old_reference_id, old_reference_id],
+                        ..Default::default()
+                    });
+                },
+                PagesCaptionMetadataMode::StaleField => {
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        object_references: vec![old_reference_id, 999_999],
+                        ..Default::default()
+                    });
+                },
+                PagesCaptionMetadataMode::NewField => {
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        object_references: vec![replacement_id],
+                        ..Default::default()
+                    });
+                },
+                PagesCaptionMetadataMode::DataReference => {
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        data_references: vec![old_reference_id],
+                        ..Default::default()
+                    });
+                },
+                PagesCaptionMetadataMode::AuthorizedField => {
+                    info.field_infos.push(crate::archive::FieldInfo {
+                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        object_references: vec![old_reference_id],
+                        ..Default::default()
+                    });
+                },
+            }
+            Ok(())
+        })
+        .unwrap();
+    *editor = PagesEditor::from_package(package).unwrap();
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PagesCaptionMetadataMode {
+    AggregateDuplicate,
+    FieldOnly,
+    WrongFieldPath,
+    DuplicateField,
+    StaleField,
+    NewField,
+    DataReference,
+    AuthorizedField,
+}
+
+fn pages_caption_storage_id(editor: &PagesEditor, drawable_object_id: u64) -> u64 {
+    let reference_id = pages_chart_caption_reference(editor, drawable_object_id);
+    let archive_name = find_object_archive(editor.package(), reference_id).unwrap();
+    let archive = editor.package().archive(&archive_name).unwrap();
+    let object = archive.object(reference_id).unwrap();
+    let message = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == crate::image_caption::CAPTION_INFO_MESSAGE_TYPE)
+        .unwrap();
+    litchi_iwa_protos::pages_movie_caption_codec::decode_caption_info(
+        &message.data,
+        litchi_iwa_protos::pages_movie_caption_codec::DecodeOptions::for_source(&message.data),
+    )
+    .unwrap()
+    .owned_storage_identifier()
+    .unwrap()
+}
+
+fn make_pages_caption_storage_shared(
+    editor: &mut PagesEditor,
+    source_drawable_object_id: u64,
+    shared_drawable_object_id: u64,
+) {
+    let source_storage_id = pages_caption_storage_id(editor, source_drawable_object_id);
+    let shared_reference_id = pages_chart_caption_reference(editor, shared_drawable_object_id);
+    let old_storage_id = pages_caption_storage_id(editor, shared_drawable_object_id);
+    let archive_name = find_object_archive(editor.package(), shared_reference_id).unwrap();
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(shared_reference_id).unwrap();
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| {
+                    message.type_ == crate::image_caption::CAPTION_INFO_MESSAGE_TYPE
+                })
+                .unwrap();
+            let original = object.messages[message_index].data.clone();
+            let data = litchi_iwa_protos::pages_movie_caption_codec::rewrite_caption_info(
+                &original,
+                litchi_iwa_protos::pages_movie_caption_codec::CaptionInfoWrite::new(&[(
+                    old_storage_id,
+                    source_storage_id,
+                )]),
+                litchi_iwa_protos::pages_movie_caption_codec::DecodeOptions::new(
+                    original.len(),
+                    original.len().saturating_mul(4),
+                    original.len().saturating_mul(64),
+                    8,
+                ),
+            )
+            .unwrap();
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: crate::image_caption::CAPTION_INFO_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            for identifier in
+                &mut object.archive_info.message_infos[message_index].object_references
+            {
+                // The old storage identifier is the only reference in this
+                // graph that is not a style or placement object.
+                if *identifier == old_storage_id {
+                    *identifier = source_storage_id;
+                }
+            }
+            Ok(())
+        })
+        .unwrap();
+    *editor = PagesEditor::from_package(package).unwrap();
+}
+
+fn make_pages_caption_info_shared(
+    editor: &mut PagesEditor,
+    source_drawable_object_id: u64,
+    shared_drawable_object_id: u64,
+) {
+    let source_caption_id = pages_chart_caption_reference(editor, source_drawable_object_id);
+    let shared_caption_id = pages_chart_caption_reference(editor, shared_drawable_object_id);
+    let graph = body_chart_graph(editor, shared_drawable_object_id).unwrap();
+    let limits = editor.package().limits();
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&graph.archive_name, |archive| {
+            let object = archive.object_mut(shared_drawable_object_id).unwrap();
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                .unwrap();
+            let original = object.messages[message_index].data.clone();
+            let data = crate::charts::caption_edge::rewrite_chart_caption_identifier(
+                limits,
+                &original,
+                source_caption_id,
+            )?;
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: CHART_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            let info = &mut object.archive_info.message_infos[message_index];
+            for identifier in &mut info.object_references {
+                if *identifier == shared_caption_id {
+                    *identifier = source_caption_id;
+                }
+            }
+            for field in &mut info.field_infos {
+                for identifier in &mut field.object_references {
+                    if *identifier == shared_caption_id {
+                        *identifier = source_caption_id;
+                    }
+                }
+            }
+            Ok(())
+        })
+        .unwrap();
+    *editor = PagesEditor::from_package(package).unwrap();
+}
+
+fn move_pages_caption_aggregate_owner_to_unrelated_object(
+    editor: &mut PagesEditor,
+    drawable_object_id: u64,
+    unrelated_object_id: u64,
+) {
+    let caption_id = pages_chart_caption_reference(editor, drawable_object_id);
+    let graph = body_chart_graph(editor, unrelated_object_id).unwrap();
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&graph.archive_name, |archive| {
+            let selected = archive.object_mut(drawable_object_id).unwrap();
+            let selected_message_index = selected
+                .messages
+                .iter()
+                .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                .unwrap();
+            selected.archive_info.message_infos[selected_message_index]
+                .object_references
+                .retain(|identifier| *identifier != caption_id);
+
+            let unrelated = archive.object_mut(unrelated_object_id).unwrap();
+            let unrelated_message_index = unrelated
+                .messages
+                .iter()
+                .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                .unwrap();
+            unrelated.archive_info.message_infos[unrelated_message_index]
+                .object_references
+                .push(caption_id);
+            Ok(())
+        })
+        .unwrap();
+    *editor = PagesEditor::from_package(package).unwrap();
+}
+
 fn assert_only_title_fields_changed(before: &[u8], after: &[u8]) {
     let before_fields = parse_wire_fields(before).unwrap();
     let after_fields = parse_wire_fields(after).unwrap();
@@ -747,6 +1154,289 @@ fn pages_chart_caption_rewrite_preserves_unknown_chart_fields() {
         editor.body_chart_caption(chart.drawable_object_id).unwrap(),
         Some("Revenue by region".to_owned())
     );
+}
+
+#[test]
+fn pages_chart_caption_retarget_preserves_unknown_archive_header_and_metadata_on_width_growth() {
+    let mut editor = PagesEditor::create_with_text("Chart caption header").unwrap();
+    let chart = editor
+        .add_body_chart(
+            "Chart caption header".encode_utf16().count(),
+            Kind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let graph = body_chart_graph(&editor, chart.drawable_object_id).unwrap();
+    reserve_pages_three_byte_caption_identifier(&mut editor, &graph.archive_name);
+
+    let old_reference_id = pages_chart_caption_reference(&editor, chart.drawable_object_id);
+    let next_identifier =
+        crate::package_metadata::next_object_identifier(editor.package()).unwrap();
+    let replacement_id = next_identifier + 1;
+    assert_ne!(
+        test_varint_width(old_reference_id),
+        test_varint_width(replacement_id),
+        "fixture must exercise a caption-reference varint-width change (old={old_reference_id}, replacement={replacement_id})"
+    );
+    let before_info = pages_chart_message_info(&editor, chart.drawable_object_id);
+    let unknown = inject_pages_archive_unknown_header(
+        &mut editor,
+        &graph.archive_name,
+        chart.drawable_object_id,
+    );
+    let before_header =
+        pages_archive_header(&editor, &graph.archive_name, chart.drawable_object_id);
+    let before_unknown = raw_fields(&before_header, UNKNOWN_ARCHIVE_INFO_FIELD);
+    assert_eq!(before_unknown, vec![unknown.clone()]);
+
+    editor
+        .set_body_chart_caption(chart.drawable_object_id, "Caption after width growth")
+        .unwrap();
+    let after_data = pages_chart_caption_data(&editor, chart.drawable_object_id);
+    let after_info = pages_chart_message_info(&editor, chart.drawable_object_id);
+    let mut expected_info = before_info;
+    expected_info.length = u32::try_from(after_data.len()).unwrap();
+    expected_info
+        .object_references
+        .retain(|identifier| *identifier != old_reference_id);
+    expected_info.object_references.push(replacement_id);
+    for field in &mut expected_info.field_infos {
+        let had_old_reference = field
+            .object_references
+            .iter()
+            .any(|identifier| *identifier == old_reference_id);
+        field
+            .object_references
+            .retain(|identifier| *identifier != old_reference_id);
+        if had_old_reference {
+            field.object_references.push(replacement_id);
+        }
+    }
+    assert_eq!(after_info, expected_info);
+    let after_header = pages_archive_header(&editor, &graph.archive_name, chart.drawable_object_id);
+    assert_eq!(
+        raw_fields(&after_header, UNKNOWN_ARCHIVE_INFO_FIELD),
+        before_unknown,
+        "retarget must retain the complete unknown ArchiveInfo field"
+    );
+    assert_eq!(
+        pages_chart_caption_reference(&editor, chart.drawable_object_id),
+        replacement_id
+    );
+}
+
+#[test]
+fn pages_chart_caption_reference_transition_requires_exact_aggregate_and_field_metadata() {
+    let modes = [
+        PagesCaptionMetadataMode::AggregateDuplicate,
+        PagesCaptionMetadataMode::FieldOnly,
+        PagesCaptionMetadataMode::WrongFieldPath,
+        PagesCaptionMetadataMode::DuplicateField,
+        PagesCaptionMetadataMode::StaleField,
+        PagesCaptionMetadataMode::NewField,
+        PagesCaptionMetadataMode::DataReference,
+    ];
+    for mode in modes {
+        let mut editor = PagesEditor::create_with_text("Chart caption metadata").unwrap();
+        let chart = editor
+            .add_body_chart(
+                "Chart caption metadata".encode_utf16().count(),
+                Kind::Column2d,
+                sample_data(),
+                POSITION,
+                SIZE,
+            )
+            .unwrap();
+        let old_reference_id = pages_chart_caption_reference(&editor, chart.drawable_object_id);
+        let replacement_id = crate::package_metadata::next_object_identifier(editor.package())
+            .unwrap()
+            .saturating_add(1);
+        mutate_pages_caption_metadata(
+            &mut editor,
+            chart.drawable_object_id,
+            old_reference_id,
+            replacement_id,
+            mode,
+        );
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_body_chart_caption(chart.drawable_object_id, "must reject")
+                .is_err(),
+            "malformed caption metadata mode {mode:?} was accepted"
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    let mut editor = PagesEditor::create_with_text("Chart caption authorized").unwrap();
+    let chart = editor
+        .add_body_chart(
+            "Chart caption authorized".encode_utf16().count(),
+            Kind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    let old_reference_id = pages_chart_caption_reference(&editor, chart.drawable_object_id);
+    let replacement_id = crate::package_metadata::next_object_identifier(editor.package())
+        .unwrap()
+        .saturating_add(1);
+    mutate_pages_caption_metadata(
+        &mut editor,
+        chart.drawable_object_id,
+        old_reference_id,
+        replacement_id,
+        PagesCaptionMetadataMode::AuthorizedField,
+    );
+    editor
+        .set_body_chart_caption(chart.drawable_object_id, "authorized")
+        .unwrap();
+    let info = pages_chart_message_info(&editor, chart.drawable_object_id);
+    assert_eq!(
+        info.object_references
+            .iter()
+            .filter(|id| **id == old_reference_id)
+            .count(),
+        0
+    );
+    assert_eq!(
+        info.object_references
+            .iter()
+            .filter(|id| **id == replacement_id)
+            .count(),
+        1
+    );
+    assert_eq!(info.field_infos.len(), 1);
+    assert_eq!(info.field_infos[0].object_references, [replacement_id]);
+}
+
+#[test]
+fn pages_chart_caption_rejects_two_caption_infos_sharing_one_storage_atomically() {
+    let mut editor = PagesEditor::create_with_text("Shared caption storage").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Shared caption storage".encode_utf16().count(),
+            Kind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    editor
+        .set_body_chart_caption(source.drawable_object_id, "original")
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    make_pages_caption_storage_shared(
+        &mut editor,
+        source.drawable_object_id,
+        duplicate.drawable_object_id,
+    );
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_body_chart_caption(source.drawable_object_id, "must reject shared storage")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn pages_chart_caption_rejects_two_chart_payloads_sharing_one_caption_info_atomically() {
+    let mut editor = PagesEditor::create_with_text("Shared caption info").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Shared caption info".encode_utf16().count(),
+            Kind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    editor
+        .set_body_chart_caption(source.drawable_object_id, "original")
+        .unwrap();
+    let graph = body_chart_graph(&editor, source.drawable_object_id).unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    make_pages_caption_info_shared(
+        &mut editor,
+        source.drawable_object_id,
+        duplicate.drawable_object_id,
+    );
+    assert_eq!(
+        pages_chart_caption_reference_in_archive(
+            &editor,
+            &graph.archive_name,
+            source.drawable_object_id,
+        ),
+        pages_chart_caption_reference_in_archive(
+            &editor,
+            &graph.archive_name,
+            duplicate.drawable_object_id,
+        )
+    );
+
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_body_chart_caption(source.drawable_object_id, "must reject shared info")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_body_chart_caption(duplicate.drawable_object_id, "must reject shared info")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn pages_chart_caption_rejects_caption_info_owner_on_unrelated_object_atomically() {
+    let mut editor = PagesEditor::create_with_text("Unrelated caption owner").unwrap();
+    let source = editor
+        .add_body_chart(
+            "Unrelated caption owner".encode_utf16().count(),
+            Kind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    editor
+        .set_body_chart_caption(source.drawable_object_id, "original")
+        .unwrap();
+    let duplicate = editor
+        .duplicate_body_chart(
+            source.drawable_object_id,
+            editor.body_text().unwrap().encode_utf16().count(),
+        )
+        .unwrap();
+    move_pages_caption_aggregate_owner_to_unrelated_object(
+        &mut editor,
+        source.drawable_object_id,
+        duplicate.drawable_object_id,
+    );
+
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_body_chart_caption(source.drawable_object_id, "must reject stale owner")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]

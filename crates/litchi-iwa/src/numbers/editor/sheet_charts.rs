@@ -747,6 +747,466 @@ mod tests {
         .unwrap()
     }
 
+    const UNKNOWN_ARCHIVE_INFO_FIELD: u32 = 4_095;
+
+    fn test_encode_varint(mut value: u64) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        while value >= 0x80 {
+            encoded.push((value as u8) | 0x80);
+            value >>= 7;
+        }
+        encoded.push(value as u8);
+        encoded
+    }
+
+    fn test_varint_width(value: u64) -> usize {
+        test_encode_varint(value).len()
+    }
+
+    fn test_decode_varint(source: &[u8]) -> (usize, usize) {
+        let mut value = 0usize;
+        let mut shift = 0usize;
+        for (index, byte) in source.iter().copied().enumerate() {
+            value |= usize::from(byte & 0x7f) << shift;
+            if byte & 0x80 == 0 {
+                return (value, index + 1);
+            }
+            shift += 7;
+        }
+        panic!("truncated test varint")
+    }
+
+    fn numbers_raw_fields(data: &[u8], number: u32) -> Vec<Vec<u8>> {
+        crate::wire::parse_wire_fields(data)
+            .unwrap()
+            .into_iter()
+            .filter(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
+            .collect()
+    }
+
+    fn numbers_chart_caption_data(
+        editor: &NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> Vec<u8> {
+        let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
+        editor
+            .package
+            .archive(&graph.archive_name)
+            .unwrap()
+            .object(drawable_object_id)
+            .unwrap()
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .unwrap()
+            .data
+            .clone()
+    }
+
+    fn numbers_chart_caption_reference(
+        editor: &NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> u64 {
+        let data = numbers_chart_caption_data(editor, sheet_id, drawable_object_id);
+        numbers_chart_caption_reference_from_data(&data)
+    }
+
+    fn numbers_chart_caption_reference_from_data(data: &[u8]) -> u64 {
+        IWorkChartArchive::decode(&data)
+            .unwrap()
+            .drawable
+            .super_
+            .unwrap()
+            .caption
+            .unwrap()
+            .identifier
+    }
+
+    fn numbers_chart_caption_reference_in_archive(
+        editor: &NumbersEditor,
+        archive_name: &str,
+        drawable_object_id: u64,
+    ) -> u64 {
+        let archive = editor.package.archive(archive_name).unwrap();
+        let data = archive
+            .object(drawable_object_id)
+            .unwrap()
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .unwrap()
+            .data
+            .as_slice();
+        numbers_chart_caption_reference_from_data(data)
+    }
+
+    fn numbers_chart_message_info(
+        editor: &NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> crate::archive::MessageInfo {
+        let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
+        let archive = editor.package.archive(&graph.archive_name).unwrap();
+        let object = archive.object(drawable_object_id).unwrap();
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .unwrap();
+        object.archive_info.message_infos[message_index].clone()
+    }
+
+    fn numbers_archive_header(
+        editor: &NumbersEditor,
+        archive_name: &str,
+        object_identifier: u64,
+    ) -> Vec<u8> {
+        let compressed = editor.package.entry(archive_name).unwrap();
+        let source = crate::snappy::SnappyStream::decompress(compressed)
+            .unwrap()
+            .into_bytes();
+        let archive = crate::archive::Archive::parse(&source).unwrap();
+        let object = archive.object(object_identifier).unwrap();
+        let object_start = usize::try_from(object.header_offset).unwrap();
+        let (_, prefix_length) = test_decode_varint(&source[object_start..]);
+        let header_start = object_start + prefix_length;
+        let header_end = usize::try_from(object.data_offset).unwrap();
+        source[header_start..header_end].to_vec()
+    }
+
+    fn inject_numbers_archive_unknown_header(
+        editor: &mut NumbersEditor,
+        archive_name: &str,
+        object_identifier: u64,
+    ) -> Vec<u8> {
+        let mut package = editor.package.clone();
+        let compressed = package.entry(archive_name).unwrap().to_vec();
+        let source = crate::snappy::SnappyStream::decompress(&compressed)
+            .unwrap()
+            .into_bytes();
+        let archive = crate::archive::Archive::parse(&source).unwrap();
+        let object = archive.object(object_identifier).unwrap();
+        let object_start = usize::try_from(object.header_offset).unwrap();
+        let (header_length, prefix_length) = test_decode_varint(&source[object_start..]);
+        let header_start = object_start + prefix_length;
+        let header_end = usize::try_from(object.data_offset).unwrap();
+        assert_eq!(header_end - header_start, header_length);
+        let payload_end = header_end + usize::try_from(object.data_length).unwrap();
+
+        let mut unknown = Vec::new();
+        crate::wire::append_varint_field(&mut unknown, UNKNOWN_ARCHIVE_INFO_FIELD, 42).unwrap();
+        let rewritten_header_length = header_length + unknown.len();
+        let mut rewritten = Vec::with_capacity(source.len() + unknown.len());
+        rewritten.extend_from_slice(&source[..object_start]);
+        rewritten.extend_from_slice(&test_encode_varint(rewritten_header_length as u64));
+        rewritten.extend_from_slice(&source[header_start..header_end]);
+        rewritten.extend_from_slice(&unknown);
+        rewritten.extend_from_slice(&source[header_end..payload_end]);
+        rewritten.extend_from_slice(&source[payload_end..]);
+        package
+            .insert_entry(
+                archive_name,
+                crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
+            )
+            .unwrap();
+        *editor = NumbersEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        unknown
+    }
+
+    fn reserve_numbers_three_byte_caption_identifier(
+        editor: &mut NumbersEditor,
+        archive_name: &str,
+    ) {
+        let next = crate::package_metadata::next_object_identifier(&editor.package).unwrap();
+        if next < 16_383 {
+            let mut package = editor.package.clone();
+            package
+                .update_archive(archive_name, |archive| {
+                    archive.insert_object(crate::archive::ArchiveObject::new(
+                        16_383,
+                        vec![RawMessage {
+                            type_: 65_534,
+                            data: vec![0],
+                        }],
+                    )?)?;
+                    Ok(())
+                })
+                .unwrap();
+            *editor = NumbersEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum NumbersCaptionMetadataMode {
+        AggregateDuplicate,
+        FieldOnly,
+        WrongFieldPath,
+        DuplicateField,
+        StaleField,
+        NewField,
+        DataReference,
+        AuthorizedField,
+    }
+
+    fn mutate_numbers_caption_metadata(
+        editor: &mut NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        old_reference_id: u64,
+        replacement_id: u64,
+        mode: NumbersCaptionMetadataMode,
+    ) {
+        let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
+        let mut package = editor.package.clone();
+        package
+            .update_archive(&graph.archive_name, |archive| {
+                let object = archive.object_mut(drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                    .unwrap();
+                let info = &mut object.archive_info.message_infos[message_index];
+                match mode {
+                    NumbersCaptionMetadataMode::AggregateDuplicate => {
+                        info.object_references.push(old_reference_id);
+                    },
+                    NumbersCaptionMetadataMode::FieldOnly => {
+                        info.object_references.retain(|id| *id != old_reference_id);
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            object_references: vec![old_reference_id],
+                            ..Default::default()
+                        });
+                    },
+                    NumbersCaptionMetadataMode::WrongFieldPath => {
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![9, 9]),
+                            object_references: vec![old_reference_id],
+                            ..Default::default()
+                        });
+                    },
+                    NumbersCaptionMetadataMode::DuplicateField => {
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            object_references: vec![old_reference_id, old_reference_id],
+                            ..Default::default()
+                        });
+                    },
+                    NumbersCaptionMetadataMode::StaleField => {
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            object_references: vec![old_reference_id, 999_999],
+                            ..Default::default()
+                        });
+                    },
+                    NumbersCaptionMetadataMode::NewField => {
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            object_references: vec![replacement_id],
+                            ..Default::default()
+                        });
+                    },
+                    NumbersCaptionMetadataMode::DataReference => {
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            data_references: vec![old_reference_id],
+                            ..Default::default()
+                        });
+                    },
+                    NumbersCaptionMetadataMode::AuthorizedField => {
+                        info.field_infos.push(crate::archive::FieldInfo {
+                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            object_references: vec![old_reference_id],
+                            ..Default::default()
+                        });
+                    },
+                }
+                Ok(())
+            })
+            .unwrap();
+        *editor = NumbersEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    }
+
+    fn numbers_caption_storage_id(
+        editor: &NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+    ) -> u64 {
+        let reference_id = numbers_chart_caption_reference(editor, sheet_id, drawable_object_id);
+        let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
+        let archive = editor.package.archive(&graph.archive_name).unwrap();
+        let object = archive.object(reference_id).unwrap();
+        let message = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == crate::image_caption::CAPTION_INFO_MESSAGE_TYPE)
+            .unwrap();
+        litchi_iwa_protos::pages_movie_caption_codec::decode_caption_info(
+            &message.data,
+            litchi_iwa_protos::pages_movie_caption_codec::DecodeOptions::new(
+                message.data.len(),
+                message.data.len().saturating_mul(4),
+                message.data.len().saturating_mul(64),
+                8,
+            ),
+        )
+        .unwrap()
+        .owned_storage_identifier()
+        .unwrap()
+    }
+
+    fn make_numbers_caption_storage_shared(
+        editor: &mut NumbersEditor,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+        shared_drawable_object_id: u64,
+    ) {
+        let source_storage_id =
+            numbers_caption_storage_id(editor, sheet_id, source_drawable_object_id);
+        let shared_reference_id =
+            numbers_chart_caption_reference(editor, sheet_id, shared_drawable_object_id);
+        let old_storage_id =
+            numbers_caption_storage_id(editor, sheet_id, shared_drawable_object_id);
+        let graph = chart_graph(editor, sheet_id, shared_drawable_object_id).unwrap();
+        let mut package = editor.package.clone();
+        package
+            .update_archive(&graph.archive_name, |archive| {
+                let object = archive.object_mut(shared_reference_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| {
+                        message.type_ == crate::image_caption::CAPTION_INFO_MESSAGE_TYPE
+                    })
+                    .unwrap();
+                let original = object.messages[message_index].data.clone();
+                let data = litchi_iwa_protos::pages_movie_caption_codec::rewrite_caption_info(
+                    &original,
+                    litchi_iwa_protos::pages_movie_caption_codec::CaptionInfoWrite::new(&[(
+                        old_storage_id,
+                        source_storage_id,
+                    )]),
+                    litchi_iwa_protos::pages_movie_caption_codec::DecodeOptions::new(
+                        original.len(),
+                        original.len().saturating_mul(4),
+                        original.len().saturating_mul(64),
+                        8,
+                    ),
+                )
+                .unwrap();
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: crate::image_caption::CAPTION_INFO_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                for identifier in
+                    &mut object.archive_info.message_infos[message_index].object_references
+                {
+                    if *identifier == old_storage_id {
+                        *identifier = source_storage_id;
+                    }
+                }
+                Ok(())
+            })
+            .unwrap();
+        *editor = NumbersEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    }
+
+    fn make_numbers_caption_info_shared(
+        editor: &mut NumbersEditor,
+        sheet_id: u64,
+        source_drawable_object_id: u64,
+        shared_drawable_object_id: u64,
+    ) {
+        let source_caption_id =
+            numbers_chart_caption_reference(editor, sheet_id, source_drawable_object_id);
+        let shared_caption_id =
+            numbers_chart_caption_reference(editor, sheet_id, shared_drawable_object_id);
+        let graph = chart_graph(editor, sheet_id, shared_drawable_object_id).unwrap();
+        let limits = editor.package.limits();
+        let mut package = editor.package.clone();
+        package
+            .update_archive(&graph.archive_name, |archive| {
+                let object = archive.object_mut(shared_drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                    .unwrap();
+                let original = object.messages[message_index].data.clone();
+                let data = crate::charts::caption_edge::rewrite_chart_caption_identifier(
+                    limits,
+                    &original,
+                    source_caption_id,
+                )?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: CHART_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                let info = &mut object.archive_info.message_infos[message_index];
+                for identifier in &mut info.object_references {
+                    if *identifier == shared_caption_id {
+                        *identifier = source_caption_id;
+                    }
+                }
+                for field in &mut info.field_infos {
+                    for identifier in &mut field.object_references {
+                        if *identifier == shared_caption_id {
+                            *identifier = source_caption_id;
+                        }
+                    }
+                }
+                Ok(())
+            })
+            .unwrap();
+        *editor = NumbersEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    }
+
+    fn move_numbers_caption_aggregate_owner_to_unrelated_object(
+        editor: &mut NumbersEditor,
+        sheet_id: u64,
+        drawable_object_id: u64,
+        unrelated_object_id: u64,
+    ) {
+        let caption_id = numbers_chart_caption_reference(editor, sheet_id, drawable_object_id);
+        let graph = chart_graph(editor, sheet_id, unrelated_object_id).unwrap();
+        let mut package = editor.package.clone();
+        package
+            .update_archive(&graph.archive_name, |archive| {
+                let selected = archive.object_mut(drawable_object_id).unwrap();
+                let selected_message_index = selected
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                    .unwrap();
+                selected.archive_info.message_infos[selected_message_index]
+                    .object_references
+                    .retain(|identifier| *identifier != caption_id);
+
+                let unrelated = archive.object_mut(unrelated_object_id).unwrap();
+                let unrelated_message_index = unrelated
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                    .unwrap();
+                unrelated.archive_info.message_infos[unrelated_message_index]
+                    .object_references
+                    .push(caption_id);
+                Ok(())
+            })
+            .unwrap();
+        *editor = NumbersEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    }
+
     fn assert_series_non_styles_are_unstyled(
         editor: &NumbersEditor,
         sheet_id: u64,
@@ -1263,6 +1723,280 @@ mod tests {
                 .windows(unknown.len())
                 .any(|window| window == unknown.as_slice())
         );
+    }
+
+    #[test]
+    fn native_chart_caption_retarget_preserves_unknown_archive_header_and_metadata_on_width_growth()
+    {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let graph = chart_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        reserve_numbers_three_byte_caption_identifier(&mut editor, &graph.archive_name);
+
+        let old_reference_id =
+            numbers_chart_caption_reference(&editor, sheet_id, source.drawable_object_id);
+        let next_identifier =
+            crate::package_metadata::next_object_identifier(&editor.package).unwrap();
+        let replacement_id = next_identifier + 1;
+        assert_ne!(
+            test_varint_width(old_reference_id),
+            test_varint_width(replacement_id),
+            "fixture must exercise a caption-reference varint-width change (old={old_reference_id}, replacement={replacement_id})"
+        );
+        let before_info = numbers_chart_message_info(&editor, sheet_id, source.drawable_object_id);
+        let unknown = inject_numbers_archive_unknown_header(
+            &mut editor,
+            &graph.archive_name,
+            source.drawable_object_id,
+        );
+        let before_header =
+            numbers_archive_header(&editor, &graph.archive_name, source.drawable_object_id);
+        let before_unknown = numbers_raw_fields(&before_header, UNKNOWN_ARCHIVE_INFO_FIELD);
+        assert_eq!(before_unknown, vec![unknown.clone()]);
+
+        editor
+            .set_sheet_chart_caption(
+                sheet_id,
+                source.drawable_object_id,
+                "Caption after width growth",
+            )
+            .unwrap();
+        let after_data = numbers_chart_caption_data(&editor, sheet_id, source.drawable_object_id);
+        let after_info = numbers_chart_message_info(&editor, sheet_id, source.drawable_object_id);
+        let mut expected_info = before_info;
+        expected_info.length = u32::try_from(after_data.len()).unwrap();
+        expected_info
+            .object_references
+            .retain(|identifier| *identifier != old_reference_id);
+        expected_info.object_references.push(replacement_id);
+        for field in &mut expected_info.field_infos {
+            let had_old_reference = field
+                .object_references
+                .iter()
+                .any(|identifier| *identifier == old_reference_id);
+            field
+                .object_references
+                .retain(|identifier| *identifier != old_reference_id);
+            if had_old_reference {
+                field.object_references.push(replacement_id);
+            }
+        }
+        assert_eq!(after_info, expected_info);
+        let after_header =
+            numbers_archive_header(&editor, &graph.archive_name, source.drawable_object_id);
+        assert_eq!(
+            numbers_raw_fields(&after_header, UNKNOWN_ARCHIVE_INFO_FIELD),
+            before_unknown,
+            "retarget must retain the complete unknown ArchiveInfo field"
+        );
+        assert_eq!(
+            numbers_chart_caption_reference(&editor, sheet_id, source.drawable_object_id),
+            replacement_id
+        );
+    }
+
+    #[test]
+    fn native_chart_caption_reference_transition_requires_exact_aggregate_and_field_metadata() {
+        let modes = [
+            NumbersCaptionMetadataMode::AggregateDuplicate,
+            NumbersCaptionMetadataMode::FieldOnly,
+            NumbersCaptionMetadataMode::WrongFieldPath,
+            NumbersCaptionMetadataMode::DuplicateField,
+            NumbersCaptionMetadataMode::StaleField,
+            NumbersCaptionMetadataMode::NewField,
+            NumbersCaptionMetadataMode::DataReference,
+        ];
+        for mode in modes {
+            let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+            let sheet_id = editor.sheets().unwrap()[0].object_id;
+            let source = editor
+                .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+                .unwrap();
+            let old_reference_id =
+                numbers_chart_caption_reference(&editor, sheet_id, source.drawable_object_id);
+            let replacement_id = crate::package_metadata::next_object_identifier(&editor.package)
+                .unwrap()
+                .saturating_add(1);
+            mutate_numbers_caption_metadata(
+                &mut editor,
+                sheet_id,
+                source.drawable_object_id,
+                old_reference_id,
+                replacement_id,
+                mode,
+            );
+            let before = editor.to_bytes().unwrap();
+            assert!(
+                editor
+                    .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "must reject")
+                    .is_err(),
+                "malformed caption metadata mode {mode:?} was accepted"
+            );
+            assert_eq!(editor.to_bytes().unwrap(), before);
+        }
+
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        let old_reference_id =
+            numbers_chart_caption_reference(&editor, sheet_id, source.drawable_object_id);
+        let replacement_id = crate::package_metadata::next_object_identifier(&editor.package)
+            .unwrap()
+            .saturating_add(1);
+        mutate_numbers_caption_metadata(
+            &mut editor,
+            sheet_id,
+            source.drawable_object_id,
+            old_reference_id,
+            replacement_id,
+            NumbersCaptionMetadataMode::AuthorizedField,
+        );
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "authorized")
+            .unwrap();
+        let info = numbers_chart_message_info(&editor, sheet_id, source.drawable_object_id);
+        assert_eq!(
+            info.object_references
+                .iter()
+                .filter(|id| **id == old_reference_id)
+                .count(),
+            0
+        );
+        assert_eq!(
+            info.object_references
+                .iter()
+                .filter(|id| **id == replacement_id)
+                .count(),
+            1
+        );
+        assert_eq!(info.field_infos.len(), 1);
+        assert_eq!(info.field_infos[0].object_references, [replacement_id]);
+    }
+
+    #[test]
+    fn native_chart_caption_rejects_two_caption_infos_sharing_one_storage_atomically() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "original")
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        make_numbers_caption_storage_shared(
+            &mut editor,
+            sheet_id,
+            source.drawable_object_id,
+            duplicate.drawable_object_id,
+        );
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_sheet_chart_caption(
+                    sheet_id,
+                    source.drawable_object_id,
+                    "must reject shared storage"
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn native_chart_caption_rejects_two_chart_payloads_sharing_one_caption_info_atomically() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "original")
+            .unwrap();
+        let graph = chart_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        make_numbers_caption_info_shared(
+            &mut editor,
+            sheet_id,
+            source.drawable_object_id,
+            duplicate.drawable_object_id,
+        );
+        assert_eq!(
+            numbers_chart_caption_reference_in_archive(
+                &editor,
+                &graph.archive_name,
+                source.drawable_object_id,
+            ),
+            numbers_chart_caption_reference_in_archive(
+                &editor,
+                &graph.archive_name,
+                duplicate.drawable_object_id,
+            )
+        );
+
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_sheet_chart_caption(
+                    sheet_id,
+                    source.drawable_object_id,
+                    "must reject shared info"
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+        assert!(
+            editor
+                .set_sheet_chart_caption(
+                    sheet_id,
+                    duplicate.drawable_object_id,
+                    "must reject shared info"
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn native_chart_caption_rejects_caption_info_owner_on_unrelated_object_atomically() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "original")
+            .unwrap();
+        let duplicate = editor
+            .duplicate_sheet_chart(sheet_id, source.drawable_object_id)
+            .unwrap();
+        move_numbers_caption_aggregate_owner_to_unrelated_object(
+            &mut editor,
+            sheet_id,
+            source.drawable_object_id,
+            duplicate.drawable_object_id,
+        );
+
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .set_sheet_chart_caption(
+                    sheet_id,
+                    source.drawable_object_id,
+                    "must reject stale owner"
+                )
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
     }
 
     #[test]

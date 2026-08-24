@@ -10,7 +10,8 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
-    ChartCaptionError, ChartSelector, Package, Position, ReadOptions, SemanticLimits, SlideSelector,
+    ChartCaptionError, ChartCaptionLimitKind, ChartSelector, Package, Position, ReadOptions,
+    SemanticLimits, SlideSelector,
 };
 use prost::Message as _;
 
@@ -464,6 +465,27 @@ fn synthetic_metadata_package_with_captions(
         entries,
         Limits::default(),
     )?)
+}
+
+fn synthetic_metadata_package_with_one_byte_standin() -> TestResult<Vec<u8>> {
+    let source = synthetic_metadata_package_with_captions(
+        [None, Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let chart = document
+        .object_mut(CHARTS[0])
+        .ok_or_else(|| io::Error::other("missing synthetic chart"))?;
+    let mut chart_data = chart_payload(0, Some(7))?;
+    append_length_delimited_field(&mut chart_data, 4_004, &vec![0; 4_096])?;
+    chart.messages[0].data = chart_data;
+    chart.archive_info.message_infos[0].object_references = vec![TITLES[0], NON_STYLES[0], 7];
+    let standin = document
+        .object_mut(CAPTION_INFOS[0])
+        .ok_or_else(|| io::Error::other("missing synthetic stand-in"))?;
+    standin.archive_info.identifier = Some(7);
+    replace_document_stream(&source, document)
 }
 
 fn synthetic_cross_component_metadata_package(
@@ -2271,6 +2293,70 @@ fn archive_headers_are_retained_and_noncanonical_object_prefixes_fail_closed() -
 
     let noncanonical = with_overlong_object_length_prefix(&active_source, CHARTS[0])?;
     assert_replacement_rejected(&noncanonical)?;
+    Ok(())
+}
+
+#[test]
+fn caption_reference_varint_growth_is_source_preserving_and_output_bounded() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_one_byte_standin()?;
+    let source = with_unknown_archive_header(&source, 7)?;
+    assert_eq!(chart_reference_identifier(&source)?, Some(7));
+    let source_header = object_header(&source, 7)?;
+    assert!(
+        source_header
+            .windows(ARCHIVE_HEADER_UNKNOWN_MARKER.len())
+            .any(|window| window == ARCHIVE_HEADER_UNKNOWN_MARKER)
+    );
+
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("one-byte stand-in growth")?
+        .commit()?;
+    let target = exact_bytes(commit.package())?;
+    assert_eq!(chart_reference_identifier(&target)?, Some(1_002));
+    assert!(
+        message_payload(&target, CHARTS[0], CHART_MESSAGE_TYPE)?.len()
+            > message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?.len()
+    );
+    let target_header = object_header(&target, 7)?;
+    assert!(
+        target_header
+            .windows(ARCHIVE_HEADER_UNKNOWN_MARKER.len())
+            .any(|window| window == ARCHIVE_HEADER_UNKNOWN_MARKER)
+    );
+    assert!(target.len() > source.len());
+
+    let restored = commit
+        .package()
+        .apply_slide_chart_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+
+    let target_metrics = package_metrics(&target)?;
+    let exact = target_read_options(&target)?;
+    let source_chart_bytes = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?.len();
+    let under_output = replace_archive_limit(
+        exact,
+        u64::try_from(target.len())?,
+        target_metrics.max_entry_bytes,
+        target_metrics.total_bytes_limit(),
+        target_metrics.max_iwa_stream_bytes,
+        target_metrics.max_archive_objects,
+        target_metrics.max_archive_messages,
+        source_chart_bytes,
+    )?;
+    let result = run_caption_create_with_options(&source, under_output)?;
+    assert!(
+        matches!(
+            &result,
+            Err(ChartCaptionError::LimitExceeded {
+                kind: ChartCaptionLimitKind::OutputBytes,
+                ..
+            })
+        ),
+        "unexpected low-output result: {result:?}"
+    );
+    assert_eq!(exact_bytes(&Package::from_bytes(&source)?)?, source);
     Ok(())
 }
 
