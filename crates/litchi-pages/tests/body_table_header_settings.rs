@@ -494,7 +494,7 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
 }
 
 #[test]
-fn locked_and_dependent_tables_refuse_changed_publication() -> TestResult<()> {
+fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze() -> TestResult<()> {
     let locked_source = synthetic_package(["Revenue", "Costs"], Some(true))?;
     let locked = Package::from_bytes(&locked_source)?;
     let locked_error = locked
@@ -513,6 +513,20 @@ fn locked_and_dependent_tables_refuse_changed_publication() -> TestResult<()> {
         .and_then(|edit| edit.set(changed_settings()).commit());
     assert!(result.is_err(), "dependent topology must fail closed");
     assert_eq!(dependent.source_bytes(), dependency_source.as_slice());
+
+    let before = dependent.body_table_header_settings(0usize)?;
+    let freeze_only = Settings {
+        header_rows_frozen: Some(true),
+        ..before
+    };
+    let commit = dependent
+        .edit_body_table_header_settings(0usize)?
+        .set(freeze_only)
+        .commit()?;
+    assert_eq!(
+        commit.package().body_table_header_settings(0usize)?,
+        freeze_only
+    );
     Ok(())
 }
 
