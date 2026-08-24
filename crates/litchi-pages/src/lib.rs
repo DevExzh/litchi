@@ -72,6 +72,11 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[doc(hidden)]
 pub use package::{__is_valid_pages_text_storage, __semantic_document_from_prepared_source};
 pub use package::{
+    BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit,
+    BodyTableHeaderSettingsError, BodyTableHeaderSettingsInvalidReason,
+    BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch,
+};
+pub use package::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
     BodyTableLockLimitKind, BodyTableLockPatch,
 };
@@ -103,4 +108,5 @@ pub use package::{
 pub use section::{Section, SectionType};
 pub use selector::BodyTableSelector;
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
+pub use table::headers::Settings as BodyTableHeaderSettings;
 pub use table::lock::BodyTableLockState;
