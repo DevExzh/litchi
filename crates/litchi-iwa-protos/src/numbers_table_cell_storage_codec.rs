@@ -741,7 +741,9 @@ impl TableDataListEntryRemoval {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableDataListEntryRemovalReport {
     source: DecodeReport,
+    selection: DecodeReport,
     result: DecodeReport,
+    verification: DecodeReport,
     output_bytes: usize,
     rewrite_work_bytes: usize,
 }
@@ -754,6 +756,14 @@ impl TableDataListEntryRemovalReport {
     #[must_use]
     pub const fn result(self) -> DecodeReport {
         self.result
+    }
+    #[must_use]
+    pub const fn selection(self) -> DecodeReport {
+        self.selection
+    }
+    #[must_use]
+    pub const fn verification(self) -> DecodeReport {
+        self.verification
     }
     #[must_use]
     pub const fn output_bytes(self) -> usize {
@@ -2997,10 +3007,18 @@ pub fn remove_table_data_list_entry_with_report(
         .len()
         .checked_sub(end - start)
         .ok_or_else(DecodeError::invalid)?;
-    let rewrite_work_bytes = source
+    let selection_report = budget.report();
+    let copy_work = source
         .len()
         .checked_add(output_bytes)
         .ok_or_else(DecodeError::invalid)?;
+    let candidate_work_upper = source_report
+        .work_bytes
+        .checked_add(selection_report.work_bytes)
+        .and_then(|work| work.checked_add(copy_work))
+        .and_then(|work| work.checked_add(output_bytes.checked_mul(4)?))
+        .ok_or_else(DecodeError::invalid)?;
+    let rewrite_work_bytes = candidate_work_upper;
     if rewrite_work_bytes > options.max_work_bytes {
         return Err(DecodeError::limited(DecodeLimit::Work {
             observed: rewrite_work_bytes,
@@ -3019,7 +3037,8 @@ pub fn remove_table_data_list_entry_with_report(
         removal,
         matching_keys: 0,
     };
-    decode_table_data_list_with_visitor(&output, options, &mut verifier)?;
+    let (_verified, verification_report) =
+        decode_table_data_list_with_visitor(&output, options, &mut verifier)?;
     if verifier.matching_keys != 0 {
         return Err(DecodeError::invalid());
     }
@@ -3027,9 +3046,17 @@ pub fn remove_table_data_list_entry_with_report(
         output,
         TableDataListEntryRemovalReport {
             source: source_report,
+            selection: selection_report,
             result: result_report,
+            verification: verification_report,
             output_bytes,
-            rewrite_work_bytes,
+            rewrite_work_bytes: source_report
+                .work_bytes
+                .checked_add(selection_report.work_bytes)
+                .and_then(|work| work.checked_add(copy_work))
+                .and_then(|work| work.checked_add(result_report.work_bytes))
+                .and_then(|work| work.checked_add(verification_report.work_bytes))
+                .ok_or_else(DecodeError::invalid)?,
         },
     ))
 }
@@ -5780,7 +5807,15 @@ mod tests {
         assert_eq!(report.source().source_bytes(), source.len());
         assert_eq!(report.output_bytes(), output.len());
         assert_eq!(report.result().source_bytes(), output.len());
-        assert_eq!(report.rewrite_work_bytes(), source.len() + output.len());
+        assert_eq!(
+            report.rewrite_work_bytes(),
+            report.source().work_bytes()
+                + report.selection().work_bytes()
+                + source.len()
+                + output.len()
+                + report.result().work_bytes()
+                + report.verification().work_bytes()
+        );
     }
 
     #[test]
@@ -5823,6 +5858,17 @@ mod tests {
         let broad = options(&source);
         let (_, report) =
             remove_table_data_list_entry_with_report(&source, removal, broad).unwrap();
+        let exact = DecodeOptions::new(
+            source.len(),
+            broad.max_fields,
+            report.rewrite_work_bytes(),
+            broad.recursion_limit,
+            broad.max_references,
+            broad.max_text_bytes,
+        );
+        let (_, replay) =
+            remove_table_data_list_entry_with_report(&source, removal, exact).unwrap();
+        assert_eq!(replay.rewrite_work_bytes(), report.rewrite_work_bytes());
         let constrained = DecodeOptions::new(
             source.len(),
             broad.max_fields,
