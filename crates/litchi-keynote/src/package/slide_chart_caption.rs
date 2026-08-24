@@ -369,6 +369,19 @@ impl CaptionBudget {
         self.charge_report(report)
     }
 
+    fn charge_chart_codec_report(
+        &mut self,
+        report: keynote_chart_caption_codec::RewriteReport,
+    ) -> Result<(), ChartCaptionError> {
+        self.charge_input(report.input_bytes())?;
+        self.charge_output(report.output_bytes())?;
+        self.charge_fields(report.fields())?;
+        self.charge_work(report.work_bytes())?;
+        self.charge_depth(report.max_depth())?;
+        self.charge_allocation(report.allocations(), report.retained_bytes())?;
+        self.charge_scratch(report.scratch_bytes())
+    }
+
     fn charge_archive_snappy_plan(
         &mut self,
         archive: &Archive,
@@ -1756,6 +1769,7 @@ fn rewrite_chart_caption_operation(
         replacement_identifier,
         source,
         archive_limits,
+        budget,
     )?;
     for object in graph_objects {
         slide_archive
@@ -1826,12 +1840,12 @@ fn rewrite_chart_caption_operation(
     let prepared_reassembly = catalog
         .prepare_reassembly_with_deletions(&edits, previews.names(), physical_limits)
         .map_err(map_archive_error)?;
-    let reassembly_limits =
-        budget.charge_reassembly(prepared_reassembly.execution_requirements())?;
+    let reassembly_requirements = prepared_reassembly.execution_requirements();
+    let reassembly_limits = budget.charge_reassembly(reassembly_requirements)?;
+    budget.charge_candidate_reopen(reassembly_requirements.output_bytes())?;
     let output = prepared_reassembly
         .execute(reassembly_limits)
         .map_err(map_archive_error)?;
-    budget.charge_candidate_reopen(output.len())?;
     let candidate = Package::from_source_with_options(output.into(), source.state.options)
         .map_err(map_read_error)?;
     Ok((candidate, 2, previews.len()))
@@ -1920,12 +1934,12 @@ fn rewrite_existing_caption_text_with_metadata(
     let prepared_reassembly = native_catalog
         .prepare_reassembly_with_deletions(std::slice::from_ref(&edit), &[], physical_limits)
         .map_err(map_archive_error)?;
-    let reassembly_limits =
-        budget.charge_reassembly(prepared_reassembly.execution_requirements())?;
+    let reassembly_requirements = prepared_reassembly.execution_requirements();
+    let reassembly_limits = budget.charge_reassembly(reassembly_requirements)?;
+    budget.charge_candidate_reopen(reassembly_requirements.output_bytes())?;
     let candidate_bytes = prepared_reassembly
         .execute(reassembly_limits)
         .map_err(map_archive_error)?;
-    budget.charge_candidate_reopen(candidate_bytes.len())?;
     let candidate = Package::from_source_with_options(candidate_bytes.into(), source.state.options)
         .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
@@ -2682,6 +2696,7 @@ fn patch_chart_caption_edge(
     replacement_identifier: u64,
     package: &Package,
     archive_limits: litchi_iwa_core::Limits,
+    budget: &mut CaptionBudget,
 ) -> Result<(), ChartCaptionError> {
     let expected_identifier = expected_identifier.ok_or(ChartCaptionError::InvalidSource)?;
     if expected_identifier == replacement_identifier || replacement_identifier == 0 {
@@ -2754,13 +2769,14 @@ fn patch_chart_caption_edge(
         });
     }
     let payload = source_object.messages[0].data.clone();
-    let options = chart_caption_decode_options(package, &payload)?;
-    let (rewritten, _) = keynote_chart_caption_codec::rewrite_chart_caption_with_report(
+    let options = chart_caption_rewrite_options(package, &payload, budget)?;
+    let (rewritten, report) = keynote_chart_caption_codec::rewrite_chart_caption_with_report(
         &payload,
         keynote_chart_caption_codec::ChartCaptionWrite::new(replacement_identifier),
         options,
     )
     .map_err(map_chart_caption_codec_error)?;
+    budget.charge_chart_codec_report(report)?;
     let aggregate_before = info.object_references.clone();
     let mut aggregate_after = aggregate_before.clone();
     aggregate_after.retain(|identifier| *identifier != expected_identifier);
@@ -3182,7 +3198,33 @@ fn chart_caption_decode_options(
         limits.max_fields(),
         limits.max_rewrite_work(),
         recursion,
-    ))
+    )
+    // The selected identifier may legitimately grow from a one-byte varint
+    // to a wider varint.  A source-sized default therefore rejects valid
+    // source-preserving rewrites before the codec can measure the candidate.
+    // Keep the ceiling finite, but derive it from the package's output policy.
+    .with_max_output_bytes(limits.max_output_bytes()))
+}
+
+fn chart_caption_rewrite_options(
+    package: &Package,
+    payload: &[u8],
+    budget: &CaptionBudget,
+) -> Result<keynote_chart_caption_codec::DecodeOptions, ChartCaptionError> {
+    let limits = package.wire_limits().map_err(map_wire_error)?;
+    let recursion = u32::try_from(limits.max_nesting())
+        .map_err(|_error| ChartCaptionError::InvalidSource)?
+        .min(budget.remaining_depth());
+    Ok(keynote_chart_caption_codec::DecodeOptions::new(
+        payload
+            .len()
+            .min(limits.max_input_bytes())
+            .min(budget.remaining_input()),
+        limits.max_fields().min(budget.remaining_fields()),
+        limits.max_rewrite_work().min(budget.remaining_work()),
+        recursion,
+    )
+    .with_max_output_bytes(limits.max_output_bytes().min(budget.remaining_output())))
 }
 
 fn caption_info_decode_options(
@@ -3507,6 +3549,16 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> ChartCaptionError {
 fn map_chart_caption_codec_error(
     error: keynote_chart_caption_codec::DecodeError,
 ) -> ChartCaptionError {
+    if let Some((observed, maximum)) = error.output_limit_values() {
+        return ChartCaptionError::LimitExceeded {
+            kind: ChartCaptionLimitKind::OutputBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        };
+    }
+    if let Some(amount) = error.allocation_amount() {
+        return ChartCaptionError::Allocation { amount };
+    }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_chart_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {

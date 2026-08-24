@@ -44,6 +44,9 @@ const DEFAULT_SHADOW_RADIUS_POINTS: i32 = 1;
 const DEFAULT_SHADOW_OPACITY: f32 = 1.0;
 const NORMALIZED_PATH_EXTENT: f32 = 100.0;
 const DEFAULT_STROKE_PATTERN_ELEMENT_COUNT: usize = 6;
+const CAPTION_INFO_FIELD_MULTIPLIER: usize = 4;
+const CAPTION_INFO_WORK_MULTIPLIER: usize = 64;
+const CAPTION_INFO_RECURSION_LIMIT: u32 = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DrawableCaptionKind {
@@ -288,7 +291,7 @@ pub(crate) fn drawable_caption_slot(
     };
     let info = pages_movie_caption_codec::decode_caption_info(
         message.data.as_slice(),
-        PagesMovieCaptionDecodeOptions::for_source(message.data.as_slice()),
+        caption_info_decode_options(package, message.data.as_slice()),
     )
     .map_err(|error| {
         Error::InvalidFormat(format!(
@@ -359,11 +362,226 @@ pub(crate) fn drawable_caption_slot(
             "{drawable_label} title/caption object {reference_id} aliases its private graph"
         )));
     }
+    ensure_exclusive_caption_storage(
+        package,
+        drawable_object_id,
+        reference_id,
+        storage_id,
+        drawable_label,
+    )?;
     Ok(DrawableCaptionSlot {
         reference_id,
         storage_id: Some(storage_id),
         object_ids,
     })
+}
+
+/// Validate that a selected CaptionInfo owns an unshared, unambiguous storage
+/// object.  The archive headers are not a complete ownership census: a second
+/// CaptionInfo payload can point at the same storage without appearing in the
+/// selected drawable's component metadata.  Scan every parsed IWA component
+/// with the strict bounded CaptionInfo projection before exposing the slot.
+///
+/// This intentionally retains no owner collection.  Counts are checked with
+/// overflow-safe arithmetic and every source payload is bounded by the
+/// package's archive limits, so malformed or adversarial aliases fail before
+/// any caller can stage a mutation.  The selected CaptionInfo must also have
+/// exactly one aggregate object owner; FieldInfo references may only repeat
+/// that same owner, while data references are always rejected.
+fn ensure_exclusive_caption_storage(
+    package: &IWorkPackage,
+    selected_drawable_id: u64,
+    selected_info_id: u64,
+    selected_storage_id: u64,
+    drawable_label: &str,
+) -> Result<()> {
+    let mut storage_objects = 0usize;
+    let mut storage_owners = 0usize;
+    let mut selected_owners = 0usize;
+    let mut selected_inbound_aggregate_references = 0usize;
+    let mut selected_aggregate_owner = None;
+    let mut selected_field_owner = None;
+
+    for archive_name in package.iwa_entry_names() {
+        let archive = package.parsed_archive(archive_name)?;
+        for object in &archive.objects {
+            let object_id = object.archive_info.identifier;
+            if object_id == Some(selected_storage_id) {
+                storage_objects = storage_objects.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "{drawable_label} caption storage {selected_storage_id} object count overflow"
+                    ))
+                })?;
+            }
+
+            for message_info in &object.archive_info.message_infos {
+                for identifier in &message_info.object_references {
+                    if *identifier != selected_info_id {
+                        continue;
+                    }
+                    if object_id.is_none() || object_id == Some(selected_info_id) {
+                        return Err(Error::InvalidFormat(format!(
+                            "{drawable_label} CaptionInfo object {selected_info_id} has an invalid inbound object owner"
+                        )));
+                    }
+                    selected_inbound_aggregate_references = selected_inbound_aggregate_references
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(format!(
+                                "{drawable_label} CaptionInfo object {selected_info_id} inbound owner count overflow"
+                            ))
+                        })?;
+                    selected_aggregate_owner = object_id;
+                }
+                for identifier in &message_info.data_references {
+                    if *identifier == selected_info_id {
+                        return Err(Error::InvalidFormat(format!(
+                            "{drawable_label} CaptionInfo object {selected_info_id} is referenced as data"
+                        )));
+                    }
+                }
+                for field in &message_info.field_infos {
+                    for identifier in &field.object_references {
+                        if *identifier != selected_info_id {
+                            continue;
+                        }
+                        if object_id.is_none() || object_id == Some(selected_info_id) {
+                            return Err(Error::InvalidFormat(format!(
+                                "{drawable_label} CaptionInfo object {selected_info_id} has an invalid inbound FieldInfo owner"
+                            )));
+                        }
+                        if selected_field_owner
+                            .is_some_and(|owner| owner != object_id.unwrap_or_default())
+                        {
+                            return Err(Error::InvalidFormat(format!(
+                                "{drawable_label} CaptionInfo object {selected_info_id} has multiple FieldInfo owners"
+                            )));
+                        }
+                        selected_field_owner = object_id;
+                    }
+                    for identifier in &field.data_references {
+                        if *identifier == selected_info_id {
+                            return Err(Error::InvalidFormat(format!(
+                                "{drawable_label} CaptionInfo object {selected_info_id} is referenced as FieldInfo data"
+                            )));
+                        }
+                    }
+                }
+            }
+
+            for message in &object.messages {
+                if message.type_ != CAPTION_INFO_MESSAGE_TYPE {
+                    continue;
+                }
+                let info = pages_movie_caption_codec::decode_caption_info(
+                    message.data.as_slice(),
+                    caption_info_decode_options(package, message.data.as_slice()),
+                )
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "{drawable_label} CaptionInfo object {} in {archive_name} has malformed payload: {error}",
+                        object_id.unwrap_or_default()
+                    ))
+                })?;
+                let deprecated = info.deprecated_storage_identifier();
+                let owned = info.owned_storage_identifier();
+                if deprecated.is_none() && owned.is_none() {
+                    continue;
+                }
+                let Some(deprecated) = deprecated else {
+                    return Err(Error::InvalidFormat(format!(
+                        "{drawable_label} CaptionInfo object {} has an owned storage without its deprecated alias",
+                        object_id.unwrap_or_default()
+                    )));
+                };
+                let Some(owned) = owned else {
+                    return Err(Error::InvalidFormat(format!(
+                        "{drawable_label} CaptionInfo object {} has a deprecated storage without its owned alias",
+                        object_id.unwrap_or_default()
+                    )));
+                };
+                if deprecated == 0 || owned == 0 || deprecated != owned {
+                    return Err(Error::InvalidFormat(format!(
+                        "{drawable_label} CaptionInfo object {} has inconsistent storage aliases",
+                        object_id.unwrap_or_default()
+                    )));
+                }
+                if info.is_text_box() != Some(true) {
+                    return Err(Error::InvalidFormat(format!(
+                        "{drawable_label} CaptionInfo object {} has an invalid text-storage owner",
+                        object_id.unwrap_or_default()
+                    )));
+                }
+                if owned != selected_storage_id {
+                    continue;
+                }
+                storage_owners = storage_owners.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "{drawable_label} caption storage {selected_storage_id} owner count overflow"
+                    ))
+                })?;
+                if object_id == Some(selected_info_id) {
+                    selected_owners = selected_owners.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "{drawable_label} CaptionInfo object {selected_info_id} owner count overflow"
+                        ))
+                    })?;
+                }
+            }
+        }
+    }
+
+    if storage_objects != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} caption storage {selected_storage_id} must have exactly one object, found {storage_objects}"
+        )));
+    }
+    if selected_inbound_aggregate_references != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} CaptionInfo object {selected_info_id} must have exactly one inbound object owner, found {selected_inbound_aggregate_references}"
+        )));
+    }
+    if selected_aggregate_owner != Some(selected_drawable_id) {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} CaptionInfo object {selected_info_id} must be owned by drawable {selected_drawable_id}"
+        )));
+    }
+    if selected_field_owner.is_some() && selected_field_owner != selected_aggregate_owner {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} CaptionInfo object {selected_info_id} has an inconsistent FieldInfo owner"
+        )));
+    }
+    if storage_owners != 1 || selected_owners != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} caption storage {selected_storage_id} must have exactly one CaptionInfo owner, found {storage_owners}"
+        )));
+    }
+    Ok(())
+}
+
+fn caption_info_decode_options(
+    package: &IWorkPackage,
+    source: &[u8],
+) -> PagesMovieCaptionDecodeOptions {
+    let limits = package.limits().archive_limits();
+    let message_bytes = source.len().max(1).min(limits.max_message_bytes());
+    let fields = source
+        .len()
+        .saturating_mul(CAPTION_INFO_FIELD_MULTIPLIER)
+        .max(1)
+        .min(limits.max_header_fields());
+    let work = source
+        .len()
+        .saturating_mul(CAPTION_INFO_WORK_MULTIPLIER)
+        .max(1)
+        .min(limits.max_header_memory_bytes());
+    PagesMovieCaptionDecodeOptions::new(
+        message_bytes,
+        fields.max(1),
+        work.max(1),
+        CAPTION_INFO_RECURSION_LIMIT
+            .min(u32::try_from(limits.max_header_nesting()).unwrap_or(u32::MAX)),
+    )
 }
 
 impl CaptionObjectIds {
@@ -967,7 +1185,7 @@ mod tests {
             production
                 .matches("pages_movie_caption_codec::decode_caption_info(")
                 .count(),
-            1
+            2
         );
         assert!(!production.contains("CaptionInfoArchive::decode"));
     }

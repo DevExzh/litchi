@@ -653,7 +653,7 @@ pub fn rewrite_chart_caption_with_report(
     // the candidate readback is a further full traversal.  Meter both shapes
     // before reserving the output so field/work/nesting failures cannot occur
     // after the sole candidate allocation.
-    let shape = measure_rewrite_path_lengths(source, options, write)?;
+    let shape = measure_rewrite_path_lengths(source, options, write, &mut budget)?;
     preflight_rewrite_pass(source, options, write, &mut budget)?;
     let readback_options = DecodeOptions {
         max_message_bytes: options.max_message_bytes.max(output_bytes),
@@ -694,7 +694,7 @@ fn measure_rewrite_root(
     let mut output_bytes = 0usize;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
-        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget, 1)?;
         let end = source.len() - remaining.len();
         let Some(ParseItem::Field(field)) = item else {
             return Err(match item {
@@ -742,7 +742,7 @@ fn measure_rewrite_drawable(
     let mut output_bytes = 0usize;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
-        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget, depth)?;
         let end = source.len() - remaining.len();
         let Some(ParseItem::Field(field)) = item else {
             return Err(match item {
@@ -790,7 +790,7 @@ fn measure_rewrite_reference(
     let mut output_bytes = 0usize;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
-        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget, depth)?;
         let end = source.len() - remaining.len();
         let Some(ParseItem::Field(field)) = item else {
             return Err(match item {
@@ -851,29 +851,35 @@ fn measure_rewrite_path_lengths(
     source: &[u8],
     options: DecodeOptions,
     write: ChartCaptionWrite,
+    budget: &mut Budget,
 ) -> Result<RewritePathLengths, DecodeError> {
-    let mut budget = Budget::unlimited(source, options);
-    let root = measure_rewrite_root(source, options, write, &mut budget)?;
+    // This pass is used to model the path lengths consumed by candidate
+    // readback.  It is still real source traversal, so it must use the
+    // transaction budget rather than an unlimited detached budget; otherwise
+    // exact report replay would under-account fields/work and limits could be
+    // exceeded after the output allocation.
+    let root = measure_rewrite_root(source, options, write, budget)?;
     let drawable_source = selected_payload(
         source,
         options,
         CHART_DRAWABLE_SUPER_FIELD,
         "TSCH.ChartDrawableArchive.super",
-        &mut budget,
+        budget,
+        1,
     )?;
-    let drawable_options = options.descend(&budget)?;
-    let drawable =
-        measure_rewrite_drawable(drawable_source, drawable_options, write, &mut budget, 2)?;
+    let drawable_options = options.descend(budget)?;
+    let drawable = measure_rewrite_drawable(drawable_source, drawable_options, write, budget, 2)?;
     let reference_source = selected_payload(
         drawable_source,
         drawable_options,
         DRAWABLE_CAPTION_FIELD,
         "TSD.DrawableArchive.caption",
-        &mut budget,
+        budget,
+        2,
     )?;
-    let reference_options = drawable_options.descend(&budget)?;
+    let reference_options = drawable_options.descend(budget)?;
     let reference =
-        measure_rewrite_reference(reference_source, reference_options, write, &mut budget, 3)?;
+        measure_rewrite_reference(reference_source, reference_options, write, budget, 3)?;
     Ok(RewritePathLengths {
         root,
         drawable,
@@ -887,10 +893,17 @@ fn selected_payload<'source>(
     selected_field: u32,
     selected_name: &'static str,
     budget: &mut Budget,
+    depth: u32,
 ) -> Result<&'source [u8], DecodeError> {
+    // Selecting the nested source is another complete traversal of this
+    // message. Charge its bytes as work as well as its individual fields so
+    // the rewrite report remains an exact upper bound for every sizing pass.
+    budget.charge_message(source.len(), depth)?;
     let mut remaining = source;
     let mut payload = None;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) =
+        next_strict_field(&mut remaining, options.recursion_limit, budget, depth)?
+    {
         if field.number != selected_field {
             continue;
         }
@@ -912,7 +925,7 @@ fn preflight_rewrite_pass(
     let nested_options = options.descend(budget)?;
     let mut remaining = source;
     let mut saw_super = false;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget, 1)? {
         if field.number != CHART_DRAWABLE_SUPER_FIELD {
             continue;
         }
@@ -947,7 +960,9 @@ fn preflight_rewrite_drawable_pass(
     let nested_options = options.descend(budget)?;
     let mut remaining = source;
     let mut saw_caption = false;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) =
+        next_strict_field(&mut remaining, options.recursion_limit, budget, depth)?
+    {
         if field.number != DRAWABLE_CAPTION_FIELD {
             continue;
         }
@@ -978,7 +993,9 @@ fn preflight_rewrite_reference_pass(
     let mut saw_identifier = false;
     let mut saw_deprecated_type = false;
     let mut saw_deprecated_is_external = false;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) =
+        next_strict_field(&mut remaining, options.recursion_limit, budget, depth)?
+    {
         match field.number {
             REFERENCE_IDENTIFIER_FIELD => {
                 if saw_identifier {
@@ -1024,7 +1041,7 @@ fn preflight_candidate_readback(
     let nested_options = options.descend(budget)?;
     let mut remaining = source;
     let mut saw_super = false;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget, 1)? {
         if field.number != CHART_DRAWABLE_SUPER_FIELD {
             continue;
         }
@@ -1056,7 +1073,9 @@ fn preflight_candidate_drawable(
     let nested_options = options.descend(budget)?;
     let mut remaining = source;
     let mut saw_caption = false;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) =
+        next_strict_field(&mut remaining, options.recursion_limit, budget, depth)?
+    {
         if field.number != DRAWABLE_CAPTION_FIELD {
             continue;
         }
@@ -1087,7 +1106,9 @@ fn preflight_candidate_reference(
     let mut saw_identifier = false;
     let mut saw_deprecated_type = false;
     let mut saw_deprecated_is_external = false;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) =
+        next_strict_field(&mut remaining, options.recursion_limit, budget, depth)?
+    {
         match field.number {
             REFERENCE_IDENTIFIER_FIELD => {
                 if saw_identifier {
@@ -1181,7 +1202,7 @@ fn rewrite_reference_into(
     let mut saw_deprecated_is_external = false;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
-        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget, 3)?;
         let end = source.len() - remaining.len();
         let Some(ParseItem::Field(field)) = item else {
             return Err(match item {
@@ -1253,7 +1274,7 @@ fn rewrite_message_fields(
     let mut saw_selected = false;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
-        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget, depth)?;
         let end = source.len() - remaining.len();
         let Some(ParseItem::Field(field)) = item else {
             return Err(match item {
@@ -1457,10 +1478,7 @@ impl Budget {
     }
 
     fn charge_message(&mut self, bytes: usize, depth: u32) -> Result<(), DecodeError> {
-        if depth > self.max_nesting {
-            return Err(self.nesting_limit_at(depth));
-        }
-        self.max_depth = self.max_depth.max(depth);
+        self.observe_depth(depth)?;
         let observed = self.work_bytes.saturating_add(bytes.saturating_mul(2));
         if observed > self.max_work_bytes {
             return Err(DecodeError {
@@ -1471,6 +1489,14 @@ impl Budget {
             });
         }
         self.work_bytes = observed;
+        Ok(())
+    }
+
+    fn observe_depth(&mut self, depth: u32) -> Result<(), DecodeError> {
+        if depth > self.max_nesting {
+            return Err(self.nesting_limit_at(depth));
+        }
+        self.max_depth = self.max_depth.max(depth);
         Ok(())
     }
 
@@ -1578,7 +1604,7 @@ fn preflight_chart_caption(
     let nested_options = options.descend(budget)?;
     let mut drawable = None;
     let mut remaining = source;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget, 1)? {
         if field.number != CHART_DRAWABLE_SUPER_FIELD {
             continue;
         }
@@ -1605,7 +1631,12 @@ fn preflight_drawable(
     let nested_options = options.descend(budget)?;
     let mut caption = None;
     let mut remaining = source;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) = next_strict_field(
+        &mut remaining,
+        options.recursion_limit,
+        budget,
+        budget.depth_for(options),
+    )? {
         if field.number != DRAWABLE_CAPTION_FIELD {
             continue;
         }
@@ -1633,7 +1664,12 @@ fn preflight_reference(
     let mut deprecated_type = None;
     let mut deprecated_is_external = None;
     let mut remaining = source;
-    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+    while let Some(field) = next_strict_field(
+        &mut remaining,
+        options.recursion_limit,
+        budget,
+        budget.depth_for(options),
+    )? {
         match field.number {
             REFERENCE_IDENTIFIER_FIELD => {
                 if identifier.is_some() {
@@ -1735,8 +1771,9 @@ fn next_strict_field<'source>(
     source: &mut &'source [u8],
     recursion_limit: u32,
     budget: &mut Budget,
+    depth: u32,
 ) -> Result<Option<StrictField<'source>>, DecodeError> {
-    match parse_strict_field(source, recursion_limit, budget)? {
+    match parse_strict_field(source, recursion_limit, budget, depth)? {
         Some(ParseItem::Field(field)) => Ok(Some(field)),
         Some(ParseItem::EndGroup(number)) => {
             Err(buffa::DecodeError::InvalidEndGroup(number).into())
@@ -1749,6 +1786,7 @@ fn parse_strict_field<'source>(
     source: &mut &'source [u8],
     recursion_limit: u32,
     budget: &mut Budget,
+    depth: u32,
 ) -> Result<Option<ParseItem<'source>>, DecodeError> {
     if source.is_empty() {
         return Ok(None);
@@ -1769,9 +1807,6 @@ fn parse_strict_field<'source>(
     let (value, canonical_value) = match wire_type {
         buffa::encoding::WireType::Varint => {
             let (value, canonical) = take_varint(source)?;
-            if !canonical {
-                return Err(DecodeError::noncanonical("protobuf varint value"));
-            }
             (StrictValue::Varint(value), canonical)
         },
         buffa::encoding::WireType::Fixed64 => {
@@ -1794,7 +1829,9 @@ fn parse_strict_field<'source>(
             let child_limit = recursion_limit
                 .checked_sub(1)
                 .ok_or_else(|| budget.nesting_limit())?;
-            skip_strict_group(source, field_number, child_limit, budget)?;
+            let group_depth = depth.saturating_add(1);
+            budget.observe_depth(group_depth)?;
+            skip_strict_group(source, field_number, child_limit, budget, group_depth)?;
             (StrictValue::Group, true)
         },
         buffa::encoding::WireType::EndGroup => return Ok(Some(ParseItem::EndGroup(field_number))),
@@ -1818,9 +1855,10 @@ fn skip_strict_group(
     expected_field_number: u32,
     recursion_limit: u32,
     budget: &mut Budget,
+    depth: u32,
 ) -> Result<(), DecodeError> {
     loop {
-        match parse_strict_field(source, recursion_limit, budget)? {
+        match parse_strict_field(source, recursion_limit, budget, depth)? {
             Some(ParseItem::Field(_)) => {},
             Some(ParseItem::EndGroup(number)) if number == expected_field_number => return Ok(()),
             Some(ParseItem::EndGroup(number)) => {
@@ -1880,11 +1918,10 @@ fn take_exact<'source>(
 )]
 mod tests {
     use super::{
-        Budget, CHART_DRAWABLE_SUPER_FIELD, ChartCaptionSnapshot, ChartCaptionWrite,
+        CHART_DRAWABLE_SUPER_FIELD, ChartCaptionSnapshot, ChartCaptionWrite,
         DRAWABLE_CAPTION_FIELD, DecodeOptions, WireResourceLimit, decode_chart_caption,
-        decode_chart_caption_identifier, decode_chart_caption_with_budget, measure_rewrite_root,
-        output_allocations, reserve_output, reset_output_allocations,
-        rewrite_chart_caption_with_report, rewrite_root_into, validate_decode_input,
+        decode_chart_caption_identifier, output_allocations, reserve_output,
+        reset_output_allocations, rewrite_chart_caption_with_report,
     };
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -1914,21 +1951,9 @@ mod tests {
     fn aggregate_rewrite_work(source: &[u8], write: ChartCaptionWrite) -> (usize, usize) {
         let options = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 8)
             .with_max_output_bytes(source.len() + 32);
-        let mut budget = Budget::new(source, options);
-        decode_chart_caption_with_budget(source, options, &mut budget).expect("source decode");
-        let output_bytes =
-            measure_rewrite_root(source, options, write, &mut budget).expect("rewrite measure");
-        let mut output = reserve_output(output_bytes).expect("rewrite allocation");
-        rewrite_root_into(source, options, write, &mut budget, &mut output).expect("rewrite pass");
-        let readback_options = DecodeOptions {
-            max_message_bytes: options.max_message_bytes.max(output.len()),
-            max_output_bytes: options.max_output_bytes.max(output.len()),
-            ..options
-        };
-        validate_decode_input(&output, readback_options).expect("readback input");
-        decode_chart_caption_with_budget(&output, readback_options, &mut budget)
-            .expect("rewrite readback");
-        (output_bytes, budget.work_bytes)
+        let (_, report) =
+            rewrite_chart_caption_with_report(source, write, options).expect("permissive rewrite");
+        (report.output_bytes(), report.work_bytes())
     }
 
     fn varint(mut value: u64) -> Vec<u8> {
@@ -1948,6 +1973,10 @@ mod tests {
 
     fn field_varint(number: u32, value: u64) -> Vec<u8> {
         [varint(u64::from(number) << 3), varint(value)].concat()
+    }
+
+    fn field_varint_raw(number: u32, value: &[u8]) -> Vec<u8> {
+        [varint(u64::from(number) << 3), value.to_vec()].concat()
     }
 
     fn field_bytes(number: u32, value: &[u8]) -> Vec<u8> {
@@ -2003,6 +2032,77 @@ mod tests {
             Some(42)
         );
         assert_eq!(source, before);
+    }
+
+    #[test]
+    fn unknown_overlong_scalar_values_are_accepted_and_retained_byte_for_byte() {
+        // Field 16's key is canonical; its value 1 is deliberately encoded
+        // with one redundant continuation byte. Unknown scalar values are
+        // source-authoritative, while selected known values remain strict.
+        let unknown = field_varint_raw(16, &[0x81, 0x00]);
+        let mut source = chart_with_caption(7);
+        source.extend_from_slice(&unknown);
+        let rewrite_options =
+            DecodeOptions::new(source.len(), source.len().saturating_mul(4), usize::MAX, 8)
+                .with_max_output_bytes(source.len() + 32);
+        assert_eq!(
+            decode_chart_caption_identifier(&source, options(&source)),
+            Ok(Some(7))
+        );
+        let (rewritten, _) = rewrite_chart_caption_with_report(
+            &source,
+            ChartCaptionWrite::new(300),
+            rewrite_options,
+        )
+        .expect("unknown scalar value remains source-authoritative");
+        assert!(
+            rewritten
+                .windows(unknown.len())
+                .any(|window| window == unknown)
+        );
+        assert_eq!(
+            decode_chart_caption_identifier(&rewritten, options(&rewritten)),
+            Ok(Some(300))
+        );
+    }
+
+    #[test]
+    fn selected_known_scalar_values_remain_strict() {
+        let source = chart_with_reference(&[0x08, 0x81, 0x00]);
+        let error = decode_chart_caption(&source, options(&source))
+            .expect_err("selected identifier overlong value");
+        assert_eq!(error.noncanonical_reason(), Some("protobuf varint value"));
+    }
+
+    #[test]
+    fn unknown_group_depth_is_reported_and_exactly_bounded() {
+        let unknown_group = [0x9b, 0x03, 0x08, 0x01, 0x9c, 0x03];
+        let reference = [unknown_group.to_vec(), field_varint(1, 7)].concat();
+        let source = chart_with_reference(&reference);
+        let (_, report) = super::decode_chart_caption_with_report(
+            &source,
+            DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 4),
+        )
+        .expect("group at the exact nesting boundary");
+        assert_eq!(report.max_depth(), 4);
+
+        let exact = DecodeOptions::new(source.len(), report.fields(), report.work_bytes(), 4);
+        let (_, replay) = super::decode_chart_caption_with_report(&source, exact)
+            .expect("exact group report replay");
+        assert_eq!(replay.fields(), report.fields());
+        assert_eq!(replay.work_bytes(), report.work_bytes());
+        assert_eq!(replay.max_depth(), report.max_depth());
+
+        let below = DecodeOptions::new(source.len(), report.fields(), report.work_bytes(), 3);
+        let error = super::decode_chart_caption_with_report(&source, below)
+            .expect_err("one level below group boundary");
+        assert_eq!(
+            error.wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: 4,
+                maximum: 3,
+            })
+        );
     }
 
     #[test]
@@ -2331,13 +2431,17 @@ mod tests {
 
         let exact_options = DecodeOptions::new(source.len(), usize::MAX, exact_work, 8)
             .with_max_output_bytes(output_bytes);
+        reset_output_allocations();
         rewrite_chart_caption_with_report(&source, write, exact_options)
             .expect("the exact aggregate work ceiling is inclusive");
+        assert_eq!(output_allocations(), 1);
 
         let below_options = DecodeOptions::new(source.len(), usize::MAX, exact_work - 1, 8)
             .with_max_output_bytes(output_bytes);
+        reset_output_allocations();
         let error = rewrite_chart_caption_with_report(&source, write, below_options)
             .expect_err("one byte below aggregate work must fail");
+        assert_eq!(output_allocations(), 0);
         assert_eq!(
             error.work_limit_values(),
             Some((exact_work, exact_work - 1))
