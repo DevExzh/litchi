@@ -2969,7 +2969,10 @@ pub fn remove_table_data_list_entry_with_report(
     removal: TableDataListEntryRemoval,
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, TableDataListEntryRemovalReport), DecodeError> {
-    let (_snapshot, source_report) = decode_table_data_list_with_report(source, options)?;
+    let (source_snapshot, source_report) = decode_table_data_list_with_report(source, options)?;
+    if source_snapshot.list_type != 10 {
+        return Err(DecodeError::invalid());
+    }
     let mut budget = Budget::new(source, options)?;
     budget.message(source, 1)?;
     let mut remaining = source;
@@ -2981,10 +2984,12 @@ pub fn remove_table_data_list_entry_with_report(
         if field.number != 3 {
             continue;
         }
-        let entry = decode_table_data_list_entry_in(field.bytes()?, &mut budget, 2)?;
+        let entry_source = field.bytes()?;
+        let entry = decode_table_data_list_entry_in(entry_source, &mut budget, 2)?;
         if entry.key != removal.key {
             continue;
         }
+        validate_exact_comment_entry(entry_source, &mut budget, 2)?;
         if selected.is_some()
             || entry.ref_count != removal.ref_count
             || entry.comment_storage.map(ReferenceSnapshot::identifier)
@@ -3059,6 +3064,42 @@ pub fn remove_table_data_list_entry_with_report(
                 .ok_or_else(DecodeError::invalid)?,
         },
     ))
+}
+
+fn validate_exact_comment_entry(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 | 2 => {
+                let _ = field.varint()?;
+            },
+            10 => validate_exact_reference(field.bytes()?, budget, child_depth)?,
+            _ => return Err(DecodeError::invalid()),
+        }
+    }
+    Ok(())
+}
+
+fn validate_exact_reference(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1..=3 => {
+                let _ = field.varint()?;
+            },
+            _ => return Err(DecodeError::invalid()),
+        }
+    }
+    Ok(())
 }
 
 struct RemovedListEntryVerifier {
@@ -5842,6 +5883,26 @@ mod tests {
         let mut mixed = list_minimal();
         b(&mut mixed, 3, &mixed_entry);
         assert!(remove_table_data_list_entry(&mixed, removal, options(&mixed)).is_err());
+
+        let mut unknown_entry = comment_entry(7, 1, 114);
+        v(&mut unknown_entry, 90, 1);
+        let mut unknown = Vec::new();
+        v(&mut unknown, 1, 10);
+        v(&mut unknown, 2, 8);
+        b(&mut unknown, 3, &unknown_entry);
+        assert!(remove_table_data_list_entry(&unknown, removal, options(&unknown)).is_err());
+
+        let mut extended_reference = reference(114);
+        v(&mut extended_reference, 90, 1);
+        let mut extended_entry = Vec::new();
+        v(&mut extended_entry, 1, 7);
+        v(&mut extended_entry, 2, 1);
+        b(&mut extended_entry, 10, &extended_reference);
+        let mut extended = Vec::new();
+        v(&mut extended, 1, 10);
+        v(&mut extended, 2, 8);
+        b(&mut extended, 3, &extended_entry);
+        assert!(remove_table_data_list_entry(&extended, removal, options(&extended)).is_err());
     }
 
     #[test]
