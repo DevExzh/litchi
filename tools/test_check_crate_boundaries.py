@@ -11818,7 +11818,12 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_pages_table_lock_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_METHODS,
-            ("body_table_lock_state", "set_body_table_lock_state"),
+            (
+                "body_table_lock",
+                "body_table_lock_state",
+                "set_body_table_lock",
+                "set_body_table_lock_state",
+            ),
         )
         self.assertEqual(
             boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE,
@@ -11877,7 +11882,9 @@ class BoundaryPolicyTests(unittest.TestCase):
             lock_source = root / boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE
             lock_source.parent.mkdir(parents=True)
             lock_source.write_text(
+                "pub fn body_table_lock(model_object_id: u64) {}\n"
                 "pub fn body_table_lock_state(model_object_id: u64) {}\n"
+                "pub fn set_body_table_lock(model_object_id: u64) {}\n"
                 "pub fn set_body_table_lock_state(model_object_id: u64) {}\n",
                 encoding="utf-8",
             )
@@ -11899,7 +11906,7 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             violations = boundaries.audit_iwa_pages_table_lock_source_topology(root)
 
-            self.assertEqual(len(violations), 6)
+            self.assertEqual(len(violations), 8)
             self.assertTrue(
                 any("table-lock source returned" in item for item in violations),
                 violations,
@@ -11958,6 +11965,46 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_pages_table_lock_source_topology(root), []
             )
+
+    def test_iwa_pages_table_lock_scans_renamed_methods_modules_and_all_examples(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/renamed.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub fn set_body_table_lock() {}\n"
+                "#[cfg(test)]\n"
+                "pub fn body_table_lock() {}\n",
+                encoding="utf-8",
+            )
+            module = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/legacy.rs"
+            module.write_text("pub(crate) mod lock;\n", encoding="utf-8")
+            example = (
+                root
+                / boundaries.IWA_PAGES_TABLE_LOCK_EXAMPLE_ROOT
+                / "alternate.rs"
+            )
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "editor.body_table_lock_state(model_object_id);\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_table_lock_source_topology(root)
+
+            self.assertEqual(len(violations), 3, violations)
+            self.assertTrue(
+                any("method set_body_table_lock:" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(
+                any("method body_table_lock:" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(any("module declaration" in item for item in violations))
+            self.assertTrue(any("alternate.rs" in item for item in violations))
 
     def test_focused_pages_table_lock_requires_each_canonical_type(self) -> None:
         for missing in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES:
@@ -12052,7 +12099,9 @@ class BoundaryPolicyTests(unittest.TestCase):
             table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
             table.write_text("pub mod lock;\npub use lock::*;\n", encoding="utf-8")
 
-            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(
+                root
+            )
 
             for fragment in (
                 "exposes raw identifier object_id",
@@ -12134,6 +12183,46 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(len(violations), 1, violations)
             self.assertIn("retains flat Package method table_lock", violations[0])
+
+    def test_focused_pages_table_lock_scans_all_facade_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomLockPatch = BodyTableLockPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyLockPatch = BodyTableLockPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableLockPatch as LockPatch;\n"
+                    "pub mod table_lock;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use lock::State as LockState;\n")
+
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+
+            for fragment in (
+                "alternate alias CustomLockPatch for BodyTableLockPatch",
+                "aliases via owner glob",
+                "alternate alias LockPatch for BodyTableLockPatch",
+                "alternate alias LockState for State",
+                "exposes duplicate table_lock module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(
+                any("TestOnlyLockPatch" in item for item in violations),
+                violations,
+            )
 
     def test_focused_pages_table_lock_ignores_unrelated_package_exports(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
