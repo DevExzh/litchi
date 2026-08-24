@@ -945,7 +945,9 @@ fn validate_dependencies(
                 .get(target.model_message_index)
         })
         .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
-    validate_known_reference_fields(model_info, &model_view, &[85, 86], target, budget)?;
+    if section_counts_changed {
+        validate_known_reference_fields(model_info, &model_view, &[85, 86], target, budget)?;
+    }
     reject_unsupported_metadata(
         package,
         target.model_component_index,
@@ -981,7 +983,15 @@ fn validate_dependencies(
         .message_infos
         .get(target.info_message_index)
         .ok_or(BodyTableHeaderSettingsError::InvalidSource)?;
-    validate_known_reference_fields(info_metadata, &info_view, &[4, 5, 15, 17], target, budget)?;
+    if section_counts_changed {
+        validate_known_reference_fields(
+            info_metadata,
+            &info_view,
+            &[4, 5, 15, 17],
+            target,
+            budget,
+        )?;
+    }
     reject_unsupported_metadata(
         package,
         target.component_index,
