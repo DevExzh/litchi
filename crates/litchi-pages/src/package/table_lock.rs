@@ -384,29 +384,29 @@ impl BodyTableLockCommit {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct BodyTableTarget {
-    table_position: usize,
-    table_name: Box<str>,
-    attachment_identifier: NonZeroU64,
-    attachment_component_index: usize,
-    attachment_object_index: usize,
-    attachment_message_index: usize,
-    drawable_identifier: NonZeroU64,
-    model_identifier: NonZeroU64,
-    model_component_index: usize,
-    model_object_index: usize,
-    model_message_index: usize,
-    model_message_type: u32,
-    component_index: usize,
-    object_index: usize,
-    message_index: usize,
-    message_type: u32,
-    body_component_index: usize,
-    body_object_index: usize,
-    body_message_index: usize,
-    body_message_type: u32,
-    body_identifier: NonZeroU64,
-    explicit_locked: Option<bool>,
+pub(crate) struct BodyTableTarget {
+    pub(crate) table_position: usize,
+    pub(crate) table_name: Box<str>,
+    pub(crate) attachment_identifier: NonZeroU64,
+    pub(crate) attachment_component_index: usize,
+    pub(crate) attachment_object_index: usize,
+    pub(crate) attachment_message_index: usize,
+    pub(crate) drawable_identifier: NonZeroU64,
+    pub(crate) model_identifier: NonZeroU64,
+    pub(crate) model_component_index: usize,
+    pub(crate) model_object_index: usize,
+    pub(crate) model_message_index: usize,
+    pub(crate) model_message_type: u32,
+    pub(crate) component_index: usize,
+    pub(crate) object_index: usize,
+    pub(crate) message_index: usize,
+    pub(crate) message_type: u32,
+    pub(crate) body_component_index: usize,
+    pub(crate) body_object_index: usize,
+    pub(crate) body_message_index: usize,
+    pub(crate) body_message_type: u32,
+    pub(crate) body_identifier: NonZeroU64,
+    pub(crate) explicit_locked: Option<bool>,
 }
 
 /// The small, presence-preserving `TST.TableInfoArchive` projection owned by
@@ -500,7 +500,7 @@ impl Package {
         })
     }
 
-    fn resolve_body_table(
+    pub(crate) fn resolve_body_table(
         &self,
         selector: BodyTableSelector<'_>,
     ) -> Result<BodyTableTarget, BodyTableLockError> {
@@ -544,6 +544,17 @@ impl Package {
             },
         }
     }
+}
+
+/// Resolve and revalidate one rooted body-table graph for sibling semantic
+/// adapters.  The returned target contains only crate-private native proof;
+/// it never crosses the Pages public API.
+pub(crate) fn validate_body_table_target(
+    package: &Package,
+    target: &BodyTableTarget,
+    budget: &mut WireBudget,
+) -> Result<(), BodyTableLockError> {
+    validate_selected_ownership(package, target, budget)
 }
 
 fn native_body_table_targets_with_budget(
@@ -1914,6 +1925,34 @@ fn parsed_archive_source_length(archive: &Archive) -> Result<usize, BodyTableLoc
     usize::try_from(length).map_err(|_| BodyTableLockError::InvalidSource)
 }
 
+/// Preflight one sibling body-table payload before its archive decoder is
+/// allowed to allocate.  The source catalog and selected compressed member
+/// are charged through the same transaction budget used by the lock owner.
+pub(crate) fn preflight_body_table_component<'a>(
+    package: &'a Package,
+    target: &BodyTableTarget,
+    budget: &mut WireBudget,
+) -> Result<(&'a str, usize), BodyTableLockError> {
+    let source = physical_source(package)?;
+    budget.charge_source_catalog(source)?;
+    let component = source
+        .components()
+        .get_index(target.model_component_index)
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    let entry = source
+        .package()
+        .iter()
+        .find(|entry| entry.name() == component.name())
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    if entry.is_opaque() {
+        return Err(BodyTableLockError::UnsupportedSource);
+    }
+    budget.charge_payload_work(entry.data().len())?;
+    let stream_length = parsed_archive_source_length(component.archive())?;
+    budget.charge_archive_inventory(stream_length, component.archive())?;
+    Ok((component.name(), stream_length))
+}
+
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
@@ -2032,7 +2071,7 @@ fn fingerprint(bytes: &[u8], budget: &mut WireBudget) -> Result<u64, BodyTableLo
     Ok(value)
 }
 
-struct WireBudget {
+pub(crate) struct WireBudget {
     limits: WireLimits,
     physical_limits: litchi_iwa_archive::Limits,
     total_bytes: usize,
@@ -2059,7 +2098,9 @@ struct WireBudget {
 }
 
 impl WireBudget {
-    fn new(physical_limits: litchi_iwa_archive::Limits) -> Result<Self, BodyTableLockError> {
+    pub(crate) fn new(
+        physical_limits: litchi_iwa_archive::Limits,
+    ) -> Result<Self, BodyTableLockError> {
         let archive = physical_limits
             .effective_archive_limits()
             .map_err(map_archive_error)?;
@@ -2121,6 +2162,38 @@ impl WireBudget {
         })
     }
 
+    pub(crate) fn wire_limits(&self) -> WireLimits {
+        self.limits
+    }
+
+    pub(crate) fn maximum_payload_references(&self) -> usize {
+        self.maximum_payload_references
+    }
+
+    pub(crate) fn charge_codec_report(
+        &mut self,
+        fields: usize,
+        work_bytes: usize,
+        max_depth: u32,
+        references: usize,
+    ) -> Result<(), BodyTableLockError> {
+        Self::charge_counter(
+            &mut self.total_fields,
+            fields,
+            usize_as_u64(self.limits.max_fields()),
+            BodyTableLockLimitKind::WireFields,
+        )?;
+        self.charge_wire_work(work_bytes)?;
+        if usize::try_from(max_depth).unwrap_or(usize::MAX) > self.limits.max_nesting() {
+            return Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::WireNesting,
+                observed: u64::from(max_depth),
+                maximum: usize_as_u64(self.limits.max_nesting()),
+            });
+        }
+        self.charge_payload_references(references)
+    }
+
     fn charge_counter(
         counter: &mut usize,
         amount: usize,
@@ -2166,7 +2239,7 @@ impl WireBudget {
         Ok(())
     }
 
-    fn charge_payload_work(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_work(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
         let work =
             self.payload_work
                 .checked_add(amount)
@@ -2206,7 +2279,7 @@ impl WireBudget {
         )
     }
 
-    fn charge_output_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_output_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
         Self::charge_counter(
             &mut self.output_bytes,
             amount,
@@ -2255,7 +2328,7 @@ impl WireBudget {
         )
     }
 
-    fn charge_payload_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
         Self::charge_counter(
             &mut self.payload_bytes,
             amount,
@@ -2264,7 +2337,10 @@ impl WireBudget {
         )
     }
 
-    fn charge_total_payload_bytes(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_total_payload_bytes(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), BodyTableLockError> {
         Self::charge_counter(
             &mut self.total_payload_bytes,
             amount,
@@ -2336,14 +2412,17 @@ impl WireBudget {
         true
     }
 
-    fn charge_input_source(&mut self, bytes: &[u8]) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_input_source(&mut self, bytes: &[u8]) -> Result<(), BodyTableLockError> {
         if self.remember_source_key(bytes) {
             self.charge_input_bytes(bytes.len())?;
         }
         Ok(())
     }
 
-    fn charge_source_catalog(&mut self, source: &SourceCatalog) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_source_catalog(
+        &mut self,
+        source: &SourceCatalog,
+    ) -> Result<(), BodyTableLockError> {
         let source_bytes = source.source_bytes();
         self.charge_input_source(source_bytes)?;
         if !self.remember_catalog_key(source_bytes) {

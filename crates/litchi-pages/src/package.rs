@@ -4,6 +4,7 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
+pub(crate) mod body_table_title;
 pub(crate) mod document_settings;
 mod footnote_text;
 mod page_layout;
@@ -44,6 +45,10 @@ use crate::{
     MAX_SECTIONS, Root, Section, SectionType,
 };
 
+pub use body_table_title::{
+    BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
+    BodyTableTitleLimitKind, BodyTableTitlePatch,
+};
 pub use footnote_text::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
     FootnoteTextLimitKind, FootnoteTextPatch,

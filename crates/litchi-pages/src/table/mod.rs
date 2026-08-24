@@ -2,3 +2,4 @@
 
 /// Interactive lock state for a body-attached table.
 pub mod lock;
+pub mod title;
