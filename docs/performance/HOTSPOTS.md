@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## Latest evidence boundary and allocator probe (changes 0270-0271)
+
+[Change 0270](changes/0270-opc-relationship-open-timing.md) corrects the OPC
+relationship-open timer to production open only, with a `black_box` result
+fence and post-timing relationship/package oracles. It supplies no latency or
+resource claim.
+
+[Change 0271](changes/0271-xlsx-repeated-store-allocator-probe.md) adds no
+hotspot claim. Its exploratory operation-scoped allocator observations are
+identical in A1/B1 and A2/B2: medium `568 -> 560` calls and `225206 -> 81224`
+bytes; oversized `816 -> 560` calls and `271112552 -> 81224` bytes. Latency,
+operation-local peak/RSS, physical-I/O, decompression, copy, and broad XLSX
+claims remain withheld; the default remains 36 cases / 198 records.
+
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:

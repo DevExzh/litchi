@@ -1,0 +1,429 @@
+{
+  "baseline_binary_sha256": "7c535ab6e4a2363d0ecca2bf42fe191cbf6358c181e50a725a781c52f798b813",
+  "baseline_revision": "18633404d27bc4c442c09915972e7655cdae813b",
+  "comparisons": [
+    {
+      "baseline": 225206.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 81224.0,
+      "delta_is_infinite": false,
+      "delta_percent": -63.93346536060318,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.allocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 568.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 560.0,
+      "delta_is_infinite": false,
+      "delta_percent": -1.4084507042253502,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 230400.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 81224.0,
+      "delta_is_infinite": false,
+      "delta_percent": -64.74652777777779,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.deallocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 536.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 528.0,
+      "delta_is_infinite": false,
+      "delta_percent": -1.4925373134328401,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.deallocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 0.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 0.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.failed_allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 5706689.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 5711883.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.09101599894438817,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.live_bytes_after.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 5711883.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 5711883.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.live_bytes_before.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 6468579.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 6468579.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.peak_live_bytes_after.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 6468579.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 6468579.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.peak_live_bytes_before.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 32.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_medium",
+      "corpus": {
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-medium",
+        "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 32.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.reallocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 271112552.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 81224.0,
+      "delta_is_infinite": false,
+      "delta_percent": -99.9700404870963,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.allocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 816.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 560.0,
+      "delta_is_infinite": false,
+      "delta_percent": -31.372549019607842,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 271112552.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 81224.0,
+      "delta_is_infinite": false,
+      "delta_percent": -99.9700404870963,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.deallocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 784.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 528.0,
+      "delta_is_infinite": false,
+      "delta_percent": -32.6530612244898,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.deallocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 0.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 0.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.failed_allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 4599961.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 4599961.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.live_bytes_after.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 4599961.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 4599961.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.live_bytes_before.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 13751092.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 13751092.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.peak_live_bytes_after.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 13751092.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 13751092.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.peak_live_bytes_before.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 32.0,
+      "cache_state": "warm",
+      "case": "xlsx_source_repeated_store_oversized",
+      "corpus": {
+        "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+        "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+        "name": "xlsx-source-repeated-store-oversized",
+        "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+        "shape": "oversized",
+        "target_entry": "Sheet1!A1"
+      },
+      "current": 32.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 5.0,
+      "metric": "operation_metrics.allocation.reallocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    }
+  ],
+  "current_binary_sha256": "518b6a93e24df399d06bb598fbfd7827a23aea4058dae090888bbed2e490119b",
+  "current_revision": "8a0ca40b1a9d77a9494c74c0cdca38dd61ee68b1",
+  "errors": [],
+  "policy": {
+    "minimum_samples": 30,
+    "policy_id": "litchi-hosted-xlsx-repeated-store-allocator-v1",
+    "schema_version": 2
+  },
+  "regressions": [],
+  "schema_version": 1,
+  "status": "pass",
+  "summary": {
+    "compared_metrics": 20,
+    "latency_claims": "withheld_instrumentation",
+    "latency_compared_results": 0,
+    "latency_excluded_results": 2,
+    "matched_results": 2,
+    "regressions": 0
+  },
+  "tool": {
+    "name": "litchi-perf-compare",
+    "version": "1.3.2"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "manifest_kind": "allocator-filesystem-case-corpus-cache-key-identity",
+  "harness_source": "tools/perf-baseline/src/filesystem.rs:XlsxRepeatStoreScenario",
+  "evidence_manifest": "docs/performance/results/0269-xlsx-repeated-store-cache-abba-20260824/0269-xlsx-repeated-store-cache-abba-manifest.json",
+  "evidence_manifest_sha256": "a1c9b662e9d84886d69130ef054c2cc4b1ac55952fd97fb48df1f8a6a96226e4",
+  "report_schema_version": 1,
+  "source_report_samples_per_case": 500,
+  "source_report_warmup_iterations_per_case": 20,
+  "planned_allocator_policy": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "minimum_samples": 30
+  },
+  "result_key_fields": [
+    "case",
+    "corpus",
+    "cache_state"
+  ],
+  "result_count": 2,
+  "case_count": 2,
+  "required_cases": [
+    "xlsx_source_repeated_store_medium",
+    "xlsx_source_repeated_store_oversized"
+  ],
+  "cache_states": [
+    "warm"
+  ],
+  "case_corpora": {
+    "xlsx_source_repeated_store_medium": [
+      "xlsx-source-repeated-store-medium"
+    ],
+    "xlsx_source_repeated_store_oversized": [
+      "xlsx-source-repeated-store-oversized"
+    ]
+  },
+  "corpora": {
+    "xlsx-source-repeated-store-medium": {
+      "name": "xlsx-source-repeated-store-medium",
+      "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+      "package_format": "XLSX/OPC/ZIP",
+      "shape": "medium",
+      "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+      "compression": "deflate",
+      "entry_count": 9216,
+      "archive_member_count": 17,
+      "entry_bytes": 4,
+      "uncompressed_payload_bytes": 4231168,
+      "archive_bytes": 4226429,
+      "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "target_entry": "Sheet1!A1",
+      "target_payload_bytes": 1,
+      "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+          "workbook": "xl/workbook.xml",
+          "worksheets": [
+            "xl/worksheets/sheet1.xml",
+            "xl/worksheets/sheet2.xml",
+            "xl/worksheets/sheet3.xml",
+            "xl/worksheets/sheet4.xml"
+          ],
+          "shared_strings": null,
+          "styles": "xl/styles.xml"
+        }
+      }
+    },
+    "xlsx-source-repeated-store-oversized": {
+      "name": "xlsx-source-repeated-store-oversized",
+      "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+      "package_format": "XLSX/OPC/ZIP",
+      "shape": "oversized",
+      "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+      "compression": "deflate",
+      "entry_count": 9216,
+      "archive_member_count": 17,
+      "entry_bytes": 4,
+      "uncompressed_payload_bytes": 12789836,
+      "archive_bytes": 4236114,
+      "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+      "target_entry": "Sheet1!A1",
+      "target_payload_bytes": 1,
+      "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+          "workbook": "xl/workbook.xml",
+          "worksheets": [
+            "xl/worksheets/sheet1.xml",
+            "xl/worksheets/sheet2.xml",
+            "xl/worksheets/sheet3.xml",
+            "xl/worksheets/sheet4.xml"
+          ],
+          "shared_strings": null,
+          "styles": "xl/styles.xml"
+        }
+      }
+    }
+  },
+  "canonicalization": "sort (case, compact canonical corpus JSON, cache_state) keys; SHA-256 UTF-8 case, NUL, corpus JSON, NUL, cache_state, LF",
+  "result_keys_sha256": "679776540ae864a066360d84b3e84c4163faff53ef8398891179892080b8a86e"
+}

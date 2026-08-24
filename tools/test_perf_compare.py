@@ -1,10 +1,13 @@
 import copy
+import hashlib
 import json
 import math
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
+from tools import perf_abba_package
 from tools import perf_compare
 
 
@@ -324,6 +327,7 @@ def allocator_policy_fixture():
     comparison_policy["expected_result_count"] = 2
     comparison_policy["required_cases"] = ["opc_file_eager_open"]
     comparison_policy["result_key_fields"] = ["case", "corpus", "cache_state"]
+    comparison_policy["require_sample_child_identity"] = True
     corpus = report()["results"][0]["corpus"]
     corpus_identity = json.dumps(
         corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
@@ -337,6 +341,9 @@ def allocator_policy_fixture():
     comparison_policy["expected_configuration"] = {
         "samples_per_case": 5,
         "filesystem_cache_states": ["warm", "cold-requested"],
+        "filesystem_fresh_child_per_sample": True,
+        "filesystem_process_isolated": True,
+        "filesystem_root_selected": False,
     }
     comparison_policy["metric_classes"] = [
         {
@@ -389,15 +396,22 @@ def allocator_report(value=100, revision="baseline"):
     result["environment"]["allocator"] = "CountingSystemAllocator(std::alloc::System)"
     result["configuration"]["cases"] = ["opc_file_eager_open"]
     result["configuration"]["filesystem_cache_states"] = ["warm", "cold-requested"]
+    result["configuration"]["filesystem_fresh_child_per_sample"] = True
+    result["configuration"]["filesystem_process_isolated"] = True
+    result["configuration"]["filesystem_root_selected"] = False
     result["filesystem_evidence"] = [
         {
             "case": "opc_file_eager_open",
             "sample_count": 5,
             "cache_states": ["warm", "cold-requested"],
+            "fresh_child_per_sample": True,
             "samples": [
                 {
                     "sample_index": sample_index,
                     "cache_state": cache_state,
+                    "child_process_id": (
+                        (1_000 if cache_state == "warm" else 2_000) + sample_index
+                    ),
                     "allocation_metrics": allocator_raw_metrics(value),
                 }
                 for cache_state in ("warm", "cold-requested")
@@ -412,6 +426,69 @@ def allocator_report(value=100, revision="baseline"):
     second = copy.deepcopy(first)
     second["cache_state"] = "cold-requested"
     result["results"].append(second)
+    return result
+
+
+def xlsx_allocator_corpus_fixture():
+    corpus = copy.deepcopy(report()["results"][0]["corpus"])
+    corpus.update(
+        {
+            "name": "xlsx-source-repeated-store-medium",
+            "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+            "package_format": "XLSX/OPC/ZIP",
+            "shape": "medium",
+            "archive_sha256": "e" * 64,
+        }
+    )
+    return corpus
+
+
+def xlsx_allocator_policy_fixture():
+    comparison_policy = allocator_policy_fixture()
+    comparison_policy["expected_result_count"] = 1
+    comparison_policy["required_cases"] = ["xlsx_source_repeated_store_medium"]
+    comparison_policy["expected_configuration"]["filesystem_cache_states"] = ["warm"]
+    comparison_policy["expected_configuration"]["filesystem_root_selected"] = True
+    comparison_policy["filesystem_identity_fields"] = [
+        "filesystem_type",
+        "source_destination_same_device",
+        "storage_identifier",
+    ]
+    corpus = xlsx_allocator_corpus_fixture()
+    corpus_identity = json.dumps(
+        corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    comparison_policy["expected_result_keys_sha256"] = (
+        perf_compare.result_key_manifest_sha256(
+            [("xlsx_source_repeated_store_medium", corpus_identity, "warm")]
+        )
+    )
+    return comparison_policy, corpus
+
+
+def xlsx_allocator_report(corpus, value=100, revision="baseline"):
+    result = allocator_report(value=value, revision=revision)
+    result["configuration"]["cases"] = ["xlsx_source_repeated_store_medium"]
+    result["configuration"]["filesystem_cache_states"] = ["warm"]
+    result["configuration"]["filesystem_root_selected"] = True
+    result["environment"].update(
+        filesystem_type="tmpfs",
+        source_destination_same_device=True,
+        storage_identifier=None,
+    )
+    row = copy.deepcopy(result["results"][0])
+    row["case"] = "xlsx_source_repeated_store_medium"
+    row["cache_state"] = "warm"
+    row["corpus"] = copy.deepcopy(corpus)
+    result["results"] = [row]
+    evidence = copy.deepcopy(result["filesystem_evidence"][0])
+    evidence["case"] = "xlsx_source_repeated_store_medium"
+    evidence["cache_states"] = ["warm"]
+    evidence["corpus"] = copy.deepcopy(corpus)
+    evidence["samples"] = evidence["samples"][:5]
+    for sample in evidence["samples"]:
+        sample["xlsx_source_sha256"] = corpus["archive_sha256"]
+    result["filesystem_evidence"] = [evidence]
     return result
 
 
@@ -719,6 +796,807 @@ class PerfCompareTests(unittest.TestCase):
         allocator_report["tool"]["instrumentation"] = "system_allocator_operation_scoped"
         with self.assertRaisesRegex(perf_compare.ComparisonInputError, "tool does not match"):
             perf_compare.compare_reports(allocator_report, report(revision="current"), policy())
+
+    def test_xlsx_allocator_policy_pins_0269_warm_corpus_keys(self):
+        repository = Path(__file__).resolve().parents[1]
+        allocator_policy = json.loads(
+            (
+                repository
+                / "docs/performance/perf-regression-policy-xlsx-allocator-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        allocator_manifest = json.loads(
+            (
+                repository
+                / "docs/performance/results/perf-regression-xlsx-allocator-manifest-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        evidence_manifest_path = repository / allocator_manifest["evidence_manifest"]
+        evidence_manifest = json.loads(evidence_manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            hashlib.sha256(evidence_manifest_path.read_bytes()).hexdigest(),
+            allocator_manifest["evidence_manifest_sha256"],
+        )
+        self.assertEqual(evidence_manifest["manifest_kind"], "litchi-perf-abba-artifacts")
+        self.assertEqual(evidence_manifest["schema_version"], 1)
+        self.assertEqual(evidence_manifest["change_id"], "0269-xlsx-repeated-store-cache-abba")
+        self.assertEqual(
+            allocator_manifest["harness_source"],
+            "tools/perf-baseline/src/filesystem.rs:XlsxRepeatStoreScenario",
+        )
+        harness_path, harness_symbol = allocator_manifest["harness_source"].split(":", 1)
+        harness_source = (repository / harness_path).read_text(encoding="utf-8")
+        self.assertIn(harness_symbol, harness_source)
+        for case in (
+            "xlsx_source_repeated_store_medium",
+            "xlsx_source_repeated_store_oversized",
+        ):
+            self.assertIn(case, harness_source)
+
+        summary_path = evidence_manifest_path.parent / evidence_manifest["summary"]["path"]
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        self.assertEqual(summary["schema_version"], evidence_manifest["summary"]["schema_version"])
+        summary_canonical = perf_abba_package.canonical_json(summary)
+        self.assertEqual(
+            hashlib.sha256(summary_canonical).hexdigest(),
+            evidence_manifest["summary"]["canonical_sha256"],
+        )
+        self.assertEqual(
+            len(summary_canonical), evidence_manifest["summary"]["canonical_bytes"]
+        )
+
+        evidence_reports = {}
+        for artifact in evidence_manifest["artifacts"]:
+            artifact_path = evidence_manifest_path.parent / artifact["path"]
+            compressed = artifact_path.read_bytes()
+            self.assertEqual(len(compressed), artifact["bytes"])
+            self.assertEqual(hashlib.sha256(compressed).hexdigest(), artifact["sha256"])
+            raw = subprocess.check_output(["zstd", "-dc", str(artifact_path)])
+            self.assertEqual(len(raw), artifact["uncompressed_bytes"])
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), artifact["uncompressed_sha256"])
+            report = json.loads(raw)
+            self.assertEqual(report["schema_version"], allocator_manifest["report_schema_version"])
+            canonical = perf_abba_package.canonical_json(report)
+            self.assertEqual(
+                hashlib.sha256(canonical).hexdigest(), artifact["canonical_sha256"]
+            )
+            self.assertEqual(
+                artifact["canonical_sha256"],
+                evidence_manifest["summary"]["report_identity"][artifact["role"]][
+                    "canonical_sha256"
+                ],
+            )
+            evidence_reports[artifact["role"]] = report
+
+        self.assertEqual(set(evidence_reports), {"a1", "a2", "b1", "b2"})
+        source_cases = {
+            "xlsx_source_repeated_store_medium",
+            "xlsx_source_repeated_store_oversized",
+        }
+        source_corpora = {
+            result["case"]: result["corpus"]
+            for result in evidence_reports["a1"]["results"]
+            if result["case"] in source_cases
+        }
+        self.assertEqual(set(source_corpora), source_cases)
+        manifest_corpora = allocator_manifest["corpora"]
+        for role, report in evidence_reports.items():
+            decompressed_corpora = {
+                result["corpus"]["name"]: result["corpus"]
+                for result in report["results"]
+                if result["case"] in source_cases
+            }
+            self.assertEqual(
+                decompressed_corpora,
+                manifest_corpora,
+                f"{role} decompressed source corpora differ from allocator manifest",
+            )
+        for role, report in evidence_reports.items():
+            configuration = report["configuration"]
+            self.assertEqual(report["tool"]["instrumentation"], "none")
+            self.assertEqual(configuration["samples_per_case"], 500)
+            self.assertEqual(configuration["warmup_iterations_per_case"], 20)
+            self.assertEqual(configuration["filesystem_cache_states"], ["warm"])
+            self.assertTrue(configuration["filesystem_fresh_child_per_sample"])
+            self.assertTrue(configuration["filesystem_process_isolated"])
+            self.assertTrue(configuration["filesystem_root_selected"])
+            self.assertEqual(configuration["cases"], sorted(source_cases))
+            for result in report["results"]:
+                if result["case"] not in source_cases:
+                    continue
+                self.assertEqual(result["cache_state"], "warm")
+                self.assertEqual(result["corpus"], source_corpora[result["case"]])
+            for evidence in report["filesystem_evidence"]:
+                if evidence["case"] not in source_cases:
+                    continue
+                self.assertEqual(evidence["corpus"], source_corpora[evidence["case"]])
+                self.assertEqual(evidence["sample_count"], 500)
+                self.assertEqual(evidence["warmup_iterations"], 20)
+                self.assertEqual(evidence["cache_states"], ["warm"])
+                self.assertTrue(evidence["fresh_child_per_sample"])
+                child_process_ids = [sample["child_process_id"] for sample in evidence["samples"]]
+                self.assertEqual(len(child_process_ids), len(set(child_process_ids)))
+                for sample in evidence["samples"]:
+                    self.assertEqual(
+                        sample["xlsx_source_sha256"],
+                        source_corpora[evidence["case"]]["archive_sha256"],
+                    )
+
+        perf_compare.validate_policy(allocator_policy)
+        expected_cases = [
+            "xlsx_source_repeated_store_medium",
+            "xlsx_source_repeated_store_oversized",
+        ]
+        self.assertEqual(allocator_policy["required_cases"], expected_cases)
+        self.assertEqual(allocator_policy["result_key_fields"], ["case", "corpus", "cache_state"])
+        self.assertEqual(
+            allocator_policy["tool_identity"]["instrumentation"],
+            "system_allocator_operation_scoped",
+        )
+        self.assertEqual(
+            allocator_policy["expected_configuration"],
+            {
+                "samples_per_case": 30,
+                "warmup_iterations_per_case": 3,
+                "filesystem_cache_states": ["warm"],
+                "filesystem_fresh_child_per_sample": True,
+                "filesystem_process_isolated": True,
+                "filesystem_root_selected": True,
+            },
+        )
+        self.assertEqual(allocator_manifest["source_report_samples_per_case"], 500)
+        self.assertEqual(allocator_manifest["source_report_warmup_iterations_per_case"], 20)
+        self.assertEqual(
+            allocator_manifest["planned_allocator_policy"],
+            {
+                "samples_per_case": 30,
+                "warmup_iterations_per_case": 3,
+                "minimum_samples": 30,
+            },
+        )
+        self.assertEqual(allocator_manifest["manifest_kind"], "allocator-filesystem-case-corpus-cache-key-identity")
+        self.assertEqual(allocator_manifest["required_cases"], expected_cases)
+        self.assertEqual(allocator_manifest["cache_states"], ["warm"])
+        self.assertEqual(allocator_manifest["result_count"], 2)
+        self.assertEqual(
+            allocator_manifest["case_corpora"],
+            {
+                "xlsx_source_repeated_store_medium": [
+                    "xlsx-source-repeated-store-medium"
+                ],
+                "xlsx_source_repeated_store_oversized": [
+                    "xlsx-source-repeated-store-oversized"
+                ],
+            },
+        )
+        expected_corpora = {
+            "xlsx-source-repeated-store-medium": {
+                "archive_bytes": 4226429,
+                "archive_member_count": 17,
+                "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+                "name": "xlsx-source-repeated-store-medium",
+                "shape": "medium",
+            },
+            "xlsx-source-repeated-store-oversized": {
+                "archive_bytes": 4236114,
+                "archive_member_count": 17,
+                "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+                "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+                "name": "xlsx-source-repeated-store-oversized",
+                "shape": "oversized",
+            },
+        }
+        for name, expected in expected_corpora.items():
+            corpus = allocator_manifest["corpora"][name]
+            for field, value in expected.items():
+                self.assertEqual(corpus[field], value, f"{name}.{field}")
+            self.assertEqual(corpus["target_entry"], "Sheet1!A1")
+            self.assertEqual(corpus["target_payload_bytes"], 1)
+            self.assertEqual(
+                corpus["target_payload_sha256"],
+                "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            )
+
+        keys = []
+        for case in expected_cases:
+            for name in allocator_manifest["case_corpora"][case]:
+                corpus = allocator_manifest["corpora"][name]
+                corpus_identity = json.dumps(
+                    corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+                )
+                keys.append((case, corpus_identity, "warm"))
+        digest = perf_compare.result_key_manifest_sha256(keys)
+        self.assertEqual(digest, "679776540ae864a066360d84b3e84c4163faff53ef8398891179892080b8a86e")
+        self.assertEqual(digest, allocator_manifest["result_keys_sha256"])
+        self.assertEqual(digest, allocator_policy["expected_result_keys_sha256"])
+
+        changed = copy.deepcopy(keys)
+        changed[0] = (changed[0][0], changed[0][1], "cold-requested")
+        self.assertNotEqual(
+            perf_compare.result_key_manifest_sha256(changed), digest
+        )
+
+    def test_allocator_filesystem_policy_rejects_child_and_source_identity_mutations(self):
+        comparison_policy = allocator_policy_fixture()
+        baseline = allocator_report()
+        current = allocator_report(revision="current")
+        perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        missing_child_process_id = copy.deepcopy(current)
+        missing_child_process_id["filesystem_evidence"][0]["samples"][0].pop(
+            "child_process_id"
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "child_process_id"
+        ):
+            perf_compare.compare_reports(
+                baseline, missing_child_process_id, comparison_policy
+            )
+
+        reused_child_process_id = copy.deepcopy(current)
+        samples = reused_child_process_id["filesystem_evidence"][0]["samples"]
+        samples[1]["child_process_id"] = samples[0]["child_process_id"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "must be unique"
+        ):
+            perf_compare.compare_reports(baseline, reused_child_process_id, comparison_policy)
+
+    def test_allocator_child_identity_is_opt_in_for_legacy_policies(self):
+        comparison_policy = allocator_policy_fixture()
+        comparison_policy.pop("require_sample_child_identity")
+        comparison_policy["expected_configuration"][
+            "filesystem_fresh_child_per_sample"
+        ] = False
+        comparison_policy["expected_configuration"]["filesystem_process_isolated"] = (
+            False
+        )
+        baseline = allocator_report()
+        current = allocator_report(revision="current")
+        for report_value in (baseline, current):
+            report_value["configuration"]["filesystem_fresh_child_per_sample"] = False
+            report_value["configuration"]["filesystem_process_isolated"] = False
+            for evidence in report_value["filesystem_evidence"]:
+                for sample in evidence["samples"]:
+                    sample.pop("child_process_id")
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+
+        isolated_policy = allocator_policy_fixture()
+        isolated_policy.pop("require_sample_child_identity")
+        isolated_current = allocator_report(revision="current")
+        isolated_current["filesystem_evidence"][0]["samples"][0].pop(
+            "child_process_id"
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "child_process_id"
+        ):
+            perf_compare.compare_reports(
+                allocator_report(), isolated_current, isolated_policy
+            )
+
+        for field in (
+            "filesystem_fresh_child_per_sample",
+            "filesystem_process_isolated",
+            "filesystem_root_selected",
+        ):
+            invalid_configuration = allocator_policy_fixture()
+            invalid_configuration["expected_configuration"][field] = 1
+            with self.subTest(expected_configuration_field=field):
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    f"expected_configuration.{field} must be boolean",
+                ):
+                    perf_compare.validate_policy(invalid_configuration)
+
+        invalid_report = allocator_report(revision="current")
+        invalid_report["configuration"]["filesystem_process_isolated"] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "configuration.filesystem_process_isolated does not match policy",
+        ):
+            perf_compare.compare_reports(
+                allocator_report(), invalid_report, allocator_policy_fixture()
+            )
+
+        invalid_policy = allocator_policy_fixture()
+        invalid_policy["require_sample_child_identity"] = "yes"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "require_sample_child_identity must be boolean",
+        ):
+            perf_compare.validate_policy(invalid_policy)
+
+    def test_selected_root_xlsx_allocator_policy_rejects_identity_mutations(self):
+        comparison_policy, corpus = xlsx_allocator_policy_fixture()
+        baseline = xlsx_allocator_report(corpus)
+        current = xlsx_allocator_report(corpus, revision="current")
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, comparison_policy)["status"],
+            "pass",
+        )
+
+        mutations = (
+            (
+                lambda report: report["filesystem_evidence"][0]["samples"][0].pop(
+                    "child_process_id"
+                ),
+                "child_process_id",
+            ),
+            (
+                lambda report: report["filesystem_evidence"][0]["samples"][1].update(
+                    child_process_id=report["filesystem_evidence"][0]["samples"][0][
+                        "child_process_id"
+                    ]
+                ),
+                "must be unique",
+            ),
+            (
+                lambda report: report["filesystem_evidence"][0]["corpus"].update(
+                    archive_sha256="f" * 64
+                ),
+                "corpus identity",
+            ),
+            (
+                lambda report: report["filesystem_evidence"][0]["samples"][0].update(
+                    xlsx_source_sha256="f" * 64
+                ),
+                "xlsx_source_sha256",
+            ),
+            (
+                lambda report: report["environment"].update(filesystem_type="ext4"),
+                "filesystem identity mismatch",
+            ),
+            (
+                lambda report: report["environment"].pop("storage_identifier"),
+                "storage_identifier is required",
+            ),
+        )
+        for mutate, message in mutations:
+            with self.subTest(message=message):
+                mutated = copy.deepcopy(current)
+                mutate(mutated)
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError, message
+                ):
+                    perf_compare.compare_reports(
+                        baseline, mutated, comparison_policy
+                    )
+
+    def test_xlsx_allocator_policy_compares_retained_0271_abba_pairs(self):
+        repository = Path(__file__).resolve().parents[1]
+        evidence_root = (
+            repository
+            / "docs/performance/results/0271-xlsx-repeated-store-allocator-probe-20260824"
+        )
+        package_manifest = json.loads(
+            (
+                evidence_root
+                / "0271-xlsx-repeated-store-allocator-probe-manifest.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertIs(type(package_manifest["schema_version"]), int)
+        self.assertEqual(package_manifest["schema_version"], 1)
+        self.assertIs(type(package_manifest["date"]), str)
+        self.assertEqual(package_manifest["date"], "2026-08-24")
+        self.assertEqual(
+            package_manifest["change_id"],
+            "0271-xlsx-repeated-store-allocator-probe",
+        )
+        self.assertEqual(package_manifest["status"], "exploratory_no_claim")
+        expected_artifacts = {
+            *(f"{role}.json" for role in ("a1", "a2", "b1", "b2")),
+            "a1-b1-comparison.json",
+            "a2-b2-comparison.json",
+            "a1-b1-summary.txt",
+            "a2-b2-summary.txt",
+        }
+        expected_artifact_roles = {
+            "a1.json": "raw_control",
+            "a2.json": "raw_control",
+            "b1.json": "raw_candidate",
+            "b2.json": "raw_candidate",
+            "a1-b1-comparison.json": "comparison",
+            "a2-b2-comparison.json": "comparison",
+            "a1-b1-summary.txt": "summary",
+            "a2-b2-summary.txt": "summary",
+        }
+        tracked_artifacts = package_manifest["tracked_artifacts"]
+        self.assertIs(type(tracked_artifacts), list)
+        tracked_paths = [artifact["path"] for artifact in tracked_artifacts]
+        self.assertEqual(len(tracked_paths), len(set(tracked_paths)))
+        self.assertEqual(len(tracked_paths), len(expected_artifacts))
+        self.assertEqual(set(tracked_paths), expected_artifacts)
+        artifacts = {
+            artifact["path"]: artifact
+            for artifact in tracked_artifacts
+        }
+        self.assertEqual(set(artifacts), expected_artifacts)
+        self.assertEqual(
+            {path: artifact["role"] for path, artifact in artifacts.items()},
+            expected_artifact_roles,
+        )
+        for relative_path, artifact in artifacts.items():
+            payload = (evidence_root / relative_path).read_bytes()
+            self.assertEqual(len(payload), artifact["bytes"], relative_path)
+            self.assertEqual(
+                hashlib.sha256(payload).hexdigest(), artifact["sha256"], relative_path
+            )
+
+        protocol = package_manifest["protocol"]
+        self.assertEqual(protocol["order"], ["a1", "b1", "b2", "a2"])
+        self.assertEqual(protocol["samples_per_case"], 30)
+        self.assertEqual(protocol["warmup_iterations_per_case"], 3)
+        self.assertEqual(protocol["filesystem_cache_states"], ["warm"])
+        for field in (
+            "fresh_child_per_sample",
+            "process_isolated",
+            "filesystem_root_selected",
+        ):
+            self.assertIs(type(protocol[field]), bool)
+            self.assertIs(protocol[field], True)
+        self.assertEqual(protocol["filesystem_type"], "tmpfs")
+        self.assertEqual(protocol["cpu_affinity"], "2")
+        self.assertEqual(protocol["execution_workers"], [1])
+        self.assertEqual(
+            protocol["allocator"], "CountingSystemAllocator(std::alloc::System)"
+        )
+        self.assertEqual(
+            protocol["instrumentation"], "system_allocator_operation_scoped"
+        )
+        self.assertEqual(
+            protocol["allocation_scope"], "operation_global_system_allocator"
+        )
+        self.assertEqual(
+            package_manifest["environment"]["source_destination_path_identity"],
+            "unavailable",
+        )
+        self.assertEqual(
+            package_manifest["environment"]["device_identity"], "unavailable"
+        )
+        self.assertIs(
+            type(package_manifest["environment"]["source_destination_same_device"]),
+            bool,
+        )
+        self.assertIs(
+            package_manifest["environment"]["source_destination_same_device"], True
+        )
+        self.assertIsNone(package_manifest["environment"]["storage_identifier"])
+        policy = json.loads(
+            (
+                repository
+                / "docs/performance/perf-regression-policy-xlsx-allocator-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        manifest_environment = package_manifest["environment"]
+        self.assertEqual(
+            set(manifest_environment),
+            {
+                "rustc_version",
+                "target_os",
+                "target_arch",
+                "logical_cpus_available",
+                "source_destination_same_device",
+                "source_destination_path_identity",
+                "device_identity",
+                "storage_identifier",
+            },
+        )
+        self.assertEqual(
+            package_manifest["revisions"]["control"]["legs"], ["a1", "a2"]
+        )
+        self.assertEqual(
+            package_manifest["revisions"]["candidate"]["legs"], ["b1", "b2"]
+        )
+        self.assertEqual(
+            set(package_manifest["binaries"]["control"]["mode_bits_by_leg"]),
+            {"a1", "a2"},
+        )
+        self.assertEqual(
+            set(package_manifest["binaries"]["candidate"]["mode_bits_by_leg"]),
+            {"b1", "b2"},
+        )
+        manifest_corpora = {
+            corpus["case"]: corpus for corpus in package_manifest["corpora"]
+        }
+        self.assertEqual(
+            [corpus["case"] for corpus in package_manifest["corpora"]],
+            policy["required_cases"],
+        )
+        self.assertEqual(set(manifest_corpora), set(policy["required_cases"]))
+        self.assertIs(
+            type(package_manifest["comparison_policy"]["paired_results_identical"]),
+            bool,
+        )
+        self.assertIs(
+            package_manifest["comparison_policy"]["paired_results_identical"], True
+        )
+        self.assertEqual(
+            package_manifest["comparison_policy"],
+            {
+                "metric_scope": "operation_metrics.allocation",
+                "maximum_regression_percent": 5.0,
+                "compared_metric_count_per_pair": 20,
+                "regressions_per_pair": 0,
+                "paired_results_identical": True,
+                "latency": "excluded",
+                "rss": "descriptive_only",
+            },
+        )
+        self.assertEqual(
+            package_manifest["claim_scope"],
+            {
+                "allocation": "exploratory_operation_scoped_observation_only",
+                "excluded": [
+                    "latency",
+                    "operation_local_peak_memory",
+                    "operation_local_peak_rss",
+                    "physical_io",
+                    "decompression",
+                    "copy",
+                    "broad_xlsx_performance",
+                    "real_producer_breadth",
+                ],
+                "default_case_count": 36,
+                "default_record_count": 198,
+                "claim_0269": "retained_latency_only",
+                "claim_registry_updated": False,
+                "historical_classification_tables_updated": False,
+            },
+        )
+        reports = {
+            role: json.loads(
+                (evidence_root / f"{role}.json").read_text(encoding="utf-8")
+            )
+            for role in ("a1", "a2", "b1", "b2")
+        }
+        perf_compare.validate_policy(policy)
+        self.assertEqual(policy["minimum_samples"], 30)
+        self.assertEqual(policy["expected_configuration"]["samples_per_case"], 30)
+        self.assertEqual(
+            policy["filesystem_identity_fields"],
+            [
+                "filesystem_type",
+                "source_destination_same_device",
+                "storage_identifier",
+            ],
+        )
+        allocation_policy_class = next(
+            item
+            for item in policy["metric_classes"]
+            if item["name"] == "allocation"
+        )
+        self.assertEqual(
+            allocation_policy_class["max_regression_percent"],
+            package_manifest["comparison_policy"]["maximum_regression_percent"],
+        )
+        self.assertEqual(allocation_policy_class["presence"], "required")
+        self.assertTrue(
+            all(
+                pattern.startswith("operation_metrics/allocation/")
+                for pattern in allocation_policy_class["path_globs"]
+            )
+        )
+        for role, report in reports.items():
+            revision_group = "control" if role.startswith("a") else "candidate"
+            self.assertEqual(
+                report["environment"]["git_revision"],
+                package_manifest["revisions"][revision_group]["git_revision"],
+            )
+            expected_binary = package_manifest["binaries"][revision_group]
+            binary = report["binary_identity"]
+            # The manifest records one representative path per binary. A2 uses
+            # a different absolute staging path for the same pinned binary, so
+            # path equality is not claimed without a per-leg manifest field.
+            self.assertTrue(Path(binary["path"]).is_absolute())
+            self.assertEqual(binary["binary_sha256"], expected_binary["sha256"])
+            self.assertEqual(binary["binary_bytes"], expected_binary["bytes"])
+            self.assertEqual(
+                binary["mode_bits"], expected_binary["mode_bits_by_leg"][role]
+            )
+            self.assertIs(type(binary["executable"]), bool)
+            self.assertIs(binary["executable"], True)
+            self.assertEqual(report["tool"]["target_os"], manifest_environment["target_os"])
+            self.assertEqual(
+                report["tool"]["target_arch"], manifest_environment["target_arch"]
+            )
+            self.assertEqual(
+                report["tool"]["instrumentation"], protocol["instrumentation"]
+            )
+            environment = report["environment"]
+            self.assertEqual(environment["rustc_version"], manifest_environment["rustc_version"])
+            self.assertEqual(
+                environment["logical_cpus_available"],
+                manifest_environment["logical_cpus_available"],
+            )
+            self.assertIs(type(environment["source_destination_same_device"]), bool)
+            self.assertIs(
+                environment["source_destination_same_device"],
+                manifest_environment["source_destination_same_device"],
+            )
+            self.assertEqual(
+                environment["storage_identifier"],
+                manifest_environment["storage_identifier"],
+            )
+            self.assertEqual(environment["filesystem_type"], protocol["filesystem_type"])
+            self.assertEqual(environment["cpu_affinity"], protocol["cpu_affinity"])
+            self.assertEqual(environment["allocator"], protocol["allocator"])
+            # The retained schema has no root path/device identity; storage_identifier
+            # is explicitly unavailable rather than synthesized by this policy.
+            self.assertIsNone(environment["storage_identifier"])
+            self.assertNotIn("filesystem_root_path", environment)
+            self.assertNotIn("device_identifier", environment)
+            configuration = report["configuration"]
+            self.assertEqual(configuration["samples_per_case"], protocol["samples_per_case"])
+            self.assertEqual(
+                configuration["warmup_iterations_per_case"],
+                protocol["warmup_iterations_per_case"],
+            )
+            self.assertEqual(
+                configuration["filesystem_cache_states"],
+                protocol["filesystem_cache_states"],
+            )
+            for field, protocol_field in (
+                ("filesystem_fresh_child_per_sample", "fresh_child_per_sample"),
+                ("filesystem_process_isolated", "process_isolated"),
+                ("filesystem_root_selected", "filesystem_root_selected"),
+            ):
+                self.assertIs(type(configuration[field]), bool)
+                self.assertIs(configuration[field], protocol[protocol_field])
+            self.assertEqual(
+                configuration["execution_workers"], protocol["execution_workers"]
+            )
+            for result_row in report["results"]:
+                expected_corpus = manifest_corpora[result_row["case"]]
+                for field, expected in expected_corpus.items():
+                    if field in {"case", "selected_member", "selected_member_uncompressed_bytes"}:
+                        continue
+                    self.assertEqual(
+                        result_row["corpus"][field], expected, f"{role}.{field}"
+                    )
+                self.assertEqual(
+                    result_row["operation_metrics"]["latency_claim"],
+                    "evidence_only_filesystem_selector",
+                )
+                self.assertEqual(
+                    result_row["operation_metrics"]["allocation"]["scope"],
+                    protocol["allocation_scope"],
+                )
+            evidence_by_case = {
+                item["case"]: item for item in report["filesystem_evidence"]
+            }
+            self.assertEqual(set(evidence_by_case), set(manifest_corpora))
+            for case, expected_corpus in manifest_corpora.items():
+                evidence = evidence_by_case[case]
+                result_corpus = next(
+                    result_row["corpus"]
+                    for result_row in report["results"]
+                    if result_row["case"] == case
+                )
+                self.assertEqual(evidence["corpus"], result_corpus)
+                for sample in evidence["samples"]:
+                    self.assertEqual(
+                        sample["xlsx_source_sha256"],
+                        expected_corpus["archive_sha256"],
+                    )
+                    repeat_store = sample["xlsx_repeat_store"]
+                    self.assertEqual(
+                        repeat_store["selected_member"],
+                        expected_corpus["selected_member"],
+                    )
+                    self.assertEqual(
+                        repeat_store["selected_member_uncompressed_bytes"],
+                        expected_corpus["selected_member_uncompressed_bytes"],
+                    )
+        canonical_corpora = {
+            role: {
+                row["case"]: json.dumps(
+                    row["corpus"], sort_keys=True, separators=(",", ":")
+                )
+                for row in report["results"]
+            }
+            for role, report in reports.items()
+        }
+        for role in ("a2", "b1", "b2"):
+            self.assertEqual(canonical_corpora[role], canonical_corpora["a1"])
+        claim_scope = package_manifest["claim_scope"]
+        self.assertEqual(
+            claim_scope["allocation"],
+            "exploratory_operation_scoped_observation_only",
+        )
+        self.assertIn("latency", claim_scope["excluded"])
+        for field in (
+            "claim_registry_updated",
+            "historical_classification_tables_updated",
+        ):
+            self.assertIs(type(claim_scope[field]), bool)
+            self.assertIs(claim_scope[field], False)
+        self.assertNotEqual(
+            reports["a1"]["binary_identity"]["mode_bits"],
+            reports["a2"]["binary_identity"]["mode_bits"],
+        )
+        for baseline_role, current_role in (("a1", "b1"), ("a2", "b2")):
+            with self.subTest(pair=f"{baseline_role}/{current_role}"):
+                result = perf_compare.compare_reports(
+                    reports[baseline_role], reports[current_role], policy
+                )
+                tracked_comparison = json.loads(
+                    (
+                        evidence_root
+                        / f"{baseline_role}-{current_role}-comparison.json"
+                    ).read_text(encoding="utf-8")
+                )
+                self.assertEqual(tracked_comparison, result)
+                self.assertEqual(
+                    len(tracked_comparison["comparisons"]),
+                    package_manifest["comparison_policy"][
+                        "compared_metric_count_per_pair"
+                    ],
+                )
+                self.assertEqual(
+                    {
+                        item["metric_class"]
+                        for item in tracked_comparison["comparisons"]
+                    },
+                    {"allocation"},
+                )
+                self.assertEqual(
+                    {
+                        item["max_regression_percent"]
+                        for item in tracked_comparison["comparisons"]
+                    },
+                    {
+                        package_manifest["comparison_policy"][
+                            "maximum_regression_percent"
+                        ]
+                    },
+                )
+                self.assertTrue(
+                    all(
+                        item["metric"].startswith("operation_metrics.allocation.")
+                        for item in tracked_comparison["comparisons"]
+                    )
+                )
+                self.assertEqual(
+                    tracked_comparison["policy"],
+                    {
+                        "schema_version": policy["schema_version"],
+                        "policy_id": policy["policy_id"],
+                        "minimum_samples": policy["minimum_samples"],
+                    },
+                )
+                tracked_summary = (
+                    evidence_root
+                    / f"{baseline_role}-{current_role}-summary.txt"
+                ).read_text(encoding="utf-8")
+                self.assertEqual(
+                    tracked_summary.strip(),
+                    "\n".join(
+                        (
+                            "PASS: 2 matched results, 20 metrics, 0 regressions",
+                            "Latency comparison excluded for 2 evidence-only result(s)",
+                        )
+                    ),
+                )
+                self.assertEqual(result["status"], "pass")
+                self.assertEqual(
+                    result["summary"]["compared_metrics"],
+                    package_manifest["comparison_policy"][
+                        "compared_metric_count_per_pair"
+                    ],
+                )
+                self.assertEqual(
+                    result["summary"]["regressions"],
+                    package_manifest["comparison_policy"]["regressions_per_pair"],
+                )
+                self.assertEqual(
+                    result["summary"]["latency_claims"], "withheld_instrumentation"
+                )
+                self.assertEqual(result["summary"]["latency_compared_results"], 0)
+                self.assertEqual(result["summary"]["matched_results"], 2)
+                self.assertEqual(result["summary"]["latency_compared_results"], 0)
+                self.assertEqual(result["summary"]["latency_excluded_results"], 2)
 
     def test_pass_compares_latency_and_available_resource_counters(self):
         baseline = report()

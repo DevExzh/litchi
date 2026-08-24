@@ -42525,6 +42525,7 @@ fn run_opc_relationship_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
         let package = OpcPackage::from_bytes(&corpus.corpus.archive)?;
+        std::hint::black_box(&package);
         let duration = started.elapsed();
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
 

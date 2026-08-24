@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## OPC timing correction and XLSX allocator probe (changes 0270-0271)
+
+[Change 0270](changes/0270-opc-relationship-open-timing.md) documents the
+corrected `opc_relationship_open` timer: only production open is timed, the
+returned package is fenced with `black_box`, and correctness oracles run after
+the timer. This is not a performance claim.
+
+[Change 0271](changes/0271-xlsx-repeated-store-allocator-probe.md) is an
+exploratory A1/B1/B2/A2 operation-scoped allocator probe with three warmups and
+30 warm samples per case. Medium allocation calls/bytes move `568 -> 560` /
+`225206 -> 81224`; oversized moves `816 -> 560` / `271112552 -> 81224`.
+Both pairings are identical across 20 compared metrics with zero regressions;
+latency is excluded. RSS is descriptive only, and no operation-local peak/RSS,
+physical-I/O, decompression, copy, or broad XLSX claim follows. The default
+case/record count remains 36 / 198, and claim-0269 remains latency-only.
+
 Date: 2026-08-24
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
