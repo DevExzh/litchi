@@ -18,7 +18,10 @@ use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{WireView, patch_length_delimited_field};
-use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, RawMessage, SnappyStream,
+};
 use litchi_iwa_protos::{comment_storage_codec, numbers_table_cell_storage_codec, tst};
 use thiserror::Error as ThisError;
 
@@ -2476,6 +2479,57 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
         return Err(Error::UnsupportedDependency {
             path: selected.target.path,
         });
+    }
+    prove_archive_reference_ownership(source, selected_storage_id, selected.target.path)?;
+    Ok(())
+}
+
+struct DeletedObjectReferenceCensus {
+    deleted: u64,
+    occurrences: usize,
+}
+
+impl ArchiveReferenceVisitor for DeletedObjectReferenceCensus {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object
+            && occurrence.referenced_identifier == self.deleted
+        {
+            self.occurrences = self.occurrences.saturating_add(1);
+        }
+        Ok(())
+    }
+}
+
+fn prove_archive_reference_ownership(
+    source: &Package,
+    deleted_object: u64,
+    path: Path,
+) -> Result<(), Error> {
+    let physical = physical_source(source).map_err(|_| Error::UnsupportedSource)?;
+    let limits = physical
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut census = DeletedObjectReferenceCensus {
+        deleted: deleted_object,
+        occurrences: 0,
+    };
+    for component in source.state.components.catalog().iter() {
+        for object in &component.archive().objects {
+            object
+                .inspect_references_with_policy_and_limits(
+                    &mut census,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    limits,
+                )
+                .map_err(|_| Error::UnsupportedDependency { path })?;
+        }
+    }
+    if census.occurrences != 0 {
+        return Err(Error::UnsupportedDependency { path });
     }
     Ok(())
 }
