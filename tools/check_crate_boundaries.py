@@ -2906,7 +2906,9 @@ RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE = (
     IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "lock.rs"
 )
 RETIRED_IWA_PAGES_TABLE_LOCK_METHODS = (
+    "body_table_lock",
     "body_table_lock_state",
+    "set_body_table_lock",
     "set_body_table_lock_state",
 )
 RETIRED_IWA_PAGES_TABLE_LOCK_METHOD_SET = frozenset(
@@ -2921,6 +2923,7 @@ IWA_PAGES_TABLE_LOCK_MODULE = re.compile(
 RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE = Path(
     "crates/litchi-iwa/examples/create_iwork_table_locks.rs"
 )
+IWA_PAGES_TABLE_LOCK_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_LOCK_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor)[ \t\r\n]*\."
@@ -3093,6 +3096,9 @@ PAGES_TABLE_LOCK_FLAT_ALIASES = frozenset(
 # a table-lock declaration outside its dedicated owner source.
 PAGES_TABLE_LOCK_FOCUSED_MARKERS = frozenset(
     PAGES_TABLE_LOCK_SHORT_NAMES | {"BodyTableLockState"}
+)
+PAGES_TABLE_LOCK_ALIAS_TARGETS = frozenset(
+    PAGES_TABLE_LOCK_CANONICAL_TYPES + ("BodyTableLockState",)
 )
 PAGES_TABLE_LOCK_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_lock|table[ \t\r\n]*::"
@@ -10399,7 +10405,7 @@ def audit_iwa_pages_table_lock_source_topology(root: Path = ROOT) -> list[str]:
     source_root = root / IWA_PAGES_SOURCE_ROOT
     if source_root.is_dir():
         for path in sorted(source_root.rglob("*.rs")):
-            source = path.read_text(encoding="utf-8")
+            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
             for name, line_number in _rust_function_declarations(source):
                 if name not in RETIRED_IWA_PAGES_TABLE_LOCK_METHOD_SET:
                     continue
@@ -10407,28 +10413,29 @@ def audit_iwa_pages_table_lock_source_topology(root: Path = ROOT) -> list[str]:
                     "retired litchi-iwa Pages table-lock method "
                     f"{name}: {path.relative_to(root)}:{line_number}"
                 )
-
-    module_path = root / IWA_PAGES_TABLES_MODULE_SOURCE
-    if module_path.is_file():
-        source = _mask_rust_non_code(module_path.read_text(encoding="utf-8"))
-        for match in IWA_PAGES_TABLE_LOCK_MODULE.finditer(source):
-            line_number = source.count("\n", 0, match.start()) + 1
-            violations.append(
-                "retired litchi-iwa Pages table-lock module declaration: "
-                f"{IWA_PAGES_TABLES_MODULE_SOURCE}:{line_number}"
-            )
-
-    example_path = root / RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE
-    if example_path.is_file():
-        source = _mask_rust_non_code(example_path.read_text(encoding="utf-8"))
-        for pattern in IWA_PAGES_README_TABLE_LOCK_CALLS:
-            for match in pattern.finditer(source):
-                line_number = source.count("\n", 0, match.start("method")) + 1
+            code = _mask_rust_non_code(source)
+            for match in IWA_PAGES_TABLE_LOCK_MODULE.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
                 violations.append(
-                    "retired litchi-iwa Pages table-lock example call "
-                    f"{match.group('method')}: "
-                    f"{RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE}:{line_number}"
+                    "retired litchi-iwa Pages table-lock module declaration: "
+                    f"{path.relative_to(root)}:{line_number}"
                 )
+
+    example_root = root / IWA_PAGES_TABLE_LOCK_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(
+                example_path.read_text(encoding="utf-8")
+            )
+            source = _mask_rust_non_code(source)
+            for pattern in IWA_PAGES_README_TABLE_LOCK_CALLS:
+                for match in pattern.finditer(source):
+                    line_number = source.count("\n", 0, match.start("method")) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-lock example call "
+                        f"{match.group('method')}: "
+                        f"{example_path.relative_to(root)}:{line_number}"
+                    )
 
     readme_path = root / IWA_PAGES_README
     if readme_path.is_file():
@@ -13006,6 +13013,70 @@ def audit_pages_table_lock_facade_source_topology(root: Path = ROOT) -> list[str
                 "focused litchi-pages table-lock public API retains flat Package "
                 f"method {method}: {PAGES_TABLE_LOCK_OWNER_SOURCE}"
             )
+
+    # Search the whole facade, not only today's three export files. A new
+    # sibling module must not create an alias that can later be globbed into
+    # the crate root without crossing this ratchet.
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "table_lock"]:
+                violations.append(
+                    "focused litchi-pages table-lock public API exposes duplicate "
+                    f"table_lock module: {path.relative_to(root)}:{line_number}"
+                )
+
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                wildcard_owner = (
+                    "package" in identifiers
+                    or "table_lock" in identifiers
+                    or (path == table_path and "lock" in identifiers)
+                )
+                if wildcard_owner:
+                    violations.append(
+                        "focused litchi-pages table-lock public API retains root "
+                        f"aliases via owner glob: {path.relative_to(root)}:{line_number}"
+                    )
+
+            if "as" in identifiers and identifiers[:2] == ["pub", "use"]:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                table_lock_target = bool(
+                    set(target_identifiers) & PAGES_TABLE_LOCK_ALIAS_TARGETS
+                ) or ("lock" in target_identifiers and "State" in target_identifiers)
+                target = target_identifiers[-1] if target_identifiers else ""
+                if table_lock_target and alias and alias != target:
+                    violations.append(
+                        "focused litchi-pages table-lock public API retains alternate "
+                        f"alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                table_lock_target = bool(
+                    set(target_identifiers) & PAGES_TABLE_LOCK_ALIAS_TARGETS
+                ) or ("lock" in target_identifiers and "State" in target_identifiers)
+                canonical_state_alias = (
+                    alias == "BodyTableLockState" and "State" in target_identifiers
+                )
+                if table_lock_target and not canonical_state_alias:
+                    target = target_identifiers[-1]
+                    if alias != target:
+                        violations.append(
+                            "focused litchi-pages table-lock public API retains "
+                            f"alternate alias {alias} for {target}: "
+                            f"{path.relative_to(root)}:{line_number}"
+                        )
 
     for path in sorted(dedicated_sources | export_sources):
         dedicated_source = path in dedicated_sources
