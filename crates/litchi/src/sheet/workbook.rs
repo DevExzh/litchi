@@ -115,7 +115,7 @@ fn append_cell_text(out: &mut String, cell: &litchi_core::sheet::CellValue) {
 /// source-backed selectors and metadata never need to reopen the path.
 pub(super) struct XlsSource {
     workbook: crate::xls::SourceBackedWorkbook,
-    source: Arc<dyn litchi_core::ReadAt>,
+    cfb: Arc<litchi_cfb::SharedOleFile>,
     eager: OnceLock<crate::xls::Workbook<Cursor<Vec<u8>>>>,
     metadata: OnceLock<Metadata>,
 }
@@ -124,11 +124,11 @@ pub(super) struct XlsSource {
 impl XlsSource {
     fn new(
         workbook: crate::xls::SourceBackedWorkbook,
-        source: Arc<dyn litchi_core::ReadAt>,
+        cfb: Arc<litchi_cfb::SharedOleFile>,
     ) -> Self {
         Self {
             workbook,
-            source,
+            cfb,
             eager: OnceLock::new(),
             metadata: OnceLock::new(),
         }
@@ -173,9 +173,7 @@ impl XlsSource {
             return Ok(metadata);
         }
 
-        let ole = litchi_cfb::SharedOleFile::open(Arc::clone(&self.source))
-            .map_err(|error| map_xls_source_error(normalize_xls_metadata_error(error)))?;
-        let metadata = match ole.get_metadata() {
+        let metadata = match self.cfb.get_metadata() {
             Ok(metadata) => litchi_core::Metadata::from(metadata),
             Err(error) if xls_metadata_error_is_soft(&error) => Metadata::default(),
             Err(error) => {
@@ -303,9 +301,9 @@ impl Workbook {
                 #[cfg(feature = "xls")]
                 crate::detection_smart::detected::WorkbookSourcePathDetection::Xls {
                     workbook,
-                    source,
+                    cfb,
                 } => Ok(Self {
-                    inner: WorkbookImpl::XlsSource(XlsSource::new(workbook, source)),
+                    inner: WorkbookImpl::XlsSource(XlsSource::new(workbook, cfb)),
                     cached_metadata: Metadata::default(),
                 }),
                 crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml {
@@ -1642,11 +1640,13 @@ mod tests {
 #[cfg(all(test, feature = "xls", any(unix, windows)))]
 mod source_xls_path_tests {
     use super::{Workbook, WorkbookImpl, XlsSource};
-    use litchi_cfb::OleWriter;
-    use litchi_core::{FileSource, OwnedSource, ReadAt};
+    use litchi_cfb::{OleWriter, SharedOleFile};
+    use litchi_core::{FileSource, OwnedSource, ReadAt, SourceVersion};
+    use litchi_ole_common::property_set::SharedPropertySetReader;
     use litchi_xls::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook};
-    use std::io::{Cursor, Write};
-    use std::sync::Arc;
+    use std::io::{self, Cursor, Write};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
 
     fn fixture_path() -> std::path::PathBuf {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/Simple.xls")
@@ -1668,6 +1668,85 @@ mod source_xls_path_tests {
         output
     }
 
+    #[derive(Clone)]
+    struct CountingSource {
+        bytes: Arc<Vec<u8>>,
+        ranges: Arc<Mutex<Vec<(u64, usize)>>>,
+        revision: Arc<AtomicU64>,
+    }
+
+    impl CountingSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                ranges: Arc::new(Mutex::new(Vec::new())),
+                revision: Arc::new(AtomicU64::new(0)),
+            }
+        }
+
+        fn clear_ranges(&self) {
+            self.ranges.lock().unwrap().clear();
+        }
+
+        fn ranges(&self) -> Vec<(u64, usize)> {
+            self.ranges.lock().unwrap().clone()
+        }
+    }
+
+    impl ReadAt for CountingSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            self.ranges.lock().unwrap().push((offset, count));
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x584c_535f_46414345,
+                self.revision.load(Ordering::Relaxed),
+            ))
+        }
+    }
+
+    fn global_offsets(stream: &[u8]) -> (Vec<u64>, usize) {
+        let mut offsets = Vec::new();
+        let mut cursor = 0_usize;
+        loop {
+            offsets.push(cursor as u64);
+            let kind = u16::from_le_bytes([stream[cursor], stream[cursor + 1]]);
+            let length = usize::from(u16::from_le_bytes([stream[cursor + 2], stream[cursor + 3]]));
+            cursor += 4 + length;
+            if kind == 0x000A {
+                return (offsets, cursor);
+            }
+        }
+    }
+
+    fn counted_stream_range(
+        source: &CountingSource,
+        cfb: &SharedOleFile,
+        offset: u64,
+        length: usize,
+    ) -> Vec<(u64, usize)> {
+        source.clear_ranges();
+        let mut output = vec![0_u8; length];
+        cfb.read_stream_range(&["Workbook"], offset, &mut output)
+            .unwrap();
+        let ranges = source.ranges();
+        source.clear_ranges();
+        ranges
+    }
+
     fn frame_bytes(kind: u16, payload: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(4 + payload.len());
         bytes.extend_from_slice(&kind.to_le_bytes());
@@ -1687,6 +1766,15 @@ mod source_xls_path_tests {
         cfb_with_streams(&[("Workbook", &stream)])
     }
 
+    fn valid_workbook_stream() -> Vec<u8> {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(OwnedSource::new(std::fs::read(fixture_path()).unwrap()));
+        SharedOleFile::open(source)
+            .unwrap()
+            .open_stream(&["Workbook"])
+            .unwrap()
+    }
+
     #[test]
     fn filesystem_open_retains_xls_source_until_text() {
         let path = fixture_path();
@@ -1702,6 +1790,53 @@ mod source_xls_path_tests {
         assert!(!names.is_empty());
         assert_eq!(workbook.worksheet_count().unwrap(), names.len());
         assert!(source.eager.get().is_none());
+    }
+
+    #[test]
+    fn source_probe_reuses_one_catalog_for_globals_and_metadata() {
+        let bytes = std::fs::read(fixture_path()).unwrap();
+        let source = Arc::new(CountingSource::new(bytes.clone()));
+        let retained: Arc<dyn ReadAt> = source.clone();
+
+        source.clear_ranges();
+        let baseline = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+        let catalog_ranges = source.ranges();
+        source.clear_ranges();
+        let workbook_stream = baseline.open_stream(&["Workbook"]).unwrap();
+        source.clear_ranges();
+        let (global_offsets, global_end) = global_offsets(&workbook_stream);
+        let source_version = retained.version().unwrap();
+
+        let (owner, cfb) = crate::detection_smart::detected::try_open_xls_source(
+            Arc::clone(&retained),
+            source_version,
+        )
+        .unwrap()
+        .expect("valid XLS source probe");
+        let actual = source.ranges();
+        assert_eq!(actual.first().copied(), Some((0, 8)));
+        assert!(actual.len() >= 1 + catalog_ranges.len());
+        assert_eq!(&actual[1..1 + catalog_ranges.len()], &catalog_ranges);
+
+        let mut expected_globals = Vec::new();
+        for offset in global_offsets {
+            expected_globals.extend(counted_stream_range(&source, &cfb, offset, 4));
+        }
+        expected_globals.extend(counted_stream_range(&source, &cfb, 0, global_end));
+        assert_eq!(&actual[1 + catalog_ranges.len()..], &expected_globals);
+
+        let adapter = XlsSource::new(owner, Arc::clone(&cfb));
+        let shared_count = Arc::strong_count(&cfb);
+        source.clear_ranges();
+        let expected_metadata = litchi_core::Metadata::from(cfb.get_metadata().unwrap());
+        let direct_metadata_ranges = source.ranges();
+        source.clear_ranges();
+        let metadata = adapter.metadata().unwrap();
+        let metadata_ranges = source.ranges();
+        assert_eq!(metadata.application, expected_metadata.application);
+        assert_eq!(metadata.author, expected_metadata.author);
+        assert_eq!(metadata_ranges, direct_metadata_ranges);
+        assert_eq!(Arc::strong_count(&cfb), shared_count);
     }
 
     #[test]
@@ -1909,6 +2044,13 @@ mod source_xls_path_tests {
                 Some(crate::detection_smart::detected::OleHostStream::PowerPointDocument),
             ),
             (
+                vec![
+                    ("Current User", b"ppt".as_slice()),
+                    ("Workbook", b"xls".as_slice()),
+                ],
+                Some(crate::detection_smart::detected::OleHostStream::PowerPointDocument),
+            ),
+            (
                 vec![("Book", b"xls".as_slice()), ("Workbook", b"xls".as_slice())],
                 Some(crate::detection_smart::detected::OleHostStream::Workbook),
             ),
@@ -1928,6 +2070,68 @@ mod source_xls_path_tests {
         }
     }
 
+    #[cfg(not(any(feature = "doc", feature = "ppt")))]
+    #[test]
+    fn path_level_feature_elided_foreign_owners_intentionally_fall_back_to_eager_xls() {
+        let workbook_stream = valid_workbook_stream();
+        let cases = [
+            vec![
+                ("WordDocument", b"word".to_vec()),
+                ("PowerPoint Document", b"ppt".to_vec()),
+                ("Workbook", workbook_stream.clone()),
+            ],
+            vec![
+                ("PowerPoint Document", b"ppt".to_vec()),
+                ("Workbook", workbook_stream.clone()),
+            ],
+            vec![
+                ("Current User", b"ppt".to_vec()),
+                ("Workbook", workbook_stream),
+            ],
+        ];
+        for streams in cases {
+            let refs = streams
+                .iter()
+                .map(|(name, bytes)| (*name, bytes.as_slice()))
+                .collect::<Vec<_>>();
+            let file = write_temporary(&cfb_with_streams(&refs));
+            let workbook = Workbook::open(file.path()).expect("polyglot XLS fallback");
+            assert!(matches!(workbook.inner, WorkbookImpl::XlsMem(_)));
+        }
+    }
+
+    #[cfg(all(feature = "doc", feature = "ppt"))]
+    #[test]
+    fn path_level_foreign_owners_precede_xls_when_host_features_are_enabled() {
+        let workbook_stream = valid_workbook_stream();
+        let cases = [
+            vec![
+                ("WordDocument", b"word".to_vec()),
+                ("PowerPoint Document", b"ppt".to_vec()),
+                ("Workbook", workbook_stream.clone()),
+            ],
+            vec![
+                ("PowerPoint Document", b"ppt".to_vec()),
+                ("Workbook", workbook_stream.clone()),
+            ],
+            vec![
+                ("Current User", b"ppt".to_vec()),
+                ("Workbook", workbook_stream),
+            ],
+        ];
+        for streams in cases {
+            let refs = streams
+                .iter()
+                .map(|(name, bytes)| (*name, bytes.as_slice()))
+                .collect::<Vec<_>>();
+            let file = write_temporary(&cfb_with_streams(&refs));
+            assert!(
+                Workbook::open(file.path()).is_err(),
+                "foreign OLE owner must not fall back to XLS when its host feature is enabled"
+            );
+        }
+    }
+
     #[test]
     fn source_xls_materialization_limit_stays_typed() {
         let source: Arc<dyn ReadAt> = Arc::new(FileSource::open(fixture_path()).unwrap());
@@ -1936,7 +2140,8 @@ mod source_xls_path_tests {
             SourceBackedLimits::default().with_max_materialize_bytes(1),
         )
         .unwrap();
-        let adapter = XlsSource::new(owner, source);
+        let cfb = Arc::new(litchi_cfb::SharedOleFile::open(Arc::clone(&source)).unwrap());
+        let adapter = XlsSource::new(owner, cfb);
         let error = adapter.with_eager(|_| Ok(())).unwrap_err();
         assert!(matches!(
             error.downcast_ref::<SourceBackedError>(),

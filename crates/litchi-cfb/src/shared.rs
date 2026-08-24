@@ -494,6 +494,17 @@ impl SharedOleFile {
         Ok(self.expected_version)
     }
 
+    /// Clones the exact positional source retained by this shared CFB view.
+    ///
+    /// This is a low-level handoff for container owners that need to compose
+    /// another source-backed parser without pairing the catalog with an
+    /// unrelated [`ReadAt`] implementation. The returned `Arc` points to the
+    /// same source object used to validate this CFB view.
+    #[must_use]
+    pub fn source_arc(&self) -> Arc<dyn ReadAt> {
+        Arc::clone(&self.source)
+    }
+
     /// Returns the declared length of a stream without reading its contents.
     ///
     /// # Errors
@@ -668,88 +679,95 @@ impl SharedOleFile {
         }
 
         self.check_source_version()?;
-        if is_minifat {
-            self.read_minifat_range(start_sector, offset, output, false, false)?;
-        } else {
-            let sector_size = self.index.sector_size;
-            if offset == 0 && size == output.len() as u64 {
-                // A full logical stream already has the exact caller-owned
-                // destination required by the validated chain reader. Reuse
-                // its contiguous-run batching instead of rediscovering the
-                // same runs through the partial-range path.
-                let required = output.len().div_ceil(sector_size);
-                self.read_chain_into(
-                    &self.index.fat,
-                    start_sector,
-                    required,
-                    sector_size,
-                    "FAT",
-                    output,
-                )?;
-                return self.check_source_version();
-            }
-            let mut sector = start_sector;
-            let first_ordinal = usize::try_from(offset / sector_size as u64).map_err(|_error| {
-                OleError::InvalidData("FAT range sector does not fit usize".to_string())
-            })?;
-            for _ in 0..first_ordinal {
-                sector = next_chain_sector(&self.index.fat, sector, "FAT")?;
-                if sector == ENDOFCHAIN {
-                    return Err(OleError::CorruptedFile(
-                        "FAT chain ends before stream range".to_string(),
-                    ));
+        let result = (|| -> Result<(), OleError> {
+            if is_minifat {
+                self.read_minifat_range(start_sector, offset, output, false, false)?;
+            } else {
+                let sector_size = self.index.sector_size;
+                if offset == 0 && size == output.len() as u64 {
+                    // A full logical stream already has the exact caller-owned
+                    // destination required by the validated chain reader. Reuse
+                    // its contiguous-run batching instead of rediscovering the
+                    // same runs through the partial-range path.
+                    let required = output.len().div_ceil(sector_size);
+                    self.read_chain_into(
+                        &self.index.fat,
+                        start_sector,
+                        required,
+                        sector_size,
+                        "FAT",
+                        output,
+                    )?;
+                    return Ok(());
                 }
-            }
-            let mut within = usize::try_from(offset % sector_size as u64).map_err(|_error| {
-                OleError::InvalidData("FAT range offset does not fit usize".to_string())
-            })?;
-            let mut written = 0_usize;
-            while written < output.len() {
-                let run_start = sector;
-                let run_within = within;
-                let mut run_bytes = (sector_size - run_within).min(output.len() - written);
-                let mut remaining = output.len() - written - run_bytes;
-                let mut next_run = None;
-                let mut last_sector = sector;
-
-                while remaining > 0 {
-                    let next = next_chain_sector(&self.index.fat, last_sector, "FAT")?;
-                    if next == ENDOFCHAIN {
+                let mut sector = start_sector;
+                let first_ordinal =
+                    usize::try_from(offset / sector_size as u64).map_err(|_error| {
+                        OleError::InvalidData("FAT range sector does not fit usize".to_string())
+                    })?;
+                for _ in 0..first_ordinal {
+                    sector = next_chain_sector(&self.index.fat, sector, "FAT")?;
+                    if sector == ENDOFCHAIN {
                         return Err(OleError::CorruptedFile(
-                            "FAT chain ends within stream range".to_string(),
+                            "FAT chain ends before stream range".to_string(),
                         ));
                     }
-                    let contiguous = last_sector.checked_add(1).ok_or_else(|| {
-                        OleError::CorruptedFile("FAT sector index overflow".to_string())
-                    })?;
-                    if next != contiguous {
-                        next_run = Some(next);
-                        break;
-                    }
-                    last_sector = next;
-                    let count = sector_size.min(remaining);
-                    run_bytes = run_bytes.checked_add(count).ok_or_else(|| {
-                        OleError::CorruptedFile("FAT range run size overflow".to_string())
-                    })?;
-                    remaining -= count;
                 }
-
-                let physical = (u64::from(run_start) + 1)
-                    .checked_mul(sector_size as u64)
-                    .and_then(|value| value.checked_add(run_within as u64))
-                    .ok_or_else(|| {
-                        OleError::CorruptedFile("FAT range physical offset overflow".to_string())
+                let mut within =
+                    usize::try_from(offset % sector_size as u64).map_err(|_error| {
+                        OleError::InvalidData("FAT range offset does not fit usize".to_string())
                     })?;
-                self.source
-                    .read_exact_at(physical, &mut output[written..written + run_bytes])?;
-                written += run_bytes;
-                if let Some(next) = next_run {
-                    sector = next;
-                    within = 0;
+                let mut written = 0_usize;
+                while written < output.len() {
+                    let run_start = sector;
+                    let run_within = within;
+                    let mut run_bytes = (sector_size - run_within).min(output.len() - written);
+                    let mut remaining = output.len() - written - run_bytes;
+                    let mut next_run = None;
+                    let mut last_sector = sector;
+
+                    while remaining > 0 {
+                        let next = next_chain_sector(&self.index.fat, last_sector, "FAT")?;
+                        if next == ENDOFCHAIN {
+                            return Err(OleError::CorruptedFile(
+                                "FAT chain ends within stream range".to_string(),
+                            ));
+                        }
+                        let contiguous = last_sector.checked_add(1).ok_or_else(|| {
+                            OleError::CorruptedFile("FAT sector index overflow".to_string())
+                        })?;
+                        if next != contiguous {
+                            next_run = Some(next);
+                            break;
+                        }
+                        last_sector = next;
+                        let count = sector_size.min(remaining);
+                        run_bytes = run_bytes.checked_add(count).ok_or_else(|| {
+                            OleError::CorruptedFile("FAT range run size overflow".to_string())
+                        })?;
+                        remaining -= count;
+                    }
+
+                    let physical = (u64::from(run_start) + 1)
+                        .checked_mul(sector_size as u64)
+                        .and_then(|value| value.checked_add(run_within as u64))
+                        .ok_or_else(|| {
+                            OleError::CorruptedFile(
+                                "FAT range physical offset overflow".to_string(),
+                            )
+                        })?;
+                    self.source
+                        .read_exact_at(physical, &mut output[written..written + run_bytes])?;
+                    written += run_bytes;
+                    if let Some(next) = next_run {
+                        sector = next;
+                        within = 0;
+                    }
                 }
             }
-        }
-        self.check_source_version()
+            Ok(())
+        })();
+        self.finish_stream_range(result)
     }
 
     fn should_read_minifat_range(&self, size: u64) -> bool {
@@ -1966,6 +1984,16 @@ impl SharedOleFile {
                 expected: self.expected_version,
                 observed,
             })
+        }
+    }
+
+    fn finish_stream_range(&self, result: Result<(), OleError>) -> Result<(), OleError> {
+        match result {
+            Ok(()) => self.check_source_version(),
+            Err(original) => match self.check_source_version() {
+                Err(error @ OleError::SourceChanged { .. }) => Err(error),
+                _ => Err(original),
+            },
         }
     }
 
@@ -4785,6 +4813,50 @@ mod tests {
             Err(OleError::InvalidData(message)) if message.contains("exceeds length")
         ));
         assert!(source.read_ranges().is_empty());
+    }
+
+    #[test]
+    fn fat_range_read_errors_preserve_stable_source_error_and_retry_successfully() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut output = [0u8; 8];
+
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            file.read_stream_range(&["Large"], 0, &mut output),
+            Err(OleError::Io(_))
+        ));
+
+        file.read_stream_range(&["Large"], 0, &mut output).unwrap();
+        assert_eq!(output, [0xA5; 8]);
+    }
+
+    #[test]
+    fn fat_range_read_error_prefers_source_change_from_post_read_fence() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+
+        let mut output = [0u8; 8];
+        assert!(matches!(
+            file.read_stream_range(&["Large"], 0, &mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn minifat_range_read_error_prefers_source_change_from_post_read_fence() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+
+        let mut output = [0u8; 4];
+        assert!(matches!(
+            file.read_stream_range(&["Small"], 0, &mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
     }
 
     #[test]

@@ -496,7 +496,7 @@ pub(crate) enum WorkbookSourcePathDetection {
     #[cfg(feature = "xls")]
     Xls {
         workbook: crate::xls::SourceBackedWorkbook,
-        source: std::sync::Arc<dyn litchi_core::ReadAt>,
+        cfb: std::sync::Arc<litchi_cfb::SharedOleFile>,
     },
     /// A recognized OOXML family whose owner is enabled in this build,
     /// together with bytes read from the same pinned filesystem source.
@@ -676,8 +676,10 @@ fn finish_non_ooxml_workbook_source(
     let _ = is_ods;
 
     #[cfg(feature = "xls")]
-    if let Some(workbook) = try_open_xls_source(std::sync::Arc::clone(&source), source_version)? {
-        return Ok(WorkbookSourcePathDetection::Xls { workbook, source });
+    if let Some((workbook, cfb)) =
+        try_open_xls_source(std::sync::Arc::clone(&source), source_version)?
+    {
+        return Ok(WorkbookSourcePathDetection::Xls { workbook, cfb });
     }
 
     read_path_source_bytes(source.as_ref(), source_version)
@@ -686,11 +688,14 @@ fn finish_non_ooxml_workbook_source(
 }
 
 #[cfg(feature = "xls")]
-fn try_open_xls_source(
+pub(crate) fn try_open_xls_source(
     source: std::sync::Arc<dyn litchi_core::ReadAt>,
     source_version: litchi_core::SourceVersion,
 ) -> std::result::Result<
-    Option<crate::xls::SourceBackedWorkbook>,
+    Option<(
+        crate::xls::SourceBackedWorkbook,
+        std::sync::Arc<litchi_cfb::SharedOleFile>,
+    )>,
     Box<dyn std::error::Error + Send + Sync>,
 > {
     let mut signature = [0_u8; 8];
@@ -699,15 +704,24 @@ fn try_open_xls_source(
         return Ok(None);
     }
 
+    let cfb = std::sync::Arc::new(
+        litchi_cfb::SharedOleFile::open(std::sync::Arc::clone(&source)).map_err(|error| {
+            Box::new(crate::xls::SourceBackedError::from(error))
+                as Box<dyn std::error::Error + Send + Sync>
+        })?,
+    );
     if matches!(
-        classify_ole_host_stream(std::sync::Arc::clone(&source), source_version)?,
+        classify_ole_host_stream_from_shared(&cfb, source.as_ref(), source_version)?,
         Some(OleHostStream::WordDocument | OleHostStream::PowerPointDocument)
     ) {
         ensure_path_source_current(source.as_ref(), source_version)?;
         return Ok(None);
     }
 
-    match crate::xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::clone(&source)) {
+    match crate::xls::raw::source_backed_workbook_from_shared_ole_file(
+        std::sync::Arc::clone(&cfb),
+        crate::xls::SourceBackedLimits::default(),
+    ) {
         Ok(workbook) => {
             let owner_version = workbook.source_version()?;
             if owner_version != source_version {
@@ -716,7 +730,7 @@ fn try_open_xls_source(
                     observed: owner_version,
                 }));
             }
-            Ok(Some(workbook))
+            Ok(Some((workbook, cfb)))
         },
         Err(error) if xls_source_recoverable_probe_error(&error) => {
             ensure_path_source_current(source.as_ref(), source_version)?;
@@ -734,25 +748,38 @@ pub(crate) enum OleHostStream {
     Workbook,
 }
 
-#[cfg(feature = "xls")]
+#[cfg(all(feature = "xls", test))]
 pub(crate) fn classify_ole_host_stream(
     source: std::sync::Arc<dyn litchi_core::ReadAt>,
     source_version: litchi_core::SourceVersion,
 ) -> std::result::Result<Option<OleHostStream>, Box<dyn std::error::Error + Send + Sync>> {
-    let cfb = litchi_cfb::SharedOleFile::open(std::sync::Arc::clone(&source)).map_err(|error| {
-        Box::new(crate::xls::SourceBackedError::from(error))
-            as Box<dyn std::error::Error + Send + Sync>
-    })?;
-    let host = if ole_stream_present(&cfb, &["WordDocument"])? {
+    let cfb = std::sync::Arc::new(
+        litchi_cfb::SharedOleFile::open(std::sync::Arc::clone(&source)).map_err(|error| {
+            Box::new(crate::xls::SourceBackedError::from(error))
+                as Box<dyn std::error::Error + Send + Sync>
+        })?,
+    );
+    classify_ole_host_stream_from_shared(&cfb, source.as_ref(), source_version)
+}
+
+#[cfg(feature = "xls")]
+fn classify_ole_host_stream_from_shared(
+    cfb: &litchi_cfb::SharedOleFile,
+    source: &dyn litchi_core::ReadAt,
+    source_version: litchi_core::SourceVersion,
+) -> std::result::Result<Option<OleHostStream>, Box<dyn std::error::Error + Send + Sync>> {
+    let host = if ole_stream_present(cfb, &["WordDocument"])? {
         Some(OleHostStream::WordDocument)
-    } else if ole_stream_present(&cfb, &["PowerPoint Document"])? {
+    } else if ole_stream_present(cfb, &["PowerPoint Document"])?
+        || ole_stream_present(cfb, &["Current User"])?
+    {
         Some(OleHostStream::PowerPointDocument)
-    } else if ole_stream_present(&cfb, &["Workbook"])? || ole_stream_present(&cfb, &["Book"])? {
+    } else if ole_stream_present(cfb, &["Workbook"])? || ole_stream_present(cfb, &["Book"])? {
         Some(OleHostStream::Workbook)
     } else {
         None
     };
-    ensure_path_source_current(source.as_ref(), source_version)?;
+    ensure_path_source_current(source, source_version)?;
     Ok(host)
 }
 
