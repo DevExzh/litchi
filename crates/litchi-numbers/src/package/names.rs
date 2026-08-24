@@ -1968,12 +1968,6 @@ fn canonical_varint(source: &[u8]) -> Result<u64, Error> {
     Ok(value)
 }
 
-fn normalized_locator(name: &str) -> &str {
-    name.strip_prefix("Index/")
-        .and_then(|name| name.strip_suffix(".iwa"))
-        .unwrap_or(name)
-}
-
 struct OwnedEntryEdit<'a> {
     name: &'a str,
     data: Vec<u8>,
@@ -2036,31 +2030,25 @@ impl PackageMetadataVisitor for MetadataSelectorVisitor<'_> {
 }
 
 fn metadata_route(source: &Package) -> Result<MetadataRoute, Error> {
-    let mut route = None;
-    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
-        for (object_index, object) in component.archive().objects.iter().enumerate() {
-            for (message_index, message) in object.messages.iter().enumerate() {
-                if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
-                    continue;
-                }
-                if route.is_some() || component.name() != PACKAGE_METADATA_ENTRY {
-                    return Err(Error::InvalidSource);
-                }
-                validate_message_metadata(object, message_index)?;
-                route = Some(MetadataRoute {
-                    component_index,
-                    object_index,
-                    message_index,
-                });
-            }
-        }
-    }
-    let route = route.ok_or(Error::InvalidSource)?;
+    let route = super::metadata::unique_message_route(source).ok_or(Error::InvalidSource)?;
+    let object = source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .and_then(|component| component.archive().objects.get(route.object_index))
+        .ok_or(Error::InvalidSource)?;
+    validate_message_metadata(object, route.message_index)?;
+    let route = MetadataRoute {
+        component_index: route.component_index,
+        object_index: route.object_index,
+        message_index: route.message_index,
+    };
     let source_catalog = physical_source(source)?;
     if source_catalog
         .package()
         .iter()
-        .filter(|entry| entry.name() == PACKAGE_METADATA_ENTRY)
+        .filter(|entry| entry.name() == super::metadata::ENTRY_NAME)
         .count()
         != 1
     {
@@ -2189,7 +2177,7 @@ fn rewrite_metadata_entry(
             .catalog()
             .get_index(*component_index)
             .ok_or(Error::InvalidSource)?;
-        target_locators.push(normalized_locator(component.name()));
+        target_locators.push(super::metadata::normalized_locator(component.name()));
     }
     let mut visitor = MetadataSelectorVisitor::new(&target_locators)?;
     let options =
