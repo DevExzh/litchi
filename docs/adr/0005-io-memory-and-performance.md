@@ -1299,3 +1299,28 @@ peak-memory, RSS, latency, throughput, zero-copy, or performance result. No
 manifest dependency, generated schema, Buffa owner, normal Prost owner, or
 workspace dependency edge changed; the hidden codec and generated projection
 remain private implementation details.
+
+## 2026-08-25 amendment: Wave76 Pages body-table dimension resource record
+
+Implementation commit `e624ebab09a891eb9d5921f6ebf8c0e601bf5dff` carries one
+aggregate transaction budget through body-table selector and model selection,
+the selected header bucket and member, decompressed archive data, strict
+codec fields/work/depth/references, output sizing, Snappy and Deflate
+compression, ZIP reassembly, and candidate reopen. Residual codec options are
+derived from that budget rather than resetting full limits for each phase.
+`preflight_dimension_rewrite` runs before codec planning or archive allocation;
+conservative message, archive, compression, and package bounds are charged
+before publication, and candidate-reopen work is precharged. Prepared ZIP
+exact requirements and execution limits cover scratch and output allocations,
+while the final execution report is checked without double-charging work or
+fields already accounted for by the aggregate budget.
+
+Exact selected-header sizing and fallible reservations remain the allocation
+boundary. The transaction retains source/target artifacts for exact inverse
+semantics and publishes only after the candidate, locality, and reopen checks
+pass. These are operation-local source, model, archive, codec, compression,
+ZIP, output, scratch, and candidate-accounting facts. They establish no
+package-wide peak-memory, RSS, latency, throughput, zero-copy, or performance
+result, and make no claim that every transaction has one allocation or one
+output-free preflight. No manifest dependency, generated schema, Buffa owner,
+normal Prost owner, or workspace dependency changed.

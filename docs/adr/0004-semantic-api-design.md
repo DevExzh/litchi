@@ -2843,3 +2843,34 @@ public facade. The compatibility host now delegates title reads, replacement,
 creation, and removal through typed selectors, retiring its raw-ID title
 mutators and legacy title graph fallback. Broader movie/media/build/theme
 compatibility remains a separate host responsibility.
+
+## 2026-08-25 amendment: Pages body-table dimension semantic ownership
+
+Implementation commit `e624ebab09a891eb9d5921f6ebf8c0e601bf5dff` establishes
+the selector-first Pages body-table dimension owner. The public surface is
+`Package::{body_table_dimension_size, edit_body_table_dimension_size,
+apply_body_table_dimension_size}`, `BodyTableSelector`, the archive-free
+`table::dimension::{Dimension, Points, Size}` values, and the corresponding
+typed transaction, diagnostics, error, and limit types. `Dimension` selects
+one checked row or column position. `Size::Default` retains the native absent
+or zero override state, while `Size::Points` requires a strictly positive,
+finite value; the two states remain semantically distinct.
+
+This owner changes display row height or column width only. It does not resize
+the table, change row or column counts, alter cell addressability, insert or
+delete axes, perform automatic fitting or equal distribution, author style
+defaults, or perform bulk multi-axis sizing. The hidden neutral
+`table_dimension_codec` owns strict borrowed `HeaderStorageBucket` selected
+`Header.size` planning and execution with raw-preserving output. The package
+owns rooted table/model/bucket selection, cross-component ownership,
+lock/dependency proof, exact patch/inverse/apply, preview invalidation,
+candidate reopen, and locality verification. Unknown raw fields, balanced
+unknown groups, and overlong unknown scalar values remain source-authoritative;
+malformed, duplicate, ambiguous, shared, resource-owned, or otherwise
+unproven graphs fail closed.
+
+No native identifier, archive or component route, wire value, generated
+message, Buffa view, or Prost type crosses the semantic facade. The six raw-ID
+Pages dimension methods and their tracked layout owner are retired by the
+compatibility cut; other Pages table and document responsibilities remain at
+their recorded owners.
