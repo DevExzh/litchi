@@ -617,13 +617,13 @@ where
         if number == 0 {
             return Err(buffa::DecodeError::InvalidFieldNumber.into());
         }
-        if !canonical && selected_field(number) {
+        if !canonical && known_field(number) {
             return Err(DecodeError::noncanonical("protobuf field key"));
         }
         budget.field()?;
         if wire == 0 {
             let (_, value_canonical) = varint(&mut remaining)?;
-            if !value_canonical && selected_field(number) {
+            if !value_canonical && known_field(number) {
                 return Err(DecodeError::noncanonical("protobuf varint value"));
             }
         } else {
@@ -653,6 +653,10 @@ fn selected_field(number: u32) -> bool {
             | REPEATING_HEADER_ROWS_FIELD
             | REPEATING_HEADER_COLUMNS_FIELD
     )
+}
+
+fn known_field(number: u32) -> bool {
+    matches!(number, TABLE_ROWS_FIELD | TABLE_COLUMNS_FIELD) || selected_field(number)
 }
 
 fn requested_value(write: TableHeaderSettingsWrite, number: u32) -> Option<u64> {
@@ -925,7 +929,7 @@ fn preflight_mode(
         if field_number == 0 {
             return Err(buffa::DecodeError::InvalidFieldNumber.into());
         }
-        if !key_canonical && (strict_unknown || selected_field(field_number)) {
+        if !key_canonical && (strict_unknown || known_field(field_number)) {
             return Err(DecodeError::noncanonical("protobuf field key"));
         }
         budget.field()?;
@@ -938,18 +942,7 @@ fn preflight_mode(
                 budget,
                 strict_unknown,
             )?;
-            if matches!(
-                field_number,
-                TABLE_ROWS_FIELD
-                    | TABLE_COLUMNS_FIELD
-                    | HEADER_ROWS_FIELD
-                    | HEADER_COLUMNS_FIELD
-                    | FOOTER_ROWS_FIELD
-                    | HEADER_ROWS_FROZEN_FIELD
-                    | HEADER_COLUMNS_FROZEN_FIELD
-                    | REPEATING_HEADER_ROWS_FIELD
-                    | REPEATING_HEADER_COLUMNS_FIELD
-            ) {
+            if known_field(field_number) {
                 return Err(buffa::DecodeError::WireTypeMismatch {
                     field_number,
                     expected: 0,
@@ -960,7 +953,7 @@ fn preflight_mode(
             continue;
         }
         let (value, value_canonical) = varint(&mut remaining)?;
-        if !value_canonical && (strict_unknown || selected_field(field_number)) {
+        if !value_canonical && (strict_unknown || known_field(field_number)) {
             return Err(DecodeError::noncanonical("protobuf varint value"));
         }
         let bit = 1u64.checked_shl(field_number).unwrap_or(0);
@@ -1532,6 +1525,44 @@ mod tests {
         .expect_err("selected overlong values must fail before a write");
         assert_eq!(error.noncanonical_reason(), Some("protobuf varint value"));
         Ok(())
+    }
+
+    #[test]
+    fn rewrite_required_dimensions_remain_canonical_and_wire_strict() {
+        let write = TableHeaderSettingsWrite::default();
+        let required_key = [0xb0, 0x80, 0x00, 1, 0x38, 1];
+        assert_eq!(
+            rewrite_table_header_settings_with_report(
+                &required_key,
+                write,
+                DecodeOptions::for_source(&required_key),
+            )
+            .expect_err("required key")
+            .noncanonical_reason(),
+            Some("protobuf field key")
+        );
+
+        let required_value = [0x30, 0x81, 0x00, 0x38, 1];
+        assert_eq!(
+            rewrite_table_header_settings_with_report(
+                &required_value,
+                write,
+                DecodeOptions::for_source(&required_value),
+            )
+            .expect_err("required value")
+            .noncanonical_reason(),
+            Some("protobuf varint value")
+        );
+
+        let required_wrong_wire = [0x32, 1, 1, 0x38, 1];
+        assert!(
+            rewrite_table_header_settings_with_report(
+                &required_wrong_wire,
+                write,
+                DecodeOptions::for_source(&required_wrong_wire),
+            )
+            .is_err()
+        );
     }
 
     #[test]
