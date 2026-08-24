@@ -13326,3 +13326,60 @@ Rust structural reread; it is not Rust/native byte parity, proof that the
 focused caption owner accepts the normalized graph, arbitrary producer-graph
 acceptance, performance/RSS evidence, durable publication, or a full-workspace
 gate.
+
+## 2026-08-25 amendment: Wave75 Keynote movie-title verification record
+
+The title-lifecycle implementation under verification is commit
+`ad7fc362036fa81c70c3e8ac373d7901e7689179`. The focused gates recorded on the
+shared checkout were:
+
+- the strict title-graph codec target passed 7/7;
+- the strict movie-edge codec target passed 7/7;
+- the focused movie-title integration target passed 10/10;
+- the focused movie-caption integration target passed 16/16;
+- the adjacent chart-caption regression target passed 21/21;
+- the focused compatibility-host movie title/caption target passed 4/4;
+- the Keynote all-target check, Keynote library Clippy gate, and
+  `litchi-iwa` library/examples check passed;
+- `python3 -m unittest tools.test_check_crate_boundaries` passed 443/443;
+  Python compilation, formatting, and `git diff --check` passed;
+- the live boundary checker exited 1 only for the three known Pages
+  table-lock findings (`body_table_lock_state`,
+  `set_body_table_lock_state`, and the returned untracked
+  `pages/editor/tables/lock.rs`), with no movie-title finding.
+
+The full pre-commit gate was not a workspace-green result. It encountered
+unrelated dirty-file rustfmt differences, pre-existing Numbers deprecated and
+`manual_contains` findings, and a full-workspace XLS test link failure caused
+by disk exhaustion. Those facts are retained as scope caveats; the focused
+commands above are the verification authority.
+
+The fresh Keynote 14.4 record used disposable artifacts under
+`/private/tmp/litchi-wave75-movie-title.QS6Bvq`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| pristine focused source | 663,567 | `b3a87256391c7e600cb2658ee10fc9575c6a6cbb40e679014e7ebc3f3b8db87f` |
+| Rust replacement candidate before Keynote | 663,578 | `3f0a49e0652df3a75eff6472432c98ea81f91b1dd0bc136cef3826270f0288ac` |
+| Rust removal candidate before Keynote | 663,576 | `60a27c035791dd1686780502a5ba184f3993166eb5ff6bb795bdb96a8c8b6f15` |
+| Rust recreation candidate before Keynote | 663,737 | `d287c8489f695a95c62847b3b465e45567b6f887bd0004238029123f9d1fe7e8` |
+| Keynote-saved replacement candidate | 738,512 | `fc92170478291efc033d50867c7cae49c546474ed97a528558ae1bfb8bea604d` |
+| Keynote-saved removal candidate | 737,688 | `fedf78994e92ddf7993b7de116be49f91e652e919d8959a44d4e3f58da487e06` |
+| Keynote-saved recreation candidate | 738,529 | `da5b95c3dcda47dc6cc4cf25b92246a545c42b5c06e7586c061ea54badd19cf5` |
+
+The replacement and removal inverses restored the pristine source exactly;
+the recreation inverse restored the exact removal candidate. Keynote 14.4
+opened all three pre-native candidates without repair or recovery, preserved
+the centered 640x360 `source.mov`, and retained the caption
+`Native title and caption for source.mov`. Replacement displayed
+`Wave75 focused movie title — 北区`, removal displayed no title, and recreation
+displayed `Wave75 recreated movie title — 北区`. Cmd-S, Cmd-W, and exact-path
+reopen retained those observations.
+
+Keynote normalized the active title/caption package bytes. Rust reread of the
+normalized removal candidate reports title `None`, while the normalized active
+title/caption graphs fail the narrow focused re-ingress policy with
+`InvalidSource`. This is bounded application open/render/save/close/reopen
+acceptance only: no Rust/native byte parity, focused re-ingress guarantee,
+arbitrary producer-graph acceptance, durable publication, performance/RSS, or
+full-workspace claim follows.
