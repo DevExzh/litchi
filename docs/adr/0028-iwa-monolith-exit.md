@@ -5018,3 +5018,36 @@ title/caption packages do not satisfy the narrow focused re-ingress policy, so
 this is not Rust/native byte parity, arbitrary graph acceptance,
 performance/RSS, durable publication, full-workspace health, or a host,
 dependency-edge, debt, or monolith-exit gate.
+
+## 2026-08-25 amendment: Wave76 Pages body-table dimension bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `e624ebab09a891eb9d5921f6ebf8c0e601bf5dff` moves the
+selector-first body-table display-dimension edge into `litchi-pages`. The
+focused owner provides semantic row-height and column-width read/edit/apply
+operations through `BodyTableSelector` and
+`table::dimension::{Dimension, Points, Size}`, with exact inverse, preview,
+candidate-reopen, and locality checks. The hidden neutral codec owns the
+strict raw-preserving header-bucket edge; the package owns rooted table/model/
+bucket selection, cross-component ownership, and lock/dependency validation.
+Malformed, duplicate, ambiguous, shared, resource-owned, and otherwise
+unproven routes fail closed. No native identifier, archive route, wire value,
+generated schema type, Buffa view, or Prost value crosses the focused facade.
+
+The six raw-ID PagesEditor dimension methods and tracked `tables/layout.rs`
+owner are retired by this slice. This is only the body-table display-size edge:
+table appearance, hidden axes, footnotes, table topology/resize machinery,
+media and other Pages compatibility responsibilities remain in `litchi-iwa`.
+The `litchi-iwa -> litchi-pages` dependency edge, debt 017, `litchi-iwa` and
+`PagesEditor`, remaining host responsibilities, generated schema/Buffa/Prost
+owners, and the IWA monolith remain. No crate-exit, dependency-removal,
+debt-retirement, manifest, generated-schema, normal-Prost, or monolith-
+deletion gate is satisfied.
+
+The Pages 14.4 record is bounded open/render/save/close/reopen evidence for
+the two display-size transitions, with exact pre-native inverse artifacts and
+strict reread of the normalized packages. Pages normalized the artifacts and
+displayed values that differ in presentation from the strict semantic points
+where documented; this is not Rust/native byte parity, a performance/RSS
+result, durable publication evidence, or a full-workspace gate. The live
+boundary checker retains the three user-owned untracked Pages table-lock
+findings, which are unrelated to this owner.

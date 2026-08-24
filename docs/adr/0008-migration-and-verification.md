@@ -13383,3 +13383,73 @@ title/caption graphs fail the narrow focused re-ingress policy with
 acceptance only: no Rust/native byte parity, focused re-ingress guarantee,
 arbitrary producer-graph acceptance, durable publication, performance/RSS, or
 full-workspace claim follows.
+
+## 2026-08-25 amendment: Wave76 Pages body-table dimension verification record
+
+The body-table dimension implementation under verification is commit
+`e624ebab09a891eb9d5921f6ebf8c0e601bf5dff`. The focused gates recorded on the
+shared checkout were:
+
+- common dimension tests passed 4/4;
+- `cargo test -p litchi-numbers --test table_dimension --quiet` passed 13/13;
+- the Pages library passed 113/113 tests;
+- `cargo test -p litchi-pages --test body_table_dimensions --quiet` passed
+  9/9;
+- the focused storage codec target passed 49/49;
+- the full `litchi-iwa-protos` library passed 455/455;
+- the two focused host CRUD regressions passed 1/1 each;
+- Pages all-target check and all-target Clippy with `-D warnings` passed;
+- the protos all-target check and library Clippy with `-D warnings` passed;
+  the all-target Clippy result required only the existing allowance for the
+  unowned `table_info_codec.rs:1086` `needless_borrow` finding;
+- the Numbers all-target check passed with its two existing `object_count`
+  deprecation warnings, and scoped Clippy passed with the existing explicit
+  allowances;
+- the `litchi-iwa` library check and examples check passed with their existing
+  warnings;
+- metadata/check/list fuzz targets and a 20-run smoke completed without a
+  crash;
+- `python3 -m unittest tools.test_check_crate_boundaries` passed 452/452;
+  Python compilation and `git diff --check` passed.
+
+The live boundary checker exited 1 only for exactly the three known user-owned
+untracked Pages table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`); it reported no dimension
+finding. Repository-wide pre-commit was not green: unrelated unstaged
+`table_info_codec.rs` and `protobuf.rs` changes failed formatting, existing
+Numbers `object_count` and `manual_contains` findings failed `-D warnings`,
+and the full library hook had an unrelated failure. The focused commands above
+are the verification authority; no full-workspace-green claim follows.
+
+The bounded native record used Pages 14.4 and the disposable artifacts under
+`/private/tmp/litchi-wave76-dimension.iktiRg`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| pristine source `/private/tmp/litchi-wave61-pages-native-source.pages` | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Rust set candidate before Pages | 81,220 | `80483f7177f0e89f4c95215dbaf1271468c95824d6ad89965cfc9cd99b3aefd8` |
+| exact set inverse | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Rust reset candidate before Pages | 81,202 | `06368106cbb119304172898c064e59944eafbe0ab276fab0a7ed5272118fec39` |
+| exact reset inverse | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Pages-normalized set artifact | 109,415 | `8d7a99f62bf8fb7ec5f134fb8cbc3d3810f9dd91d0e4d81c504500656f31074b` |
+| Pages-normalized reset artifact | 108,200 | `8101e0dc2ff44e74c582340c456295f41c2341212121bbbec5ecb2a6d730901e` |
+
+The source is `Table 1`, a 5-by-4 table whose source row index 2 is 22.73 pt
+and source column index 1 is 116.9125 pt. The Rust set candidate reads
+`Row(2) = Points(42)` and `Column(1) = Points(150)`; its inverse is exact to
+the pristine source. The Rust reset candidate reads both selected dimensions
+as `Default`; its inverse is also exact. Pages 14.4 opened both candidates
+without repair, recovery, or conversion UI, rendered the 5-by-4 table, saved,
+closed, and reopened each exact path. The set UI displayed row 3 as 42 pt;
+column B displayed 1.95 in and a formatter stepper value of
+140.0883709372031, while strict Rust reread after the Pages save remained
+`Points(150)`. The reset UI displayed the effective 22.73 pt and 116.9125 pt
+values, while strict Rust reread remained `Default`. These observations record
+Pages display normalization rather than claiming Rust/native value
+equivalence. Strict Rust reread of both normalized artifacts succeeded.
+
+This is bounded application open/render/save/close/reopen acceptance plus exact
+pre-native inverses and strict normalized reread. Pages normalized the package
+bytes; no Rust/native byte parity, performance/RSS result, durable publication,
+or full-workspace claim follows.
