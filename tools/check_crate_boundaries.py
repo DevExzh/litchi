@@ -347,6 +347,9 @@ KEYNOTE_CHART_CAPTION_GRAPH_HELPERS = frozenset(
 )
 KEYNOTE_CHART_CAPTION_GRAPH_OPERATION = "rewrite_chart_caption_operation"
 KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION = "patch_chart_caption_edge"
+KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITIONS = frozenset(
+    {KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION, "patch_caption_edge"}
+)
 KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION_MARKERS = frozenset(
     {
         "expected_identifier",
@@ -386,7 +389,7 @@ KEYNOTE_CHART_CAPTION_EXTERNAL_REFERENCE_MARKERS = frozenset(
 # implementation type: a future owner may call it ``ChartCaptionBudget`` or
 # ``CaptionPackageBudget`` while retaining the same accounting contract.
 KEYNOTE_CHART_CAPTION_PACKAGE_BUDGET_TYPE = re.compile(
-    r"(?m)^[ \t]*(?!pub(?:[ \t]+\([^)]*\))?[ \t]+)struct[ \t]+"
+    r"(?m)^[ \t]*(?:pub[ \t]*\([ \t]*super[ \t]*\)[ \t]+)?struct[ \t]+"
     r"(?P<name>(?:Chart|Caption|Package)[A-Za-z0-9_]*Budget)\b"
 )
 KEYNOTE_CHART_CAPTION_CODEC_REPORT_CHARGE = re.compile(
@@ -638,6 +641,134 @@ IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS = frozenset(
         "set_slide_movie_caption_by_selector",
         "remove_slide_movie_caption_by_selector",
     }
+)
+# Wave74 completes the caption graph owner.  Keep the title-only compatibility
+# methods out of this set: title CRUD may remain in the migration host, but the
+# combined/raw caption surface and its fallback must not survive the cutover.
+IWA_KEYNOTE_MOVIE_CAPTION_LEGACY_METHODS = frozenset(
+    {
+        "slide_movie_title_caption",
+        "slide_movie_caption",
+        "set_slide_movie_caption",
+        "remove_slide_movie_caption",
+    }
+)
+IWA_KEYNOTE_MOVIE_CAPTION_RAW_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_movie_title_caption|"
+    r"slide_movie_caption|set_slide_movie_caption|remove_slide_movie_caption)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_MOVIE_CAPTION_IDENTIFIER_POSITION_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"movie_position_for_identifier|movie_position_from_identifier|"
+    r"movie_index_for_identifier|movie_index_from_identifier|"
+    r"movie_position_from_object|movie_index_from_object|"
+    r"position_for_movie_identifier|index_for_movie_identifier"
+    r")(?![A-Za-z0-9_])|"
+    r"\.position[ \t\r\n]*\([ \t\r\n]*\|[^{}\n|]{0,400}\b(?:"
+    r"drawable_object_id|movie_object_id|movie_id|native_id|object_id|identifier)"
+    r"[^{}\n|]{0,400}\)"
+)
+KEYNOTE_MOVIE_CAPTION_GRAPH_OPERATION = "rewrite_movie_caption_operation"
+KEYNOTE_MOVIE_CAPTION_GRAPH_OPERATIONS = frozenset(
+    {
+        KEYNOTE_MOVIE_CAPTION_GRAPH_OPERATION,
+        "rewrite_caption_graph_operation_with_budget",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_REFERENCE_TRANSITION = "patch_movie_caption_edge"
+KEYNOTE_MOVIE_CAPTION_REFERENCE_TRANSITIONS = frozenset(
+    {KEYNOTE_MOVIE_CAPTION_REFERENCE_TRANSITION, "patch_caption_edge"}
+)
+KEYNOTE_MOVIE_CAPTION_REFERENCE_TRANSITION_MARKERS = frozenset(
+    {
+        "expected_identifier",
+        "replacement_identifier",
+        "validate_selected_message_metadata",
+        "rewrite_movie_caption_with_report",
+        "replace_message_transitioning_object_references_preserving_header_with_limits",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_SAVE_TOKEN_REWRITE_MARKERS = frozenset(
+    {
+        "prepare_package_metadata_additions_and_save_tokens",
+        "prepare_package_metadata_save_tokens",
+        "rewrite_package_metadata_additions_and_save_tokens",
+        "rewrite_package_metadata_save_tokens",
+        "advance_package_save_token",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_METADATA_GRAPH_MARKERS = frozenset(
+    {
+        "add_component_object_uuids",
+        "remove_component_object_uuids",
+        "set_package_last_object_identifier",
+        "ObjectUuidAddition",
+        "ObjectUuidRemoval",
+        "AdditionSaveTokenBatch",
+        "RemovalSaveTokenBatch",
+        "ExternalReferenceAddition",
+        "ExternalReferenceRemoval",
+        "DataReferenceOwnerRemoval",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_GRAPH_MARKERS = frozenset(
+    {
+        "CaptionObjectIds",
+        "CaptionThemeStyle",
+        "DrawableCaptionKind",
+        "DrawableCaptionSlot",
+        "IWorkThemeArchive",
+        "ObjectGraph",
+        "ArchiveObject",
+        "RawMessage",
+        "WireView",
+        "DecodeOptions",
+        "MovieCaptionWrite",
+        "decode_movie_caption_identifier",
+        "rewrite_movie_caption",
+        "caption_objects",
+        "drawable_caption_slot",
+        "replace_object_reference",
+        "standin_caption_object",
+        "insert_slide_movie_caption",
+        "insert_slide_movie_caption_standin",
+        "replace_slide_movie_caption_reference",
+        "next_object_identifier",
+        "keynote_movie_caption_codec",
+        "pages_movie_caption_codec",
+        "litchi_iwa_protos",
+        "prost",
+        "prost_types",
+        "kn",
+        "tsa",
+        "tsd",
+        "tsp",
+    }
+)
+KEYNOTE_MOVIE_CAPTION_OBJECT_FRAMING_MARKERS = frozenset(
+    {"validate_canonical_object_framing"}
+)
+KEYNOTE_MOVIE_CAPTION_CROSS_COMPONENT_MARKERS = frozenset(
+    {"cross_component", "cross-component", "CrossComponent", "cross component"}
+)
+KEYNOTE_MOVIE_CAPTION_EXTERNAL_REFERENCE_MARKERS = frozenset(
+    {
+        "external_reference",
+        "external_references",
+        "ExternalReference",
+        "ExternalReferenceDescriptor",
+        "visit_external_reference",
+        "external_ref",
+    }
+)
+# The Wave74 owner must account graph creation/removal and the existing text
+# path under one private transaction budget.  This deliberately accepts the
+# established ``CaptionPackageBudget``/``MovieCaptionBudget`` naming family
+# without exposing the type through the public facade.
+KEYNOTE_MOVIE_CAPTION_PACKAGE_BUDGET_TYPE = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]*\([ \t]*super[ \t]*\)[ \t]+)?struct[ \t]+"
+    r"(?P<name>(?:Movie|Caption|Package)[A-Za-z0-9_]*Budget)\b"
 )
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
@@ -15177,8 +15308,11 @@ def audit_keynote_chart_caption_facade_source_topology(
         )
     else:
         operation_body, operation_offset = operation
+        operation_path = "\n".join(
+            [operation_body, *reachable_bodies({KEYNOTE_CHART_CAPTION_GRAPH_OPERATION})]
+        )
         for marker in sorted(KEYNOTE_CHART_CAPTION_OBJECT_FRAMING_MARKERS):
-            if marker in operation_body:
+            if marker in operation_path:
                 continue
             line_number = owner_code.count("\n", 0, operation_offset) + 1
             violations.append(
@@ -15263,7 +15397,7 @@ def audit_keynote_chart_caption_facade_source_topology(
         (
             (body, offset)
             for name, body, offset in owner_functions
-            if name == KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION
+            if name in KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITIONS
         ),
         None,
     )
@@ -15696,81 +15830,433 @@ def audit_keynote_movie_caption_facade_source_topology(
 
 
 def audit_iwa_keynote_movie_caption_source_topology(root: Path = ROOT) -> list[str]:
-    """Audit only a future selector-based movie-caption replacement bridge.
+    """Require the selector-first movie-caption bridge and retire its fallback.
 
-    Existing title and graph create/remove methods intentionally remain in the
-    compatibility host during this phase.  Until selector-suffixed replacement
-    methods appear, this audit is a no-op.  Once they do appear, each method
-    must accept ``MovieSelector`` and route the focused read/edit operation to
-    the Keynote package owner rather than silently reimplementing the edge.
+    Wave73 deliberately left this audit dormant while the compatibility host
+    retained the raw-ID caption graph.  Wave74 owns the caption lifecycle, so
+    the old getter/setter/remover and their graph fallback must now be absent
+    from production.  Title-only methods remain outside this audit; the
+    combined title/caption getter is included because it exposes the retired
+    caption route as a raw-ID operation.
     """
 
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     path = root / IWA_KEYNOTE_MOVIE_CAPTION_SOURCE
-    if not path.is_file():
+    if not source_root.is_dir() or not path.is_file():
         return []
-    production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
-    source = _mask_rust_non_code(production_source)
+
     declaration = re.compile(
         r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
         r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
         r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
     )
-    matches = list(declaration.finditer(source))
-    declared = {match.group(1) for match in matches}
-    if not declared.intersection(IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS):
+
+    def function_records(source: str) -> list[tuple[str, str, str, int, int]]:
+        masked = _mask_rust_non_code(source)
+        records: list[tuple[str, str, str, int, int]] = []
+        for match in declaration.finditer(masked):
+            opening = masked.find("{", match.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(masked) and depth:
+                if masked[cursor] == "{":
+                    depth += 1
+                elif masked[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            records.append(
+                (
+                    match.group(1),
+                    masked[match.start() : opening],
+                    masked[opening + 1 : cursor - 1],
+                    match.start(),
+                    cursor,
+                )
+            )
+        return records
+
+    source_records: list[tuple[Path, str, list[tuple[str, str, str, int, int]]]] = []
+    for source_path in sorted(source_root.rglob("*.rs")):
+        if source_path.name in {"tests.rs", *KEYNOTE_TEST_ONLY_SOURCE_NAMES}:
+            continue
+        raw_source = source_path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        source_records.append(
+            (
+                source_path,
+                _mask_rust_non_code(production_source),
+                function_records(production_source),
+            )
+        )
+
+    all_source = "\n".join(source for _path, source, _records in source_records)
+    all_records = [
+        (path_item, record)
+        for path_item, _source, records in source_records
+        for record in records
+    ]
+    declared = {record[0] for _path_item, record in all_records}
+    has_caption_surface = bool(
+        declared & (IWA_KEYNOTE_MOVIE_CAPTION_LEGACY_METHODS | IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS)
+    )
+    if not has_caption_surface:
         return []
 
     violations: list[str] = []
-
-    def body_after(match: re.Match[str]) -> str:
-        opening = source.find("{", match.end())
-        if opening < 0:
-            return ""
-        depth = 1
-        cursor = opening + 1
-        while cursor < len(source) and depth:
-            if source[cursor] == "{":
-                depth += 1
-            elif source[cursor] == "}":
-                depth -= 1
-            cursor += 1
-        return source[opening + 1 : cursor - 1] if depth == 0 else ""
-
     for name in sorted(IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS - declared):
         violations.append(
             "litchi-iwa Keynote movie-caption selector bridge is missing "
             f"{name}: {IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}"
         )
-    for match in matches:
-        name = match.group(1)
-        if name not in IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS:
+
+    typed_spans: list[tuple[int, int, str]] = []
+    for source_path, source, records in source_records:
+        for name, signature, body, start, end in records:
+            line_number = source.count("\n", 0, start) + 1
+            relative = source_path.relative_to(root)
+            if name in IWA_KEYNOTE_MOVIE_CAPTION_LEGACY_METHODS:
+                violations.append(
+                    "litchi-iwa Keynote movie-caption raw-ID method must be retired "
+                    f"{name}: {relative}:{line_number}"
+                )
+            if name not in IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS:
+                continue
+            typed_spans.append((start, end, name))
+            if not re.search(
+                r"\bselector\b[ \t\r\n]*:[^,)]*\bMovieSelector\b", signature
+            ):
+                violations.append(
+                    "litchi-iwa Keynote movie-caption selector bridge must accept a "
+                    f"MovieSelector parameter {name}: {relative}:{line_number}"
+                )
+            for parameter in KEYNOTE_MOVIE_CAPTION_RAW_ID_PARAMETER.finditer(signature):
+                violations.append(
+                    "litchi-iwa Keynote movie-caption raw identifier parameter must be retired "
+                    f"{parameter.group(0).strip()}: {relative}:{line_number}"
+                )
+            if name == "slide_movie_caption_by_selector":
+                required = ("slide_movie_caption",)
+            elif name == "set_slide_movie_caption_by_selector":
+                required = ("edit_slide_movie_caption", ".set(", ".commit(")
+            else:
+                required = ("edit_slide_movie_caption", ".clear(", ".commit(")
+            if not all(marker in body for marker in required):
+                violations.append(
+                    "litchi-iwa Keynote movie-caption selector mutation must route through "
+                    f"focused Package::{name.removesuffix('_by_selector')}: "
+                    f"{relative}:{line_number}"
+                )
+
+    for source_path, source, _records in source_records:
+        relative = source_path.relative_to(root)
+        for match in IWA_KEYNOTE_MOVIE_CAPTION_IDENTIFIER_POSITION_FALLBACK.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-caption identifier-to-position fallback must be retired "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_MOVIE_CAPTION_RAW_ID_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            line = source[line_start:line_end]
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line
+            ):
+                continue
+            # A typed bridge may call the focused Package getter with the
+            # semantic selector.  Permit that qualified route only inside its
+            # own function body; all other calls are legacy fallback paths.
+            offset = match.start()
+            typed_call = any(
+                start <= offset < end and name in IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS
+                for start, end, name in typed_spans
+            )
+            if (
+                typed_call
+                and "selector" in line
+                and not re.search(
+                    r"\b(?:slide_movie_title_caption|set_slide_movie_caption|"
+                    r"remove_slide_movie_caption)\b"
+                    r"[ \t\r\n]*\(",
+                    line,
+                )
+            ):
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-caption raw-ID call must be retired "
+                f"{match.group('method')}: {relative}:{line_number}"
+            )
+
+    # The old generic helper names are harmless for title-only code when their
+    # bodies no longer contain a Caption branch.  Reject them only when the
+    # dedicated source still contains a caption-kind fallback or explicit
+    # caption host wrapper; this preserves the title-only compatibility scope.
+    caption_path = root / IWA_KEYNOTE_MOVIE_CAPTION_SOURCE
+    caption_source = next(
+        (source for source_path, source, _records in source_records if source_path == caption_path),
+        "",
+    )
+    always_caption_markers = (
+        "set_slide_movie_caption_host",
+        "remove_slide_movie_caption_host",
+        "insert_slide_movie_caption",
+        "insert_slide_movie_caption_standin",
+        "replace_slide_movie_caption_reference",
+    )
+    marker_matches = list(always_caption_markers)
+    for generic_marker in ("set_slide_movie_caption_legacy", "remove_slide_movie_caption_legacy"):
+        generic_function = next(
+            (
+                body
+                for name, _signature, body, _start, _end in function_records(caption_source)
+                if name == generic_marker
+            ),
+            "",
+        )
+        if "DrawableCaptionKind::Caption" in generic_function:
+            marker_matches.append(generic_marker)
+    for marker in marker_matches:
+        marker_match = re.search(rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", caption_source)
+        if marker_match is None:
             continue
-        line_number = source.count("\n", 0, match.start()) + 1
-        opening = source.find("{", match.end())
-        signature = source[match.start() : opening if opening >= 0 else len(source)]
-        if not re.search(
-            r"\bselector\b[ \t\r\n]*:[^,)]*\bMovieSelector\b", signature
+        line_number = caption_source.count("\n", 0, marker_match.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote movie-caption legacy graph/fallback marker must be retired "
+            f"{marker}: {IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_movie_caption_lifecycle_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the complete private movie-caption graph transition.
+
+    The facade audit proves that semantic types do not leak physical values;
+    this companion ratchet proves that ``set``/``clear`` are not merely
+    routed to the old host.  Creation and removal must share one bounded
+    operation that updates the graph registry/Metadata and verifies the exact
+    candidate.  Unsupported malformed or unproven *dependencies* may still
+    fail closed, but a blanket absent-caption/clear branch is not a lifecycle
+    owner.
+    """
+
+    owner_path = root / KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE
+    if not owner_path.is_file():
+        return [
+            "focused litchi-keynote movie-caption owner source is missing: "
+            f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        ]
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    shared_path = root / KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+    shared = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(shared_path.read_text(encoding="utf-8"))
+        )
+        if shared_path.is_file()
+        else ""
+    )
+    # Movie lifecycle orchestration deliberately reuses the private drawable-
+    # generic caption graph/budget seam owned beside the chart transaction.
+    # Audit both private package sources as one reachable implementation while
+    # keeping the movie facade itself in the dedicated owner file.
+    lifecycle_source = f"{shared}\n{owner}"
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    functions: dict[str, tuple[str, str, int]] = {}
+    for match in declaration.finditer(lifecycle_source):
+        opening = lifecycle_source.find("{", match.end())
+        if opening < 0:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(lifecycle_source) and depth:
+            if lifecycle_source[cursor] == "{":
+                depth += 1
+            elif lifecycle_source[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth:
+            continue
+        functions[match.group(1)] = (
+            lifecycle_source[match.start() : opening],
+            lifecycle_source[opening + 1 : cursor - 1],
+            match.start(),
+        )
+
+    violations: list[str] = []
+    budget_declarations = list(
+        KEYNOTE_MOVIE_CAPTION_PACKAGE_BUDGET_TYPE.finditer(lifecycle_source)
+    )
+    if not budget_declarations:
+        violations.append(
+            "focused litchi-keynote movie-caption owner is missing one private aggregate "
+            f"package budget: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+        budget_name: str | None = None
+    else:
+        if len(budget_declarations) != 1:
+            violations.append(
+                "focused litchi-keynote movie-caption owner must define exactly one private "
+                f"aggregate package budget: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+            )
+        budget_name = budget_declarations[0].group("name")
+
+    def require_budget(name: str, label: str, *, signature_required: bool = True) -> str | None:
+        function = functions.get(name)
+        if function is None:
+            violations.append(
+                "focused litchi-keynote movie-caption lifecycle is missing "
+                f"{label} function {name}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+            )
+            return None
+        signature, body, _offset = function
+        if signature_required and (
+            budget_name is None
+            or budget_name not in signature
+            or not re.search(
+                r"\b(?:budget|package_budget|aggregate_budget|transaction_budget)\b",
+                signature,
+            )
         ):
             violations.append(
-                "litchi-iwa Keynote movie-caption selector bridge must accept a "
-                f"MovieSelector parameter {name}: "
-                f"{IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}:{line_number}"
+                "focused litchi-keynote movie-caption lifecycle "
+                f"{label} must thread the private aggregate package budget: "
+                f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
             )
-        body = body_after(match)
-        if name == "slide_movie_caption_by_selector":
-            routed = re.search(r"\bslide_movie_caption\b[ \t\r\n]*\(", body)
-        else:
-            routed = re.search(
-                r"\b(?:edit_slide_movie_caption|apply_slide_movie_caption)\b"
-                r"[ \t\r\n]*\(",
-                body,
-            )
-        if routed is None:
+        if not re.search(
+            r"\b(?:budget|package_budget|aggregate_budget|transaction_budget)\b",
+            body,
+        ):
             violations.append(
-                "litchi-iwa Keynote movie-caption selector bridge must route through "
-                f"the focused Package operation {name}: "
-                f"{IWA_KEYNOTE_MOVIE_CAPTION_SOURCE}:{line_number}"
+                "focused litchi-keynote movie-caption lifecycle "
+                f"{label} must use the aggregate package budget: "
+                f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
             )
+        return body
+
+    commit_body = require_budget("commit", "commit", signature_required=False)
+    apply_body = require_budget(
+        "apply_slide_movie_caption", "apply", signature_required=False
+    )
+
+    operation_name = None
+    for name in functions:
+        if name in KEYNOTE_MOVIE_CAPTION_GRAPH_OPERATIONS or re.search(
+            r"rewrite_[A-Za-z0-9_]*movie[A-Za-z0-9_]*caption"
+            r"(?:_graph|_lifecycle|_operation)?$",
+            name,
+        ):
+            operation_name = name
+            break
+    if operation_name is None:
+        violations.append(
+            "focused litchi-keynote movie-caption graph operation helper is missing "
+            f"{KEYNOTE_MOVIE_CAPTION_GRAPH_OPERATION}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+        operation_body = ""
+        operation_offset = 0
+    else:
+        operation_body = functions[operation_name][1]
+        operation_offset = functions[operation_name][2]
+        for marker in ("creating", "removing"):
+            if not re.search(rf"\b{re.escape(marker)}\b", operation_body):
+                line_number = lifecycle_source.count("\n", 0, operation_offset) + 1
+                violations.append(
+                    "focused litchi-keynote movie-caption graph operation must expose "
+                    f"the {marker} path: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}:{line_number}"
+                )
+        if not re.search(r"\b(?:creating|removing)\b", operation_body):
+            # Keep the diagnostic above useful if an implementation chose an
+            # enum/action spelling rather than booleans.
+            violations.append(
+                "focused litchi-keynote movie-caption graph operation must distinguish "
+                f"create/remove transitions: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+            )
+
+    lifecycle_blob = "\n".join(
+        [lifecycle_source, operation_body, commit_body or "", apply_body or ""]
+    )
+    if not any(marker in lifecycle_blob for marker in KEYNOTE_MOVIE_CAPTION_GRAPH_MARKERS):
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle must retain a strict graph "
+            f"transition marker: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+    if not any(
+        marker in lifecycle_blob for marker in KEYNOTE_MOVIE_CAPTION_METADATA_GRAPH_MARKERS
+    ):
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle must update the Metadata/UUID "
+            f"registry through a strict transition: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+    if not any(marker in lifecycle_blob for marker in KEYNOTE_MOVIE_CAPTION_SAVE_TOKEN_REWRITE_MARKERS):
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle must advance Metadata save tokens: "
+            f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+    if not any(marker in lifecycle_blob for marker in KEYNOTE_MOVIE_CAPTION_OBJECT_FRAMING_MARKERS):
+        line_number = lifecycle_source.count("\n", 0, operation_offset) + 1
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle must validate canonical object "
+            f"framing: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}:{line_number}"
+        )
+    if not any(marker in lifecycle_blob for marker in KEYNOTE_MOVIE_CAPTION_REFERENCE_TRANSITION_MARKERS):
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle must use a source-authoritative "
+            f"caption reference transition: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+
+    if any(marker in lifecycle_blob for marker in KEYNOTE_MOVIE_CAPTION_CROSS_COMPONENT_MARKERS):
+        if not any(
+            marker in lifecycle_blob
+            for marker in KEYNOTE_MOVIE_CAPTION_EXTERNAL_REFERENCE_MARKERS
+        ):
+            violations.append(
+                "focused litchi-keynote movie-caption cross-component graph dependency "
+                f"must carry external-reference attribution: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+            )
+
+    if not KEYNOTE_CHART_CAPTION_CODEC_REPORT_CHARGE.search(lifecycle_blob):
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle must charge nested codec reports "
+            f"through the aggregate package budget: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
+    for category in ("archive", "snappy", "zip", "reopen", "artifact"):
+        pattern = KEYNOTE_CHART_CAPTION_RESOURCE_CHARGES[category]
+        if not pattern.search(lifecycle_blob):
+            violations.append(
+                "focused litchi-keynote movie-caption lifecycle must charge prepublication "
+                f"{category} work through the aggregate package budget: "
+                f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+            )
+
+    # A lifecycle owner may reject an unproven *dependency*, but it must not
+    # retain the old blanket stand-in/clear fallback branch.
+    if re.search(
+        r"(?:storage_identifier|caption_info_identifier)\s*\.\s*is_none\(\)"
+        r"[^;\n]{0,220}UnsupportedDependency|"
+        r"after\s*\.\s*is_none\(\)[^;\n]{0,220}UnsupportedDependency",
+        owner,
+        re.DOTALL,
+    ):
+        violations.append(
+            "focused litchi-keynote movie-caption lifecycle retains a blanket "
+            "absent/clear UnsupportedDependency branch: "
+            f"{KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+        )
     return sorted(set(violations))
 
 
@@ -17677,6 +18163,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_chart_caption_facade_source_topology()
         + audit_iwa_keynote_movie_caption_source_topology()
         + audit_keynote_movie_caption_facade_source_topology()
+        + audit_keynote_movie_caption_lifecycle_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

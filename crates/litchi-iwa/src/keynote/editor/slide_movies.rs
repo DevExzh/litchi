@@ -1000,10 +1000,14 @@ mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::DrawablePoint;
+    use litchi_core::Position;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+    use litchi_keynote::MovieSelector;
+    use litchi_keynote::slide::audio::Options as SlideAudioOptions;
     use std::time::Duration;
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-movie";
+    const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";
     const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nsource-built-poster";
     const REPLACEMENT_POSTER: &[u8] = b"GIF89areplacement-poster";
@@ -1238,39 +1242,51 @@ mod tests {
 
         assert_eq!(
             editor
-                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap(),
-            crate::DrawableTitleCaption::default()
+            None
+        );
+        assert_eq!(
+            editor
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
+                .unwrap(),
+            None
         );
         editor
             .set_slide_movie_title(0, movie.drawable_object_id, "Quarterly highlight")
             .unwrap();
         editor
-            .set_slide_movie_caption(0, movie.drawable_object_id, "Revenue overview")
+            .set_slide_movie_caption_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                "Revenue overview",
+            )
             .unwrap();
-        let expected = crate::DrawableTitleCaption {
-            title: Some("Quarterly highlight".to_owned()),
-            caption: Some("Revenue overview".to_owned()),
-        };
         assert_eq!(
             editor
-                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap(),
-            expected
+            Some("Quarterly highlight".to_owned())
+        );
+        assert_eq!(
+            editor
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
+                .unwrap(),
+            Some("Revenue overview".to_owned())
         );
 
         editor
-            .set_slide_movie_caption(0, movie.drawable_object_id, "Updated revenue overview")
+            .set_slide_movie_caption_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                "Updated revenue overview",
+            )
             .unwrap();
-        let replaced = crate::DrawableTitleCaption {
-            title: Some("Quarterly highlight".to_owned()),
-            caption: Some("Updated revenue overview".to_owned()),
-        };
         assert_eq!(
             editor
-                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap(),
-            replaced
+            Some("Updated revenue overview".to_owned())
         );
 
         let duplicate = editor
@@ -1278,9 +1294,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor
-                .slide_movie_title_caption(0, duplicate.drawable_object_id)
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
                 .unwrap(),
-            replaced
+            Some("Updated revenue overview".to_owned())
         );
 
         editor
@@ -1288,12 +1304,12 @@ mod tests {
             .unwrap();
         assert!(
             editor
-                .remove_slide_movie_caption(0, movie.drawable_object_id)
+                .remove_slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap()
         );
         assert!(
             !editor
-                .remove_slide_movie_caption(0, movie.drawable_object_id)
+                .remove_slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0),)
                 .unwrap()
         );
         assert!(
@@ -1303,17 +1319,23 @@ mod tests {
         );
         assert_eq!(
             editor
-                .slide_movie_title_caption(0, movie.drawable_object_id)
+                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap(),
-            crate::DrawableTitleCaption::default()
+            None
+        );
+        assert_eq!(
+            editor
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
+                .unwrap(),
+            None
         );
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
-                .slide_movie_title_caption(0, duplicate.drawable_object_id)
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
                 .unwrap(),
-            replaced
+            Some("Updated revenue overview".to_owned())
         );
         editor = reopened;
         editor
@@ -1325,6 +1347,59 @@ mod tests {
                 .unwrap()
                 .iter()
                 .all(|item| item.drawable_object_id != duplicate.drawable_object_id)
+        );
+    }
+
+    #[test]
+    fn movie_caption_bridge_preserves_movie_selector_order_after_audio() {
+        let mut editor = KeynoteDocumentBuilder::new()
+            .title("Movie caption selector order")
+            .build()
+            .unwrap();
+        let audio = editor
+            .add_slide_audio(
+                0,
+                "audio.aiff",
+                AUDIO,
+                SlideAudioOptions::new(POSITION, Duration::from_millis(1_375)).unwrap(),
+            )
+            .unwrap();
+        let movie = editor
+            .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
+            .unwrap();
+
+        assert_eq!(
+            editor.slide_audio(0).unwrap()[0].drawable_object_id,
+            audio.drawable_object_id
+        );
+        assert_eq!(
+            editor.slide_movies(0).unwrap()[0].drawable_object_id,
+            movie.drawable_object_id
+        );
+
+        editor
+            .set_slide_movie_caption_by_selector(
+                Position::new(0),
+                MovieSelector::index(1),
+                "Caption after audio",
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
+                .unwrap(),
+            Some("Caption after audio".to_owned())
+        );
+        assert!(
+            editor
+                .remove_slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
+                .unwrap(),
+            None
         );
     }
 

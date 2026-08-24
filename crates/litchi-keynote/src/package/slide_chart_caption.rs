@@ -24,7 +24,11 @@ use litchi_iwa_archive::{
     SourceCatalog,
     package::{EntryEdit, ExactArtifacts, ReassemblyExecutionLimits},
 };
-use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len, wire::WireView};
+use litchi_iwa_common::{
+    decode_varint_from_bytes,
+    varint::encoded_len,
+    wire::{WireView, append_length_delimited_field_with_limits, append_varint_field},
+};
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
@@ -36,7 +40,7 @@ use litchi_iwa_protos::package_metadata_codec::{
 };
 use litchi_iwa_protos::{
     keynote_chart_caption_codec, keynote_chart_caption_graph_codec as graph_codec,
-    pages_movie_caption_codec,
+    keynote_movie_caption_codec, pages_movie_caption_codec,
 };
 use thiserror::Error;
 
@@ -60,6 +64,16 @@ const PACKAGE_METADATA_MEMBER_NAME: &str = "Index/Metadata.iwa";
 const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 const MAX_CAPTION_BYTES: usize = 64 * 1024 * 1024;
 
+/// Native drawable edge whose caption reference is being transitioned.
+///
+/// Charts and movies share the graph, Metadata, and preview transaction. Only
+/// the drawable message type and strict edge codec differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CaptionEdgeKind {
+    Chart,
+    Movie,
+}
+
 /// Operation-local accounting for the chart-caption owner.
 ///
 /// The lower-level codecs and archive reassembler each have their own
@@ -69,7 +83,7 @@ const MAX_CAPTION_BYTES: usize = 64 * 1024 * 1024;
 /// exact ZIP execution plan.  It deliberately does not live in a patch, so a
 /// replay cannot inherit stale budget state from the original transaction.
 #[derive(Debug, Clone, Copy)]
-struct CaptionBudget {
+pub(super) struct CaptionBudget {
     maximum_input: usize,
     maximum_output: usize,
     maximum_fields: usize,
@@ -77,6 +91,7 @@ struct CaptionBudget {
     maximum_depth: u32,
     maximum_components: usize,
     maximum_references: usize,
+    maximum_allocations: usize,
     input: usize,
     output: usize,
     fields: usize,
@@ -91,7 +106,7 @@ struct CaptionBudget {
 }
 
 impl CaptionBudget {
-    fn for_package(package: &Package) -> Result<Self, ChartCaptionError> {
+    pub(super) fn for_package(package: &Package) -> Result<Self, ChartCaptionError> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
         let semantic = package.semantic_limits();
         let physical = package.state.options.archive();
@@ -105,6 +120,7 @@ impl CaptionBudget {
             maximum_depth: u32::try_from(wire.max_nesting()).unwrap_or(u32::MAX),
             maximum_components: semantic.max_objects(),
             maximum_references: semantic.max_references(),
+            maximum_allocations: aggregate_input.saturating_add(64),
             input: 0,
             output: 0,
             fields: 0,
@@ -214,10 +230,18 @@ impl CaptionBudget {
         count: usize,
         retained: usize,
     ) -> Result<(), ChartCaptionError> {
-        self.allocations = self
+        let observed = self
             .allocations
             .checked_add(count)
             .ok_or(ChartCaptionError::InvalidSource)?;
+        if observed > self.maximum_allocations {
+            return Err(Self::limit(
+                ChartCaptionLimitKind::Entries,
+                observed,
+                self.maximum_allocations,
+            ));
+        }
+        self.allocations = observed;
         self.retained_bytes = self
             .retained_bytes
             .checked_add(retained)
@@ -284,28 +308,16 @@ impl CaptionBudget {
         &mut self,
         report: graph_codec::EncodeReport,
     ) -> Result<(), ChartCaptionError> {
-        if report.output_bytes() > self.maximum_output {
-            return Err(Self::limit(
-                ChartCaptionLimitKind::OutputBytes,
-                report.output_bytes(),
-                self.maximum_output,
-            ));
-        }
-        if report.fields() > self.maximum_fields {
-            return Err(Self::limit(
-                ChartCaptionLimitKind::WireFields,
-                report.fields(),
-                self.maximum_fields,
-            ));
-        }
-        if report.work_bytes() > self.maximum_work {
-            return Err(Self::limit(
-                ChartCaptionLimitKind::WireWork,
-                report.work_bytes(),
-                self.maximum_work,
-            ));
-        }
-        self.charge_depth(report.max_depth())
+        // This report spans the graph codec's sizing, emission, and four
+        // output-buffer allocations. Charge every dimension to the enclosing
+        // package transaction rather than treating the codec as a separate
+        // unlimited phase.
+        self.charge_output(report.output_bytes())?;
+        self.charge_fields(report.fields())?;
+        self.charge_work(report.work_bytes())?;
+        self.charge_depth(report.max_depth())?;
+        self.charge_allocation(report.allocations(), report.output_bytes())?;
+        self.charge_scratch(report.output_bytes())
     }
 
     fn precharge_graph(
@@ -335,7 +347,10 @@ impl CaptionBudget {
         Ok(())
     }
 
-    fn charge_catalog_scan(&mut self, package: &Package) -> Result<(), ChartCaptionError> {
+    pub(super) fn charge_catalog_scan(
+        &mut self,
+        package: &Package,
+    ) -> Result<(), ChartCaptionError> {
         let mut work = 0usize;
         for component in package.state.source.components().iter() {
             work = work
@@ -367,19 +382,6 @@ impl CaptionBudget {
         report: metadata_codec::RewriteReport,
     ) -> Result<(), ChartCaptionError> {
         self.charge_report(report)
-    }
-
-    fn charge_chart_codec_report(
-        &mut self,
-        report: keynote_chart_caption_codec::RewriteReport,
-    ) -> Result<(), ChartCaptionError> {
-        self.charge_input(report.input_bytes())?;
-        self.charge_output(report.output_bytes())?;
-        self.charge_fields(report.fields())?;
-        self.charge_work(report.work_bytes())?;
-        self.charge_depth(report.max_depth())?;
-        self.charge_allocation(report.allocations(), report.retained_bytes())?;
-        self.charge_scratch(report.scratch_bytes())
     }
 
     fn charge_archive_snappy_plan(
@@ -448,7 +450,10 @@ impl CaptionBudget {
         Ok(())
     }
 
-    fn charge_candidate_reopen(&mut self, output_bytes: usize) -> Result<(), ChartCaptionError> {
+    pub(super) fn charge_candidate_reopen(
+        &mut self,
+        output_bytes: usize,
+    ) -> Result<(), ChartCaptionError> {
         self.charge_input(output_bytes)?;
         self.charge_work(output_bytes)?;
         self.charge_allocation(1, output_bytes)?;
@@ -459,7 +464,7 @@ impl CaptionBudget {
         Ok(())
     }
 
-    fn charge_exact_artifacts(
+    pub(super) fn charge_exact_artifacts(
         &mut self,
         source_bytes: usize,
         target_bytes: usize,
@@ -501,6 +506,12 @@ impl CaptionBudget {
 
     fn remaining_depth(&self) -> u32 {
         self.maximum_depth
+    }
+
+    fn remaining_allocations(&self) -> usize {
+        self.maximum_allocations
+            .checked_sub(self.allocations)
+            .unwrap_or(0)
     }
 }
 
@@ -1690,9 +1701,46 @@ fn rewrite_chart_caption_operation(
         return Err(ChartCaptionError::InvalidSource);
     }
 
+    rewrite_caption_graph_operation_with_budget(
+        source,
+        &selection.slide_component_name,
+        selection.chart_identifier,
+        selection.reference_identifier,
+        selection.storage_identifier,
+        after,
+        CaptionEdgeKind::Chart,
+        budget,
+    )
+}
+
+/// Execute the canonical graph transition for any supported drawable edge.
+///
+/// Creation retains the selected stand-in and appends four canonical graph
+/// objects. Removal retains the old graph and appends one fresh stand-in. The
+/// caller owns the operation budget so chart and movie transactions account
+/// the same physical lifecycle and can reject before publication.
+pub(super) fn rewrite_caption_graph_operation_with_budget(
+    source: &Package,
+    slide_component_name: &str,
+    drawable_identifier: u64,
+    reference_identifier: Option<u64>,
+    storage_identifier: Option<u64>,
+    after: Option<&str>,
+    edge_kind: CaptionEdgeKind,
+    budget: &mut CaptionBudget,
+) -> Result<(Package, usize, usize), ChartCaptionError> {
+    let creating = storage_identifier.is_none() && after.is_some();
+    let removing = storage_identifier.is_some() && after.is_none();
+    if !creating && !removing {
+        return Err(ChartCaptionError::UnsupportedDependency);
+    }
+    if after.is_some_and(contains_dependent_marker) {
+        return Err(ChartCaptionError::UnsupportedDependency);
+    }
+
     let catalog = physical_catalog(source)?;
     let metadata_name = metadata_member_name(catalog, source)?;
-    let slide_name = selection.slide_component_name.clone();
+    let slide_name = slide_component_name.to_owned();
     if metadata_name == slide_name {
         return Err(ChartCaptionError::InvalidSource);
     }
@@ -1734,49 +1782,62 @@ fn rewrite_chart_caption_operation(
     let slide_selector = metadata_facts.selector()?;
     prove_metadata_selector_component(source, &slide_name, slide_selector)?;
     let first_identifier = next_caption_identifier(source, &metadata_facts)?;
-    let (new_identifiers, replacement_identifier, graph_objects) = if creating {
-        let first = first_identifier;
-        let ids = CaptionGraphIds::allocate(first)?;
-        let theme = caption_theme(source, selection)?;
-        prove_caption_dependencies(
-            source,
-            &metadata_facts,
-            &slide_name,
-            [theme.stylesheet, theme.paragraph_style],
-        )?;
-        let width = caption_drawable_width(source, selection)?;
-        budget.precharge_graph(
-            after.ok_or(ChartCaptionError::InvalidSource)?,
-            theme.language.as_deref(),
-        )?;
-        let (objects, graph_report) = caption_graph_objects(
-            source,
-            ids,
-            selection.chart_identifier,
-            width,
-            after.ok_or(ChartCaptionError::InvalidSource)?,
-            theme.stylesheet,
-            theme.paragraph_style,
-            theme.language.as_deref(),
-            budget,
-        )?;
-        budget.observe_graph_report(graph_report)?;
-        (ids, ids.info, objects)
-    } else {
-        let standin = first_identifier;
-        let object = canonical_standin(standin)?;
-        (CaptionGraphIds::standin(standin), standin, vec![object])
-    };
+    let (new_identifiers, replacement_identifier, graph_objects, graph_style_identifier) =
+        if creating {
+            let first = first_identifier;
+            let ids = CaptionGraphIds::allocate(first)?;
+            let theme = caption_theme(source)?;
+            prove_caption_dependencies(
+                source,
+                &metadata_facts,
+                &slide_name,
+                [theme.stylesheet, theme.paragraph_style],
+            )?;
+            let width = caption_drawable_width(source, drawable_identifier)?;
+            budget.precharge_graph(
+                after.ok_or(ChartCaptionError::InvalidSource)?,
+                theme.language.as_deref(),
+            )?;
+            let (objects, graph_report) = caption_graph_objects(
+                source,
+                ids,
+                drawable_identifier,
+                width,
+                after.ok_or(ChartCaptionError::InvalidSource)?,
+                theme.stylesheet,
+                theme.paragraph_style,
+                theme.language.as_deref(),
+                budget,
+            )?;
+            budget.observe_graph_report(graph_report)?;
+            (
+                ids,
+                ids.info,
+                objects,
+                (edge_kind == CaptionEdgeKind::Movie).then_some(ids.style),
+            )
+        } else {
+            let standin = first_identifier;
+            let object = canonical_standin(standin)?;
+            (
+                CaptionGraphIds::standin(standin),
+                standin,
+                vec![object],
+                None,
+            )
+        };
 
     let slide_archive = archive_mut(&mut archives, &slide_name)?;
-    patch_chart_caption_edge(
+    patch_caption_edge(
         slide_archive,
-        selection.chart_identifier,
-        selection.reference_identifier,
+        drawable_identifier,
+        reference_identifier,
         replacement_identifier,
         source,
         archive_limits,
         budget,
+        edge_kind,
+        graph_style_identifier,
     )?;
     for object in graph_objects {
         slide_archive
@@ -1858,32 +1919,7 @@ fn rewrite_chart_caption_operation(
     Ok((candidate, 2, previews.len()))
 }
 
-/// Rewrite an existing caption storage and update the owning Metadata save
-/// token. This physical seam is shared by movie captions, whose native edge
-/// codec and graph selection differ from charts but whose storage/metadata
-/// transaction is identical.
-pub(super) fn rewrite_existing_storage_text_with_metadata(
-    source: &Package,
-    storage_identifier: u64,
-    slide_node_identifier: u64,
-    slide_component_name: &str,
-    end: usize,
-    desired: &str,
-) -> Result<(Package, usize, usize), ChartCaptionError> {
-    let mut budget = CaptionBudget::for_package(source)?;
-    budget.charge_catalog_scan(source)?;
-    rewrite_existing_caption_text_with_metadata_budget(
-        source,
-        storage_identifier,
-        slide_node_identifier,
-        slide_component_name,
-        end,
-        desired,
-        &mut budget,
-    )
-}
-
-fn rewrite_existing_caption_text_with_metadata_budget(
+pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     source: &Package,
     storage_identifier: u64,
     slide_node_identifier: u64,
@@ -2558,7 +2594,7 @@ fn canonical_standin(identifier: u64) -> Result<ArchiveObject, ChartCaptionError
 fn caption_graph_objects(
     package: &Package,
     ids: CaptionGraphIds,
-    chart_identifier: u64,
+    drawable_identifier: u64,
     drawable_width: f32,
     text: &str,
     stylesheet_identifier: u64,
@@ -2576,10 +2612,11 @@ fn caption_graph_objects(
             budget
                 .remaining_depth()
                 .min(u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX)),
-        );
+        )
+        .with_max_allocations(budget.remaining_allocations());
     let output = graph_codec::encode_caption_graph_with_report(
         graph_codec::CaptionGraphWrite {
-            drawable_identifier: chart_identifier,
+            drawable_identifier,
             style_identifier: ids.style,
             info_identifier: ids.info,
             storage_identifier: ids.storage,
@@ -2635,10 +2672,7 @@ struct CaptionTheme {
     language: Option<String>,
 }
 
-fn caption_theme(
-    package: &Package,
-    _selection: &CaptionSelection,
-) -> Result<CaptionTheme, ChartCaptionError> {
+fn caption_theme(package: &Package) -> Result<CaptionTheme, ChartCaptionError> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let document_candidates = package
         .state
@@ -2777,11 +2811,11 @@ fn first_reference_identifier(
 
 fn caption_drawable_width(
     package: &Package,
-    selection: &CaptionSelection,
+    drawable_identifier: u64,
 ) -> Result<f32, ChartCaptionError> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let object = package
-        .object(selection.chart_identifier)
+        .object(drawable_identifier)
         .ok_or(ChartCaptionError::InvalidSource)?;
     let payload = &object
         .messages
@@ -2815,23 +2849,30 @@ fn caption_drawable_width(
     Ok(value)
 }
 
-fn patch_chart_caption_edge(
+fn patch_caption_edge(
     archive: &mut Archive,
-    chart_identifier: u64,
+    drawable_identifier: u64,
     expected_identifier: Option<u64>,
     replacement_identifier: u64,
     package: &Package,
     archive_limits: litchi_iwa_core::Limits,
     budget: &mut CaptionBudget,
+    edge_kind: CaptionEdgeKind,
+    graph_style_identifier: Option<u64>,
 ) -> Result<(), ChartCaptionError> {
-    let expected_identifier = expected_identifier.ok_or(ChartCaptionError::InvalidSource)?;
-    if expected_identifier == replacement_identifier || replacement_identifier == 0 {
+    let missing_movie_edge = expected_identifier.is_none() && edge_kind == CaptionEdgeKind::Movie;
+    let mut expected_identifier = expected_identifier;
+    if replacement_identifier == 0 {
         return Err(ChartCaptionError::InvalidSource);
     }
     let source_object = archive
-        .object(chart_identifier)
+        .object(drawable_identifier)
         .ok_or(ChartCaptionError::InvalidSource)?;
-    if source_object.messages.len() != 1 || source_object.messages[0].type_ != CHART_MESSAGE_TYPE {
+    let message_type = match edge_kind {
+        CaptionEdgeKind::Chart => CHART_MESSAGE_TYPE,
+        CaptionEdgeKind::Movie => 3_007,
+    };
+    if source_object.messages.len() != 1 || source_object.messages[0].type_ != message_type {
         return Err(ChartCaptionError::InvalidSource);
     }
     validate_selected_message_metadata(source_object, 0)?;
@@ -2840,6 +2881,31 @@ fn patch_chart_caption_edge(
         .message_infos
         .first()
         .ok_or(ChartCaptionError::InvalidSource)?;
+    if expected_identifier.is_none() {
+        if !missing_movie_edge {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        let standins = info
+            .object_references
+            .iter()
+            .copied()
+            .filter(|identifier| {
+                package.object(*identifier).is_some_and(|object| {
+                    object.messages.len() == 1
+                        && object.messages[0].type_ == STANDIN_MESSAGE_TYPE
+                        && object.messages[0].data.is_empty()
+                })
+            })
+            .collect::<Vec<_>>();
+        if standins.len() != 1 {
+            return Err(ChartCaptionError::InvalidSource);
+        }
+        expected_identifier = standins.first().copied();
+    }
+    let expected_identifier = expected_identifier.ok_or(ChartCaptionError::InvalidSource)?;
+    if expected_identifier == replacement_identifier {
+        return Err(ChartCaptionError::InvalidSource);
+    }
     if info.data_references.contains(&expected_identifier)
         || info.data_references.contains(&replacement_identifier)
         || info
@@ -2895,18 +2961,118 @@ fn patch_chart_caption_edge(
         });
     }
     let payload = source_object.messages[0].data.clone();
-    let options = chart_caption_rewrite_options(package, &payload, budget)?;
-    let (rewritten, report) = keynote_chart_caption_codec::rewrite_chart_caption_with_report(
-        &payload,
-        keynote_chart_caption_codec::ChartCaptionWrite::new(replacement_identifier),
-        options,
-    )
-    .map_err(map_chart_caption_codec_error)?;
-    budget.charge_chart_codec_report(report)?;
+    let (
+        rewritten,
+        report_input,
+        report_output,
+        report_fields,
+        report_work,
+        report_depth,
+        report_allocations,
+        report_retained,
+        report_scratch,
+    ) = match edge_kind {
+        CaptionEdgeKind::Chart => {
+            let options = chart_caption_rewrite_options(package, &payload, budget)?;
+            let (rewritten, report) =
+                keynote_chart_caption_codec::rewrite_chart_caption_with_report(
+                    &payload,
+                    keynote_chart_caption_codec::ChartCaptionWrite::new(replacement_identifier),
+                    options,
+                )
+                .map_err(map_chart_caption_codec_error)?;
+            (
+                rewritten,
+                report.input_bytes(),
+                report.output_bytes(),
+                report.fields(),
+                report.work_bytes(),
+                report.max_depth(),
+                report.allocations(),
+                report.retained_bytes(),
+                report.scratch_bytes(),
+            )
+        },
+        CaptionEdgeKind::Movie if missing_movie_edge => {
+            let limits = package.wire_limits().map_err(map_wire_error)?;
+            let rewritten = insert_movie_caption_edge(&payload, replacement_identifier, limits)?;
+            let input_bytes = payload.len();
+            let output_bytes = rewritten.len();
+            let source_view =
+                WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
+            let output_view =
+                WireView::parse_with_limits(&rewritten, limits).map_err(map_wire_error)?;
+            let source_fields = source_view.fields().count()
+                + WireView::parse_with_limits(
+                    unique_payload_field(&source_view, 1)?
+                        .ok_or(ChartCaptionError::InvalidSource)?,
+                    limits,
+                )
+                .map_err(map_wire_error)?
+                .fields()
+                .count();
+            let output_fields = output_view.fields().count()
+                + WireView::parse_with_limits(
+                    unique_payload_field(&output_view, 1)?
+                        .ok_or(ChartCaptionError::InvalidSource)?,
+                    limits,
+                )
+                .map_err(map_wire_error)?
+                .fields()
+                .count();
+            (
+                rewritten,
+                input_bytes,
+                output_bytes,
+                source_fields
+                    .saturating_add(output_fields)
+                    .saturating_add(2),
+                input_bytes.saturating_add(output_bytes),
+                4,
+                1,
+                output_bytes,
+                output_bytes,
+            )
+        },
+        CaptionEdgeKind::Movie => {
+            let options = movie_caption_rewrite_options(package, &payload, budget)?;
+            let (rewritten, report) =
+                keynote_movie_caption_codec::rewrite_movie_caption_with_report(
+                    &payload,
+                    keynote_movie_caption_codec::MovieCaptionWrite::new(replacement_identifier),
+                    options,
+                )
+                .map_err(map_movie_caption_codec_error)?;
+            (
+                rewritten,
+                report.input_bytes(),
+                report.output_bytes(),
+                report.fields(),
+                report.work_bytes(),
+                report.max_depth(),
+                report.allocations(),
+                report.retained_bytes(),
+                report.scratch_bytes(),
+            )
+        },
+    };
+    budget.charge_input(report_input)?;
+    budget.charge_output(report_output)?;
+    budget.charge_fields(report_fields)?;
+    budget.charge_work(report_work)?;
+    budget.charge_depth(report_depth)?;
+    budget.charge_allocation(report_allocations, report_retained)?;
+    budget.charge_scratch(report_scratch)?;
     let aggregate_before = info.object_references.clone();
     let mut aggregate_after = aggregate_before.clone();
     aggregate_after.retain(|identifier| *identifier != expected_identifier);
     aggregate_after.push(replacement_identifier);
+    if let Some(style_identifier) = graph_style_identifier {
+        if style_identifier == 0 || aggregate_before.contains(&style_identifier) {
+            return Err(ChartCaptionError::UnsupportedDependency);
+        }
+        aggregate_after.push(style_identifier);
+    }
     let fields = field_states
         .iter()
         .enumerate()
@@ -2927,7 +3093,7 @@ fn patch_chart_caption_edge(
         .replace_message_transitioning_object_references_preserving_header_with_limits(
             0,
             RawMessage {
-                type_: CHART_MESSAGE_TYPE,
+                type_: message_type,
                 data: rewritten,
             },
             transition,
@@ -2935,9 +3101,89 @@ fn patch_chart_caption_edge(
         )
         .map_err(map_core_error)?;
     *archive
-        .object_mut(chart_identifier)
+        .object_mut(drawable_identifier)
         .ok_or(ChartCaptionError::InvalidSource)? = rewritten_object;
     Ok(())
+}
+
+/// Add a missing MovieArchive caption edge to a canonical stand-in drawable.
+///
+/// The strict movie codec intentionally rewrites an existing reference only.
+/// A stand-in fixture can carry its placeholder solely in ArchiveInfo's
+/// aggregate references, so creation first authors the one canonical field
+/// while retaining every source wire field and then strictly decodes the
+/// candidate through the same movie codec.
+fn insert_movie_caption_edge(
+    payload: &[u8],
+    replacement_identifier: u64,
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<Vec<u8>, ChartCaptionError> {
+    if replacement_identifier == 0 {
+        return Err(ChartCaptionError::InvalidSource);
+    }
+    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let super_payload = unique_payload_field(&outer, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
+    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    if drawable.fields().any(|field| field.number() == 11) {
+        return Err(ChartCaptionError::InvalidSource);
+    }
+
+    let mut reference_payload = Vec::new();
+    append_varint_field(&mut reference_payload, 1, replacement_identifier)
+        .map_err(map_wire_error)?;
+    let mut drawable_output = Vec::new();
+    drawable_output
+        .try_reserve_exact(
+            super_payload
+                .len()
+                .saturating_add(reference_payload.len() + 4),
+        )
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: super_payload
+                .len()
+                .saturating_add(reference_payload.len() + 4),
+        })?;
+    for field in drawable.fields() {
+        field.validate_canonical_key().map_err(map_wire_error)?;
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        drawable_output.extend_from_slice(field.raw());
+    }
+    append_length_delimited_field_with_limits(&mut drawable_output, 11, &reference_payload, limits)
+        .map_err(map_wire_error)?;
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(payload.len().saturating_add(drawable_output.len()))
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: payload.len().saturating_add(drawable_output.len()),
+        })?;
+    for field in outer.fields() {
+        field.validate_canonical_key().map_err(map_wire_error)?;
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        if field.number() == 1 {
+            append_length_delimited_field_with_limits(&mut output, 1, &drawable_output, limits)
+                .map_err(map_wire_error)?;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    let recursion =
+        u32::try_from(limits.max_nesting()).map_err(|_error| ChartCaptionError::InvalidSource)?;
+    let snapshot = keynote_movie_caption_codec::decode_movie_caption(
+        &output,
+        keynote_movie_caption_codec::DecodeOptions::new(
+            output.len().min(limits.max_input_bytes()),
+            limits.max_fields(),
+            limits.max_rewrite_work(),
+            recursion,
+        )
+        .with_max_output_bytes(limits.max_output_bytes()),
+    )
+    .map_err(map_movie_caption_codec_error)?;
+    if snapshot.caption_identifier() != Some(replacement_identifier) {
+        return Err(ChartCaptionError::Verification);
+    }
+    Ok(output)
 }
 
 fn verify_graph_transition(
@@ -2946,13 +3192,52 @@ fn verify_graph_transition(
     before: &CaptionSelection,
     target: &CaptionSelection,
 ) -> Result<(), ChartCaptionError> {
+    verify_caption_graph_transition(
+        source,
+        candidate,
+        &before.slide_component_name,
+        before.reference_identifier,
+        before.caption_info_identifier,
+        before.storage_identifier,
+        before.placement_identifier,
+        before.style_identifier,
+        target.reference_identifier,
+        target.caption_info_identifier,
+        target.storage_identifier,
+        target.placement_identifier,
+        target.style_identifier,
+    )
+}
+
+/// Verify the physical locality and retained-object rules of a canonical
+/// drawable graph transition. Movie and chart selectors provide the same
+/// graph facts through this private primitive.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The private cross-owner seam carries the complete before/target graph census explicitly."
+)]
+pub(super) fn verify_caption_graph_transition(
+    source: &Package,
+    candidate: &Package,
+    slide_component_name: &str,
+    before_reference: Option<u64>,
+    before_caption_info: Option<u64>,
+    before_storage: Option<u64>,
+    before_placement: Option<u64>,
+    before_style: Option<u64>,
+    target_reference: Option<u64>,
+    target_caption_info: Option<u64>,
+    target_storage: Option<u64>,
+    target_placement: Option<u64>,
+    target_style: Option<u64>,
+) -> Result<(), ChartCaptionError> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let metadata_name = metadata_member_name(source_catalog, source)?;
     if metadata_member_name(candidate_catalog, candidate)? != metadata_name {
         return Err(ChartCaptionError::Verification);
     }
-    let slide_name = before.slide_component_name.as_str();
+    let slide_name = slide_component_name;
     for entry in source_catalog.package().iter() {
         if PREVIEW_ENTRY_NAMES.contains(&entry.name())
             || entry.name() == slide_name
@@ -2974,22 +3259,22 @@ fn verify_graph_transition(
     if source_metadata.2 == candidate_metadata.2 {
         return Err(ChartCaptionError::Verification);
     }
-    if before.storage_identifier.is_none() {
+    if before_storage.is_none() {
         // A stand-in -> active transition normally retains the source
         // stand-in.  The exact inverse of an active -> stand-in transition
         // has the same semantic orientation, but its source stand-in is the
         // newly allocated object and therefore is deliberately absent from
         // the restored candidate.  In both cases the target graph must be
         // present in full.
-        if target.storage_identifier.is_none()
-            || target.style_identifier.is_none()
-            || target.placement_identifier.is_none()
-            || target.caption_info_identifier.is_none()
+        if target_storage.is_none()
+            || target_style.is_none()
+            || target_placement.is_none()
+            || target_caption_info.is_none()
             || ![
-                target.caption_info_identifier,
-                target.storage_identifier,
-                target.placement_identifier,
-                target.style_identifier,
+                target_caption_info,
+                target_storage,
+                target_placement,
+                target_style,
             ]
             .into_iter()
             .flatten()
@@ -2997,19 +3282,14 @@ fn verify_graph_transition(
         {
             return Err(ChartCaptionError::Verification);
         }
-        let source_standin_present = candidate
-            .object(
-                before
-                    .reference_identifier
-                    .ok_or(ChartCaptionError::Verification)?,
-            )
-            .is_some();
+        let source_standin_present =
+            before_reference.is_some_and(|identifier| candidate.object(identifier).is_some());
         if !source_standin_present
             && ![
-                target.caption_info_identifier,
-                target.storage_identifier,
-                target.placement_identifier,
-                target.style_identifier,
+                target_caption_info,
+                target_storage,
+                target_placement,
+                target_style,
             ]
             .into_iter()
             .flatten()
@@ -3017,7 +3297,7 @@ fn verify_graph_transition(
         {
             return Err(ChartCaptionError::Verification);
         }
-    } else if target.storage_identifier.is_some() {
+    } else if target_storage.is_some() {
         return Err(ChartCaptionError::Verification);
     } else {
         // Removal creates a fresh stand-in while retaining the old graph.
@@ -3025,25 +3305,21 @@ fn verify_graph_transition(
         // that old graph, so either the target stand-in or the source graph
         // is the retained side of this exact transition.
         let target_standin = candidate
-            .object(
-                target
-                    .reference_identifier
-                    .ok_or(ChartCaptionError::Verification)?,
-            )
+            .object(target_reference.ok_or(ChartCaptionError::Verification)?)
             .is_some();
         if !target_standin {
             return Err(ChartCaptionError::Verification);
         }
         let source_graph_present = [
-            before.caption_info_identifier,
-            before.storage_identifier,
-            before.placement_identifier,
-            before.style_identifier,
+            before_caption_info,
+            before_storage,
+            before_placement,
+            before_style,
         ]
         .into_iter()
         .flatten()
         .all(|identifier| candidate.object(identifier).is_some());
-        if !source_graph_present && target.reference_identifier.is_none() {
+        if !source_graph_present && target_reference.is_none() {
             return Err(ChartCaptionError::Verification);
         }
     }
@@ -3342,6 +3618,27 @@ fn chart_caption_rewrite_options(
         .map_err(|_error| ChartCaptionError::InvalidSource)?
         .min(budget.remaining_depth());
     Ok(keynote_chart_caption_codec::DecodeOptions::new(
+        payload
+            .len()
+            .min(limits.max_input_bytes())
+            .min(budget.remaining_input()),
+        limits.max_fields().min(budget.remaining_fields()),
+        limits.max_rewrite_work().min(budget.remaining_work()),
+        recursion,
+    )
+    .with_max_output_bytes(limits.max_output_bytes().min(budget.remaining_output())))
+}
+
+fn movie_caption_rewrite_options(
+    package: &Package,
+    payload: &[u8],
+    budget: &CaptionBudget,
+) -> Result<keynote_movie_caption_codec::DecodeOptions, ChartCaptionError> {
+    let limits = package.wire_limits().map_err(map_wire_error)?;
+    let recursion = u32::try_from(limits.max_nesting())
+        .map_err(|_error| ChartCaptionError::InvalidSource)?
+        .min(budget.remaining_depth());
+    Ok(keynote_movie_caption_codec::DecodeOptions::new(
         payload
             .len()
             .min(limits.max_input_bytes())
@@ -3695,6 +3992,55 @@ fn map_chart_caption_codec_error(
                 }
             },
             keynote_chart_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
+                ChartCaptionError::LimitExceeded {
+                    kind: ChartCaptionLimitKind::WireNesting,
+                    observed: u64::from(observed),
+                    maximum: u64::from(maximum),
+                }
+            },
+            _ => ChartCaptionError::InvalidSource,
+        };
+    }
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return ChartCaptionError::LimitExceeded {
+            kind: ChartCaptionLimitKind::WireFields,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return ChartCaptionError::LimitExceeded {
+            kind: ChartCaptionLimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        };
+    }
+    ChartCaptionError::InvalidSource
+}
+
+fn map_movie_caption_codec_error(
+    error: keynote_movie_caption_codec::DecodeError,
+) -> ChartCaptionError {
+    if let Some((observed, maximum)) = error.output_limit_values() {
+        return ChartCaptionError::LimitExceeded {
+            kind: ChartCaptionLimitKind::OutputBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        };
+    }
+    if let Some(amount) = error.allocation_amount() {
+        return ChartCaptionError::Allocation { amount };
+    }
+    if let Some(limit) = error.wire_resource_limit() {
+        return match limit {
+            keynote_movie_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {
+                ChartCaptionError::LimitExceeded {
+                    kind: ChartCaptionLimitKind::WireBytes,
+                    observed: usize_to_u64(observed),
+                    maximum: usize_to_u64(maximum),
+                }
+            },
+            keynote_movie_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
                 ChartCaptionError::LimitExceeded {
                     kind: ChartCaptionLimitKind::WireNesting,
                     observed: u64::from(observed),

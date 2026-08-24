@@ -10572,7 +10572,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(sum("raw byte slice" in item for item in violations), 1)
             self.assertEqual(sum("raw identifier parameter" in item for item in violations), 1)
 
-    def test_keynote_movie_caption_host_audit_is_dormant_until_replacement_bridge(self) -> None:
+    def test_keynote_movie_caption_host_audit_retires_raw_fallback_and_requires_bridge(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / boundaries.IWA_KEYNOTE_MOVIE_CAPTION_SOURCE
@@ -10582,20 +10582,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "pub fn remove_slide_movie_caption(&mut self, slide_index: usize, drawable_object_id: u64) {}\n",
                 encoding="utf-8",
             )
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_movie_caption_source_topology(root), []
-            )
-
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { self.slide_movie_caption(selector); }\n"
-                "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: MovieSelector, caption: &str) { self.set_slide_movie_caption(selector, caption); }\n"
-                "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: MovieSelector) { self.remove_slide_movie_caption(selector); }\n"
-                "}\n",
-                encoding="utf-8",
-            )
             violations = boundaries.audit_iwa_keynote_movie_caption_source_topology(root)
-            self.assertTrue(any("focused Package operation" in item for item in violations), violations)
+            self.assertTrue(any("selector bridge is missing" in item for item in violations), violations)
+            self.assertTrue(any("raw-ID method must be retired" in item for item in violations), violations)
 
             source.write_text(
                 "impl KeynoteEditor {\n"
@@ -10605,19 +10594,57 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "}\n",
                 encoding="utf-8",
             )
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_movie_caption_source_topology(root), []
+            self.assertEqual(boundaries.audit_iwa_keynote_movie_caption_source_topology(root), [])
+
+            source.write_text(
+                source.read_text(encoding="utf-8")
+                + "fn set_slide_movie_caption_legacy(kind: DrawableCaptionKind) { let _ = DrawableCaptionKind::Title; let _ = kind; }\n",
+                encoding="utf-8",
             )
+            self.assertEqual(boundaries.audit_iwa_keynote_movie_caption_source_topology(root), [])
+            source.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    "DrawableCaptionKind::Title; let _ = kind",
+                    "DrawableCaptionKind::Caption; let _ = kind",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_caption_source_topology(root)
+            self.assertTrue(any("legacy graph/fallback marker" in item for item in violations), violations)
+
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
+                "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: MovieSelector, caption: &str) { self.set_slide_movie_caption(selector, caption); }\n"
+                "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: MovieSelector) { package.edit_slide_movie_caption(selector).clear().commit(); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_caption_source_topology(root)
+            self.assertTrue(any("raw-ID call must be retired" in item for item in violations), violations)
 
             source.write_text(
                 "#[cfg(test)]\n"
                 "fn cfg_only_bridge(selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
+                "#[cfg(test)]\n"
                 "pub fn set_slide_movie_caption(&mut self, slide_index: usize, drawable_object_id: u64, caption: &str) {}\n",
                 encoding="utf-8",
             )
             self.assertEqual(
                 boundaries.audit_iwa_keynote_movie_caption_source_topology(root), []
             )
+
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_movie_caption_by_selector(&self, selector: MovieSelector) { package.slide_movie_caption(selector); }\n"
+                "    pub fn set_slide_movie_caption_by_selector(&mut self, selector: MovieSelector, caption: &str) { package.edit_slide_movie_caption(selector).set(caption).commit(); }\n"
+                "    pub fn remove_slide_movie_caption_by_selector(&mut self, selector: MovieSelector) { package.edit_slide_movie_caption(selector).clear().commit(); }\n"
+                "    fn movie_position_for_identifier(&self, object_id: u64) -> usize { let _ = object_id; 0 }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_caption_source_topology(root)
+            self.assertTrue(any("identifier-to-position fallback" in item for item in violations), violations)
 
     def test_keynote_movie_caption_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
@@ -10627,6 +10654,82 @@ class BoundaryPolicyTests(unittest.TestCase):
         self.assertIn(
             "+ audit_keynote_movie_caption_facade_source_topology()", main_source
         )
+        self.assertIn(
+            "+ audit_keynote_movie_caption_lifecycle_source_topology()", main_source
+        )
+
+    def test_focused_keynote_movie_caption_lifecycle_requires_graph_metadata_and_budget(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_caption_facade_fixture(root)
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("private aggregate package budget" in item for item in violations), violations)
+            self.assertTrue(any("graph operation helper is missing" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                + "struct MovieCaptionBudget;\n"
+                + "#[cfg(test)]\n"
+                + "fn rewrite_movie_caption_operation(creating: bool, removing: bool) { let _ = (creating, removing); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("private aggregate package budget" in item for item in violations), violations)
+            self.assertTrue(any("graph operation helper is missing" in item for item in violations), violations)
+
+            source = owner.read_text(encoding="utf-8")
+            source = source.replace(
+                "pub fn apply_slide_movie_caption(&self, patch: SlideMovieCaptionPatch) -> SlideMovieCaptionCommit { let _ = patch; SlideMovieCaptionCommit }",
+                "pub fn apply_slide_movie_caption(&self, patch: SlideMovieCaptionPatch) -> SlideMovieCaptionCommit { let budget = MovieCaptionBudget; let _ = (patch, budget); SlideMovieCaptionCommit }",
+            ).replace(
+                "pub fn commit(self) -> SlideMovieCaptionCommit { let _ = self; SlideMovieCaptionCommit }",
+                "pub fn commit(self) -> SlideMovieCaptionCommit { let budget = MovieCaptionBudget; let _ = (self, budget); SlideMovieCaptionCommit }",
+            )
+            source += """
+struct MovieCaptionBudget;
+fn rewrite_movie_caption_operation(
+    budget: &MovieCaptionBudget,
+    creating: bool,
+    removing: bool,
+) {
+    let _ = (budget, creating, removing);
+    validate_canonical_object_framing();
+    patch_movie_caption_edge(expected_identifier, replacement_identifier);
+    rewrite_movie_caption_with_report();
+    prepare_package_metadata_additions_and_save_tokens();
+    add_component_object_uuids();
+    budget.charge_movie_codec_report(report);
+    budget.charge_archive_work();
+    budget.charge_snappy_work();
+    budget.charge_zip_work();
+    budget.charge_reopen_work();
+    budget.charge_artifact_work();
+}
+"""
+            owner.write_text(source, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root), []
+            )
+
+            owner.write_text(
+                source.replace("add_component_object_uuids();", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("Metadata/UUID registry" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("creating: bool,", "creating: bool,").replace(
+                    "    let _ = (budget, creating, removing);",
+                    "    let _ = (budget, creating, removing);\n    if storage_identifier.is_none() { return Err(UnsupportedDependency); }",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("blanket" in item for item in violations), violations)
 
     def test_pages_and_numbers_chart_caption_audits_require_neutral_edge_and_mask_tests(
         self,

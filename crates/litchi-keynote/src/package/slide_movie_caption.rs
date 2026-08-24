@@ -1,10 +1,9 @@
 //! Exact-source, selector-first Keynote movie-caption transactions.
 //!
 //! Movie captions use the same native CaptionInfo/text-storage graph as chart
-//! captions, but are reached through a movie drawable.  This owner deliberately
-//! admits only existing file-backed movie captions and replacement of their
-//! text.  Graph creation and removal are dependency-sensitive operations and
-//! therefore remain explicit `UnsupportedDependency` failures in this phase.
+//! captions, but are reached through a movie drawable. Existing storage text,
+//! canonical stand-in creation, and fresh-stand-in removal all share the chart
+//! owner's bounded physical lifecycle seam.
 
 #![allow(
     clippy::map_err_ignore,
@@ -245,21 +244,10 @@ impl<'a> SlideMovieCaptionEdit<'a> {
                 diagnostics: SlideMovieCaptionDiagnostics::unchanged(),
             });
         }
-        // Phase 1 intentionally does not synthesize or remove graph objects.
-        if self.selection.storage_identifier.is_none() || self.after.is_none() {
-            return Err(SlideMovieCaptionError::UnsupportedDependency);
-        }
         if !source_catalog.source_is_exact() {
             return Err(SlideMovieCaptionError::UnsupportedSource);
         }
         self.source.validate().map_err(map_read_error)?;
-        let end = self
-            .selection
-            .text
-            .as_deref()
-            .ok_or(SlideMovieCaptionError::InvalidSource)?
-            .encode_utf16()
-            .count();
         if self
             .selection
             .text
@@ -269,40 +257,115 @@ impl<'a> SlideMovieCaptionEdit<'a> {
         {
             return Err(SlideMovieCaptionError::UnsupportedDependency);
         }
-        let (package, touched_components, deleted_previews) =
-            super::slide_chart_caption::rewrite_existing_storage_text_with_metadata(
-                self.source,
-                self.selection
-                    .storage_identifier
-                    .ok_or(SlideMovieCaptionError::InvalidSource)?,
-                self.selection.slide_node_identifier,
-                &self.selection.slide_component_name,
-                end,
-                self.after
-                    .as_deref()
-                    .ok_or(SlideMovieCaptionError::InvalidSource)?,
-            )
+        let mut budget = super::slide_chart_caption::CaptionBudget::for_package(self.source)
             .map_err(map_chart_caption_error)?;
+        budget
+            .charge_catalog_scan(self.source)
+            .map_err(map_chart_caption_error)?;
+        let (package, touched_components, deleted_previews) =
+            match (self.selection.storage_identifier, self.after.as_deref()) {
+                (Some(storage_identifier), Some(desired)) => {
+                    let end = self
+                        .selection
+                        .text
+                        .as_deref()
+                        .ok_or(SlideMovieCaptionError::InvalidSource)?
+                        .encode_utf16()
+                        .count();
+                    super::slide_chart_caption::rewrite_existing_caption_text_with_metadata_budget(
+                        self.source,
+                        storage_identifier,
+                        self.selection.slide_node_identifier,
+                        &self.selection.slide_component_name,
+                        end,
+                        desired,
+                        &mut budget,
+                    )
+                    .map_err(map_chart_caption_error)?
+                },
+                (None, Some(desired)) => {
+                    super::slide_chart_caption::rewrite_caption_graph_operation_with_budget(
+                        self.source,
+                        &self.selection.slide_component_name,
+                        self.selection.movie_identifier,
+                        self.selection.reference_identifier,
+                        self.selection.storage_identifier,
+                        Some(desired),
+                        super::slide_chart_caption::CaptionEdgeKind::Movie,
+                        &mut budget,
+                    )
+                    .map_err(map_chart_caption_error)?
+                },
+                (Some(_), None) => {
+                    super::slide_chart_caption::rewrite_caption_graph_operation_with_budget(
+                        self.source,
+                        &self.selection.slide_component_name,
+                        self.selection.movie_identifier,
+                        self.selection.reference_identifier,
+                        self.selection.storage_identifier,
+                        None,
+                        super::slide_chart_caption::CaptionEdgeKind::Movie,
+                        &mut budget,
+                    )
+                    .map_err(map_chart_caption_error)?
+                },
+                (None, None) => return Err(SlideMovieCaptionError::InvalidSource),
+            };
         let candidate = select_caption(
             &package,
             SlideSelector::position(self.selection.slide_position),
             MovieSelector::position(self.selection.movie_position),
             true,
         )?;
-        if !candidate.same_identity(&self.selection) || candidate.text != self.after {
+        if !candidate.same_movie_identity(&self.selection) || candidate.text != self.after {
             return Err(SlideMovieCaptionError::Verification);
         }
-        super::slide_chart_caption::verify_existing_text_metadata_candidate(
-            self.source,
-            &package,
-            self.selection
-                .storage_identifier
-                .ok_or(SlideMovieCaptionError::InvalidSource)?,
-            self.selection.slide_node_identifier,
-            true,
-        )
-        .map_err(map_chart_caption_error)?;
+        if self.selection.storage_identifier.is_some() && candidate.storage_identifier.is_some() {
+            super::slide_chart_caption::verify_existing_text_metadata_candidate(
+                self.source,
+                &package,
+                self.selection
+                    .storage_identifier
+                    .ok_or(SlideMovieCaptionError::InvalidSource)?,
+                self.selection.slide_node_identifier,
+                true,
+            )
+            .map_err(map_chart_caption_error)?;
+        } else {
+            let expected_objects = if self.selection.storage_identifier.is_none() {
+                self.source.state.total_objects.saturating_add(4)
+            } else {
+                self.source.state.total_objects.saturating_add(1)
+            };
+            if package.state.total_objects != expected_objects {
+                return Err(SlideMovieCaptionError::Verification);
+            }
+            super::slide_chart_caption::verify_caption_graph_transition(
+                self.source,
+                &package,
+                &self.selection.slide_component_name,
+                self.selection.reference_identifier,
+                self.selection.caption_info_identifier,
+                self.selection.storage_identifier,
+                self.selection.placement_identifier,
+                self.selection.style_identifier,
+                candidate.reference_identifier,
+                candidate.caption_info_identifier,
+                candidate.storage_identifier,
+                candidate.placement_identifier,
+                candidate.style_identifier,
+            )
+            .map_err(map_chart_caption_error)?;
+            if !super::rendering_invalidation::root_previews_absent(package.state.source.package())
+                .map_err(map_rendering_error)?
+            {
+                return Err(SlideMovieCaptionError::Verification);
+            }
+        }
         let target = physical_catalog(&package)?.shared_source();
+        budget
+            .charge_exact_artifacts(source_bytes.len(), target.len())
+            .map_err(map_chart_caption_error)?;
         Ok(SlideMovieCaptionCommit {
             package,
             patch: SlideMovieCaptionPatch {
@@ -539,12 +602,20 @@ impl Package {
                 diagnostics: SlideMovieCaptionDiagnostics::unchanged(),
             });
         }
-        if patch.selection.storage_identifier.is_none() || patch.after.is_none() {
-            return Err(SlideMovieCaptionError::UnsupportedDependency);
-        }
         if !catalog.source_is_exact() {
             return Err(SlideMovieCaptionError::PatchConflict);
         }
+        let mut budget = super::slide_chart_caption::CaptionBudget::for_package(self)
+            .map_err(map_chart_caption_error)?;
+        budget
+            .charge_catalog_scan(self)
+            .map_err(map_chart_caption_error)?;
+        budget
+            .charge_exact_artifacts(source.len(), patch.artifacts.target().len())
+            .map_err(map_chart_caption_error)?;
+        budget
+            .charge_candidate_reopen(patch.artifacts.target().len())
+            .map_err(map_chart_caption_error)?;
         let candidate =
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
@@ -558,17 +629,65 @@ impl Package {
         if !selected.same_identity(&patch.target_selection) || selected.text != patch.after {
             return Err(SlideMovieCaptionError::Verification);
         }
-        super::slide_chart_caption::verify_existing_text_metadata_candidate(
-            self,
-            &candidate,
-            patch
-                .selection
-                .storage_identifier
-                .ok_or(SlideMovieCaptionError::InvalidSource)?,
-            patch.selection.slide_node_identifier,
-            patch.target_requires_invalidated_previews,
-        )
-        .map_err(map_chart_caption_error)?;
+        if patch.selection.storage_identifier.is_some()
+            && patch.target_selection.storage_identifier.is_some()
+        {
+            super::slide_chart_caption::verify_existing_text_metadata_candidate(
+                self,
+                &candidate,
+                patch
+                    .selection
+                    .storage_identifier
+                    .ok_or(SlideMovieCaptionError::InvalidSource)?,
+                patch.selection.slide_node_identifier,
+                patch.target_requires_invalidated_previews,
+            )
+            .map_err(map_chart_caption_error)?;
+        } else {
+            let source_count = self.state.total_objects;
+            let candidate_count = candidate.state.total_objects;
+            let count_matches = match (
+                patch.selection.storage_identifier,
+                patch.target_selection.storage_identifier,
+            ) {
+                (None, Some(_)) => {
+                    candidate_count == source_count.saturating_add(4)
+                        || source_count == candidate_count.saturating_add(1)
+                },
+                (Some(_), None) => {
+                    candidate_count == source_count.saturating_add(1)
+                        || source_count == candidate_count.saturating_add(4)
+                },
+                _ => false,
+            };
+            if !count_matches {
+                return Err(SlideMovieCaptionError::Verification);
+            }
+            super::slide_chart_caption::verify_caption_graph_transition(
+                self,
+                &candidate,
+                &patch.selection.slide_component_name,
+                patch.selection.reference_identifier,
+                patch.selection.caption_info_identifier,
+                patch.selection.storage_identifier,
+                patch.selection.placement_identifier,
+                patch.selection.style_identifier,
+                patch.target_selection.reference_identifier,
+                patch.target_selection.caption_info_identifier,
+                patch.target_selection.storage_identifier,
+                patch.target_selection.placement_identifier,
+                patch.target_selection.style_identifier,
+            )
+            .map_err(map_chart_caption_error)?;
+            if patch.target_requires_invalidated_previews
+                && !super::rendering_invalidation::root_previews_absent(
+                    candidate.state.source.package(),
+                )
+                .map_err(map_rendering_error)?
+            {
+                return Err(SlideMovieCaptionError::Verification);
+            }
+        }
         Ok(SlideMovieCaptionCommit {
             package: candidate,
             patch: patch.clone(),
@@ -914,32 +1033,93 @@ fn prove_exclusive_movie_drawable(
     movie_identifier: u64,
 ) -> Result<(), SlideMovieCaptionError> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let mut occurrences = 0usize;
+    let mut payload_occurrences = 0usize;
+    let mut aggregate_occurrences = 0usize;
+    let mut field_occurrences = 0usize;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             let owner_identifier = object
                 .archive_info
                 .identifier
                 .ok_or(SlideMovieCaptionError::InvalidSource)?;
-            for message in &object.messages {
-                if message.type_ != SLIDE_MESSAGE_TYPE {
-                    continue;
+            for (message_index, message) in object.messages.iter().enumerate() {
+                let info = object
+                    .archive_info
+                    .message_infos
+                    .get(message_index)
+                    .ok_or(SlideMovieCaptionError::InvalidSource)?;
+                let canonical_slide =
+                    owner_identifier == slide_identifier && message.type_ == SLIDE_MESSAGE_TYPE;
+
+                if message.type_ == SLIDE_MESSAGE_TYPE {
+                    let local =
+                        repeated_references(&message.data, SLIDE_OWNED_DRAWABLES_FIELD, limits)?
+                            .into_iter()
+                            .filter(|identifier| *identifier == movie_identifier)
+                            .count();
+                    if local != 0 && (!canonical_slide || local != 1) {
+                        return Err(SlideMovieCaptionError::UnsupportedDependency);
+                    }
+                    payload_occurrences = payload_occurrences
+                        .checked_add(local)
+                        .ok_or(SlideMovieCaptionError::InvalidSource)?;
                 }
-                let local =
-                    repeated_references(&message.data, SLIDE_OWNED_DRAWABLES_FIELD, limits)?
-                        .into_iter()
-                        .filter(|identifier| *identifier == movie_identifier)
-                        .count();
-                if local != 0 && (local != 1 || owner_identifier != slide_identifier) {
+
+                let aggregate_count = info
+                    .object_references
+                    .iter()
+                    .filter(|identifier| **identifier == movie_identifier)
+                    .count();
+                let aggregate_data_count = info
+                    .data_references
+                    .iter()
+                    .filter(|identifier| **identifier == movie_identifier)
+                    .count();
+                if aggregate_data_count != 0 {
                     return Err(SlideMovieCaptionError::UnsupportedDependency);
                 }
-                occurrences = occurrences
-                    .checked_add(local)
-                    .ok_or(SlideMovieCaptionError::InvalidSource)?;
+                if aggregate_count != 0 {
+                    if !canonical_slide || aggregate_count != 1 {
+                        return Err(SlideMovieCaptionError::UnsupportedDependency);
+                    }
+                    aggregate_occurrences = aggregate_occurrences
+                        .checked_add(aggregate_count)
+                        .ok_or(SlideMovieCaptionError::InvalidSource)?;
+                }
+
+                for field in &info.field_infos {
+                    let field_count = field
+                        .object_references
+                        .iter()
+                        .filter(|identifier| **identifier == movie_identifier)
+                        .count();
+                    let field_data_count = field
+                        .data_references
+                        .iter()
+                        .filter(|identifier| **identifier == movie_identifier)
+                        .count();
+                    if field_data_count != 0 {
+                        return Err(SlideMovieCaptionError::UnsupportedDependency);
+                    }
+                    if field_count != 0 {
+                        if !canonical_slide
+                            || field_count != 1
+                            || !matches!(
+                                field.path.path.as_slice(),
+                                [7, 1] | [1, 7, 1] | [1, 1, 7, 1]
+                            )
+                        {
+                            return Err(SlideMovieCaptionError::UnsupportedDependency);
+                        }
+                        field_occurrences = field_occurrences
+                            .checked_add(field_count)
+                            .ok_or(SlideMovieCaptionError::InvalidSource)?;
+                    }
+                }
             }
         }
     }
-    if occurrences == 1 {
+    if payload_occurrences == 1 && aggregate_occurrences == 1 && field_occurrences <= 1 {
         Ok(())
     } else {
         Err(SlideMovieCaptionError::InvalidSource)
@@ -1715,6 +1895,12 @@ fn map_chart_caption_error(
         ChartCaptionError::Verification => SlideMovieCaptionError::Verification,
         _ => SlideMovieCaptionError::InvalidSource,
     }
+}
+
+fn map_rendering_error(
+    _error: super::rendering_invalidation::RenderingInvalidationError,
+) -> SlideMovieCaptionError {
+    SlideMovieCaptionError::InvalidSource
 }
 
 fn map_chart_caption_limit_kind(
