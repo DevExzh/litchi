@@ -15979,6 +15979,8 @@ class BoundaryPolicyTests(unittest.TestCase):
             "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
             "            }\n"
             "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            prove_archive_reference_ownership(edit.source, &located)?;\n"
+            "            inspect_references_with_policy_and_limits(visitor, ArchiveReferencePolicy::RejectUnknownMetadata, limits)?;\n"
             "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
             "        }\n"
             "        rewrite_existing(edit)\n"
@@ -16032,6 +16034,41 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             self.assertTrue(
                 any("unsupported entry owner guard" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_requires_archive_census(
+        self,
+    ) -> None:
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) || entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 || located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=combined_clear
+            )
+            violations = boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("archive reference census" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("opaque archive-owner rejection" in item for item in violations),
                 violations,
             )
 
