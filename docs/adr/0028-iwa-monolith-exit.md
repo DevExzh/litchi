@@ -4611,3 +4611,32 @@ migration-host API, or `litchi-iwa` crate responsibility is retired. The host
 adapter, no-Metadata fallback, unsupported comment graphs, Pages table-lock
 baseline, and the monolith itself remain. Wave60 therefore satisfies no
 host-exit, dependency-removal, or monolith-deletion gate.
+
+## 2026-08-24 amendment: Wave61 Pages body-table lock bounded owner slice (not a monolith-exit gate)
+
+Commits `a27a22c9cf95d548da7634167d6bac7190b8321a` through
+`ca3fbd21a24f7195ef9b2d8d169e286339fc274e` harden the selector-first
+`litchi-pages` body-table lock owner, accept the aggregate-only reference
+metadata emitted by Pages while rejecting contradictory ownership, remove the
+unpublished flat semantic aliases, and improve operation-local work preflight.
+Commit `4742e20107f29a1990d6a1886d8046a9333133b5` prevents alternate aliases,
+wildcard exports, renamed host methods, and relocated host modules/examples
+from bypassing the boundary ratchet.
+
+The focused public vocabulary now contains only `BodyTableSelector`,
+`BodyTableLockState`, `Package::{body_table_lock, edit_body_table_lock,
+apply_body_table_lock}`, and the `BodyTableLock*` transaction types. Raw
+object IDs, archive routes, wire values, and generated schema types remain
+private. Pages 14.4 opened the Rust-locked candidate without repair,
+recognized it as locked, saved and normalized it without an alert, and
+preserved the lock across close/reopen; the strict Rust owner reread that
+artifact. This is bounded acceptance for this operation, not byte parity or a
+general Pages publication gate.
+
+The `litchi-iwa` Pages compatibility host, its dependency edges, ordered
+debts, and the monolith remain. The live boundary checker still reports the
+three user-owned untracked retired-host findings, so this amendment does not
+claim host retirement. No manifest edge, generated schema, Buffa/Prost owner,
+or other migration-host responsibility was removed. Wave61 therefore
+satisfies no host-exit, dependency-removal, or monolith-deletion gate and
+makes no package-wide performance or full-workspace green claim.

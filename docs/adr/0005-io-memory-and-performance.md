@@ -936,3 +936,30 @@ RSS.
 No manifest edge changed. Generated schemas and normal Prost owners elsewhere
 remain, and this resource record makes no package-wide performance,
 workspace-wide dependency-removal, or publication-completeness claim.
+
+## 2026-08-24 amendment: Wave61 Pages body-table lock resource record
+
+Commit `ca3fbd21a24f7195ef9b2d8d169e286339fc274e` strengthens the finite
+resource contract for the selector-first Pages body-table lock transaction.
+Before Snappy decompression or `Archive::parse` can allocate the selected
+component, the owner derives the complete decoded archive extent and physical
+object/message inventory from the already parsed source catalog, charges that
+inventory to the shared operation budget, and then cross-checks the actual
+decompressed length. Canonical archive-object framing is still validated
+after parse.
+
+Name selection charges the compared source and selector bytes for every
+candidate table; position selection charges the inspected prefix. Exact
+source/patch and no-op artifact comparisons now charge equal-length byte
+scans instead of performing unreported linear work. These charges join the
+existing finite source, package-entry, payload, field, nesting, reference,
+object/message, output, compression, ZIP reassembly, and candidate-reopen
+ceilings. Overflow and limit failures remain typed and occur before the
+selected mutation is published.
+
+This is an operation-local preflight improvement, not a measurement of peak
+RSS, allocation count, latency, or throughput. It does not establish a
+package-wide allocation census or claim that every generic ZIP/catalog
+candidate allocation has moved behind one common reservation. No manifest,
+generated-schema, Buffa, or Prost ownership changed, and no workspace-wide
+performance or dependency-removal claim follows.
