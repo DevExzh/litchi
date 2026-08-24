@@ -2327,3 +2327,25 @@ and the `litchi-iwa -> litchi-keynote` edge remain open.
 This is bounded package-level ownership evidence only. No native Keynote
 open/save gate is admitted, no host-edge retirement is claimed, and no
 monolith-exit or host-deletion claim follows.
+
+## 2026-08-25 current-topology amendment: Wave71 Pages artifact and footnote cut
+
+Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` updates the focused Pages
+surface without changing the workspace topology. `Package::source_bytes` is
+now crate-private and `Package::from_archive_bytes` is removed; exact retained
+ZIP output is public only through `Package::write_to` and root `WriteError`.
+The writer streams exact bytes with partial-write/`Interrupted` handling and
+typed redacted offset errors, but it does not flush, sync, rename, or provide
+atomic or durable filesystem publication.
+
+`PagesEditor::set_body_footnote_text` is removed. The existing-root
+selector-first `litchi_pages::Package::edit_body_footnote_text` transaction
+owns replacement, while the host retains footnote reads and insert/remove
+graph lifecycle. This is one focused API/operation migration step; it does not
+move the remaining Pages graph or native publication responsibilities.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. The
+`litchi-iwa -> litchi-pages` edge remains, as do generated schemas, normal
+Prost/Buffa owners, the migration host, and the monolith. Wave71 retires no
+crate, edge, debt, or host-exit gate.

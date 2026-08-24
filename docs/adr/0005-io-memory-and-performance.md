@@ -1183,3 +1183,26 @@ allocation, peak-memory, RSS, latency, throughput, or zero-copy measurement,
 and no aggregate budget across archive serialization, compression, ZIP
 reassembly, or native application save is claimed. No manifest, generated
 schema, Buffa owner, normal Prost owner, or workspace dependency changed.
+
+## 2026-08-25 amendment: Wave71 Pages exact-output resource record
+
+Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` makes
+`litchi_pages::Package::write_to` the public exact-output seam. The writer
+streams the retained ZIP artifact to a caller-owned `Write` sink without
+allocating another package-sized output buffer. It tolerates `Interrupted`,
+tracks the offset reached by conforming partial writes, and reports zero-write,
+over-report, and ordinary sink failures through typed redacted `WriteError`
+values carrying `bytes_written`.
+
+The Pages-to-host section bridge now uses one-pass `FocusedCandidateWriter`.
+It charges each emitted chunk before retaining it and preserves the existing
+`3S+2T` work accounting, so a limit failure does not leave a package-sized
+candidate allocation behind. This is an operation-local bridge accounting
+record, not a package-wide allocation or peak-memory proof.
+
+`write_to` does not flush or sync its sink and does not rename, atomically
+replace, or durably publish a filesystem path. No package-wide output-buffer,
+allocation, zero-copy, RSS, latency, throughput, or performance claim follows;
+those policies remain with the caller and later publication work. No manifest
+edge, generated schema, Buffa owner, normal Prost owner, or workspace
+dependency changed.
