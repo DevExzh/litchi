@@ -4938,3 +4938,29 @@ parity items remain P2 follow-ups rather than completed deletion gates.
 The Pages 14.4 record is bounded application open/render/save/close/reopen
 acceptance only; it is not Rust/native byte parity, a performance/RSS result,
 a Numbers native result, or a full publication/workspace gate.
+
+## 2026-08-25 amendment: Wave73 focused Keynote movie-caption owner (not a monolith-exit gate)
+
+Commit `6ed7ee4e277c78a99f1b779a2b5530d7267beddf` moves existing file-movie
+caption reads and `Some -> Some` replacement behind the selector-first
+`litchi-keynote::Package` facade and a hidden strict movie-caption codec. The
+focused owner proves the selected slide/movie/caption graph, exact Metadata
+component identities and save tokens for every changed native component,
+preview invalidation, full candidate reopen/locality, and reversible exact
+artifacts without publishing native IDs.
+
+This is intentionally not full movie-title/caption lifecycle ownership.
+Caption creation/removal and title CRUD remain compatibility-host graph
+operations; the legacy raw-ID host methods, native graph builders, metadata
+UUID/watermark paths, media management, and normalized-producer compatibility
+remain in `litchi-iwa`. The hidden Buffa projection, generated schemas, normal
+Prost owners, manifest edges, all ordered debts, and the migration monolith
+remain. No crate, dependency edge, host, debt, generated-schema owner, or
+normal Prost owner is retired, so Wave73 establishes no host-exit,
+dependency-removal, debt-retirement, or monolith-deletion gate.
+
+The Keynote 14.4 record is bounded application open/render/save/close/reopen
+evidence for the pre-Keynote focused candidate. Keynote's normalized artifact
+does not pass the focused strict re-ingress policy; no Rust/native parity,
+arbitrary graph acceptance, performance/RSS, durable publication,
+full-workspace, or monolith-exit claim follows.

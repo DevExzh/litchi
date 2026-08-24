@@ -2752,3 +2752,32 @@ creation and the remaining chart lifecycle stay in the compatibility host.
 No raw-ID, archive, generated, Metadata, or wire type crosses a focused public
 facade, and the P2 follow-ups for duplicate known `MessageInfo` scalar
 canonicality and arbitrary unmodeled payload/reference parity remain open.
+
+## 2026-08-25 amendment: focused Keynote movie-caption ownership
+
+Commit `6ed7ee4e277c78a99f1b779a2b5530d7267beddf` adds a selector-first
+Keynote package owner for captions on existing file-backed slide movies.
+`MovieSelector` resolves checked movie source order within a semantic
+`SlideSelector`; no native identifier crosses the public facade. The focused
+surface is `Package::{slide_movie_caption, edit_slide_movie_caption,
+apply_slide_movie_caption}` with exact `SlideMovieCaptionEdit`, patch, commit,
+diagnostics, error, and limit types.
+
+The hidden `litchi_iwa_protos::keynote_movie_caption_codec` owns the strict
+`MovieArchive.super -> DrawableArchive.{title,caption} -> Reference.identifier`
+projection. Selected known fields are singular, canonical, and source checked;
+unrelated raw fields, balanced unknown groups, and overlong unknown scalar
+values remain source authoritative. The package owner additionally proves a
+file movie, exact slide parent and one global slide owner, distinct title and
+caption edges, co-located and exclusively owned `CaptionInfo`/storage/style/
+placement objects, exact Metadata current-component selectors, every touched
+component save token, preview invalidation, candidate reopen, and exact patch
+inverse/locality.
+
+This phase admits reads, exact no-ops, and existing-caption `Some -> Some`
+replacement only. Caption graph creation/removal and movie-title mutation
+remain explicit focused `UnsupportedDependency` operations. The compatibility
+host routes active-caption reads/replacements through the focused package but
+retains title CRUD and legacy caption create/remove graph lifecycle. This is a
+bounded semantic owner, not a raw-ID replacement API or full movie lifecycle
+retirement.
