@@ -717,6 +717,53 @@ pub struct TableDataListEntrySnapshot<'source> {
     import_warning_set: Option<&'source [u8]>,
     cell_spec: Option<&'source [u8]>,
 }
+
+/// Exact semantic precondition for removing one root comment-storage entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListEntryRemoval {
+    key: u32,
+    ref_count: u32,
+    comment_storage_identifier: u64,
+}
+
+impl TableDataListEntryRemoval {
+    #[must_use]
+    pub const fn new(key: u32, ref_count: u32, comment_storage_identifier: u64) -> Self {
+        Self {
+            key,
+            ref_count,
+            comment_storage_identifier,
+        }
+    }
+}
+
+/// Exact accounting for a source-authoritative root-list removal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListEntryRemovalReport {
+    source: DecodeReport,
+    result: DecodeReport,
+    output_bytes: usize,
+    rewrite_work_bytes: usize,
+}
+
+impl TableDataListEntryRemovalReport {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+    #[must_use]
+    pub const fn result(self) -> DecodeReport {
+        self.result
+    }
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+    #[must_use]
+    pub const fn rewrite_work_bytes(self) -> usize {
+        self.rewrite_work_bytes
+    }
+}
 impl<'source> TableDataListEntrySnapshot<'source> {
     #[must_use]
     pub const fn key(self) -> u32 {
@@ -2894,6 +2941,117 @@ pub fn decode_table_data_list_with_visitor(
     let mut budget = Budget::new(source, options)?;
     let snapshot = decode_table_data_list_in(source, &mut budget, 1, visitor)?;
     Ok((snapshot, budget.report()))
+}
+
+/// Remove exactly one root comment-storage list entry after strict source
+/// validation, preserving every unselected field byte and source order.
+pub fn remove_table_data_list_entry(
+    source: &[u8],
+    removal: TableDataListEntryRemoval,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    Ok(remove_table_data_list_entry_with_report(source, removal, options)?.0)
+}
+
+/// Remove one root comment-storage entry and return exact aggregate reports.
+pub fn remove_table_data_list_entry_with_report(
+    source: &[u8],
+    removal: TableDataListEntryRemoval,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, TableDataListEntryRemovalReport), DecodeError> {
+    let (_snapshot, source_report) = decode_table_data_list_with_report(source, options)?;
+    let mut budget = Budget::new(source, options)?;
+    budget.message(source, 1)?;
+    let mut remaining = source;
+    let mut selected = None;
+    while !remaining.is_empty() {
+        let field_start = source.len() - remaining.len();
+        let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
+        let field_end = source.len() - remaining.len();
+        if field.number != 3 {
+            continue;
+        }
+        let entry = decode_table_data_list_entry_in(field.bytes()?, &mut budget, 2)?;
+        if entry.key != removal.key {
+            continue;
+        }
+        if selected.is_some()
+            || entry.ref_count != removal.ref_count
+            || entry.comment_storage.map(ReferenceSnapshot::identifier)
+                != Some(removal.comment_storage_identifier)
+            || entry.string_value.is_some()
+            || entry.reference.is_some()
+            || entry.formula.is_some()
+            || entry.format.is_some()
+            || entry.custom_format.is_some()
+            || entry.rich_text_payload.is_some()
+            || entry.import_warning_set.is_some()
+            || entry.cell_spec.is_some()
+        {
+            return Err(DecodeError::invalid());
+        }
+        selected = Some((field_start, field_end));
+    }
+    let (start, end) = selected.ok_or_else(DecodeError::invalid)?;
+    let output_bytes = source
+        .len()
+        .checked_sub(end - start)
+        .ok_or_else(DecodeError::invalid)?;
+    let rewrite_work_bytes = source
+        .len()
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    if rewrite_work_bytes > options.max_work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: rewrite_work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    let mut output = Vec::new();
+    reserve_exact(&mut output, output_bytes)?;
+    output.extend_from_slice(&source[..start]);
+    output.extend_from_slice(&source[end..]);
+    let (result_snapshot, result_report) = decode_table_data_list_with_report(&output, options)?;
+    if result_snapshot.list_type != 10 {
+        return Err(DecodeError::invalid());
+    }
+    let mut verifier = RemovedListEntryVerifier {
+        removal,
+        matching_keys: 0,
+    };
+    decode_table_data_list_with_visitor(&output, options, &mut verifier)?;
+    if verifier.matching_keys != 0 {
+        return Err(DecodeError::invalid());
+    }
+    Ok((
+        output,
+        TableDataListEntryRemovalReport {
+            source: source_report,
+            result: result_report,
+            output_bytes,
+            rewrite_work_bytes,
+        },
+    ))
+}
+
+struct RemovedListEntryVerifier {
+    removal: TableDataListEntryRemoval,
+    matching_keys: usize,
+}
+
+impl StorageVisitor for RemovedListEntryVerifier {
+    fn visit_list_entry(
+        &mut self,
+        entry: TableDataListEntrySnapshot<'_>,
+    ) -> Result<(), DecodeError> {
+        if entry.key == self.removal.key {
+            self.matching_keys = self
+                .matching_keys
+                .checked_add(1)
+                .ok_or_else(DecodeError::invalid)?;
+        }
+        Ok(())
+    }
 }
 
 fn decode_table_data_list_in(
@@ -5508,6 +5666,14 @@ mod tests {
         source
     }
 
+    fn comment_entry(key: u32, ref_count: u32, storage_id: u64) -> Vec<u8> {
+        let mut source = Vec::new();
+        v(&mut source, 1, u64::from(key));
+        v(&mut source, 2, u64::from(ref_count));
+        b(&mut source, 10, &reference(storage_id));
+        source
+    }
+
     fn range_minimal() -> Vec<u8> {
         let mut source = Vec::new();
         v(&mut source, 1, 4);
@@ -5588,6 +5754,89 @@ mod tests {
         let absent = decode_table_data_list(&absent_source, options(&absent_source)).unwrap();
         assert_eq!(absent.is_new_for_bnc(), None);
         assert_eq!(absent_prost.is_new_for_bnc, None);
+    }
+
+    #[test]
+    fn root_comment_entry_removal_preserves_unselected_source_bytes_and_reports() {
+        let mut source = Vec::new();
+        v(&mut source, 1, 10);
+        v(&mut source, 2, 9);
+        let first = comment_entry(7, 1, 114);
+        let retained = rich_text_entry(8, 700);
+        b(&mut source, 3, &first);
+        unknown_fields(&mut source, 91);
+        b(&mut source, 3, &retained);
+        let removal = TableDataListEntryRemoval::new(7, 1, 114);
+
+        let (output, report) =
+            remove_table_data_list_entry_with_report(&source, removal, options(&source)).unwrap();
+
+        let mut expected = Vec::new();
+        v(&mut expected, 1, 10);
+        v(&mut expected, 2, 9);
+        unknown_fields(&mut expected, 91);
+        b(&mut expected, 3, &retained);
+        assert_eq!(output, expected);
+        assert_eq!(report.source().source_bytes(), source.len());
+        assert_eq!(report.output_bytes(), output.len());
+        assert_eq!(report.result().source_bytes(), output.len());
+        assert_eq!(report.rewrite_work_bytes(), source.len() + output.len());
+    }
+
+    #[test]
+    fn root_comment_entry_removal_rejects_mismatch_duplicate_and_mixed_payloads() {
+        let removal = TableDataListEntryRemoval::new(7, 1, 114);
+        let mut valid = list_minimal();
+        b(&mut valid, 3, &comment_entry(7, 1, 114));
+        for invalid_removal in [
+            TableDataListEntryRemoval::new(8, 1, 114),
+            TableDataListEntryRemoval::new(7, 2, 114),
+            TableDataListEntryRemoval::new(7, 1, 115),
+        ] {
+            assert!(
+                remove_table_data_list_entry(&valid, invalid_removal, options(&valid)).is_err()
+            );
+        }
+
+        let mut duplicate = valid.clone();
+        b(&mut duplicate, 3, &comment_entry(7, 1, 114));
+        assert!(remove_table_data_list_entry(&duplicate, removal, options(&duplicate)).is_err());
+
+        let mut mixed_entry = comment_entry(7, 1, 114);
+        b(&mut mixed_entry, 9, &reference(700));
+        let mut mixed = list_minimal();
+        b(&mut mixed, 3, &mixed_entry);
+        assert!(remove_table_data_list_entry(&mixed, removal, options(&mixed)).is_err());
+    }
+
+    #[test]
+    fn root_comment_entry_removal_enforces_comment_list_and_preallocation_limits() {
+        let removal = TableDataListEntryRemoval::new(7, 1, 114);
+        let mut wrong_type = list_minimal();
+        b(&mut wrong_type, 3, &comment_entry(7, 1, 114));
+        assert!(remove_table_data_list_entry(&wrong_type, removal, options(&wrong_type)).is_err());
+
+        let mut source = Vec::new();
+        v(&mut source, 1, 10);
+        v(&mut source, 2, 8);
+        b(&mut source, 3, &comment_entry(7, 1, 114));
+        let broad = options(&source);
+        let (_, report) =
+            remove_table_data_list_entry_with_report(&source, removal, broad).unwrap();
+        let constrained = DecodeOptions::new(
+            source.len(),
+            broad.max_fields,
+            report.rewrite_work_bytes() - 1,
+            broad.recursion_limit,
+            broad.max_references,
+            broad.max_text_bytes,
+        );
+        assert!(matches!(
+            remove_table_data_list_entry(&source, removal, constrained)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
     }
 
     #[test]
