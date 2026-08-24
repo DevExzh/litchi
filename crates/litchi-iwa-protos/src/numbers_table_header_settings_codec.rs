@@ -19,6 +19,7 @@ pub struct DecodeOptions {
     fields: usize,
     work: usize,
     recursion: u32,
+    output_bytes: usize,
 }
 impl DecodeOptions {
     #[must_use]
@@ -28,7 +29,34 @@ impl DecodeOptions {
             fields,
             work,
             recursion,
+            output_bytes: bytes,
         }
+    }
+
+    /// Build conservative finite limits from one known source payload.
+    #[must_use]
+    pub fn for_source(source: &[u8]) -> Self {
+        let bytes = source.len().max(1);
+        Self {
+            bytes,
+            fields: bytes.checked_mul(8).unwrap_or(usize::MAX).max(1),
+            work: bytes.checked_mul(32).unwrap_or(usize::MAX).max(1),
+            recursion: 8,
+            output_bytes: bytes.checked_mul(2).unwrap_or(usize::MAX).max(1),
+        }
+    }
+
+    /// Replace the aggregate candidate-output ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_output_bytes(mut self, maximum: usize) -> Self {
+        self.output_bytes = maximum;
+        self
+    }
+
+    /// Return the aggregate candidate-output ceiling.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.output_bytes
     }
     fn buffa(self) -> BuffaDecodeOptions {
         BuffaDecodeOptions::new()
@@ -89,7 +117,74 @@ impl TableHeaderSettingsSnapshot {
     pub const fn repeating_header_columns_enabled(self) -> Option<bool> {
         self.repeating_header_columns_enabled
     }
+
+    /// Return a presence-preserving update containing all optional settings.
+    #[must_use]
+    pub const fn optional_write(self) -> TableHeaderSettingsWrite {
+        TableHeaderSettingsWrite {
+            header_rows: self.header_rows,
+            header_columns: self.header_columns,
+            footer_rows: self.footer_rows,
+            header_rows_frozen: self.header_rows_frozen,
+            header_columns_frozen: self.header_columns_frozen,
+            repeating_header_rows_enabled: self.repeating_header_rows_enabled,
+            repeating_header_columns_enabled: self.repeating_header_columns_enabled,
+        }
+    }
 }
+
+/// Presence-preserving values for the seven optional table-header fields.
+///
+/// `None` means that the corresponding protobuf field is absent in the
+/// requested candidate.  Unknown fields and the required row/column fields
+/// are never synthesized by this value; the wire rewrite copies them from the
+/// source verbatim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct TableHeaderSettingsWrite {
+    pub header_rows: Option<u32>,
+    pub header_columns: Option<u32>,
+    pub footer_rows: Option<u32>,
+    pub header_rows_frozen: Option<bool>,
+    pub header_columns_frozen: Option<bool>,
+    pub repeating_header_rows_enabled: Option<bool>,
+    pub repeating_header_columns_enabled: Option<bool>,
+}
+
+impl TableHeaderSettingsWrite {
+    /// Build a complete presence-preserving optional-field update.
+    #[must_use]
+    pub const fn new(
+        header_rows: Option<u32>,
+        header_columns: Option<u32>,
+        footer_rows: Option<u32>,
+        header_rows_frozen: Option<bool>,
+        header_columns_frozen: Option<bool>,
+        repeating_header_rows_enabled: Option<bool>,
+        repeating_header_columns_enabled: Option<bool>,
+    ) -> Self {
+        Self {
+            header_rows,
+            header_columns,
+            footer_rows,
+            header_rows_frozen,
+            header_columns_frozen,
+            repeating_header_rows_enabled,
+            repeating_header_columns_enabled,
+        }
+    }
+
+    /// Build an update from a decoded snapshot.
+    #[must_use]
+    pub const fn from_snapshot(snapshot: TableHeaderSettingsSnapshot) -> Self {
+        snapshot.optional_write()
+    }
+}
+
+/// Compatibility spelling for callers that describe this value as an update.
+pub type TableHeaderSettingsUpdate = TableHeaderSettingsWrite;
+
+/// Compatibility spelling for callers that describe this value as a patch.
+pub type TableHeaderSettingsPatch = TableHeaderSettingsWrite;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum WireResourceLimit {
@@ -108,6 +203,8 @@ enum Kind {
     NonCanonical(&'static str),
     Field { observed: usize, maximum: usize },
     Work { observed: usize, maximum: usize },
+    Output { observed: usize, maximum: usize },
+    Allocation { amount: usize },
     Projection,
 }
 impl DecodeError {
@@ -171,6 +268,26 @@ impl DecodeError {
             None
         }
     }
+
+    /// Return the exact candidate-output limit observation, when applicable.
+    #[must_use]
+    pub const fn output_limit_values(&self) -> Option<(usize, usize)> {
+        if let Kind::Output { observed, maximum } = self.0 {
+            Some((observed, maximum))
+        } else {
+            None
+        }
+    }
+
+    /// Return the requested output allocation, when reservation failed.
+    #[must_use]
+    pub const fn allocation_amount(&self) -> Option<usize> {
+        if let Kind::Allocation { amount } = self.0 {
+            Some(amount)
+        } else {
+            None
+        }
+    }
 }
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -186,11 +303,73 @@ impl fmt::Display for DecodeError {
             Kind::Work { observed, maximum } => {
                 write!(f, "requires {observed} work bytes; maximum is {maximum}")
             },
+            Kind::Output { observed, maximum } => {
+                write!(f, "produced {observed} output bytes; maximum is {maximum}")
+            },
+            Kind::Allocation { amount } => {
+                write!(f, "cannot allocate table-header output for {amount} bytes")
+            },
             Kind::Projection => f.write_str("strict preflight disagrees with Buffa projection"),
         }
     }
 }
 impl std::error::Error for DecodeError {}
+
+/// Exact aggregate consumption for one table-header rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewriteReport {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    changed: bool,
+}
+
+impl RewriteReport {
+    /// Source payload bytes inspected before publication.
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    /// Exact candidate payload size measured before allocation.
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    /// Aggregate strict field visits across source, rewrite, and readback.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Aggregate strict wire work across the complete operation.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    /// Maximum nesting observed by strict source and candidate scans.
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    /// Number of fallible output reservations performed.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Whether any selected optional field changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+}
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Buffa errors are non-exhaustive and unrecognized failures remain opaque wire errors."
@@ -212,6 +391,7 @@ struct Budget {
     max_fields: usize,
     max_work: usize,
     max_recursion: u32,
+    max_depth: u32,
 }
 impl Budget {
     const fn new(options: DecodeOptions) -> Self {
@@ -221,6 +401,7 @@ impl Budget {
             max_fields: options.fields,
             max_work: options.work,
             max_recursion: options.recursion,
+            max_depth: 1,
         }
     }
     fn charge(&mut self, bytes: usize) -> Result<(), DecodeError> {
@@ -238,9 +419,12 @@ impl Budget {
         Ok(())
     }
     fn field(&mut self) -> Result<(), DecodeError> {
+        self.fields(1)
+    }
+    fn fields(&mut self, amount: usize) -> Result<(), DecodeError> {
         let observed = self
             .fields
-            .checked_add(1)
+            .checked_add(amount)
             .ok_or(DecodeError(Kind::Projection))?;
         if observed > self.max_fields {
             return Err(DecodeError(Kind::Field {
@@ -265,7 +449,24 @@ pub fn decode_table_header_settings(
 ) -> Result<TableHeaderSettingsSnapshot, DecodeError> {
     validate(source, o)?;
     let mut b = Budget::new(o);
-    let strict = preflight(source, o, &mut b)?;
+    decode_snapshot_with_budget(source, o, &mut b)
+}
+
+fn decode_snapshot_with_budget(
+    source: &[u8],
+    o: DecodeOptions,
+    b: &mut Budget,
+) -> Result<TableHeaderSettingsSnapshot, DecodeError> {
+    decode_snapshot_with_budget_mode(source, o, b, true)
+}
+
+fn decode_snapshot_with_budget_mode(
+    source: &[u8],
+    o: DecodeOptions,
+    b: &mut Budget,
+    strict_unknown: bool,
+) -> Result<TableHeaderSettingsSnapshot, DecodeError> {
+    let strict = preflight_mode(source, o, b, strict_unknown)?;
     let v: projection::NumbersTableHeaderSettingsArchiveLazyView<'_> =
         o.buffa().decode_lazy_view(source)?;
     let projected = TableHeaderSettingsSnapshot {
@@ -284,6 +485,395 @@ pub fn decode_table_header_settings(
     }
     Ok(strict)
 }
+
+/// Rewrite the seven optional header/footer/freeze/repeat fields while
+/// retaining every required and unknown source span.
+pub fn rewrite_table_header_settings(
+    source: &[u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    Ok(rewrite_table_header_settings_with_report(source, write, options)?.0)
+}
+
+/// Rewrite one table-header payload and return exact aggregate accounting.
+pub fn rewrite_table_header_settings_with_report(
+    source: &[u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, RewriteReport), DecodeError> {
+    validate(source, options)?;
+    let mut budget = Budget::new(options);
+    let current = decode_snapshot_with_budget_mode(source, options, &mut budget, false)?;
+    let changed = current.optional_write() != write;
+    if !changed {
+        if source.len() > options.output_bytes {
+            return Err(DecodeError(Kind::Output {
+                observed: source.len(),
+                maximum: options.output_bytes,
+            }));
+        }
+        let output = reserve_output(source.len())?;
+        let mut output = output;
+        append_bytes(&mut output, source)?;
+        return Ok((
+            output,
+            RewriteReport {
+                input_bytes: source.len(),
+                output_bytes: source.len(),
+                fields: budget.fields,
+                work_bytes: budget.work,
+                max_depth: budget.max_depth,
+                allocations: 1,
+                changed: false,
+            },
+        ));
+    }
+
+    let output_bytes = measure_rewrite_output(source, write, options, &mut budget)?;
+    if output_bytes > options.output_bytes {
+        return Err(DecodeError(Kind::Output {
+            observed: output_bytes,
+            maximum: options.output_bytes,
+        }));
+    }
+    precharge_candidate_readback(source, write, output_bytes, options, &mut budget)?;
+    let mut output = reserve_output(output_bytes)?;
+    let mut emit_budget = Budget::new(DecodeOptions {
+        fields: usize::MAX,
+        work: usize::MAX,
+        ..options
+    });
+    emit_rewrite_output(source, write, options, &mut emit_budget, &mut output)?;
+    if output.len() != output_bytes {
+        return Err(DecodeError(Kind::Projection));
+    }
+
+    let readback_options = DecodeOptions {
+        bytes: options.bytes.max(output.len()),
+        output_bytes: options.output_bytes,
+        ..options
+    };
+    validate(&output, readback_options)?;
+    let mut readback_budget = Budget::new(DecodeOptions {
+        fields: usize::MAX,
+        work: usize::MAX,
+        ..readback_options
+    });
+    let readback =
+        decode_snapshot_with_budget_mode(&output, readback_options, &mut readback_budget, false)?;
+    if readback.optional_write() != write {
+        return Err(DecodeError(Kind::Projection));
+    }
+    Ok((
+        output,
+        RewriteReport {
+            input_bytes: source.len(),
+            output_bytes,
+            fields: budget.fields,
+            work_bytes: budget.work,
+            max_depth: budget.max_depth,
+            allocations: 1,
+            changed: true,
+        },
+    ))
+}
+
+/// Compatibility alias for callers that use the `rewrite_*_with_report`
+/// spelling without the Numbers-specific module prefix.
+pub fn rewrite_table_header_settings_extension(
+    source: &[u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    rewrite_table_header_settings(source, write, options)
+}
+
+#[derive(Clone, Copy)]
+struct FieldSpan {
+    number: u32,
+    start: usize,
+    end: usize,
+}
+
+fn visit_field_spans<F>(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    mut visitor: F,
+) -> Result<(), DecodeError>
+where
+    F: FnMut(FieldSpan) -> Result<(), DecodeError>,
+{
+    budget.charge(source.len())?;
+    let mut remaining = source;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let (tag, canonical) = varint(&mut remaining)?;
+        let raw =
+            u32::try_from(tag).map_err(|_conversion| buffa::DecodeError::InvalidFieldNumber)?;
+        let number = raw >> 3;
+        let wire = raw & 7;
+        if number == 0 {
+            return Err(buffa::DecodeError::InvalidFieldNumber.into());
+        }
+        if !canonical && selected_field(number) {
+            return Err(DecodeError::noncanonical("protobuf field key"));
+        }
+        budget.field()?;
+        if wire == 0 {
+            let (_, value_canonical) = varint(&mut remaining)?;
+            if !value_canonical && selected_field(number) {
+                return Err(DecodeError::noncanonical("protobuf varint value"));
+            }
+        } else {
+            skip(
+                &mut remaining,
+                number,
+                wire,
+                options.recursion,
+                budget,
+                false,
+            )?;
+        }
+        let end = source.len() - remaining.len();
+        visitor(FieldSpan { number, start, end })?;
+    }
+    Ok(())
+}
+
+fn selected_field(number: u32) -> bool {
+    matches!(
+        number,
+        HEADER_ROWS_FIELD
+            | HEADER_COLUMNS_FIELD
+            | FOOTER_ROWS_FIELD
+            | HEADER_ROWS_FROZEN_FIELD
+            | HEADER_COLUMNS_FROZEN_FIELD
+            | REPEATING_HEADER_ROWS_FIELD
+            | REPEATING_HEADER_COLUMNS_FIELD
+    )
+}
+
+fn requested_value(write: TableHeaderSettingsWrite, number: u32) -> Option<u64> {
+    match number {
+        HEADER_ROWS_FIELD => write.header_rows.map(u64::from),
+        HEADER_COLUMNS_FIELD => write.header_columns.map(u64::from),
+        FOOTER_ROWS_FIELD => write.footer_rows.map(u64::from),
+        HEADER_ROWS_FROZEN_FIELD => write.header_rows_frozen.map(u64::from),
+        HEADER_COLUMNS_FROZEN_FIELD => write.header_columns_frozen.map(u64::from),
+        REPEATING_HEADER_ROWS_FIELD => write.repeating_header_rows_enabled.map(u64::from),
+        REPEATING_HEADER_COLUMNS_FIELD => write.repeating_header_columns_enabled.map(u64::from),
+        _ => None,
+    }
+}
+
+fn varint_len(mut value: u64) -> usize {
+    let mut length = 1;
+    while value >= 128 {
+        value >>= 7;
+        length += 1;
+    }
+    length
+}
+
+fn encoded_varint_field_len(number: u32, value: u64) -> usize {
+    varint_len(u64::from(number) << 3) + varint_len(value)
+}
+
+fn measure_rewrite_output(
+    source: &[u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<usize, DecodeError> {
+    let mut output_bytes = 0usize;
+    let mut seen = [false; 7];
+    visit_field_spans(source, options, budget, |span| {
+        if selected_field(span.number) {
+            let index = optional_index(span.number).ok_or(DecodeError(Kind::Projection))?;
+            seen[index] = true;
+            if let Some(value) = requested_value(write, span.number) {
+                output_bytes = output_bytes
+                    .checked_add(encoded_varint_field_len(span.number, value))
+                    .ok_or(DecodeError(Kind::Projection))?;
+            }
+        } else {
+            output_bytes = output_bytes
+                .checked_add(span.end - span.start)
+                .ok_or(DecodeError(Kind::Projection))?;
+        }
+        Ok(())
+    })?;
+    for (index, number) in optional_fields().iter().copied().enumerate() {
+        if !seen[index]
+            && let Some(value) = requested_value(write, number)
+        {
+            output_bytes = output_bytes
+                .checked_add(encoded_varint_field_len(number, value))
+                .ok_or(DecodeError(Kind::Projection))?;
+        }
+    }
+    Ok(output_bytes)
+}
+
+fn precharge_candidate_readback(
+    source: &[u8],
+    write: TableHeaderSettingsWrite,
+    output_bytes: usize,
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let scan_options = DecodeOptions {
+        fields: usize::MAX,
+        work: usize::MAX,
+        ..options
+    };
+    let mut scan_budget = Budget::new(scan_options);
+    let mut selected_present = [false; 7];
+    visit_field_spans(source, scan_options, &mut scan_budget, |span| {
+        if let Some(index) = optional_index(span.number) {
+            selected_present[index] = true;
+        }
+        Ok(())
+    })?;
+    let selected_source_fields = selected_present.iter().filter(|present| **present).count();
+    let selected_candidate_fields = optional_fields()
+        .iter()
+        .filter(|field| requested_value(write, **field).is_some())
+        .count();
+    let candidate_fields = scan_budget
+        .fields
+        .checked_sub(selected_source_fields)
+        .and_then(|fields| fields.checked_add(selected_candidate_fields))
+        .ok_or(DecodeError(Kind::Projection))?;
+    budget.charge(source.len())?;
+    budget.fields(scan_budget.fields)?;
+    budget.fields(candidate_fields)?;
+    budget.charge(output_bytes)?;
+    // Emission replays the source spans after the sole output reservation.
+    // Charge that traversal now so a field/work ceiling can never fail after
+    // the candidate Vec exists.
+    budget.charge(source.len())?;
+    budget.fields(scan_budget.fields)?;
+    budget.max_depth = budget.max_depth.max(scan_budget.max_depth);
+    Ok(())
+}
+
+fn emit_rewrite_output(
+    source: &[u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+    budget: &mut Budget,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
+    let mut seen = [false; 7];
+    visit_field_spans(source, options, budget, |span| {
+        if selected_field(span.number) {
+            let index = optional_index(span.number).ok_or(DecodeError(Kind::Projection))?;
+            seen[index] = true;
+            if let Some(value) = requested_value(write, span.number) {
+                append_varint_field(output, span.number, value)?;
+            }
+        } else {
+            append_bytes(output, &source[span.start..span.end])?;
+        }
+        Ok(())
+    })?;
+    for (index, number) in optional_fields().iter().copied().enumerate() {
+        if !seen[index]
+            && let Some(value) = requested_value(write, number)
+        {
+            append_varint_field(output, number, value)?;
+        }
+    }
+    Ok(())
+}
+
+const fn optional_fields() -> [u32; 7] {
+    [
+        HEADER_ROWS_FIELD,
+        HEADER_COLUMNS_FIELD,
+        FOOTER_ROWS_FIELD,
+        HEADER_ROWS_FROZEN_FIELD,
+        HEADER_COLUMNS_FROZEN_FIELD,
+        REPEATING_HEADER_ROWS_FIELD,
+        REPEATING_HEADER_COLUMNS_FIELD,
+    ]
+}
+
+const fn optional_index(number: u32) -> Option<usize> {
+    match number {
+        HEADER_ROWS_FIELD => Some(0),
+        HEADER_COLUMNS_FIELD => Some(1),
+        FOOTER_ROWS_FIELD => Some(2),
+        HEADER_ROWS_FROZEN_FIELD => Some(3),
+        HEADER_COLUMNS_FROZEN_FIELD => Some(4),
+        REPEATING_HEADER_ROWS_FIELD => Some(5),
+        REPEATING_HEADER_COLUMNS_FIELD => Some(6),
+        _ => None,
+    }
+}
+
+fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(amount)
+        .map_err(|_error| DecodeError(Kind::Allocation { amount }))?;
+    record_output_allocation();
+    Ok(output)
+}
+
+fn append_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), DecodeError> {
+    let remaining = output
+        .capacity()
+        .checked_sub(output.len())
+        .ok_or(DecodeError(Kind::Projection))?;
+    if bytes.len() > remaining {
+        return Err(DecodeError(Kind::Projection));
+    }
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn append_varint_field(output: &mut Vec<u8>, number: u32, value: u64) -> Result<(), DecodeError> {
+    let required = encoded_varint_field_len(number, value);
+    let remaining = output
+        .capacity()
+        .checked_sub(output.len())
+        .ok_or(DecodeError(Kind::Projection))?;
+    if required > remaining {
+        return Err(DecodeError(Kind::Projection));
+    }
+    push_varint(u64::from(number) << 3, output);
+    push_varint(value, output);
+    Ok(())
+}
+
+fn push_varint(mut value: u64, output: &mut Vec<u8>) {
+    while value >= 128 {
+        output.push((value as u8 & 127) | 128);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+#[cfg(test)]
+thread_local! {
+    static OUTPUT_ALLOCATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[inline]
+fn record_output_allocation() {
+    #[cfg(test)]
+    OUTPUT_ALLOCATIONS.with(|count| count.set(count.get().saturating_add(1)));
+}
+
+#[cfg(test)]
+fn output_allocations() -> usize {
+    OUTPUT_ALLOCATIONS.with(std::cell::Cell::get)
+}
+
 fn validate(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
     let hard = usize::try_from(buffa::MAX_MESSAGE_BYTES)
         .map_err(|_conversion| DecodeError(Kind::Projection))?;
@@ -307,10 +897,11 @@ fn validate(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
     }
     Ok(())
 }
-fn preflight(
+fn preflight_mode(
     source: &[u8],
     options: DecodeOptions,
     budget: &mut Budget,
+    strict_unknown: bool,
 ) -> Result<TableHeaderSettingsSnapshot, DecodeError> {
     budget.charge(source.len())?;
     let mut snapshot = TableHeaderSettingsSnapshot {
@@ -328,16 +919,16 @@ fn preflight(
     let mut remaining = source;
     while !remaining.is_empty() {
         let (tag, key_canonical) = varint(&mut remaining)?;
-        if !key_canonical {
-            return Err(DecodeError::noncanonical("protobuf field key"));
-        }
-        budget.field()?;
         let raw =
             u32::try_from(tag).map_err(|_conversion| buffa::DecodeError::InvalidFieldNumber)?;
         let field_number = raw >> 3;
         if field_number == 0 {
             return Err(buffa::DecodeError::InvalidFieldNumber.into());
         }
+        if !key_canonical && (strict_unknown || selected_field(field_number)) {
+            return Err(DecodeError::noncanonical("protobuf field key"));
+        }
+        budget.field()?;
         if raw & 7 != 0 {
             skip(
                 &mut remaining,
@@ -345,6 +936,7 @@ fn preflight(
                 raw & 7,
                 options.recursion,
                 budget,
+                strict_unknown,
             )?;
             if matches!(
                 field_number,
@@ -368,7 +960,7 @@ fn preflight(
             continue;
         }
         let (value, value_canonical) = varint(&mut remaining)?;
-        if !value_canonical {
+        if !value_canonical && (strict_unknown || selected_field(field_number)) {
             return Err(DecodeError::noncanonical("protobuf varint value"));
         }
         let bit = 1u64.checked_shl(field_number).unwrap_or(0);
@@ -456,11 +1048,12 @@ fn skip(
     wire: u32,
     depth: u32,
     budget: &mut Budget,
+    strict_unknown: bool,
 ) -> Result<(), DecodeError> {
     match wire {
         0 => {
             let (_, canonical) = varint(s)?;
-            if !canonical {
+            if strict_unknown && !canonical {
                 return Err(DecodeError::noncanonical("protobuf varint value"));
             }
             Ok(())
@@ -468,7 +1061,7 @@ fn skip(
         1 => take(s, 8),
         2 => {
             let (length, canonical) = varint(s)?;
-            if !canonical {
+            if strict_unknown && !canonical {
                 return Err(DecodeError::noncanonical("length-delimited size"));
             }
             take(
@@ -482,6 +1075,7 @@ fn skip(
             number,
             depth.checked_sub(1).ok_or_else(|| budget.nesting())?,
             budget,
+            strict_unknown,
         ),
         4 => Err(buffa::DecodeError::InvalidEndGroup(number).into()),
         5 => take(s, 4),
@@ -494,13 +1088,17 @@ fn skip_group(
     expected: u32,
     depth: u32,
     budget: &mut Budget,
+    strict_unknown: bool,
 ) -> Result<(), DecodeError> {
+    budget.max_depth = budget
+        .max_depth
+        .max(budget.max_recursion.saturating_sub(depth));
     loop {
         if s.is_empty() {
             return Err(buffa::DecodeError::UnexpectedEof.into());
         }
         let (tag, canonical) = varint(s)?;
-        if !canonical {
+        if strict_unknown && !canonical {
             return Err(DecodeError::noncanonical("protobuf field key"));
         }
         budget.field()?;
@@ -517,7 +1115,7 @@ fn skip_group(
             }
             return Err(buffa::DecodeError::InvalidEndGroup(number).into());
         }
-        skip(s, number, wire, depth, budget)?;
+        skip(s, number, wire, depth, budget, strict_unknown)?;
     }
 }
 fn take(s: &mut &[u8], n: usize) -> Result<(), DecodeError> {
@@ -836,6 +1434,181 @@ mod tests {
             .noncanonical_reason(),
             Some("length-delimited size")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn rewrite_changes_optional_presence_and_retains_unknown_source_spans()
+    -> Result<(), DecodeError> {
+        let mut source = dimensions();
+        source.extend(varint_field(100, 7));
+        source.extend(varint_field(HEADER_ROWS_FIELD, 2));
+        source.extend(varint_field(FOOTER_ROWS_FIELD, 1));
+        source.extend([0xe8, 1, 1]);
+        let write = TableHeaderSettingsWrite::new(
+            Some(3),
+            None,
+            Some(2),
+            Some(false),
+            None,
+            Some(true),
+            Some(false),
+        );
+        let options = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 64);
+        let (rewritten, report) =
+            rewrite_table_header_settings_with_report(&source, write, options)?;
+        assert!(report.changed());
+        assert_eq!(report.allocations(), 1);
+        assert!(rewritten.windows(2).any(|window| window == [0xa0, 6]));
+        assert!(rewritten.windows(2).any(|window| window == [0xe8, 1]));
+        assert!(rewritten.windows(2).any(|window| window == [0xa0, 6]));
+        assert!(!rewritten.windows(2).any(|window| window == [0x50, 2]));
+        assert_eq!(
+            decode_table_header_settings(&rewritten, DecodeOptions::for_source(&rewritten))?,
+            TableHeaderSettingsSnapshot {
+                rows: 1,
+                columns: 1,
+                header_rows: Some(3),
+                header_columns: None,
+                footer_rows: Some(2),
+                header_rows_frozen: Some(false),
+                header_columns_frozen: None,
+                repeating_header_rows_enabled: Some(true),
+                repeating_header_columns_enabled: Some(false),
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rewrite_appends_absent_selected_fields_and_is_exactly_bounded() -> Result<(), DecodeError> {
+        let source = dimensions();
+        let write = TableHeaderSettingsWrite::new(
+            Some(1),
+            Some(2),
+            None,
+            None,
+            Some(true),
+            None,
+            Some(false),
+        );
+        let options = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 32);
+        let (rewritten, report) =
+            rewrite_table_header_settings_with_report(&source, write, options)?;
+        assert_eq!(report.output_bytes(), rewritten.len());
+        assert_eq!(report.allocations(), 1);
+        let exact = options.with_max_output_bytes(rewritten.len());
+        assert!(rewrite_table_header_settings_with_report(&source, write, exact).is_ok());
+        assert!(
+            rewrite_table_header_settings_with_report(
+                &source,
+                write,
+                options.with_max_output_bytes(rewritten.len() - 1)
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rewrite_noop_copies_source_and_selected_wire_remains_strict() -> Result<(), DecodeError> {
+        let mut source = dimensions();
+        source.extend(varint_field(HEADER_ROWS_FIELD, 2));
+        let write = TableHeaderSettingsWrite::new(Some(2), None, None, None, None, None, None);
+        let options = DecodeOptions::for_source(&source);
+        let (rewritten, report) =
+            rewrite_table_header_settings_with_report(&source, write, options)?;
+        assert_eq!(rewritten, source);
+        assert!(!report.changed());
+        assert_eq!(report.output_bytes(), source.len());
+
+        let mut malformed = dimensions();
+        malformed.extend([0x50, 0x81, 0]);
+        let error = rewrite_table_header_settings_with_report(
+            &malformed,
+            write,
+            DecodeOptions::for_source(&malformed),
+        )
+        .expect_err("selected overlong values must fail before a write");
+        assert_eq!(error.noncanonical_reason(), Some("protobuf varint value"));
+        Ok(())
+    }
+
+    #[test]
+    fn rewrite_retains_noncanonical_unknown_framing_byte_for_byte() -> Result<(), DecodeError> {
+        let mut source = dimensions();
+        let unknown_varint = [0xa0, 0x06, 0x81, 0x00];
+        let unknown_length = [0xb2, 0x06, 0x80, 0x00];
+        source.extend(unknown_varint);
+        source.extend(unknown_length);
+        let write = TableHeaderSettingsWrite::new(Some(2), None, None, None, None, None, None);
+        let options = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 16);
+        let (rewritten, report) =
+            rewrite_table_header_settings_with_report(&source, write, options)?;
+        assert!(report.changed());
+        assert!(
+            rewritten
+                .windows(unknown_varint.len())
+                .any(|window| window == unknown_varint)
+        );
+        assert!(
+            rewritten
+                .windows(unknown_length.len())
+                .any(|window| window == unknown_length)
+        );
+        assert!(decode_table_header_settings(&source, options).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn rewrite_output_reservation_is_fallible_and_typed() {
+        let error = reserve_output(usize::MAX).expect_err("oversized reservation");
+        assert_eq!(error.allocation_amount(), Some(usize::MAX));
+    }
+
+    #[test]
+    fn rewrite_report_replays_at_exact_limits_before_allocation() -> Result<(), DecodeError> {
+        let mut source = dimensions();
+        source.extend([0xa0, 0x06, 0x81, 0x00, 0xa3, 0x06, 0x08, 1, 0xa4, 0x06]);
+        let write =
+            TableHeaderSettingsWrite::new(Some(3), None, None, None, Some(true), None, None);
+        let broad = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 32);
+        let (expected, report) = rewrite_table_header_settings_with_report(&source, write, broad)?;
+        let exact = DecodeOptions::new(
+            source.len(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth().max(1),
+        )
+        .with_max_output_bytes(report.output_bytes());
+        let before = output_allocations();
+        let (actual, exact_report) =
+            rewrite_table_header_settings_with_report(&source, write, exact)?;
+        assert_eq!(actual, expected);
+        assert_eq!(exact_report.output_bytes(), report.output_bytes());
+        assert_eq!(output_allocations(), before + 1);
+
+        let before = output_allocations();
+        let below_fields = DecodeOptions::new(
+            source.len(),
+            report.fields().saturating_sub(1),
+            report.work_bytes(),
+            report.max_depth().max(1),
+        )
+        .with_max_output_bytes(report.output_bytes());
+        assert!(rewrite_table_header_settings_with_report(&source, write, below_fields).is_err());
+        assert_eq!(output_allocations(), before);
+
+        let before = output_allocations();
+        let below_work = DecodeOptions::new(
+            source.len(),
+            report.fields(),
+            report.work_bytes().saturating_sub(1),
+            report.max_depth().max(1),
+        )
+        .with_max_output_bytes(report.output_bytes());
+        assert!(rewrite_table_header_settings_with_report(&source, write, below_work).is_err());
+        assert_eq!(output_allocations(), before);
         Ok(())
     }
 }
