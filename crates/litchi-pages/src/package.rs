@@ -66,8 +66,7 @@ pub use section_text::{
 };
 pub use table_lock::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
-    BodyTableLockLimitKind, BodyTableLockPatch, TableLockCommit, TableLockDiagnostics,
-    TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
+    BodyTableLockLimitKind, BodyTableLockPatch,
 };
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;

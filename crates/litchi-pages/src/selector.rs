@@ -217,10 +217,6 @@ impl From<Position> for BodyTableSelector<'_> {
     }
 }
 
-/// Compatibility spelling for callers that use a table-scoped selector
-/// namespace. It remains a semantic body-table selector.
-pub type TableSelector<'a> = BodyTableSelector<'a>;
-
 #[cfg(test)]
 mod tests {
     use super::*;

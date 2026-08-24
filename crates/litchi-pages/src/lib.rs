@@ -73,8 +73,7 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 pub use package::{__is_valid_pages_text_storage, __semantic_document_from_prepared_source};
 pub use package::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
-    BodyTableLockLimitKind, BodyTableLockPatch, TableLockCommit, TableLockDiagnostics,
-    TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
+    BodyTableLockLimitKind, BodyTableLockPatch,
 };
 pub use package::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
@@ -98,6 +97,6 @@ pub use package::{
     SectionTextLimitKind, SectionTextPatch,
 };
 pub use section::{Section, SectionType};
-pub use selector::{BodyTableSelector, TableSelector};
+pub use selector::BodyTableSelector;
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
-pub use table::lock::{BodyTableLockState, State as TableLockState};
+pub use table::lock::BodyTableLockState;
