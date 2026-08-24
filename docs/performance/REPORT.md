@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## Rejected DOC owner-public-phases hypothesis (change 0274)
+
+[Change 0274](changes/0274-doc-owner-public-phases-abba.md) is retained
+decision evidence, not a performance win. In a clean CPU-2, 20-warmup,
+500-sample ABBA run, only large lifecycle p50 passed (+3.887%/+3.253%);
+tiny p50 was adverse and payload-heavy directions disagreed. Means and tails
+were rejected, and the candidate was reverted under the keep/revert rule.
+`performance_claim: none`; no selector, default count, claim-registry entry,
+or historical classification changed.
+
 ## Latest DOCX section-layout closure (change 0273)
 
 [Change 0273](changes/0273-docx-source-backed-section-layout.md) adds one

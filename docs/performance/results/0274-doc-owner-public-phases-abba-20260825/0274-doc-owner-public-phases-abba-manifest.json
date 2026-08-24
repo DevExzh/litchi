@@ -1,0 +1,117 @@
+{
+  "artifacts": [
+    {
+      "bytes": 137311,
+      "canonical_sha256": "1f65925df324968a207265f1dfd7c729e03b7aa1cbc420efd351bad44f058f76",
+      "compression": "zstd",
+      "path": "a1-control.json.zst",
+      "role": "a1",
+      "sha256": "695b7ce5b625545a7ce8b8c3f3eef100e0262362cff4218b334c1ecb775e108a",
+      "uncompressed_bytes": 994345,
+      "uncompressed_sha256": "159d01cdd886c191baf42acee21c223c45fb17c9d1181a3d9713fb015704e8c1"
+    },
+    {
+      "bytes": 136646,
+      "canonical_sha256": "3fc9507a0ed1949e384093ba8b278bd6f5dd0a01096ff006e14186113f5db4dd",
+      "compression": "zstd",
+      "path": "b1-candidate.json.zst",
+      "role": "b1",
+      "sha256": "4901024ecf03a0054b92f824594d0d82125889725c03b834d6ddc1213b1d5afb",
+      "uncompressed_bytes": 994335,
+      "uncompressed_sha256": "5ea0b2090c490aa31fd12d9d5c32082bbdcf4302ba3e75767ad0c77b1b14656c"
+    },
+    {
+      "bytes": 138483,
+      "canonical_sha256": "0b3c52b14d19a382832231d8b6f5f45d59b72e1a274c41e8f12b14404c27e2a1",
+      "compression": "zstd",
+      "path": "b2-candidate.json.zst",
+      "role": "b2",
+      "sha256": "bfbd88696d99491ae156e09e4a1df7fe10a3194c14f892d228f123f621c0d7ea",
+      "uncompressed_bytes": 994566,
+      "uncompressed_sha256": "9d189d1eadc3aa3ea928b3fd236e8d2de348acd3c4f00ff1f5a9d930402961cc"
+    },
+    {
+      "bytes": 135922,
+      "canonical_sha256": "d644a90bbab1ffeaa06981ab15ed4b50349474c78f07444457034151eb7e8c28",
+      "compression": "zstd",
+      "path": "a2-control.json.zst",
+      "role": "a2",
+      "sha256": "5058a1e4dc6745958a24b669bdb8d958ac7470b3864a0d784ee39b1a832d81e0",
+      "uncompressed_bytes": 994065,
+      "uncompressed_sha256": "ec83ad89dbc6eece99dea71089285b65fbbe4021cb1cf8fff5067d8b48306fbd"
+    }
+  ],
+  "change": "0274-doc-owner-public-phases-abba",
+  "change_id": "0274-doc-owner-public-phases-abba",
+  "compression": {
+    "checksum": "XXH64",
+    "content_size": true,
+    "executable": {
+      "bytes": 1103288,
+      "path": "/usr/bin/zstd",
+      "sha256": "fe50fd600cad89b775dc5b4b10bc8ff95e2d33ddb4f7632966464b1fbdab8598",
+      "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+    },
+    "format": "zstd",
+    "level": 3,
+    "threads": 1
+  },
+  "manifest_kind": "litchi-perf-abba-artifacts",
+  "manifest_path": "0274-doc-owner-public-phases-abba-manifest.json",
+  "schema_version": 1,
+  "self_excluded": true,
+  "summary": {
+    "bytes": 424045,
+    "canonical_bytes": 356218,
+    "canonical_sha256": "b1073bf107e844b3b6d4124a3f01eb10375586e0d728eca0cff7a632d72c79cf",
+    "path": "doc-owner-public-phases-0274-summary.json",
+    "report_identity": {
+      "a1": {
+        "canonical_sha256": "1f65925df324968a207265f1dfd7c729e03b7aa1cbc420efd351bad44f058f76"
+      },
+      "a2": {
+        "canonical_sha256": "d644a90bbab1ffeaa06981ab15ed4b50349474c78f07444457034151eb7e8c28"
+      },
+      "b1": {
+        "canonical_sha256": "3fc9507a0ed1949e384093ba8b278bd6f5dd0a01096ff006e14186113f5db4dd"
+      },
+      "b2": {
+        "canonical_sha256": "0b3c52b14d19a382832231d8b6f5f45d59b72e1a274c41e8f12b14404c27e2a1"
+      }
+    },
+    "result_count": 3,
+    "schema_version": 1,
+    "sha256": "b7d873e873a2cfcfe2a76271cd2f261cba89f66e89559e5970b995398d97a607",
+    "tool": {
+      "name": "litchi-perf-abba-summary",
+      "version": "0.1.0"
+    }
+  },
+  "summary_identity": {
+    "bytes": 424045,
+    "canonical_bytes": 356218,
+    "canonical_sha256": "b1073bf107e844b3b6d4124a3f01eb10375586e0d728eca0cff7a632d72c79cf",
+    "path": "doc-owner-public-phases-0274-summary.json",
+    "report_identity": {
+      "a1": {
+        "canonical_sha256": "1f65925df324968a207265f1dfd7c729e03b7aa1cbc420efd351bad44f058f76"
+      },
+      "a2": {
+        "canonical_sha256": "d644a90bbab1ffeaa06981ab15ed4b50349474c78f07444457034151eb7e8c28"
+      },
+      "b1": {
+        "canonical_sha256": "3fc9507a0ed1949e384093ba8b278bd6f5dd0a01096ff006e14186113f5db4dd"
+      },
+      "b2": {
+        "canonical_sha256": "0b3c52b14d19a382832231d8b6f5f45d59b72e1a274c41e8f12b14404c27e2a1"
+      }
+    },
+    "result_count": 3,
+    "schema_version": 1,
+    "sha256": "b7d873e873a2cfcfe2a76271cd2f261cba89f66e89559e5970b995398d97a607",
+    "tool": {
+      "name": "litchi-perf-abba-summary",
+      "version": "0.1.0"
+    }
+  }
+}

@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## Rejected DOC owner-public-phases hypothesis (change 0274)
+
+Change 0274 is not a retained production optimization. The clean ABBA package
+disproved representative end-to-end benefit from removing the public-reader
+`Vec` clone: only large lifecycle p50 passed, tiny p50 was adverse, and
+payload-heavy directions plus mean/tail statistics were rejected. The
+candidate was reverted under the keep/revert rule. No claim-registry entry,
+selector, or default count changed; the current matrix remains 393 names and
+36 cases / 198 records.
+
 ## Latest DOCX section-layout closure (change 0273)
 
 Change 0273 adds one opt-in typed existing-main-story section-layout selector,

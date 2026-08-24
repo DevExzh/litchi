@@ -406,6 +406,152 @@ def docx_section_layout_row(
     }
 
 
+def doc_owner_public_phase_row(shape, *, offset=0, sample_order=None):
+    corpus = copy.deepcopy(
+        perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CORPUS_IDENTITIES[shape]
+    )
+    output_digest = perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_EXPECTED_OUTPUT_SHA256[
+        shape
+    ]
+    source_fingerprint, target_fingerprint = (
+        perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_EXPECTED_FINGERPRINTS[shape]
+    )
+    sample_count = CONFIGURATION["samples_per_case"]
+    measured = [100 + offset + index for index in range(sample_count)]
+    if sample_order is None:
+        sample_order = list(range(2, sample_count)) + [0, 1]
+    sample_order = list(sample_order)
+
+    def original_order(values):
+        reordered = [None] * sample_count
+        for sorted_index, original_index in enumerate(sample_order):
+            reordered[original_index] = values[sorted_index]
+        return reordered
+
+    open_owner = [2] * sample_count
+    open_public = [3] * sample_count
+    open_retain = [1] * sample_count
+    edit_new = [2] * sample_count
+    edit_replacement = [3] * sample_count
+    edit_authoring = [5] * sample_count
+    edit_finish = [1] * sample_count
+    edit_final_owner = [2] * sample_count
+    edit_final_public = [3] * sample_count
+    edit_final_retain = [1] * sample_count
+    edit_patch = [1] * sample_count
+    edit_commit_outer = [16] * sample_count
+    edit_output_materialization = [1] * sample_count
+    open_attributed = [6] * sample_count
+    edit_attributed = [14] * sample_count
+    open_outer = [8] * sample_count
+    edit_total = [22] * sample_count
+    same_lineage_apply = [2] * sample_count
+    deferred_fingerprint = [3] * sample_count
+    attributed = [20] * sample_count
+    unattributed = [value - 20 for value in measured]
+    workflow_no_diagnostic = [value + 2 for value in measured]
+    workflow_with_fingerprint_demand = [value + 5 for value in measured]
+    timing_values = {
+        "open_owner_ns": open_owner,
+        "open_public_ns": open_public,
+        "open_retain_ns": open_retain,
+        "edit_authoring_ns": edit_authoring,
+        "edit_new_ns": edit_new,
+        "edit_replacement_ns": edit_replacement,
+        "edit_finish_ns": edit_finish,
+        "edit_final_owner_ns": edit_final_owner,
+        "edit_final_public_ns": edit_final_public,
+        "edit_final_retain_ns": edit_final_retain,
+        "edit_patch_ns": edit_patch,
+        "edit_commit_outer_ns": edit_commit_outer,
+        "edit_output_materialization_ns": edit_output_materialization,
+        "open_attributed_total_ns": open_attributed,
+        "edit_attributed_total_ns": edit_attributed,
+        "open_outer_ns": open_outer,
+        "edit_total_ns": edit_total,
+        "measured_total_ns": measured,
+        "same_lineage_apply_ns": same_lineage_apply,
+        "deferred_fingerprint_ns": deferred_fingerprint,
+        "workflow_no_diagnostic_ns": workflow_no_diagnostic,
+        "workflow_with_fingerprint_demand_ns": workflow_with_fingerprint_demand,
+        "attributed_total_ns": attributed,
+        "unattributed_ns": unattributed,
+    }
+    overlay = {
+        "implementation": perf_abba_summary._DOC_OWNER_PUBLIC_PHASES_IMPLEMENTATION,
+        "timing_scope": perf_abba_summary._DOC_OWNER_PUBLIC_PHASES_TIMING_SCOPE,
+        "performance_claim": perf_abba_summary._DOC_OWNER_PUBLIC_PHASES_PERFORMANCE_CLAIM,
+        "selected_paragraph": corpus["entry_count"] // 2,
+        "source_bytes": corpus["archive_bytes"],
+        "candidate_bytes": perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_EXPECTED_CANDIDATE_BYTES[
+            shape
+        ],
+        "source_archive_sha256": corpus["archive_sha256"],
+        "expected_output_sha256": output_digest,
+        "expected_source_fingerprint": source_fingerprint,
+        "expected_target_fingerprint": target_fingerprint,
+        **{
+            field: original_order(values)
+            for field, values in timing_values.items()
+        },
+        "source_fingerprints": [source_fingerprint] * sample_count,
+        "target_fingerprints": [target_fingerprint] * sample_count,
+        "output_sha256": [output_digest] * sample_count,
+        "gates": {
+            field: True
+            for field in perf_abba_summary._DOC_OWNER_PUBLIC_PHASE_GATE_FIELDS
+        },
+    }
+    source = {
+        field: []
+        for field in perf_abba_summary._DOC_OWNER_PUBLIC_PHASE_ROOT_SOURCE_VECTOR_FIELDS
+    }
+    source[perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE] = overlay
+    elapsed_ns = elapsed(measured)
+    elapsed_ns["sample_order"] = sample_order
+    return {
+        "case": perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE,
+        "corpus": corpus,
+        "elapsed_ns": elapsed_ns,
+        "source": source,
+        "sink": None,
+        "output_sha256": output_digest,
+    }
+
+
+def doc_owner_public_phase_legs(offsets=(0, -10, -8, 2)):
+    revisions = (
+        "control-revision",
+        "candidate-revision",
+        "candidate-revision",
+        "control-revision",
+    )
+    shapes = perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_SHAPES
+    legs = []
+    for offset, revision in zip(offsets, revisions):
+        leg = report(
+            [
+                doc_owner_public_phase_row(
+                    shape,
+                    offset=offset,
+                )
+                for shape in shapes
+            ],
+            revision=revision,
+        )
+        leg["configuration"].update(
+            cases=[perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE],
+            writer_shapes=list(shapes),
+            corpus_shapes=["tiny"],
+            payload_kinds=["compressible"],
+            semantic_shapes=["tiny"],
+            rtf_variants=["plain"],
+            execution_workers=[1],
+        )
+        legs.append(leg)
+    return legs
+
+
 def reports_for_values(values):
     revisions = ("control-revision", "candidate-revision", "candidate-revision", "control-revision")
     return [
@@ -2748,6 +2894,72 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             perf_abba_summary.AbbaSummaryInputError, "exact sample permutation"
         ):
             validate(order=(0, 0))
+
+    def test_doc_owner_public_phases_projection_accepts_timing_only_differences(self):
+        legs = doc_owner_public_phase_legs()
+        self.assertNotEqual(
+            legs[0]["results"][0]["elapsed_ns"]["samples"],
+            legs[1]["results"][0]["elapsed_ns"]["samples"],
+        )
+        summary = perf_abba_summary.summarize_reports(legs)
+        self.assertEqual(summary["verification"]["result_count"], 3)
+        for result in summary["results"]:
+            source = result["source"]
+            overlay = source[perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE]
+            for field in perf_abba_summary._DOC_OWNER_PUBLIC_PHASE_DYNAMIC_FIELDS:
+                self.assertNotIn(field, overlay)
+            for field in perf_abba_summary._DOC_OWNER_PUBLIC_PHASE_IDENTITY_VECTOR_FIELDS:
+                self.assertIn(field, overlay)
+            for field in perf_abba_summary._DOC_OWNER_PUBLIC_PHASE_ROOT_SOURCE_VECTOR_FIELDS:
+                self.assertNotIn(field, source)
+            self.assertEqual(
+                overlay["expected_output_sha256"], result["output_sha256"]
+            )
+
+    def test_doc_owner_public_phases_rejects_identity_schema_and_arithmetic_mutations(self):
+        mutations = (
+            (
+                lambda row: row["corpus"].__setitem__("archive_sha256", "f" * 64),
+                "pinned DOC owner/public identity",
+            ),
+            (
+                lambda row: row["source"][
+                    perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE
+                ].__setitem__("source_archive_sha256", "f" * 64),
+                "source_archive_sha256 disagrees",
+            ),
+            (
+                lambda row: row["source"][
+                    perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE
+                ]["gates"].__setitem__("stale_source_refusal_verified", False),
+                "stale_source_refusal_verified must be true",
+            ),
+            (
+                lambda row: row["source"][
+                    perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE
+                ]["measured_total_ns"].pop(),
+                "exactly 15 samples",
+            ),
+            (
+                lambda row: row["elapsed_ns"].__setitem__(
+                    "sample_order", [0] * CONFIGURATION["samples_per_case"]
+                ),
+                "exact sample permutation",
+            ),
+            (
+                lambda row: row["source"][
+                    perf_abba_summary.DOC_OWNER_PUBLIC_PHASES_CASE
+                ]["open_public_ns"].__setitem__(0, 4),
+                "phase sum",
+            ),
+        )
+        for mutate, message in mutations:
+            malformed = doc_owner_public_phase_legs()
+            mutate(malformed[0]["results"][0])
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(malformed)
 
     def test_allocator_binary_identity_is_not_accepted_for_latency_abba(self):
         legs = four_legs()

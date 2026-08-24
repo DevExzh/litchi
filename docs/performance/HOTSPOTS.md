@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## Rejected DOC owner-public-phases hypothesis (change 0274)
+
+Change 0274 does not establish a hotspot or production optimization. Removing
+the public-reader `Vec` clone produced one accepted large lifecycle p50
+direction pair, adverse tiny p50, and disagreeing payload-heavy directions;
+means and tails were noisy/rejected. The candidate was reverted, so no
+latency, allocator, RSS, physical-I/O, or broad DOC hotspot claim follows.
+The current matrix remains 393 names with the default 36 cases / 198 records.
+
 ## Latest DOCX section-layout closure (change 0273)
 
 [Change 0273](changes/0273-docx-source-backed-section-layout.md) adds one

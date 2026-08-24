@@ -1,0 +1,436 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "3c57ee856892ebb509b4190b165321ce19c08bd89ac1920c42a7fe8687bb4fef",
+  "content_set_sha256": "e6dd5f0ce74d185553d3043cd80aa60c12c398f483ceed332e0fab5b336d86de",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "c03f75b89d1e935aa87eef3c88a1ed292c05de1c",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "doc-cfb:sha256:3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+      "name": "doc-large",
+      "legacy_v1": {
+        "name": "doc-large",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "large",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 512,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 32256,
+        "archive_bytes": 97792,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 81920,
+        "target_payload_sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+        "xlsx": null
+      },
+      "format": "DOC/CFB",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-legacy-writer-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "large"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 97792,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "logical_payload_bytes": 32256,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 0,
+        "entry_count": 512
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 97792,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "WordDocument",
+          "logical_bytes": 81920,
+          "sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "doc_owner_public_phases"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "doc-cfb:sha256:707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+      "name": "doc-payload-heavy",
+      "legacy_v1": {
+        "name": "doc-payload-heavy",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "payload-heavy",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 128,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 2560000,
+        "archive_bytes": 5179904,
+        "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 5128192,
+        "target_payload_sha256": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+        "xlsx": null
+      },
+      "format": "DOC/CFB",
+      "size_class": "unknown",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-legacy-writer-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "payload-heavy"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 5179904,
+        "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "logical_payload_bytes": 2560000,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 0,
+        "entry_count": 128
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 5179904,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "WordDocument",
+          "logical_bytes": 5128192,
+          "sha256": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "doc_owner_public_phases"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "doc-cfb:sha256:ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+      "name": "doc-tiny",
+      "legacy_v1": {
+        "name": "doc-tiny",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "tiny",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 189,
+        "archive_bytes": 15360,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 4096,
+        "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+        "xlsx": null
+      },
+      "format": "DOC/CFB",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-legacy-writer-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "tiny"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 15360,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "logical_payload_bytes": 189,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 0,
+        "entry_count": 3
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 15360,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "WordDocument",
+          "logical_bytes": 4096,
+          "sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "doc_owner_public_phases"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "doc_owner_public_phases",
+      "corpus_id": "doc-cfb:sha256:3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+      "legacy_name": "doc-large",
+      "legacy_archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+      "role": "timed"
+    },
+    {
+      "case": "doc_owner_public_phases",
+      "corpus_id": "doc-cfb:sha256:707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+      "legacy_name": "doc-payload-heavy",
+      "legacy_archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+      "role": "timed"
+    },
+    {
+      "case": "doc_owner_public_phases",
+      "corpus_id": "doc-cfb:sha256:ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+      "legacy_name": "doc-tiny",
+      "legacy_archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+      "role": "timed"
+    }
+  ]
+}

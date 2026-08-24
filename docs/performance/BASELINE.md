@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest rejected DOC owner-public-phases hypothesis (change 0274)
+
+[Change 0274](changes/0274-doc-owner-public-phases-abba.md) records a clean
+CPU-2 ABBA test of public-reader `Vec`-clone removal across three DOC shapes.
+Only large lifecycle p50 passed both paired directions; tiny p50 was adverse,
+payload-heavy directions disagreed, and means/tails were rejected. The
+candidate was reverted under the keep/revert rule, so `performance_claim:
+none` and no production optimization remains. The current matrix is unchanged
+at 393 names and 36 cases / 198 default records.
+
 ## Latest DOCX section-layout closure (change 0273)
 
 [Change 0273](changes/0273-docx-source-backed-section-layout.md) adds one
