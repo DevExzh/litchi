@@ -4670,3 +4670,36 @@ migration-host responsibility was removed. Wave62 therefore satisfies no
 crate-exit, workspace dependency-removal, generated-schema retirement, or
 monolith-deletion gate and makes no package-wide performance or full-workspace
 green claim.
+
+## 2026-08-24 amendment: Wave63 Pages body-table header bounded owner slice (not a monolith-exit gate)
+
+The Wave63 series from `6f35a3d88` through final hardening commit
+`7bc68903ef8f107b4473843945c908856988215f` establishes the selector-first
+Pages body-table header/footer owner, the doc-hidden neutral strict codec, the
+focused package transaction, the tracked host cutover, and the boundary
+ratchet. The public seam uses `BodyTableSelector`, semantic
+`table::headers::{Count, Settings}`, and
+`Package::{body_table_header_settings, edit_body_table_header_settings,
+apply_body_table_header_settings}`. Raw IDs, archive routes, wire values, and
+generated types remain private.
+
+The transaction preserves optional-field presence and unknown source bytes,
+rejects malformed or external references and unsupported dependency graphs,
+invalidates the root previews on changed publication, reopens the complete
+candidate, and retains exact source/target inverse artifacts. Pages 14.4
+opened the Rust candidate without repair, rendered the 5-by-4 table with one
+header row, saved, closed, and reopened it; strict Rust reread preserved the
+requested frozen-row semantic after Pages normalized the package. The Pages
+UI did not directly expose that freeze value, so this is bounded
+open/render/save/reopen plus Rust-reread evidence, not a visual freeze-state
+claim or byte parity.
+
+The tracked Pages raw-ID header methods are retired, but the `litchi-iwa`
+crate, remaining Pages dimensions/appearance/hidden-axis and footnote work,
+other migration hosts, dependency edges, ordered debts, and the monolith
+remain. No manifest edge, generated schema, Buffa/Prost owner, or other
+workspace dependency was removed. The live checker also retains the three
+user-owned untracked Pages table-lock findings. Wave63 therefore satisfies no
+crate-exit, dependency-removal, generated-schema-retirement, or
+monolith-deletion gate and makes no performance, general publication, or
+full-workspace green claim.
