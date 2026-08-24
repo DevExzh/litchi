@@ -557,12 +557,15 @@ impl SharedOleFile {
     /// the same validated FAT or MiniFAT chain and never restart traversal
     /// from the stream's first sector. MiniFAT cursors read the selected
     /// logical bytes directly and leave the shared Mini Stream cache untouched.
+    /// Construction resolves only the immutable validated catalog and chain;
+    /// it publishes no source bytes and performs no source-version fence.
+    /// The first and every subsequent [`SharedOleStreamCursor::read_exact`]
+    /// call fences the retained source before payload publication.
     ///
     /// # Errors
     ///
     /// Returns an error when `path` is not a stream, `offset` is past the
-    /// declared stream length, the selected chain cannot reach `offset`, or
-    /// the source version changes while the cursor is initialized.
+    /// declared stream length, or the selected chain cannot reach `offset`.
     pub fn stream_cursor_at(
         &self,
         path: &[&str],
@@ -581,46 +584,40 @@ impl SharedOleFile {
             )));
         }
 
-        self.check_source_version()?;
-        let result = (|| {
-            let state = if offset == length {
-                SharedOleStreamCursorState::End
-            } else if is_minifat {
-                let unit = self.index.mini_sector_size;
-                let ordinal = usize::try_from(offset / unit as u64).map_err(|_error| {
-                    OleError::InvalidData("MiniFAT cursor sector does not fit usize".to_string())
-                })?;
-                let sector =
-                    cursor_chain_sector(&self.index.minifat, start_sector, ordinal, "MiniFAT")?;
-                SharedOleStreamCursorState::MiniFAT {
-                    sector,
-                    within: usize::try_from(offset % unit as u64).map_err(|_error| {
-                        OleError::InvalidData(
-                            "MiniFAT cursor offset does not fit usize".to_string(),
-                        )
-                    })?,
-                }
-            } else {
-                let unit = self.index.sector_size;
-                let ordinal = usize::try_from(offset / unit as u64).map_err(|_error| {
-                    OleError::InvalidData("FAT cursor sector does not fit usize".to_string())
-                })?;
-                let sector = cursor_chain_sector(&self.index.fat, start_sector, ordinal, "FAT")?;
-                SharedOleStreamCursorState::Fat {
-                    sector,
-                    within: usize::try_from(offset % unit as u64).map_err(|_error| {
-                        OleError::InvalidData("FAT cursor offset does not fit usize".to_string())
-                    })?,
-                }
-            };
-            Ok(SharedOleStreamCursor {
-                file: self,
-                length,
-                position: offset,
-                state,
-            })
-        })();
-        self.finish_cursor_operation(result)
+        let state = if offset == length {
+            SharedOleStreamCursorState::End
+        } else if is_minifat {
+            let unit = self.index.mini_sector_size;
+            let ordinal = usize::try_from(offset / unit as u64).map_err(|_error| {
+                OleError::InvalidData("MiniFAT cursor sector does not fit usize".to_string())
+            })?;
+            let sector =
+                cursor_chain_sector(&self.index.minifat, start_sector, ordinal, "MiniFAT")?;
+            SharedOleStreamCursorState::MiniFAT {
+                sector,
+                within: usize::try_from(offset % unit as u64).map_err(|_error| {
+                    OleError::InvalidData("MiniFAT cursor offset does not fit usize".to_string())
+                })?,
+            }
+        } else {
+            let unit = self.index.sector_size;
+            let ordinal = usize::try_from(offset / unit as u64).map_err(|_error| {
+                OleError::InvalidData("FAT cursor sector does not fit usize".to_string())
+            })?;
+            let sector = cursor_chain_sector(&self.index.fat, start_sector, ordinal, "FAT")?;
+            SharedOleStreamCursorState::Fat {
+                sector,
+                within: usize::try_from(offset % unit as u64).map_err(|_error| {
+                    OleError::InvalidData("FAT cursor offset does not fit usize".to_string())
+                })?,
+            }
+        };
+        Ok(SharedOleStreamCursor {
+            file: self,
+            length,
+            position: offset,
+            state,
+        })
     }
 
     /// Returns whether an entry is present at `path`.
@@ -5501,8 +5498,8 @@ mod tests {
     fn stream_cursor_fences_before_during_and_after_hostile_reads() {
         let source = Arc::new(TestSource::new(sample_bytes()));
         let file = shared(source.clone());
-        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
         source.revision.store(1, AtomicOrdering::SeqCst);
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
         let mut output = [0u8; 4];
         assert!(matches!(
             cursor.read_exact(&mut output),
