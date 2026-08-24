@@ -1071,3 +1071,30 @@ Those stages remain separately bounded and fallible. Consequently this is an
 operation-local resource record, not a package-wide allocation, peak-memory,
 RSS, latency, throughput, or performance measurement. No manifest edge,
 generated schema, Buffa owner, or normal Prost owner changed.
+
+## 2026-08-24 amendment: Wave66 Keynote chart-caption hardening resource record
+
+Commit `cd76c394e2cd6e360cd01e8bd61cb7594d837701` keeps the Wave65
+chart-caption lifecycle while adding strict source-authority work at its
+selected boundaries. Canonical IWA framing checks, chart/reference/theme
+wire scans, physical dependency attribution, Metadata component and external-
+reference inspection, save-token rewriting, MessageInfo reference transition,
+candidate reassembly, and complete reopen all remain under the existing
+finite package, archive, wire, object, field, nesting, reference, work, and
+output ceilings.
+
+The strict Metadata and chart-caption codecs measure their selected outputs
+before fallible allocation and verify candidate readback. The package scans a
+finite physical catalog, rejects ambiguous owners instead of retaining an
+unbounded graph, and preserves exact source/target artifacts for inverse
+application. Some-to-some replacement adds the Metadata sidecar as one
+authorized changed component; graph transitions authorize aggregate and
+field-local reference lists without exposing raw identifiers publicly.
+
+Wave66 still does not provide one aggregate transaction counter or a single
+candidate allocation across archive parsing, dependency census, Metadata
+inspection/rewrite, Snappy compression, ZIP reassembly, candidate reopen, and
+exact artifacts. Each stage remains bounded and fallible, but this is not a
+package-wide allocation, peak-memory, RSS, latency, throughput, or performance
+claim. No manifest edge, generated schema, Buffa owner, normal Prost owner, or
+workspace dependency changed.

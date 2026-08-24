@@ -4754,3 +4754,27 @@ user-owned untracked Pages table-lock findings and no Keynote caption finding.
 Wave65 therefore satisfies no crate-exit, host-exit, dependency-removal,
 generated-schema-retirement, monolith-deletion, full-workspace-green, or
 package-wide-performance gate.
+
+## 2026-08-24 amendment: Wave66 Keynote chart-caption hardening (not a monolith-exit gate)
+
+Commit `cd76c394e2cd6e360cd01e8bd61cb7594d837701` hardens the focused
+Keynote chart-caption owner with source-authoritative chart-reference
+transitions, canonical IWA object framing, strict selected wire validation,
+exact current Metadata save-token updates for existing text, and proven
+cross-component stylesheet/paragraph external references. The semantic public
+API and the Wave65 host cutover remain unchanged; no raw-ID compatibility
+surface was restored.
+
+This is a bounded acceptance and safety refinement. Arbitrary future caption
+graphs, ambiguous/weak/versioned dependencies, unrelated owners, and
+noncanonical selected wire forms remain rejected. The native record is
+bounded Keynote 14.4 open/render/save/close/reopen evidence with an exact
+pre-native inverse; it is not byte parity, arbitrary graph acceptance,
+package-wide performance, or a general publication gate.
+
+The `litchi-iwa` crate, remaining Keynote/Pages/Numbers compatibility hosts,
+dependency edges, ordered debts, generated schemas, Buffa/Prost owners, and
+monolith remain. Wave66 removes no manifest edge, crate, remaining host,
+generated-schema owner, or normal Prost owner. It therefore satisfies no
+crate-exit, host-exit, dependency-removal, generated-schema-retirement,
+monolith-deletion, full-workspace-green, or aggregate-resource gate.
