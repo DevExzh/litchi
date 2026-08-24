@@ -3,6 +3,22 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0269 — XLSX repeated-store cache ABBA](changes/0269-xlsx-repeated-store-cache-abba.md)
+(the direct same-selector release ABBA comparison accepts all eight
+p50/mean/p95/p99 cells across the medium and oversized primary selectors,
+with zero adverse-both cells. The semantic-query-only interval repeats four
+queries eight times in fresh warm children; structural reacquisition controls
+remain excluded. This is a latency-only XLSX claim with no resource,
+allocation/RSS, physical-I/O, cold-cache, publication/save, producer, or broad
+XLSX scope.)
+
+[change 0268 — XLS owned-source publication ABBA](changes/0268-xls-owned-source-publication-abba.md)
+(the direct CPU-2 release A1/B1/B2/A2 comparison accepts all eight
+p50/mean/p95/p99 cells for the Number and RK/MulRK source-backed publication
+selectors, with zero adverse-both cells. This is a latency-only XLS claim
+with no resource, allocation/RSS, physical-I/O, cold-cache, producer, or broad
+XLS scope.)
+
 [change 0267 — XLSX repeated-store strict schema and harness](changes/0267-xlsx-repeated-store-strict-harness.md)
 (the four opt-in selectors bring the current selectable matrix to 389 names
 while the default remains 36 cases / 198 records. A pinned medium/oversized

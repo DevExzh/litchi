@@ -2100,6 +2100,8 @@ def _validate_filesystem_evidence(
     tool: dict[str, Any],
     indexed: Mapping[tuple[str, str], dict[str, Any]],
     label: str,
+    *,
+    report_role: str,
 ) -> tuple[bool, frozenset[str], dict[tuple[str, str], str], frozenset[int]]:
     raw = root.get("filesystem_evidence", _MISSING)
     for case, corpus_identity in indexed:
@@ -2282,7 +2284,7 @@ def _validate_filesystem_evidence(
                     validated_sample["xlsx_repeat_store"],
                     f"{location}.samples[{sample_position}].xlsx_repeat_store",
                     case=case,
-                    report_label=label,
+                    report_label=report_role,
                     corpus=corpus,
                 )
                 repeated_store_roles.add(role)
@@ -2468,6 +2470,7 @@ def _validate_report(
     label: str,
     *,
     profile: str | None = None,
+    report_role: str | None = None,
     raw_canonical_sha256: str | None = None,
 ) -> tuple[
     int,
@@ -2482,6 +2485,11 @@ def _validate_report(
     dict[str, Any] | None,
     frozenset[int],
 ]:
+    if report_role is not None and report_role not in LEG_ORDER:
+        raise AbbaSummaryInputError(
+            f"{label} report_role must be one of {', '.join(LEG_ORDER)}"
+        )
+    semantic_role = report_role or label
     root = _require_object(report, label)
     detected_profile = detect_report_profile(root, label)
     if profile is not None and profile != detected_profile:
@@ -2521,9 +2529,20 @@ def _validate_report(
     _validate_configuration(configuration, label)
     indexed = _index_results(root, label)
     _validate_xls_numeric_source_summary(indexed, label)
-    _validate_xls_numeric_operation_evidence(indexed, label)
+    _validate_xls_numeric_operation_evidence(
+        indexed,
+        label,
+        report_role=semantic_role,
+    )
     filesystem_present, filesystem_shapes, filesystem_identity, filesystem_child_process_ids = (
-        _validate_filesystem_evidence(root, configuration, tool, indexed, label)
+        _validate_filesystem_evidence(
+            root,
+            configuration,
+            tool,
+            indexed,
+            label,
+            report_role=semantic_role,
+        )
     )
     return (
         schema_version,
@@ -3361,7 +3380,10 @@ def _validate_xls_numeric_source_summary(
 
 
 def _validate_xls_numeric_operation_evidence(
-    indexed: Mapping[tuple[str, str], dict[str, Any]], label: str
+    indexed: Mapping[tuple[str, str], dict[str, Any]],
+    label: str,
+    *,
+    report_role: str,
 ) -> None:
     """Validate additive native-XLS logical operation-shape evidence.
 
@@ -3533,7 +3555,9 @@ def _validate_xls_numeric_operation_evidence(
                 expected_mode = "owned_immutable_arc"
             else:
                 expected_mode = (
-                    "generic_read_at" if label in {"a1", "a2"} else "owned_immutable_arc"
+                    "generic_read_at"
+                    if report_role in {"a1", "a2"}
+                    else "owned_immutable_arc"
                 )
             if mode != expected_mode:
                 raise AbbaSummaryInputError(
@@ -3853,6 +3877,7 @@ def _project_report(
     label: str = "report",
     *,
     profile: str | None = None,
+    report_role: str | None = None,
     expected_revision: str | None = None,
     minimum_samples: int = MIN_RETAINED_SAMPLES,
     raw_canonical_sha256: str | None = None,
@@ -3876,6 +3901,7 @@ def _project_report(
         report,
         label,
         profile=profile,
+        report_role=report_role,
         raw_canonical_sha256=raw_canonical_sha256,
     )
     report_schema, tool, environment, configuration, indexed, report_sha256 = validated[:6]

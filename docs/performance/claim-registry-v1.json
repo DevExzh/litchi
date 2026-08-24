@@ -101,6 +101,38 @@
       "sha256": "bad9031a246b80d1090ad16cb9837b4581d8f451bbd43e7d03c839e878ae99d3",
       "schema_version": 1,
       "abba_schema_version": 1
+    },
+    {
+      "id": "abba-0268-xls-owned-source",
+      "kind": "abba_package",
+      "relative_path": "docs/performance/results/0268-xls-owned-source-publication-abba-20260824",
+      "manifest": {
+        "path": "0268-xls-owned-source-publication-abba-manifest.json",
+        "sha256": "bba41c49c4ed94120c61043fe8eb0602928c0545df9352841dc1bd9adbb29c7e",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "d016ae3b96cad3ce271a2aa099660b33f65fd0956df645d7d6016b0ca51b9d91",
+        "canonical_sha256": "5db3fb8465f0bfa72748ef1220329d0108ac84a847e3325611e40dfcca5599ca",
+        "schema_version": 1
+      }
+    },
+    {
+      "id": "abba-0269-xlsx-repeated-store-cache",
+      "kind": "abba_package",
+      "relative_path": "docs/performance/results/0269-xlsx-repeated-store-cache-abba-20260824",
+      "manifest": {
+        "path": "0269-xlsx-repeated-store-cache-abba-manifest.json",
+        "sha256": "a1c9b662e9d84886d69130ef054c2cc4b1ac55952fd97fb48df1f8a6a96226e4",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "6200fa280525d370d6d8375d750def700c011c7d646fddfbddec642afce8d317",
+        "canonical_sha256": "6a6697f01ac678efbc8c8466bc8f32a5ecef99700b1492437ab081f87bdea4ae",
+        "schema_version": 1
+      }
     }
   ],
   "claims": [
@@ -479,6 +511,184 @@
       },
       "documentation": [
         "docs/performance/changes/0251-xlsx-xml-borrowed-abba.md"
+      ]
+    },
+    {
+      "id": "claim-0268-xls-owned-source",
+      "change_id": "0268-xls-owned-source-publication-abba",
+      "claim_class": "optimization",
+      "status": "landed",
+      "code_state": "landed",
+      "reason_codes": [
+        "accepted_latency_only"
+      ],
+      "scope": {
+        "format": "xls",
+        "selectors": [
+          "xls_numeric_source_backed_number_edit_save",
+          "xls_numeric_source_backed_rk_mulrk_edit_save"
+        ],
+        "corpora": [
+          {
+            "name": "xls-comments-opaque-heavy",
+            "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+            "generator": "litchi-xls-comments-opaque-heavy-v1",
+            "shape": "256-comments-opaque-heavy",
+            "package_format": "XLS/CFB"
+          },
+          {
+            "name": "xls-rk-mulrk-deterministic",
+            "archive_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+            "generator": "litchi-xls-rk-mulrk-publication-v1",
+            "shape": "one-rk-one-mulrk",
+            "package_format": "XLS/CFB"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0268-xls-owned-source",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 8,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "xls_numeric_source_backed_number_edit_save",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_numeric_source_backed_number_edit_save",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_numeric_source_backed_number_edit_save",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_numeric_source_backed_number_edit_save",
+            "corpus": "xls-comments-opaque-heavy",
+            "statistic": "p99"
+          },
+          {
+            "case": "xls_numeric_source_backed_rk_mulrk_edit_save",
+            "corpus": "xls-rk-mulrk-deterministic",
+            "statistic": "p50"
+          },
+          {
+            "case": "xls_numeric_source_backed_rk_mulrk_edit_save",
+            "corpus": "xls-rk-mulrk-deterministic",
+            "statistic": "mean"
+          },
+          {
+            "case": "xls_numeric_source_backed_rk_mulrk_edit_save",
+            "corpus": "xls-rk-mulrk-deterministic",
+            "statistic": "p95"
+          },
+          {
+            "case": "xls_numeric_source_backed_rk_mulrk_edit_save",
+            "corpus": "xls-rk-mulrk-deterministic",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0268-xls-owned-source-publication-abba.md"
+      ]
+    },
+    {
+      "id": "claim-0269-xlsx-repeated-store-cache",
+      "change_id": "0269-xlsx-repeated-store-cache-abba",
+      "claim_class": "optimization",
+      "status": "landed",
+      "code_state": "landed",
+      "reason_codes": [
+        "accepted_latency_only"
+      ],
+      "scope": {
+        "format": "xlsx",
+        "selectors": [
+          "xlsx_source_repeated_store_medium",
+          "xlsx_source_repeated_store_oversized"
+        ],
+        "corpora": [
+          {
+            "name": "xlsx-source-repeated-store-medium",
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+            "shape": "medium",
+            "package_format": "XLSX/OPC/ZIP"
+          },
+          {
+            "name": "xlsx-source-repeated-store-oversized",
+            "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+            "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+            "shape": "oversized",
+            "package_format": "XLSX/OPC/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0269-xlsx-repeated-store-cache",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 8,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "xlsx_source_repeated_store_medium",
+            "corpus": "xlsx-source-repeated-store-medium",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_source_repeated_store_medium",
+            "corpus": "xlsx-source-repeated-store-medium",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_source_repeated_store_medium",
+            "corpus": "xlsx-source-repeated-store-medium",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_source_repeated_store_medium",
+            "corpus": "xlsx-source-repeated-store-medium",
+            "statistic": "p99"
+          },
+          {
+            "case": "xlsx_source_repeated_store_oversized",
+            "corpus": "xlsx-source-repeated-store-oversized",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_source_repeated_store_oversized",
+            "corpus": "xlsx-source-repeated-store-oversized",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_source_repeated_store_oversized",
+            "corpus": "xlsx-source-repeated-store-oversized",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_source_repeated_store_oversized",
+            "corpus": "xlsx-source-repeated-store-oversized",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0269-xlsx-repeated-store-cache-abba.md"
       ]
     }
   ]
