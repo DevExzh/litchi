@@ -2625,3 +2625,31 @@ The owner also rejects unrelated aggregate or FieldInfo owners of a selected
 caption graph and aliased caption stand-ins. These checks expand the
 fail-closed acceptance boundary; they do not claim support for arbitrary
 future Keynote caption graphs or normalize producer extensions.
+
+## 2026-08-24 amendment: Keynote chart-title raw-ID host retirement
+
+Commit `e62b6fdb1` retires the remaining raw-identifier Keynote chart-title
+host operation. The selector-first semantic owner remains
+`Package::{slide_chart_catalog, slide_chart_title, edit_slide_chart_title,
+apply_slide_chart_title}`, with `SlideSelector`, `ChartSelector`, and the
+`ChartTitle{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` transaction types.
+The package owner and its focused behavior are unchanged; chart-title reads,
+edits, no-ops, exact patches, inverse application, and candidate verification
+continue to use semantic selectors and do not expose native identifiers,
+archive objects, component routes, protobuf messages, or wire payloads.
+
+Wave68 removes the deprecated `litchi-iwa::KeynoteEditor` raw-ID chart-title
+method and setter/remover wrappers, together with their private
+identifier-to-position bridge and fallback path. Nineteen examples and the
+host chart-title tests were migrated to selector-first methods using a
+positional slide and `ChartSelector`. This is an intentional unpublished
+`0.0.1` breaking removal of an adapter-only surface; no compatibility shim or
+public raw-ID replacement is added. Other Keynote migration-host operations,
+graph ownership, and the remaining `litchi-iwa` compatibility edge remain in
+scope for later slices.
+
+This retires one host operation rather than declaring the host, dependency
+edge, generated schema owners, or monolith complete. The semantic package
+facade remains the authority for chart-title behavior, while any retained
+host adapter is selector-based and cannot widen the public API with native
+IDs.
