@@ -964,6 +964,34 @@ fn oversized_unknown_record_is_refused_before_payload_read() {
 }
 
 #[test]
+fn supported_unknown_payload_is_skipped_without_source_overread() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let payload = vec![0xA5; 4_096];
+    let unknown_offset = worksheet_eof_offset(&original, first_sheet_offset(&original));
+    let modified = insert_before_worksheet_eof(&original, &frame_bytes(0x1234, &payload));
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let header_ranges = physical_ranges_for_stream_range(&source, unknown_offset as u64, 4);
+    let payload_ranges =
+        physical_ranges_for_stream_range(&source, unknown_offset as u64 + 4, payload.len());
+    source.clear_ranges();
+
+    let actual = owner.cell_value_by_index(0, 0, 0).unwrap();
+    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let expected = eager
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(0, 0)
+        .map(CellTrait::value);
+    assert_eq!(actual.as_ref(), expected);
+
+    let query_ranges = source.ranges();
+    assert!(overlaps_any(&query_ranges, &header_ranges));
+    assert!(!overlaps_any(&query_ranges, &payload_ranges));
+}
+
+#[test]
 fn stale_sources_are_rejected_before_selected_reads() {
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();

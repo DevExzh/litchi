@@ -62,6 +62,39 @@ struct PendingPhysicalRange {
     sector: u32,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SharedOleStreamCursorState {
+    End,
+    Fat { sector: u32, within: usize },
+    MiniFAT { sector: u32, within: usize },
+}
+
+/// A non-owning, forward-only cursor over one validated CFB stream.
+///
+/// The cursor resolves the stream directory entry once and keeps only the
+/// current logical chain position. FAT and MiniFAT payloads are read directly
+/// from the retained positional source; creating or using a cursor never
+/// materializes the shared Mini Stream cache.
+///
+/// A cursor is intentionally not `Clone`. Callers that need independent
+/// traversals should create independent cursors from [`SharedOleFile`].
+pub struct SharedOleStreamCursor<'a> {
+    file: &'a SharedOleFile,
+    length: u64,
+    position: u64,
+    state: SharedOleStreamCursorState,
+}
+
+impl std::fmt::Debug for SharedOleStreamCursor<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SharedOleStreamCursor")
+            .field("length", &self.length)
+            .field("position", &self.position)
+            .finish_non_exhaustive()
+    }
+}
+
 // MS-CFB routes streams strictly smaller than the 4096-byte cutoff through
 // MiniFAT. Keep this bound local to the positional reader rather than adding
 // another public limit: it is an invariant of the format, not caller policy.
@@ -516,6 +549,78 @@ impl SharedOleFile {
             return Err(OleError::InvalidFormat("Not a stream".to_string()));
         }
         Ok(entry.size)
+    }
+
+    /// Creates a non-owning, forward-only cursor at a logical stream offset.
+    ///
+    /// The directory entry is resolved once. Subsequent cursor operations use
+    /// the same validated FAT or MiniFAT chain and never restart traversal
+    /// from the stream's first sector. MiniFAT cursors read the selected
+    /// logical bytes directly and leave the shared Mini Stream cache untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `path` is not a stream, `offset` is past the
+    /// declared stream length, the selected chain cannot reach `offset`, or
+    /// the source version changes while the cursor is initialized.
+    pub fn stream_cursor_at(
+        &self,
+        path: &[&str],
+        offset: u64,
+    ) -> Result<SharedOleStreamCursor<'_>, OleError> {
+        let (is_minifat, start_sector, length) = {
+            let entry = self.find_entry(path)?;
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
+        if offset > length {
+            return Err(OleError::InvalidData(format!(
+                "stream cursor offset {offset} exceeds length {length}"
+            )));
+        }
+
+        self.check_source_version()?;
+        let result = (|| {
+            let state = if offset == length {
+                SharedOleStreamCursorState::End
+            } else if is_minifat {
+                let unit = self.index.mini_sector_size;
+                let ordinal = usize::try_from(offset / unit as u64).map_err(|_error| {
+                    OleError::InvalidData("MiniFAT cursor sector does not fit usize".to_string())
+                })?;
+                let sector =
+                    cursor_chain_sector(&self.index.minifat, start_sector, ordinal, "MiniFAT")?;
+                SharedOleStreamCursorState::MiniFAT {
+                    sector,
+                    within: usize::try_from(offset % unit as u64).map_err(|_error| {
+                        OleError::InvalidData(
+                            "MiniFAT cursor offset does not fit usize".to_string(),
+                        )
+                    })?,
+                }
+            } else {
+                let unit = self.index.sector_size;
+                let ordinal = usize::try_from(offset / unit as u64).map_err(|_error| {
+                    OleError::InvalidData("FAT cursor sector does not fit usize".to_string())
+                })?;
+                let sector = cursor_chain_sector(&self.index.fat, start_sector, ordinal, "FAT")?;
+                SharedOleStreamCursorState::Fat {
+                    sector,
+                    within: usize::try_from(offset % unit as u64).map_err(|_error| {
+                        OleError::InvalidData("FAT cursor offset does not fit usize".to_string())
+                    })?,
+                }
+            };
+            Ok(SharedOleStreamCursor {
+                file: self,
+                length,
+                position: offset,
+                state,
+            })
+        })();
+        self.finish_cursor_operation(result)
     }
 
     /// Returns whether an entry is present at `path`.
@@ -1997,6 +2102,16 @@ impl SharedOleFile {
         }
     }
 
+    fn finish_cursor_operation<T>(&self, result: Result<T, OleError>) -> Result<T, OleError> {
+        match result {
+            Ok(value) => self.check_source_version().map(|()| value),
+            Err(original) => match self.check_source_version() {
+                Err(error @ OleError::SourceChanged { .. }) => Err(error),
+                _ => Err(original),
+            },
+        }
+    }
+
     fn read_fat_stream(&self, start_sector: u32, size: u64) -> Result<Vec<u8>, OleError> {
         let size = usize::try_from(size)
             .map_err(|_error| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
@@ -2292,6 +2407,374 @@ impl ReadAt for OwnedArcSource {
     fn version(&self) -> io::Result<SourceVersion> {
         Ok(self.version)
     }
+}
+
+impl SharedOleStreamCursor<'_> {
+    /// Declared logical stream length.
+    #[must_use]
+    pub const fn len(&self) -> u64 {
+        self.length
+    }
+
+    /// Whether the selected stream is logically empty.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
+    /// Current logical stream position.
+    #[must_use]
+    pub const fn position(&self) -> u64 {
+        self.position
+    }
+
+    /// Advances the cursor by `bytes` without reading payload bytes.
+    ///
+    /// Movement is strictly forward. A failed movement leaves the logical
+    /// position unchanged. Skipping traverses only the immutable, validated
+    /// allocation tables and publishes no source bytes; the next read fences
+    /// the retained source before using the moved position.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-data error when the movement exceeds the
+    /// stream, or a corruption error when the chain cannot be traversed
+    /// consistently.
+    pub fn skip_forward(&mut self, bytes: u64) -> Result<(), OleError> {
+        self.move_forward(bytes)
+    }
+
+    /// Moves to a later logical position without reading payload bytes.
+    ///
+    /// Passing a position before the current position is rejected; callers
+    /// must create a new cursor for backward movement. Skipping publishes no
+    /// source bytes and does not perform a source-version fence; the next
+    /// read detects a persistent source change.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-data error for backward or out-of-bounds
+    /// movement, or a corruption error when the chain cannot be traversed
+    /// consistently.
+    pub fn skip_to(&mut self, position: u64) -> Result<(), OleError> {
+        if position < self.position {
+            return Err(OleError::InvalidData(
+                "stream cursor cannot move backwards".to_string(),
+            ));
+        }
+        let bytes = position
+            .checked_sub(self.position)
+            .ok_or_else(|| OleError::InvalidData("stream cursor position underflow".to_string()))?;
+        self.move_forward(bytes)
+    }
+
+    /// Reads exactly `output.len()` logical bytes and advances the cursor.
+    ///
+    /// Every read fences the retained source before payload I/O and again
+    /// after the read. Reads are grouped into physically contiguous FAT or
+    /// MiniFAT runs when doing so is safe. The destination may contain a
+    /// prefix when a later source, chain, or version check fails; callers must
+    /// discard it on any error. A failed read does not commit the cursor
+    /// position, so a stable source may be retried. If a read/chain error and a
+    /// source mutation race, the post-read `SourceChanged` error wins.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed invalid-data error when the requested bytes exceed the
+    /// remaining logical stream, a corruption error when allocation traversal
+    /// fails, or a source I/O/source-version error.
+    pub fn read_exact(&mut self, output: &mut [u8]) -> Result<(), OleError> {
+        self.file.check_source_version()?;
+        let state = self.state;
+        let position = self.position;
+        let result = (|| {
+            let requested = output.len() as u64;
+            let end = position.checked_add(requested).ok_or_else(|| {
+                OleError::InvalidData("stream cursor read end overflow".to_string())
+            })?;
+            if end > self.length {
+                return Err(OleError::InvalidData(format!(
+                    "stream cursor read {position}..{end} exceeds length {}",
+                    self.length
+                )));
+            }
+            let state = self.read_from_state(state, output)?;
+            let state = if end == self.length {
+                SharedOleStreamCursorState::End
+            } else {
+                state
+            };
+            Ok((state, end))
+        })();
+        match self.file.finish_cursor_operation(result) {
+            Ok((state, position)) => {
+                self.state = state;
+                self.position = position;
+                Ok(())
+            },
+            Err(error) => Err(error),
+        }
+    }
+
+    fn move_forward(&mut self, bytes: u64) -> Result<(), OleError> {
+        let state = self.state;
+        let position = self.position;
+        let end = position
+            .checked_add(bytes)
+            .ok_or_else(|| OleError::InvalidData("stream cursor position overflow".to_string()))?;
+        if end > self.length {
+            return Err(OleError::InvalidData(format!(
+                "stream cursor position {end} exceeds length {}",
+                self.length
+            )));
+        }
+        let state = self.advance_state(state, bytes)?;
+        self.state = if end == self.length {
+            SharedOleStreamCursorState::End
+        } else {
+            state
+        };
+        self.position = end;
+        Ok(())
+    }
+
+    fn read_from_state(
+        &self,
+        mut state: SharedOleStreamCursorState,
+        output: &mut [u8],
+    ) -> Result<SharedOleStreamCursorState, OleError> {
+        let mut written = 0_usize;
+        while written < output.len() {
+            state = self.normalize_state(state)?;
+            let (physical, available) = self.physical_span(state)?;
+            let mut run_bytes = available.min(output.len() - written);
+            let mut probe = self.advance_within(state, run_bytes)?;
+
+            while written + run_bytes < output.len() {
+                let next = self.normalize_state(probe)?;
+                let (next_physical, next_available) = self.physical_span(next)?;
+                let contiguous = physical.checked_add(run_bytes as u64).ok_or_else(|| {
+                    OleError::CorruptedFile(
+                        "stream cursor physical run offset overflow".to_string(),
+                    )
+                })?;
+                if next_physical != contiguous {
+                    probe = next;
+                    break;
+                }
+                let count = next_available.min(output.len() - written - run_bytes);
+                run_bytes = run_bytes.checked_add(count).ok_or_else(|| {
+                    OleError::CorruptedFile("stream cursor run size overflow".to_string())
+                })?;
+                probe = self.advance_within(next, count)?;
+            }
+
+            self.file
+                .source
+                .read_exact_at(physical, &mut output[written..written + run_bytes])?;
+            written += run_bytes;
+            state = probe;
+        }
+        Ok(state)
+    }
+
+    fn advance_state(
+        &self,
+        mut state: SharedOleStreamCursorState,
+        mut bytes: u64,
+    ) -> Result<SharedOleStreamCursorState, OleError> {
+        while bytes > 0 {
+            state = self.normalize_state(state)?;
+            let available = self.physical_span(state)?.1;
+            let count = bytes.min(available as u64);
+            state = self.advance_within(
+                state,
+                usize::try_from(count).map_err(|_error| {
+                    OleError::InvalidData("stream cursor movement does not fit usize".to_string())
+                })?,
+            )?;
+            bytes -= count;
+        }
+        Ok(state)
+    }
+
+    fn advance_within(
+        &self,
+        state: SharedOleStreamCursorState,
+        bytes: usize,
+    ) -> Result<SharedOleStreamCursorState, OleError> {
+        match state {
+            SharedOleStreamCursorState::End => Err(OleError::CorruptedFile(
+                "stream cursor passed EOF".to_string(),
+            )),
+            SharedOleStreamCursorState::Fat { sector, within } => {
+                let unit = self.file.index.sector_size;
+                let next = within.checked_add(bytes).ok_or_else(|| {
+                    OleError::CorruptedFile("FAT cursor offset overflow".to_string())
+                })?;
+                if next > unit {
+                    return Err(OleError::CorruptedFile(
+                        "FAT cursor crossed a sector boundary".to_string(),
+                    ));
+                }
+                Ok(SharedOleStreamCursorState::Fat {
+                    sector,
+                    within: next,
+                })
+            },
+            SharedOleStreamCursorState::MiniFAT { sector, within } => {
+                let unit = self.file.index.mini_sector_size;
+                let next = within.checked_add(bytes).ok_or_else(|| {
+                    OleError::CorruptedFile("MiniFAT cursor offset overflow".to_string())
+                })?;
+                if next > unit {
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT cursor crossed a sector boundary".to_string(),
+                    ));
+                }
+                Ok(SharedOleStreamCursorState::MiniFAT {
+                    sector,
+                    within: next,
+                })
+            },
+        }
+    }
+
+    fn normalize_state(
+        &self,
+        state: SharedOleStreamCursorState,
+    ) -> Result<SharedOleStreamCursorState, OleError> {
+        match state {
+            SharedOleStreamCursorState::End => Ok(state),
+            SharedOleStreamCursorState::Fat { sector, within } => {
+                let unit = self.file.index.sector_size;
+                if within < unit {
+                    return Ok(state);
+                }
+                if within > unit {
+                    return Err(OleError::CorruptedFile(
+                        "FAT cursor offset exceeds sector size".to_string(),
+                    ));
+                }
+                let next = next_chain_sector(&self.file.index.fat, sector, "FAT")?;
+                if next == ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "FAT chain ends before cursor range".to_string(),
+                    ));
+                }
+                Ok(SharedOleStreamCursorState::Fat {
+                    sector: next,
+                    within: 0,
+                })
+            },
+            SharedOleStreamCursorState::MiniFAT { sector, within } => {
+                let unit = self.file.index.mini_sector_size;
+                if within < unit {
+                    return Ok(state);
+                }
+                if within > unit {
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT cursor offset exceeds sector size".to_string(),
+                    ));
+                }
+                let next = next_chain_sector(&self.file.index.minifat, sector, "MiniFAT")?;
+                if next == ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT chain ends before cursor range".to_string(),
+                    ));
+                }
+                Ok(SharedOleStreamCursorState::MiniFAT {
+                    sector: next,
+                    within: 0,
+                })
+            },
+        }
+    }
+
+    fn physical_span(&self, state: SharedOleStreamCursorState) -> Result<(u64, usize), OleError> {
+        match state {
+            SharedOleStreamCursorState::End => Err(OleError::CorruptedFile(
+                "stream cursor passed EOF".to_string(),
+            )),
+            SharedOleStreamCursorState::Fat { sector, within } => {
+                let unit = self.file.index.sector_size;
+                if within >= unit {
+                    return Err(OleError::CorruptedFile(
+                        "FAT cursor offset exceeds sector size".to_string(),
+                    ));
+                }
+                let physical = (u64::from(sector) + 1)
+                    .checked_mul(unit as u64)
+                    .and_then(|value| value.checked_add(within as u64))
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("FAT cursor physical offset overflow".to_string())
+                    })?;
+                Ok((physical, unit - within))
+            },
+            SharedOleStreamCursorState::MiniFAT { sector, within } => {
+                let root = self.file.index.root.as_ref().ok_or_else(|| {
+                    OleError::CorruptedFile("mini stream has no root entry".to_string())
+                })?;
+                let unit = self.file.index.mini_sector_size;
+                if within >= unit {
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT cursor offset exceeds sector size".to_string(),
+                    ));
+                }
+                let mini_offset = usize::try_from(sector)
+                    .map_err(|_error| {
+                        OleError::CorruptedFile(
+                            "MiniFAT cursor sector does not fit usize".to_string(),
+                        )
+                    })?
+                    .checked_mul(unit)
+                    .and_then(|value| value.checked_add(within))
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT cursor offset overflow".to_string())
+                    })?;
+                let root_remaining =
+                    root.size.checked_sub(mini_offset as u64).ok_or_else(|| {
+                        OleError::CorruptedFile(
+                            "MiniFAT cursor exceeds root mini-stream length".to_string(),
+                        )
+                    })?;
+                let count =
+                    (unit - within).min(usize::try_from(root_remaining).unwrap_or(usize::MAX));
+                if count == 0 {
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT cursor exceeds root mini-stream length".to_string(),
+                    ));
+                }
+                let range = self
+                    .file
+                    .minifat_physical_range(root.size, sector, within, count, 0)?;
+                Ok((range.physical, range.length))
+            },
+        }
+    }
+}
+
+fn cursor_chain_sector(
+    table: &[u32],
+    start_sector: u32,
+    ordinal: usize,
+    table_name: &str,
+) -> Result<u32, OleError> {
+    let mut sector = start_sector;
+    for _ in 0..ordinal {
+        sector = next_chain_sector(table, sector, table_name)?;
+        if sector == ENDOFCHAIN {
+            return Err(OleError::CorruptedFile(format!(
+                "{table_name} chain ends before cursor offset"
+            )));
+        }
+    }
+    if sector == ENDOFCHAIN {
+        return Err(OleError::CorruptedFile(format!(
+            "{table_name} chain ends before cursor offset"
+        )));
+    }
+    Ok(sector)
 }
 
 fn next_chain_sector(table: &[u32], sector: u32, table_name: &str) -> Result<u32, OleError> {
@@ -4855,6 +5338,204 @@ mod tests {
         let mut output = [0u8; 4];
         assert!(matches!(
             file.read_stream_range(&["Small"], 0, &mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn stream_cursor_fat_sequential_reads_match_ranges_without_restarting_chain() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let expected = vec![0xA5; 8192];
+        source.reset_read_count();
+
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        assert_eq!(cursor.len(), expected.len() as u64);
+        assert_eq!(cursor.position(), 0);
+        let mut observed = vec![0u8; expected.len()];
+        for chunk in observed.chunks_mut(512) {
+            cursor.read_exact(chunk).unwrap();
+        }
+
+        assert_eq!(observed, expected);
+        assert_eq!(cursor.position(), expected.len() as u64);
+        let ranges = source.read_ranges();
+        assert_eq!(ranges.len(), expected.len() / 512);
+        for (index, (offset, length)) in ranges.into_iter().enumerate() {
+            assert_eq!(offset, 512 + index as u64 * 512);
+            assert_eq!(length, 512);
+        }
+    }
+
+    #[test]
+    fn stream_cursor_fragmented_fat_reads_match_logical_order() {
+        let mut bytes = sample_bytes();
+        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let entry = parsed.find_entry(&["Large"]).unwrap();
+        let sector_size = parsed.index.sector_size;
+        let mut chain = Vec::new();
+        let mut sector = entry.start_sector;
+        for _ in 0..8192usize.div_ceil(sector_size) {
+            chain.push(sector);
+            sector = parsed.index.fat[sector as usize];
+        }
+        let fat_sector = u32::from_le_bytes(bytes[0x4c..0x50].try_into().unwrap());
+        let fat_offset = (fat_sector as usize + 1) * sector_size;
+        let [first, second, third, fourth] = [chain[0], chain[1], chain[2], chain[3]];
+        for (current, next) in [(first, third), (third, second), (second, fourth)] {
+            let offset = fat_offset + current as usize * 4;
+            bytes[offset..offset + 4].copy_from_slice(&next.to_le_bytes());
+        }
+        let second_offset = (second as usize + 1) * sector_size;
+        let third_offset = (third as usize + 1) * sector_size;
+        for index in 0..sector_size {
+            bytes.swap(second_offset + index, third_offset + index);
+        }
+
+        let source = Arc::new(TestSource::new(bytes));
+        let file = shared(source.clone());
+        source.reset_read_count();
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        let mut observed = vec![0u8; 8192];
+        cursor.read_exact(&mut observed).unwrap();
+
+        assert_eq!(observed, vec![0xA5; 8192]);
+        assert_eq!(
+            source.read_ranges()[..3],
+            [
+                ((u64::from(first) + 1) * sector_size as u64, sector_size),
+                ((u64::from(third) + 1) * sector_size as u64, sector_size),
+                ((u64::from(second) + 1) * sector_size as u64, sector_size),
+            ]
+        );
+    }
+
+    #[test]
+    fn stream_cursor_minifat_parity_leaves_cache_unmaterialized() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Small"], 0).unwrap();
+        let mut observed = [0u8; 11];
+        cursor.read_exact(&mut observed).unwrap();
+
+        assert_eq!(&observed, b"mini stream");
+        assert_eq!(cursor.position(), 11);
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn stream_cursor_minifat_handles_partial_root_tail_like_range_reader() {
+        let (bytes, _selected) = two_mini_bytes(4095);
+        let parsed = SharedOleFile::open(Arc::new(TestSource::new(bytes.clone()))).unwrap();
+        let mut index = match Arc::try_unwrap(parsed.index) {
+            Ok(index) => index,
+            Err(_index) => panic!("test owns the parsed index"),
+        };
+        let root = index.root.as_mut().unwrap();
+        assert!(root.size >= 8191);
+        root.size = 8191;
+        let source = Arc::new(TestSource::new(bytes));
+        let expected_version = source.version().unwrap();
+        let file = SharedOleFile {
+            source: source.clone(),
+            expected_version,
+            source_is_owned_immutable: false,
+            index: Arc::new(index),
+            ministream: Mutex::new(None),
+            minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
+            minifat_singleflight: MiniFATSingleFlight::new(),
+        };
+
+        let mut expected = vec![0u8; 4095];
+        file.read_stream_range(&["Other"], 0, &mut expected)
+            .unwrap();
+        source.reset_read_count();
+        let mut cursor = file.stream_cursor_at(&["Other"], 0).unwrap();
+        let mut observed = vec![0u8; expected.len()];
+        cursor.read_exact(&mut observed).unwrap();
+
+        assert_eq!(observed, expected);
+        assert_eq!(cursor.position(), expected.len() as u64);
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn stream_cursor_forward_skip_rejects_backward_and_out_of_bounds_moves() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source);
+        let mut cursor = file.stream_cursor_at(&["Small"], 0).unwrap();
+
+        cursor.skip_forward(4).unwrap();
+        assert_eq!(cursor.position(), 4);
+        let mut output = [0u8; 4];
+        cursor.read_exact(&mut output).unwrap();
+        assert_eq!(&output, b" str");
+        assert!(matches!(
+            cursor.skip_to(3),
+            Err(OleError::InvalidData(message)) if message.contains("backwards")
+        ));
+        assert!(matches!(
+            cursor.skip_forward(4),
+            Err(OleError::InvalidData(message)) if message.contains("exceeds length")
+        ));
+        assert_eq!(cursor.position(), 8);
+    }
+
+    #[test]
+    fn stream_cursor_skip_does_not_fence_but_next_read_rejects_mutation() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.revision.store(1, AtomicOrdering::SeqCst);
+
+        cursor.skip_forward(512).unwrap();
+        assert_eq!(cursor.position(), 512);
+        let mut output = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn stream_cursor_fences_before_during_and_after_hostile_reads() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.revision.store(1, AtomicOrdering::SeqCst);
+        let mut output = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact(&mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact(&mut output),
+            Err(OleError::Io(_))
+        ));
+        cursor.read_exact(&mut output).unwrap();
+        assert_eq!(output, [0xA5; 4]);
+
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact(&mut output),
             Err(OleError::SourceChanged { .. })
         ));
     }

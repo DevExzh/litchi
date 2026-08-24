@@ -15,7 +15,7 @@ use crate::number_format::{DateSystem, Formatting};
 use crate::records::{BofRecord, BoundSheetRecord, CellRecord, Encoding, FormulaValue, SheetType};
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
-use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits};
+use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor};
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::sheet::Cell as CellTrait;
@@ -1109,6 +1109,9 @@ fn parse_globals(
     let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
     let mut offset = 0_u64;
     let mut record_count = 0_usize;
+    let mut cursor = cfb
+        .stream_cursor_at(&refs, 0)
+        .map_err(SourceBackedError::from)?;
 
     // The first pass reads only BIFF headers.  Besides avoiding payload reads
     // for encrypted workbooks, this establishes the exact global boundary so
@@ -1122,7 +1125,10 @@ fn parse_globals(
                 "truncated BIFF global record header".into(),
             ));
         }
-        let header = read_range(cfb, &refs, offset, 4)?;
+        let mut header = [0_u8; 4];
+        cursor
+            .read_exact(&mut header)
+            .map_err(SourceBackedError::from)?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         if kind == FILEPASS {
             return Err(SourceBackedError::EncryptedUnsupported);
@@ -1167,6 +1173,9 @@ fn parse_globals(
                 maximum: limits.max_global_bytes,
             });
         }
+        cursor
+            .skip_forward(payload_len as u64)
+            .map_err(SourceBackedError::from)?;
         offset = end;
         if kind == EOF {
             if payload_len != 0 {
@@ -1468,14 +1477,11 @@ fn read_range(cfb: &SharedOleFile, path: &[&str], offset: u64, length: usize) ->
 
 struct WorksheetFrame {
     kind: u16,
-    payload_offset: u64,
     payload_len: usize,
 }
 
 struct WorksheetScan<'a> {
-    cfb: &'a SharedOleFile,
-    path: &'a [&'a str],
-    cursor: u64,
+    cursor: SharedOleStreamCursor<'a>,
     upper_bound: u64,
     scanned_bytes: u64,
     scanned_records: usize,
@@ -1491,23 +1497,24 @@ impl<'a> WorksheetScan<'a> {
         upper_bound: u64,
         limits: SourceBackedLimits,
         execution: Option<&'a ExecutionContext>,
-    ) -> Self {
-        Self {
-            cfb,
-            path,
-            cursor: start,
+    ) -> Result<Self> {
+        let cursor = cfb
+            .stream_cursor_at(path, start)
+            .map_err(SourceBackedError::from)?;
+        Ok(Self {
+            cursor,
             upper_bound,
             scanned_bytes: 0,
             scanned_records: 0,
             limits,
             execution,
-        }
+        })
     }
 
     fn next_frame(&mut self) -> Result<WorksheetFrame> {
         self.check_execution()?;
-        if self
-            .cursor
+        let cursor_position = self.cursor.position();
+        if cursor_position
             .checked_add(4)
             .is_none_or(|value| value > self.upper_bound)
         {
@@ -1515,7 +1522,10 @@ impl<'a> WorksheetScan<'a> {
                 "BIFF worksheet has no complete record header before its boundary".into(),
             ));
         }
-        let header = read_range(self.cfb, self.path, self.cursor, 4)?;
+        let mut header = [0_u8; 4];
+        self.cursor
+            .read_exact(&mut header)
+            .map_err(SourceBackedError::from)?;
         let kind = u16::from_le_bytes([header[0], header[1]]);
         let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
         if payload_len > litchi_biff::MAX_RECORD_BYTES {
@@ -1528,7 +1538,7 @@ impl<'a> WorksheetScan<'a> {
         let frame_len = 4_u64.checked_add(payload_len as u64).ok_or_else(|| {
             SourceBackedError::InvalidData("BIFF worksheet frame overflows".into())
         })?;
-        let next = self.cursor.checked_add(frame_len).ok_or_else(|| {
+        let next = cursor_position.checked_add(frame_len).ok_or_else(|| {
             SourceBackedError::InvalidData("BIFF worksheet offset overflows".into())
         })?;
         if next > self.upper_bound {
@@ -1566,17 +1576,30 @@ impl<'a> WorksheetScan<'a> {
         }
         self.scanned_records = records;
         self.scanned_bytes = bytes;
-        self.cursor = next;
-        Ok(WorksheetFrame {
-            kind,
-            payload_offset: self.cursor - payload_len as u64,
-            payload_len,
-        })
+        Ok(WorksheetFrame { kind, payload_len })
     }
 
-    fn read_payload(&self, frame: &WorksheetFrame) -> Result<Vec<u8>> {
+    fn read_payload(&mut self, frame: &WorksheetFrame) -> Result<Vec<u8>> {
         self.check_execution()?;
-        read_range(self.cfb, self.path, frame.payload_offset, frame.payload_len)
+        let mut payload = Vec::new();
+        payload
+            .try_reserve_exact(frame.payload_len)
+            .map_err(|_error| SourceBackedError::Allocation {
+                resource: "source-backed worksheet payload",
+                requested: frame.payload_len as u64,
+            })?;
+        payload.resize(frame.payload_len, 0);
+        self.cursor
+            .read_exact(&mut payload)
+            .map_err(SourceBackedError::from)?;
+        Ok(payload)
+    }
+
+    fn skip_payload(&mut self, frame: &WorksheetFrame) -> Result<()> {
+        self.check_execution()?;
+        self.cursor
+            .skip_forward(frame.payload_len as u64)
+            .map_err(SourceBackedError::from)
     }
 
     fn check_execution(&self) -> Result<()> {
@@ -1644,7 +1667,7 @@ fn query_cell(
         sheet.end,
         owner.limits,
         execution,
-    );
+    )?;
     let mut first = true;
     loop {
         let frame = scan.next_frame()?;
@@ -1789,7 +1812,7 @@ fn query_cell(
                     )?;
                 }
             },
-            _ => {},
+            _ => scan.skip_payload(&frame)?,
         }
     }
 }
