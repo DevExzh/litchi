@@ -3454,3 +3454,27 @@ The order cases provide bounded package-level ownership and preservation
 evidence only. No native Keynote open/save gate is admitted, no
 `litchi-iwa -> litchi-keynote` host edge or ordered debt is retired, and no
 monolith-exit or host-deletion claim follows.
+
+## 2026-08-25 amendment: Wave71 Pages artifact and footnote boundaries
+
+Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` closes the public raw-artifact
+escape from `litchi_pages::Package`. `Package::from_bytes` and
+`Package::from_bytes_with_limits` remain the byte-ingress names;
+`Package::from_archive_bytes` is removed rather than retained as a deprecated
+compatibility alias. The exact retained ZIP artifact remains private to the
+package, while public callers use `Package::write_to` and the root-reexported
+`WriteError` to stream it to a caller-owned sink. The package preserves
+unsupported ZIP members and unmodeled protobuf fields through this seam.
+
+The same commit removes `PagesEditor::set_body_footnote_text` and gives the
+selector-first `litchi_pages::Package::edit_body_footnote_text` transaction
+ownership of existing-root body-footnote text replacement. The legacy host
+retains footnote reads and insert/remove graph lifecycle operations, including
+their native graph and publication responsibilities. No raw identifier,
+archive object, generated message, or wire value is added to the focused
+facade.
+
+This is an API-boundary and one-operation ownership step. It does not remove a
+crate or manifest edge, change generated-schema or normal Prost/Buffa owners,
+or complete the migration host. The 64-package/239-declaration topology and
+13-entry ordered debt ledger remain in force.

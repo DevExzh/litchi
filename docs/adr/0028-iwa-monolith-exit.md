@@ -4886,3 +4886,29 @@ manifest edges, all 13 ordered debts, generated schemas, Buffa/Prost owners,
 and monolith remain. Wave70 removes no crate, dependency edge, host
 responsibility, debt item, generated-schema owner, or normal Prost owner; it
 therefore makes no host-exit, dependency-removal, or monolith-deletion claim.
+
+## 2026-08-25 amendment: Wave71 Pages artifact and footnote migration slice (not a monolith-exit gate)
+
+Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` retires the public Pages raw
+artifact accessor and one raw-ID host operation. The focused package keeps
+exact retained ZIP bytes private and exposes `Package::write_to` with typed
+partial-sink `WriteError`; the redundant public `from_archive_bytes` alias is
+removed. Exact output remains a streaming sink operation only: it does not
+flush, sync, rename, or atomically or durably publish a filesystem path.
+
+`PagesEditor::set_body_footnote_text` is removed. Existing-root body-footnote
+text replacement is owned by selector-first
+`litchi_pages::Package::edit_body_footnote_text`; the compatibility host still
+owns footnote reads and insert/remove graph lifecycle, native graph handling,
+and the remaining Pages mutation surface. The section-content bridge uses one
+pass `FocusedCandidateWriter` and preserves its existing `3S+2T` work
+accounting.
+
+This is a bounded API and operation retirement step, not deletion of
+`litchi-iwa`. The `litchi-iwa -> litchi-pages` manifest edge, debt 017 and the
+other 12 ordered debts (13 total), migration-host examples/tests, generated
+schemas, Buffa/Prost owners, and monolith remain. Wave71 retires no crate,
+dependency edge, debt item, host responsibility, generated-schema owner, or
+normal Prost owner; it establishes no host-exit, dependency-removal, or
+monolith-deletion gate. No full-workspace-green, package-wide-performance,
+durable-publication, or native/Rust byte-parity claim follows.

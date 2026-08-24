@@ -2704,3 +2704,28 @@ ownership; native identifiers remain inside that compatibility boundary.
 This is an internal strict-codec ownership step, not a public Pages API,
 facade migration, or claim that the remaining Pages drawable graph has moved
 out of `litchi-iwa`.
+
+## 2026-08-25 amendment: Wave71 Pages exact output and footnote API
+
+Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` makes the Pages package's
+exact-output boundary explicit. `Package::from_bytes` and
+`Package::from_bytes_with_limits` are the supported byte-ingress names;
+`Package::from_archive_bytes` has been removed. `Package::source_bytes` is
+crate-private. Public callers publish the immutable exact artifact through
+`Package::write_to<W: Write + ?Sized>`, with `WriteError` reexported by the
+focused crate root.
+
+`write_to` emits the retained ZIP bytes exactly, including unsupported members
+and unmodeled protobuf fields. It handles partial writes and
+`Interrupted`, detects zero-length and sink over-reporting, and exposes only
+typed, redacted failure information together with `bytes_written`; package
+bytes and sink error text do not enter `Display` or `Debug`. It does not flush,
+sync, rename, or atomically or durably publish a filesystem destination.
+
+The same commit removes the raw-ID host setter
+`PagesEditor::set_body_footnote_text`. Existing-root text replacement is now
+owned by the selector-first `Package::edit_body_footnote_text` transaction.
+The host still owns footnote reads and insert/remove graph lifecycle paths.
+This does not add a raw-ID replacement API, broaden accepted graph shapes, or
+move native identifiers, archive objects, generated messages, or wire values
+across the focused facade.

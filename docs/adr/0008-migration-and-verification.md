@@ -13110,3 +13110,58 @@ the same stacking and text observations. This is bounded application
 open/render/save/reopen acceptance only: no Rust/native byte parity,
 performance/RSS, broad Pages graph, publication, or monolith-exit claim is
 made.
+
+## 2026-08-25 amendment: Wave71 Pages API, footnote, and verification record
+
+Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` retires the public Pages
+`Package::source_bytes` accessor and deprecated `Package::from_archive_bytes`
+alias. `Package::write_to<W: Write + ?Sized>` is now the public exact-output
+seam, with root `WriteError` reexport. It streams exact retained ZIP bytes,
+supports partial writes and `Interrupted`, and reports typed redacted sink
+failures with the conforming `bytes_written` offset. It performs no
+flush/sync/rename and provides no atomic or durable filesystem publication.
+`PagesEditor::set_body_footnote_text` is also removed; existing-root text
+replacement is owned by selector-first
+`litchi_pages::Package::edit_body_footnote_text`, while the host retains
+footnote reads and insert/remove graph lifecycle.
+
+The focused gates for this slice were:
+
+- all-target `litchi-pages` tests: 227 total, plus two documentation tests;
+- focused IWA footnote tests: 13/13, section-content bridge tests: 3/3, and
+  table tests: 38/38;
+- Pages facade tests: 7/7;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 431/431;
+- targeted formatting, `git diff --check`, scoped checks, and scoped Clippy:
+  passed.
+
+The live boundary checker exited 1 only for the three known user-owned
+untracked Pages table-lock findings; it reported no Wave71 finding. The
+repository-wide pre-commit hook was bypassed after unrelated unstaged
+rustfmt differences in `table_info_codec`/`protobuf` and pre-existing Numbers
+`object_count`/`manual_contains` lint findings. These are scoped Wave71 gates,
+not a full-workspace green claim.
+
+The bounded Pages 14.4 native record used one disposable artifact:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| Rust candidate `/private/tmp/litchi-wave71-pages-footnote.PLNB00/focused-footnote.pages` before Pages | 5,631 | `7051e8b2128052e2720dec1089988d233ec90e6e9ab1214191007f5f0562acdf` |
+| Pages-saved, closed, and reopened exact-path artifact | 32,693 | `154f5739f94aad978fdb572a7f20fcdb26956fcb25436ff64a6810933166225a` |
+
+Pages 14.4 opened the candidate without repair, displayed body text `Alpha
+Beta` and the footnote `Created from scratch with litchi-iwa.`, then saved,
+closed, and reopened the exact path. Rust reread the normalized package and
+the no-op `write_to` output had the same 32,693-byte size and SHA-256. This is
+bounded native open/render/save/close/reopen evidence only; it is not
+Rust/native byte parity, arbitrary graph acceptance, a performance/RSS
+measurement, or a full publication or workspace gate.
+
+The tracked oracle `test-data/iwork/pages/basic.pages` is 96,417 bytes with
+SHA-256
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`; the
+focused exact `write_to` test passes against that artifact.
+
+No manifest edge, generated schema, Prost/Buffa owner, ordered debt, host
+responsibility, or monolith gate changed in Wave71. All 13 ordered debts remain
+open.
