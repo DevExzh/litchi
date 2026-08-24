@@ -15,7 +15,7 @@ mod rich;
 mod rich_commit;
 mod sparse;
 mod sparse_commit;
-mod tile;
+pub(super) mod tile;
 
 use std::{cell::Cell, mem::size_of, sync::Arc};
 

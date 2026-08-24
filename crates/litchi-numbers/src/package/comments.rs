@@ -1635,6 +1635,49 @@ fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRoo
         .map_err(|_| Error::InvalidSource { path })?
         .clear_comment_with_limit(key, WireLimits::MAX_OUTPUT_BYTES)
         .map_err(|_| Error::InvalidSource { path })?;
+    let tile_source = message_at_route(source, tile, path)?.data.as_slice();
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes();
+    let tile_change = super::table_cell_edit::tile::TileChange {
+        row: u32::try_from(located.target.row % located.target.tile_size)
+            .map_err(|_| Error::InvalidSource { path })?,
+        column: u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
+        change: super::table_cell_edit::tile::BncChange::CommentClear {
+            expected_identifier: key,
+        },
+    };
+    let tile_output = super::table_cell_edit::tile::rewrite_tile(
+        super::table_cell_edit::tile::TileRewriteRequest {
+            source: tile_source,
+            columns: located.target.native.columns,
+            changes: std::slice::from_ref(&tile_change),
+            limits: super::table_cell_edit::tile::TileLimits::new(
+                tile_source.len().max(1).min(maximum_wire),
+                maximum_wire,
+                tile_source.len().saturating_mul(8).clamp(1, maximum_wire),
+                u64::try_from(
+                    tile_source
+                        .len()
+                        .saturating_mul(128)
+                        .clamp(1, WireLimits::MAX_REWRITE_WORK),
+                )
+                .unwrap_or(u64::MAX),
+                located.target.tile_size,
+                source.state.options.semantic().max_materialized_cells(),
+            ),
+        },
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let tile_data = tile_output.payload.ok_or(Error::Verification)?;
+    let transition = tile_output
+        .transitions
+        .as_slice()
+        .first()
+        .filter(|transition| {
+            transition.before_references.comment == Some(key)
+                && transition.after_references.comment.is_none()
+        })
+        .ok_or(Error::Verification)?;
+    let _ = transition;
     let list_source = message_at_route(source, entry.route, path)?.data.as_slice();
     let list_data = numbers_table_cell_storage_codec::remove_table_data_list_entry(
         list_source,
@@ -1656,7 +1699,7 @@ fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRoo
         .map_err(|_| Error::Allocation { amount: 3, path })?;
     mutations.push(ArchiveMutation::ReplaceMessage {
         route: tile,
-        data: Vec::new(),
+        data: tile_data,
         pruned_object_references: Vec::new(),
     });
     mutations.push(ArchiveMutation::ReplaceMessage {

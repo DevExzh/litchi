@@ -76,10 +76,6 @@ pub(crate) enum BncChange {
         cache: Option<ScalarInput>,
     },
     FormulaCache(CacheScalarInput),
-    #[expect(
-        dead_code,
-        reason = "root comment-clear publication is landing in the adjacent package transaction"
-    )]
     CommentClear {
         expected_identifier: u32,
     },
