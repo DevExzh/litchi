@@ -76,6 +76,13 @@ pub(crate) enum BncChange {
         cache: Option<ScalarInput>,
     },
     FormulaCache(CacheScalarInput),
+    #[expect(
+        dead_code,
+        reason = "root comment-clear publication is landing in the adjacent package transaction"
+    )]
+    CommentClear {
+        expected_identifier: u32,
+    },
 }
 
 /// The cache subset admitted by the formula planner and raw BNC writer.
@@ -2427,7 +2434,10 @@ fn prepare_borrowed_row<'source>(
         }
         if bnc_change_is_noop(previous, change.change)?
             || previous.is_none()
-                && matches!(change.change, BncChange::Clear | BncChange::FormulaClear)
+                && matches!(
+                    change.change,
+                    BncChange::Clear | BncChange::FormulaClear | BncChange::CommentClear { .. }
+                )
         {
             continue;
         }
@@ -2731,6 +2741,11 @@ fn planned_transition(
             }
         },
         BncChange::FormulaCache(_) => return Ok(None),
+        BncChange::CommentClear { .. } => {
+            after_references = before_references;
+            after_references.comment = None;
+            before
+        },
     };
     Ok(Some(CellTransition {
         row,
@@ -2920,6 +2935,14 @@ fn plan_cell_mutation(previous: Option<&[u8]>, change: BncChange) -> Result<Opti
             view.plan_formula_rewrite(identifier, cache.map(ScalarInput::as_wire))
         },
         BncChange::FormulaCache(input) => view.plan_formula_cache_rewrite(input.as_wire()),
+        BncChange::CommentClear {
+            expected_identifier,
+        } => {
+            return view
+                .clear_comment_with_limit(expected_identifier, usize::MAX)
+                .map(|bytes| Some(bytes.len()))
+                .map_err(map_bnc_error);
+        },
     }
     .map_err(map_bnc_error)?;
     Ok(plan.output_len())
@@ -2932,7 +2955,9 @@ fn mutate_cell(
 ) -> Result<CellMutation> {
     let Some(previous) = previous else {
         return match change {
-            BncChange::Clear | BncChange::FormulaClear => Ok(CellMutation::Unchanged),
+            BncChange::Clear | BncChange::FormulaClear | BncChange::CommentClear { .. } => {
+                Ok(CellMutation::Unchanged)
+            },
             BncChange::Set(input) => {
                 let view =
                     BncCellView::parse(&MINIMAL_BNC_CELL).map_err(|_| TileError::InvalidSource)?;
@@ -2983,6 +3008,12 @@ fn mutate_cell(
         .map_err(map_bnc_error),
         BncChange::FormulaCache(input) => view
             .rewrite_formula_cache_with_limit(input.as_wire(), max_output_bytes)
+            .map(CellMutation::Replace)
+            .map_err(map_bnc_error),
+        BncChange::CommentClear {
+            expected_identifier,
+        } => view
+            .clear_comment_with_limit(expected_identifier, max_output_bytes)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
     }
@@ -3149,6 +3180,7 @@ pub(crate) fn bnc_change_is_noop(cell: Option<&[u8]>, change: BncChange) -> Resu
             },
         },
         BncChange::FormulaCache(input) => view.formula_cache_equals(input.as_wire()),
+        BncChange::CommentClear { .. } => view.comment_identifier().is_none(),
     })
 }
 
@@ -4338,6 +4370,55 @@ mod tests {
         .expect("rich-only rewrite");
         let (_, rich_rows) = decode_rows(rich.payload.as_deref().expect("rich replacement"));
         assert_eq!(row_cell(&rich_rows.values[0], 1), b2);
+    }
+
+    #[test]
+    fn comment_clear_preserves_value_and_reports_only_comment_reference_transition() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(42.0).unwrap();
+        cell.set_comment_identifier(Some(9));
+        let source = one_row_tile(0, &[Some(cell.encode())]);
+        let changes = [TileChange {
+            row: 0,
+            column: 0,
+            change: BncChange::CommentClear {
+                expected_identifier: 9,
+            },
+        }];
+
+        let outcome = rewrite_tile(TileRewriteRequest {
+            source: &source,
+            columns: 1,
+            changes: &changes,
+            limits: limits(),
+        })
+        .unwrap();
+        let payload = outcome.payload.as_deref().unwrap();
+        let (_, rows) = decode_rows(payload);
+        let rewritten = row_cell(&rows.values[0], 0);
+        let view = BncCellView::parse(rewritten).unwrap();
+        assert_eq!(view.stored_value(), StoredValue::Number);
+        assert_eq!(view.comment_identifier(), None);
+        assert_eq!(outcome.transitions.len(), 1);
+        assert_eq!(outcome.transitions[0].before_references.comment, Some(9));
+        assert_eq!(outcome.transitions[0].after_references.comment, None);
+        assert_eq!(outcome.transitions[0].before, outcome.transitions[0].after);
+
+        let stale = [TileChange {
+            change: BncChange::CommentClear {
+                expected_identifier: 8,
+            },
+            ..changes[0]
+        }];
+        assert!(
+            rewrite_tile(TileRewriteRequest {
+                source: &source,
+                columns: 1,
+                changes: &stale,
+                limits: limits(),
+            })
+            .is_err()
+        );
     }
 
     #[test]
