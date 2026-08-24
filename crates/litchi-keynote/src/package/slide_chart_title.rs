@@ -602,14 +602,14 @@ impl Package {
 }
 
 #[derive(Debug, Clone)]
-struct ChartSelection {
-    slide_position: Position,
-    chart_position: Position,
-    slide_identifier: u64,
-    chart_identifier: u64,
-    non_style_identifier: u64,
-    title: Option<String>,
-    slide_component_name: String,
+pub(super) struct ChartSelection {
+    pub(super) slide_position: Position,
+    pub(super) chart_position: Position,
+    pub(super) slide_identifier: u64,
+    pub(super) chart_identifier: u64,
+    pub(super) non_style_identifier: u64,
+    pub(super) title: Option<String>,
+    pub(super) slide_component_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -622,7 +622,7 @@ struct ChartGraph {
     slide_component_name: String,
 }
 
-fn select_chart(
+pub(super) fn select_chart(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     chart_selector: ChartSelector<'_>,

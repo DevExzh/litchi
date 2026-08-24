@@ -1197,20 +1197,80 @@ fn rewrite_text(
         expected_storage_identifier,
     )?;
     prove_slide_text_caches_absent(source, record.slide_identifier)?;
+    let start = usize::try_from(span.start().utf16_index())
+        .map_err(|_error| SlideTextError::InvalidSource)?;
+    let end = usize::try_from(span.end().utf16_index())
+        .map_err(|_error| SlideTextError::InvalidSource)?;
+    let (candidate, touched_components) = rewrite_owned_storage_text(
+        source,
+        expected_storage_identifier,
+        record.node_identifier,
+        start..end,
+        replacement,
+    )?;
+    verify_candidate(
+        source,
+        &candidate,
+        position,
+        role,
+        expected,
+        record.node_identifier,
+        true,
+    )?;
+    Ok((candidate, touched_components))
+}
+
+/// Decode one already-selected native text storage through the strict text
+/// wire boundary without exposing its physical identity outside the package
+/// adapter.
+pub(super) fn read_owned_storage_text(
+    source: &Package,
+    storage_identifier: u64,
+) -> Result<String, SlideTextError> {
+    let object = source
+        .required_object(storage_identifier, "Keynote text storage")
+        .map_err(map_read_error)?;
+    let (message_index, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
+    validate_selected_storage_metadata(object, message_index)?;
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+        &message.data,
+        storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
+    )
+    .map_err(map_text_rewrite_error)?;
+    Ok(decoded.into_storage().into_text())
+}
+
+/// Rewrite one already-proven, exclusively owned text storage and invalidate
+/// the selected slide's render caches.
+///
+/// This is an internal physical seam shared by selector-first text owners.
+/// The caller must prove the semantic graph and exclusive ownership before
+/// invoking it, then perform capability-specific semantic readback on the
+/// returned package.
+pub(super) fn rewrite_owned_storage_text(
+    source: &Package,
+    storage_identifier: u64,
+    slide_node_identifier: u64,
+    span: Range<usize>,
+    replacement: &str,
+) -> Result<(Package, usize), SlideTextError> {
+    validate_replacement(replacement)?;
     let catalog = physical_catalog(source)?;
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let start = usize::try_from(span.start().utf16_index())
-        .map_err(|_error| SlideTextError::InvalidSource)?;
-    let end = usize::try_from(span.end().utf16_index())
-        .map_err(|_error| SlideTextError::InvalidSource)?;
     let mut component_names = Vec::new();
     component_names
         .try_reserve_exact(2)
         .map_err(|_allocation| SlideTextError::Allocation { amount: 2 })?;
-    for identifier in [expected_storage_identifier, record.node_identifier] {
+    for identifier in [storage_identifier, slide_node_identifier] {
         let mut matches = catalog
             .components()
             .iter()
@@ -1248,12 +1308,12 @@ fn rewrite_text(
         let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
         validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
-        if let Some(object) = archive.object(expected_storage_identifier) {
+        if let Some(object) = archive.object(storage_identifier) {
             let (message_index, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
             validate_selected_storage_metadata(object, message_index)?;
             let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
                 &message.data,
-                start..end,
+                span.clone(),
                 replacement,
                 RewriteBehavior::PreserveOnEqualText,
                 storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
@@ -1270,7 +1330,7 @@ fn rewrite_text(
                 return Err(SlideTextError::Verification);
             }
             archive
-                .object_mut(expected_storage_identifier)
+                .object_mut(storage_identifier)
                 .ok_or(SlideTextError::InvalidSource)?
                 .replace_message_preserving_header_with_limits(
                     message_index,
@@ -1282,7 +1342,7 @@ fn rewrite_text(
                 )
                 .map_err(map_core_error)?;
         }
-        if let Some(node) = archive.object_mut(record.node_identifier) {
+        if let Some(node) = archive.object_mut(slide_node_identifier) {
             if std::mem::replace(&mut node_changed, true) {
                 return Err(SlideTextError::Verification);
             }
@@ -1329,13 +1389,11 @@ fn rewrite_text(
     let candidate = Package::from_source_with_options(output.into(), source.state.options)
         .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
-    verify_candidate(
+    verify_owned_storage_candidate(
         source,
         &candidate,
-        position,
-        role,
-        expected,
-        record.node_identifier,
+        storage_identifier,
+        slide_node_identifier,
         true,
     )?;
     Ok((candidate, compressed_components.len()))
@@ -1514,9 +1572,7 @@ fn verify_untouched_objects(
                 {
                     return Err(SlideTextError::Verification);
                 }
-            } else if source_object.archive_info != candidate_object.archive_info
-                || source_object.messages != candidate_object.messages
-            {
+            } else if !source_object.same_content_ignoring_offsets(candidate_object) {
                 return Err(SlideTextError::Verification);
             }
         }
@@ -1526,6 +1582,36 @@ fn verify_untouched_objects(
     } else {
         Err(SlideTextError::Verification)
     }
+}
+
+/// Recheck the exact physical locality of a storage-only mutation retained in
+/// an exact patch artifact.
+pub(super) fn verify_owned_storage_candidate(
+    source: &Package,
+    candidate: &Package,
+    storage_identifier: u64,
+    slide_node_identifier: u64,
+    require_invalidated_previews: bool,
+) -> Result<(), SlideTextError> {
+    verify_untouched_objects(
+        source,
+        candidate,
+        storage_identifier,
+        slide_node_identifier,
+        require_invalidated_previews,
+    )?;
+    if require_invalidated_previews {
+        let candidate_catalog = physical_catalog(candidate)?;
+        if PREVIEW_ENTRY_NAMES.iter().any(|name| {
+            candidate_catalog
+                .package()
+                .iter()
+                .any(|entry| entry.name() == *name)
+        }) {
+            return Err(SlideTextError::Verification);
+        }
+    }
+    Ok(())
 }
 
 fn verify_selected_storage_object(
