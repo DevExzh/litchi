@@ -582,6 +582,57 @@ def add_pages_table_title_canonical_scaffold(root: Path) -> None:
     selector.write_text("pub enum BodyTableSelector<'a> { Name(&'a str) }\n", encoding="utf-8")
 
 
+def add_pages_table_headers_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_TABLE_HEADERS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use crate::package::body_table_headers::{"
+        "BodyTableHeaderSettingsCommit as Commit, BodyTableHeaderSettingsDiagnostics as Diagnostics, "
+        "BodyTableHeaderSettingsEdit as Edit, BodyTableHeaderSettingsError as Error, "
+        "BodyTableHeaderSettingsLimitKind as LimitKind, BodyTableHeaderSettingsPatch as Patch};\n"
+        "pub use litchi_iwa_common::table::headers::{Count, Error, Settings};\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+    package_export = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[1]
+    table_export = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+    selector = root / boundaries.PAGES_TABLE_HEADERS_SELECTOR_SOURCE
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod table;\n"
+        "pub use selector::BodyTableSelector;\n"
+        "pub use package::{BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, "
+        "BodyTableHeaderSettingsEdit, BodyTableHeaderSettingsError, BodyTableHeaderSettingsLimitKind, "
+        "BodyTableHeaderSettingsPatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod body_table_headers;\n"
+        "pub use body_table_headers::{BodyTableHeaderSettingsCommit, "
+        "BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit, BodyTableHeaderSettingsError, "
+        "BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch};\n",
+        encoding="utf-8",
+    )
+    table_export.write_text("pub mod headers;\n", encoding="utf-8")
+    selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -12289,6 +12340,338 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_pages_table_lock_facade_source_topology(root), []
             )
+
+    def test_pages_table_headers_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_HEADER_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/layout.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_HEADER_METHODS,
+            ("table_header_settings", "set_table_header_settings"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_table_headers.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS,
+            (
+                "body_table_header_settings",
+                "edit_body_table_header_settings",
+                "apply_body_table_header_settings",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HEADERS_SEMANTIC_TYPES,
+            ("Count", "Error", "Settings"),
+        )
+        self.assertIn(
+            "BodyTableHeaderSettingsPatch",
+            boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES,
+        )
+
+    def test_retired_iwa_pages_table_headers_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            layout = root / boundaries.RETIRED_IWA_PAGES_TABLE_HEADER_SOURCE
+            layout.parent.mkdir(parents=True)
+            layout.write_text(
+                "use litchi_numbers::table::headers::Settings as HeaderSettings;\n"
+                "pub fn table_header_settings(model_object_id: u64) {}\n"
+                "pub fn set_table_header_settings(model_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            alternate = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/other.rs"
+            alternate.parent.mkdir(parents=True, exist_ok=True)
+            alternate.write_text(
+                "pub fn set_table_header_settings() {}\n"
+                "#[cfg(test)]\n"
+                "pub fn table_header_settings() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT / "other.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "editor.set_table_header_settings(model_object_id, settings);\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "PagesEditor::table_header_settings(model_object_id);\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_table_headers_source_topology(root)
+
+            self.assertTrue(any("table-header import" in item for item in violations))
+            self.assertTrue(any("method table_header_settings:" in item for item in violations))
+            self.assertTrue(any("method set_table_header_settings:" in item for item in violations))
+            self.assertTrue(any("other.rs" in item and "method set_table_header_settings" in item for item in violations))
+            self.assertFalse(
+                any("other.rs" in item and "method table_header_settings" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(any("example call" in item for item in violations), violations)
+            self.assertTrue(any("README call" in item for item in violations), violations)
+
+    def test_iwa_pages_table_headers_ignores_near_names_and_non_code(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/near.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "// pub fn table_header_settings() {}\n"
+                'const NOTE: &str = "set_table_header_settings()";\n'
+                "pub fn table_header_settings_snapshot() {}\n"
+                "pub fn set_table_header_settings_for_test() {}\n"
+                "#[cfg(test)]\n"
+                "use litchi_numbers::table::headers::Settings;\n"
+                "#[cfg(test)]\n"
+                "pub fn table_header_settings() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT / "near.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "// editor.table_header_settings();\n"
+                'const NOTE: &str = "set_table_header_settings()";\n',
+                encoding="utf-8",
+            )
+            numbers_example = (
+                root
+                / boundaries.IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT
+                / "edit_numbers_table_headers.rs"
+            )
+            numbers_example.write_text(
+                "package.table_header_settings(sheet, table);\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_headers_source_topology(root), []
+            )
+
+    def test_focused_pages_table_headers_requires_each_canonical_type_and_method(self) -> None:
+        for missing in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_headers_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_headers_facade_source_topology(root)
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_headers_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_headers_facade_source_topology(root)
+                        )
+                    )
+
+    def test_focused_pages_table_headers_requires_semantics_selector_and_root_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_HEADERS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::body_table_headers::{"
+                "BodyTableHeaderSettingsCommit as Commit};\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_HEADERS_SELECTOR_SOURCE
+            selector.write_text("pub enum OtherSelector { Name }\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+            lib.write_text("pub mod table;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_headers_facade_source_topology(root)
+
+            self.assertTrue(
+                any("missing semantic table::headers type Count" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing semantic table::headers type Error" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing semantic table::headers type Settings" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing canonical BodyTableSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing root BodyTableSelector re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_headers_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_header_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_header_settings() {}\n"
+                "pub fn apply_body_table_header_settings() {}\n"
+                "}\n"
+                "pub type TableHeadersPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableHeadersArchive as TableHeadersPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+            table.write_text("pub mod headers;\npub use headers::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_headers_facade_source_topology(root)
+
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::headers glob",
+                "retains flat alias TableHeadersPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_headers_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomHeadersPatch = BodyTableHeaderSettingsPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyHeadersPatch = BodyTableHeaderSettingsPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableHeaderSettingsPatch as HeadersPatch;\n"
+                    "pub mod body_table_headers;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use headers::Settings as HeadersSettings;\n")
+
+            violations = boundaries.audit_pages_table_headers_facade_source_topology(root)
+
+            for fragment in (
+                "alternate alias CustomHeadersPatch for BodyTableHeaderSettingsPatch",
+                "aliases via owner glob",
+                "alternate alias HeadersPatch for BodyTableHeaderSettingsPatch",
+                "alternate alias HeadersSettings for Settings",
+                "exposes duplicate body_table_headers module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyHeadersPatch" in item for item in violations))
+
+    def test_focused_pages_table_headers_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_header_settings() {}\n"
+                "pub fn edit_body_table_header_settings() {}\n"
+                "pub fn apply_body_table_header_settings() {}\n"
+                "}\n"
+                "fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod headers;\n"
+                "pub use headers::{Count, Settings};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_headers_facade_source_topology(root), []
+            )
+
+    def test_focused_pages_table_headers_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_table_headers_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_pages_table_headers_facade_source_topology()", main_source
+        )
 
     def test_pages_table_title_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
