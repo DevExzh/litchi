@@ -394,6 +394,41 @@ impl<'source> RemovalBatch<'source> {
     }
 }
 
+/// One atomic registry-removal and save-token transition.
+///
+/// The two borrowed batches are evaluated against the same source snapshot
+/// and published as one candidate.  This is intentionally separate from
+/// [`Batch`]: removal keeps `last_object_identifier` unchanged, while a
+/// save-token transition changes only fields 8 and 12.
+#[derive(Debug, Clone, Copy)]
+pub struct RemovalSaveTokenBatch<'source> {
+    removals: RemovalBatch<'source>,
+    save_tokens: SaveTokenBatch<'source>,
+}
+
+impl<'source> RemovalSaveTokenBatch<'source> {
+    #[must_use]
+    pub const fn new(
+        removals: RemovalBatch<'source>,
+        save_tokens: SaveTokenBatch<'source>,
+    ) -> Self {
+        Self {
+            removals,
+            save_tokens,
+        }
+    }
+
+    #[must_use]
+    pub const fn removals(self) -> RemovalBatch<'source> {
+        self.removals
+    }
+
+    #[must_use]
+    pub const fn save_tokens(self) -> SaveTokenBatch<'source> {
+        self.save_tokens
+    }
+}
+
 impl<'source> ExternalReferenceAddition<'source> {
     #[must_use]
     pub const fn new(
@@ -1947,6 +1982,141 @@ mod tests {
     }
 
     #[test]
+    fn combined_removal_and_save_tokens_is_one_raw_preserving_transition() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let target = ComponentSelector::new(2, "b.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let mut selected = component(1, "a.iwa", None, &[(5, uuid)], &[(6, 2, Some(5), Some(0))]);
+        put_varint_field(&mut selected, 12, 536);
+        let selected_unknown = [0x90, 0x03, 0x81, 0x00];
+        selected.extend_from_slice(&selected_unknown);
+        let untouched = component(2, "b.iwa", None, &[], &[]);
+        let mut source = metadata(10, &[selected.clone(), untouched.clone()], &[]);
+        put_varint_field(&mut source, 8, 536);
+
+        let uuids = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let externals = [ExternalReferenceRemoval::new(
+            selector,
+            target,
+            5,
+            Some(false),
+        )];
+        let removals = RemovalBatch::new(10, &uuids, &externals, &[]);
+        let save_tokens = SaveTokenBatch::new(core::slice::from_ref(&selector));
+        let batch = RemovalSaveTokenBatch::new(removals, save_tokens);
+        let allocations = output_allocations();
+        let output =
+            rewrite_package_metadata_removals_and_save_tokens(&source, batch, options(&source))
+                .unwrap();
+
+        assert_eq!(output.report().removals(), 2);
+        assert_eq!(output.report().additions(), 0);
+        assert_eq!(output.report().components_changed(), 1);
+        assert_eq!(output.report().output_bytes(), output.bytes().len());
+        assert_eq!(output.report().retained_bytes(), output.bytes().len());
+        assert_eq!(output_allocations(), allocations + 1);
+        assert_eq!(scalar_values(output.bytes(), 8), vec![537]);
+        assert_eq!(component_scalar_values(output.bytes(), 1, 12), vec![537]);
+        assert!(
+            output
+                .bytes()
+                .windows(selected_unknown.len())
+                .any(|window| { window == selected_unknown })
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(untouched.len())
+                .any(|window| { window == untouched })
+        );
+        assert!(
+            !output
+                .bytes()
+                .windows(uuid_entry(5, uuid).len())
+                .any(|window| { window == uuid_entry(5, uuid) })
+        );
+        assert!(
+            !output
+                .bytes()
+                .windows(external_reference(2, Some(5), Some(0)).len())
+                .any(|window| window == external_reference(2, Some(5), Some(0)))
+        );
+        let limited = RewriteOptions::new(
+            source.len(),
+            output.report().output_bytes() - 1,
+            output.report().fields(),
+            output.report().work_bytes(),
+            output.report().max_depth(),
+            output.report().components_scanned(),
+            output.report().references_scanned(),
+            output.report().removals(),
+        );
+        let allocations = output_allocations();
+        assert!(matches!(
+            rewrite_package_metadata_removals_and_save_tokens(&source, batch, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(RewriteLimit::OutputBytes { .. })
+        ));
+        assert_eq!(output_allocations(), allocations);
+    }
+
+    #[test]
+    fn combined_transition_adds_absent_tokens_and_rejects_hostile_removals() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let mut selected = component(1, "a.iwa", None, &[(5, uuid)], &[]);
+        put_varint_field(&mut selected, 12, 2);
+        let untouched = component(2, "b.iwa", None, &[], &[]);
+        let mut source = metadata(10, &[selected, untouched], &[]);
+        put_varint_field(&mut source, 8, 0);
+        let hostile_removals = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let removals = RemovalBatch::new(10, &hostile_removals, &[], &[]);
+        let batch = RemovalSaveTokenBatch::new(
+            removals,
+            SaveTokenBatch::new(core::slice::from_ref(&selector)),
+        );
+        let error =
+            rewrite_package_metadata_removals_and_save_tokens(&source, batch, options(&source))
+                .unwrap_err();
+        assert_eq!(reason(error), InvalidReason::SaveTokenMismatch);
+
+        let mut valid_source = metadata(10, &[component(1, "a.iwa", None, &[(5, uuid)], &[])], &[]);
+        put_varint_field(&mut valid_source, 8, 0);
+        let valid_entries = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let valid_removals = RemovalBatch::new(10, &valid_entries, &[], &[]);
+        let valid = rewrite_package_metadata_removals_and_save_tokens(
+            &valid_source,
+            RemovalSaveTokenBatch::new(
+                valid_removals,
+                SaveTokenBatch::new(core::slice::from_ref(&selector)),
+            ),
+            options(&valid_source),
+        )
+        .unwrap();
+        assert_eq!(scalar_values(valid.bytes(), 8), vec![1]);
+        assert_eq!(component_scalar_values(valid.bytes(), 1, 12), vec![1]);
+
+        let versioned = component(9, "old.iwa", None, &[(5, uuid)], &[]);
+        let mut hostile = metadata(
+            10,
+            &[component(1, "a.iwa", None, &[(5, uuid)], &[])],
+            &[versioned],
+        );
+        put_varint_field(&mut hostile, 8, 0);
+        let error = rewrite_package_metadata_removals_and_save_tokens(
+            &hostile,
+            RemovalSaveTokenBatch::new(
+                valid_removals,
+                SaveTokenBatch::new(core::slice::from_ref(&selector)),
+            ),
+            options(&hostile),
+        )
+        .unwrap_err();
+        assert_eq!(reason(error), InvalidReason::VersionedRemoval);
+    }
+
+    #[test]
     fn removal_output_limit_is_inclusive_and_max_minus_one_precedes_allocation() {
         let selector = ComponentSelector::new(1, "a.iwa");
         let uuid = UuidBits::new(10, 20);
@@ -2799,6 +2969,143 @@ pub fn rewrite_package_metadata_save_tokens(
     })
 }
 
+/// Atomically remove exact registry ownership records and advance the root
+/// plus selected current-component save tokens.
+///
+/// The source is scanned for both transitions before the sole output buffer
+/// is reserved.  Field 1 and every unselected/versioned record remain raw;
+/// the only scalar additions/replacements are root field 8 and selected
+/// current-component field 12.  A removal that would cross a versioned or
+/// ambiguous owner is rejected by the same strict ownership scanner used by
+/// [`remove_package_metadata`].
+pub fn rewrite_package_metadata_removals_and_save_tokens(
+    source: &[u8],
+    batch: RemovalSaveTokenBatch<'_>,
+    options: RewriteOptions,
+) -> Result<RewriteOutput, RewriteError> {
+    validate_removal_batch(batch.removals, options)?;
+    validate_save_token_batch(batch.save_tokens, options)?;
+
+    let mut budget = Budget::new_inspection(source, options)?;
+    budget.removals = batch
+        .removals
+        .object_uuids
+        .len()
+        .checked_add(batch.removals.external_references.len())
+        .and_then(|count| count.checked_add(batch.removals.data_reference_owners.len()))
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    validate_save_token_selector_duplicates(batch.save_tokens, &mut budget)?;
+
+    let mut removal_state = RemovalScanState::new(batch.removals, &mut budget)?;
+    scan_removal_metadata(
+        source,
+        batch.removals,
+        &mut removal_state,
+        &mut budget,
+        false,
+    )?;
+    removal_state.validate_source()?;
+
+    let mut save_state = SaveTokenScanState::new(batch.save_tokens, &mut budget)?;
+    scan_save_token_metadata(
+        source,
+        batch.save_tokens,
+        SaveTokenScanMode::Source,
+        &mut save_state,
+        None,
+        &mut budget,
+    )?;
+    let old_root = save_state.validate_source()?;
+    if old_root == u64::MAX
+        || save_state.last != Some(batch.removals.expected_last_object_identifier)
+    {
+        return Err(RewriteError::invalid(if old_root == u64::MAX {
+            InvalidReason::SaveTokenOverflow
+        } else {
+            InvalidReason::LastIdentifierMismatch
+        }));
+    }
+    let new_root = old_root
+        .checked_add(1)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::SaveTokenOverflow))?;
+
+    let output_size = combined_output_size(source, batch, new_root, &mut budget)?;
+    budget.output_size(output_size)?;
+
+    // Charge the complete rewrite and a conservative candidate verification
+    // before reserving the sole output buffer.  Candidate scans use the
+    // source shape as an upper bound (removals only shrink it); inserted token
+    // fields and the output-size delta are charged explicitly.
+    let measured = budget.clone();
+    budget.source_phase = false;
+    charge_combined_rewrite(source, batch, new_root, &mut budget)?;
+    charge_combined_candidate_verification(source, batch, new_root, output_size, &mut budget)?;
+    budget.preflight_repeat_delta(&measured)?;
+    let planned_fields = repeated_counter(measured.fields, budget.fields)?;
+    let planned_work = repeated_counter(measured.work_bytes, budget.work_bytes)?;
+    let planned_components =
+        repeated_counter(measured.components_scanned, budget.components_scanned)?;
+    let planned_references =
+        repeated_counter(measured.references_scanned, budget.references_scanned)?;
+
+    let mut candidate = Vec::new();
+    #[cfg(test)]
+    record_output_allocation();
+    candidate
+        .try_reserve_exact(output_size)
+        .map_err(|_error| RewriteError::allocation(output_size))?;
+    if candidate.capacity() != output_size {
+        return Err(RewriteError::allocation(output_size));
+    }
+    budget.allocation(0)?;
+    rewrite_combined_into(source, batch, new_root, &mut candidate, &mut budget)?;
+    if candidate.len() != output_size {
+        return Err(RewriteError::invalid(InvalidReason::Verification));
+    }
+
+    budget.source_phase = false;
+    let mut verified_removals = RemovalScanState::new(batch.removals, &mut budget)?;
+    scan_removal_metadata(
+        &candidate,
+        batch.removals,
+        &mut verified_removals,
+        &mut budget,
+        true,
+    )?;
+    verified_removals.validate_candidate()?;
+
+    let mut verified_tokens = SaveTokenScanState::new(batch.save_tokens, &mut budget)?;
+    scan_save_token_metadata(
+        &candidate,
+        batch.save_tokens,
+        SaveTokenScanMode::Verification,
+        &mut verified_tokens,
+        Some((
+            save_state
+                .last_raw
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
+            save_state
+                .last
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
+            new_root,
+        )),
+        &mut budget,
+    )?;
+    verified_tokens.validate_candidate(new_root)?;
+    budget.pad_repeated_counters(
+        planned_fields,
+        planned_work,
+        planned_components,
+        planned_references,
+    )?;
+    budget.output_bytes = candidate.len();
+    budget.retained_bytes = candidate.len();
+    Ok(RewriteOutput {
+        bytes: candidate,
+        report: budget.report(),
+    })
+}
+
 fn validate_save_token_batch(
     batch: SaveTokenBatch<'_>,
     options: RewriteOptions,
@@ -3319,6 +3626,404 @@ fn rewrite_save_token_component(
         }
     }
     if selected && !token_seen {
+        put_varint_field(output, 12, new_root);
+    }
+    Ok(())
+}
+
+fn combined_output_size(
+    source: &[u8],
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    budget: &mut Budget,
+) -> Result<usize, RewriteError> {
+    budget.message(source, 1)?;
+    let mut output = 0usize;
+    let mut has_root_token = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        match field.number {
+            3 => {
+                let payload = field.bytes()?;
+                let (identifier, locator) = component_header(payload, budget, 2)?;
+                let (new_len, changed) = combined_component_size(
+                    payload, identifier, locator, batch, new_root, true, budget, 2,
+                )?;
+                output = checked_add(
+                    output,
+                    if changed {
+                        length_delimited_field_len(3, new_len)?
+                    } else {
+                        field.raw.len()
+                    },
+                )?;
+            },
+            8 => {
+                let _ = field.varint()?;
+                if has_root_token {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+                has_root_token = true;
+                output = checked_add(output, varint_field_len(8, new_root))?;
+            },
+            _ => output = checked_add(output, field.raw.len())?,
+        }
+    }
+    if !has_root_token {
+        output = checked_add(output, varint_field_len(8, new_root))?;
+    }
+    Ok(output)
+}
+
+fn combined_component_size(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    current: bool,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(usize, bool), RewriteError> {
+    budget.message(source, depth)?;
+    let selected_token =
+        current && save_token_component_selected(component, locator, batch.save_tokens, budget)?;
+    let mut output = 0usize;
+    let mut token_seen = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        let keep = match field.number {
+            6 => !external_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch.removals,
+                budget,
+                depth + 1,
+            )?,
+            7 => {
+                let rewrite = data_reference_rewrite(
+                    field.bytes()?,
+                    component,
+                    locator,
+                    batch.removals,
+                    budget,
+                    depth + 1,
+                )?;
+                if rewrite.selected == 0 {
+                    output = checked_add(output, field.raw.len())?;
+                } else if rewrite.surviving_owners != 0 {
+                    output =
+                        checked_add(output, length_delimited_field_len(7, rewrite.payload_size)?)?;
+                }
+                false
+            },
+            11 => !object_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch.removals,
+                budget,
+                depth + 1,
+            )?,
+            12 if selected_token => {
+                let _ = field.varint()?;
+                if token_seen {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+                token_seen = true;
+                output = checked_add(output, varint_field_len(12, new_root))?;
+                false
+            },
+            12 => {
+                let _ = field.varint()?;
+                if token_seen {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+                token_seen = true;
+                true
+            },
+            _ => true,
+        };
+        if keep {
+            output = checked_add(output, field.raw.len())?;
+        }
+    }
+    if selected_token && !token_seen {
+        output = checked_add(output, varint_field_len(12, new_root))?;
+    }
+    let changed = selected_token || output != source.len();
+    Ok((output, changed))
+}
+
+fn save_token_component_selected(
+    component: u64,
+    locator: &str,
+    batch: SaveTokenBatch<'_>,
+    budget: &mut Budget,
+) -> Result<bool, RewriteError> {
+    let mut selected = false;
+    for selector in batch.components.iter().copied() {
+        budget.work(
+            selector
+                .locator
+                .len()
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+        )?;
+        selected |= selector.identifier == component && selector.locator == locator;
+    }
+    Ok(selected)
+}
+
+fn charge_combined_rewrite(
+    source: &[u8],
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number != 3 {
+            continue;
+        }
+        let payload = field.bytes()?;
+        let (identifier, locator) = component_header(payload, budget, 2)?;
+        let (_size, changed) = combined_component_size(
+            payload, identifier, locator, batch, new_root, true, budget, 2,
+        )?;
+        if changed {
+            charge_combined_component_rewrite(
+                payload,
+                component_selector(identifier, locator),
+                batch,
+                new_root,
+                budget,
+                2,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn component_selector<'source>(
+    identifier: u64,
+    locator: &'source str,
+) -> ComponentSelector<'source> {
+    ComponentSelector::new(identifier, locator)
+}
+
+fn charge_combined_component_rewrite(
+    source: &[u8],
+    component: ComponentSelector<'_>,
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.message(source, depth)?;
+    let selected_token = save_token_component_selected(
+        component.identifier,
+        component.locator,
+        batch.save_tokens,
+        budget,
+    )?;
+    let mut token_seen = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            6 => {
+                let _ = external_field_selected(
+                    field.bytes()?,
+                    component.identifier,
+                    component.locator,
+                    batch.removals,
+                    budget,
+                    depth + 1,
+                )?;
+            },
+            7 => {
+                let _ = data_reference_rewrite(
+                    field.bytes()?,
+                    component.identifier,
+                    component.locator,
+                    batch.removals,
+                    budget,
+                    depth + 1,
+                )?;
+            },
+            11 => {
+                let _ = object_field_selected(
+                    field.bytes()?,
+                    component.identifier,
+                    component.locator,
+                    batch.removals,
+                    budget,
+                    depth + 1,
+                )?;
+            },
+            12 => {
+                let _ = field.varint()?;
+                if selected_token {
+                    if token_seen {
+                        return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                    }
+                    token_seen = true;
+                    let _ = varint_field_len(12, new_root);
+                }
+            },
+            _ => {},
+        }
+    }
+    if selected_token && !token_seen {
+        budget.field()?;
+    }
+    Ok(())
+}
+
+fn charge_combined_candidate_verification(
+    source: &[u8],
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    output_size: usize,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    // The removal scan over the source is a conservative upper bound for the
+    // candidate: removals can only delete fields and references.
+    let mut removal_state = RemovalScanState::new(batch.removals, budget)?;
+    scan_removal_metadata(source, batch.removals, &mut removal_state, budget, true)?;
+
+    // Save-token candidate work has the same component graph plus possible
+    // canonical field-8/12 insertions.  Use the strict source parser for
+    // Buffa parity and charge the output-size delta for inserted bytes.
+    let mut save_state = SaveTokenScanState::new(batch.save_tokens, budget)?;
+    scan_save_token_metadata(
+        source,
+        batch.save_tokens,
+        SaveTokenScanMode::Source,
+        &mut save_state,
+        None,
+        budget,
+    )?;
+    if output_size > source.len() {
+        budget.work(output_size - source.len())?;
+    }
+    let _ = new_root;
+    Ok(())
+}
+
+fn rewrite_combined_into(
+    source: &[u8],
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut has_root_token = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        match field.number {
+            3 => rewrite_combined_component(field, batch, new_root, output, budget, 2)?,
+            8 => {
+                let _ = field.varint()?;
+                has_root_token = true;
+                put_varint_field(output, 8, new_root);
+            },
+            _ => output.extend_from_slice(field.raw),
+        }
+    }
+    if !has_root_token {
+        put_varint_field(output, 8, new_root);
+    }
+    Ok(())
+}
+
+fn rewrite_combined_component(
+    field: Field<'_>,
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    let source = field.bytes()?;
+    let (identifier, locator) = component_header(source, budget, depth)?;
+    let (size, changed) = combined_component_size(
+        source, identifier, locator, batch, new_root, true, budget, depth,
+    )?;
+    if !changed {
+        output.extend_from_slice(field.raw);
+        return Ok(());
+    }
+    budget.changed_component()?;
+    put_key(output, field.number, 2);
+    put_varint(
+        output,
+        u64::try_from(size)
+            .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    );
+    rewrite_combined_component_payload(
+        source, identifier, locator, batch, new_root, output, budget, depth,
+    )?;
+    Ok(())
+}
+
+fn rewrite_combined_component_payload(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalSaveTokenBatch<'_>,
+    new_root: u64,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.message(source, depth)?;
+    let selected_token =
+        save_token_component_selected(component, locator, batch.save_tokens, budget)?;
+    let mut token_seen = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            6 if external_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch.removals,
+                budget,
+                depth + 1,
+            )? => {},
+            7 => rewrite_data_reference_field(
+                field,
+                component,
+                locator,
+                batch.removals,
+                output,
+                budget,
+                depth + 1,
+            )?,
+            11 if object_field_selected(
+                field.bytes()?,
+                component,
+                locator,
+                batch.removals,
+                budget,
+                depth + 1,
+            )? => {},
+            12 if selected_token => {
+                let _ = field.varint()?;
+                if token_seen {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+                token_seen = true;
+                put_varint_field(output, 12, new_root);
+            },
+            _ => output.extend_from_slice(field.raw),
+        }
+    }
+    if selected_token && !token_seen {
         put_varint_field(output, 12, new_root);
     }
     Ok(())
@@ -5358,6 +6063,13 @@ fn checked_add(left: usize, right: usize) -> Result<usize, RewriteError> {
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))
 }
 
+fn repeated_counter(measured: usize, current: usize) -> Result<usize, RewriteError> {
+    current
+        .checked_sub(measured)
+        .and_then(|delta| current.checked_add(delta))
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))
+}
+
 fn put_varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
     put_key(output, number, 0);
     put_varint(output, value);
@@ -5629,6 +6341,28 @@ impl Budget {
             .scratch_bytes
             .checked_add(scratch)
             .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+        Ok(())
+    }
+    fn pad_repeated_counters(
+        &mut self,
+        fields: usize,
+        work: usize,
+        components: usize,
+        references: usize,
+    ) -> Result<(), RewriteError> {
+        if self.fields > fields
+            || self.components_scanned > components
+            || self.references_scanned > references
+        {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+        self.fields = fields;
+        self.components_scanned = components;
+        self.references_scanned = references;
+        if self.work_bytes > work {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+        self.work(work - self.work_bytes)?;
         Ok(())
     }
     const fn report(&self) -> RewriteReport {

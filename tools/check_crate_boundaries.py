@@ -2277,6 +2277,59 @@ NUMBERS_TABLE_CELL_STORAGE_NO_EAGER_DECODE_PATTERNS = (
     ),
 )
 IWA_PACKAGE_METADATA_SOURCE = Path("crates/litchi-iwa/src/package_metadata.rs")
+NUMBERS_COMMENT_SOURCE = Path("crates/litchi-numbers/src/package/comments.rs")
+PACKAGE_METADATA_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/package_metadata_codec.rs"
+)
+PACKAGE_METADATA_REMOVE_FUNCTION = "remove_package_metadata"
+PACKAGE_METADATA_SAVE_TOKEN_FUNCTION = "rewrite_package_metadata_save_tokens"
+PACKAGE_METADATA_COMBINED_FUNCTION = (
+    "rewrite_package_metadata_removals_and_save_tokens"
+)
+PACKAGE_METADATA_REMOVE_BATCH = "RemovalBatch"
+PACKAGE_METADATA_SAVE_TOKEN_BATCH = "SaveTokenBatch"
+PACKAGE_METADATA_COMBINED_BATCH = "RemovalSaveTokenBatch"
+PACKAGE_METADATA_SELECTOR = "ComponentSelector"
+NUMBERS_COMMENT_CLEAR_FUNCTION = "clear_table_cell_comment"
+NUMBERS_COMMENT_COMMIT_FUNCTION = "commit_edit"
+NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR = "UnsupportedDependency"
+PACKAGE_METADATA_CODEC_NO_EAGER_PATTERNS = (
+    (
+        "generated PackageMetadata::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:"
+            r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*"
+            r")*(?:r#)?PackageMetadata[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated ComponentInfo::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:"
+            r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*"
+            r")*(?:r#)?ComponentInfo[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated ObjectUuidMapEntry::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:"
+            r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*"
+            r")*(?:r#)?ObjectUuidMapEntry[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated Prost Message::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:r#)?(?:Message|M)"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "prost dependency marker",
+        re.compile(r"(?<![A-Za-z0-9_#])(?:prost|prost_types)\b"),
+    ),
+)
 PACKAGE_METADATA_READ_FUNCTIONS = (
     "component_identifier_for_entry",
     "component_identifier_for_object_uuid",
@@ -11966,6 +12019,212 @@ def audit_iwa_package_metadata_read_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep comment clears gated on the bounded metadata primitives.
+
+    A changed comment clear is still deliberately unsupported by the focused
+    Numbers owner.  Enabling it requires one atomic metadata publication that
+    removes the exact comment-graph registrations and advances the selected
+    current-component save tokens.  This ratchet records that prerequisite:
+    the hidden codec must expose typed selector/removal/save-token batches and
+    remain generated-Prost-free, while the focused clear route must continue to
+    fail closed before any cell-only rewrite is reachable.
+    """
+
+    violations: list[str] = []
+    codec_path = root / PACKAGE_METADATA_CODEC_SOURCE
+    if not codec_path.is_file():
+        return [
+            "focused Numbers comment-clear metadata prerequisite is missing "
+            f"codec source: {PACKAGE_METADATA_CODEC_SOURCE}"
+        ]
+
+    raw_codec = codec_path.read_text(encoding="utf-8")
+    codec_source = _mask_rust_cfg_test_items(raw_codec)
+    codec_code = _mask_rust_non_code(codec_source)
+
+    for label, pattern in PACKAGE_METADATA_CODEC_NO_EAGER_PATTERNS:
+        for match in pattern.finditer(codec_code):
+            line_number = codec_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused PackageMetadata removal/save-token codec uses "
+                f"{label}: {PACKAGE_METADATA_CODEC_SOURCE}:{line_number}"
+            )
+
+    def public_function_signature(name: str) -> str | None:
+        match = re.search(
+            rf"(?<![A-Za-z0-9_#])pub(?:[ \t\r\n]+\([^()]*\))?"
+            rf"[ \t\r\n]+fn[ \t\r\n]+{re.escape(name)}\b",
+            codec_code,
+        )
+        if match is None:
+            return None
+        opening = codec_code.find("{", match.end())
+        if opening < 0:
+            return codec_code[match.start() : match.end()]
+        return codec_code[match.start() : opening]
+
+    required_functions = (
+        (
+            PACKAGE_METADATA_REMOVE_FUNCTION,
+            PACKAGE_METADATA_REMOVE_BATCH,
+            "removal",
+        ),
+        (
+            PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
+            PACKAGE_METADATA_SAVE_TOKEN_BATCH,
+            "save-token",
+        ),
+        (
+            PACKAGE_METADATA_COMBINED_FUNCTION,
+            PACKAGE_METADATA_COMBINED_BATCH,
+            "combined removal/save-token",
+        ),
+    )
+    for function_name, batch_name, description in required_functions:
+        signature = public_function_signature(function_name)
+        if signature is None:
+            violations.append(
+                "focused PackageMetadata codec is missing typed "
+                f"{description} API {function_name}: {PACKAGE_METADATA_CODEC_SOURCE}"
+            )
+            continue
+        if not re.search(rf"\b{re.escape(batch_name)}\b", signature):
+            line_number = codec_code.count("\n", 0, codec_code.find(signature)) + 1
+            violations.append(
+                "focused PackageMetadata codec "
+                f"{function_name} must accept {batch_name}: "
+                f"{PACKAGE_METADATA_CODEC_SOURCE}:{line_number}"
+            )
+
+    for type_name in (
+        PACKAGE_METADATA_SELECTOR,
+        PACKAGE_METADATA_REMOVE_BATCH,
+        PACKAGE_METADATA_SAVE_TOKEN_BATCH,
+        PACKAGE_METADATA_COMBINED_BATCH,
+    ):
+        if re.search(
+            rf"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+            rf"(?:struct|enum|type)[ \t\r\n]+{re.escape(type_name)}\b",
+            codec_code,
+        ) is not None:
+            continue
+        violations.append(
+            "focused PackageMetadata codec is missing typed "
+            f"{type_name}: {PACKAGE_METADATA_CODEC_SOURCE}"
+        )
+
+    combined_batch = re.search(
+        rf"(?<![A-Za-z0-9_#])pub[ \t\r\n]+struct[ \t\r\n]+"
+        rf"{re.escape(PACKAGE_METADATA_COMBINED_BATCH)}\b[\s\S]*?\}}",
+        codec_code,
+    )
+    if combined_batch is None or not all(
+        re.search(rf"\b{re.escape(batch_name)}\b", combined_batch.group(0))
+        for batch_name in (
+            PACKAGE_METADATA_REMOVE_BATCH,
+            PACKAGE_METADATA_SAVE_TOKEN_BATCH,
+        )
+    ):
+        violations.append(
+            "focused PackageMetadata combined batch must compose typed removal "
+            f"and save-token batches: {PACKAGE_METADATA_CODEC_SOURCE}"
+        )
+
+    comment_path = root / NUMBERS_COMMENT_SOURCE
+    if not comment_path.is_file():
+        return sorted(set(violations))
+    raw_comments = comment_path.read_text(encoding="utf-8")
+    comment_source = _mask_rust_cfg_test_items(raw_comments)
+    comment_code = _mask_rust_non_code(comment_source)
+
+    function_bodies: dict[str, str] = {}
+    for declaration in RUST_FUNCTION_DECLARATION.finditer(comment_code):
+        opening = comment_code.find("{", declaration.end())
+        if opening < 0:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(comment_code) and depth:
+            if comment_code[cursor] == "{":
+                depth += 1
+            elif comment_code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth == 0:
+            function_bodies.setdefault(
+                declaration.group(1), comment_code[opening + 1 : cursor - 1]
+            )
+
+    clear_body = function_bodies.get(NUMBERS_COMMENT_CLEAR_FUNCTION)
+    if clear_body is None:
+        violations.append(
+            "focused Numbers comment owner is missing production "
+            f"{NUMBERS_COMMENT_CLEAR_FUNCTION}: {NUMBERS_COMMENT_SOURCE}"
+        )
+    else:
+        if re.search(r"\.(?:clear)[ \t\r\n]*\(", clear_body) is None:
+            violations.append(
+                "focused Numbers comment clear must retain its typed staging "
+                f"clear path: {NUMBERS_COMMENT_SOURCE}"
+            )
+        for function_name in (
+            PACKAGE_METADATA_REMOVE_FUNCTION,
+            PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
+            PACKAGE_METADATA_COMBINED_FUNCTION,
+        ):
+            if re.search(rf"\b{re.escape(function_name)}\b", clear_body) is not None:
+                violations.append(
+                    "focused Numbers comment clear must not call PackageMetadata "
+                    f"{function_name} before the combined publication route exists: "
+                    f"{NUMBERS_COMMENT_SOURCE}"
+                )
+
+    commit_body = function_bodies.get(NUMBERS_COMMENT_COMMIT_FUNCTION)
+    if commit_body is None:
+        violations.append(
+            "focused Numbers comment owner is missing production "
+            f"{NUMBERS_COMMENT_COMMIT_FUNCTION}: {NUMBERS_COMMENT_SOURCE}"
+        )
+    else:
+        unsupported = commit_body.find(NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR)
+        rewrite = commit_body.find("rewrite_existing")
+        if unsupported < 0:
+            violations.append(
+                "focused Numbers comment changed clear must fail with typed "
+                f"{NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR} before publication: "
+                f"{NUMBERS_COMMENT_SOURCE}"
+            )
+        elif rewrite >= 0 and unsupported > rewrite:
+            violations.append(
+                "focused Numbers comment changed clear must reject before its "
+                f"rewrite path: {NUMBERS_COMMENT_SOURCE}"
+            )
+
+    # Until the combined operation is implemented, no metadata primitive may
+    # be reachable from this focused owner.  This prevents a partial clear from
+    # removing a cell pointer while leaving stale UUID/external registrations.
+    for function_name in (
+        PACKAGE_METADATA_REMOVE_FUNCTION,
+        PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
+        PACKAGE_METADATA_COMBINED_FUNCTION,
+    ):
+        if re.search(rf"\b{re.escape(function_name)}\b", comment_code) is None:
+            continue
+        line_number = comment_code.count(
+            "\n", 0, comment_code.find(function_name)
+        ) + 1
+        violations.append(
+            "focused Numbers comment owner reaches PackageMetadata "
+            f"{function_name} before the combined clear route is complete: "
+            f"{NUMBERS_COMMENT_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_extractor_no_eager_comment_storage_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -13495,6 +13754,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_iwa_numbers_table_cell_storage_source_topology()
         + audit_iwa_package_metadata_read_source_topology()
+        + audit_numbers_comment_clear_metadata_prerequisite_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
