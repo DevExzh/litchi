@@ -14,8 +14,8 @@ mod snappy;
 
 pub use archive::{
     Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferenceScope, ArchiveReferenceVisitor, FieldInfo, FieldPath, FieldType,
-    KnownFieldRule, MessageInfo, RawMessage, UnknownFieldRule,
+    ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor, FieldInfo, FieldPath,
+    FieldType, KnownFieldRule, MessageInfo, RawMessage, UnknownFieldRule,
 };
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;
