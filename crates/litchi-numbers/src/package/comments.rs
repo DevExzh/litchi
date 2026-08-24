@@ -25,7 +25,8 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{
     comment_storage_codec, numbers_table_cell_storage_codec,
     package_metadata_codec::{
-        RewriteOptions as MetadataRewriteOptions, inspect_package_metadata_with_visitor,
+        RewriteOptions as MetadataRewriteOptions, SaveTokenBatch,
+        inspect_package_metadata_with_visitor, rewrite_package_metadata_save_tokens,
     },
     tst,
 };
@@ -553,6 +554,7 @@ enum ArchiveMutation {
 struct PreparedRootClear {
     cell: Vec<u8>,
     mutations: Vec<ArchiveMutation>,
+    metadata_entry: (String, Vec<u8>),
 }
 
 impl ArchiveMutation {
@@ -1471,7 +1473,11 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         }
         prove_global_comment_ownership(edit.source, &located)?;
         let prepared = prepare_root_clear(edit.source, &located)?;
-        if prepared.cell.is_empty() || prepared.mutations.len() != 3 {
+        if prepared.cell.is_empty()
+            || prepared.mutations.len() != 3
+            || prepared.metadata_entry.0 != super::metadata::ENTRY_NAME
+            || prepared.metadata_entry.1.is_empty()
+        {
             return Err(Error::Verification);
         }
         return Err(Error::UnsupportedDependency {
@@ -1711,7 +1717,166 @@ fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRoo
         component_index: storage.component_index,
         object_identifier: entry.entry.storage_id,
     });
-    Ok(PreparedRootClear { cell, mutations })
+    let metadata_entry = prepare_metadata_token_entry(source, &mutations, path)?;
+    Ok(PreparedRootClear {
+        cell,
+        mutations,
+        metadata_entry,
+    })
+}
+
+fn prepare_metadata_token_entry(
+    source: &Package,
+    mutations: &[ArchiveMutation],
+    path: Path,
+) -> Result<(String, Vec<u8>), Error> {
+    let route = super::metadata::unique_message_route(source)
+        .ok_or(Error::UnsupportedDependency { path })?;
+    let metadata_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let metadata_message = metadata_component
+        .archive()
+        .objects
+        .get(route.object_index)
+        .and_then(|object| object.messages.get(route.message_index))
+        .filter(|message| message.type_ == super::metadata::MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource { path })?;
+    let mut component_indices = Vec::new();
+    component_indices
+        .try_reserve_exact(mutations.len())
+        .map_err(|_| Error::Allocation {
+            amount: mutations.len(),
+            path,
+        })?;
+    for mutation in mutations {
+        let index = mutation.component_index();
+        if !component_indices.contains(&index) {
+            component_indices.push(index);
+        }
+    }
+    component_indices.sort_unstable();
+    let mut target_locators = Vec::new();
+    target_locators
+        .try_reserve_exact(component_indices.len())
+        .map_err(|_| Error::Allocation {
+            amount: component_indices.len(),
+            path,
+        })?;
+    for index in component_indices {
+        let component = source
+            .state
+            .components
+            .catalog()
+            .get_index(index)
+            .ok_or(Error::InvalidSource { path })?;
+        target_locators.push(super::metadata::normalized_locator(component.name()));
+    }
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    let token_fields = target_locators.len().saturating_add(1).saturating_mul(16);
+    let options = MetadataRewriteOptions::new(
+        metadata_message.data.len().max(1).min(maximum_wire),
+        metadata_message
+            .data
+            .len()
+            .saturating_add(token_fields)
+            .max(1)
+            .min(maximum_wire),
+        metadata_message
+            .data
+            .len()
+            .saturating_mul(8)
+            .clamp(1, WireLimits::MAX_FIELDS),
+        metadata_message
+            .data
+            .len()
+            .saturating_mul(128)
+            .saturating_add(
+                target_locators
+                    .len()
+                    .saturating_mul(metadata_message.data.len()),
+            )
+            .saturating_add(token_fields)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_MAX_NESTING,
+        source
+            .state
+            .components
+            .catalog()
+            .len()
+            .max(metadata_message.data.len())
+            .max(target_locators.len())
+            .max(1),
+        source.state.options.semantic().max_references().max(1),
+        0,
+    );
+    let mut visitor = super::metadata::ComponentSelectorVisitor::new(&target_locators)
+        .map_err(|amount| Error::Allocation { amount, path })?;
+    inspect_package_metadata_with_visitor(metadata_message.data.as_slice(), options, &mut visitor)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let selectors = visitor.into_selectors().map_err(|amount| {
+        if amount == 0 {
+            Error::UnsupportedDependency { path }
+        } else {
+            Error::Allocation { amount, path }
+        }
+    })?;
+    let rewritten = rewrite_package_metadata_save_tokens(
+        metadata_message.data.as_slice(),
+        SaveTokenBatch::new(&selectors),
+        options,
+    )
+    .map_err(|_| Error::UnsupportedDependency { path })?
+    .into_bytes();
+    let physical = physical_source(source)?;
+    let entry = physical
+        .package()
+        .iter()
+        .find(|entry| entry.name() == super::metadata::ENTRY_NAME)
+        .filter(|entry| !entry.is_opaque())
+        .ok_or(Error::UnsupportedDependency { path })?;
+    let archive_limits = physical
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let stream = SnappyStream::decompress_with_limits(
+        entry.data(),
+        physical
+            .limits()
+            .snappy_limits()
+            .map_err(|_| Error::InvalidSource { path })?,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    archive
+        .objects
+        .get_mut(route.object_index)
+        .ok_or(Error::InvalidSource { path })?
+        .replace_message_preserving_header_with_limits(
+            route.message_index,
+            RawMessage {
+                type_: super::metadata::MESSAGE_TYPE,
+                data: rewritten,
+            },
+            archive_limits,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+    let bytes = archive
+        .to_bytes_with_limits(archive_limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource { path })?;
+    Ok((super::metadata::ENTRY_NAME.to_owned(), compressed))
 }
 
 fn rewrite_archives(
