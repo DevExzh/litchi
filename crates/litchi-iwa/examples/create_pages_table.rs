@@ -3,10 +3,11 @@ use std::env;
 use litchi_iwa::pages::{
     PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableDimensionSize,
     PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
-    PagesTableTitleSettings,
 };
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
+use litchi_pages::table::title::Settings as PagesTableTitleSettings;
+use litchi_pages::{BodyTableSelector, Package};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -50,10 +51,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    editor.set_table_title_settings(
-        table.model_object_id,
-        PagesTableTitleSettings::new(Some(true), Some(true)),
-    )?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
         editor.set_table_column_width(
             table.model_object_id,
@@ -88,6 +85,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         0,
         PagesCellValue::Text("Generated independently".to_owned()),
     )?;
-    editor.save(output)?;
+    let focused = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = focused
+        .edit_body_table_title(BodyTableSelector::name("Revenue"))?
+        .set(PagesTableTitleSettings::new(Some(true), Some(true)))
+        .commit()?;
+    std::fs::write(output, commit.package().source_bytes())?;
     Ok(())
 }

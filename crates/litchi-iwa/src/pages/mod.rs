@@ -47,9 +47,9 @@ pub use editor::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
     PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
-    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, PagesTableTitleSettings,
-    RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
-    RemovedPagesMovie, RemovedPagesTextBox,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, RemovedPagesAudio,
+    RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
+    RemovedPagesTextBox,
 };
 pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
 pub use litchi_pages::{Section, SectionType};
