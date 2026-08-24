@@ -1081,6 +1081,12 @@ pub mod keynote_document_codec;
 #[doc(hidden)]
 pub mod keynote_chart_caption_codec;
 
+/// Internal generated-free encoder for one canonical inline Keynote chart
+/// caption graph. Generated protobuf types remain test-only or private to
+/// their existing owners.
+#[doc(hidden)]
+pub mod keynote_chart_caption_graph_codec;
+
 /// Internal strict Keynote chart-title generated-extension projection.
 /// Generated types remain private and caller-owned source bytes remain the
 /// preservation authority.

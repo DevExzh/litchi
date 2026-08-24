@@ -9963,7 +9963,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
-    def test_iwa_keynote_chart_caption_requires_typed_facade_and_deprecated_ids(
+    def test_iwa_keynote_chart_caption_requires_selector_ownership_and_masks_tests(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -9972,44 +9972,82 @@ class BoundaryPolicyTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text(
                 "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_caption(&self, id: u64) {}\n"
-                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
-                "    pub fn remove_slide_chart_caption(&mut self, id: u64) {}\n"
                 "    pub fn slide_chart_caption_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_caption_by_selector(&mut self) {}\n"
-                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {}\n"
+                "    pub fn set_slide_chart_caption_by_selector(&mut self) {\n"
+                "        self.edit_slide_chart_caption().set(\"caption\").commit();\n"
+                "    }\n"
+                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {\n"
+                "        self.edit_slide_chart_caption().clear().commit();\n"
+                "    }\n"
+                "    #[cfg(test)]\n"
+                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
                 "}\n",
                 encoding="utf-8",
             )
 
-            violations = boundaries.audit_iwa_keynote_chart_caption_source_topology(root)
-            self.assertEqual(len(violations), 3)
-            for method in boundaries.IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS:
-                self.assertTrue(
-                    any(
-                        "chart-caption legacy method must remain deprecated " + method
-                        in item
-                        for item in violations
-                    ),
-                    violations,
-                )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_caption_source_topology(root), []
+            )
 
             source.write_text(
                 "impl KeynoteEditor {\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn slide_chart_caption(&self, id: u64) {}\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn remove_slide_chart_caption(&mut self, id: u64) {}\n"
                 "    pub fn slide_chart_caption_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_caption_by_selector(&mut self) {}\n"
-                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {}\n"
+                "    pub fn set_slide_chart_caption_by_selector(&mut self) {\n"
+                "        self.edit_slide_chart_caption().set(\"caption\").commit();\n"
+                "    }\n"
+                "    pub fn remove_slide_chart_caption_by_selector(&mut self) {\n"
+                "        self.edit_slide_chart_caption().clear().commit();\n"
+                "    }\n"
+                "    pub fn set_slide_chart_caption(&mut self, id: u64) {}\n"
                 "}\n",
                 encoding="utf-8",
             )
             self.assertEqual(
-                boundaries.audit_iwa_keynote_chart_caption_source_topology(root), []
+                len(boundaries.audit_iwa_keynote_chart_caption_source_topology(root)), 2
+            )
+
+            helper = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/helper.rs"
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "fn slide_chart_caption_slot(drawable_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_KEYNOTE_CHART_CAPTION_EXAMPLE_ROOT / "caption.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn demo(editor: &mut KeynoteEditor) {\n"
+                "    editor.set_slide_chart_caption(0, 9, \"caption\");\n"
+                "}\n"
+                "fn raw_caption(drawable_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_KEYNOTE_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "Use editor.remove_slide_chart_caption(0, 9).\n"
+                "Legacy signature: set_slide_chart_caption(id: u64).\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_caption_source_topology(root)
+            self.assertTrue(
+                any("native graph helper must be retired" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("example retains raw-ID call" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("example retains raw identifier" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("README retains raw-ID call" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("README retains raw identifier" in item for item in violations),
+                violations,
             )
 
     def test_focused_keynote_chart_caption_facade_requires_semantic_owner_shape(
@@ -10028,6 +10066,15 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    pub fn slide_chart_caption(&self) {}\n"
                 "    pub fn edit_slide_chart_caption(&self) {}\n"
                 "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl ChartCaptionEdit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {}\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -10054,9 +10101,52 @@ class BoundaryPolicyTests(unittest.TestCase):
                 root
             )
             self.assertTrue(
-                any("public method exposes physical type" in item for item in violations),
+                any("public API exposes" in item for item in violations),
                 violations,
             )
+
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nimpl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {}\n"
+                "}\n"
+                "impl ChartCaptionEdit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {}\n"
+                "}\n"
+                "fn private_codec(bytes: &[u8]) { let _ = prost::Message::decode(bytes); }\n"
+                "pub struct Leaked {\n"
+                "    pub storage_id: u64,\n"
+                "    pub wire: WireView<'static>,\n"
+                "    pub archive: ArchiveObject,\n"
+                "}\n"
+                "pub use litchi_iwa_protos::WireView;\n"
+                "pub type LeakedCaption = ChartCaptionEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("raw identifier" in item for item in violations), violations
+            )
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("protobuf type" in item for item in violations), violations)
+            self.assertTrue(any("alternate alias" in item for item in violations), violations)
+
+    def test_keynote_chart_caption_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_chart_caption_legacy_calls()", main_source
+        )
+        self.assertIn(
+            "+ audit_iwa_keynote_chart_caption_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_keynote_chart_caption_facade_source_topology()", main_source
+        )
 
     def test_focused_numbers_package_no_eager_prost_allows_test_only_usage(
         self,

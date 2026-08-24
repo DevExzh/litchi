@@ -596,16 +596,16 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
 
     assert_eq!(
         editor
-            .slide_chart_caption(0, source.drawable_object_id)
+            .slide_chart_caption_by_selector(0, ChartSelector::index(0))
             .unwrap(),
         None
     );
     editor
-        .set_slide_chart_caption(0, source.drawable_object_id, "Revenue by region")
+        .set_slide_chart_caption_by_selector(0, ChartSelector::index(0), "Revenue by region")
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_caption(0, source.drawable_object_id)
+            .slide_chart_caption_by_selector(0, ChartSelector::index(0))
             .unwrap(),
         Some("Revenue by region".to_owned())
     );
@@ -615,7 +615,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_caption(0, duplicate.drawable_object_id)
+            .slide_chart_caption_by_selector(0, ChartSelector::index(1))
             .unwrap(),
         Some("Revenue by region".to_owned())
     );
@@ -630,7 +630,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
     );
     assert!(
         !editor
-            .remove_slide_chart_caption(0, source.drawable_object_id)
+            .remove_slide_chart_caption_by_selector(0, ChartSelector::index(0))
             .unwrap()
     );
     assert_eq!(
