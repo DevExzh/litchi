@@ -12901,3 +12901,72 @@ open/render/save/close/reopen application acceptance plus exact pre-native
 inverse evidence. It is not Rust/native byte parity, arbitrary
 cross-component graph acceptance, a performance/RSS measurement, or a full
 publication/workspace gate.
+
+## 2026-08-24 amendment: Wave67 Keynote chart-caption verification record
+
+The aggregate caption transaction budget, output-free archive/ZIP planning,
+prepared Metadata execution seams, adversarial limit coverage, and boundary
+ratchet changes are commit
+`688ddbb0bd6ca4e7addc15ac8fbd12b0032fc5a9`.
+
+The exact scoped gates were:
+
+- `cargo test -p litchi-keynote --test slide_chart_caption --quiet`: 20/20
+  passed;
+- `cargo test -p litchi-iwa-protos keynote_chart_caption_graph_codec --lib
+  --quiet`: 4/4 passed;
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib
+  --no-fail-fast`: 36/36 passed;
+- `cargo test -p litchi-iwa-core --lib --quiet`: 42/42 passed;
+- `RUSTFLAGS='-A unused-qualifications' cargo test -p litchi-iwa-archive
+  --lib --quiet`: 137/137 passed. The allowance is for the existing unrelated
+  `package_state.rs:500` qualification lint;
+- `cargo test -p litchi-iwa --lib
+  keynote::editor::slide_charts::tests:: --quiet`: 55/55 passed;
+- warning-denied Clippy passed for `litchi-iwa-core`, the focused
+  `litchi-iwa-protos` library, the `litchi-keynote` library, and the
+  chart-caption integration target;
+- `cargo check -p litchi-keynote -p litchi-iwa-protos -p litchi-iwa
+  --all-targets --quiet`, the archive library check, `cargo fmt --all --
+  --check`, and `git diff --check` passed;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 412/412 passed,
+  with `py_compile` and the direct caption audits also clean.
+
+The live `python3 tools/check_crate_boundaries.py --explain` command exits 1
+only for the three known findings in the user-owned untracked Pages
+table-lock source and its two legacy methods; it reports no Keynote or Wave67
+finding. Repository-wide commit hooks are not fully green. After stashing the
+unrelated worktree fixes, the formatting hook exposes existing differences in
+`crates/litchi-iwa/src/protobuf.rs` and
+`crates/litchi-iwa-protos/src/table_info_codec.rs`; workspace linting exposes
+the existing Numbers `object_count` and `manual_contains` findings; and the
+workspace lib/test command cannot compile
+`crates/litchi/tests/numbers_semantic_values.rs:55` because its match lacks a
+wildcard for the non-exhaustive `Storage` enum. The doc-test hook passed. The
+implementation commit therefore skipped only those three reproduced failing
+hooks. These scoped results are not a full-workspace green claim.
+
+The bounded Keynote 14.4 native record used disposable artifacts. The Rust
+candidate was saved in place, so the pre-Keynote and Keynote-normalized rows
+below intentionally name the same path at different points in the run.
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| compatibility-host source oracle `/private/tmp/litchi-wave64-chart-caption-native/host-source.key` | 11,977 | `f977851182891c4fb1b7cb1bbe5051bb9d40f012bdf526f4433ec26a5ef238f1` |
+| Rust candidate before Keynote `/private/tmp/litchi-wave67-caption-native.R7hLA8/rust-wave67-pre-keynote.key` | 11,990 | `e99333a8bf88933a361e41a650ebc18df6128241bf19b3ba10ee7902582fc1c2` |
+| exact inverse `/private/tmp/litchi-wave67-caption-native.R7hLA8/inverse.key` | 11,977 | `f977851182891c4fb1b7cb1bbe5051bb9d40f012bdf526f4433ec26a5ef238f1` |
+| Keynote-saved and reopened candidate at the same path | 70,404 | `c070848a275e863106df7ab4305068e45053592c5c1d73a4dc461dc0c3c1ede8` |
+
+The focused transaction changed `Native source caption` to
+`Wave67 budgeted caption — 北区`, reported three touched physical components
+and no preview deletion, and produced an inverse byte-identical to the source.
+Keynote opened the Rust candidate without repair, rendered one 2D column chart
+with that caption and North April 17, May 26 and South April 55, May 43, saved
+in place, closed, and reopened the exact saved path with the same visible
+caption and data and no repair alert.
+
+Keynote normalized the package bytes. This is bounded application
+open/render/save/close/reopen acceptance plus exact pre-native inverse
+evidence. It is not post-Keynote focused Rust re-ingress, Rust/native byte
+parity, arbitrary caption-graph acceptance, a performance/RSS measurement, or
+a full publication/workspace gate.

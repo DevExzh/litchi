@@ -1098,3 +1098,40 @@ exact artifacts. Each stage remains bounded and fallible, but this is not a
 package-wide allocation, peak-memory, RSS, latency, throughput, or performance
 claim. No manifest edge, generated schema, Buffa owner, normal Prost owner, or
 workspace dependency changed.
+
+## 2026-08-24 amendment: Wave67 Keynote chart-caption aggregate transaction-budget resource record
+
+Commit `688ddbb0bd6ca4e7addc15ac8fbd12b0032fc5a9` replaces the
+Wave66 collection of independently bounded chart-caption stages with one
+private aggregate `CaptionBudget` for the focused transaction. The budget
+charges the finite package catalog and ownership census, strict graph and
+Metadata codec reports, archive serialization, Snappy input and maximum
+compressed extent, ZIP reassembly planning and execution, complete candidate
+reopens, and exact source/target artifacts. Checked counters cover input,
+intermediate and final output, fields, work, nesting, components, references,
+objects, messages, additions, allocations, retained bytes, and scratch bytes;
+overflow fails closed.
+
+The supporting seams are output-free where publication needs a global plan.
+`Archive::encoded_len_with_limits` measures exact source-authoritative IWA
+serialization, `SnappyStream::maximum_compressed_len` provides a bounded
+compression ceiling, and `PreparedReassembly` exposes exact ZIP execution
+requirements before final allocation. The strict PackageMetadata save-token
+and addition-plus-save-token routes now expose prepare reports and execution
+requirements; prepare performs source scan, sizing, precharge, and semantic
+validation without allocating the candidate output, while execute enforces
+the residual limits and performs the single codec output reservation.
+
+Existing-caption replacement still uses two private staged candidates: the
+native text candidate followed by the Metadata save-token candidate. Both
+stages and both allocations are charged before publication, and a later
+failure leaves the package source unchanged, but Wave67 does not claim one
+candidate allocation for the whole transaction. The aggregate intermediate-
+output ceiling is transaction-local and intentionally larger than the final
+physical package ceiling; member and final artifact limits are enforced again
+by reassembly and complete reopen.
+
+This is a focused chart-caption transaction contract, not a package-wide
+peak-memory, allocation-count, RSS, latency, throughput, or performance
+measurement. No manifest edge, generated schema, Buffa owner, normal Prost
+owner, or workspace dependency changed.

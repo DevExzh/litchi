@@ -4778,3 +4778,33 @@ monolith remain. Wave66 removes no manifest edge, crate, remaining host,
 generated-schema owner, or normal Prost owner. It therefore satisfies no
 crate-exit, host-exit, dependency-removal, generated-schema-retirement,
 monolith-deletion, full-workspace-green, or aggregate-resource gate.
+
+## 2026-08-24 amendment: Wave67 Keynote chart-caption aggregate-budget slice (not a monolith-exit gate)
+
+Commit `688ddbb0bd6ca4e7addc15ac8fbd12b0032fc5a9` adds one private
+aggregate resource budget around the already admitted selector-first Keynote
+chart-caption transaction. It also adds output-free archive sizing, prepared
+ZIP reassembly, prepared PackageMetadata token/addition execution, typed limit
+mapping, exact/max-minus-one integration coverage, and a ratchet that requires
+the focused commit and apply paths to retain those charges. The semantic
+public API and the Wave65 host cutover are unchanged; no raw-ID compatibility
+surface was restored.
+
+This is a bounded resource and publication refinement of the canonical
+caption lifecycle. Unsupported future graphs, ambiguous owners, malformed
+wire, hostile Metadata, and unproven dependencies remain rejected. Existing-
+caption replacement uses two charged private candidates and therefore does
+not establish a single-allocation package transaction. The native record is
+bounded Keynote 14.4 open/render/save/close/reopen evidence with an exact
+pre-native inverse, not byte parity, post-native focused Rust re-ingress,
+arbitrary graph acceptance, package-wide performance, or a general
+publication gate.
+
+The `litchi-iwa` crate, remaining Keynote/Pages/Numbers compatibility hosts,
+dependency edges, ordered debts, generated schemas, Buffa/Prost owners, and
+monolith remain. No manifest edge, crate, remaining host, generated-schema
+owner, or normal Prost owner was removed. The live checker retains the three
+user-owned untracked Pages table-lock findings and no Keynote caption finding.
+Wave67 therefore satisfies no crate-exit, host-exit, dependency-removal,
+generated-schema-retirement, monolith-deletion, package-wide-performance, or
+full-workspace-green gate.
