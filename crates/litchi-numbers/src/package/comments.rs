@@ -6,11 +6,12 @@
 //! semantic value; native object identifiers, table-list keys, protobuf
 //! messages, and archive member names remain private to this adapter.
 //!
-//! The exact-source write seam is intentionally narrow: it can replace the
-//! text of an existing, unshared root comment whose table-list entry and cell
-//! key are globally unique and whose storage has no replies. Creating
-//! comments and clearing comments are refused; both operations require
-//! ownership-graph mutations that this adapter does not perform.
+//! The exact-source write seam is intentionally narrow: it can replace or
+//! clear an existing, unshared root comment whose table-list entry and cell
+//! key are globally unique and whose storage has no replies. Clear
+//! publication also requires an exact PackageMetadata sidecar with no
+//! ownership of the deleted storage object. Creating comments remains
+//! unsupported.
 
 use std::{collections::HashSet, fmt, sync::Arc};
 
@@ -667,12 +668,12 @@ impl Package {
 
     /// Remove a table-cell comment.
     ///
-    /// Changed clears are intentionally refused with
-    /// [`Error::UnsupportedDependency`]. Removing the cell pointer requires
-    /// owner-aware table-list and comment-storage graph cleanup, so this
-    /// adapter never publishes a cell-only rewrite that could leave an
-    /// orphaned comment graph. Clearing an already-empty cell remains the
-    /// exact no-op supported by the edit transaction.
+    /// A changed clear is supported only for an exact, globally unshared root
+    /// comment graph with strict PackageMetadata ownership and save-token
+    /// attribution. Shared, segmented, reply-bearing, metadata-owned, or
+    /// otherwise ambiguous graphs fail closed with
+    /// [`Error::UnsupportedDependency`]. Clearing an already-empty cell is an
+    /// exact no-op.
     pub fn clear_table_cell_comment<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
@@ -739,7 +740,9 @@ impl Package {
             {
                 return Err(Error::UnsupportedDependency { path: patch.path });
             }
-            prove_global_comment_ownership(self, &located)?;
+            if patch.after.is_none() {
+                prove_root_clear_ownership(self, &located)?;
+            }
         }
         let source_previews = root_preview_deletions(source_catalog)?;
         if source_previews.len() != patch.source_previews {
@@ -1461,18 +1464,18 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             diagnostics: Diagnostics::unchanged(),
         });
     }
-    // A changed clear is deliberately unsupported.  Do this before native
-    // graph inspection or archive mutation so segmented/shared entries are
-    // rejected uniformly and publication can never become a cell-only clear.
     if edit.before.is_some() && edit.after.is_none() {
+        if !source_catalog.source_is_exact() {
+            return Err(Error::UnsupportedSource);
+        }
         let located = resolve_comment_native(edit.source, edit.target.clone())?;
         if located.comment != edit.before {
             return Err(Error::InvalidSource {
                 path: edit.target.path,
             });
         }
-        prove_global_comment_ownership(edit.source, &located)?;
-        let prepared = prepare_root_clear(edit.source, &located)?;
+        prove_root_clear_ownership(edit.source, &located)?;
+        let mut prepared = prepare_root_clear(edit.source, &located)?;
         if prepared.cell.is_empty()
             || prepared.mutations.len() != 3
             || prepared.metadata_entry.0 != super::metadata::ENTRY_NAME
@@ -1480,8 +1483,66 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         {
             return Err(Error::Verification);
         }
-        return Err(Error::UnsupportedDependency {
+        let source_cell = located.cell_bytes.clone().ok_or(Error::InvalidSource {
             path: edit.target.path,
+        })?;
+        let previews = root_preview_deletions(source_catalog)?;
+        let (native_entries, touched) = rewrite_archives(
+            edit.source,
+            prepared.mutations.as_mut_slice(),
+            edit.target.path,
+        )?;
+        let mut edits = Vec::new();
+        edits
+            .try_reserve_exact(native_entries.len().saturating_add(1))
+            .map_err(|_| Error::Allocation {
+                amount: native_entries.len().saturating_add(1),
+                path: edit.target.path,
+            })?;
+        for (name, data) in &native_entries {
+            edits.push(EntryEdit::new(name.as_str(), data.as_slice()));
+        }
+        edits.push(EntryEdit::new(
+            prepared.metadata_entry.0.as_str(),
+            prepared.metadata_entry.1.as_slice(),
+        ));
+        let deleted_names = previews.iter().map(String::as_str).collect::<Vec<_>>();
+        let output = source_catalog
+            .package()
+            .reassemble_with_deletions_to_bytes(&edits, &deleted_names, source_catalog.limits())
+            .map_err(|_| Error::InvalidSource {
+                path: edit.target.path,
+            })?;
+        let package =
+            Package::from_shared_bytes_with_options(output.into(), edit.source.state.options)
+                .map_err(|_| Error::Verification)?;
+        let position = cell_position_for_path(edit.target.path)?;
+        if package
+            .table_cell_comment(
+                SheetSelector::index(edit.target.path.sheet()),
+                TableSelector::index(edit.target.path.table()),
+                position,
+            )?
+            .is_some()
+        {
+            return Err(Error::Verification);
+        }
+        let target_owner = physical_source(&package)?.__source_owner();
+        let target_cell = Arc::from(prepared.cell.into_boxed_slice());
+        return Ok(Commit {
+            package,
+            patch: Patch {
+                artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+                path: edit.target.path,
+                before: edit.before,
+                after: None,
+                source_cell,
+                target_cell,
+                source_previews: previews.len(),
+                target_previews: 0,
+                touched_components: touched,
+            },
+            diagnostics: Diagnostics::published(touched, previews.len()),
         });
     }
     if !source_catalog.source_is_exact() {
@@ -1657,9 +1718,9 @@ fn prepare_root_clear(source: &Package, located: &Located) -> Result<PreparedRoo
             columns: located.target.native.columns,
             changes: std::slice::from_ref(&tile_change),
             limits: super::table_cell_edit::tile::TileLimits::new(
-                tile_source.len().max(1).min(maximum_wire),
                 maximum_wire,
-                tile_source.len().saturating_mul(8).clamp(1, maximum_wire),
+                maximum_wire,
+                WireLimits::MAX_FIELDS,
                 u64::try_from(
                     tile_source
                         .len()
@@ -2838,9 +2899,17 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
             path: selected.target.path,
         });
     }
-    prove_archive_reference_ownership(source, selected_storage_id, selected.target.path)?;
-    prove_metadata_ownership(source, selected_storage_id, selected.target.path)?;
     Ok(())
+}
+
+fn prove_root_clear_ownership(source: &Package, selected: &Located) -> Result<(), Error> {
+    prove_global_comment_ownership(source, selected)?;
+    let entry = selected.entry.as_ref().ok_or(Error::InvalidSource {
+        path: selected.target.path,
+    })?;
+    let deleted_object = entry.entry.storage_id;
+    prove_archive_reference_ownership(source, deleted_object, entry.route, selected.target.path)?;
+    prove_metadata_ownership(source, deleted_object, selected.target.path)
 }
 
 fn prove_metadata_ownership(
@@ -2914,7 +2983,10 @@ fn prove_metadata_ownership(
 
 struct DeletedObjectReferenceCensus {
     deleted: u64,
+    expected_object: u64,
+    expected_message: usize,
     occurrences: usize,
+    unexpected: bool,
 }
 
 impl ArchiveReferenceVisitor for DeletedObjectReferenceCensus {
@@ -2926,6 +2998,8 @@ impl ArchiveReferenceVisitor for DeletedObjectReferenceCensus {
             && occurrence.referenced_identifier == self.deleted
         {
             self.occurrences = self.occurrences.saturating_add(1);
+            self.unexpected |= occurrence.object_identifier != self.expected_object
+                || occurrence.message_index != self.expected_message;
         }
         Ok(())
     }
@@ -2934,6 +3008,7 @@ impl ArchiveReferenceVisitor for DeletedObjectReferenceCensus {
 fn prove_archive_reference_ownership(
     source: &Package,
     deleted_object: u64,
+    allowed_route: MessageRoute,
     path: Path,
 ) -> Result<(), Error> {
     let physical = physical_source(source).map_err(|_| Error::UnsupportedSource)?;
@@ -2943,7 +3018,17 @@ fn prove_archive_reference_ownership(
         .map_err(|_| Error::InvalidSource { path })?;
     let mut census = DeletedObjectReferenceCensus {
         deleted: deleted_object,
+        expected_object: source
+            .state
+            .components
+            .catalog()
+            .get_index(allowed_route.component_index)
+            .and_then(|component| component.archive().objects.get(allowed_route.object_index))
+            .and_then(|object| object.archive_info.identifier)
+            .ok_or(Error::InvalidSource { path })?,
+        expected_message: allowed_route.message_index,
         occurrences: 0,
+        unexpected: false,
     };
     for component in source.state.components.catalog().iter() {
         for object in &component.archive().objects {
@@ -2956,7 +3041,7 @@ fn prove_archive_reference_ownership(
                 .map_err(|_| Error::UnsupportedDependency { path })?;
         }
     }
-    if census.occurrences != 0 {
+    if census.occurrences != 1 || census.unexpected {
         return Err(Error::UnsupportedDependency { path });
     }
     Ok(())
