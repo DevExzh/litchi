@@ -352,6 +352,43 @@ impl<'source> ExternalReferenceRemoval<'source> {
     }
 }
 
+/// One exact removal of the root `PackageMetadata.data_metadata_map`
+/// reference (field 10).
+///
+/// The reference points at the object containing the package's
+/// `DataMetadataMap`.  Removing the pointed-to object without also removing
+/// this root edge would leave a dangling package-level owner, so the edge is
+/// an explicit part of a removal transaction.  The nested `TSP.Reference` is
+/// decoded strictly during the source scan; its unknown fields are retained
+/// when the edge is not selected and are treated as a hostile extension when
+/// the edge is selected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataMetadataMapRemoval {
+    object_identifier: u64,
+}
+
+impl DataMetadataMapRemoval {
+    #[must_use]
+    pub const fn new(object_identifier: u64) -> Self {
+        Self { object_identifier }
+    }
+
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+
+    /// Alias that makes the root-reference role explicit at call sites.
+    #[must_use]
+    pub const fn map_object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+}
+
+/// Descriptive alias for callers that prefer to distinguish the root edge
+/// from the DataMetadataMap object itself.
+pub type RootDataMetadataMapRemoval = DataMetadataMapRemoval;
+
 /// Borrowed atomic removal request. The last object identifier is retained.
 #[derive(Debug, Clone, Copy)]
 pub struct RemovalBatch<'source> {
@@ -359,6 +396,7 @@ pub struct RemovalBatch<'source> {
     object_uuids: &'source [ObjectUuidRemoval<'source>],
     external_references: &'source [ExternalReferenceRemoval<'source>],
     data_reference_owners: &'source [DataReferenceOwnerRemoval<'source>],
+    data_metadata_map: Option<DataMetadataMapRemoval>,
 }
 
 impl<'source> RemovalBatch<'source> {
@@ -374,7 +412,17 @@ impl<'source> RemovalBatch<'source> {
             object_uuids,
             external_references,
             data_reference_owners,
+            data_metadata_map: None,
         }
+    }
+
+    /// Add an exact root `data_metadata_map` edge removal to this borrowed
+    /// batch.  The builder is `const` so callers can assemble a transaction
+    /// without allocating an intermediate request object.
+    #[must_use]
+    pub const fn with_data_metadata_map(mut self, removal: DataMetadataMapRemoval) -> Self {
+        self.data_metadata_map = Some(removal);
+        self
     }
     #[must_use]
     pub const fn expected_last_object_identifier(self) -> u64 {
@@ -391,6 +439,11 @@ impl<'source> RemovalBatch<'source> {
     #[must_use]
     pub const fn data_reference_owners(self) -> &'source [DataReferenceOwnerRemoval<'source>] {
         self.data_reference_owners
+    }
+
+    #[must_use]
+    pub const fn data_metadata_map(self) -> Option<DataMetadataMapRemoval> {
+        self.data_metadata_map
     }
 }
 
@@ -1063,6 +1116,30 @@ mod tests {
         }
         if let Some(weak) = weak {
             put_varint_field(&mut reference, 3, weak);
+        }
+        reference
+    }
+
+    fn root_data_metadata_reference(
+        object: u64,
+        deprecated_type: Option<u64>,
+        deprecated_external: Option<u64>,
+        unknown: bool,
+    ) -> Vec<u8> {
+        let mut reference = Vec::new();
+        put_varint_field(&mut reference, 1, object);
+        if let Some(value) = deprecated_type {
+            put_varint_field(&mut reference, 2, value);
+        }
+        if let Some(value) = deprecated_external {
+            put_varint_field(&mut reference, 3, value);
+        }
+        if unknown {
+            // Keep this deliberately noncanonical unknown scalar framing in
+            // the source so selected removal must refuse it while untouched
+            // root references remain source-authoritative.
+            put_key(&mut reference, 30, 0);
+            reference.extend_from_slice(&[0x81, 0x00]);
         }
         reference
     }
@@ -1888,6 +1965,409 @@ mod tests {
     }
 
     #[test]
+    fn root_data_metadata_map_removal_is_exact_and_preserves_unselected_raw_bytes() {
+        let map_reference = root_data_metadata_reference(80, Some(7), Some(1), false);
+        let mut source = metadata(10, &[component(1, "a.iwa", None, &[], &[])], &[]);
+        let mut map_field = Vec::new();
+        bytes_field(&mut map_field, 10, &map_reference);
+        source.extend_from_slice(&map_field);
+        let batch = RemovalBatch::new(10, &[], &[], &[])
+            .with_data_metadata_map(DataMetadataMapRemoval::new(80));
+
+        let before_allocations = output_allocations();
+        let output = remove_package_metadata(&source, batch, options(&source)).unwrap();
+
+        assert_eq!(output.report().removals(), 1);
+        assert_eq!(output.report().additions(), 0);
+        assert_eq!(output.report().output_bytes(), output.bytes().len());
+        assert_eq!(output_allocations(), before_allocations + 1);
+        assert!(
+            !output
+                .bytes()
+                .windows(map_field.len())
+                .any(|window| window == map_field)
+        );
+        // The helper emits field 1 before the root map.  Its framing and the
+        // unknown root/group records from `metadata` are source-authoritative.
+        assert!(
+            output
+                .bytes()
+                .windows(2)
+                .any(|window| window == [0x08, 0x0a])
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(3)
+                .any(|window| window == [0x90, 0x03, 0x07])
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(6)
+                .any(|window| { window == [0x9b, 0x03, 0x08, 0x00, 0x9c, 0x03] })
+        );
+        assert_eq!(
+            inspect_package_metadata_with_visitor(
+                output.bytes(),
+                options(output.bytes()),
+                &mut Facts::default(),
+            )
+            .unwrap()
+            .last_object_identifier(),
+            10
+        );
+
+        // A map edge for a different object is untouched byte-for-byte while
+        // another component registry record is removed.
+        let uuid = UuidBits::new(10, 20);
+        let unrelated_map = root_data_metadata_reference(81, None, None, true);
+        let mut preserved_source =
+            metadata(10, &[component(1, "a.iwa", None, &[(5, uuid)], &[])], &[]);
+        let mut preserved_map_field = Vec::new();
+        bytes_field(&mut preserved_map_field, 10, &unrelated_map);
+        preserved_source.extend_from_slice(&preserved_map_field);
+        let uuids = [ObjectUuidRemoval::new(
+            ComponentSelector::new(1, "a.iwa"),
+            5,
+            uuid,
+        )];
+        let preserved = remove_package_metadata(
+            &preserved_source,
+            RemovalBatch::new(10, &uuids, &[], &[]),
+            options(&preserved_source),
+        )
+        .unwrap();
+        assert!(
+            preserved
+                .bytes()
+                .windows(preserved_map_field.len())
+                .any(|window| window == preserved_map_field)
+        );
+    }
+
+    #[test]
+    fn root_data_metadata_map_removal_rejects_malformed_and_hostile_references() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let base = |reference: &[u8]| {
+            let mut source = metadata(10, &[component(1, "a.iwa", None, &[], &[])], &[]);
+            bytes_field(&mut source, 10, reference);
+            source
+        };
+        let batch = |object| {
+            RemovalBatch::new(10, &[], &[], &[])
+                .with_data_metadata_map(DataMetadataMapRemoval::new(object))
+        };
+
+        let mismatch = base(&root_data_metadata_reference(81, None, None, false));
+        assert_eq!(
+            reason(remove_package_metadata(&mismatch, batch(80), options(&mismatch)).unwrap_err()),
+            InvalidReason::RemovalNotFound
+        );
+
+        let missing_identifier = base(&[0x10, 0x01]);
+        assert_eq!(
+            reason(
+                remove_package_metadata(
+                    &missing_identifier,
+                    batch(80),
+                    options(&missing_identifier),
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::InvalidIdentifier
+        );
+
+        let wrong_wire = base(&[0x0a, 0x01, 0x01]);
+        assert_eq!(
+            reason(
+                remove_package_metadata(&wrong_wire, batch(80), options(&wrong_wire)).unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
+        let duplicate_identifier = base(&[0x08, 0x50, 0x08, 0x50]);
+        assert_eq!(
+            reason(
+                remove_package_metadata(
+                    &duplicate_identifier,
+                    batch(80),
+                    options(&duplicate_identifier),
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
+        let unknown = root_data_metadata_reference(80, None, None, true);
+        let unknown_source = base(&unknown);
+        assert_eq!(
+            reason(
+                remove_package_metadata(&unknown_source, batch(80), options(&unknown_source))
+                    .unwrap_err()
+            ),
+            InvalidReason::RemovalMismatch
+        );
+
+        let mut noncanonical_identifier = Vec::new();
+        put_key(&mut noncanonical_identifier, 1, 0);
+        noncanonical_identifier.extend_from_slice(&[0xd0, 0x80, 0x00]);
+        let noncanonical_source = base(&noncanonical_identifier);
+        assert_eq!(
+            reason(
+                remove_package_metadata(
+                    &noncanonical_source,
+                    batch(80),
+                    options(&noncanonical_source),
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
+        let mut duplicate_root = base(&root_data_metadata_reference(80, None, None, false));
+        let duplicate_reference = root_data_metadata_reference(80, None, None, false);
+        bytes_field(&mut duplicate_root, 10, &duplicate_reference);
+        assert_eq!(
+            reason(
+                remove_package_metadata(&duplicate_root, batch(80), options(&duplicate_root))
+                    .unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
+        // A root edge cannot be hidden behind a component data identifier or
+        // an object UUID removal.  Both collisions must fail before output
+        // allocation, leaving the caller-owned source untouched.
+        let mut object_collision =
+            metadata(10, &[component(1, "a.iwa", None, &[(80, uuid)], &[])], &[]);
+        let map = root_data_metadata_reference(80, None, None, false);
+        bytes_field(&mut object_collision, 10, &map);
+        let original_object_collision = object_collision.clone();
+        let uuids = [ObjectUuidRemoval::new(selector, 80, uuid)];
+        let error = remove_package_metadata(
+            &object_collision,
+            RemovalBatch::new(10, &uuids, &[], &[]),
+            options(&object_collision),
+        )
+        .unwrap_err();
+        assert_eq!(reason(error), InvalidReason::CrossComponentRemoval);
+        assert_eq!(object_collision, original_object_collision);
+
+        let data = data_reference(80, &[(5, 1)], false);
+        let mut owner_component = component(1, "a.iwa", None, &[], &[]);
+        bytes_field(&mut owner_component, 7, &data);
+        let mut data_collision = metadata(10, &[owner_component], &[]);
+        bytes_field(&mut data_collision, 10, &map);
+        let original_data_collision = data_collision.clone();
+        let owners = [DataReferenceOwnerRemoval::new(selector, 80, 5, 1)];
+        assert_eq!(
+            reason(
+                remove_package_metadata(
+                    &data_collision,
+                    RemovalBatch::new(10, &[], &[], &owners),
+                    options(&data_collision),
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::CrossComponentRemoval
+        );
+        assert_eq!(data_collision, original_data_collision);
+    }
+
+    #[test]
+    fn root_data_metadata_map_removal_is_replayable_and_limits_before_allocation() {
+        let map = root_data_metadata_reference(80, Some(7), Some(1), false);
+        let mut source = metadata(10, &[component(1, "a.iwa", None, &[], &[])], &[]);
+        let mut map_field = Vec::new();
+        bytes_field(&mut map_field, 10, &map);
+        source.extend_from_slice(&map_field);
+        let batch = RemovalBatch::new(10, &[], &[], &[])
+            .with_data_metadata_map(DataMetadataMapRemoval::new(80));
+        let baseline = remove_package_metadata(&source, batch, options(&source)).unwrap();
+        let report = baseline.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        assert_eq!(
+            remove_package_metadata(&source, batch, exact)
+                .unwrap()
+                .bytes(),
+            baseline.bytes()
+        );
+        for (output_bytes, work_bytes) in [
+            (report.output_bytes().saturating_sub(1), report.work_bytes()),
+            (report.output_bytes(), report.work_bytes().saturating_sub(1)),
+        ] {
+            let before_allocations = output_allocations();
+            let error = remove_package_metadata(
+                &source,
+                batch,
+                RewriteOptions::new(
+                    source.len(),
+                    output_bytes,
+                    report.fields(),
+                    work_bytes,
+                    report.max_depth(),
+                    report.components_scanned(),
+                    report.references_scanned(),
+                    report.removals(),
+                ),
+            )
+            .unwrap_err();
+            assert!(error.resource_limit().is_some());
+            // Output-size failure is rejected before allocation. A work-only
+            // ceiling may be reached by strict candidate verification after
+            // the sole fallible candidate reservation.
+            if output_bytes < report.output_bytes() {
+                assert_eq!(output_allocations(), before_allocations);
+            }
+        }
+        assert_eq!(source, source.clone());
+    }
+
+    #[test]
+    fn removal_can_drop_root_data_metadata_map_edge_atomically() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let map_object = 70;
+        let uuid = UuidBits::new(10, 20);
+        let current = component(1, "a.iwa", None, &[(map_object, uuid)], &[]);
+        let mut source = metadata(10, &[current], &[]);
+        let reference = root_data_metadata_reference(map_object, Some(2), Some(0), false);
+        bytes_field(&mut source, 10, &reference);
+
+        let uuids = [ObjectUuidRemoval::new(selector, map_object, uuid)];
+        let removals = RemovalBatch::new(10, &uuids, &[], &[])
+            .with_data_metadata_map(DataMetadataMapRemoval::new(map_object));
+        reset_work_charges();
+        let baseline = remove_package_metadata(&source, removals, options(&source)).unwrap();
+        assert_eq!(baseline.report().removals(), 2);
+        assert_eq!(work_charges(), baseline.report().work_bytes());
+        assert!(
+            !baseline
+                .bytes()
+                .windows(reference.len())
+                .any(|window| { window == reference })
+        );
+        assert!(
+            !baseline
+                .bytes()
+                .windows(reference.len())
+                .any(|window| window == reference)
+        );
+
+        // Replay the exact aggregate report and prove that the candidate is
+        // still one fallible allocation, with max-minus-one output failing
+        // before that allocation is attempted.
+        let report = baseline.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        let before = output_allocations();
+        let replay = remove_package_metadata(&source, removals, exact).unwrap();
+        assert_eq!(replay.bytes(), baseline.bytes());
+        assert_eq!(replay.report(), report);
+        assert_eq!(output_allocations(), before + 1);
+
+        let limited = RewriteOptions::new(
+            source.len(),
+            report.output_bytes().saturating_sub(1),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        let before = output_allocations();
+        let error = remove_package_metadata(&source, removals, limited).unwrap_err();
+        assert!(error.resource_limit().is_some());
+        assert_eq!(output_allocations(), before);
+        assert_eq!(source.last(), Some(&0x00));
+    }
+
+    #[test]
+    fn root_data_metadata_map_rejects_deleted_cross_kind_ids_and_hostile_extensions() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+
+        let mut source = metadata(10, &[component(1, "a.iwa", None, &[(70, uuid)], &[])], &[]);
+        let reference = root_data_metadata_reference(70, None, None, false);
+        bytes_field(&mut source, 10, &reference);
+        let uuids = [ObjectUuidRemoval::new(selector, 70, uuid)];
+        let error = remove_package_metadata(
+            &source,
+            RemovalBatch::new(10, &uuids, &[], &[]),
+            options(&source),
+        )
+        .unwrap_err();
+        assert_eq!(reason(error), InvalidReason::CrossComponentRemoval);
+
+        let owners = [DataReferenceOwnerRemoval::new(selector, 70, 71, 1)];
+        let error = remove_package_metadata(
+            &source,
+            RemovalBatch::new(10, &[], &[], &owners),
+            options(&source),
+        )
+        .unwrap_err();
+        assert_eq!(reason(error), InvalidReason::CrossComponentRemoval);
+
+        let mut hostile = metadata(10, &[component(1, "a.iwa", None, &[(70, uuid)], &[])], &[]);
+        let hostile_reference = root_data_metadata_reference(70, None, None, true);
+        bytes_field(&mut hostile, 10, &hostile_reference);
+        let removals = [ObjectUuidRemoval::new(selector, 70, uuid)];
+        let batch = RemovalBatch::new(10, &removals, &[], &[])
+            .with_data_metadata_map(DataMetadataMapRemoval::new(70));
+        let error = remove_package_metadata(&hostile, batch, options(&hostile)).unwrap_err();
+        assert_eq!(reason(error), InvalidReason::RemovalMismatch);
+
+        // Without deleting the map object, an unknown root reference is
+        // source-authoritative and remains byte-identical through an unrelated
+        // registry removal.
+        let unrelated_uuid = UuidBits::new(30, 40);
+        let mut preserved = metadata(
+            10,
+            &[component(
+                1,
+                "a.iwa",
+                None,
+                &[(70, uuid), (71, unrelated_uuid)],
+                &[],
+            )],
+            &[],
+        );
+        bytes_field(&mut preserved, 10, &hostile_reference);
+        let unrelated = [ObjectUuidRemoval::new(selector, 71, unrelated_uuid)];
+        let output = remove_package_metadata(
+            &preserved,
+            RemovalBatch::new(10, &unrelated, &[], &[]),
+            options(&preserved),
+        )
+        .unwrap();
+        assert!(
+            output
+                .bytes()
+                .windows(hostile_reference.len())
+                .any(|window| { window == hostile_reference })
+        );
+    }
+
+    #[test]
     fn external_only_removal_preserves_other_component_owners_of_the_same_object() {
         let selected = ComponentSelector::new(1, "a.iwa");
         let target = ComponentSelector::new(2, "styles.iwa");
@@ -2101,6 +2581,63 @@ mod tests {
                 .unwrap_err()
             ),
             InvalidReason::ComponentMismatch
+        );
+    }
+
+    #[test]
+    fn combined_root_map_and_uuid_removal_updates_only_selected_token() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let mut selected = component(1, "a.iwa", None, &[(80, uuid)], &[]);
+        put_varint_field(&mut selected, 12, 5);
+        let untouched = component(2, "b.iwa", None, &[], &[]);
+        let mut source = metadata(10, &[selected.clone(), untouched.clone()], &[]);
+        put_varint_field(&mut source, 8, 5);
+        let map_reference = root_data_metadata_reference(80, Some(7), Some(1), false);
+        let mut map_field = Vec::new();
+        bytes_field(&mut map_field, 10, &map_reference);
+        source.extend_from_slice(&map_field);
+
+        let uuid_removals = [ObjectUuidRemoval::new(selector, 80, uuid)];
+        let removals = RemovalBatch::new(10, &uuid_removals, &[], &[])
+            .with_data_metadata_map(DataMetadataMapRemoval::new(80));
+        let batch = RemovalSaveTokenBatch::new(
+            removals,
+            SaveTokenBatch::new(core::slice::from_ref(&selector)),
+        );
+        let output =
+            rewrite_package_metadata_removals_and_save_tokens(&source, batch, options(&source))
+                .unwrap();
+
+        assert_eq!(output.report().removals(), 2);
+        assert_eq!(output.report().components_changed(), 1);
+        assert_eq!(scalar_values(output.bytes(), 8), vec![6]);
+        assert_eq!(component_scalar_values(output.bytes(), 1, 12), vec![6]);
+        assert!(
+            !output
+                .bytes()
+                .windows(map_field.len())
+                .any(|window| window == map_field)
+        );
+        assert!(
+            !output
+                .bytes()
+                .windows(uuid_entry(80, uuid).len())
+                .any(|window| { window == uuid_entry(80, uuid) })
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(untouched.len())
+                .any(|window| window == untouched)
+        );
+        // Root field 1 remains the source framing/value, despite both the
+        // root edge and selected UUID registry entry being removed.
+        assert!(
+            output
+                .bytes()
+                .windows(2)
+                .any(|window| window == [0x08, 0x0a])
         );
     }
 
@@ -3280,6 +3817,9 @@ pub fn rewrite_package_metadata_removals_and_save_tokens(
         .len()
         .checked_add(batch.removals.external_references.len())
         .and_then(|count| count.checked_add(batch.removals.data_reference_owners.len()))
+        .and_then(|count| {
+            count.checked_add(usize::from(batch.removals.data_metadata_map.is_some()))
+        })
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
     validate_removal_batch_duplicates(batch.removals, &mut budget)?;
     validate_save_token_selector_duplicates(batch.save_tokens, &mut budget)?;
@@ -3947,6 +4487,7 @@ fn combined_output_size(
                     },
                 )?;
             },
+            10 if root_data_metadata_map_selected(field.bytes()?, batch.removals, budget, 2)? => {},
             8 => {
                 let _ = field.varint()?;
                 if has_root_token {
@@ -4074,6 +4615,10 @@ fn charge_combined_rewrite(
     budget.message(source, 1)?;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number == 10 {
+            let _ = root_data_metadata_map_selected(field.bytes()?, batch.removals, budget, 2)?;
+            continue;
+        }
         if field.number != 3 {
             continue;
         }
@@ -4181,7 +4726,7 @@ fn charge_combined_candidate_verification(
     // The removal scan over the source is a conservative upper bound for the
     // candidate: removals can only delete fields and references.
     let mut removal_state = RemovalScanState::new(batch.removals, budget)?;
-    scan_removal_metadata(source, batch.removals, &mut removal_state, budget, true)?;
+    scan_removal_metadata(source, batch.removals, &mut removal_state, budget, false)?;
 
     // Save-token candidate work has the same component graph plus possible
     // canonical field-8/12 insertions.  Use the strict source parser for
@@ -4251,6 +4796,7 @@ fn rewrite_combined_into(
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         match field.number {
             3 => rewrite_combined_component(field, batch, new_root, output, budget, 2)?,
+            10 if root_data_metadata_map_selected(field.bytes()?, batch.removals, budget, 2)? => {},
             8 => {
                 let _ = field.varint()?;
                 has_root_token = true;
@@ -4674,6 +5220,7 @@ struct RemovalScanState {
     objects: Vec<RemovalMatchCount>,
     externals: Vec<RemovalMatchCount>,
     data_owners: Vec<RemovalMatchCount>,
+    data_metadata_map: Option<RemovalMatchCount>,
 }
 
 impl RemovalScanState {
@@ -4695,6 +5242,11 @@ impl RemovalScanState {
             objects: zeroed_vec(batch.object_uuids.len(), budget)?,
             externals: zeroed_vec(batch.external_references.len(), budget)?,
             data_owners: zeroed_vec(batch.data_reference_owners.len(), budget)?,
+            data_metadata_map: if batch.data_metadata_map.is_some() {
+                Some(RemovalMatchCount::default())
+            } else {
+                None
+            },
         })
     }
 
@@ -4724,6 +5276,14 @@ impl RemovalScanState {
         {
             return Err(RewriteError::invalid(InvalidReason::DuplicateRemoval));
         }
+        if let Some(map) = self.data_metadata_map {
+            if map.current == 0 {
+                return Err(RewriteError::invalid(InvalidReason::RemovalNotFound));
+            }
+            if map.current != 1 {
+                return Err(RewriteError::invalid(InvalidReason::DuplicateRemoval));
+            }
+        }
         Ok(())
     }
 
@@ -4739,6 +5299,9 @@ impl RemovalScanState {
                 .chain(self.data_owners.iter())
                 .any(|count| count.current != 0)
         {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+        if self.data_metadata_map.is_some_and(|map| map.current != 0) {
             return Err(RewriteError::invalid(InvalidReason::Verification));
         }
         Ok(())
@@ -4758,6 +5321,7 @@ pub fn remove_package_metadata(
         .len()
         .checked_add(batch.external_references.len())
         .and_then(|count| count.checked_add(batch.data_reference_owners.len()))
+        .and_then(|count| count.checked_add(usize::from(batch.data_metadata_map.is_some())))
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
     validate_removal_batch_duplicates(batch, &mut budget)?;
 
@@ -4806,6 +5370,7 @@ fn validate_removal_batch(
         .len()
         .checked_add(batch.external_references.len())
         .and_then(|count| count.checked_add(batch.data_reference_owners.len()))
+        .and_then(|count| count.checked_add(usize::from(batch.data_metadata_map.is_some())))
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
     if removals == 0 {
         return Err(RewriteError::invalid(InvalidReason::RemovalNotFound));
@@ -4817,6 +5382,12 @@ fn validate_removal_batch(
         }));
     }
     if batch.expected_last_object_identifier == 0 {
+        return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+    }
+    if batch
+        .data_metadata_map
+        .is_some_and(|removal| removal.object_identifier == 0)
+    {
         return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
     }
     for removal in batch.object_uuids.iter() {
@@ -5028,6 +5599,19 @@ fn removal_contains_object(
     Ok(found)
 }
 
+fn removal_contains_data_identifier(
+    batch: RemovalBatch<'_>,
+    data_identifier: u64,
+    budget: &mut Budget,
+) -> Result<bool, RewriteError> {
+    let mut found = false;
+    for removal in batch.data_reference_owners.iter() {
+        budget.work(1)?;
+        found |= removal.data_identifier == data_identifier;
+    }
+    Ok(found)
+}
+
 fn removed_uuid_contains_object(
     batch: RemovalBatch<'_>,
     object_identifier: u64,
@@ -5050,6 +5634,7 @@ fn scan_removal_metadata(
 ) -> Result<(), RewriteError> {
     budget.message(source, 1)?;
     let mut last = None;
+    let mut data_metadata_map_seen = false;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         match field.number {
@@ -5063,6 +5648,13 @@ fn scan_removal_metadata(
                 candidate,
                 2,
             )?,
+            10 => {
+                if data_metadata_map_seen {
+                    return Err(RewriteError::invalid(InvalidReason::MalformedWire));
+                }
+                data_metadata_map_seen = true;
+                scan_root_data_metadata_map(field.bytes()?, batch, state, budget, candidate, 2)?;
+            },
             _ => {},
         }
     }
@@ -5083,6 +5675,111 @@ fn scan_removal_metadata(
         || view.last_object_identifier != batch.expected_last_object_identifier
     {
         return Err(RewriteError::invalid(InvalidReason::MalformedWire));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct RootDataMetadataMapReference {
+    identifier: u64,
+    unknown_fields: bool,
+}
+
+/// Decode the root `TSP.Reference` while keeping the source bytes as the
+/// writer's authority.  Known fields are singular and canonical; unknown
+/// fields (including balanced groups and relaxed unknown scalar framing) are
+/// intentionally only observed so that an untouched reference can be copied
+/// byte-for-byte.
+fn decode_root_data_metadata_map(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<RootDataMetadataMapReference, RewriteError> {
+    budget.reference()?;
+    budget.message(source, depth)?;
+    let mut identifier = None;
+    let mut unknown_fields = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut identifier, field.varint()?)?,
+            2 => {
+                // `deprecated_type` is an int32 scalar.  The wire parser
+                // already enforces canonical varint framing and u64 overflow;
+                // the bit pattern is intentionally retained as an opaque
+                // signed value because it is not part of the ownership key.
+                let _ = field.varint()?;
+            },
+            3 => {
+                let _ = canonical_bool(field.varint()?)?;
+            },
+            _ => unknown_fields = true,
+        }
+    }
+    Ok(RootDataMetadataMapReference {
+        identifier: identifier
+            .filter(|value| *value != 0)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?,
+        unknown_fields,
+    })
+}
+
+fn root_data_metadata_map_selected(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<bool, RewriteError> {
+    let reference = decode_root_data_metadata_map(source, budget, depth)?;
+    Ok(batch
+        .data_metadata_map
+        .is_some_and(|removal| removal.object_identifier == reference.identifier))
+}
+
+fn scan_root_data_metadata_map(
+    source: &[u8],
+    batch: RemovalBatch<'_>,
+    state: &mut RemovalScanState,
+    budget: &mut Budget,
+    candidate: bool,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    let reference = decode_root_data_metadata_map(source, budget, depth)?;
+    let selected = batch
+        .data_metadata_map
+        .is_some_and(|removal| removal.object_identifier == reference.identifier);
+    let object_collision = removal_contains_object(batch, reference.identifier, budget)?;
+    let data_collision = removal_contains_data_identifier(batch, reference.identifier, budget)?;
+
+    // A root map reference is an object edge, not a component/data owner.  A
+    // caller must authorize its removal explicitly; silently deleting an
+    // object or data record while this edge survives would leave a dangling
+    // registry.  Numeric collisions across object/data namespaces are also
+    // rejected, even when the root edge itself was selected.
+    if data_collision {
+        return Err(RewriteError::invalid(InvalidReason::CrossComponentRemoval));
+    }
+    if candidate && selected {
+        return Err(RewriteError::invalid(InvalidReason::Verification));
+    }
+    if object_collision && !selected {
+        return Err(RewriteError::invalid(if candidate {
+            InvalidReason::Verification
+        } else {
+            InvalidReason::CrossComponentRemoval
+        }));
+    }
+    if selected {
+        if reference.unknown_fields {
+            return Err(RewriteError::invalid(InvalidReason::RemovalMismatch));
+        }
+        state.data_metadata_map = state
+            .data_metadata_map
+            .map(|mut count| {
+                count.current = checked_add(count.current, 1)?;
+                Ok(count)
+            })
+            .transpose()?;
     }
     Ok(())
 }
@@ -5370,6 +6067,10 @@ fn removal_output_size(
     let mut size = 0usize;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number == 10 && root_data_metadata_map_selected(field.bytes()?, batch, budget, 2)?
+        {
+            continue;
+        }
         if field.number != 3 {
             size = checked_add(size, field.raw.len())?;
             continue;
@@ -5566,7 +6267,9 @@ fn charge_removal_rewrite(
     budget.message(source, 1)?;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
-        if field.number == 3 {
+        if field.number == 10 {
+            let _ = root_data_metadata_map_selected(field.bytes()?, batch, budget, 2)?;
+        } else if field.number == 3 {
             let payload = field.bytes()?;
             let (component, locator) = component_header(payload, budget, 2)?;
             let _size = removal_component_size(payload, component, locator, batch, budget, 2)?;
@@ -5584,6 +6287,10 @@ fn rewrite_removals_into(
     budget.message(source, 1)?;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if field.number == 10 && root_data_metadata_map_selected(field.bytes()?, batch, budget, 2)?
+        {
+            continue;
+        }
         if field.number != 3 {
             output.extend_from_slice(field.raw);
             continue;
