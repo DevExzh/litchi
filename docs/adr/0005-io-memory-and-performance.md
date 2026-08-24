@@ -1184,6 +1184,30 @@ and no aggregate budget across archive serialization, compression, ZIP
 reassembly, or native application save is claimed. No manifest, generated
 schema, Buffa owner, normal Prost owner, or workspace dependency changed.
 
+## 2026-08-25 amendment: Wave74 Keynote movie-caption resource record
+
+Implementation commit `40c3d0b217e4b17304efca24c6a81b9d1240246b`
+threads one private `CaptionBudget` through the canonical movie-caption graph
+transition. It charges graph projection and rewrite reports, selected native
+archive scans, exact output sizing, metadata inspection and the prepared
+UUID/watermark/save-token rewrite, Snappy member work, ZIP reassembly,
+candidate reopen and locality verification, and retained source/target patch
+artifacts. Fields and work are summed, nesting uses the observed maximum, and
+allocation/scratch/output requirements remain fallible and bounded.
+
+Creation and removal use staged private native and Metadata candidates. No
+package publication occurs until every stage and the final reopened candidate
+verify, so a later failure leaves the source exact. This is publication
+atomicity, not a claim that the transaction has one global candidate allocation
+or one output-free preflight covering every stage. The resource evidence is
+operation-local; it establishes no package-wide peak-RSS, latency, throughput,
+zero-copy, or performance result.
+
+No manifest dependency changed. `litchi-iwa-protos` retains its generated
+schema, Buffa, and normal Prost owners, and the broader workspace retains its
+existing Prost edges. This slice therefore records bounded accounting for one
+semantic owner, not generated-code or dependency retirement.
+
 ## 2026-08-25 amendment: Wave73 Keynote movie-caption resource record
 
 Commit `6ed7ee4e277c78a99f1b779a2b5530d7267beddf` gives the hidden movie-caption
