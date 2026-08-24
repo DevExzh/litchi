@@ -1,0 +1,9 @@
+// Borrowed scalar projection for one TP.DrawablesZOrderArchive reference.
+syntax = "proto2";
+package LitchiIwaProjection;
+
+message PagesDrawableOrderReferenceArchive {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}

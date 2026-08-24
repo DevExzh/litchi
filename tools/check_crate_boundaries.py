@@ -3092,6 +3092,61 @@ IWA_PAGES_CHART_CAPTION_LEGACY_REWRITE_MARKERS = frozenset(
 IWA_NUMBERS_CHART_CAPTION_LEGACY_REWRITE_MARKERS = frozenset(
     IWA_NUMBERS_CHART_CAPTION_REWRITE_FUNCTIONS
 )
+# Pages drawable ordering is a narrow TS/P wire seam.  Keep this audit scoped
+# to the focused owner below: broader Pages graph readers still legitimately
+# use the generated DrawablesZOrderArchive while creating shapes, charts, and
+# media.  The owner itself must route the selected repeated-reference field
+# through the bounded neutral codec.
+IWA_PAGES_DRAWABLE_ORDER_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "drawable_order.rs"
+)
+IWA_PAGES_DRAWABLE_ORDER_CODEC_MODULE = "pages_drawable_order_codec"
+IWA_PAGES_DRAWABLE_ORDER_CODEC_ROUTE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"pages_drawable_order_codec\b"
+)
+IWA_PAGES_DRAWABLE_ORDER_CODEC_DECODE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:decode|read)[ \t\r\n]*"
+    r"(?:[A-Za-z0-9_]*[ \t\r\n]*)?drawable[s]?[ \t\r\n]*"
+    r"(?:[A-Za-z0-9_]*[ \t\r\n]*)?order(?:_[A-Za-z0-9_]+)?\b"
+    r"|(?<![A-Za-z0-9_#])decode[ \t\r\n]*_[ \t\r\n]*"
+    r"(?:pages[ \t\r\n]*_[ \t\r\n]*)?drawable[s]?[ \t\r\n]*"
+    r"(?:[A-Za-z0-9_]*[ \t\r\n]*)?order(?:_[A-Za-z0-9_]+)?\b"
+)
+IWA_PAGES_DRAWABLE_ORDER_CODEC_REWRITE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:rewrite|write|replace)[ \t\r\n]*"
+    r"(?:[A-Za-z0-9_]*[ \t\r\n]*)?drawable[s]?[ \t\r\n]*"
+    r"(?:[A-Za-z0-9_]*[ \t\r\n]*)?order(?:_[A-Za-z0-9_]+)?\b"
+    r"|(?<![A-Za-z0-9_#])(?:rewrite|write|replace)[ \t\r\n]*_[ \t\r\n]*"
+    r"(?:pages[ \t\r\n]*_[ \t\r\n]*)?drawable[s]?[ \t\r\n]*"
+    r"(?:[A-Za-z0-9_]*[ \t\r\n]*)?order(?:_[A-Za-z0-9_]+)?\b"
+)
+IWA_PAGES_DRAWABLE_ORDER_GENERATED_MARKERS = frozenset(
+    {
+        "DrawablesZOrderArchive",
+        "tp::DrawablesZOrderArchive",
+        "prost::Message",
+        "prost_types",
+        "Message",
+    }
+)
+IWA_PAGES_DRAWABLE_ORDER_GENERATED_DECODE = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?DrawablesZOrderArchive\b"
+    r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+    r"|(?<![A-Za-z0-9_#])(?:prost[ \t\r\n]*::[ \t\r\n]*)?"
+    r"Message[ \t\r\n]*::[ \t\r\n]*decode\b"
+    r"|<[\s\S]*?[ \t\r\n]+as[ \t\r\n]+"
+    r"(?:(?:::)?(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+    r"(?:r#)?Message[ \t\r\n]*>[ \t\r\n]*::[ \t\r\n]*decode\b"
+)
+IWA_PAGES_DRAWABLE_ORDER_RAW_HELPER_MARKERS = frozenset(
+    {
+        "reorder_reference_field",
+        "replace_pages_drawable_order",
+        "DRAWABLES_Z_ORDER_MESSAGE_TYPE",
+        "DRAWABLES_Z_ORDER_REFERENCES_FIELD",
+    }
+)
 IWA_PAGES_LEGACY_METHOD_SOURCE = (
     IWA_PAGES_SOURCE_ROOT / "editor" / "section_content.rs"
 )
@@ -11501,6 +11556,86 @@ def audit_iwa_numbers_chart_caption_source_topology(root: Path = ROOT) -> list[s
     )
 
 
+def audit_iwa_pages_drawable_order_source_topology(root: Path = ROOT) -> list[str]:
+    """Require the Pages drawable-order owner to use the strict neutral codec.
+
+    This intentionally examines only ``editor/drawable_order.rs``.  Pages
+    shape/chart/media graph builders elsewhere still have compatibility reads
+    of ``TP.DrawablesZOrderArchive`` and are outside this focused migration
+    boundary.  Test fixtures are masked item-by-item so a cfg(test) decoder
+    cannot conceal a later production import or helper.
+    """
+
+    path = root / IWA_PAGES_DRAWABLE_ORDER_SOURCE
+    if not path.is_file():
+        return [
+            "focused litchi-iwa Pages drawable-order source is missing: "
+            f"{IWA_PAGES_DRAWABLE_ORDER_SOURCE}"
+        ]
+
+    production_source = _mask_rust_cfg_test_items(
+        path.read_text(encoding="utf-8")
+    )
+    source = _mask_rust_non_code(production_source)
+    violations: list[str] = []
+
+    if IWA_PAGES_DRAWABLE_ORDER_CODEC_ROUTE.search(source) is None:
+        violations.append(
+            "focused litchi-iwa Pages drawable-order source must route through "
+            f"neutral {IWA_PAGES_DRAWABLE_ORDER_CODEC_MODULE}: "
+            f"{IWA_PAGES_DRAWABLE_ORDER_SOURCE}"
+        )
+    if IWA_PAGES_DRAWABLE_ORDER_CODEC_DECODE.search(source) is None:
+        violations.append(
+            "focused litchi-iwa Pages drawable-order source is missing strict "
+            f"{IWA_PAGES_DRAWABLE_ORDER_CODEC_MODULE} decode route: "
+            f"{IWA_PAGES_DRAWABLE_ORDER_SOURCE}"
+        )
+    if IWA_PAGES_DRAWABLE_ORDER_CODEC_REWRITE.search(source) is None:
+        violations.append(
+            "focused litchi-iwa Pages drawable-order source is missing strict "
+            f"{IWA_PAGES_DRAWABLE_ORDER_CODEC_MODULE} rewrite route: "
+            f"{IWA_PAGES_DRAWABLE_ORDER_SOURCE}"
+        )
+
+    for marker in sorted(IWA_PAGES_DRAWABLE_ORDER_GENERATED_MARKERS):
+        marker_pattern = re.compile(
+            rf"(?<![A-Za-z0-9_#]){re.escape(marker)}(?![A-Za-z0-9_])"
+        )
+        match = marker_pattern.search(source)
+        if match is None:
+            continue
+        line_number = source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-iwa Pages drawable-order source retains generated "
+            f"marker {marker}: {IWA_PAGES_DRAWABLE_ORDER_SOURCE}:{line_number}"
+        )
+
+    generated_decode = IWA_PAGES_DRAWABLE_ORDER_GENERATED_DECODE.search(source)
+    if generated_decode is not None:
+        line_number = source.count("\n", 0, generated_decode.start()) + 1
+        violations.append(
+            "focused litchi-iwa Pages drawable-order source retains generated "
+            "archive/Prost decode: "
+            f"{IWA_PAGES_DRAWABLE_ORDER_SOURCE}:{line_number}"
+        )
+
+    for marker in sorted(IWA_PAGES_DRAWABLE_ORDER_RAW_HELPER_MARKERS):
+        match = re.search(
+            rf"(?<![A-Za-z0-9_#]){re.escape(marker)}(?![A-Za-z0-9_])",
+            source,
+        )
+        if match is None:
+            continue
+        line_number = source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-iwa Pages drawable-order source retains legacy raw "
+            f"helper marker {marker}: {IWA_PAGES_DRAWABLE_ORDER_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -16694,6 +16829,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_table_headers_source_topology()
         + audit_pages_table_headers_facade_source_topology()
         + audit_iwa_pages_chart_caption_source_topology()
+        + audit_iwa_pages_drawable_order_source_topology()
         + audit_iwa_pages_document_settings_source_topology()
         + audit_pages_document_settings_facade_source_topology()
         + audit_iwa_pages_section_settings_source_topology()

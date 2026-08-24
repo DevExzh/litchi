@@ -10570,6 +10570,87 @@ class BoundaryPolicyTests(unittest.TestCase):
             "+ audit_iwa_numbers_chart_caption_source_topology()", main_source
         )
 
+    def test_pages_drawable_order_audit_requires_neutral_codec_and_masks_tests(
+        self,
+    ) -> None:
+        """Keep only the focused Pages order owner on the strict codec seam."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_path = root / boundaries.IWA_PAGES_DRAWABLE_ORDER_SOURCE
+            source_path.parent.mkdir(parents=True)
+            source_path.write_text(
+                "#[cfg(test)]\n"
+                "use prost::Message;\n"
+                "#[cfg(test)]\n"
+                "fn generated_fixture() {\n"
+                "    let _ = tp::DrawablesZOrderArchive::decode(bytes);\n"
+                "}\n"
+                "use litchi_iwa_protos::pages_drawable_order_codec::{\n"
+                "    decode_drawable_order, rewrite_drawable_order,\n"
+                "};\n"
+                "fn read_order(bytes: &[u8]) {\n"
+                "    decode_drawable_order(bytes);\n"
+                "}\n"
+                "fn write_order(bytes: &[u8]) {\n"
+                "    rewrite_drawable_order(bytes, ids);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_source_topology(root), []
+            )
+
+            graph = root / "crates/litchi-iwa/src/pages/editor/charts/graph.rs"
+            graph.parent.mkdir(parents=True, exist_ok=True)
+            graph.write_text(
+                "fn broader_graph() {\n"
+                "    let _ = tp::DrawablesZOrderArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            # Other Pages graph owners are intentionally outside this narrow
+            # drawable-order source ratchet.
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_source_topology(root), []
+            )
+
+            source_path.write_text(
+                source_path.read_text(encoding="utf-8")
+                + "fn production_bad() {\n"
+                "    let _ = prost::Message::decode(bytes);\n"
+                "    let _ = tp::DrawablesZOrderArchive::decode(bytes);\n"
+                "    reorder_reference_field();\n"
+                "    replace_pages_drawable_order();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_drawable_order_source_topology(root)
+            self.assertTrue(any("generated marker" in item for item in violations), violations)
+            self.assertTrue(any("generated archive/Prost decode" in item for item in violations), violations)
+            self.assertTrue(any("reorder_reference_field" in item for item in violations), violations)
+            self.assertTrue(any("replace_pages_drawable_order" in item for item in violations), violations)
+
+    def test_pages_drawable_order_audit_rejects_missing_codec_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_path = root / boundaries.IWA_PAGES_DRAWABLE_ORDER_SOURCE
+            source_path.parent.mkdir(parents=True)
+            source_path.write_text(
+                "fn read_order(bytes: &[u8]) { decode_drawable_order(bytes); }\n"
+                "fn write_order(bytes: &[u8]) { rewrite_drawable_order(bytes, ids); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_drawable_order_source_topology(root)
+            self.assertTrue(any("neutral pages_drawable_order_codec" in item for item in violations), violations)
+
+    def test_pages_drawable_order_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_drawable_order_source_topology()", main_source
+        )
+
     def test_focused_keynote_chart_caption_requires_one_aggregate_budget_and_masks_decoys(
         self,
     ) -> None:
