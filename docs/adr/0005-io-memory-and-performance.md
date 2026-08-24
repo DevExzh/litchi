@@ -1045,3 +1045,29 @@ counter or that every candidate stage uses a single allocation. No latency,
 throughput, peak-memory, RSS, or package-wide allocation measurement was made.
 No manifest edge, generated schema, Buffa owner, normal Prost owner, or
 workspace-wide dependency changed.
+
+## 2026-08-24 amendment: Wave65 Keynote chart-caption graph resource record
+
+Commit `f0bbe079b094b3652751f6ab7c89b2dc64fac6a9` extends the focused
+chart-caption resource contract from text replacement to the canonical graph
+lifecycle. The graph codec, Metadata codec, archive parser, Snappy path, and
+package owner retain finite source, payload, field, nesting, work, reference,
+object, text, output, and candidate-reopen ceilings. Creation and stand-in
+removal account for graph-object additions, UUID/Metadata registration,
+selected-component save-token work, archive edits, preview invalidation,
+compression, ZIP reassembly, and candidate verification.
+
+The graph and metadata codecs perform bounded preflight, exact selected
+payload sizing, and fallible reservations for their own outputs. The package
+also bounds physical package members, decoded archive objects/messages, graph
+ownership census, and Metadata scans; unknown source spans are retained and
+ambiguous or unsupported ownership is rejected. Exact artifacts are reused
+for no-ops and retained for inverse application.
+
+This implementation does not claim one aggregate transaction budget across
+graph encoding, Metadata rewriting, archive serialization, Snappy
+compression, ZIP reassembly, candidate reopening, and `ExactArtifacts`.
+Those stages remain separately bounded and fallible. Consequently this is an
+operation-local resource record, not a package-wide allocation, peak-memory,
+RSS, latency, throughput, or performance measurement. No manifest edge,
+generated schema, Buffa owner, or normal Prost owner changed.

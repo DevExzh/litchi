@@ -2549,3 +2549,43 @@ fail closed. The `litchi-iwa` migration host now exposes selector methods and
 delegates existing-caption reads and replacements to this owner; native graph
 creation and stand-in removal remain compatibility-host operations. The old
 raw-ID methods remain deprecated rather than deleted in this slice.
+
+## 2026-08-24 amendment: full Keynote chart-caption graph semantic ownership
+
+Commit `f0bbe079b094b3652751f6ab7c89b2dc64fac6a9` completes the admitted
+Keynote chart-caption graph transition in the selector-first package owner.
+The public surface remains
+`Package::{slide_chart_caption, edit_slide_chart_caption,
+apply_slide_chart_caption}`, `SlideSelector`, `ChartSelector`, and the
+`ChartCaption{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` transaction
+types. `None` denotes the canonical empty stand-in, while `Some(text)`
+denotes the inline CaptionInfo graph and its text storage; no native object
+identifier, component route, archive object, protobuf message, or wire
+payload crosses this semantic facade.
+
+The owner now admits the complete canonical lifecycle: an exclusive canonical
+stand-in can become an inline caption graph, existing text can be replaced,
+and an active graph can be replaced by a fresh canonical stand-in. Creation
+allocates the CaptionInfo, text storage, placement, and style graph and
+registers every new object UUID in the exact Metadata sidecar. Removal keeps
+the old graph for exact history/inverse semantics while retargeting the chart
+to a fresh stand-in and registering that stand-in. Existing storage rewrites
+retain the strict text-owner guarantees. Empty-to-empty edits remain exact
+no-ops; changed transitions invalidate the root previews, reopen the complete
+candidate, and return exact source/target artifacts whose inverse restores
+the source bytes.
+
+Chart-edge, CaptionInfo parentage, placement/style, storage ownership,
+co-location, source-preserved wire fields, UUID allocation, Metadata
+component selection, save-token advancement, last-object-identifier, and
+candidate graph counts are checked together. Cross-component, shared,
+ambiguous, malformed, hostile-diff, noncanonical, or otherwise unproven
+graphs fail closed; the supported lifecycle is not a claim to normalize
+arbitrary future caption graphs.
+
+The former raw-ID `litchi-iwa` chart-caption methods were removed from the
+production migration host and its example now uses selector-first methods.
+This is an intentional unpublished `0.0.1` breaking removal of an
+adapter-only surface; the host's remaining Keynote compatibility operations
+are unrelated and remain. The focused facade and boundary ratchets keep
+archive, metadata, wire, generated, and physical types private.
