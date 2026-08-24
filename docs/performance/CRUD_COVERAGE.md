@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+Change 0275 adds a read-only source-backed BIFF8 XLS owner and five matched
+open/list/one-cell selectors, taking the matrix to **398 names** while leaving
+the default at **36 cases / 198 records**. It covers typed sheet descriptors,
+selected scalar/cached-formula cells, stale/cancelled/limited/malformed and
+FILEPASS refusal, legacy-BIFF eager fallback, OLE host precedence, pinned path
+replacement, and bounded full-text materialization. It does not add XLS edit,
+patch, save, publication, or encrypted read support. Logical locality and a
+dirty release smoke are correctness/prioritization evidence only;
+`performance_claim: none`.
+
 Change 0274 adds no CRUD selector or production optimization. Its clean ABBA
 rejection evidence covers the DOC owner public phases across tiny, large, and
 payload-heavy shapes; only large lifecycle p50 passed, while tiny/payload-heavy
@@ -36,7 +46,7 @@ claims withheld.
 
 Date: 2026-08-24
 
-This is a coverage map, not a completion claim. It compares the 393 selectable
+This is a coverage map, not a completion claim. It compares the 398 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a

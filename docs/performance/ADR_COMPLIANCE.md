@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## Source-backed XLS selective-read closure (change 0275)
+
+Change 0275 keeps CFB ownership in `litchi-cfb`, BIFF semantics in
+`litchi-xls`, and path routing in the `litchi` facade. Public results are typed
+sheet/cell values rather than CFB IDs or raw records. The owner is immutable,
+version-fenced, finitely bounded, cancellation-aware, and read-only; FILEPASS
+and malformed data remain typed refusals. Five opt-in selectors bring the
+matrix to **398 names** while the default stays **36 cases / 198 records**.
+Logical locality is accepted as correctness evidence, but the dirty smoke is
+slower than eager and has `performance_claim: none`; request coalescing and
+global/SST deferral remain open.
+
 ## Rejected DOC owner-public-phases hypothesis (change 0274)
 
 Change 0274 is not a retained production optimization. The clean ABBA package

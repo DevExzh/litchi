@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## Source-backed XLS selective-read boundary (change 0275)
+
+Change 0275 closes the production ownership and matched-measurement boundary
+for BIFF8 open/list/one-cell. The 16,995,840-byte opaque-heavy corpus records
+138,459 logical source bytes for open/list and 138,593 for one-cell, with zero
+opaque or unselected-sheet overlap, but the dirty five-sample release p50 is
+roughly 11.7x/12.0x/13.4x eager. The next hotspot is the 401-429 fine-grained
+CFB/global reads and associated freshness fences; parser-owned global/SST
+materialization is a secondary deferral candidate. The matrix is **398
+names**, the default remains **36 cases / 198 records**, and
+`performance_claim: none`.
+
 ## Rejected DOC owner-public-phases hypothesis (change 0274)
 
 Change 0274 does not establish a hotspot or production optimization. Removing

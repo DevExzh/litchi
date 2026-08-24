@@ -153,7 +153,10 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
     None
 }
 
-#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+#[cfg(all(
+    any(feature = "odt", feature = "ods", feature = "odp"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
 fn is_normal_odf_package(bytes: &[u8]) -> bool {
     let limits = crate::opc::ReadLimits::default();
     litchi_odf_common::detect::packaged_mime(bytes).is_some()

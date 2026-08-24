@@ -462,11 +462,17 @@ fn reclaim_presentation_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8>
     std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
 }
 
-#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(unix, windows)
+))]
 const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Result of the private source-backed workbook path probe.
-#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(unix, windows)
+))]
 #[allow(
     dead_code,
     reason = "OOXML precedence variants are only constructed when an OOXML probe feature is enabled"
@@ -486,6 +492,12 @@ pub(crate) enum WorkbookSourcePathDetection {
     /// A validated, source-retaining ODS owner.
     #[cfg(feature = "ods")]
     Ods(Box<litchi_ods::SourceBackedSpreadsheet>),
+    /// A validated, source-retaining XLS owner.
+    #[cfg(feature = "xls")]
+    Xls {
+        workbook: crate::xls::SourceBackedWorkbook,
+        source: std::sync::Arc<dyn litchi_core::ReadAt>,
+    },
     /// A recognized OOXML family whose owner is enabled in this build,
     /// together with bytes read from the same pinned filesystem source.
     OtherOoxml {
@@ -504,7 +516,10 @@ pub(crate) enum WorkbookSourcePathDetection {
 /// [`DetectedFormat`] API remains unchanged; this helper is only used by the
 /// unified filesystem workbook facade. Other formats retain bytes from the
 /// same pinned source for the established eager fallback.
-#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(unix, windows)
+))]
 pub(crate) fn detect_workbook_source_path(
     path: &std::path::Path,
 ) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
@@ -618,7 +633,7 @@ pub(crate) fn detect_workbook_source_path(
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx"),
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
@@ -636,7 +651,10 @@ fn hard_workbook_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
     )
 }
 
-#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(unix, windows)
+))]
 fn finish_non_ooxml_workbook_source(
     source: std::sync::Arc<dyn litchi_core::ReadAt>,
     source_version: litchi_core::SourceVersion,
@@ -657,12 +675,112 @@ fn finish_non_ooxml_workbook_source(
     #[cfg(not(feature = "ods"))]
     let _ = is_ods;
 
+    #[cfg(feature = "xls")]
+    if let Some(workbook) = try_open_xls_source(std::sync::Arc::clone(&source), source_version)? {
+        return Ok(WorkbookSourcePathDetection::Xls { workbook, source });
+    }
+
     read_path_source_bytes(source.as_ref(), source_version)
         .map(WorkbookSourcePathDetection::Bytes)
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }
 
-#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+#[cfg(feature = "xls")]
+fn try_open_xls_source(
+    source: std::sync::Arc<dyn litchi_core::ReadAt>,
+    source_version: litchi_core::SourceVersion,
+) -> std::result::Result<
+    Option<crate::xls::SourceBackedWorkbook>,
+    Box<dyn std::error::Error + Send + Sync>,
+> {
+    let mut signature = [0_u8; 8];
+    let read = source.read_at(0, &mut signature)?;
+    if read != signature.len() || signature != [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1] {
+        return Ok(None);
+    }
+
+    if matches!(
+        classify_ole_host_stream(std::sync::Arc::clone(&source), source_version)?,
+        Some(OleHostStream::WordDocument | OleHostStream::PowerPointDocument)
+    ) {
+        ensure_path_source_current(source.as_ref(), source_version)?;
+        return Ok(None);
+    }
+
+    match crate::xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::clone(&source)) {
+        Ok(workbook) => {
+            let owner_version = workbook.source_version()?;
+            if owner_version != source_version {
+                return Err(Box::new(litchi_core::Error::SourceChanged {
+                    expected: source_version,
+                    observed: owner_version,
+                }));
+            }
+            Ok(Some(workbook))
+        },
+        Err(error) if xls_source_recoverable_probe_error(&error) => {
+            ensure_path_source_current(source.as_ref(), source_version)?;
+            Ok(None)
+        },
+        Err(error) => Err(Box::new(error)),
+    }
+}
+
+#[cfg(feature = "xls")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OleHostStream {
+    WordDocument,
+    PowerPointDocument,
+    Workbook,
+}
+
+#[cfg(feature = "xls")]
+pub(crate) fn classify_ole_host_stream(
+    source: std::sync::Arc<dyn litchi_core::ReadAt>,
+    source_version: litchi_core::SourceVersion,
+) -> std::result::Result<Option<OleHostStream>, Box<dyn std::error::Error + Send + Sync>> {
+    let cfb = litchi_cfb::SharedOleFile::open(std::sync::Arc::clone(&source)).map_err(|error| {
+        Box::new(crate::xls::SourceBackedError::from(error))
+            as Box<dyn std::error::Error + Send + Sync>
+    })?;
+    let host = if ole_stream_present(&cfb, &["WordDocument"])? {
+        Some(OleHostStream::WordDocument)
+    } else if ole_stream_present(&cfb, &["PowerPoint Document"])? {
+        Some(OleHostStream::PowerPointDocument)
+    } else if ole_stream_present(&cfb, &["Workbook"])? || ole_stream_present(&cfb, &["Book"])? {
+        Some(OleHostStream::Workbook)
+    } else {
+        None
+    };
+    ensure_path_source_current(source.as_ref(), source_version)?;
+    Ok(host)
+}
+
+#[cfg(feature = "xls")]
+fn ole_stream_present(
+    cfb: &litchi_cfb::SharedOleFile,
+    path: &[&str],
+) -> std::result::Result<bool, litchi_cfb::OleError> {
+    match cfb.stream_len(path) {
+        Ok(_) => Ok(true),
+        Err(litchi_cfb::OleError::StreamNotFound) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(feature = "xls")]
+fn xls_source_recoverable_probe_error(error: &crate::xls::SourceBackedError) -> bool {
+    matches!(
+        error,
+        crate::xls::SourceBackedError::WorkbookStreamMissing
+            | crate::xls::SourceBackedError::UnsupportedBiffVersion(_)
+    )
+}
+
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(unix, windows)
+))]
 fn ensure_path_source_current(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,
@@ -675,7 +793,10 @@ fn ensure_path_source_current(
     }
 }
 
-#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(unix, windows)
+))]
 fn read_path_source_bytes(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,

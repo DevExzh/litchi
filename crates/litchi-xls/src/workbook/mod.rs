@@ -8,8 +8,13 @@
 mod codec;
 mod model;
 pub mod package;
+pub mod source;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::{OpenOptions, Workbook};
+pub use source::{
+    SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedWorkbook,
+    SourceBackedWorksheet, SourceBackedWorksheetDescriptor,
+};

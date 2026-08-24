@@ -44,6 +44,10 @@ pub(super) enum WorkbookImpl {
     #[cfg(all(feature = "ods", any(unix, windows)))]
     OdsSource(litchi_ods::SourceBackedSpreadsheet),
 
+    /// Filesystem-backed XLS with deferred CFB/BIFF reads.
+    #[cfg(all(feature = "xls", any(unix, windows)))]
+    XlsSource(super::workbook::XlsSource),
+
     // For other formats, we just indicate they're not yet fully unified
     #[cfg(any(feature = "xls", any(feature = "xlsx", feature = "xlsb")))]
     #[allow(dead_code, reason = "placeholder for formats not yet fully unified")]

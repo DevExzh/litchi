@@ -733,7 +733,10 @@ pub use user_routing::{CUsr, CbUsr, DocRoute, RecipName, RoutingDelivery, UsrInf
 pub use uses_elfs::UsesElfs;
 pub use vba::{VbaMetadata, VbaProjectStorage};
 pub use web_pub::{WebPageType, WebPub, WebPubRange, WebSourceType};
-pub use workbook::{OpenOptions, Workbook};
+pub use workbook::{
+    OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedWorkbook,
+    SourceBackedWorksheet, SourceBackedWorksheetDescriptor, Workbook,
+};
 pub use workbook_view::{WorkbookView, WorkbookWindow};
 pub use worksheet::Worksheet;
 pub use worksheet::layout::Layout;
