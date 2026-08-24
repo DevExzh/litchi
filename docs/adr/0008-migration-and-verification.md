@@ -12503,3 +12503,54 @@ comment`. The accessibility surface did not expose the comment text, so the
 native claim is bounded to no-repair open, table render, and comment presence;
 it is not a native text-parity, save/reopen, autosave, durability,
 performance, or RSS claim.
+
+## 2026-08-24 amendment: Wave60 Numbers root comment-clear verification record
+
+The focused clear landed in commit `efa7810a5`; host delegation landed in
+`7eaf9e9c5`. Compatibility, staging, boundary, source-preservation, and
+resource hardening culminate in commit
+`895ef17848516cf201e717239c44c119eae5da87`. The final scoped gates were:
+
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib --quiet`:
+  32/32 passed;
+- `cargo test -p litchi-numbers --test table_data_list_reader_integration
+  --quiet`: 19/19 passed;
+- `cargo test -p litchi-numbers --lib package::comments::tests:: --quiet`:
+  11/11 passed;
+- `cargo test -p litchi-iwa --lib
+  'numbers::editor::tests::supported_cell_comment_' --quiet`: 2/2 passed;
+- the legacy no-Metadata and shared/segmented fallback regressions
+  `cell_comment_crud_preserves_value_and_comment_metadata` and
+  `shared_segmented_comments_use_copy_on_write_and_cleanup`: 1/1 each;
+- `cargo check -p litchi-numbers --all-targets --quiet` and
+  `cargo clippy -p litchi-iwa-protos --lib --quiet -- -D warnings`: passed;
+  Numbers all-target Clippy passed with explicit allowances for the existing
+  `deprecated`, `manual_contains`, and test-only `clone_on_copy` findings;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 387/387 passed.
+  `py_compile`, targeted Rust formatting, and `git diff --check` passed.
+
+The live `python3 tools/check_crate_boundaries.py --explain` command still
+exits 1 only for the known Pages table-lock baseline: exactly 23 findings (20
+flat aliases and three retired-host findings from the untracked host source).
+It reports no Numbers comment-clear finding. These scoped results are not a
+full-workspace green claim.
+
+The bounded native record used Numbers 14.4 and disposable artifacts under
+`/private/tmp/litchi-wave60-comment-native.ns6Bzr`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| `source.numbers` | 6,154 | `b433c124314b3c42a5d65a650e16d1ea57ec9512e3d59f2b4796d2e2e9d00f7f` |
+| initial Rust `cleared.numbers` before native save | 6,065 | `495743874a1c718ad6150d063b90f54e86759fa68076ea1b20897bd0deb91e71` |
+| Numbers-saved `cleared.numbers` | 28,454 | `34fe41ad5a764acd56605ec03d0e837ee5649ceaf8752afd3729820a62a9c289` |
+| `inverse.numbers` | 6,154 | `b433c124314b3c42a5d65a650e16d1ea57ec9512e3d59f2b4796d2e2e9d00f7f` |
+
+Rust cleared B2 from the 3 by 3 `Review` table and produced an exact inverse.
+Numbers 14.4 opened the Rust candidate without repair, rendered the table, and
+no longer exposed B2 as `Contains comment`. Command-S completed without an
+alert; Numbers closed and reopened its normalized 28,454-byte artifact, and
+the strict Rust reader reopened that artifact with B2 still comment-free.
+Numbers changed the package bytes during save, so this is bounded native
+open/render/save/close/reopen acceptance for the clear semantics—not
+Rust/native byte parity, exact post-save preservation, a performance/RSS
+measurement, or a full publication gate for unsupported comment graphs.
