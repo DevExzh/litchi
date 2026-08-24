@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Current matrix and gap (change 0272)
+
+[Change 0272](changes/0272-opc-source-overlay-multi-part-matrix.md) adds three
+opt-in source-overlay multi-part selectors and 27 benchmark records: changed,
+equal-payload no-op, and mixed, each across sizes 2/8/32 and
+small/large/media-incompressible payloads. The selectable matrix is **392
+names**; the default remains **36 cases / 198 records**. This is
+benchmark-only correctness/evidence coverage with `performance_claim: none`.
+The dirty five-sample profile is only prioritization evidence; the current gap
+is clean retained evidence plus explicit-context/scaling evidence for any
+future recompression, parallel, or compression-policy work.
+
 ## Latest OPC timing-boundary correction and XLSX allocator probe (changes 0270-0271)
 
 [Change 0270](changes/0270-opc-relationship-open-timing.md) corrects the
@@ -1140,7 +1152,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**389 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**392 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

@@ -174,6 +174,105 @@ def row(shape, samples, *, source=None, sink=None, output_sha256=None):
     return result
 
 
+def opc_multi_source(
+    samples,
+    mode,
+    count,
+    *,
+    source_shape,
+    payload_kind,
+    uncompressed_payload_bytes,
+    archive_bytes,
+    archive_sha256,
+    expected_eager_sha256,
+    offset,
+):
+    samples = list(samples)
+    output_digest = archive_sha256 if mode == "noop" else "c" * 64
+    phase_preparation = [1] * len(samples)
+    phase_open = [2] * len(samples)
+    phase_planning = [1] * len(samples)
+    phase_publication = [
+        sample - phase_preparation[index] - phase_open[index] - phase_planning[index]
+        for index, sample in enumerate(samples)
+    ]
+    overlay = {
+        "implementation": "SourceBackedPackage::write_part_overlays_to_stream",
+        "timing_scope": (
+            "elapsed_ns is explicitly the sum of preparation_ns, open_ns, "
+            "planning_ns, and publication_ns; interstitial work is excluded"
+        ),
+        "performance_claim": "none",
+        "overlay_mode": mode,
+        "replacement_semantics": {
+            "changed": "non-empty changed-payload replacement plan",
+            "noop": "non-empty equal-payload replacement plan; semantic no-op",
+            "mixed": "non-empty mixed changed/equal-payload replacement plan",
+        }[mode],
+        "overlay_count": count,
+        "source_shape": source_shape,
+        "payload_kind": payload_kind,
+        "source_bytes": archive_bytes,
+        "source_sha256": archive_sha256,
+        "expected_eager_sha256": expected_eager_sha256,
+        "source_cache_max_bytes": uncompressed_payload_bytes,
+        "source_cache_max_entries": 32,
+        "sink_max_bytes": 68_004,
+        "sink_max_write": 65_536,
+        "preparation_ns": phase_preparation,
+        "open_ns": phase_open,
+        "planning_ns": phase_planning,
+        "publication_ns": phase_publication,
+        "cache_before_publication_hits": [0] * len(samples),
+        "cache_before_publication_cold_loads": [0] * len(samples),
+        "cache_before_publication_retained_entries": [0] * len(samples),
+        "cache_before_publication_retained_bytes": [0] * len(samples),
+        "source_cache_after_publication_probe_hits": [0] * len(samples),
+        "source_cache_after_publication_probe_cold_loads": [count] * len(samples),
+        "source_cache_after_publication_probe_retained_entries": [count] * len(samples),
+        "source_cache_after_publication_probe_retained_bytes": [
+            count * (uncompressed_payload_bytes // 32)
+        ]
+        * len(samples),
+        "reopened_output_cache_hits": [0] * len(samples),
+        "reopened_output_cache_cold_loads": [0] * len(samples),
+        "reopened_output_cache_retained_entries": [0] * len(samples),
+        "reopened_output_cache_retained_bytes": [0] * len(samples),
+        "observed_after_publication_source_read_calls": [count + offset] * len(samples),
+        "observed_after_publication_source_read_bytes": [10_000 + offset] * len(samples),
+        "observed_after_publication_ordinary_payload_read_calls": [count] * len(samples),
+        "observed_after_publication_ordinary_payload_read_bytes": [count * 123] * len(samples),
+        "expected_eager_semantic_verified": True,
+        "raw_members_and_order_preservation_verified": True,
+        "equal_payload_noop_source_verified": mode == "noop",
+        "observed_output_sha256": [output_digest] * len(samples),
+    }
+    return {
+        "read_calls": [count + offset] * len(samples),
+        "read_bytes": [10_000 + offset] * len(samples),
+        "ordinary_payload_read_calls": [count] * len(samples),
+        "ordinary_payload_read_bytes": [count * 123] * len(samples),
+        "max_in_flight_reads": [1] * len(samples),
+        "opc_source_overlay": overlay,
+    }, output_digest
+
+
+def opc_multi_sink():
+    return {
+        "accepted_bytes": 1234,
+        "write_calls": 3,
+        "largest_write": 512,
+        "write_size_buckets": {
+            "bytes_0": 0,
+            "bytes_1_to_512": 3,
+            "bytes_513_to_4096": 0,
+            "bytes_4097_to_16384": 0,
+            "bytes_16385_to_65536": 0,
+            "bytes_over_65536": 0,
+        },
+    }
+
+
 def reports_for_values(values):
     revisions = ("control-revision", "candidate-revision", "candidate-revision", "control-revision")
     return [
@@ -2069,6 +2168,101 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(fixed_page_break)
 
+    def test_opc_source_overlay_multi_part_fixed_shape_count_matrix_is_exact(self):
+        cases = sorted(perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_CASES)
+        identities = perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_CORPUS_IDENTITIES
+        counts = perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS
+        reports = four_legs()
+        def populate(legs):
+            for leg_index, leg in enumerate(legs):
+                leg["configuration"]["cases"] = cases
+                rows = []
+                for case in cases:
+                    mode = case.removeprefix("opc_source_overlay_multi_part_")
+                    for identity in identities.values():
+                        for count in counts:
+                            result = copy.deepcopy(leg["results"][0])
+                            result["case"] = case
+                            result["corpus"] = {
+                                field: value
+                                for field, value in identity.items()
+                                if field != "name_prefix"
+                            }
+                            result["corpus"].update(
+                                name=f"{identity['name_prefix']}{count}",
+                            )
+                            source, output_digest = opc_multi_source(
+                                result["elapsed_ns"]["samples"],
+                                mode,
+                                count,
+                                source_shape=identity["shape"],
+                                payload_kind=identity["payload_kind"],
+                                uncompressed_payload_bytes=identity[
+                                    "uncompressed_payload_bytes"
+                                ],
+                                archive_bytes=identity["archive_bytes"],
+                                archive_sha256=identity["archive_sha256"],
+                                expected_eager_sha256=(
+                                    perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_EXPECTED_EAGER_SHA256[
+                                        (case, identity["shape"], count)
+                                    ]
+                                ),
+                                offset=leg_index,
+                            )
+                            result["source"] = source
+                            result["sink"] = opc_multi_sink()
+                            result["elapsed_ns"]["sample_order"] = list(
+                                range(len(result["elapsed_ns"]["samples"]))
+                            )
+                            result["output_sha256"] = output_digest
+                            rows.append(result)
+                leg["results"] = rows
+
+        populate(reports)
+        self.assertFalse(perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_HASHES_PENDING)
+        self.assertEqual(
+            len(perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_EXPECTED_EAGER_SHA256),
+            27,
+        )
+        for identity in identities.values():
+            for count in counts:
+                corpus = {
+                    field: value
+                    for field, value in identity.items()
+                    if field != "name_prefix"
+                }
+                corpus["name"] = f"{identity['name_prefix']}{count}"
+                self.assertEqual(
+                    perf_abba_summary._opc_source_overlay_multi_part_identity(corpus),
+                    (identity["shape"], count),
+                )
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(summary["verification"]["result_count"], 27)
+
+        missing_sink = copy.deepcopy(reports)
+        missing_sink[0]["results"][0].pop("sink")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "sink must be an object",
+        ):
+            perf_abba_summary.summarize_reports(missing_sink)
+
+        malformed = copy.deepcopy(reports)
+        malformed[0]["results"].pop()
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "complete multi-Part OPC 3-shape x 3-count matrix",
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        arbitrary_hash = copy.deepcopy(reports)
+        arbitrary_hash[0]["results"][0]["corpus"]["archive_sha256"] = "d" * 64
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "pinned multi-Part OPC identity|fixed identity",
+        ):
+            perf_abba_summary.summarize_reports(arbitrary_hash)
+
     def test_allocator_instrumentation_is_not_accepted_for_latency_abba(self):
         legs = four_legs()
         for leg in legs:
@@ -2078,6 +2272,236 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             "instrumentation.*latency ABBA",
         ):
             perf_abba_summary.summarize_reports(legs)
+
+    def test_opc_source_overlay_nested_schema_projection_and_sample_binding(self):
+        identity = copy.deepcopy(
+            perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_CORPUS_IDENTITIES[
+                "overlay-small"
+            ]
+        )
+        corpus = {
+            field: value for field, value in identity.items() if field != "name_prefix"
+        }
+        corpus.update(
+            name=f"{identity['name_prefix']}2",
+        )
+        source, output_digest = opc_multi_source(
+            [10, 12],
+            "mixed",
+            2,
+            source_shape="overlay-small",
+            payload_kind="compressible",
+            uncompressed_payload_bytes=32 * 1024,
+            archive_bytes=7451,
+            archive_sha256=(
+                "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509"
+            ),
+            expected_eager_sha256=(
+                perf_abba_summary.OPC_SOURCE_OVERLAY_MULTI_PART_EXPECTED_EAGER_SHA256[
+                    (
+                        "opc_source_overlay_multi_part_mixed",
+                        "overlay-small",
+                        2,
+                    )
+                ]
+            ),
+            offset=5,
+        )
+        overlay = source["opc_source_overlay"]
+        sink = opc_multi_sink()
+        perf_abba_summary._validate_opc_source_overlay(
+            overlay,
+            "test.source.opc_source_overlay",
+            case="opc_source_overlay_multi_part_mixed",
+            corpus=corpus,
+            samples_per_case=2,
+            elapsed_samples=[10, 12],
+            sample_order=[0, 1],
+            source=source,
+            sink=sink,
+            output_sha256=output_digest,
+            allow_pending_hashes=True,
+        )
+        projected = perf_abba_summary._source_identity_projection(source)
+        self.assertNotIn("read_calls", projected)
+        self.assertNotIn("preparation_ns", projected["opc_source_overlay"])
+        self.assertEqual(
+            projected["opc_source_overlay"]["implementation"],
+            overlay["implementation"],
+        )
+
+        missing = copy.deepcopy(overlay)
+        missing.pop("publication_ns")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "schema mismatch"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                missing,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        wrong_cardinality = copy.deepcopy(overlay)
+        wrong_cardinality["publication_ns"] = [8]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "exactly 2 samples"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                wrong_cardinality,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        wrong_sum = copy.deepcopy(overlay)
+        wrong_sum["publication_ns"][1] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "bind to sorted elapsed_ns"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                wrong_sum,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        bad_source = copy.deepcopy(source)
+        bad_source["read_calls"][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "disagrees with source.read_calls"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                overlay,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=bad_source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        bad_sink = copy.deepcopy(sink)
+        bad_sink["largest_write"] = 65_537
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "largest_write exceeds"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                overlay,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=bad_sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        bad_eager = copy.deepcopy(overlay)
+        bad_eager["expected_eager_sha256"] = "f" * 64
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "pinned case/shape/count identity",
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                bad_eager,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        bad_sink_formula = copy.deepcopy(overlay)
+        bad_sink_formula["sink_max_bytes"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            r"2\*accepted_bytes\+65536",
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                bad_sink_formula,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        overflow_overlay = copy.deepcopy(overlay)
+        overflow_overlay["sink_max_bytes"] = perf_abba_summary.U64_MAX
+        overflow_sink = copy.deepcopy(sink)
+        overflow_sink["accepted_bytes"] = perf_abba_summary.U64_MAX
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "formula overflows u64"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                overflow_overlay,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 1],
+                source=source,
+                sink=overflow_sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
+
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "exact sample permutation"
+        ):
+            perf_abba_summary._validate_opc_source_overlay(
+                overlay,
+                "test.source.opc_source_overlay",
+                case="opc_source_overlay_multi_part_mixed",
+                corpus=corpus,
+                samples_per_case=2,
+                elapsed_samples=[10, 12],
+                sample_order=[0, 0],
+                source=source,
+                sink=sink,
+                output_sha256=output_digest,
+                allow_pending_hashes=True,
+            )
 
     def test_allocator_binary_identity_is_not_accepted_for_latency_abba(self):
         legs = four_legs()

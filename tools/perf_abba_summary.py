@@ -275,6 +275,211 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
     },
 }
 
+OPC_SOURCE_OVERLAY_MULTI_PART_CASES = frozenset(
+    {
+        "opc_source_overlay_multi_part_changed",
+        "opc_source_overlay_multi_part_noop",
+        "opc_source_overlay_multi_part_mixed",
+    }
+)
+OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS = (2, 8, 32)
+# These physical corpus identity values are pinned from the compiled
+# multi-Part changed smoke report at
+# /dev/shm/opc-source-overlay-multi-part-changed-smoke/report.json.
+OPC_SOURCE_OVERLAY_MULTI_PART_HASHES_PENDING = False
+OPC_SOURCE_OVERLAY_MULTI_PART_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
+    "overlay-small": {
+        "name_prefix": "overlay-small-compressible-count-",
+        "generator": "litchi-opc-source-overlay-multi-part-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "overlay-small",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 32,
+        "archive_member_count": 34,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 32 * 1024,
+        "target_entry": "benchmark/parts/00016.bin",
+        "target_payload_bytes": 1024,
+        "archive_bytes": 7451,
+        "archive_sha256": "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509",
+        "target_payload_sha256": "5b7b9793a43d08ca2c0670289d932541377407ed352ab9f6c145f63d19de9f98",
+    },
+    "overlay-large": {
+        "name_prefix": "overlay-large-incompressible-count-",
+        "generator": "litchi-opc-source-overlay-multi-part-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "overlay-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 32,
+        "archive_member_count": 34,
+        "entry_bytes": 64 * 1024,
+        "uncompressed_payload_bytes": 2 * 1024 * 1024,
+        "target_entry": "benchmark/parts/00016.bin",
+        "target_payload_bytes": 64 * 1024,
+        "archive_bytes": 2103195,
+        "archive_sha256": "8356d7467215b04a3d1c3703f50fbd6322f2002ca7c3ead1f24414c5e550ef73",
+        "target_payload_sha256": "e17b543eec6b4d3534978d7d59e7240dcbf0f2a2050fd80f32ea3daec266aa73",
+    },
+    "overlay-media-incompressible": {
+        "name_prefix": "overlay-media-incompressible-incompressible-count-",
+        "generator": "litchi-opc-source-overlay-multi-part-v1",
+        "package_format": "OPC/ZIP",
+        "shape": "overlay-media-incompressible",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 32,
+        "archive_member_count": 34,
+        "entry_bytes": 256 * 1024,
+        "uncompressed_payload_bytes": 8 * 1024 * 1024,
+        "target_entry": "benchmark/parts/00016.bin",
+        "target_payload_bytes": 256 * 1024,
+        "archive_bytes": 8396580,
+        "archive_sha256": "bf8c309af5306c6682b9df65b97246f81b022fe5e3b5e02cc2c4dcf3e1e87883",
+        "target_payload_sha256": "3ad07c7e34d3dd6d9ff75b696ccbdd702777b6e4dea04b19bbe3d0aa6d21cdeb",
+    },
+}
+OPC_SOURCE_OVERLAY_MULTI_PART_EXPECTED_EAGER_SHA256: dict[
+    tuple[str, str, int], str
+] = {
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-small",
+        2,
+    ): "980abb9efebb5f53105f304e1b70b7497882e366558de0e7739766c9b6e7e083",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-small",
+        8,
+    ): "fee10334d108aa7262bbe404e8f8848fa5bf9f11edbc63e1c1599e52b3fbe54a",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-small",
+        32,
+    ): "bdc0f47ca45be8e3654f4f21f93cec12dc505c2d45a0a308273cc24f4aa60cc2",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-small",
+        2,
+    ): "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-small",
+        8,
+    ): "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-small",
+        32,
+    ): "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-small",
+        2,
+    ): "387831c00e9d5f882c7f61209f21a2eda7a30ce3995925c252c80c0b7dedb169",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-small",
+        8,
+    ): "820b0ea99e9a5ee31b55acfe78340994e5b46f6e8337e6d7fd6d1a811a59491c",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-small",
+        32,
+    ): "f992e1df7ee8fbe235c2c46ccc8dab2c88dbaf328e60b11c563ed62b6c1a6adc",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-large",
+        2,
+    ): "adcf54d3e4f9a8c35190e0b9187fafff7e94aa1992afd0c410d45387fe925ec0",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-large",
+        8,
+    ): "ad37dc59d476bd09e0f5e4839c95b818ff8e3c9af315c8d3c4d246c3b1f5fea8",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-large",
+        32,
+    ): "4279caf9d8c0c0df131e392763c1c1fb9ec41b081999c4a50f381b03b55abb10",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-large",
+        2,
+    ): "8356d7467215b04a3d1c3703f50fbd6322f2002ca7c3ead1f24414c5e550ef73",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-large",
+        8,
+    ): "8356d7467215b04a3d1c3703f50fbd6322f2002ca7c3ead1f24414c5e550ef73",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-large",
+        32,
+    ): "8356d7467215b04a3d1c3703f50fbd6322f2002ca7c3ead1f24414c5e550ef73",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-large",
+        2,
+    ): "90fdf6163d11b3e32ed9356a9fc82fc35448d40281c2f6b59013d92ff3c9fa91",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-large",
+        8,
+    ): "52e10126ef1972b1b346f510a8a46db81584a41f7505add7deeb84a4751e8ad0",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-large",
+        32,
+    ): "772f8360dcbdaa6d3146894e826fdb8f2d082b098da887b851f89a143289a5fc",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-media-incompressible",
+        2,
+    ): "1bed16c8ef6421f058535372802d31ecf1a91243be5f6048d2a1d17030e0c465",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-media-incompressible",
+        8,
+    ): "7458528265a57f89135eeec420053690b8a2dad666f0886bfb79be7b69859564",
+    (
+        "opc_source_overlay_multi_part_changed",
+        "overlay-media-incompressible",
+        32,
+    ): "49984303765eed16b8cda0db34fe952a8beb97ee1ef38a2a29a3df0e93f65730",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-media-incompressible",
+        2,
+    ): "bf8c309af5306c6682b9df65b97246f81b022fe5e3b5e02cc2c4dcf3e1e87883",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-media-incompressible",
+        8,
+    ): "bf8c309af5306c6682b9df65b97246f81b022fe5e3b5e02cc2c4dcf3e1e87883",
+    (
+        "opc_source_overlay_multi_part_noop",
+        "overlay-media-incompressible",
+        32,
+    ): "bf8c309af5306c6682b9df65b97246f81b022fe5e3b5e02cc2c4dcf3e1e87883",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-media-incompressible",
+        2,
+    ): "9852986f7addf22c22766587912b05951b8fd32c6f339f24a693dda88e7c4386",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-media-incompressible",
+        8,
+    ): "dee30e2f5ebaec5dc1e1fba871d789c5a6d6b5568a7883a7f85cbdef525d56a6",
+    (
+        "opc_source_overlay_multi_part_mixed",
+        "overlay-media-incompressible",
+        32,
+    ): "cf178d5a31e2bda0aa3723c7085b6d913acb24229ce6e80041a0a0a8455c085f",
+}
+
 _MISSING = object()
 _FILESYSTEM_EVIDENCE_KEYS = frozenset(
     {
@@ -2528,6 +2733,7 @@ def _validate_report(
         raise AbbaSummaryInputError(f"{label}.configuration must not be empty")
     _validate_configuration(configuration, label)
     indexed = _index_results(root, label)
+    _validate_opc_source_overlay_result_rows(indexed, configuration, label)
     _validate_xls_numeric_source_summary(indexed, label)
     _validate_xls_numeric_operation_evidence(
         indexed,
@@ -2567,6 +2773,534 @@ def _stable_environment(environment: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _opc_source_overlay_multi_part_identity(
+    corpus: Mapping[str, Any],
+    *,
+    allow_pending_hashes: bool = False,
+) -> tuple[str, int] | None:
+    shape = corpus.get("shape")
+    if not isinstance(shape, str):
+        return None
+    expected = OPC_SOURCE_OVERLAY_MULTI_PART_CORPUS_IDENTITIES.get(shape)
+    if expected is None:
+        return None
+    pending_hash_fields = {
+        field
+        for field in ("archive_bytes", "archive_sha256", "target_payload_sha256")
+        if expected.get(field) is None
+    }
+    if pending_hash_fields and not allow_pending_hashes:
+        fields = ", ".join(sorted(pending_hash_fields))
+        raise AbbaSummaryInputError(
+            "multi-Part OPC fixed corpus identity constants are missing "
+            f"for {shape}: fill {fields} from a compiled benchmark smoke run"
+        )
+    for field, value in expected.items():
+        if field == "name_prefix" or field in pending_hash_fields:
+            continue
+        if corpus.get(field) != value:
+            return None
+    name = corpus.get("name")
+    prefix = expected["name_prefix"]
+    if not isinstance(name, str) or not name.startswith(prefix):
+        return None
+    suffix = name[len(prefix) :]
+    if not suffix.isdigit():
+        return None
+    count = int(suffix)
+    if count not in OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS or name != f"{prefix}{count}":
+        return None
+    for field in ("archive_sha256", "target_payload_sha256"):
+        value = corpus.get(field)
+        if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
+            return None
+    archive_bytes = corpus.get("archive_bytes")
+    if (
+        isinstance(archive_bytes, bool)
+        or not isinstance(archive_bytes, int)
+        or archive_bytes <= 0
+    ):
+        return None
+    if not pending_hash_fields:
+        for field in ("archive_sha256", "target_payload_sha256"):
+            if corpus.get(field) != expected[field]:
+                return None
+        if corpus.get("archive_bytes") != expected["archive_bytes"]:
+            return None
+    return shape, count
+
+
+_OPC_SOURCE_OVERLAY_KEYS = frozenset(
+    {
+        "implementation",
+        "timing_scope",
+        "performance_claim",
+        "overlay_mode",
+        "replacement_semantics",
+        "overlay_count",
+        "source_shape",
+        "payload_kind",
+        "source_bytes",
+        "source_sha256",
+        "expected_eager_sha256",
+        "source_cache_max_bytes",
+        "source_cache_max_entries",
+        "sink_max_bytes",
+        "sink_max_write",
+        "preparation_ns",
+        "open_ns",
+        "planning_ns",
+        "publication_ns",
+        "cache_before_publication_hits",
+        "cache_before_publication_cold_loads",
+        "cache_before_publication_retained_entries",
+        "cache_before_publication_retained_bytes",
+        "source_cache_after_publication_probe_hits",
+        "source_cache_after_publication_probe_cold_loads",
+        "source_cache_after_publication_probe_retained_entries",
+        "source_cache_after_publication_probe_retained_bytes",
+        "reopened_output_cache_hits",
+        "reopened_output_cache_cold_loads",
+        "reopened_output_cache_retained_entries",
+        "reopened_output_cache_retained_bytes",
+        "observed_after_publication_source_read_calls",
+        "observed_after_publication_source_read_bytes",
+        "observed_after_publication_ordinary_payload_read_calls",
+        "observed_after_publication_ordinary_payload_read_bytes",
+        "expected_eager_semantic_verified",
+        "raw_members_and_order_preservation_verified",
+        "equal_payload_noop_source_verified",
+        "observed_output_sha256",
+    }
+)
+_OPC_SOURCE_OVERLAY_PHASE_VECTOR_FIELDS = (
+    "preparation_ns",
+    "open_ns",
+    "planning_ns",
+    "publication_ns",
+)
+_OPC_SOURCE_OVERLAY_COUNTER_VECTOR_FIELDS = (
+    "cache_before_publication_hits",
+    "cache_before_publication_cold_loads",
+    "cache_before_publication_retained_entries",
+    "cache_before_publication_retained_bytes",
+    "source_cache_after_publication_probe_hits",
+    "source_cache_after_publication_probe_cold_loads",
+    "source_cache_after_publication_probe_retained_entries",
+    "source_cache_after_publication_probe_retained_bytes",
+    "reopened_output_cache_hits",
+    "reopened_output_cache_cold_loads",
+    "reopened_output_cache_retained_entries",
+    "reopened_output_cache_retained_bytes",
+    "observed_after_publication_source_read_calls",
+    "observed_after_publication_source_read_bytes",
+    "observed_after_publication_ordinary_payload_read_calls",
+    "observed_after_publication_ordinary_payload_read_bytes",
+)
+_OPC_SOURCE_OVERLAY_DYNAMIC_FIELDS = frozenset(
+    {
+        *_OPC_SOURCE_OVERLAY_PHASE_VECTOR_FIELDS,
+        *_OPC_SOURCE_OVERLAY_COUNTER_VECTOR_FIELDS,
+        "observed_output_sha256",
+    }
+)
+_OPC_SOURCE_OVERLAY_SOURCE_VECTOR_FIELDS = (
+    "read_calls",
+    "read_bytes",
+    "ordinary_payload_read_calls",
+    "ordinary_payload_read_bytes",
+    "max_in_flight_reads",
+)
+_OPC_SOURCE_OVERLAY_SINK_KEYS = frozenset(
+    {"accepted_bytes", "write_calls", "largest_write", "write_size_buckets"}
+)
+_OPC_SOURCE_OVERLAY_SINK_BUCKET_KEYS = frozenset(
+    {
+        "bytes_0",
+        "bytes_1_to_512",
+        "bytes_513_to_4096",
+        "bytes_4097_to_16384",
+        "bytes_16385_to_65536",
+        "bytes_over_65536",
+    }
+)
+
+
+def _validate_opc_source_overlay(
+    value: Any,
+    location: str,
+    *,
+    case: str,
+    corpus: Mapping[str, Any],
+    samples_per_case: int,
+    elapsed_samples: Sequence[Any],
+    sample_order: Sequence[Any],
+    source: Mapping[str, Any],
+    sink: Mapping[str, Any],
+    output_sha256: Any,
+    allow_pending_hashes: bool = False,
+) -> None:
+    overlay = _require_object(value, location)
+    if set(overlay) != _OPC_SOURCE_OVERLAY_KEYS:
+        missing = sorted(_OPC_SOURCE_OVERLAY_KEYS - set(overlay))
+        unknown = sorted(set(overlay) - _OPC_SOURCE_OVERLAY_KEYS)
+        raise AbbaSummaryInputError(
+            f"{location} schema mismatch (missing={missing!r}, unknown={unknown!r})"
+        )
+    if (
+        isinstance(samples_per_case, bool)
+        or not isinstance(samples_per_case, int)
+        or samples_per_case <= 0
+    ):
+        raise AbbaSummaryInputError(f"{location} samples_per_case must be positive")
+    elapsed = [
+        _u64(item, f"{location}.elapsed_ns.samples[{index}]")
+        for index, item in enumerate(elapsed_samples)
+    ]
+    if len(elapsed) != samples_per_case:
+        raise AbbaSummaryInputError(
+            f"{location} vectors must contain exactly {samples_per_case} samples"
+        )
+    if (
+        not isinstance(sample_order, list)
+        or len(sample_order) != samples_per_case
+        or any(
+            isinstance(item, bool)
+            or not isinstance(item, int)
+            or item < 0
+            or item >= samples_per_case
+            for item in sample_order
+        )
+        or sorted(sample_order) != list(range(samples_per_case))
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.sample_order must be an exact sample permutation"
+        )
+    sorted_elapsed = sorted(elapsed)
+    if elapsed != sorted_elapsed:
+        raise AbbaSummaryInputError(
+            f"{location}.elapsed_ns.samples must be sorted for overlay evidence"
+        )
+    if case not in OPC_SOURCE_OVERLAY_MULTI_PART_CASES:
+        raise AbbaSummaryInputError(f"{location} is present for a non-multi-Part case")
+    mode = case.removeprefix("opc_source_overlay_multi_part_")
+    semantics = {
+        "changed": "non-empty changed-payload replacement plan",
+        "noop": "non-empty equal-payload replacement plan; semantic no-op",
+        "mixed": "non-empty mixed changed/equal-payload replacement plan",
+    }[mode]
+    if overlay["implementation"] != "SourceBackedPackage::write_part_overlays_to_stream":
+        raise AbbaSummaryInputError(f"{location}.implementation does not match the publisher")
+    if not isinstance(overlay["timing_scope"], str) or not overlay["timing_scope"]:
+        raise AbbaSummaryInputError(f"{location}.timing_scope must be non-empty")
+    for required_phrase in (
+        "preparation_ns",
+        "open_ns",
+        "planning_ns",
+        "publication_ns",
+        "excluded",
+    ):
+        if required_phrase not in overlay["timing_scope"]:
+            raise AbbaSummaryInputError(
+                f"{location}.timing_scope must name all reported phases and exclusions"
+            )
+    if overlay["performance_claim"] != "none":
+        raise AbbaSummaryInputError(f"{location}.performance_claim must be 'none'")
+    if overlay["overlay_mode"] != mode:
+        raise AbbaSummaryInputError(f"{location}.overlay_mode disagrees with case")
+    if overlay["replacement_semantics"] != semantics:
+        raise AbbaSummaryInputError(
+            f"{location}.replacement_semantics disagrees with overlay_mode"
+        )
+    identity = _opc_source_overlay_multi_part_identity(
+        corpus, allow_pending_hashes=allow_pending_hashes
+    )
+    if identity is None:
+        raise AbbaSummaryInputError(f"{location} corpus does not match fixed identity")
+    shape, count = identity
+    if overlay["overlay_count"] != count:
+        raise AbbaSummaryInputError(f"{location}.overlay_count disagrees with corpus")
+    expected_eager_identity = OPC_SOURCE_OVERLAY_MULTI_PART_EXPECTED_EAGER_SHA256.get(
+        (case, shape, count)
+    )
+    if expected_eager_identity is None:
+        raise AbbaSummaryInputError(
+            f"{location} has no pinned expected eager digest for its case/shape/count cell"
+        )
+    if overlay["source_shape"] != shape or overlay["source_shape"] != corpus.get("shape"):
+        raise AbbaSummaryInputError(f"{location}.source_shape disagrees with corpus")
+    if overlay["payload_kind"] != corpus.get("payload_kind"):
+        raise AbbaSummaryInputError(f"{location}.payload_kind disagrees with corpus")
+    source_bytes = _u64(overlay["source_bytes"], f"{location}.source_bytes", positive=True)
+    if source_bytes != corpus.get("archive_bytes"):
+        raise AbbaSummaryInputError(f"{location}.source_bytes disagrees with corpus.archive_bytes")
+    source_digest = _validate_output_sha256(
+        overlay["source_sha256"], f"{location}.source_sha256"
+    )
+    if source_digest != corpus.get("archive_sha256"):
+        raise AbbaSummaryInputError(f"{location}.source_sha256 disagrees with corpus")
+    eager_digest = _validate_output_sha256(
+        overlay["expected_eager_sha256"], f"{location}.expected_eager_sha256"
+    )
+    if eager_digest != expected_eager_identity:
+        raise AbbaSummaryInputError(
+            f"{location}.expected_eager_sha256 disagrees with the pinned case/shape/count identity"
+        )
+    output_digest = _validate_output_sha256(output_sha256, f"{location}.result.output_sha256")
+    if mode == "noop" and output_digest != source_digest:
+        raise AbbaSummaryInputError(f"{location} noop output differs from source digest")
+    if mode != "noop" and output_digest == source_digest:
+        raise AbbaSummaryInputError(
+            f"{location} changed/mixed output must differ from source digest"
+        )
+    source_cache_max_bytes = _u64(
+        overlay["source_cache_max_bytes"],
+        f"{location}.source_cache_max_bytes",
+        positive=True,
+    )
+    source_cache_max_entries = _u64(
+        overlay["source_cache_max_entries"],
+        f"{location}.source_cache_max_entries",
+        positive=True,
+    )
+    if source_cache_max_bytes != corpus.get("uncompressed_payload_bytes"):
+        raise AbbaSummaryInputError(
+            f"{location}.source_cache_max_bytes disagrees with corpus cache policy"
+        )
+    if source_cache_max_entries != corpus.get("entry_count"):
+        raise AbbaSummaryInputError(
+            f"{location}.source_cache_max_entries disagrees with corpus cache policy"
+        )
+    sink_max_bytes = _u64(
+        overlay["sink_max_bytes"], f"{location}.sink_max_bytes", positive=True
+    )
+    sink_max_write = _u64(
+        overlay["sink_max_write"], f"{location}.sink_max_write", positive=True
+    )
+    if sink_max_write != 65_536:
+        raise AbbaSummaryInputError(
+            f"{location}.sink_max_write disagrees with the bounded sink policy"
+        )
+    sink_object = _require_object(sink, f"{location}.result.sink")
+    if set(sink_object) != _OPC_SOURCE_OVERLAY_SINK_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink schema does not match the bounded overlay sink"
+        )
+    sink_accepted_bytes = _u64(
+        sink_object["accepted_bytes"], f"{location}.result.sink.accepted_bytes", positive=True
+    )
+    sink_write_calls = _u64(
+        sink_object["write_calls"], f"{location}.result.sink.write_calls", positive=True
+    )
+    sink_largest_write = _u64(
+        sink_object["largest_write"], f"{location}.result.sink.largest_write"
+    )
+    if sink_accepted_bytes > sink_max_bytes:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink.accepted_bytes exceeds sink_max_bytes"
+        )
+    if sink_largest_write > sink_max_write:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink.largest_write exceeds sink_max_write"
+        )
+    sink_formula_headroom = U64_MAX - 65_536
+    if sink_accepted_bytes > sink_formula_headroom // 2:
+        raise AbbaSummaryInputError(
+            f"{location}.sink_max_bytes formula overflows u64"
+        )
+    expected_sink_max_bytes = sink_accepted_bytes * 2 + 65_536
+    if sink_max_bytes != expected_sink_max_bytes:
+        raise AbbaSummaryInputError(
+            f"{location}.sink_max_bytes must equal 2*accepted_bytes+65536"
+        )
+    buckets = _require_object(
+        sink_object["write_size_buckets"],
+        f"{location}.result.sink.write_size_buckets",
+    )
+    if set(buckets) != _OPC_SOURCE_OVERLAY_SINK_BUCKET_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink.write_size_buckets schema is incomplete"
+        )
+    bucket_counts = {
+        field: _u64(value, f"{location}.result.sink.write_size_buckets.{field}")
+        for field, value in buckets.items()
+    }
+    if sum(bucket_counts.values()) != sink_write_calls:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink write-size buckets disagree with write_calls"
+        )
+    if bucket_counts["bytes_over_65536"] != 0:
+        raise AbbaSummaryInputError(
+            f"{location}.result.sink observed a write above sink_max_write"
+        )
+    for field in (
+        "expected_eager_semantic_verified",
+        "raw_members_and_order_preservation_verified",
+    ):
+        if not _required_bool(overlay[field], location, field):
+            raise AbbaSummaryInputError(f"{location}.{field} must be true")
+    if _required_bool(overlay["equal_payload_noop_source_verified"], location, "equal_payload_noop_source_verified") != (mode == "noop"):
+        raise AbbaSummaryInputError(
+            f"{location}.equal_payload_noop_source_verified disagrees with overlay_mode"
+        )
+
+    def vector(field: str) -> list[int]:
+        raw = overlay[field]
+        if not isinstance(raw, list) or len(raw) != samples_per_case:
+            raise AbbaSummaryInputError(
+                f"{location}.{field} must contain exactly {samples_per_case} samples"
+            )
+        return [
+            _u64(item, f"{location}.{field}[{index}]")
+            for index, item in enumerate(raw)
+        ]
+
+    phases = {field: vector(field) for field in _OPC_SOURCE_OVERLAY_PHASE_VECTOR_FIELDS}
+    counters = {field: vector(field) for field in _OPC_SOURCE_OVERLAY_COUNTER_VECTOR_FIELDS}
+    digests = overlay["observed_output_sha256"]
+    if not isinstance(digests, list) or len(digests) != samples_per_case:
+        raise AbbaSummaryInputError(
+            f"{location}.observed_output_sha256 must contain exactly {samples_per_case} samples"
+        )
+    if len(set(digests)) != 1:
+        raise AbbaSummaryInputError(
+            f"{location}.observed_output_sha256 is not deterministic across samples"
+        )
+    for index, digest in enumerate(digests):
+        if _validate_output_sha256(digest, f"{location}.observed_output_sha256[{index}]") != output_digest:
+            raise AbbaSummaryInputError(
+                f"{location}.observed_output_sha256 disagrees with result.output_sha256"
+            )
+        phase_sum = sum(
+            phases[field][index] for field in _OPC_SOURCE_OVERLAY_PHASE_VECTOR_FIELDS
+        )
+        if phase_sum > U64_MAX or phase_sum != sorted_elapsed[index]:
+            raise AbbaSummaryInputError(
+                f"{location} phase vectors must bind to sorted elapsed_ns.samples"
+            )
+    if any(counters[field][index] != 0 for field in (
+        "cache_before_publication_retained_entries",
+        "cache_before_publication_retained_bytes",
+    ) for index in range(samples_per_case)):
+        raise AbbaSummaryInputError(f"{location} cache retention oracle is non-zero")
+    if any(
+        counters[field][index] != 0
+        for field in (
+            "reopened_output_cache_hits",
+            "reopened_output_cache_cold_loads",
+            "reopened_output_cache_retained_entries",
+            "reopened_output_cache_retained_bytes",
+        )
+        for index in range(samples_per_case)
+    ):
+        raise AbbaSummaryInputError(
+            f"{location} reopened output is not a zero-cache lazy open"
+        )
+    expected_probe_bytes = count * corpus["entry_bytes"]
+    if any(
+        counters[field][index] != expected
+        for field, expected in (
+            ("source_cache_after_publication_probe_hits", 0),
+            ("source_cache_after_publication_probe_cold_loads", count),
+            ("source_cache_after_publication_probe_retained_entries", count),
+            ("source_cache_after_publication_probe_retained_bytes", expected_probe_bytes),
+        )
+        for index in range(samples_per_case)
+    ):
+        raise AbbaSummaryInputError(
+            f"{location} source cache replay does not match exact selected-Part evidence"
+        )
+    for nested_field, source_field in (
+        (
+            "observed_after_publication_source_read_calls",
+            "read_calls",
+        ),
+        (
+            "observed_after_publication_source_read_bytes",
+            "read_bytes",
+        ),
+        (
+            "observed_after_publication_ordinary_payload_read_calls",
+            "ordinary_payload_read_calls",
+        ),
+        (
+            "observed_after_publication_ordinary_payload_read_bytes",
+            "ordinary_payload_read_bytes",
+        ),
+    ):
+        if counters[nested_field] != source.get(source_field):
+            raise AbbaSummaryInputError(
+                f"{location}.{nested_field} disagrees with source.{source_field}"
+            )
+    if not all(
+        counters[field][index] > 0
+        for field in (
+            "source_cache_after_publication_probe_cold_loads",
+            "observed_after_publication_source_read_calls",
+            "observed_after_publication_source_read_bytes",
+            "observed_after_publication_ordinary_payload_read_bytes",
+        )
+        for index in range(samples_per_case)
+    ):
+        raise AbbaSummaryInputError(f"{location} source/cache evidence is empty")
+    if any(
+        counters["observed_after_publication_ordinary_payload_read_calls"][index] < count
+        for index in range(samples_per_case)
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.observed_after_publication_ordinary_payload_read_calls is below overlay_count"
+        )
+
+
+def _validate_opc_source_overlay_result_rows(
+    indexed: Mapping[tuple[str, str], dict[str, Any]],
+    configuration: Mapping[str, Any],
+    label: str,
+) -> None:
+    samples_per_case = _required_positive_integer(
+        configuration.get("samples_per_case"), f"{label}.configuration", "samples_per_case"
+    )
+    for (case, corpus_identity), row in indexed.items():
+        source = row.get("source")
+        if case not in OPC_SOURCE_OVERLAY_MULTI_PART_CASES:
+            if isinstance(source, dict) and source.get("opc_source_overlay") is not None:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.opc_source_overlay is only valid for multi-Part cases"
+                )
+            continue
+        source_object = _require_object(source, f"{label}.{case}.source")
+        overlay = _require_object(
+            source_object.get("opc_source_overlay"),
+            f"{label}.{case}.source.opc_source_overlay",
+        )
+        sink_object = _require_object(
+            row.get("sink"), f"{label}.{case}.sink"
+        )
+        for field in _OPC_SOURCE_OVERLAY_SOURCE_VECTOR_FIELDS:
+            raw = source_object.get(field)
+            if not isinstance(raw, list) or len(raw) != samples_per_case:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.{field} must contain exactly {samples_per_case} samples"
+                )
+            for index, item in enumerate(raw):
+                _u64(item, f"{label}.{case}.source.{field}[{index}]")
+        elapsed_object = _require_object(
+            row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns"
+        )
+        _validate_opc_source_overlay(
+            overlay,
+            f"{label}.{case}.source.opc_source_overlay",
+            case=case,
+            corpus=json.loads(corpus_identity),
+            samples_per_case=samples_per_case,
+            elapsed_samples=elapsed_object["samples"],
+            sample_order=elapsed_object.get("sample_order"),
+            source=source_object,
+            sink=sink_object,
+            output_sha256=row.get("output_sha256"),
+        )
+
+
 def _validate_configuration_rows(
     configuration: dict[str, Any],
     indexed: Mapping[tuple[str, str], dict[str, Any]],
@@ -2583,6 +3317,28 @@ def _validate_configuration_rows(
         raise AbbaSummaryInputError(
             f"{label}.configuration.cases does not match result cases"
         )
+    multi_part_pairs: dict[str, list[tuple[str, int]]] = {}
+    for case, corpus_identity in indexed:
+        if case not in OPC_SOURCE_OVERLAY_MULTI_PART_CASES:
+            continue
+        corpus = json.loads(corpus_identity)
+        identity = _opc_source_overlay_multi_part_identity(corpus)
+        if identity is None:
+            raise AbbaSummaryInputError(
+                f"{label}.{case} corpus does not match the pinned multi-Part OPC identity"
+            )
+        multi_part_pairs.setdefault(case, []).append(identity)
+    expected_multi_part_pairs = {
+        (shape, count)
+        for shape in OPC_SOURCE_OVERLAY_MULTI_PART_CORPUS_IDENTITIES
+        for count in OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS
+    }
+    for case in OPC_SOURCE_OVERLAY_MULTI_PART_CASES.intersection(cases):
+        actual_pairs = multi_part_pairs.get(case, [])
+        if len(actual_pairs) != len(expected_multi_part_pairs) or set(actual_pairs) != expected_multi_part_pairs:
+            raise AbbaSummaryInputError(
+                f"{label}.{case} must cover the complete multi-Part OPC 3-shape x 3-count matrix"
+            )
     declared_shapes = {
         shape
         for field, values in configuration.items()
@@ -2606,8 +3362,11 @@ def _validate_configuration_rows(
         filesystem_shape_set
     )
     fixed_case_exception = all(
-        (expected := FIXED_CASE_CORPUS_IDENTITIES.get(case)) is not None
-        and all(corpus.get(field) == value for field, value in expected.items())
+        (
+            (expected := FIXED_CASE_CORPUS_IDENTITIES.get(case)) is not None
+            and all(corpus.get(field) == value for field, value in expected.items())
+        )
+        or _opc_source_overlay_multi_part_identity(corpus) is not None
         for case, corpus in undeclared_rows
     )
     if undeclared_rows and not filesystem_exception and not fixed_case_exception:
@@ -3735,6 +4494,14 @@ def _source_identity_projection(value: Any) -> Any:
                 for item in operation_evidence
             ]
         projected["xls_numeric"] = projected_xls
+    opc_source_overlay = projected.get("opc_source_overlay")
+    if isinstance(opc_source_overlay, dict):
+        projected_overlay = dict(opc_source_overlay)
+        for field in _OPC_SOURCE_OVERLAY_DYNAMIC_FIELDS:
+            projected_overlay.pop(field, None)
+        projected["opc_source_overlay"] = projected_overlay
+        for field in _OPC_SOURCE_OVERLAY_SOURCE_VECTOR_FIELDS:
+            projected.pop(field, None)
     return projected
 
 

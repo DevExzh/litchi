@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## Current count and gap (change 0272)
+
+The three opt-in source-overlay multi-part selectors add 27 benchmark records
+across changed, equal-payload no-op, and mixed paths. The selectable matrix is
+now **392 names** while the default remains **36 cases / 198 records**.
+`performance_claim: none`: the dirty five-sample profile is only a
+prioritization observation. The open gap is clean retained evidence and
+explicit-context/scaling evidence before considering recompression, parallel,
+or compression-policy changes.
+
 ## Latest evidence boundary and allocator probe (changes 0270-0271)
 
 [Change 0270](changes/0270-opc-relationship-open-timing.md) corrects the OPC

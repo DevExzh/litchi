@@ -9,8 +9,8 @@
 pub mod allocation_metrics;
 mod cold_verified;
 mod corpus_manifest;
-mod docx_story_hyperlinks;
 mod docx_story_hyperlink_publication;
+mod docx_story_hyperlinks;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
@@ -88,6 +88,8 @@ const OPC_CACHE_COHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const CONTENT_TYPE: &str = "application/octet-stream";
 const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const OPC_RELATIONSHIP_CORPUS_GENERATOR: &str = "litchi-opc-relationship-heavy-v1";
+const OPC_SOURCE_OVERLAY_MULTI_CORPUS_GENERATOR: &str = "litchi-opc-source-overlay-multi-part-v1";
+const OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS: [usize; 3] = [2, 8, 32];
 const OPC_RELATIONSHIP_PART_COUNT: usize = 256;
 const OPC_RELATIONSHIP_PART_BYTES: usize = 96;
 const OPC_RELATIONSHIP_TYPE: &str = "https://litchi.dev/performance/relationship-heavy";
@@ -276,6 +278,47 @@ impl CorpusShape {
             Self::ManySmall => 1024,
             Self::FewLarge => 4 * 1024 * 1024,
             Self::WideRoot => 64,
+        }
+    }
+}
+
+/// Fixed source-overlay corpus shapes.  This separate opt-in family keeps the
+/// historical substrate matrix unchanged while ensuring every selected
+/// overlay count (2, 8, and 32) fits in every corpus.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpcOverlayShape {
+    Small,
+    Large,
+    Media,
+}
+
+impl OpcOverlayShape {
+    const ALL: [Self; 3] = [Self::Small, Self::Large, Self::Media];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Small => "overlay-small",
+            Self::Large => "overlay-large",
+            Self::Media => "overlay-media-incompressible",
+        }
+    }
+
+    const fn entry_count(self) -> usize {
+        32
+    }
+
+    const fn entry_bytes(self) -> usize {
+        match self {
+            Self::Small => 1024,
+            Self::Large => 64 * 1024,
+            Self::Media => 256 * 1024,
+        }
+    }
+
+    const fn payload_kind(self) -> PayloadKind {
+        match self {
+            Self::Small => PayloadKind::Compressible,
+            Self::Large | Self::Media => PayloadKind::Incompressible,
         }
     }
 }
@@ -845,6 +888,31 @@ impl PayloadKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpcOverlayMode {
+    Changed,
+    Noop,
+    Mixed,
+}
+
+impl OpcOverlayMode {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Changed => "changed",
+            Self::Noop => "noop",
+            Self::Mixed => "mixed",
+        }
+    }
+
+    const fn case(self) -> Case {
+        match self {
+            Self::Changed => Case::OpcSourceOverlayMultiPartChanged,
+            Self::Noop => Case::OpcSourceOverlayMultiPartNoop,
+            Self::Mixed => Case::OpcSourceOverlayMultiPartMixed,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Case {
     ZipIndex,
     ZipReadOne,
@@ -861,6 +929,9 @@ enum Case {
     OpcSourceCacheControlContention,
     OpcSourceCacheManagedContention,
     OpcSourceOverlayOnePartSave,
+    OpcSourceOverlayMultiPartChanged,
+    OpcSourceOverlayMultiPartNoop,
+    OpcSourceOverlayMultiPartMixed,
     OpcFileEagerOpen,
     OpcFileSourceOpen,
     OpcFileEagerOnePartAtomicSave,
@@ -1294,6 +1365,9 @@ impl Case {
             Self::OpcSourceCacheControlContention => "opc_source_cache_control_contention",
             Self::OpcSourceCacheManagedContention => "opc_source_cache_managed_contention",
             Self::OpcSourceOverlayOnePartSave => "opc_source_overlay_one_part_save",
+            Self::OpcSourceOverlayMultiPartChanged => "opc_source_overlay_multi_part_changed",
+            Self::OpcSourceOverlayMultiPartNoop => "opc_source_overlay_multi_part_noop",
+            Self::OpcSourceOverlayMultiPartMixed => "opc_source_overlay_multi_part_mixed",
             Self::OpcFileEagerOpen => "opc_file_eager_open",
             Self::OpcFileSourceOpen => "opc_file_source_open",
             Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
@@ -2524,7 +2598,29 @@ impl Case {
     }
 
     const fn is_opc_source_overlay_save(self) -> bool {
+        self.is_opc_source_overlay_one_part_save() || self.is_opc_source_overlay_multi_part_save()
+    }
+
+    const fn is_opc_source_overlay_one_part_save(self) -> bool {
         matches!(self, Self::OpcSourceOverlayOnePartSave)
+    }
+
+    const fn is_opc_source_overlay_multi_part_save(self) -> bool {
+        matches!(
+            self,
+            Self::OpcSourceOverlayMultiPartChanged
+                | Self::OpcSourceOverlayMultiPartNoop
+                | Self::OpcSourceOverlayMultiPartMixed
+        )
+    }
+
+    const fn opc_source_overlay_mode(self) -> Option<OpcOverlayMode> {
+        match self {
+            Self::OpcSourceOverlayMultiPartChanged => Some(OpcOverlayMode::Changed),
+            Self::OpcSourceOverlayMultiPartNoop => Some(OpcOverlayMode::Noop),
+            Self::OpcSourceOverlayMultiPartMixed => Some(OpcOverlayMode::Mixed),
+            _ => None,
+        }
     }
 
     const fn is_filesystem(self) -> bool {
@@ -3539,6 +3635,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_relationships: Option<OpcRelationshipSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    opc_source_overlay: Option<OpcSourceOverlaySummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
@@ -3668,6 +3766,53 @@ struct OpcRelationshipIdentity {
     all_members_deflated_verified: bool,
     source_bytes: usize,
     source_sha256: String,
+}
+
+/// Phase and post-timing evidence for one deterministic multi-Part source
+/// overlay.  The generic `SourceSummary` fields hold source reads and
+/// materialization counts; this nested record keeps the overlay matrix and
+/// phase boundaries explicit without changing schema-v1 top-level fields.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct OpcSourceOverlaySummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    overlay_mode: &'static str,
+    replacement_semantics: &'static str,
+    overlay_count: usize,
+    source_shape: &'static str,
+    payload_kind: &'static str,
+    source_bytes: u64,
+    source_sha256: String,
+    expected_eager_sha256: String,
+    source_cache_max_bytes: u64,
+    source_cache_max_entries: usize,
+    sink_max_bytes: u64,
+    sink_max_write: u64,
+    preparation_ns: Vec<u64>,
+    open_ns: Vec<u64>,
+    planning_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    cache_before_publication_hits: Vec<u64>,
+    cache_before_publication_cold_loads: Vec<u64>,
+    cache_before_publication_retained_entries: Vec<usize>,
+    cache_before_publication_retained_bytes: Vec<usize>,
+    source_cache_after_publication_probe_hits: Vec<u64>,
+    source_cache_after_publication_probe_cold_loads: Vec<u64>,
+    source_cache_after_publication_probe_retained_entries: Vec<usize>,
+    source_cache_after_publication_probe_retained_bytes: Vec<usize>,
+    reopened_output_cache_hits: Vec<u64>,
+    reopened_output_cache_cold_loads: Vec<u64>,
+    reopened_output_cache_retained_entries: Vec<usize>,
+    reopened_output_cache_retained_bytes: Vec<usize>,
+    observed_after_publication_source_read_calls: Vec<u64>,
+    observed_after_publication_source_read_bytes: Vec<u64>,
+    observed_after_publication_ordinary_payload_read_calls: Vec<u64>,
+    observed_after_publication_ordinary_payload_read_bytes: Vec<u64>,
+    expected_eager_semantic_verified: bool,
+    raw_members_and_order_preservation_verified: bool,
+    equal_payload_noop_source_verified: bool,
+    observed_output_sha256: Vec<String>,
 }
 
 /// Actual member-count evidence retained by the ZIP index selector.  The
@@ -7247,6 +7392,24 @@ fn section_inventory_summary(snapshot: &litchi_docx::section::Snapshot) -> Secti
     }
 }
 
+fn validate_opc_source_overlay_multi_part_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+) -> Result<(), Box<dyn Error>> {
+    if cases
+        .iter()
+        .any(|case| case.is_opc_source_overlay_multi_part_save())
+        && (shapes != CorpusShape::ALL.as_slice() || payloads != PayloadKind::ALL.as_slice())
+    {
+        return Err(
+            "multi-Part OPC source overlay selectors use a fixed small/large/media matrix; omit --shape and --payload"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 pub fn run() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -7264,6 +7427,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
+    validate_opc_source_overlay_multi_part_options(
+        &options.cases,
+        &options.shapes,
+        &options.payloads,
+    )?;
     let mut results = Vec::new();
     let filesystem_runs = filesystem::run_selected(
         &options.cases,
@@ -7574,7 +7742,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
-        .any(|case| case.is_opc_source_overlay_save())
+        .any(|case| case.is_opc_source_overlay_one_part_save())
     {
         let corpus = build_opc_corpus(CorpusShape::FewLarge, PayloadKind::Incompressible)?;
         results.push(run_opc_source_overlay_one_part_save(
@@ -7582,6 +7750,36 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             options.warmup_iterations,
             options.samples,
         )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_source_overlay_multi_part_save())
+    {
+        let selected = options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_opc_source_overlay_multi_part_save())
+            .collect::<Vec<_>>();
+        for shape in OpcOverlayShape::ALL {
+            let corpus = build_opc_overlay_corpus(shape)?;
+            for case in &selected {
+                let mode = case
+                    .opc_source_overlay_mode()
+                    .ok_or("invalid multi-Part OPC source overlay selector")?;
+                for &overlay_count in &OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS {
+                    results.push(run_opc_source_overlay_multi_part(
+                        mode,
+                        &corpus,
+                        overlay_count,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?);
+                }
+            }
+        }
     }
 
     if options
@@ -7953,7 +8151,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if options.cases.iter().any(|case| case.is_pptx_slide_boundary()) {
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_pptx_slide_boundary())
+    {
         let corpus = pptx_slide_boundaries::build_corpus()?;
         for case in options
             .cases
@@ -9287,6 +9489,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_cache_control_contention" => Some(Case::OpcSourceCacheControlContention),
         "opc_source_cache_managed_contention" => Some(Case::OpcSourceCacheManagedContention),
         "opc_source_overlay_one_part_save" => Some(Case::OpcSourceOverlayOnePartSave),
+        "opc_source_overlay_multi_part_changed" => Some(Case::OpcSourceOverlayMultiPartChanged),
+        "opc_source_overlay_multi_part_noop" => Some(Case::OpcSourceOverlayMultiPartNoop),
+        "opc_source_overlay_multi_part_mixed" => Some(Case::OpcSourceOverlayMultiPartMixed),
         "opc_file_eager_open" => Some(Case::OpcFileEagerOpen),
         "opc_file_source_open" => Some(Case::OpcFileSourceOpen),
         "opc_file_eager_one_part_atomic_save" => Some(Case::OpcFileEagerOnePartAtomicSave),
@@ -9894,6 +10099,9 @@ fn usage_text() -> String {
                                        opc_source_cache_control_contention,\n\
                                        opc_source_cache_managed_contention,\n\
                                        opc_source_overlay_one_part_save,\n\
+                                       opc_source_overlay_multi_part_changed,\n\
+                                       opc_source_overlay_multi_part_noop,\n\
+                                       opc_source_overlay_multi_part_mixed,\n\
                                        opc_file_eager_open,opc_file_source_open,\n\
                                        opc_file_eager_one_part_atomic_save,\n\
                                        opc_file_source_one_part_atomic_save,\n\
@@ -10422,6 +10630,70 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
         xlsx: None,
     };
     Ok(OpcRelationshipCorpus { corpus, identity })
+}
+
+fn build_opc_overlay_corpus(shape: OpcOverlayShape) -> Result<Corpus, Box<dyn Error>> {
+    let entry_count = shape.entry_count();
+    let entry_bytes = shape.entry_bytes();
+    let target_index = entry_count / 2;
+    let target_name = entry_name(target_index);
+    let payload_kind = shape.payload_kind();
+    let mut package = OpcPackage::new();
+    let mut target_payload = None;
+
+    for index in 0..entry_count {
+        let name = entry_name(index);
+        let payload = payload_bytes(payload_kind, index, entry_bytes);
+        if index == target_index {
+            target_payload = Some(payload.clone());
+        }
+        package.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/{name}"))?,
+            CONTENT_TYPE.to_owned(),
+            payload,
+        )))?;
+    }
+    package.rels_mut().try_add_relationship(
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        target_name.clone(),
+        "rIdBenchmarkMain".to_owned(),
+        TargetMode::Internal,
+    )?;
+
+    let archive = PackageWriter::to_bytes(&package)?;
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let target_payload = target_payload.ok_or("multi-Part OPC corpus has no target entry")?;
+    let entry_count_u64 = u64::try_from(entry_count)?;
+    let entry_bytes_u64 = u64::try_from(entry_bytes)?;
+    let uncompressed_payload_bytes = entry_count_u64
+        .checked_mul(entry_bytes_u64)
+        .ok_or("multi-Part OPC payload byte count overflow")?;
+
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("{}-{}", shape.name(), payload_kind.name()),
+            generator: OPC_SOURCE_OVERLAY_MULTI_CORPUS_GENERATOR,
+            package_format: "OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: payload_kind.name(),
+            compression: "deflate",
+            entry_count,
+            archive_member_count,
+            entry_bytes,
+            uncompressed_payload_bytes: usize::try_from(uncompressed_payload_bytes)?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: target_name.clone(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name,
+        target_payload,
+        xlsx: None,
+    })
 }
 
 fn build_cfb_corpus(
@@ -16905,7 +17177,9 @@ fn verify_xlsx_vendor_extension_package(
         }
         if bin_part.is_some()
             || has_vendor_target(package.rels())
-            || package.iter_parts().any(|part| has_vendor_target(part.rels()))
+            || package
+                .iter_parts()
+                .any(|part| has_vendor_target(part.rels()))
         {
             return Err("XLSX non-vendor corpus contains stray vendor-extension topology".into());
         }
@@ -16915,8 +17189,7 @@ fn verify_xlsx_vendor_extension_package(
         return Err("XLSX non-vendor corpus unexpectedly contains vendor-extension XML".into());
     }
     let xml_part = xml_part.expect("XLSX vendor-extension XML part was checked above");
-    let bin_part = bin_part
-        .ok_or("XLSX vendor-extension binary part is missing")?;
+    let bin_part = bin_part.ok_or("XLSX vendor-extension binary part is missing")?;
     if xml_part.content_type() != XLSX_VENDOR_EXTENSION_XML_CONTENT_TYPE
         || xml_part.blob() != XLSX_VENDOR_EXTENSION_XML
     {
@@ -17156,12 +17429,12 @@ fn run_xlsx_cell_value_lifecycle_gates(
         let restored_workbook = Workbook::from_bytes(restored_bytes)?;
         verify_xlsx_cells(&restored_workbook, spec, &[])?;
     }
-    let partial_sink_verified = if corpus.manifest.shape == XlsxCellCrudShape::VendorExtension.name()
+    let partial_sink_verified = if corpus.manifest.shape
+        == XlsxCellCrudShape::VendorExtension.name()
     {
-        let partial_editor =
-            litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
-                OwnedSource::new(corpus.archive.clone()),
-            ))?;
+        let partial_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+            OwnedSource::new(corpus.archive.clone()),
+        ))?;
         let mut partial_edit =
             partial_editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
         partial_edit.set(
@@ -17191,8 +17464,7 @@ fn run_xlsx_cell_value_lifecycle_gates(
         );
         if !partial_sink_verified {
             return Err(
-                "XLSX vendor-extension partial sink did not report typed incomplete output"
-                    .into(),
+                "XLSX vendor-extension partial sink did not report typed incomplete output".into(),
             );
         }
         Some(true)
@@ -18071,6 +18343,11 @@ fn run_case_with_config(
         },
         Case::OpcSourceOverlayOnePartSave => {
             run_opc_source_overlay_one_part_save(corpus, warmup_iterations, samples)
+        },
+        Case::OpcSourceOverlayMultiPartChanged
+        | Case::OpcSourceOverlayMultiPartNoop
+        | Case::OpcSourceOverlayMultiPartMixed => {
+            Err("multi-Part OPC source overlay uses its fixed matrix runner".into())
         },
         Case::OpcFileEagerOpen
         | Case::OpcFileSourceOpen
@@ -37978,6 +38255,539 @@ fn run_opc_source_overlay_one_part_save(
     })
 }
 
+#[derive(Clone, Debug)]
+struct OpcOverlayReplacement {
+    partname: PackURI,
+    member_name: String,
+    payload: Vec<u8>,
+    changed: bool,
+}
+
+fn multi_overlay_payload_kind(corpus: &Corpus) -> Result<PayloadKind, Box<dyn Error>> {
+    match corpus.manifest.payload_kind {
+        "compressible" => Ok(PayloadKind::Compressible),
+        "incompressible" => Ok(PayloadKind::Incompressible),
+        _ => Err("multi-Part OPC corpus has an unsupported payload kind".into()),
+    }
+}
+
+fn build_opc_multi_overlay_replacements(
+    corpus: &Corpus,
+    mode: OpcOverlayMode,
+    overlay_count: usize,
+) -> Result<Vec<OpcOverlayReplacement>, Box<dyn Error>> {
+    if !OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS.contains(&overlay_count)
+        || overlay_count > corpus.manifest.entry_count
+    {
+        return Err("multi-Part OPC overlay count is outside the fixed matrix".into());
+    }
+    let payload_kind = multi_overlay_payload_kind(corpus)?;
+    let mut replacements = Vec::with_capacity(overlay_count);
+    for index in 0..overlay_count {
+        let member_name = entry_name(index);
+        let changed = match mode {
+            OpcOverlayMode::Changed => true,
+            OpcOverlayMode::Noop => false,
+            OpcOverlayMode::Mixed => index % 2 == 0,
+        };
+        let mut payload = payload_bytes(payload_kind, index, corpus.manifest.entry_bytes);
+        if changed {
+            let first = payload
+                .first_mut()
+                .ok_or("multi-Part OPC overlay replacement target is empty")?;
+            *first ^= 0xff;
+        }
+        replacements.push(OpcOverlayReplacement {
+            partname: PackURI::new(format!("/{member_name}"))?,
+            member_name,
+            payload,
+            changed,
+        });
+    }
+    Ok(replacements)
+}
+
+fn expected_opc_multi_overlay_output(
+    corpus: &Corpus,
+    replacements: &[OpcOverlayReplacement],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    if !replacements.iter().any(|replacement| replacement.changed) {
+        return Ok(corpus.archive.clone());
+    }
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    for replacement in replacements {
+        package
+            .get_part_mut(&replacement.partname)?
+            .set_blob(replacement.payload.clone());
+    }
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn verify_opc_multi_overlay_semantics(
+    expected: &[u8],
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let expected_package = OpcPackage::from_bytes(expected)?;
+    let output_package = OpcPackage::from_bytes(output)?;
+    if output_package.part_count() != expected_package.part_count() {
+        return Err("multi-Part OPC overlay output part count differs from eager artifact".into());
+    }
+    if relationship_signatures(expected_package.rels())
+        != relationship_signatures(output_package.rels())
+    {
+        return Err(
+            "multi-Part OPC overlay package relationships differ from eager artifact".into(),
+        );
+    }
+    for index in 0..expected_package.part_count() {
+        let name = entry_name(index);
+        let uri = PackURI::new(format!("/{name}"))?;
+        let expected_part = expected_package.get_part(&uri)?;
+        let output_part = output_package.get_part(&uri)?;
+        if expected_part.content_type() != output_part.content_type()
+            || expected_part.blob() != output_part.blob()
+            || relationship_signatures(expected_part.rels())
+                != relationship_signatures(output_part.rels())
+        {
+            return Err(format!(
+                "multi-Part OPC overlay output Part {name} differs from eager artifact"
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_opc_multi_overlay_changes(
+    corpus: &Corpus,
+    output: &[u8],
+    replacements: &[OpcOverlayReplacement],
+) -> Result<(), Box<dyn Error>> {
+    let source_package = OpcPackage::from_bytes(&corpus.archive)?;
+    let output_package = OpcPackage::from_bytes(output)?;
+    let mut changed_count = 0usize;
+    for replacement in replacements {
+        let source_payload = source_package.get_part(&replacement.partname)?.blob();
+        let output_payload = output_package.get_part(&replacement.partname)?.blob();
+        if replacement.changed {
+            changed_count = changed_count
+                .checked_add(1)
+                .ok_or("multi-Part OPC changed replacement count overflows")?;
+            if source_payload == output_payload {
+                return Err(format!(
+                    "multi-Part OPC changed replacement {} equals its source payload",
+                    replacement.member_name
+                )
+                .into());
+            }
+        } else if source_payload != output_payload {
+            return Err(format!(
+                "multi-Part OPC equal-payload replacement {} changed its source payload",
+                replacement.member_name
+            )
+            .into());
+        }
+    }
+    if changed_count > 0 && output == corpus.archive {
+        return Err("multi-Part OPC changed replacements produced the source artifact".into());
+    }
+    Ok(())
+}
+
+fn verify_opc_multi_overlay_preservation(
+    corpus: &Corpus,
+    output: &[u8],
+    replacements: &[OpcOverlayReplacement],
+) -> Result<(), Box<dyn Error>> {
+    let source_members = raw_zip_members(&corpus.archive)?;
+    let output_members = raw_zip_members(output)?;
+    let source_layout = raw_zip_layout(&corpus.archive)?;
+    let output_layout = raw_zip_layout(output)?;
+    if source_members.keys().ne(output_members.keys()) {
+        return Err("multi-Part OPC overlay changed the physical member set".into());
+    }
+    if source_layout.0 != output_layout.0
+        || source_layout.1 != output_layout.1
+        || source_layout.2 != output_layout.2
+    {
+        return Err(
+            "multi-Part OPC overlay changed untouched raw member records, member order, or archive comment"
+                .into(),
+        );
+    }
+    let changed_names = replacements
+        .iter()
+        .filter(|replacement| replacement.changed)
+        .map(|replacement| replacement.member_name.as_str())
+        .collect::<BTreeSet<_>>();
+    for (name, source_member) in source_members {
+        if !changed_names.contains(name.as_str())
+            && output_members.get(&name) != Some(&source_member)
+        {
+            return Err(format!(
+                "multi-Part OPC overlay changed an untouched raw member record: {name}"
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn opc_overlay_replacement_semantics(mode: OpcOverlayMode) -> &'static str {
+    match mode {
+        OpcOverlayMode::Changed => "non-empty changed-payload replacement plan",
+        OpcOverlayMode::Noop => "non-empty equal-payload replacement plan; semantic no-op",
+        OpcOverlayMode::Mixed => "non-empty mixed changed/equal-payload replacement plan",
+    }
+}
+
+fn run_opc_source_overlay_multi_part(
+    mode: OpcOverlayMode,
+    corpus: &Corpus,
+    overlay_count: usize,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.entry_count != OpcOverlayShape::Small.entry_count()
+        || !OpcOverlayShape::ALL
+            .iter()
+            .any(|shape| shape.name() == corpus.manifest.shape)
+    {
+        return Err("multi-Part OPC overlay runner received an unexpected corpus".into());
+    }
+    let replacements = build_opc_multi_overlay_replacements(corpus, mode, overlay_count)?;
+    let expected = expected_opc_multi_overlay_output(corpus, &replacements)?;
+    verify_opc_multi_overlay_semantics(&expected, &expected)?;
+    let expected_eager_sha256 = sha256_hex(&expected);
+    let maximum = u64::try_from(expected.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("multi-Part OPC overlay sequential output ceiling overflows u64")?;
+    let max_write = 64 * 1024_u64;
+    let cache_limits = opc_source_cache_limits(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut measured_digests = Vec::with_capacity(samples);
+    let mut overlay_summary = OpcSourceOverlaySummary {
+        implementation: "SourceBackedPackage::write_part_overlays_to_stream",
+        timing_scope: "elapsed_ns is explicitly the sum of preparation_ns, open_ns, planning_ns, and publication_ns; structural setup belongs to those named phases, while interstitial checks and eager artifact, reopen/digest/preservation, source/cache evidence, configured cache/sink ceilings, and semantic oracles are excluded from the aggregate",
+        performance_claim: "none",
+        overlay_mode: mode.name(),
+        replacement_semantics: opc_overlay_replacement_semantics(mode),
+        overlay_count,
+        source_shape: corpus.manifest.shape,
+        payload_kind: corpus.manifest.payload_kind,
+        source_bytes: u64::try_from(corpus.archive.len())?,
+        source_sha256: corpus.manifest.archive_sha256.clone(),
+        expected_eager_sha256,
+        source_cache_max_bytes: u64::try_from(cache_limits.max_bytes())?,
+        source_cache_max_entries: cache_limits.max_entries(),
+        sink_max_bytes: maximum,
+        sink_max_write: max_write,
+        preparation_ns: Vec::with_capacity(samples),
+        open_ns: Vec::with_capacity(samples),
+        planning_ns: Vec::with_capacity(samples),
+        publication_ns: Vec::with_capacity(samples),
+        cache_before_publication_hits: Vec::with_capacity(samples),
+        cache_before_publication_cold_loads: Vec::with_capacity(samples),
+        cache_before_publication_retained_entries: Vec::with_capacity(samples),
+        cache_before_publication_retained_bytes: Vec::with_capacity(samples),
+        source_cache_after_publication_probe_hits: Vec::with_capacity(samples),
+        source_cache_after_publication_probe_cold_loads: Vec::with_capacity(samples),
+        source_cache_after_publication_probe_retained_entries: Vec::with_capacity(samples),
+        source_cache_after_publication_probe_retained_bytes: Vec::with_capacity(samples),
+        reopened_output_cache_hits: Vec::with_capacity(samples),
+        reopened_output_cache_cold_loads: Vec::with_capacity(samples),
+        reopened_output_cache_retained_entries: Vec::with_capacity(samples),
+        reopened_output_cache_retained_bytes: Vec::with_capacity(samples),
+        observed_after_publication_source_read_calls: Vec::with_capacity(samples),
+        observed_after_publication_source_read_bytes: Vec::with_capacity(samples),
+        observed_after_publication_ordinary_payload_read_calls: Vec::with_capacity(samples),
+        observed_after_publication_ordinary_payload_read_bytes: Vec::with_capacity(samples),
+        expected_eager_semantic_verified: true,
+        raw_members_and_order_preservation_verified: true,
+        equal_payload_noop_source_verified: !replacements
+            .iter()
+            .any(|replacement| replacement.changed),
+        observed_output_sha256: Vec::with_capacity(samples),
+    };
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let preparation_started = Instant::now();
+        let (source, _target_range) = opc_instrumented_source(corpus)?;
+        let mut sink = CountingSink::bounded(maximum, max_write);
+        sink.reserve_budget()?;
+        let preparation_duration = preparation_started.elapsed();
+
+        let open_started = Instant::now();
+        let source_package =
+            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        if source_package.iter_parts().count() != corpus.manifest.entry_count {
+            return Err("multi-Part OPC source open part count differs from corpus".into());
+        }
+        let open_duration = open_started.elapsed();
+
+        let planning_started = Instant::now();
+        let planned_replacements = replacements
+            .iter()
+            .map(|replacement| (replacement.partname.clone(), replacement.payload.clone()))
+            .collect::<Vec<_>>();
+        let cache_before_publication = source_package.cache_diagnostics();
+        let planning_duration = planning_started.elapsed();
+
+        let publication_started = Instant::now();
+        source_package.write_part_overlays_to_stream(&mut sink, planned_replacements)?;
+        let publication_duration = publication_started.elapsed();
+        let total_duration = preparation_duration
+            .saturating_add(open_duration)
+            .saturating_add(planning_duration)
+            .saturating_add(publication_duration);
+        let preparation_ns = elapsed_ns(preparation_duration)?;
+        let open_ns = elapsed_ns(open_duration)?;
+        let planning_ns = elapsed_ns(planning_duration)?;
+        let publication_ns = elapsed_ns(publication_duration)?;
+        let phase_total_ns = preparation_ns
+            .checked_add(open_ns)
+            .and_then(|value| value.checked_add(planning_ns))
+            .and_then(|value| value.checked_add(publication_ns))
+            .ok_or("multi-Part OPC overlay phase sum overflows u64")?;
+        if phase_total_ns != elapsed_ns(total_duration)? {
+            return Err(
+                "multi-Part OPC overlay elapsed_ns does not equal its named phase sum".into(),
+            );
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, total_duration)?;
+
+        let metrics = source.snapshot();
+        if metrics.read_calls == 0
+            || metrics.read_bytes == 0
+            || metrics.ordinary_payload_read_calls
+                < u64::try_from(overlay_count).unwrap_or(u64::MAX)
+            || metrics.ordinary_payload_read_bytes == 0
+        {
+            return Err("multi-Part OPC overlay performed insufficient source reads".into());
+        }
+        if cache_before_publication.retained_entries != 0
+            || cache_before_publication.retained_bytes != 0
+        {
+            return Err("multi-Part OPC source open materialized ordinary payloads".into());
+        }
+        if sink.bytes.len() as u64 > maximum {
+            return Err("multi-Part OPC overlay exceeded its configured sink ceiling".into());
+        }
+        verify_opc_multi_overlay_semantics(&expected, &sink.bytes)?;
+        verify_opc_multi_overlay_changes(corpus, &sink.bytes, &replacements)?;
+        verify_opc_multi_overlay_preservation(corpus, &sink.bytes, &replacements)?;
+        let source_cache_probe =
+            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        for replacement in &replacements {
+            let data = source_cache_probe.part(&replacement.partname)?.data()?;
+            std::hint::black_box(data.as_bytes());
+        }
+        let source_cache_after_publication_probe = source_cache_probe.cache_diagnostics();
+        let expected_probe_bytes = overlay_count
+            .checked_mul(corpus.manifest.entry_bytes)
+            .ok_or("multi-Part OPC source cache probe byte count overflows usize")?;
+        if source_cache_after_publication_probe.cold_loads != u64::try_from(overlay_count)?
+            || source_cache_after_publication_probe.retained_entries != overlay_count
+            || source_cache_after_publication_probe.retained_bytes != expected_probe_bytes
+        {
+            return Err(
+                "multi-Part OPC source cache replay did not retain exactly one cold-loaded selected Part per replacement"
+                    .into(),
+            );
+        }
+        let reopened_output_source: Arc<dyn ReadAt> =
+            Arc::new(OwnedSource::new(sink.bytes.clone()));
+        let reopened_output_package = SourceBackedPackage::from_read_at_with_cache_limits(
+            reopened_output_source,
+            cache_limits,
+        )?;
+        let reopened_output_cache = reopened_output_package.cache_diagnostics();
+        if reopened_output_cache.hits != 0
+            || reopened_output_cache.cold_loads != 0
+            || reopened_output_cache.retained_entries != 0
+            || reopened_output_cache.retained_bytes != 0
+        {
+            return Err(
+                "multi-Part OPC reopened output was not lazy and retained ordinary payloads".into(),
+            );
+        }
+        let digest = sha256_hex(&sink.bytes);
+        if digest.is_empty() {
+            return Err("multi-Part OPC overlay produced an empty digest".into());
+        }
+        if iteration >= warmup_iterations {
+            source_summary.record(metrics);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest.clone());
+            overlay_summary.preparation_ns.push(preparation_ns);
+            overlay_summary.open_ns.push(open_ns);
+            overlay_summary.planning_ns.push(planning_ns);
+            overlay_summary.publication_ns.push(publication_ns);
+            overlay_summary
+                .cache_before_publication_hits
+                .push(cache_before_publication.hits);
+            overlay_summary
+                .cache_before_publication_cold_loads
+                .push(cache_before_publication.cold_loads);
+            overlay_summary
+                .cache_before_publication_retained_entries
+                .push(cache_before_publication.retained_entries);
+            overlay_summary
+                .cache_before_publication_retained_bytes
+                .push(cache_before_publication.retained_bytes);
+            overlay_summary
+                .reopened_output_cache_hits
+                .push(reopened_output_cache.hits);
+            overlay_summary
+                .reopened_output_cache_cold_loads
+                .push(reopened_output_cache.cold_loads);
+            overlay_summary
+                .reopened_output_cache_retained_entries
+                .push(reopened_output_cache.retained_entries);
+            overlay_summary
+                .reopened_output_cache_retained_bytes
+                .push(reopened_output_cache.retained_bytes);
+            overlay_summary
+                .observed_after_publication_source_read_calls
+                .push(metrics.read_calls);
+            overlay_summary
+                .observed_after_publication_source_read_bytes
+                .push(metrics.read_bytes);
+            overlay_summary
+                .observed_after_publication_ordinary_payload_read_calls
+                .push(metrics.ordinary_payload_read_calls);
+            overlay_summary
+                .observed_after_publication_ordinary_payload_read_bytes
+                .push(metrics.ordinary_payload_read_bytes);
+            overlay_summary
+                .source_cache_after_publication_probe_hits
+                .push(source_cache_after_publication_probe.hits);
+            overlay_summary
+                .source_cache_after_publication_probe_cold_loads
+                .push(source_cache_after_publication_probe.cold_loads);
+            overlay_summary
+                .source_cache_after_publication_probe_retained_entries
+                .push(source_cache_after_publication_probe.retained_entries);
+            overlay_summary
+                .source_cache_after_publication_probe_retained_bytes
+                .push(source_cache_after_publication_probe.retained_bytes);
+            overlay_summary.observed_output_sha256.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, "multi-Part OPC source overlay")?;
+    let output_sha256 = measured_digests
+        .first()
+        .cloned()
+        .ok_or("multi-Part OPC overlay produced no measured output digest")?;
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &output_sha256)
+    {
+        return Err("multi-Part OPC overlay output digests are not stable".into());
+    }
+    let elapsed_statistics = statistics(elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    reorder_sample_vector(&mut source_summary.read_calls, &sample_order)?;
+    reorder_sample_vector(&mut source_summary.read_bytes, &sample_order)?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
+    reorder_sample_vector(&mut overlay_summary.preparation_ns, &sample_order)?;
+    reorder_sample_vector(&mut overlay_summary.open_ns, &sample_order)?;
+    reorder_sample_vector(&mut overlay_summary.planning_ns, &sample_order)?;
+    reorder_sample_vector(&mut overlay_summary.publication_ns, &sample_order)?;
+    reorder_sample_vector(
+        &mut overlay_summary.cache_before_publication_hits,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.cache_before_publication_cold_loads,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.cache_before_publication_retained_entries,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.cache_before_publication_retained_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.source_cache_after_publication_probe_hits,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.source_cache_after_publication_probe_cold_loads,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.source_cache_after_publication_probe_retained_entries,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.source_cache_after_publication_probe_retained_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.reopened_output_cache_hits,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.reopened_output_cache_cold_loads,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.reopened_output_cache_retained_entries,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.reopened_output_cache_retained_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.observed_after_publication_source_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.observed_after_publication_source_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.observed_after_publication_ordinary_payload_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut overlay_summary.observed_after_publication_ordinary_payload_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(&mut overlay_summary.observed_output_sha256, &sample_order)?;
+    source_summary.opc_source_overlay = Some(overlay_summary);
+    let mut result_corpus = corpus.manifest.clone();
+    result_corpus.name = format!("{}-count-{overlay_count}", result_corpus.name);
+    Ok(CaseResult {
+        case: mode.case().name(),
+        cache_state: None,
+        corpus: result_corpus,
+        elapsed_ns: elapsed_statistics,
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(output_sha256),
+        operation_metrics: None,
+    })
+}
+
 fn relationship_signatures(relationships: &Relationships) -> Vec<(String, String, String, bool)> {
     let mut signatures = relationships
         .iter()
@@ -42563,8 +43373,7 @@ fn run_opc_relationship_open(
     let identity = &corpus.identity;
     let source = OpcRelationshipSummary {
         implementation: "LazyArchiveReader/PackageReader",
-        timing_scope:
-            "OpcPackage::from_bytes only; post-timing part/relationship/payload identity gates excluded",
+        timing_scope: "OpcPackage::from_bytes only; post-timing part/relationship/payload identity gates excluded",
         performance_claim: "none",
         source_bytes: u64::try_from(identity.source_bytes)?,
         source_sha256: identity.source_sha256.clone(),
@@ -45323,6 +46132,27 @@ fn statistics(samples: Vec<u64>) -> Statistics {
     }
 }
 
+fn reorder_sample_vector<T: Clone>(
+    values: &mut Vec<T>,
+    sample_order: &[usize],
+) -> Result<(), Box<dyn Error>> {
+    if values.len() != sample_order.len() {
+        return Err("sample evidence vector length differs from elapsed_ns".into());
+    }
+    let original = std::mem::take(values);
+    let mut reordered = Vec::with_capacity(original.len());
+    for &index in sample_order {
+        reordered.push(
+            original
+                .get(index)
+                .ok_or("sample evidence order contains an invalid index")?
+                .clone(),
+        );
+    }
+    *values = reordered;
+    Ok(())
+}
+
 fn midpoint(left: u64, right: u64) -> u64 {
     left / 2 + right / 2 + (left % 2 + right % 2) / 2
 }
@@ -45641,7 +46471,7 @@ mod tests {
         cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
         parse_case, payload_bytes, pptx_named_slide_name, resolve_execution_workers, run_case,
-        run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated, usage_text,
+        run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
         run_cfb_selective_read, run_cfb_selective_simulated_read,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
         run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
@@ -45655,8 +46485,8 @@ mod tests {
         run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_break_projection,
         run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
-        simulated_request_delay, statistics, updated_writer_text, verify_xlsx_cells, writer_shape,
-        xlsb_cells_digest, xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
+        simulated_request_delay, statistics, updated_writer_text, usage_text, verify_xlsx_cells,
+        writer_shape, xlsb_cells_digest, xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
@@ -46227,7 +47057,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 389);
+        assert_eq!(selectable_count, 392);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -47575,6 +48405,183 @@ mod tests {
         assert!(source.read_calls.windows(2).all(|pair| pair[0] == pair[1]));
         assert!(source.read_bytes.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(source.ordinary_payload_materializations, Some(vec![1, 1]));
+    }
+
+    #[test]
+    fn opc_source_overlay_multi_part_matrix_is_opt_in_and_phase_scoped() {
+        let cases = [
+            (
+                "opc_source_overlay_multi_part_changed",
+                super::OpcOverlayMode::Changed,
+                false,
+            ),
+            (
+                "opc_source_overlay_multi_part_noop",
+                super::OpcOverlayMode::Noop,
+                true,
+            ),
+            (
+                "opc_source_overlay_multi_part_mixed",
+                super::OpcOverlayMode::Mixed,
+                false,
+            ),
+        ];
+        for (name, mode, _) in cases {
+            let parsed = parse_case(name).expect("multi-Part OPC selector parses");
+            assert_eq!(parsed.name(), name);
+            assert!(parsed.is_opc_source_overlay_multi_part_save());
+            assert!(!Case::DEFAULT.contains(&parsed));
+            assert_eq!(parsed, mode.case());
+        }
+        for shape in super::OpcOverlayShape::ALL {
+            let corpus = super::build_opc_overlay_corpus(shape).unwrap();
+            assert_eq!(corpus.manifest.entry_count, 32);
+            for &overlay_count in &super::OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS {
+                for (_, mode, _) in cases {
+                    let replacements =
+                        super::build_opc_multi_overlay_replacements(&corpus, mode, overlay_count)
+                            .unwrap();
+                    assert_eq!(replacements.len(), overlay_count);
+                    let expected_changed = match mode {
+                        super::OpcOverlayMode::Changed => overlay_count,
+                        super::OpcOverlayMode::Noop => 0,
+                        super::OpcOverlayMode::Mixed => overlay_count.div_ceil(2),
+                    };
+                    assert_eq!(
+                        replacements
+                            .iter()
+                            .filter(|replacement| replacement.changed)
+                            .count(),
+                        expected_changed
+                    );
+                    let expected =
+                        super::expected_opc_multi_overlay_output(&corpus, &replacements).unwrap();
+                    if mode == super::OpcOverlayMode::Noop {
+                        assert_eq!(expected, corpus.archive);
+                    } else {
+                        assert_ne!(expected, corpus.archive);
+                    }
+                    let sample_count =
+                        if shape == super::OpcOverlayShape::Small && overlay_count == 2 {
+                            2
+                        } else {
+                            1
+                        };
+                    let measured = super::run_opc_source_overlay_multi_part(
+                        mode,
+                        &corpus,
+                        overlay_count,
+                        0,
+                        sample_count,
+                    )
+                    .unwrap();
+                    let overlay = measured
+                        .source
+                        .as_ref()
+                        .and_then(|source| source.opc_source_overlay.as_ref())
+                        .expect("matrix cell emits overlay evidence");
+                    assert_eq!(overlay.overlay_mode, mode.name());
+                    assert_eq!(overlay.overlay_count, overlay_count);
+                    assert_eq!(overlay.source_shape, shape.name());
+                    assert_eq!(measured.elapsed_ns.samples.len(), sample_count);
+                    assert_eq!(measured.elapsed_ns.sample_order.len(), sample_count);
+                    let mut sample_order = measured.elapsed_ns.sample_order.clone();
+                    sample_order.sort_unstable();
+                    assert_eq!(sample_order, (0..sample_count).collect::<Vec<_>>());
+                    for index in 0..sample_count {
+                        assert_eq!(
+                            measured.elapsed_ns.samples[index],
+                            overlay.preparation_ns[index]
+                                + overlay.open_ns[index]
+                                + overlay.planning_ns[index]
+                                + overlay.publication_ns[index]
+                        );
+                    }
+                    assert_eq!(overlay.preparation_ns.len(), sample_count);
+                    assert_eq!(
+                        overlay.source_cache_after_publication_probe_cold_loads,
+                        vec![overlay_count as u64; sample_count]
+                    );
+                    assert_eq!(
+                        overlay.source_cache_after_publication_probe_retained_entries,
+                        vec![overlay_count; sample_count]
+                    );
+                    assert_eq!(
+                        overlay.source_cache_after_publication_probe_retained_bytes,
+                        vec![overlay_count * corpus.manifest.entry_bytes; sample_count]
+                    );
+                    assert_eq!(
+                        overlay.source_cache_after_publication_probe_hits,
+                        vec![0; sample_count]
+                    );
+                    assert_eq!(overlay.reopened_output_cache_hits, vec![0; sample_count]);
+                    assert_eq!(
+                        overlay.reopened_output_cache_cold_loads,
+                        vec![0; sample_count]
+                    );
+                    assert_eq!(
+                        overlay.reopened_output_cache_retained_entries,
+                        vec![0; sample_count]
+                    );
+                    assert_eq!(
+                        overlay.reopened_output_cache_retained_bytes,
+                        vec![0; sample_count]
+                    );
+                    assert_eq!(
+                        overlay.equal_payload_noop_source_verified,
+                        mode == super::OpcOverlayMode::Noop
+                    );
+                    assert!(
+                        overlay
+                            .observed_after_publication_source_read_calls
+                            .iter()
+                            .all(|&calls| calls > 0)
+                    );
+                    assert!(
+                        overlay
+                            .observed_after_publication_ordinary_payload_read_calls
+                            .iter()
+                            .all(|&calls| calls >= overlay_count as u64)
+                    );
+                    assert!(
+                        overlay
+                            .observed_output_sha256
+                            .iter()
+                            .all(|digest| digest == measured.output_sha256.as_ref().unwrap())
+                    );
+                }
+            }
+        }
+
+        let first = super::build_opc_overlay_corpus(super::OpcOverlayShape::Small).unwrap();
+        let second = super::build_opc_overlay_corpus(super::OpcOverlayShape::Small).unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(
+            first.manifest.archive_sha256,
+            second.manifest.archive_sha256
+        );
+        assert_eq!(first.manifest.entry_count, 32);
+        assert_eq!(first.manifest.entry_bytes, 1024);
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let mut restricted_shapes = CorpusShape::ALL.to_vec();
+        restricted_shapes.pop();
+        assert!(
+            super::validate_opc_source_overlay_multi_part_options(
+                &[Case::OpcSourceOverlayMultiPartChanged],
+                &restricted_shapes,
+                &PayloadKind::ALL,
+            )
+            .is_err()
+        );
+        assert!(
+            super::validate_opc_source_overlay_multi_part_options(
+                &[Case::OpcSourceOverlayMultiPartChanged],
+                &CorpusShape::ALL,
+                &PayloadKind::ALL,
+            )
+            .is_ok()
+        );
     }
 
     #[test]
