@@ -4808,3 +4808,31 @@ user-owned untracked Pages table-lock findings and no Keynote caption finding.
 Wave67 therefore satisfies no crate-exit, host-exit, dependency-removal,
 generated-schema-retirement, monolith-deletion, package-wide-performance, or
 full-workspace-green gate.
+
+## 2026-08-24 amendment: Wave68 Keynote chart-title host-retirement slice (not a monolith-exit gate)
+
+Commit `e62b6fdb1` removes the raw-ID Keynote chart-title method, its
+identifier-to-position wrappers, and the associated host fallback path. The
+19 migrated examples and host tests now call the selector-first semantic
+chart-title owner; the focused `litchi-keynote` Package behavior is unchanged.
+This is a narrow host-retirement step toward the monolith boundary, not a
+claim that the host is replaceable as a whole.
+
+The `litchi-iwa` owner edge, remaining Keynote graph/chart/text/media/soundtrack
+and build operations, ordered debts including debt014, compatibility-host
+tests, generated schemas, Buffa/Prost owners, and the monolith remain. Wave68
+does not remove a manifest edge or crate, retire a generated-schema or normal
+Prost owner, or establish a host/edge/debt/monolith exit gate. No public
+raw-ID API is added and no claim of full-workspace verification or package-wide
+performance is made.
+
+The bounded native evidence is the disposable Keynote 14.4 record from
+`/private/tmp/litchi-wave68-chart-title-native.PGGXxv/rust-chart-title.key`
+(12,796 bytes, SHA-256
+`96a9070e5416fe74fe5e229a86f43733bcb0095c515fd25d5b70dd965d70d42d`) and its
+same-path saved/closed/reopened normalization (156,131 bytes, SHA-256
+`87893cbd99f402049d8e1eac884f8cfbd290de04dc4ac91083f097fd4afc0ac4`). Keynote
+opened without repair and displayed the recorded Quarterly Results slide and
+Quarterly revenue chart/caption/data. This is bounded application acceptance,
+not Rust/native parity, performance/RSS, publication, or any monolith-exit
+evidence.

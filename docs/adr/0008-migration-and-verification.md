@@ -12970,3 +12970,46 @@ open/render/save/close/reopen acceptance plus exact pre-native inverse
 evidence. It is not post-Keynote focused Rust re-ingress, Rust/native byte
 parity, arbitrary caption-graph acceptance, a performance/RSS measurement, or
 a full publication/workspace gate.
+
+## 2026-08-24 amendment: Wave68 Keynote chart-title host-retirement verification record
+
+The raw-ID chart-title host retirement and selector migration are commit
+`e62b6fdb1`. The focused gates were:
+
+- the `litchi-keynote` chart-title integration target passed 10/10;
+- the focused Keynote host chart-title test suite passed 55/55;
+- the scoped all-target check and examples check passed;
+- `python3 -m unittest tools.test_check_crate_boundaries` passed 414/414;
+  `py_compile` and `git diff --check` passed;
+- the live `python3 tools/check_crate_boundaries.py --explain` command exited
+  1 only for the three known untracked Pages table-lock findings. It reported
+  no Wave68 or Keynote chart-title finding.
+
+The normal repository hooks were not a clean workspace-wide gate. Formatting
+reproduced unrelated existing differences in
+`crates/litchi-iwa/src/protobuf.rs` and
+`crates/litchi-iwa-protos/src/table_info_codec.rs`. Cargo linting retained the
+existing Numbers `object_count` deprecations (two occurrences) and
+`manual_contains` finding. A workspace test was also blocked by the
+non-exhaustive `Storage` match in
+`crates/litchi/tests/numbers_semantic_values.rs:55`; later workspace and
+doc-test attempts hit disk exhaustion. `cargo clean` removed 57.6 GiB of
+reproducible `target` artifacts to recover space. These results are recorded
+as bounded scoped evidence, not as a full-workspace pass.
+
+The bounded native record used disposable artifacts and Keynote 14.4:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| Rust pre-Keynote candidate `/private/tmp/litchi-wave68-chart-title-native.PGGXxv/rust-chart-title.key` | 12,796 | `96a9070e5416fe74fe5e229a86f43733bcb0095c515fd25d5b70dd965d70d42d` |
+| Keynote-saved, closed, and reopened exact-path artifact | 156,131 | `87893cbd99f402049d8e1eac884f8cfbd290de04dc4ac91083f097fd4afc0ac4` |
+
+Keynote opened the Rust artifact without repair. It showed slide title
+`Quarterly Results`, body `Native chart built from typed IWA objects`, a 2D
+Column chart titled `Quarterly revenue`, caption `Revenue by region`, and
+North Q1/Q2/Q3 values 12/18/24 plus South Q1/Q2/Q3 values 9/21/27. The file
+was saved, closed, and reopened at the exact path without a warning, with the
+same visible chart/title/caption/data observations. This is bounded native
+open/render/save/close/reopen acceptance only: no Rust/native byte parity,
+performance/RSS claim, full-workspace green claim, or edge/monolith/debt014
+exit claim is made.
