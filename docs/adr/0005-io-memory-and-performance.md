@@ -963,3 +963,34 @@ package-wide allocation census or claim that every generic ZIP/catalog
 candidate allocation has moved behind one common reservation. No manifest,
 generated-schema, Buffa, or Prost ownership changed, and no workspace-wide
 performance or dependency-removal claim follows.
+
+## 2026-08-24 amendment: Wave62 Pages body-table title resource record
+
+The Wave62 ownership and hardening series is commits
+`48f203aae56e43133fd931accfa6558661594ba0`,
+`a92f8f11a50c709877b8d1f0a158da72114dc4ab`,
+`a7088be4dd9fde9b2e843473b093839e7b7629b3`, and
+`a1c1e83a3edad808bacefa648fe0c1bdd53308f5`. The title transaction reuses the
+body-table lock `WireBudget` for one operation-local accounting envelope.
+Before the editable selected archive is allocated, it charges the source
+catalog, selected compressed member, decoded archive extent, and physical
+object/message inventory. Name and position selection, rooted graph
+inspection, reference metadata, and cross-component title-style scans are
+charged through the same budget; the final style scans are allocation-free.
+
+The strict title codec reports and charges selected wire bytes, fields,
+nesting, work, and references. The package precharges rewritten payload,
+compression, ZIP-entry, complete package, and candidate verification bounds.
+Candidate bytes are charged before reopening the candidate `SourceCatalog`,
+and verification continues with the same transaction budget. Exact output
+sizing and fallible reservations remain the allocation boundary for the
+focused codec and publication artifacts; overflow and limit failures are
+typed and occur before publication.
+
+This is a finite operation-local resource contract, not a measurement or
+claim about package-wide peak memory, allocation count, RSS, latency,
+throughput, or performance. Generic ZIP/catalog construction still has its
+own bounded internal allocations; this amendment does not claim one global
+allocation for every candidate stage. No manifest edge, generated schema,
+Buffa owner, or Prost owner changed, and no workspace-wide dependency-removal
+claim follows.

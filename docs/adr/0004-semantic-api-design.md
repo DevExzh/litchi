@@ -2453,3 +2453,36 @@ including alternate aliases, wildcard exports, relocated modules, renamed
 host methods, and every host example. Individual `cfg(test)` items are masked
 without hiding later production declarations. The `litchi-iwa` host remains a
 compatibility concern; this semantic amendment does not claim its deletion.
+
+## 2026-08-24 amendment: Pages body-table title semantic ownership
+
+Commits `48f203aae56e43133fd931accfa6558661594ba0`,
+`a92f8f11a50c709877b8d1f0a158da72114dc4ab`,
+`a7088be4dd9fde9b2e843473b093839e7b7629b3`, and
+`a1c1e83a3edad808bacefa648fe0c1bdd53308f5` establish the selector-first
+Pages body-table title owner. The public surface is
+`Package::{body_table_title_settings, edit_body_table_title,
+apply_body_table_title}`, `BodyTableSelector`, the presence-preserving
+`table::title::Settings`, and the
+`BodyTableTitle{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` transaction
+types. `Settings` distinguishes absent optional Booleans from explicitly
+stored `false`; no native object identifier, archive route, wire field, or
+generated message crosses this semantic API.
+
+The package resolves the selected rooted body table, cross-checks its native
+model, and delegates strict selected-field projection and rewriting to the
+doc-hidden `litchi_iwa_protos::numbers_table_title_codec`. Enabling a visible
+title additionally requires distinct, non-external title paragraph and shape
+references, exact aggregate ownership, exact field-local ownership whenever
+that optional metadata is present, and unique one-message style objects of
+the expected native types. Unknown or contradictory ownership, resource
+references, duplicate objects, hostile message metadata, malformed selected
+fields, and non-finite or negative title height fail closed.
+
+The transaction preserves untouched source bytes, deletes the three root
+previews only for a changed publication, reopens the complete candidate, and
+returns exact source/target artifacts whose inverse restores the original
+package. The tracked raw-`u64` Pages host title methods were removed
+intentionally from the unpublished `0.0.1` compatibility surface, and the
+retained host examples now use the semantic package owner. The Keynote title
+host and other `litchi-iwa` operations are unrelated and remain.
