@@ -4726,3 +4726,31 @@ No manifest edge, generated-schema owner, migration-host crate, or workspace
 dependency was removed. Wave64 therefore satisfies no crate-exit,
 dependency-removal, generated-schema-retirement, or monolith-deletion gate and
 makes no arbitrary-caption-graph, performance, or full-workspace green claim.
+
+## 2026-08-24 amendment: Wave65 Keynote chart-caption full owner slice (not a monolith-exit gate)
+
+Commit `f0bbe079b094b3652751f6ab7c89b2dc64fac6a9` moves the admitted
+canonical Keynote chart-caption graph lifecycle into `litchi-keynote`:
+stand-in-to-inline creation, existing-text replacement, active-to-fresh-
+stand-in removal, Metadata UUID/save-token registration, preview invalidation,
+candidate reopen, and exact patch/inverse artifacts. The production
+`litchi-iwa` chart-caption host now exposes only selector-based methods and
+the tracked raw-ID getter/setter/remover and graph helpers were retired; the
+retained example uses the semantic selector owner.
+
+The focused package still fails closed for cross-component, shared,
+ambiguous, malformed, hostile-diff, or unsupported future graph shapes. This
+is full ownership of the admitted canonical lifecycle, not a claim that every
+Keynote caption graph is publishable. The native record is bounded Keynote
+14.4 open/render/save/close/reopen evidence; focused Rust readback of the
+normalized native candidates returns `InvalidSource`, so it is not a Rust
+re-ingress, byte-parity, arbitrary-graph, or publication-completeness gate.
+
+The `litchi-iwa` crate, remaining Keynote/Pages/Numbers compatibility hosts,
+dependency edges, ordered debts, generated schemas, Buffa/Prost owners, and
+monolith remain. No manifest, crate, host, generated-schema, or normal Prost
+exit was claimed. The live boundary checker retains exactly the three
+user-owned untracked Pages table-lock findings and no Keynote caption finding.
+Wave65 therefore satisfies no crate-exit, host-exit, dependency-removal,
+generated-schema-retirement, monolith-deletion, full-workspace-green, or
+package-wide-performance gate.
