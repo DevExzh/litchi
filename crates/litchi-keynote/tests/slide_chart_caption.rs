@@ -1,8 +1,13 @@
 use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
-use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_common::{
+    decode_varint_from_bytes,
+    wire::{WireView, append_length_delimited_field, append_varint_field},
+};
+use litchi_iwa_core::{
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
 use litchi_keynote::{ChartCaptionError, ChartSelector, Package, Position, SlideSelector};
 use prost::Message as _;
@@ -13,6 +18,7 @@ const METADATA_OBJECT: u64 = 300;
 const METADATA_LAST_IDENTIFIER: u64 = 1_000;
 const DOCUMENT_COMPONENT: u64 = 1;
 const UNRELATED_COMPONENT: u64 = 2;
+const FOREIGN_COMPONENT: u64 = 3;
 const METADATA_ROOT_UNKNOWN_FIELD: u32 = 4_001;
 const METADATA_COMPONENT_UNKNOWN_FIELD: u32 = 4_002;
 const METADATA_UNKNOWN_MARKER: &[u8] = b"chart-caption metadata extension";
@@ -32,6 +38,8 @@ const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
+const ARCHIVE_HEADER_UNKNOWN_FIELD: u32 = 4_003;
+const ARCHIVE_HEADER_UNKNOWN_MARKER: &[u8] = b"chart-caption archive header extension";
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -252,6 +260,18 @@ fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
     }
 }
 
+fn external_reference(
+    component_identifier: u64,
+    object_identifier: Option<u64>,
+    is_weak: Option<bool>,
+) -> tsp::ComponentExternalReference {
+    tsp::ComponentExternalReference {
+        component_identifier,
+        object_identifier,
+        is_weak,
+    }
+}
+
 fn metadata_component_payload(
     identifier: u64,
     preferred_locator: &str,
@@ -259,11 +279,30 @@ fn metadata_component_payload(
     save_token: u64,
     object_identifiers: &[u64],
 ) -> TestResult<Vec<u8>> {
+    metadata_component_payload_with_external_references(
+        identifier,
+        preferred_locator,
+        locator,
+        save_token,
+        object_identifiers,
+        &[],
+    )
+}
+
+fn metadata_component_payload_with_external_references(
+    identifier: u64,
+    preferred_locator: &str,
+    locator: Option<&str>,
+    save_token: u64,
+    object_identifiers: &[u64],
+    external_references: &[tsp::ComponentExternalReference],
+) -> TestResult<Vec<u8>> {
     let mut payload = tsp::ComponentInfo {
         identifier,
         preferred_locator: preferred_locator.to_owned(),
         locator: locator.map(str::to_owned),
         save_token: Some(save_token),
+        external_references: external_references.to_vec(),
         object_uuid_map_entries: object_identifiers
             .iter()
             .copied()
@@ -329,6 +368,59 @@ fn metadata_payload(
     Ok(payload)
 }
 
+fn metadata_payload_with_foreign_dependencies(
+    last_identifier: u64,
+    external_references: &[tsp::ComponentExternalReference],
+) -> TestResult<Vec<u8>> {
+    let document = metadata_component_payload_with_external_references(
+        DOCUMENT_COMPONENT,
+        "Document",
+        Some("Document"),
+        10,
+        &[
+            1, 2, 3, 4, 80, 90, 100, 101, 110, 111, 120, 121, 130, 131, 140, 141, 150, 151, 160,
+            161,
+        ],
+        external_references,
+    )?;
+    let unrelated = metadata_component_payload(
+        UNRELATED_COMPONENT,
+        "Unrelated",
+        Some("Unrelated"),
+        7,
+        &[900],
+    )?;
+    let stylesheet = metadata_component_payload(
+        FOREIGN_COMPONENT,
+        "Stylesheet",
+        Some("Stylesheet"),
+        8,
+        &[81, 82],
+    )?;
+    let versioned = tsp::ComponentInfo {
+        identifier: DOCUMENT_COMPONENT,
+        preferred_locator: "Document".to_owned(),
+        locator: Some("Document".to_owned()),
+        save_token: Some(3),
+        object_uuid_map_entries: vec![metadata_uuid_entry(901)],
+        ..tsp::ComponentInfo::default()
+    }
+    .encode_to_vec();
+    let mut payload = Vec::new();
+    append_varint_field(&mut payload, 1, last_identifier)?;
+    append_length_delimited_field(&mut payload, 3, &document)?;
+    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(&mut payload, 3, &stylesheet)?;
+    append_varint_field(&mut payload, 8, 10)?;
+    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        METADATA_ROOT_UNKNOWN_FIELD,
+        METADATA_UNKNOWN_MARKER,
+    )?;
+    Ok(payload)
+}
+
 fn caption_theme_payload() -> TestResult<Vec<u8>> {
     let presets = {
         let mut bytes = Vec::new();
@@ -365,6 +457,38 @@ fn synthetic_metadata_package_with_captions(
         .iter()
         .map(|entry| (entry.name(), entry.data()))
         .collect::<Vec<_>>();
+    entries.push((METADATA_MEMBER, metadata.as_slice()));
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+fn synthetic_cross_component_metadata_package(
+    captions: [Option<&str>; 2],
+    external_references: &[tsp::ComponentExternalReference],
+) -> TestResult<Vec<u8>> {
+    let source = synthetic_package_with_captions(captions)?;
+    let mut document = Archive::parse(&document_stream(&source)?)?;
+    document
+        .objects
+        .push(object(80, 9_001, caption_theme_payload()?)?);
+    let source = replace_document_stream(&source, document)?;
+    let stylesheet = component(vec![
+        object(81, 9_002, Vec::new())?,
+        object(82, 9_003, Vec::new())?,
+    ])?;
+    let metadata = component(vec![object(
+        METADATA_OBJECT,
+        11_006,
+        metadata_payload_with_foreign_dependencies(METADATA_LAST_IDENTIFIER, external_references)?,
+    )?])?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let mut entries = catalog
+        .iter()
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    entries.push(("Index/Stylesheet.iwa", stylesheet.as_slice()));
     entries.push((METADATA_MEMBER, metadata.as_slice()));
     Ok(litchi_iwa_archive::package::to_bytes(
         entries,
@@ -429,6 +553,114 @@ fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
         .collect())
 }
 
+fn push_varint_width(mut value: u64, width: usize, output: &mut Vec<u8>) {
+    assert!((1..=10).contains(&width));
+    for index in 0..width {
+        let mut byte = (value & 0x7f) as u8;
+        value >>= 7;
+        if index + 1 != width {
+            byte |= 0x80;
+        }
+        output.push(byte);
+    }
+    assert_eq!(value, 0, "requested varint width is too narrow");
+}
+
+fn length_delimited_field_with_key_width(number: u32, payload: &[u8], key_width: usize) -> Vec<u8> {
+    let mut output = Vec::new();
+    push_varint_width((u64::from(number) << 3) | 2, key_width, &mut output);
+    push_varint(payload.len() as u64, &mut output);
+    output.extend_from_slice(payload);
+    output
+}
+
+fn varint_field_with_width(
+    number: u32,
+    value: u64,
+    key_width: usize,
+    value_width: usize,
+) -> Vec<u8> {
+    let mut output = Vec::new();
+    push_varint_width(u64::from(number) << 3, key_width, &mut output);
+    push_varint_width(value, value_width, &mut output);
+    output
+}
+
+fn fixed32_field_with_key_width(number: u32, value: f32, key_width: usize) -> Vec<u8> {
+    let mut output = Vec::new();
+    push_varint_width((u64::from(number) << 3) | 5, key_width, &mut output);
+    output.extend_from_slice(&value.to_le_bytes());
+    output
+}
+
+fn append_duplicate_field(payload: &[u8], number: u32) -> TestResult<Vec<u8>> {
+    let view = WireView::parse(payload)?;
+    let duplicate = view
+        .fields()
+        .find(|field| field.number() == number)
+        .map(|field| field.raw().to_vec())
+        .ok_or_else(|| io::Error::other("missing field to duplicate"))?;
+    let mut output = payload.to_vec();
+    output.extend_from_slice(&duplicate);
+    Ok(output)
+}
+
+fn replace_nested_field_raw(
+    payload: &[u8],
+    path: &[u32],
+    replacement: &[u8],
+) -> TestResult<Vec<u8>> {
+    let number = *path
+        .first()
+        .ok_or_else(|| io::Error::other("empty nested field path"))?;
+    let view = WireView::parse(payload)?;
+    let mut output = Vec::with_capacity(payload.len() + replacement.len());
+    let mut replaced = false;
+    for field in view.fields() {
+        if !replaced && field.number() == number {
+            if path.len() == 1 {
+                output.extend_from_slice(replacement);
+            } else {
+                if field.wire_type() != 2 {
+                    return Err(io::Error::other("nested field is not length-delimited").into());
+                }
+                let nested = replace_nested_field_raw(field.payload(), &path[1..], replacement)?;
+                output.extend_from_slice(&length_delimited_field_with_key_width(
+                    number,
+                    &nested,
+                    field.key().len(),
+                ));
+            }
+            replaced = true;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    if !replaced {
+        return Err(io::Error::other("missing nested field").into());
+    }
+    Ok(output)
+}
+
+fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> {
+    if path.len() == 1 {
+        return append_duplicate_field(payload, path[0]);
+    }
+    let view = WireView::parse(payload)?;
+    let parent_number = path[0];
+    let parent = view
+        .fields()
+        .find(|field| field.number() == parent_number)
+        .ok_or_else(|| io::Error::other("missing nested parent"))?;
+    if parent.wire_type() != 2 {
+        return Err(io::Error::other("nested parent is not length-delimited").into());
+    }
+    let nested = append_nested_duplicate(parent.payload(), &path[1..])?;
+    let replacement =
+        length_delimited_field_with_key_width(parent_number, &nested, parent.key().len());
+    replace_nested_field_raw(payload, &[parent_number], &replacement)
+}
+
 fn chart_reference_identifier(package: &[u8]) -> TestResult<Option<u64>> {
     let payload = message_payload(package, CHARTS[0], CHART_MESSAGE_TYPE)?;
     let outer = WireView::parse(&payload)?;
@@ -482,6 +714,58 @@ fn metadata_component_raw_fields(
     Err(io::Error::other("missing synthetic current metadata component").into())
 }
 
+fn metadata_component_raw_payload(
+    payload: &[u8],
+    identifier: u64,
+    versioned: bool,
+) -> TestResult<Vec<u8>> {
+    let field_number = if versioned { 11 } else { 3 };
+    for field in WireView::parse(payload)?
+        .fields()
+        .filter(|field| field.number() == field_number)
+    {
+        let component = tsp::ComponentInfo::decode(field.payload())?;
+        if component.identifier == identifier {
+            return Ok(field.payload().to_vec());
+        }
+    }
+    Err(io::Error::other("missing synthetic metadata component payload").into())
+}
+
+fn replace_component_field(
+    component_payload: &[u8],
+    number: u32,
+    replacement: &[u8],
+) -> TestResult<Vec<u8>> {
+    replace_nested_field_raw(component_payload, &[number], replacement)
+}
+
+fn with_document_preferred_locator(source: &[u8], preferred_locator: &str) -> TestResult<Vec<u8>> {
+    let payload = metadata_message_payload(source)?;
+    let root = WireView::parse(&payload)?;
+    let mut rewritten = Vec::with_capacity(payload.len() + preferred_locator.len());
+    let mut replaced = false;
+    for field in root.fields() {
+        if !replaced && field.number() == 3 {
+            let component = tsp::ComponentInfo::decode(field.payload())?;
+            if component.identifier == DOCUMENT_COMPONENT {
+                let mut component_payload = field.payload().to_vec();
+                let mut preferred = Vec::new();
+                append_length_delimited_field(&mut preferred, 2, preferred_locator.as_bytes())?;
+                component_payload = replace_component_field(&component_payload, 2, &preferred)?;
+                append_length_delimited_field(&mut rewritten, 3, &component_payload)?;
+                replaced = true;
+                continue;
+            }
+        }
+        rewritten.extend_from_slice(field.raw());
+    }
+    if !replaced {
+        return Err(io::Error::other("missing document metadata component").into());
+    }
+    replace_metadata_payload(source, rewritten)
+}
+
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let archive = Archive::parse(&document_stream(package)?)?;
     let object = archive
@@ -498,6 +782,120 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
     let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
     Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?)
+}
+
+fn push_varint(value: u64, output: &mut Vec<u8>) {
+    let mut value = value;
+    while value >= 0x80 {
+        output.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+fn object_header_location(stream: &[u8], identifier: u64) -> TestResult<(usize, usize, usize)> {
+    let mut object_start = 0usize;
+    while object_start < stream.len() {
+        let (encoded_header_length, prefix_length) =
+            decode_varint_from_bytes(&stream[object_start..])?;
+        let header_length = usize::try_from(encoded_header_length)?;
+        let header_start = object_start
+            .checked_add(prefix_length)
+            .ok_or_else(|| io::Error::other("synthetic header offset overflow"))?;
+        let header_end = header_start
+            .checked_add(header_length)
+            .ok_or_else(|| io::Error::other("synthetic header range overflow"))?;
+        let header = stream
+            .get(header_start..header_end)
+            .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
+        let info = ArchiveInfo::decode(header)?;
+        if info.identifier == Some(identifier) {
+            return Ok((object_start, prefix_length, header_length));
+        }
+        let payload_length = info
+            .message_infos
+            .iter()
+            .try_fold(0usize, |total, message| {
+                total.checked_add(usize::try_from(message.length).ok()?)
+            })
+            .ok_or_else(|| io::Error::other("synthetic payload length overflow"))?;
+        object_start = header_end
+            .checked_add(payload_length)
+            .ok_or_else(|| io::Error::other("synthetic object range overflow"))?;
+    }
+    Err(io::Error::other("synthetic object is missing").into())
+}
+
+fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let stream = document_stream(package)?;
+    let (object_start, prefix_length, header_length) = object_header_location(&stream, identifier)?;
+    let header_start = object_start
+        .checked_add(prefix_length)
+        .ok_or_else(|| io::Error::other("synthetic header offset overflow"))?;
+    let header_end = header_start
+        .checked_add(header_length)
+        .ok_or_else(|| io::Error::other("synthetic header range overflow"))?;
+    Ok(stream[header_start..header_end].to_vec())
+}
+
+fn with_unknown_archive_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let mut stream = document_stream(package)?;
+    let (object_start, prefix_length, header_length) = object_header_location(&stream, identifier)?;
+    let header_start = object_start
+        .checked_add(prefix_length)
+        .ok_or_else(|| io::Error::other("synthetic header offset overflow"))?;
+    let header_end = header_start
+        .checked_add(header_length)
+        .ok_or_else(|| io::Error::other("synthetic header range overflow"))?;
+    let mut header = stream[header_start..header_end].to_vec();
+    append_length_delimited_field(
+        &mut header,
+        ARCHIVE_HEADER_UNKNOWN_FIELD,
+        ARCHIVE_HEADER_UNKNOWN_MARKER,
+    )?;
+    let mut rewritten = Vec::with_capacity(
+        stream
+            .len()
+            .saturating_add(header.len().saturating_sub(header_length)),
+    );
+    rewritten.extend_from_slice(&stream[..object_start]);
+    push_varint(header.len() as u64, &mut rewritten);
+    rewritten.extend_from_slice(&header);
+    rewritten.extend_from_slice(&stream[header_end..]);
+    stream = rewritten;
+    Archive::parse(&stream)?;
+    let compressed = SnappyStream::compress(&stream)?;
+    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?)
+}
+
+fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let mut stream = document_stream(package)?;
+    let archive = Archive::parse(&stream)?;
+    let object = archive
+        .object(identifier)
+        .ok_or_else(|| io::Error::other("missing synthetic object"))?;
+    let offset = usize::try_from(object.header_offset)?;
+    let (_length, prefix_length) = decode_varint_from_bytes(&stream[offset..])?;
+    if prefix_length != 1 {
+        return Err(io::Error::other("synthetic prefix is not one byte").into());
+    }
+    stream[offset] |= 0x80;
+    stream.insert(offset + 1, 0);
+    Archive::parse(&stream)?;
+    let compressed = SnappyStream::compress(&stream)?;
+    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
             &compressed,
@@ -586,9 +984,66 @@ fn assert_graph_change_rejected(source: &[u8]) -> TestResult<()> {
     Ok(())
 }
 
+fn assert_replacement_rejected(source: &[u8]) -> TestResult<()> {
+    let package = Package::from_bytes(source)?;
+    let result = package
+        .edit_slide_chart_caption(0usize, 0usize)
+        .and_then(|edit| edit.set("replacement"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+fn with_document_message_payload(
+    source: &[u8],
+    identifier: u64,
+    type_: u32,
+    data: Vec<u8>,
+) -> TestResult<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let object = archive
+        .object_mut(identifier)
+        .ok_or_else(|| io::Error::other("missing synthetic document object"))?;
+    let message = object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == type_)
+        .ok_or_else(|| io::Error::other("missing synthetic document message"))?;
+    message.data = data;
+    replace_document_stream(source, archive)
+}
+
+fn with_unrelated_caption_owner(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let object = archive
+        .object_mut(NON_STYLES[1])
+        .ok_or_else(|| io::Error::other("missing unrelated chart object"))?;
+    let info = object
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or_else(|| io::Error::other("missing unrelated chart message info"))?;
+    info.object_references.push(STORAGES[0]);
+    info.field_infos.push(FieldInfo {
+        path: FieldPath::new(vec![77, 1]),
+        r#type: Some(FieldType::ObjectReference),
+        object_references: vec![STORAGES[0]],
+        ..FieldInfo::default()
+    });
+    replace_document_stream(source, archive)
+}
+
 #[test]
 fn existing_caption_replacement_is_exact_reversible_and_local() -> TestResult<()> {
-    let source = synthetic_package()?;
+    let source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
     let package = Package::from_bytes(&source)?;
     assert_eq!(
         package.slide_chart_caption(
@@ -612,7 +1067,7 @@ fn existing_caption_replacement_is_exact_reversible_and_local() -> TestResult<()
         Some("South".to_owned())
     );
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert_eq!(commit.diagnostics().touched_components(), 2);
     assert_eq!(commit.diagnostics().deleted_previews(), 3);
     assert!(commit.diagnostics().full_reparse_performed());
 
@@ -741,16 +1196,21 @@ fn shared_storage_and_wrong_parent_are_rejected_atomically() -> TestResult<()> {
 
 #[test]
 fn patch_conflict_and_debug_output_are_content_redacted() -> TestResult<()> {
-    let source = synthetic_package()?;
+    let source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
     let package = Package::from_bytes(&source)?;
     let commit = package
         .edit_slide_chart_caption(0usize, 0usize)?
         .set("private chart caption")?
         .commit()?;
-    let other = Package::from_bytes(&synthetic_package_with_captions([
-        Some("Different"),
-        Some("South"),
-    ])?)?;
+    let other = Package::from_bytes(&synthetic_metadata_package_with_captions(
+        [Some("Different"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?)?;
     assert!(matches!(
         other.apply_slide_chart_caption(commit.patch()),
         Err(ChartCaptionError::PatchConflict)
@@ -792,7 +1252,11 @@ fn malformed_caption_edge_and_storage_wire_are_refused() -> TestResult<()> {
 
 #[test]
 fn selected_storage_unknown_fields_survive_exactly() -> TestResult<()> {
-    let source = synthetic_package()?;
+    let source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
     let before = message_payload(&source, STORAGES[0], STORAGE_MESSAGE_TYPE)?;
     let package = Package::from_bytes(&source)?;
     let commit = package
@@ -1179,5 +1643,294 @@ fn canonical_standin_and_shared_or_aliased_graphs_are_rejected() -> TestResult<(
         vec![TITLES[1], NON_STYLES[1], CAPTION_INFOS[0]];
     let aliased = replace_document_stream(&source, alias_archive)?;
     assert_graph_change_rejected(&aliased)?;
+    Ok(())
+}
+
+#[test]
+fn metadata_replacement_advances_selected_token_once_and_preserves_source_fields() -> TestResult<()>
+{
+    let source = with_document_preferred_locator(
+        &synthetic_metadata_package_with_captions(
+            [Some("North"), Some("South")],
+            METADATA_LAST_IDENTIFIER,
+            None,
+        )?,
+        "Document-preferred",
+    )?;
+    let before_metadata = metadata_message_payload(&source)?;
+    let before_field_one = raw_fields(&before_metadata, 1)?;
+    let before_root_unknown = raw_fields(&before_metadata, METADATA_ROOT_UNKNOWN_FIELD)?;
+    let before_selected_unknown = metadata_component_raw_fields(
+        &before_metadata,
+        DOCUMENT_COMPONENT,
+        METADATA_COMPONENT_UNKNOWN_FIELD,
+    )?;
+    let before_unrelated =
+        metadata_component_raw_payload(&before_metadata, UNRELATED_COMPONENT, false)?;
+    let before_versioned =
+        metadata_component_raw_payload(&before_metadata, DOCUMENT_COMPONENT, true)?;
+    let before_token = raw_fields(&before_metadata, 8)?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("East")?
+        .commit()?;
+    let target = exact_bytes(commit.package())?;
+    let target_metadata_payload = metadata_message_payload(&target)?;
+    let metadata = decoded_metadata(&target)?;
+    assert_eq!(metadata.last_object_identifier, METADATA_LAST_IDENTIFIER);
+    assert_eq!(metadata.save_token, Some(11));
+    assert_eq!(
+        metadata_component(&metadata, DOCUMENT_COMPONENT, false)?.save_token,
+        Some(11)
+    );
+    assert_eq!(
+        metadata_component(&metadata, UNRELATED_COMPONENT, false)?.save_token,
+        Some(7)
+    );
+    assert_eq!(
+        metadata_component(&metadata, DOCUMENT_COMPONENT, true)?.save_token,
+        Some(3)
+    );
+    assert_eq!(raw_fields(&target_metadata_payload, 1)?, before_field_one);
+    assert_eq!(
+        raw_fields(&target_metadata_payload, METADATA_ROOT_UNKNOWN_FIELD)?,
+        before_root_unknown
+    );
+    assert_eq!(
+        metadata_component_raw_fields(
+            &target_metadata_payload,
+            DOCUMENT_COMPONENT,
+            METADATA_COMPONENT_UNKNOWN_FIELD,
+        )?,
+        before_selected_unknown
+    );
+    assert_eq!(
+        metadata_component_raw_payload(&target_metadata_payload, UNRELATED_COMPONENT, false)?,
+        before_unrelated
+    );
+    assert_eq!(
+        metadata_component_raw_payload(&target_metadata_payload, DOCUMENT_COMPONENT, true)?,
+        before_versioned
+    );
+    assert_ne!(raw_fields(&target_metadata_payload, 8)?, before_token);
+    assert_eq!(chart_reference_identifier(&target)?, Some(CAPTION_INFOS[0]));
+    assert_eq!(commit.diagnostics().touched_components(), 2);
+    let restored = commit
+        .package()
+        .apply_slide_chart_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn metadata_missing_or_ambiguous_changed_replacement_fails_atomically() -> TestResult<()> {
+    let missing = synthetic_package()?;
+    assert_replacement_rejected(&missing)?;
+    let valid = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let ambiguous = duplicate_metadata_object(&valid)?;
+    assert_replacement_rejected(&ambiguous)?;
+    Ok(())
+}
+
+#[test]
+fn cross_component_caption_dependencies_require_exact_metadata_edges() -> TestResult<()> {
+    let missing = synthetic_cross_component_metadata_package(
+        [None, Some("South")],
+        &[external_reference(FOREIGN_COMPONENT, Some(81), None)],
+    )?;
+    assert_graph_change_rejected(&missing)?;
+
+    let references = [
+        external_reference(FOREIGN_COMPONENT, Some(81), None),
+        external_reference(FOREIGN_COMPONENT, Some(82), None),
+    ];
+    let supported = synthetic_cross_component_metadata_package([None, Some("South")], &references)?;
+    let before_metadata = metadata_message_payload(&supported)?;
+    let before_external = metadata_component_raw_fields(&before_metadata, DOCUMENT_COMPONENT, 6)?;
+    let package = Package::from_bytes(&supported)?;
+    let commit = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("cross-component caption")?
+        .commit()?;
+    let target = exact_bytes(commit.package())?;
+    let target_metadata = metadata_message_payload(&target)?;
+    assert_eq!(
+        metadata_component_raw_fields(&target_metadata, DOCUMENT_COMPONENT, 6)?,
+        before_external
+    );
+    assert_eq!(
+        decoded_metadata(&target)?
+            .components
+            .iter()
+            .find(|component| component.identifier == FOREIGN_COMPONENT)
+            .map(|component| component.save_token),
+        Some(Some(8))
+    );
+    let restored = commit
+        .package()
+        .apply_slide_chart_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, supported);
+    Ok(())
+}
+
+#[test]
+fn unrelated_aggregate_and_field_caption_owner_is_rejected_atomically() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let hostile = with_unrelated_caption_owner(&source)?;
+    assert_replacement_rejected(&hostile)?;
+    Ok(())
+}
+
+#[test]
+fn known_caption_reference_theme_and_width_wire_variants_fail_closed() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_captions(
+        [None, Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let chart = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
+    let drawable = WireView::parse(&chart)?
+        .fields()
+        .find(|field| field.number() == 1)
+        .ok_or_else(|| io::Error::other("missing chart drawable"))?;
+    let drawable_payload = drawable.payload();
+    let reference_payload = reference(CAPTION_INFOS[0]).encode_to_vec();
+    let chart_variants = [
+        replace_nested_field_raw(
+            &chart,
+            &[1],
+            &length_delimited_field_with_key_width(
+                1,
+                &append_nested_duplicate(drawable_payload, &[11])?,
+                drawable.key().len(),
+            ),
+        )?,
+        replace_nested_field_raw(
+            &chart,
+            &[1, 11],
+            &varint_field_with_width(11, CAPTION_INFOS[0], 1, 2),
+        )?,
+        replace_nested_field_raw(
+            &chart,
+            &[1, 11],
+            &length_delimited_field_with_key_width(11, &reference_payload, 2),
+        )?,
+        replace_nested_field_raw(
+            &chart,
+            &[1, 11, 1],
+            &varint_field_with_width(1, CAPTION_INFOS[0], 1, 3),
+        )?,
+    ];
+    for payload in chart_variants {
+        assert_graph_change_rejected(&with_document_message_payload(
+            &source,
+            CHARTS[0],
+            CHART_MESSAGE_TYPE,
+            payload,
+        )?)?;
+    }
+
+    let theme = message_payload(&source, 80, 9_001)?;
+    let theme_root = WireView::parse(&theme)?
+        .fields()
+        .find(|field| field.number() == 1)
+        .ok_or_else(|| io::Error::other("missing theme root"))?;
+    let theme_variants = [
+        append_nested_duplicate(&theme, &[1])?,
+        replace_nested_field_raw(&theme, &[1], &varint_field_with_width(1, 1, 1, 1))?,
+        replace_nested_field_raw(
+            &theme,
+            &[1],
+            &length_delimited_field_with_key_width(1, theme_root.payload(), 2),
+        )?,
+    ];
+    for payload in theme_variants {
+        let hostile = with_document_message_payload(&source, 80, 9_001, payload)?;
+        assert_graph_change_rejected(&hostile)?;
+    }
+
+    let width_variants = [
+        append_nested_duplicate(&chart, &[1, 1, 2, 1])?,
+        replace_nested_field_raw(
+            &chart,
+            &[1, 1, 2, 1],
+            &varint_field_with_width(1, 640, 1, 2),
+        )?,
+        replace_nested_field_raw(
+            &chart,
+            &[1, 1, 2, 1],
+            &fixed32_field_with_key_width(1, 640.0, 2),
+        )?,
+    ];
+    for payload in width_variants {
+        let hostile =
+            with_document_message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE, payload)?;
+        assert_graph_change_rejected(&hostile)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn archive_headers_are_retained_and_noncanonical_object_prefixes_fail_closed() -> TestResult<()> {
+    let standin_source = synthetic_metadata_package_with_captions(
+        [None, Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let standin_header_source = with_unknown_archive_header(&standin_source, CAPTION_INFOS[0])?;
+    assert!(
+        object_header(&standin_header_source, CAPTION_INFOS[0])?
+            .windows(ARCHIVE_HEADER_UNKNOWN_MARKER.len())
+            .any(|window| window == ARCHIVE_HEADER_UNKNOWN_MARKER)
+    );
+    let package = Package::from_bytes(&standin_header_source)?;
+    let commit = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("header-preserved")?
+        .commit()?;
+    let target = exact_bytes(commit.package())?;
+    assert!(
+        object_header(&target, CAPTION_INFOS[0])?
+            .windows(ARCHIVE_HEADER_UNKNOWN_MARKER.len())
+            .any(|window| window == ARCHIVE_HEADER_UNKNOWN_MARKER)
+    );
+    let restored = commit
+        .package()
+        .apply_slide_chart_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, standin_header_source);
+
+    let active_source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+        None,
+    )?;
+    let active_header_source = with_unknown_archive_header(&active_source, CAPTION_INFOS[0])?;
+    let package = Package::from_bytes(&active_header_source)?;
+    let commit = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .clear()?
+        .commit()?;
+    let target = exact_bytes(commit.package())?;
+    assert!(
+        object_header(&target, CAPTION_INFOS[0])?
+            .windows(ARCHIVE_HEADER_UNKNOWN_MARKER.len())
+            .any(|window| window == ARCHIVE_HEADER_UNKNOWN_MARKER)
+    );
+    let restored = commit
+        .package()
+        .apply_slide_chart_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, active_header_source);
+
+    let noncanonical = with_overlong_object_length_prefix(&active_source, CHARTS[0])?;
+    assert_replacement_rejected(&noncanonical)?;
     Ok(())
 }

@@ -324,6 +324,39 @@ KEYNOTE_CHART_CAPTION_GRAPH_HELPERS = frozenset(
         "chart_position_for_identifier",
     }
 )
+KEYNOTE_CHART_CAPTION_GRAPH_OPERATION = "rewrite_chart_caption_operation"
+KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION = "patch_chart_caption_edge"
+KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION_MARKERS = frozenset(
+    {
+        "expected_identifier",
+        "replacement_identifier",
+        "validate_selected_message_metadata",
+        "rewrite_chart_caption_with_report",
+        "replace_message_transitioning_object_references_preserving_header_with_limits",
+    }
+)
+KEYNOTE_CHART_CAPTION_SAVE_TOKEN_REWRITE_MARKERS = frozenset(
+    {
+        "rewrite_package_metadata_additions_and_save_tokens",
+        "rewrite_package_metadata_save_tokens",
+    }
+)
+KEYNOTE_CHART_CAPTION_OBJECT_FRAMING_MARKERS = frozenset(
+    {"validate_canonical_object_framing"}
+)
+KEYNOTE_CHART_CAPTION_CROSS_COMPONENT_MARKERS = frozenset(
+    {"cross_component", "cross-component", "CrossComponent", "cross component"}
+)
+KEYNOTE_CHART_CAPTION_EXTERNAL_REFERENCE_MARKERS = frozenset(
+    {
+        "external_reference",
+        "external_references",
+        "ExternalReference",
+        "ExternalReferenceDescriptor",
+        "visit_external_reference",
+        "external_ref",
+    }
+)
 KEYNOTE_CHART_CAPTION_GRAPH_MARKERS = frozenset(
     {
         "CaptionObjectIds",
@@ -13803,6 +13836,173 @@ def audit_keynote_chart_caption_facade_source_topology(
                 f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
             )
     owner_code = _mask_rust_non_code(owner)
+
+    def function_bodies(code: str) -> list[tuple[str, str, int]]:
+        """Return production Rust function bodies with source offsets."""
+
+        bodies: list[tuple[str, str, int]] = []
+        for declaration in re.finditer(
+            r"(?<![A-Za-z0-9_#])fn[ \t\r\n]+(?:r#)?"
+            r"([A-Za-z_][A-Za-z0-9_]*)\b",
+            code,
+        ):
+            opening = code.find("{", declaration.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            bodies.append(
+                (
+                    declaration.group(1),
+                    code[opening + 1 : cursor - 1],
+                    declaration.start(),
+                )
+            )
+        return bodies
+
+    owner_functions = function_bodies(owner_code)
+    operation = next(
+        (
+            (body, offset)
+            for name, body, offset in owner_functions
+            if name == KEYNOTE_CHART_CAPTION_GRAPH_OPERATION
+        ),
+        None,
+    )
+    if operation is None:
+        violations.append(
+            "focused litchi-keynote chart-caption graph operation helper is missing "
+            f"{KEYNOTE_CHART_CAPTION_GRAPH_OPERATION}: "
+            f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
+    else:
+        operation_body, operation_offset = operation
+        for marker in sorted(KEYNOTE_CHART_CAPTION_OBJECT_FRAMING_MARKERS):
+            if marker in operation_body:
+                continue
+            line_number = owner_code.count("\n", 0, operation_offset) + 1
+            violations.append(
+                "focused litchi-keynote chart-caption graph create/remove must validate "
+                f"canonical object framing ({marker}): "
+                f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
+            )
+
+        existing_branch = re.search(
+            r"\bif[ \t\r\n]+!creating[ \t\r\n]*&&[ \t\r\n]*!removing\b",
+            operation_body,
+        )
+        if existing_branch is None:
+            line_number = owner_code.count("\n", 0, operation_offset) + 1
+            violations.append(
+                "focused litchi-keynote chart-caption graph operation must expose "
+                "the changed existing-caption path: "
+                f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
+            )
+        else:
+            branch_opening = operation_body.find("{", existing_branch.end())
+            branch_depth = 1
+            branch_cursor = branch_opening + 1 if branch_opening >= 0 else len(operation_body)
+            while branch_opening >= 0 and branch_cursor < len(operation_body) and branch_depth:
+                if operation_body[branch_cursor] == "{":
+                    branch_depth += 1
+                elif operation_body[branch_cursor] == "}":
+                    branch_depth -= 1
+                branch_cursor += 1
+            branch_body = (
+                operation_body[branch_opening + 1 : branch_cursor - 1]
+                if branch_depth == 0
+                else ""
+            )
+            called_helpers = {
+                match.group(1)
+                for match in re.finditer(
+                    r"\b([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\(",
+                    branch_body,
+                )
+            }
+            reachable_branch_bodies = [branch_body]
+            reachable_branch_bodies.extend(
+                body
+                for name, body, _offset in owner_functions
+                if name in called_helpers
+            )
+            if not any(
+                marker in body
+                for body in reachable_branch_bodies
+                for marker in KEYNOTE_CHART_CAPTION_SAVE_TOKEN_REWRITE_MARKERS
+            ):
+                line_number = owner_code.count(
+                    "\n", 0, operation_offset + existing_branch.start()
+                ) + 1
+                violations.append(
+                    "focused litchi-keynote chart-caption existing-caption rewrite must "
+                    "advance Metadata save tokens: "
+                    f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
+                )
+
+    transition = next(
+        (
+            (body, offset)
+            for name, body, offset in owner_functions
+            if name == KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION
+        ),
+        None,
+    )
+    if transition is None:
+        violations.append(
+            "focused litchi-keynote chart-caption source-authoritative reference "
+            f"transition helper is missing {KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION}: "
+            f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
+    else:
+        transition_body, transition_offset = transition
+        for marker in sorted(KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION_MARKERS):
+            if marker in transition_body:
+                continue
+            line_number = owner_code.count("\n", 0, transition_offset) + 1
+            violations.append(
+                "focused litchi-keynote chart-caption reference transition must retain "
+                f"source-authoritative marker {marker}: "
+                f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
+            )
+
+    if any(marker in owner_code for marker in KEYNOTE_CHART_CAPTION_CROSS_COMPONENT_MARKERS):
+        if not any(
+            marker in owner_code
+            for marker in KEYNOTE_CHART_CAPTION_EXTERNAL_REFERENCE_MARKERS
+        ):
+            violations.append(
+                "focused litchi-keynote chart-caption cross-component graph dependency "
+                "must carry external-reference attribution: "
+                f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+            )
+
+    for name, body, offset in owner_functions:
+        plain_replace = re.search(
+            r"\.replace_message_preserving_header(?!_)[ \t\r\n]*\(", body
+        )
+        if plain_replace is None:
+            continue
+        reference_mutation = re.search(
+            r"(?:object_references|field_infos|data_references)\b", body
+        )
+        if reference_mutation is None or reference_mutation.start() > plain_replace.start():
+            continue
+        line_number = owner_code.count("\n", 0, offset) + 1
+        violations.append(
+            "focused litchi-keynote chart-caption MessageInfo reference mutation must "
+            "use the source-authoritative transitioning replacement helper: "
+            f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
+        )
+
     method_names = {
         match.group(1)
         for match in re.finditer(
