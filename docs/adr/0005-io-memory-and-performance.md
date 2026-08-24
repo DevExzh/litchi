@@ -1206,3 +1206,22 @@ allocation, zero-copy, RSS, latency, throughput, or performance claim follows;
 those policies remain with the caller and later publication work. No manifest
 edge, generated schema, Buffa owner, normal Prost owner, or workspace
 dependency changed.
+
+## 2026-08-25 amendment: Wave72 shared chart-caption resource record
+
+Commit `997e0bf55e8a1381296a4d446f83dd5217a15385` makes every internal
+chart-caption codec traversal charge its source scan, sizing, raw emission, and
+candidate-verification work. Unknown overlong scalar values and complete
+unknown source groups are retained byte-for-byte; their keys and length
+framing, selected known fields, and exact nesting depth remain bounded and
+strict. Pages and Numbers retarget paths preserve raw `ArchiveInfo` headers and
+the exact aggregate/`FieldInfo` reference sets, rejecting shared or
+misattributed `CaptionInfo`/storage owners before publication. Keynote merges
+the residual codec report into `CaptionBudget` and precharges candidate reopen
+work; output and allocation failures retain typed limit/error mapping.
+
+These are operation-local source, work, nesting, output, allocation, and
+candidate-accounting facts. They do not establish a package-wide memory,
+peak-RSS, latency, throughput, zero-copy, or performance measurement, nor a
+single allocation for every format transaction. No manifest edge, generated
+schema, Buffa owner, normal Prost owner, or workspace dependency changed.

@@ -13165,3 +13165,48 @@ focused exact `write_to` test passes against that artifact.
 No manifest edge, generated schema, Prost/Buffa owner, ordered debt, host
 responsibility, or monolith gate changed in Wave71. All 13 ordered debts remain
 open.
+
+## 2026-08-25 amendment: Wave72 shared chart-caption hardening verification record
+
+The shared chart-caption hardening is commit
+`997e0bf55e8a1381296a4d446f83dd5217a15385`. The focused gates were:
+
+- the strict chart-caption codec target passed 17/17;
+- the Pages caption pattern passed 6/6 and the Numbers caption pattern passed
+  10/10;
+- the existing Pages and Numbers caption CRUD checks passed 1/1 each;
+- `cargo test -p litchi-keynote --test slide_chart_caption --quiet` passed
+  21/21;
+- `cargo check -p litchi-iwa-protos --all-targets` passed and its library
+  Clippy gate passed with `-D warnings`;
+- the `litchi-keynote` all-target check passed with only two existing
+  `Show::slide` deprecation warnings, and its library/test Clippy gates passed;
+- the `litchi-iwa` all-target check passed with existing deprecation warnings,
+  and scoped IWA Clippy passed with the documented pre-existing allowances;
+- the `keynote_chart_caption` fuzz-target check passed;
+- the boundary unit suite passed 433/433, Python compilation and targeted
+  formatting/diff checks passed, and the live checker exited 1 only for the
+  three known untracked Pages table-lock findings.
+
+The global hooks were not a workspace-green result: they also encountered
+pre-existing Numbers `object_count`/`manual_contains` findings, a
+non-exhaustive `litchi` test failure, unrelated unformatted
+`table_info`/`protobuf` files, and disk exhaustion. These are scoped Wave72
+results only; no full-workspace pass is claimed.
+
+The bounded native record used a fresh Pages 14.4 artifact:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| Rust candidate before Pages `/private/tmp/litchi-wave72-pages-caption.GsPpzM/rust-chart.pages` | 8,685 | `57a37f68894891ae404c8943087491546e615b6f64407a7acaf794d21410a859` |
+| Pages-saved, closed, and reopened exact-path artifact | 126,445 | `d4016b23ecb377f9a6982114e924410a28fc25e14417e8611083e3d327433130` |
+
+Pages opened the candidate without repair and displayed `Quarterly Results`,
+one 2D Column chart `Quarterly revenue`, caption `Revenue by region`, and the
+North Q1/Q2/Q3 values 12/18/24 with South values 9/21/27. Cmd-S, Cmd-W, and
+exact-path reopen retained those observations. Rust reread the normalized
+artifact with anchor 17, object 144, `Kind(1)`, and rows 2x3. This is bounded
+application acceptance only: it is not Rust/native byte parity, a performance
+or RSS measurement, or a Numbers native claim. The P2 follow-ups for duplicate
+known `MessageInfo` scalar canonicality and arbitrary unmodeled
+payload/reference parity remain open.

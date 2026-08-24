@@ -4912,3 +4912,29 @@ dependency edge, debt item, host responsibility, generated-schema owner, or
 normal Prost owner; it establishes no host-exit, dependency-removal, or
 monolith-deletion gate. No full-workspace-green, package-wide-performance,
 durable-publication, or native/Rust byte-parity claim follows.
+
+## 2026-08-25 amendment: Wave72 shared chart-caption hardening slice (not a monolith-exit gate)
+
+Commit `997e0bf55e8a1381296a4d446f83dd5217a15385` hardens the hidden shared
+chart-caption codec and the existing compatibility-host retarget paths. All
+internal codec traversals are metered; unknown overlong scalar values and
+source groups remain retained while known selected fields, keys, lengths, and
+group depth stay strict. Pages and Numbers preserve raw `ArchiveInfo` headers
+and exact aggregate/`FieldInfo` references, rejecting shared or misattributed
+`CaptionInfo`/storage ownership atomically. Keynote charges the residual codec
+report and candidate reopen in its private `CaptionBudget`, with typed output
+and allocation failures.
+
+Wave72 creates no focused Pages or Numbers chart-caption package owner.
+Graph/theme creation and the remaining chart lifecycle remain in
+`litchi-iwa`; no public API, manifest edge, generated schema, Prost/Buffa
+owner, host responsibility, or ordered debt is retired. The 13-debt ledger,
+all format compatibility hosts, and the monolith remain, so this slice makes
+no crate-exit, host-exit, dependency-removal, debt-retirement,
+generated-schema-retirement, or monolith-deletion claim. The duplicate known
+`MessageInfo` scalar canonicality and arbitrary unmodeled payload/reference
+parity items remain P2 follow-ups rather than completed deletion gates.
+
+The Pages 14.4 record is bounded application open/render/save/close/reopen
+acceptance only; it is not Rust/native byte parity, a performance/RSS result,
+a Numbers native result, or a full publication/workspace gate.
