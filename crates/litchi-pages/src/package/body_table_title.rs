@@ -580,7 +580,7 @@ fn rewrite_title(
     if actual != before {
         return Err(BodyTableTitleError::InvalidSource);
     }
-    validate_visible_prerequisites(source, target, decoded, after)?;
+    validate_visible_prerequisites(source, target, decoded, after, &mut budget)?;
     let limits = title_wire_limits(source)?
         .with_output_bytes(message.data.len().saturating_add(64))
         .map_err(map_wire_error)?
@@ -702,6 +702,7 @@ fn validate_visible_prerequisites(
     target: &table_lock::BodyTableTarget,
     snapshot: TableTitleSettingsSnapshot,
     after: Settings,
+    budget: &mut table_lock::WireBudget,
 ) -> Result<(), BodyTableTitleError> {
     if !after.is_visible() {
         return Ok(());
@@ -745,6 +746,14 @@ fn validate_visible_prerequisites(
         .message_infos
         .get(target.model_message_index)
         .ok_or(BodyTableTitleError::InvalidSource)?;
+    budget
+        .charge_payload_work(
+            info.object_references
+                .len()
+                .saturating_add(info.data_references.len())
+                .saturating_add(info.field_infos.len()),
+        )
+        .map_err(map_lock_error)?;
     let rooted_role_ids = [
         1_u64,
         target.body_identifier.get(),
@@ -783,24 +792,27 @@ fn validate_visible_prerequisites(
         return Err(BodyTableTitleError::InvalidSource);
     }
     for (field_number, identifier) in [(30_u32, style.identifier()), (36_u32, shape.identifier())] {
-        let declarations = info
-            .field_infos
-            .iter()
-            .filter(|field| field.path.as_slice() == [field_number])
-            .collect::<Vec<_>>();
-        if declarations.len() > 1
-            || declarations.first().is_some_and(|field| {
-                field.r#type.is_some_and(|kind| {
-                    !matches!(kind, litchi_iwa_core::FieldType::ObjectReference)
-                }) || !field.data_references.is_empty()
-                    || field.object_references.as_slice() != [identifier]
-            })
-        {
+        let mut declaration = None;
+        for field in &info.field_infos {
+            if field.path.as_slice() != [field_number] {
+                continue;
+            }
+            if declaration.replace(field).is_some() {
+                return Err(BodyTableTitleError::InvalidSource);
+            }
+        }
+        if declaration.is_some_and(|field| {
+            field
+                .r#type
+                .is_some_and(|kind| !matches!(kind, litchi_iwa_core::FieldType::ObjectReference))
+                || !field.data_references.is_empty()
+                || field.object_references.as_slice() != [identifier]
+        }) {
             return Err(BodyTableTitleError::InvalidSource);
         }
     }
-    require_style_object(package, style.identifier(), 2_022)?;
-    require_style_object(package, shape.identifier(), 2_025)?;
+    require_style_object(package, style.identifier(), 2_022, budget)?;
+    require_style_object(package, shape.identifier(), 2_025, budget)?;
     Ok(())
 }
 
@@ -808,33 +820,28 @@ fn require_style_object(
     package: &Package,
     identifier: u64,
     message_type: u32,
+    budget: &mut table_lock::WireBudget,
 ) -> Result<(), BodyTableTitleError> {
-    let mut matches = Vec::new();
+    let mut matched = None;
     for component in package.state.source.components().iter() {
+        budget.charge_payload_work(1).map_err(map_lock_error)?;
         for object in &component.archive().objects {
+            budget.charge_payload_work(1).map_err(map_lock_error)?;
             if object.archive_info.identifier == Some(identifier) {
-                matches.push(object);
+                if matched.replace(object).is_some() {
+                    return Err(BodyTableTitleError::InvalidSource);
+                }
             }
         }
     }
-    if matches.len() != 1 {
-        return Err(BodyTableTitleError::InvalidSource);
-    }
-    let object = matches[0];
+    let object = matched.ok_or(BodyTableTitleError::InvalidSource)?;
     if object.messages.len() != 1 || object.archive_info.message_infos.len() != 1 {
         return Err(BodyTableTitleError::InvalidSource);
     }
-    let messages = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_index, message)| message.type_ == message_type)
-        .collect::<Vec<_>>();
-    if messages.len() != 1 {
+    if object.messages[0].type_ != message_type {
         return Err(BodyTableTitleError::InvalidSource);
     }
-    page_layout::validate_selected_metadata(object, messages[0].0)
-        .map_err(map_page_layout_error)?;
+    page_layout::validate_selected_metadata(object, 0).map_err(map_page_layout_error)?;
     Ok(())
 }
 
