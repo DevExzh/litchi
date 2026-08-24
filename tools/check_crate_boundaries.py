@@ -12285,6 +12285,19 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
                     re.compile(r"\b(?:prove_global_comment_ownership|global_comment_ownership)\b"),
                     False,
                 ),
+                (
+                    "deletion-grade archive reference census",
+                    re.compile(
+                        r"\b(?:inspect_references_with_policy_and_limits|"
+                        r"prove_archive_reference_ownership)\b"
+                    ),
+                    False,
+                ),
+                (
+                    "opaque archive-owner rejection",
+                    re.compile(r"\bArchiveReferencePolicy\s*::\s*RejectUnknownMetadata\b"),
+                    False,
+                ),
             )
             for label, pattern, requires_unsupported in required_guards:
                 guard_match = pattern.search(reachable_code)
@@ -12295,7 +12308,7 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
                     )
                     continue
                 guard_region = reachable_code[
-                    max(0, guard_match.start() - 220) : guard_match.end() + 260
+                    max(0, guard_match.start() - 520) : guard_match.end() + 520
                 ]
                 if (
                     "return Err" not in guard_region
