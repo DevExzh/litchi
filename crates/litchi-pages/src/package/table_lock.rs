@@ -592,6 +592,7 @@ fn native_body_table_targets_with_budget(
         body_identifier.get(),
         &[ROOT_BODY_FIELD],
         true,
+        false,
         budget,
     )? {
         return Err(BodyTableLockError::InvalidSource);
@@ -1437,24 +1438,25 @@ fn validate_selected_ownership(
         .get(target.message_index)
         .ok_or(BodyTableLockError::InvalidSource)?;
     validate_selected_metadata(object, target.message_index)?;
-    if message_info.type_ != target.message_type
-        || !message_declares_reference(
-            message_info,
-            target.model_identifier.get(),
-            &[TABLE_INFO_MODEL_FIELD],
-            true,
-            budget,
-        )?
-        || !message_declares_reference(
-            message_info,
-            target.body_identifier.get(),
-            &[TABLE_INFO_SUPER_FIELD, DRAWABLE_PARENT_FIELD],
-            true,
-            budget,
-        )?
-    {
+    if message_info.type_ != target.message_type {
         return Err(BodyTableLockError::InvalidSource);
     }
+    message_declares_reference(
+        message_info,
+        target.model_identifier.get(),
+        &[TABLE_INFO_MODEL_FIELD],
+        true,
+        false,
+        budget,
+    )?;
+    message_declares_reference(
+        message_info,
+        target.body_identifier.get(),
+        &[TABLE_INFO_SUPER_FIELD, DRAWABLE_PARENT_FIELD],
+        false,
+        false,
+        budget,
+    )?;
     let attachment_component = source
         .components()
         .get_index(target.attachment_component_index)
@@ -1485,6 +1487,7 @@ fn validate_selected_ownership(
         target.drawable_identifier.get(),
         &[DRAWABLE_FIELD],
         true,
+        false,
         budget,
     )? {
         return Err(BodyTableLockError::InvalidSource);
@@ -1545,6 +1548,7 @@ fn message_declares_reference(
     message: &litchi_iwa_core::MessageInfo,
     identifier: u64,
     accepted_path: &[u32],
+    require_aggregate: bool,
     require_field: bool,
     budget: &mut WireBudget,
 ) -> Result<bool, BodyTableLockError> {
@@ -1557,7 +1561,7 @@ fn message_declares_reference(
         .iter()
         .filter(|candidate| **candidate == identifier)
         .count();
-    if aggregate_occurrences != 1 {
+    if aggregate_occurrences > 1 || (require_aggregate && aggregate_occurrences != 1) {
         return Err(BodyTableLockError::InvalidSource);
     }
     if message.data_references.contains(&identifier) {
@@ -1581,9 +1585,9 @@ fn message_declares_reference(
             accepted_fields = accepted_fields
                 .checked_add(1)
                 .ok_or(BodyTableLockError::InvalidSource)?;
-            if (require_field || !field.object_references.is_empty())
-                && (field.object_references.as_slice() != [identifier]
-                    || !field.data_references.is_empty())
+            if field.object_references.as_slice() != [identifier]
+                || !field.data_references.is_empty()
+                || aggregate_occurrences != 1
             {
                 return Err(BodyTableLockError::InvalidSource);
             }
@@ -1617,76 +1621,88 @@ fn validate_body_table_ownership(
     entries: &[BodyTableEntry],
     budget: &mut WireBudget,
 ) -> Result<(), BodyTableLockError> {
-    if let Some(first_entry) = entries.first() {
-        message_declares_reference_prefix(
-            message,
-            first_entry.identifier.get(),
-            &[TABLE_BODY_FIELD],
-            budget,
-        )?;
-    } else {
-        // There is no selected edge for the empty inventory, but the stale
-        // body header is still inspected below. Charge its complete
-        // reference metadata before retaining any declaration state.
-        budget.charge_payload_items(message.field_infos.len())?;
-        budget.charge_payload_references(message.object_references.len())?;
-        budget.charge_payload_references(message.data_references.len())?;
-        budget.charge_payload_work(message.field_infos.len())?;
-        for field in &message.field_infos {
-            budget.charge_payload_references(field.object_references.len())?;
-            budget.charge_payload_references(field.data_references.len())?;
-            budget.charge_payload_work(field.path.path.len())?;
+    budget.charge_payload_items(message.field_infos.len())?;
+    budget.charge_payload_references(message.object_references.len())?;
+    budget.charge_payload_references(message.data_references.len())?;
+    budget.charge_payload_work(message.field_infos.len())?;
+    budget.charge_payload_work(entries.len())?;
+
+    // Current Pages writers commonly retain table-attachment ownership only
+    // in MessageInfo.object_references and omit field-local declarations. The
+    // rooted payload remains authoritative for the field-9 edge, so accept
+    // that aggregate-only form while still rejecting duplicates and any
+    // contradictory field-local attribution.
+    let mut declarations = HashMap::new();
+    declarations
+        .try_reserve(entries.len())
+        .map_err(|_| BodyTableLockError::Allocation {
+            amount: entries.len(),
+        })?;
+    for entry in entries {
+        if declarations
+            .insert(entry.identifier.get(), (0usize, 0usize))
+            .is_some()
+        {
+            return Err(BodyTableLockError::InvalidSource);
         }
     }
-
-    // Reserve for every possible field-9 declaration, rather than only the
-    // selected entry inventory.  Malformed input may carry extra declaration
-    // edges; charging and reserving the complete checked count keeps those
-    // inserts from growing the map outside the transaction budget.
-    let declaration_capacity = message
-        .field_infos
-        .iter()
-        .try_fold(0usize, |count, field| {
-            if field.path.as_slice() == [TABLE_BODY_FIELD] {
-                count.checked_add(1)
-            } else {
-                Some(count)
-            }
-        })
-        .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })?;
-    budget.charge_payload_work(message.field_infos.len())?;
-    budget.charge_payload_work(declaration_capacity)?;
-    let mut declared = HashMap::new();
-    declared
-        .try_reserve(declaration_capacity)
-        .map_err(|_| BodyTableLockError::Allocation {
-            amount: declaration_capacity,
-        })?;
+    for identifier in &message.object_references {
+        budget.charge_payload_work(1)?;
+        if let Some((aggregate_count, _)) = declarations.get_mut(identifier) {
+            *aggregate_count = aggregate_count
+                .checked_add(1)
+                .ok_or(BodyTableLockError::InvalidSource)?;
+        }
+    }
+    for identifier in &message.data_references {
+        budget.charge_payload_work(1)?;
+        if declarations.contains_key(identifier) {
+            return Err(BodyTableLockError::InvalidSource);
+        }
+    }
     for field in &message.field_infos {
-        if field.path.as_slice() != [TABLE_BODY_FIELD] {
+        budget.charge_payload_references(field.object_references.len())?;
+        budget.charge_payload_references(field.data_references.len())?;
+        budget.charge_payload_work(field.path.path.len())?;
+        for identifier in &field.data_references {
+            budget.charge_payload_work(1)?;
+            if declarations.contains_key(identifier) {
+                return Err(BodyTableLockError::InvalidSource);
+            }
+        }
+        if field.path.as_slice() == [TABLE_BODY_FIELD] {
+            if field.object_references.len() != 1 || !field.data_references.is_empty() {
+                return Err(BodyTableLockError::InvalidSource);
+            }
+            let identifier = field.object_references[0];
+            let Some((_, field_count)) = declarations.get_mut(&identifier) else {
+                return Err(BodyTableLockError::InvalidSource);
+            };
+            *field_count = field_count
+                .checked_add(1)
+                .ok_or(BodyTableLockError::InvalidSource)?;
+            if *field_count > 1 {
+                return Err(BodyTableLockError::InvalidSource);
+            }
             continue;
         }
-        budget.charge_payload_work(1)?;
-        let identifier = *field
-            .object_references
-            .first()
-            .ok_or(BodyTableLockError::InvalidSource)?;
-        if declared.insert(identifier, ()).is_some() {
-            return Err(BodyTableLockError::InvalidSource);
+        for identifier in &field.object_references {
+            budget.charge_payload_work(1)?;
+            if declarations.contains_key(identifier) {
+                return Err(BodyTableLockError::InvalidSource);
+            }
         }
     }
-    if declared.len() != entries.len() {
+    if declarations
+        .values()
+        .any(|(aggregate_count, _)| *aggregate_count != 1)
+    {
         return Err(BodyTableLockError::InvalidSource);
-    }
-    for entry in entries {
-        budget.charge_payload_work(1)?;
-        if !declared.contains_key(&entry.identifier.get()) {
-            return Err(BodyTableLockError::InvalidSource);
-        }
     }
     Ok(())
 }
 
+#[cfg(test)]
 fn message_declares_reference_prefix(
     message: &litchi_iwa_core::MessageInfo,
     identifier: u64,
@@ -2977,6 +2993,7 @@ mod tests {
                 &message_data,
                 100,
                 &[TABLE_BODY_FIELD],
+                true,
                 false,
                 &mut message_budget,
             ),
@@ -3015,6 +3032,7 @@ mod tests {
                 &field_data,
                 100,
                 &[TABLE_BODY_FIELD],
+                true,
                 true,
                 &mut field_budget,
             ),
