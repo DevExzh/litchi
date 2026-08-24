@@ -2462,6 +2462,59 @@ mod tests {
     }
 
     #[test]
+    fn plain_removal_exact_work_includes_rewrite_and_candidate_scans() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let selected = data_reference(71, &[(5, 2), (6, 3)], false);
+        let mut current = component(1, "a.iwa", None, &[(5, uuid)], &[]);
+        bytes_field(&mut current, 7, &selected);
+        let source = metadata(10, &[current], &[]);
+        let uuids = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let owners = [DataReferenceOwnerRemoval::new(selector, 71, 5, 2)];
+        let batch = RemovalBatch::new(10, &uuids, &[], &owners);
+
+        reset_work_charges();
+        let baseline = remove_package_metadata(&source, batch, options(&source)).unwrap();
+        assert_eq!(work_charges(), baseline.report().work_bytes());
+        let report = baseline.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        assert_eq!(
+            remove_package_metadata(&source, batch, exact)
+                .unwrap()
+                .bytes(),
+            baseline.bytes()
+        );
+
+        let before = output_allocations();
+        let limited = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes() - 1,
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        assert!(
+            remove_package_metadata(&source, batch, limited)
+                .unwrap_err()
+                .resource_limit()
+                .is_some()
+        );
+        assert_eq!(output_allocations(), before);
+    }
+
+    #[test]
     fn combined_removal_and_save_tokens_is_one_raw_preserving_transition() {
         let selector = ComponentSelector::new(1, "a.iwa");
         let target = ComponentSelector::new(2, "b.iwa");
@@ -5332,11 +5385,23 @@ pub fn remove_package_metadata(
     let output_size = removal_output_size(source, batch, &mut budget)?;
     budget.output_size(output_size)?;
 
-    // Charge the exact rewrite traversal before constructing the sole owned candidate.
+    // Charge the rewrite and candidate-verification traversals before
+    // constructing the sole owned candidate.  The source shape is a
+    // conservative verification bound because removals can only shrink the
+    // candidate; counters are padded after the real candidate scan so the
+    // returned report remains exactly replayable at its limits.
     let measured = budget.clone();
     charge_removal_rewrite(source, batch, &mut budget)?;
-    budget.preflight_repeat_delta(&measured)?;
     budget.source_phase = false;
+    let mut candidate_shape = RemovalScanState::new(batch, &mut budget)?;
+    scan_removal_metadata(source, batch, &mut candidate_shape, &mut budget, false)?;
+    let planned_fields = repeated_counter(measured.fields, budget.fields)?;
+    let planned_work = repeated_counter(measured.work_bytes, budget.work_bytes)?;
+    let planned_components =
+        repeated_counter(measured.components_scanned, budget.components_scanned)?;
+    let planned_references =
+        repeated_counter(measured.references_scanned, budget.references_scanned)?;
+    budget.preflight_repeat_delta(&measured)?;
 
     let mut candidate = Vec::new();
     #[cfg(test)]
@@ -5353,6 +5418,12 @@ pub fn remove_package_metadata(
     let mut verified = RemovalScanState::new(batch, &mut budget)?;
     scan_removal_metadata(&candidate, batch, &mut verified, &mut budget, true)?;
     verified.validate_candidate()?;
+    budget.pad_repeated_counters(
+        planned_fields,
+        planned_work,
+        planned_components,
+        planned_references,
+    )?;
     budget.output_bytes = candidate.len();
     budget.retained_bytes = candidate.len();
     Ok(RewriteOutput {
@@ -6272,7 +6343,110 @@ fn charge_removal_rewrite(
         } else if field.number == 3 {
             let payload = field.bytes()?;
             let (component, locator) = component_header(payload, budget, 2)?;
-            let _size = removal_component_size(payload, component, locator, batch, budget, 2)?;
+            let size = removal_component_size(payload, component, locator, batch, budget, 2)?;
+            if size != payload.len() {
+                charge_removal_component_rewrite(payload, component, locator, batch, budget, 2)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Meter the payload traversal performed after a component's size changes.
+///
+/// `removal_component_size` is also used by the output-sizing pass, but a
+/// changed component is subsequently visited once more by
+/// `rewrite_removal_component`.  Keeping this traversal explicit ensures the
+/// plain removal path preflights the same work that the writer performs before
+/// it reserves its candidate buffer.
+fn charge_removal_component_rewrite(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.message(source, depth)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            6 => {
+                let _ = external_field_selected(
+                    field.bytes()?,
+                    component,
+                    locator,
+                    batch,
+                    budget,
+                    depth + 1,
+                )?;
+            },
+            7 => charge_data_reference_rewrite(
+                field.bytes()?,
+                component,
+                locator,
+                batch,
+                budget,
+                depth + 1,
+            )?,
+            11 => {
+                let _ = object_field_selected(
+                    field.bytes()?,
+                    component,
+                    locator,
+                    batch,
+                    budget,
+                    depth + 1,
+                )?;
+            },
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn charge_data_reference_rewrite(
+    source: &[u8],
+    component: u64,
+    locator: &str,
+    batch: RemovalBatch<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    let rewrite = data_reference_rewrite(source, component, locator, batch, budget, depth)?;
+    if rewrite.selected == 0 || rewrite.surviving_owners == 0 {
+        return Ok(());
+    }
+
+    let mut data_identifier = None;
+    budget.message(source, depth)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 1 {
+            set_once(&mut data_identifier, field.varint()?)?;
+        }
+    }
+    let data_identifier =
+        data_identifier.ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 2 {
+            continue;
+        }
+        let (object, count, owner_unknown_fields) =
+            decode_data_owner(field.bytes()?, budget, depth + 1)?;
+        let mut selected = false;
+        for removal in batch.data_reference_owners.iter() {
+            budget.work(1)?;
+            selected |= removal.component.identifier == component
+                && removal.component.locator == locator
+                && removal.data_identifier == data_identifier
+                && removal.object_identifier == object
+                && removal.expected_count == count;
+        }
+        if selected && owner_unknown_fields {
+            return Err(RewriteError::invalid(InvalidReason::RemovalMismatch));
         }
     }
     Ok(())
