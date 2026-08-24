@@ -2337,6 +2337,42 @@ impl Archive {
             .position(|object| object.archive_info.identifier == Some(identifier))?;
         Some(self.objects.remove(index))
     }
+
+    /// Remove exactly one object after validating the complete archive.
+    ///
+    /// Zero, missing, and duplicate identifiers are rejected. Validation and
+    /// target resolution complete before mutation, so every error preserves
+    /// the archive exactly. Graph ownership remains the caller's concern.
+    pub fn remove_object_checked(&mut self, identifier: u64) -> Result<ArchiveObject> {
+        self.remove_object_checked_with_limits(identifier, Limits::default())
+    }
+
+    /// Remove exactly one object under explicit resource limits.
+    pub fn remove_object_checked_with_limits(
+        &mut self,
+        identifier: u64,
+        limits: Limits,
+    ) -> Result<ArchiveObject> {
+        let limits = limits.validate()?;
+        if identifier == 0 {
+            return Err(Error::invalid_archive(0, "object identifier is zero"));
+        }
+        self.validate_with_limits(limits)?;
+        let mut selected = None;
+        for (index, object) in self.objects.iter().enumerate() {
+            if object.archive_info.identifier != Some(identifier) {
+                continue;
+            }
+            if selected.replace(index).is_some() {
+                return Err(Error::invalid_archive(
+                    index,
+                    "object identifier is duplicated",
+                ));
+            }
+        }
+        let index = selected.ok_or_else(|| Error::invalid_archive(0, "object is missing"))?;
+        Ok(self.objects.remove(index))
+    }
 }
 
 impl Default for Archive {
@@ -5826,6 +5862,39 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, Error::Limit { .. }));
         assert!(facts.0.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn checked_object_removal_is_exact_and_atomic() -> Result<()> {
+        let mut archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 7,
+                        data: vec![1],
+                    }],
+                )?,
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 8,
+                        data: vec![2],
+                    }],
+                )?,
+            ],
+        };
+        let source = archive.clone();
+        assert!(archive.remove_object_checked(0).is_err());
+        assert_eq!(archive, source);
+        assert!(archive.remove_object_checked(3).is_err());
+        assert_eq!(archive, source);
+
+        let removed = archive.remove_object_checked(1)?;
+        assert_eq!(removed.archive_info.identifier, Some(1));
+        assert_eq!(archive.objects.len(), 1);
+        assert_eq!(archive.objects[0].archive_info.identifier, Some(2));
         Ok(())
     }
 
