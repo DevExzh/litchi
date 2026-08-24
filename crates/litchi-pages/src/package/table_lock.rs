@@ -387,6 +387,11 @@ impl BodyTableLockCommit {
 pub(crate) struct BodyTableTarget {
     pub(crate) table_position: usize,
     pub(crate) table_name: Box<str>,
+    pub(crate) sheet_identifier: NonZeroU64,
+    pub(crate) sheet_component_index: usize,
+    pub(crate) sheet_object_index: usize,
+    pub(crate) sheet_message_index: usize,
+    pub(crate) sheet_message_type: u32,
     pub(crate) attachment_identifier: NonZeroU64,
     pub(crate) attachment_component_index: usize,
     pub(crate) attachment_object_index: usize,
@@ -401,6 +406,7 @@ pub(crate) struct BodyTableTarget {
     pub(crate) object_index: usize,
     pub(crate) message_index: usize,
     pub(crate) message_type: u32,
+    pub(crate) info_message_index: usize,
     pub(crate) body_component_index: usize,
     pub(crate) body_object_index: usize,
     pub(crate) body_message_index: usize,
@@ -844,6 +850,15 @@ fn native_body_table_targets_with_budget(
         let target = BodyTableTarget {
             table_position,
             table_name,
+            // Pages' rooted body is the section/sheet owner for table
+            // attachment dependencies. Keep this proof on the target so
+            // sibling semantic adapters can inspect the exact body payload
+            // without rebuilding the document graph.
+            sheet_identifier: body_identifier,
+            sheet_component_index: body_location.component_index,
+            sheet_object_index: body_location.object_index,
+            sheet_message_index: body_message.0,
+            sheet_message_type: body_message.1.type_,
             attachment_identifier: entry.identifier,
             attachment_component_index: attachment_location.component_index,
             attachment_object_index: attachment_location.object_index,
@@ -858,6 +873,7 @@ fn native_body_table_targets_with_budget(
             object_index: drawable_location.object_index,
             message_index,
             message_type: message.type_,
+            info_message_index: message_index,
             body_component_index: body_location.component_index,
             body_object_index: body_location.object_index,
             body_message_index: body_message.0,
@@ -1405,7 +1421,7 @@ fn table_info_rewrite_bound(input_len: usize, lock_present: bool) -> Option<usiz
 /// frame adds its four-byte header.  Keeping this reservation conservative is
 /// required because `compress_vec` allocates that raw bound before returning
 /// the actual compressed bytes.
-fn snappy_compressed_bound(input_len: usize) -> Option<usize> {
+pub(crate) fn snappy_compressed_bound(input_len: usize) -> Option<usize> {
     let full_chunk_bound = SnappyStream::WRITE_CHUNK_SIZE
         .checked_add(SnappyStream::WRITE_CHUNK_SIZE / SNAPPY_RAW_MAX_EXPANSION_DIVISOR)?
         .checked_add(SNAPPY_RAW_MAX_OVERHEAD)?
@@ -1427,7 +1443,7 @@ fn snappy_compressed_bound(input_len: usize) -> Option<usize> {
 /// workspace's `flate2` backend.  This mirrors its fixed-block worst-case
 /// literal bound without a zlib wrapper: at most nine bits per input byte,
 /// plus the small-input and final-block overheads.
-fn deflate_compressed_bound(input_len: usize) -> Option<usize> {
+pub(crate) fn deflate_compressed_bound(input_len: usize) -> Option<usize> {
     let literal_bits = input_len
         .checked_mul(DEFLATE_MAX_LITERAL_BITS - 8)?
         .checked_add(7)?;
@@ -2010,7 +2026,7 @@ fn reopen_shared(
 /// [`Package::from_source_catalog`] before allowing that parser to allocate
 /// its semantic snapshot.  The parser owns the concrete allocations, while
 /// this adapter owns the transaction-wide ceiling.
-fn charge_reopen_work(
+pub(crate) fn charge_reopen_work(
     source: &SourceCatalog,
     budget: &mut WireBudget,
 ) -> Result<(), BodyTableLockError> {
@@ -2260,7 +2276,10 @@ impl WireBudget {
         Ok(())
     }
 
-    fn charge_payload_references(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_references(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), BodyTableLockError> {
         self.charge_wire_work(amount)?;
         Self::charge_counter(
             &mut self.payload_references,
@@ -2375,7 +2394,7 @@ impl WireBudget {
         )
     }
 
-    fn charge_payload_items(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_items(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
         let limits = self
             .physical_limits
             .effective_archive_limits()
@@ -2797,6 +2816,11 @@ mod tests {
         let target = BodyTableTarget {
             table_position: 17,
             table_name: "private-table-name".into(),
+            sheet_identifier: NonZeroU64::new(0xfeed_babe).expect("identifier"),
+            sheet_component_index: 1,
+            sheet_object_index: 2,
+            sheet_message_index: 4,
+            sheet_message_type: 10_001,
             attachment_identifier: NonZeroU64::new(0xfeed_face).expect("identifier"),
             attachment_component_index: 2,
             attachment_object_index: 3,
@@ -2811,6 +2835,7 @@ mod tests {
             object_index: 23,
             message_index: 29,
             message_type: 6_003,
+            info_message_index: 29,
             body_component_index: 31,
             body_object_index: 37,
             body_message_index: 41,
