@@ -15953,6 +15953,137 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_numbers_comment_clear_metadata_prerequisite_accepts_combined_route(
+        self,
+    ) -> None:
+        """A future clear may pass only with the complete narrow guard set."""
+
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !global_comment_ownership_is_safe(edit.source, &located) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=combined_clear
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_partial_combined_guards(
+        self,
+    ) -> None:
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !global_comment_ownership_is_safe(edit.source, &located) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=combined_clear
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("unsupported entry owner guard" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_public_wire_boundary(
+        self,
+    ) -> None:
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !global_comment_ownership_is_safe(edit.source, &located) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root,
+                commit_body=combined_clear,
+                clear_body=(
+                    "        pub fn clear_table_cell_comment(&self) -> RawMessage {\n"
+                    "            self.edit_table_cell_comment().clear().commit()\n"
+                    "        }\n"
+                ),
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("public API exposes a raw/wire/Prost type" in item for item in violations),
+                violations,
+            )
+
     def test_numbers_comment_clear_metadata_prerequisite_rejects_generated_codec_path(
         self,
     ) -> None:
@@ -16039,7 +16170,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 )
             )
             self.assertTrue(
-                any("must not call PackageMetadata" in item for item in violations),
+                any("owner reaches PackageMetadata" in item for item in violations),
                 violations,
             )
             self.assertTrue(

@@ -12024,13 +12024,14 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
 ) -> list[str]:
     """Keep comment clears gated on the bounded metadata primitives.
 
-    A changed comment clear is still deliberately unsupported by the focused
-    Numbers owner.  Enabling it requires one atomic metadata publication that
-    removes the exact comment-graph registrations and advances the selected
-    current-component save tokens.  This ratchet records that prerequisite:
-    the hidden codec must expose typed selector/removal/save-token batches and
-    remain generated-Prost-free, while the focused clear route must continue to
-    fail closed before any cell-only rewrite is reachable.
+    A changed comment clear remains unsupported until its owner reaches one
+    atomic metadata publication that removes the exact comment-graph
+    registrations and advances the selected current-component save tokens.
+    Once that combined seam is reachable, admission is intentionally narrow:
+    the route must retain root-only, uniqueness/reply, and global-ownership
+    checks, and its semantic public boundary must not expose native IDs, wire
+    types, or generated-Prost materialization.  The reject-all route remains a
+    valid state while that implementation is absent.
     """
 
     violations: list[str] = []
@@ -12158,6 +12159,27 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
                 declaration.group(1), comment_code[opening + 1 : cursor - 1]
             )
 
+    def reachable_bodies(function_name: str) -> list[tuple[str, str]]:
+        """Return the local helper bodies reachable from one owner function."""
+
+        reachable: list[tuple[str, str]] = []
+        pending = [function_name]
+        visited: set[str] = set()
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            body = function_bodies.get(current)
+            if body is None:
+                continue
+            visited.add(current)
+            reachable.append((current, body))
+            for call in PACKAGE_METADATA_BARE_CALL.finditer(body):
+                called = call.group("name").removeprefix("r#")
+                if called in function_bodies and called not in visited:
+                    pending.append(called)
+        return reachable
+
     clear_body = function_bodies.get(NUMBERS_COMMENT_CLEAR_FUNCTION)
     if clear_body is None:
         violations.append(
@@ -12170,17 +12192,6 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
                 "focused Numbers comment clear must retain its typed staging "
                 f"clear path: {NUMBERS_COMMENT_SOURCE}"
             )
-        for function_name in (
-            PACKAGE_METADATA_REMOVE_FUNCTION,
-            PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
-            PACKAGE_METADATA_COMBINED_FUNCTION,
-        ):
-            if re.search(rf"\b{re.escape(function_name)}\b", clear_body) is not None:
-                violations.append(
-                    "focused Numbers comment clear must not call PackageMetadata "
-                    f"{function_name} before the combined publication route exists: "
-                    f"{NUMBERS_COMMENT_SOURCE}"
-                )
 
     commit_body = function_bodies.get(NUMBERS_COMMENT_COMMIT_FUNCTION)
     if commit_body is None:
@@ -12189,29 +12200,172 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
             f"{NUMBERS_COMMENT_COMMIT_FUNCTION}: {NUMBERS_COMMENT_SOURCE}"
         )
     else:
+        reachable = reachable_bodies(NUMBERS_COMMENT_COMMIT_FUNCTION)
+        reachable_code = "\n".join(body for _name, body in reachable)
+        combined_call = re.search(
+            rf"\b{re.escape(PACKAGE_METADATA_COMBINED_FUNCTION)}"
+            r"[ \t\r\n]*\(",
+            reachable_code,
+        )
+        has_combined_route = combined_call is not None
+
         unsupported = commit_body.find(NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR)
         rewrite = commit_body.find("rewrite_existing")
-        if unsupported < 0:
+        if not has_combined_route and unsupported < 0:
             violations.append(
                 "focused Numbers comment changed clear must fail with typed "
                 f"{NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR} before publication: "
                 f"{NUMBERS_COMMENT_SOURCE}"
             )
-        elif rewrite >= 0 and unsupported > rewrite:
+        elif not has_combined_route and rewrite >= 0 and unsupported > rewrite:
             violations.append(
                 "focused Numbers comment changed clear must reject before its "
                 f"rewrite path: {NUMBERS_COMMENT_SOURCE}"
             )
 
-    # Until the combined operation is implemented, no metadata primitive may
-    # be reachable from this focused owner.  This prevents a partial clear from
-    # removing a cell pointer while leaving stale UUID/external registrations.
+        if has_combined_route:
+            # The combined seam is the only permitted metadata route.  A
+            # removal-only or token-only call can otherwise make the native
+            # clear appear atomic while leaving the other side of the graph
+            # stale.
+            for function_name in (
+                PACKAGE_METADATA_REMOVE_FUNCTION,
+                PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
+            ):
+                if re.search(
+                    rf"\b{re.escape(function_name)}\b[ \t\r\n]*\(",
+                    reachable_code,
+                ) is not None:
+                    violations.append(
+                        "focused Numbers comment clear must use only the combined "
+                        f"PackageMetadata route, found {function_name}: "
+                        f"{NUMBERS_COMMENT_SOURCE}"
+                    )
+
+            # These checks encode the narrow root-only admission policy.  Each
+            # guard must fail with UnsupportedDependency nearby; a mere field
+            # mention is not enough to admit a destructive graph mutation.
+            required_guards = (
+                (
+                    "root-only/segment ownership",
+                    re.compile(r"\bEntryOwner[ \t\r\n]*::[ \t\r\n]*Root\b"),
+                    True,
+                ),
+                (
+                    "shared entry uniqueness",
+                    re.compile(
+                        r"\b(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)*refcount\b[\s\S]{0,100}"
+                        r"(?:!=|==|<|>)[\s\r\n]*1\b"
+                    ),
+                    True,
+                ),
+                (
+                    "single storage ownership",
+                    re.compile(
+                        r"\bstorage_occurrences\b[\s\S]{0,100}"
+                        r"(?:!=|==|<|>)[\s\r\n]*1\b"
+                    ),
+                    True,
+                ),
+                (
+                    "reply ownership",
+                    re.compile(
+                        r"\breplies\b[\s\r\n]{0,100}"
+                        r"(?:!=|==|<|>)[\s\r\n]*0\b"
+                    ),
+                    True,
+                ),
+                (
+                    "unsupported entry owner",
+                    re.compile(r"\bsupports_text_rewrite[ \t\r\n]*\("),
+                    True,
+                ),
+                (
+                    "global comment ownership",
+                    re.compile(r"\b(?:prove_global_comment_ownership|global_comment_ownership)\b"),
+                    False,
+                ),
+            )
+            for label, pattern, requires_unsupported in required_guards:
+                guard_match = pattern.search(reachable_code)
+                if guard_match is None:
+                    violations.append(
+                        "focused Numbers combined comment clear is missing its "
+                        f"{label} guard: {NUMBERS_COMMENT_SOURCE}"
+                    )
+                    continue
+                guard_region = reachable_code[
+                    max(0, guard_match.start() - 220) : guard_match.end() + 260
+                ]
+                if (
+                    "return Err" not in guard_region
+                    or (
+                        requires_unsupported
+                        and NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR not in guard_region
+                    )
+                ):
+                    guard_requirement = (
+                        f"for {label} with {NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR}: "
+                        if requires_unsupported
+                        else f"for {label}: "
+                    )
+                    violations.append(
+                        "focused Numbers combined comment clear must fail closed "
+                        + guard_requirement
+                        + f"{NUMBERS_COMMENT_SOURCE}"
+                    )
+
+            # Keep the semantic owner free of low-level public leakage and
+            # eager generated reads.  Internal raw surgery remains private;
+            # only public declarations and the reachable clear route are
+            # inspected here.
+            public_forbidden = re.compile(
+                r"\b(?:RawMessage|WireView|WireLimits|WireResourceLimit|"
+                r"Archive(?:Object)?|ObjectIdentifier|NativeId|native_id|"
+                r"ComponentSelector|RemovalBatch|SaveTokenBatch|"
+                r"RemovalSaveTokenBatch|prost|Message)\b"
+            )
+            for declaration, line_number in _rust_public_declarations(comment_source):
+                if public_forbidden.search(declaration) is None:
+                    continue
+                violations.append(
+                    "focused Numbers comment public API exposes a raw/wire/Prost "
+                    f"type: {NUMBERS_COMMENT_SOURCE}:{line_number}"
+                )
+            if re.search(r"\b(?:prost|prost_types)\b", comment_code) is not None:
+                violations.append(
+                    "focused Numbers combined comment clear retains a Prost "
+                    f"dependency marker: {NUMBERS_COMMENT_SOURCE}"
+                )
+            for label, pattern in PACKAGE_METADATA_NO_EAGER_DECODE_PATTERNS[:8]:
+                if pattern.search(reachable_code) is None:
+                    continue
+                violations.append(
+                    "focused Numbers combined comment clear reaches "
+                    f"{label}: {NUMBERS_COMMENT_SOURCE}"
+                )
+
+    # In the reject-all state, no metadata primitive may be reachable from this
+    # focused owner.  This prevents a partial clear from removing a cell
+    # pointer while leaving stale UUID/external registrations.
+    reachable_code = "\n".join(
+        body for _name, body in reachable_bodies(NUMBERS_COMMENT_COMMIT_FUNCTION)
+    )
+    has_combined_route = re.search(
+        rf"\b{re.escape(PACKAGE_METADATA_COMBINED_FUNCTION)}"
+        r"[ \t\r\n]*\(",
+        reachable_code,
+    ) is not None
     for function_name in (
         PACKAGE_METADATA_REMOVE_FUNCTION,
         PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
         PACKAGE_METADATA_COMBINED_FUNCTION,
     ):
-        if re.search(rf"\b{re.escape(function_name)}\b", comment_code) is None:
+        if has_combined_route and function_name == PACKAGE_METADATA_COMBINED_FUNCTION:
+            continue
+        if re.search(
+            rf"\b{re.escape(function_name)}\b[ \t\r\n]*\(", comment_code
+        ) is None:
             continue
         line_number = comment_code.count(
             "\n", 0, comment_code.find(function_name)
