@@ -24,6 +24,9 @@ const CAPTIONS: [u64; 2] = [130, 131];
 const STORAGES: [u64; 2] = [140, 141];
 const PLACEMENTS: [u64; 2] = [150, 151];
 const STYLES: [u64; 2] = [160, 161];
+const THEME: u64 = 80;
+const STYLESHEET: u64 = 81;
+const PARAGRAPH_STYLE: u64 = 82;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const STANDIN_MESSAGE_TYPE: u32 = 3_097;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
@@ -76,7 +79,10 @@ fn movie_payload(movie: usize, caption_identifier: Option<u64>) -> Vec<u8> {
             }),
             parent: Some(reference(SLIDE)),
             title: Some(reference(TITLES[movie])),
-            caption: caption_identifier.map(reference),
+            // A stand-in is still the canonical MovieArchive caption edge;
+            // `caption_identifier` only selects an alternate edge for hostile
+            // alias fixtures.
+            caption: Some(reference(caption_identifier.unwrap_or(CAPTIONS[movie]))),
             accessibility_description: Some("Test movie".to_owned()),
             ..tsd::DrawableArchive::default()
         },
@@ -151,7 +157,7 @@ fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
     }
 }
 
-fn metadata_component(
+fn metadata_component_payload(
     identifier: u64,
     locator: &str,
     token: u64,
@@ -180,10 +186,10 @@ fn metadata_component(
 
 fn metadata_payload() -> TestResult<Vec<u8>> {
     let ids = [
-        1, 2, 3, 4, 80, 81, 90, 100, 101, 110, 111, 130, 131, 140, 141, 150, 151, 160, 161,
+        1, 2, 3, 4, 80, 81, 82, 90, 100, 101, 110, 111, 130, 131, 140, 141, 150, 151, 160, 161,
     ];
-    let document = metadata_component(DOCUMENT_COMPONENT, "Document", 10, &ids)?;
-    let unrelated = metadata_component(UNRELATED_COMPONENT, "Unrelated", 7, &[900])?;
+    let document = metadata_component_payload(DOCUMENT_COMPONENT, "Document", 10, &ids)?;
+    let unrelated = metadata_component_payload(UNRELATED_COMPONENT, "Unrelated", 7, &[900])?;
     let versioned = tsp::ComponentInfo {
         identifier: DOCUMENT_COMPONENT,
         preferred_locator: "Document".to_owned(),
@@ -205,6 +211,34 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
         METADATA_UNKNOWN_MARKER,
     )?;
     Ok(payload)
+}
+
+fn metadata_payload_with_last_identifier(last_identifier: u64) -> TestResult<Vec<u8>> {
+    let payload = metadata_payload()?;
+    let mut rewritten = Vec::with_capacity(payload.len() + 10);
+    let mut replaced = false;
+    for field in WireView::parse(&payload)?.fields() {
+        if !replaced && field.number() == 1 {
+            append_varint_field(&mut rewritten, 1, last_identifier)?;
+            replaced = true;
+        } else {
+            rewritten.extend_from_slice(field.raw());
+        }
+    }
+    if !replaced {
+        append_varint_field(&mut rewritten, 1, last_identifier)?;
+    }
+    Ok(rewritten)
+}
+
+fn caption_theme_payload() -> TestResult<Vec<u8>> {
+    let mut presets = Vec::new();
+    append_length_delimited_field(&mut presets, 1, &reference(PARAGRAPH_STYLE).encode_to_vec())?;
+    let mut theme_super = Vec::new();
+    append_length_delimited_field(&mut theme_super, 210, &presets)?;
+    let mut theme = Vec::new();
+    append_length_delimited_field(&mut theme, 1, &theme_super)?;
+    Ok(theme)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -255,8 +289,9 @@ fn synthetic_package_with_captions(captions: [Option<&str>; 2]) -> TestResult<Ve
         object(2, 2, show.encode_to_vec())?,
         object(SLIDE_NODE, 4, node.encode_to_vec())?,
         object_with_references(SLIDE, 5, slide.encode_to_vec(), MOVIES.to_vec())?,
-        object(80, 10, Vec::new())?,
-        object(81, 9_002, Vec::new())?,
+        object(THEME, 10, caption_theme_payload()?)?,
+        object(STYLESHEET, 9_002, Vec::new())?,
+        object(PARAGRAPH_STYLE, 9_003, Vec::new())?,
         object(90, 9_003, Vec::new())?,
     ];
     for movie in 0..MOVIES.len() {
@@ -269,7 +304,7 @@ fn synthetic_package_with_captions(captions: [Option<&str>; 2]) -> TestResult<Ve
         objects.push(object_with_references(
             MOVIES[movie],
             MOVIE_MESSAGE_TYPE,
-            movie_payload(movie, caption),
+            movie_payload(movie, Some(CAPTIONS[movie])),
             refs.to_vec(),
         )?);
         objects.push(object(TITLES[movie], STANDIN_MESSAGE_TYPE, Vec::new())?);
@@ -312,6 +347,33 @@ fn synthetic_package_with_captions(captions: [Option<&str>; 2]) -> TestResult<Ve
     )?)
 }
 
+fn synthetic_metadata_package_with_captions(
+    captions: [Option<&str>; 2],
+    last_identifier: u64,
+) -> TestResult<Vec<u8>> {
+    let source = synthetic_package_with_captions(captions)?;
+    let metadata = component(vec![object(
+        METADATA_OBJECT,
+        11_006,
+        metadata_payload_with_last_identifier(last_identifier)?,
+    )?])?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let entries = catalog
+        .iter()
+        .map(|entry| {
+            if entry.name() == METADATA_MEMBER {
+                (entry.name(), metadata.as_slice())
+            } else {
+                (entry.name(), entry.data())
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
@@ -334,6 +396,74 @@ fn metadata_message_payload(package: &[u8]) -> TestResult<Vec<u8>> {
         .map(|message| message.data.clone())
         .ok_or_else(|| io::Error::other("missing metadata object"))
         .map_err(Into::into)
+}
+
+fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
+    let replacement = SnappyStream::compress(
+        &Archive {
+            objects: vec![object(METADATA_OBJECT, 11_006, payload)?],
+        }
+        .to_bytes()?,
+    )?;
+    let catalog = Catalog::from_bytes(source)?;
+    let entries = catalog
+        .iter()
+        .map(|entry| {
+            if entry.name() == METADATA_MEMBER {
+                (entry.name(), replacement.as_slice())
+            } else {
+                (entry.name(), entry.data())
+            }
+        })
+        .collect::<Vec<_>>();
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+fn with_metadata_reserved_uuid(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let payload = metadata_message_payload(source)?;
+    let mut rewritten = Vec::with_capacity(payload.len() + 32);
+    let mut replaced = false;
+    for field in WireView::parse(&payload)?.fields() {
+        if field.number() != 3 || replaced {
+            rewritten.extend_from_slice(field.raw());
+            continue;
+        }
+        let component = tsp::ComponentInfo::decode(field.payload())?;
+        if component.identifier != DOCUMENT_COMPONENT {
+            rewritten.extend_from_slice(field.raw());
+            continue;
+        }
+        let mut component_payload = field.payload().to_vec();
+        let entry = metadata_uuid_entry(identifier).encode_to_vec();
+        append_length_delimited_field(&mut component_payload, 11, &entry)?;
+        append_length_delimited_field(&mut rewritten, 3, &component_payload)?;
+        replaced = true;
+    }
+    if !replaced {
+        return Err(io::Error::other("missing document metadata component").into());
+    }
+    replace_metadata_payload(source, rewritten)
+}
+
+fn with_duplicate_current_metadata_component(source: &[u8]) -> TestResult<Vec<u8>> {
+    let payload = metadata_message_payload(source)?;
+    let duplicate = WireView::parse(&payload)?
+        .fields()
+        .find(|field| {
+            if field.number() != 3 {
+                return false;
+            }
+            tsp::ComponentInfo::decode(field.payload())
+                .is_ok_and(|component| component.identifier == DOCUMENT_COMPONENT)
+        })
+        .map(|field| field.raw().to_vec())
+        .ok_or_else(|| io::Error::other("missing document metadata component"))?;
+    let mut rewritten = payload;
+    rewritten.extend_from_slice(&duplicate);
+    replace_metadata_payload(source, rewritten)
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -378,6 +508,22 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
         })
         .map(|message| message.data.clone())
         .ok_or_else(|| io::Error::other("missing requested movie message").into())
+}
+
+fn movie_caption_identifier(package: &[u8], identifier: u64) -> TestResult<Option<u64>> {
+    let payload = message_payload(package, identifier, MOVIE_MESSAGE_TYPE)?;
+    Ok(tsd::MovieArchive::decode(payload.as_slice())?
+        .super_
+        .caption
+        .map(|reference| reference.identifier))
+}
+
+fn movie_title_identifier(package: &[u8], identifier: u64) -> TestResult<Option<u64>> {
+    let payload = message_payload(package, identifier, MOVIE_MESSAGE_TYPE)?;
+    Ok(tsd::MovieArchive::decode(payload.as_slice())?
+        .super_
+        .title
+        .map(|reference| reference.identifier))
 }
 
 fn with_document_message_payload(
@@ -549,6 +695,43 @@ fn metadata_component_raw_payload(
     Err(io::Error::other("missing metadata component").into())
 }
 
+fn metadata_component(
+    metadata: &tsp::PackageMetadata,
+    identifier: u64,
+    versioned: bool,
+) -> TestResult<&tsp::ComponentInfo> {
+    let components = if versioned {
+        &metadata.versioned_components
+    } else {
+        &metadata.components
+    };
+    components
+        .iter()
+        .find(|component| component.identifier == identifier)
+        .ok_or_else(|| io::Error::other("missing synthetic metadata component").into())
+}
+
+fn metadata_component_raw_fields(
+    payload: &[u8],
+    identifier: u64,
+    number: u32,
+) -> TestResult<Vec<Vec<u8>>> {
+    for field in WireView::parse(payload)?.fields() {
+        if field.number() != 3 {
+            continue;
+        }
+        let component = tsp::ComponentInfo::decode(field.payload())?;
+        if component.identifier == identifier {
+            return Ok(WireView::parse(field.payload())?
+                .fields()
+                .filter(|nested| nested.number() == number)
+                .map(|nested| nested.raw().to_vec())
+                .collect());
+        }
+    }
+    Err(io::Error::other("missing synthetic current metadata component").into())
+}
+
 fn decoded_metadata(package: &[u8]) -> TestResult<tsp::PackageMetadata> {
     Ok(tsp::PackageMetadata::decode(
         metadata_message_payload(package)?.as_slice(),
@@ -570,8 +753,9 @@ fn reads_active_and_standin_movie_captions() -> TestResult<()> {
 }
 
 #[test]
-fn no_op_and_graph_create_clear_refuse_atomically() -> TestResult<()> {
-    let source = synthetic_package()?;
+fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
     let package = Package::from_bytes(&source)?;
     let no_op = package
         .edit_slide_movie_caption(0usize, 0usize)?
@@ -579,26 +763,6 @@ fn no_op_and_graph_create_clear_refuse_atomically() -> TestResult<()> {
         .commit()?;
     assert!(no_op.patch().is_noop());
     assert_eq!(exact_bytes(no_op.package())?, source);
-
-    let create = package
-        .edit_slide_movie_caption(0usize, 1usize)?
-        .set("new graph")?
-        .commit();
-    assert!(matches!(
-        create,
-        Err(SlideMovieCaptionError::UnsupportedDependency)
-    ));
-    assert_eq!(exact_bytes(&package)?, source);
-
-    let clear = package
-        .edit_slide_movie_caption(0usize, 0usize)?
-        .clear()?
-        .commit();
-    assert!(matches!(
-        clear,
-        Err(SlideMovieCaptionError::UnsupportedDependency)
-    ));
-    assert_eq!(exact_bytes(&package)?, source);
 
     let catalog = Catalog::from_bytes(&source)?;
     let no_metadata_source = litchi_iwa_archive::package::to_bytes(
@@ -621,6 +785,439 @@ fn no_op_and_graph_create_clear_refuse_atomically() -> TestResult<()> {
             | Err(SlideMovieCaptionError::UnsupportedDependency)
     ));
     assert_eq!(exact_bytes(&no_metadata_package)?, no_metadata_source);
+
+    let metadata_create_source = synthetic_package_with_captions([None, Some("South")])?;
+    let metadata_create_catalog = Catalog::from_bytes(&metadata_create_source)?;
+    let no_metadata_create_source = litchi_iwa_archive::package::to_bytes(
+        metadata_create_catalog
+            .iter()
+            .filter(|entry| entry.name() != METADATA_MEMBER)
+            .map(|entry| (entry.name(), entry.data()))
+            .collect::<Vec<_>>(),
+        Limits::default(),
+    )?;
+    let no_metadata_create = Package::from_bytes(&no_metadata_create_source)?;
+    let create_without_metadata = no_metadata_create
+        .edit_slide_movie_caption(0usize, 0usize)?
+        .set("created without metadata")?
+        .commit();
+    assert!(matches!(
+        create_without_metadata,
+        Err(SlideMovieCaptionError::UnsupportedSource)
+            | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&no_metadata_create)?, no_metadata_create_source);
+
+    let metadata_clear_source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+    )?;
+    let metadata_clear_catalog = Catalog::from_bytes(&metadata_clear_source)?;
+    let no_metadata_clear_source = litchi_iwa_archive::package::to_bytes(
+        metadata_clear_catalog
+            .iter()
+            .filter(|entry| entry.name() != METADATA_MEMBER)
+            .map(|entry| (entry.name(), entry.data()))
+            .collect::<Vec<_>>(),
+        Limits::default(),
+    )?;
+    let no_metadata_clear = Package::from_bytes(&no_metadata_clear_source)?;
+    let clear_without_metadata = no_metadata_clear
+        .edit_slide_movie_caption(0usize, 0usize)?
+        .clear()?
+        .commit();
+    assert!(matches!(
+        clear_without_metadata,
+        Err(SlideMovieCaptionError::UnsupportedSource)
+            | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&no_metadata_clear)?, no_metadata_clear_source);
+    Ok(())
+}
+
+#[test]
+fn canonical_movie_standin_creation_updates_metadata_and_inverse_exactly() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([None, Some("South")], METADATA_LAST_IDENTIFIER)?;
+    let before_metadata = metadata_message_payload(&source)?;
+    let before_field_one = raw_fields(&before_metadata, 1)?;
+    let before_root_unknown = raw_fields(&before_metadata, METADATA_ROOT_UNKNOWN_FIELD)?;
+    let before_component_unknown = metadata_component_raw_fields(
+        &before_metadata,
+        DOCUMENT_COMPONENT,
+        METADATA_COMPONENT_UNKNOWN_FIELD,
+    )?;
+    let before_unrelated =
+        metadata_component_raw_payload(&before_metadata, UNRELATED_COMPONENT, false)?;
+    let before_versioned =
+        metadata_component_raw_payload(&before_metadata, DOCUMENT_COMPONENT, true)?;
+    let before_title_identifier = movie_title_identifier(&source, MOVIES[0])?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.slide_movie_caption(0usize, MovieSelector::index(0))?,
+        None
+    );
+
+    let commit = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(0))?
+        .set("West")?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .slide_movie_caption(0usize, MovieSelector::index(0))?,
+        Some("West".to_owned())
+    );
+    assert_eq!(
+        commit
+            .package()
+            .slide_movie_caption(0usize, MovieSelector::index(1))?,
+        Some("South".to_owned())
+    );
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 2);
+    assert_eq!(commit.diagnostics().deleted_previews(), 3);
+    assert!(commit.diagnostics().full_reparse_performed());
+
+    let target = exact_bytes(commit.package())?;
+    let metadata = decoded_metadata(&target)?;
+    assert_eq!(metadata.last_object_identifier, 1_004);
+    assert_eq!(metadata.save_token, Some(11));
+    assert_eq!(
+        metadata_component(&metadata, DOCUMENT_COMPONENT, false)?.save_token,
+        Some(11)
+    );
+    assert_eq!(
+        metadata_component(&metadata, UNRELATED_COMPONENT, false)?.save_token,
+        Some(7)
+    );
+    assert_eq!(
+        metadata_component(&metadata, DOCUMENT_COMPONENT, true)?.save_token,
+        Some(3)
+    );
+    assert_ne!(
+        raw_fields(&metadata_message_payload(&target)?, 1)?,
+        before_field_one
+    );
+    assert_eq!(
+        raw_fields(
+            &metadata_message_payload(&target)?,
+            METADATA_ROOT_UNKNOWN_FIELD
+        )?,
+        before_root_unknown
+    );
+    assert_eq!(
+        metadata_component_raw_fields(
+            &metadata_message_payload(&target)?,
+            DOCUMENT_COMPONENT,
+            METADATA_COMPONENT_UNKNOWN_FIELD,
+        )?,
+        before_component_unknown
+    );
+    assert_eq!(
+        metadata_component_raw_payload(
+            &metadata_message_payload(&target)?,
+            UNRELATED_COMPONENT,
+            false,
+        )?,
+        before_unrelated
+    );
+    assert_eq!(
+        metadata_component_raw_payload(
+            &metadata_message_payload(&target)?,
+            DOCUMENT_COMPONENT,
+            true,
+        )?,
+        before_versioned
+    );
+    let selected = metadata_component(&metadata, DOCUMENT_COMPONENT, false)?;
+    for identifier in [1_001, 1_002, 1_003, 1_004] {
+        assert!(
+            selected
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == identifier),
+            "new caption graph identifier {identifier} is not registered"
+        );
+    }
+
+    let document = Archive::parse(&document_stream(&target)?)?;
+    assert_eq!(
+        document
+            .object(CAPTIONS[0])
+            .and_then(|object| object.messages.first())
+            .map(|message| message.type_),
+        Some(STANDIN_MESSAGE_TYPE)
+    );
+    for (identifier, type_) in [
+        (1_001, SHAPE_STYLE_MESSAGE_TYPE),
+        (1_002, CAPTION_INFO_MESSAGE_TYPE),
+        (1_003, STORAGE_MESSAGE_TYPE),
+        (1_004, CAPTION_PLACEMENT_MESSAGE_TYPE),
+    ] {
+        assert_eq!(
+            document
+                .object(identifier)
+                .and_then(|object| object.messages.first())
+                .map(|message| message.type_),
+            Some(type_),
+            "new graph object {identifier} has the wrong type"
+        );
+    }
+    assert_eq!(movie_caption_identifier(&target, MOVIES[0])?, Some(1_002));
+    assert_eq!(
+        movie_title_identifier(&target, MOVIES[0])?,
+        before_title_identifier
+    );
+    assert!(
+        Catalog::from_bytes(&target)?
+            .iter()
+            .all(|entry| !entry.name().starts_with("preview"))
+    );
+    for name in ["Data/sentinel.bin", "Data/movie.mov", "Data/poster.png"] {
+        assert_eq!(
+            Catalog::from_bytes(&source)?
+                .iter()
+                .find(|entry| entry.name() == name)
+                .map(|entry| entry.data()),
+            Catalog::from_bytes(&target)?
+                .iter()
+                .find(|entry| entry.name() == name)
+                .map(|entry| entry.data())
+        );
+    }
+    let restored = commit
+        .package()
+        .apply_slide_movie_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn active_movie_caption_removal_allocates_fresh_standin_and_inverse_exactly() -> TestResult<()> {
+    let source = synthetic_metadata_package_with_captions(
+        [Some("North"), Some("South")],
+        METADATA_LAST_IDENTIFIER,
+    )?;
+    let before_metadata = metadata_message_payload(&source)?;
+    let before_field_one = raw_fields(&before_metadata, 1)?;
+    let before_root_unknown = raw_fields(&before_metadata, METADATA_ROOT_UNKNOWN_FIELD)?;
+    let before_component_unknown = metadata_component_raw_fields(
+        &before_metadata,
+        DOCUMENT_COMPONENT,
+        METADATA_COMPONENT_UNKNOWN_FIELD,
+    )?;
+    let before_title_identifier = movie_title_identifier(&source, MOVIES[0])?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(0))?
+        .clear()?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .slide_movie_caption(0usize, MovieSelector::index(0))?,
+        None
+    );
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 2);
+    assert_eq!(commit.diagnostics().deleted_previews(), 3);
+
+    let target = exact_bytes(commit.package())?;
+    let metadata = decoded_metadata(&target)?;
+    assert_eq!(metadata.last_object_identifier, 1_001);
+    assert_eq!(metadata.save_token, Some(11));
+    assert_eq!(
+        metadata_component(&metadata, DOCUMENT_COMPONENT, false)?.save_token,
+        Some(11)
+    );
+    assert_eq!(raw_fields(&metadata_message_payload(&target)?, 1)?.len(), 1);
+    assert_ne!(
+        raw_fields(&metadata_message_payload(&target)?, 1)?,
+        before_field_one
+    );
+    assert_eq!(
+        raw_fields(
+            &metadata_message_payload(&target)?,
+            METADATA_ROOT_UNKNOWN_FIELD
+        )?,
+        before_root_unknown
+    );
+    assert_eq!(
+        metadata_component_raw_fields(
+            &metadata_message_payload(&target)?,
+            DOCUMENT_COMPONENT,
+            METADATA_COMPONENT_UNKNOWN_FIELD,
+        )?,
+        before_component_unknown
+    );
+    let selected = metadata_component(&metadata, DOCUMENT_COMPONENT, false)?;
+    for identifier in [CAPTIONS[0], STORAGES[0], PLACEMENTS[0], STYLES[0], 1_001] {
+        assert!(
+            selected
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == identifier),
+            "caption removal lost UUID registration {identifier}"
+        );
+    }
+    let document = Archive::parse(&document_stream(&target)?)?;
+    for (identifier, type_) in [
+        (CAPTIONS[0], CAPTION_INFO_MESSAGE_TYPE),
+        (STORAGES[0], STORAGE_MESSAGE_TYPE),
+        (PLACEMENTS[0], CAPTION_PLACEMENT_MESSAGE_TYPE),
+        (STYLES[0], SHAPE_STYLE_MESSAGE_TYPE),
+    ] {
+        assert_eq!(
+            document
+                .object(identifier)
+                .and_then(|object| object.messages.first())
+                .map(|message| message.type_),
+            Some(type_),
+            "removed caption graph object {identifier} was unexpectedly culled"
+        );
+    }
+    assert_eq!(
+        document
+            .object(1_001)
+            .and_then(|object| object.messages.first())
+            .map(|message| message.type_),
+        Some(STANDIN_MESSAGE_TYPE)
+    );
+    assert_eq!(movie_caption_identifier(&target, MOVIES[0])?, Some(1_001));
+    assert_eq!(
+        movie_title_identifier(&target, MOVIES[0])?,
+        before_title_identifier
+    );
+    assert_eq!(
+        raw_fields(
+            &message_payload(&target, STORAGES[0], STORAGE_MESSAGE_TYPE)?,
+            STORAGE_UNKNOWN_FIELD,
+        )?,
+        raw_fields(
+            &message_payload(&source, STORAGES[0], STORAGE_MESSAGE_TYPE)?,
+            STORAGE_UNKNOWN_FIELD,
+        )?
+    );
+    assert!(
+        Catalog::from_bytes(&target)?
+            .iter()
+            .all(|entry| !entry.name().starts_with("preview"))
+    );
+    let restored = commit
+        .package()
+        .apply_slide_movie_caption(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> TestResult<()> {
+    let source =
+        synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
+
+    let mut alias_archive = Archive::parse(&document_stream(&source)?)?;
+    let first_movie = alias_archive
+        .object_mut(MOVIES[0])
+        .ok_or_else(|| io::Error::other("missing first movie"))?;
+    first_movie.messages[0].data = movie_payload(0, Some(CAPTIONS[1]));
+    first_movie.archive_info.message_infos[0].object_references =
+        vec![TITLES[0], CAPTIONS[1], STYLES[0]];
+    let aliased = replace_document_stream(&source, alias_archive)?;
+    let package = Package::from_bytes(&aliased)?;
+    let result = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(1))
+        .and_then(|edit| edit.set("created"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::InvalidSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, aliased);
+
+    let malformed_standin = {
+        let mut archive = Archive::parse(&document_stream(&source)?)?;
+        archive
+            .object_mut(CAPTIONS[1])
+            .ok_or_else(|| io::Error::other("missing stand-in"))?
+            .messages[0]
+            .data = vec![0x08, 0x01];
+        replace_document_stream(&source, archive)?
+    };
+    let package = Package::from_bytes(&malformed_standin)?;
+    let result = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(1))
+        .and_then(|edit| edit.set("created"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&package)?, malformed_standin);
+
+    let duplicate_metadata = with_duplicate_current_metadata_component(&source)?;
+    let package = Package::from_bytes(&duplicate_metadata)?;
+    let result = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(1))
+        .and_then(|edit| edit.set("created"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&package)?, duplicate_metadata);
+
+    let overflow = synthetic_metadata_package_with_captions([Some("North"), None], u64::MAX)?;
+    let package = Package::from_bytes(&overflow)?;
+    let result = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(1))
+        .and_then(|edit| edit.set("created"))
+        .and_then(|edit| edit.commit());
+    assert!(matches!(
+        result,
+        Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::LimitExceeded { .. })
+    ));
+    assert_eq!(exact_bytes(&package)?, overflow);
+
+    let reserved = with_metadata_reserved_uuid(&source, METADATA_LAST_IDENTIFIER + 1)?;
+    let package = Package::from_bytes(&reserved)?;
+    let result = package
+        .edit_slide_movie_caption(0usize, MovieSelector::index(1))?
+        .set("created")?
+        .commit()?;
+    let target = exact_bytes(result.package())?;
+    let metadata = decoded_metadata(&target)?;
+    assert_eq!(metadata.last_object_identifier, 1_005);
+    let selected = metadata_component(&metadata, DOCUMENT_COMPONENT, false)?;
+    for identifier in [1_002, 1_003, 1_004, 1_005] {
+        assert!(
+            selected
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == identifier),
+            "reserved identifier allocation skipped metadata UUID {identifier}"
+        );
+    }
+    assert_eq!(movie_caption_identifier(&target, MOVIES[1])?, Some(1_003));
+    assert!(
+        Archive::parse(&document_stream(&target)?)?
+            .object(METADATA_LAST_IDENTIFIER + 1)
+            .is_none()
+    );
+    assert_eq!(
+        result
+            .package()
+            .apply_slide_movie_caption(&result.patch().inverse())
+            .map(|restored| exact_bytes(restored.package()))??,
+        reserved
+    );
     Ok(())
 }
 
@@ -629,8 +1226,7 @@ fn active_replacement_updates_selected_caption_and_inverse_exactly() -> TestResu
     let source = synthetic_package_with_captions([Some("North"), Some("South")])?;
     let package = Package::from_bytes(&source)?;
     let before_metadata = metadata_message_payload(&source)?;
-    let before_movie = message_payload(&source, MOVIES[0], MOVIE_MESSAGE_TYPE)?;
-    let before_title_edge = raw_fields(&before_movie, 1)?;
+    let before_title_identifier = movie_title_identifier(&source, MOVIES[0])?;
     let before_field_one = raw_fields(&before_metadata, 1)?;
     let before_root_unknown = raw_fields(&before_metadata, METADATA_ROOT_UNKNOWN_FIELD)?;
     let before_selected_component =
@@ -665,8 +1261,10 @@ fn active_replacement_updates_selected_caption_and_inverse_exactly() -> TestResu
     );
     let target = exact_bytes(commit.package())?;
     let target_metadata = metadata_message_payload(&target)?;
-    let target_movie = message_payload(&target, MOVIES[0], MOVIE_MESSAGE_TYPE)?;
-    assert_eq!(raw_fields(&target_movie, 1)?, before_title_edge);
+    assert_eq!(
+        movie_title_identifier(&target, MOVIES[0])?,
+        before_title_identifier
+    );
     let before_storage = message_payload(&source, STORAGES[0], STORAGE_MESSAGE_TYPE)?;
     let target_storage = message_payload(&target, STORAGES[0], STORAGE_MESSAGE_TYPE)?;
     assert_eq!(

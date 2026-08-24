@@ -1,11 +1,10 @@
-//! Native title and caption CRUD for Keynote slide movies.
+//! Native title CRUD and selector-based caption bridging for Keynote slide movies.
 
 use litchi_core::Position;
 use litchi_keynote::MovieSelector;
 use prost::Message;
 
 use super::*;
-use crate::DrawableTitleCaption;
 use crate::image_caption::{
     CAPTION_INFO_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind,
     caption_objects, patch_drawable_caption_reference, replace_object_reference,
@@ -23,25 +22,22 @@ pub(super) struct MovieCaptionSlot {
 }
 
 impl KeynoteEditor {
-    /// Read the native title and caption attached to one ordinary slide movie.
-    pub fn slide_movie_title_caption(
+    /// Read the native title attached to one movie selected by source position.
+    pub fn slide_movie_title_by_selector(
         &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<DrawableTitleCaption> {
-        let mut title_caption = movie_title_caption(self, slide_index, drawable_object_id)?;
-        if movie_caption_slot(
-            self,
-            slide_index,
-            drawable_object_id,
-            DrawableCaptionKind::Caption,
-        )?
-        .storage_id
-        .is_some()
-        {
-            title_caption.caption = focused_movie_caption(self, slide_index, drawable_object_id)?;
-        }
-        Ok(title_caption)
+        slide_position: Position,
+        selector: MovieSelector,
+    ) -> Result<Option<String>> {
+        let media = self.slide_media_infos(slide_position.get())?;
+        let movie = media.get(selector.as_index()).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Keynote movie selector {} is out of bounds on slide {}",
+                selector.as_index(),
+                slide_position.get()
+            ))
+        })?;
+        self.require_file_movie(slide_position.get(), movie.drawable_object_id)?;
+        movie_title(self, slide_position.get(), movie.drawable_object_id)
     }
 
     /// Create or replace one ordinary slide movie's native title.
@@ -51,13 +47,7 @@ impl KeynoteEditor {
         drawable_object_id: u64,
         title: &str,
     ) -> Result<()> {
-        set_slide_movie_caption_legacy(
-            self,
-            slide_index,
-            drawable_object_id,
-            title,
-            DrawableCaptionKind::Title,
-        )
+        set_slide_movie_title_legacy(self, slide_index, drawable_object_id, title)
     }
 
     /// Remove one ordinary slide movie's native title.
@@ -69,65 +59,77 @@ impl KeynoteEditor {
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<bool> {
-        remove_slide_movie_caption_legacy(
-            self,
-            slide_index,
-            drawable_object_id,
-            DrawableCaptionKind::Title,
-        )
+        remove_slide_movie_title_legacy(self, slide_index, drawable_object_id)
     }
 
-    /// Create or replace one ordinary slide movie's native caption.
-    pub fn set_slide_movie_caption(
+    /// Read one ordinary slide movie's native caption by semantic selector.
+    pub fn slide_movie_caption_by_selector(
+        &self,
+        slide_position: Position,
+        selector: MovieSelector,
+    ) -> Result<Option<String>> {
+        focused_movie_caption_package(self)?
+            .slide_movie_caption(slide_position, selector)
+            .map_err(map_focused_movie_caption_error)
+    }
+
+    /// Create or replace one ordinary slide movie's native caption by selector.
+    pub fn set_slide_movie_caption_by_selector(
         &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
+        slide_position: Position,
+        selector: MovieSelector,
         caption: &str,
     ) -> Result<()> {
-        set_slide_movie_caption_host(self, slide_index, drawable_object_id, caption)
+        let package = focused_movie_caption_package(self)?;
+        let edit = package
+            .edit_slide_movie_caption(slide_position, selector)
+            .map_err(map_focused_movie_caption_error)?;
+        let edit = edit.set(caption).map_err(map_focused_movie_caption_error)?;
+        let commit = edit.commit().map_err(map_focused_movie_caption_error)?;
+        if commit.patch().is_noop() {
+            return Ok(());
+        }
+        replace_from_focused_movie_caption_commit(self, commit)
     }
 
-    /// Remove one ordinary slide movie's native caption.
+    /// Remove one ordinary slide movie's native caption by selector.
     ///
     /// Returns whether a caption was present. Native iWork removal preserves
     /// the prior caption graph for undo history and attaches a fresh empty
     /// stand-in.
-    pub fn remove_slide_movie_caption(
+    pub fn remove_slide_movie_caption_by_selector(
         &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
+        slide_position: Position,
+        selector: MovieSelector,
     ) -> Result<bool> {
-        remove_slide_movie_caption_host(self, slide_index, drawable_object_id)
+        let package = focused_movie_caption_package(self)?;
+        let edit = package
+            .edit_slide_movie_caption(slide_position, selector)
+            .map_err(map_focused_movie_caption_error)?;
+        let had_caption = edit.before().is_some();
+        let edit = edit.clear().map_err(map_focused_movie_caption_error)?;
+        let commit = edit.commit().map_err(map_focused_movie_caption_error)?;
+        if commit.patch().is_noop() {
+            return Ok(false);
+        }
+        replace_from_focused_movie_caption_commit(self, commit)?;
+        Ok(had_caption)
     }
 }
 
-fn movie_title_caption(
+fn movie_title(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-) -> Result<DrawableTitleCaption> {
+) -> Result<Option<String>> {
     editor.require_file_movie(slide_index, drawable_object_id)?;
     let graph = ObjectGraph::read(editor.package())?;
     let movie: tsd::MovieArchive =
         graph.decode_type(drawable_object_id, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
-    Ok(DrawableTitleCaption {
-        title: movie_caption_slot_from_reference(
-            &graph,
-            movie.super_.title,
-            DrawableCaptionKind::Title,
-        )?
+    movie_caption_slot_from_reference(&graph, movie.super_.title, DrawableCaptionKind::Title)?
         .storage_id
         .map(|storage_id| graph.storage_text(storage_id))
-        .transpose()?,
-        caption: movie_caption_slot_from_reference(
-            &graph,
-            movie.super_.caption,
-            DrawableCaptionKind::Caption,
-        )?
-        .storage_id
-        .map(|storage_id| graph.storage_text(storage_id))
-        .transpose()?,
-    })
+        .transpose()
 }
 
 fn movie_caption_slot(
@@ -201,127 +203,6 @@ fn movie_caption_slot_from_reference(
     })
 }
 
-fn set_slide_movie_caption_host(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-    text: &str,
-) -> Result<()> {
-    editor.require_file_movie(slide_index, drawable_object_id)?;
-    if movie_caption_slot(
-        editor,
-        slide_index,
-        drawable_object_id,
-        DrawableCaptionKind::Caption,
-    )?
-    .storage_id
-    .is_none()
-    {
-        // Phase-1's focused owner does not admit this host-created stand-in;
-        // retain the established native graph creation path explicitly.
-        return set_slide_movie_caption_legacy(
-            editor,
-            slide_index,
-            drawable_object_id,
-            text,
-            DrawableCaptionKind::Caption,
-        );
-    }
-    let selector = movie_selector_for_drawable(editor, slide_index, drawable_object_id)?;
-    let package = focused_movie_caption_package(editor)?;
-    let edit = package
-        .edit_slide_movie_caption(Position::new(slide_index), selector)
-        .map_err(map_focused_movie_caption_error)?;
-    let had_caption = edit.before().is_some();
-    let edit = edit.set(text).map_err(map_focused_movie_caption_error)?;
-    let commit = match edit.commit() {
-        Ok(commit) => commit,
-        Err(litchi_keynote::SlideMovieCaptionError::UnsupportedDependency) if !had_caption => {
-            // Phase-1's focused owner does not synthesize a missing caption graph.
-            return set_slide_movie_caption_legacy(
-                editor,
-                slide_index,
-                drawable_object_id,
-                text,
-                DrawableCaptionKind::Caption,
-            );
-        },
-        Err(error) => return Err(map_focused_movie_caption_error(error)),
-    };
-    if commit.patch().is_noop() {
-        return Ok(());
-    }
-    replace_from_focused_movie_caption_commit(editor, commit)
-}
-
-fn remove_slide_movie_caption_host(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<bool> {
-    editor.require_file_movie(slide_index, drawable_object_id)?;
-    if movie_caption_slot(
-        editor,
-        slide_index,
-        drawable_object_id,
-        DrawableCaptionKind::Caption,
-    )?
-    .storage_id
-    .is_none()
-    {
-        return Ok(false);
-    }
-    let selector = movie_selector_for_drawable(editor, slide_index, drawable_object_id)?;
-    let package = focused_movie_caption_package(editor)?;
-    let edit = package
-        .edit_slide_movie_caption(Position::new(slide_index), selector)
-        .map_err(map_focused_movie_caption_error)?;
-    let had_caption = edit.before().is_some();
-    let edit = edit.clear().map_err(map_focused_movie_caption_error)?;
-    let commit = match edit.commit() {
-        Ok(commit) => commit,
-        Err(litchi_keynote::SlideMovieCaptionError::UnsupportedDependency) if had_caption => {
-            // Phase-1's focused owner does not remove a caption graph. Keep the
-            // established native removal behavior as an explicit fallback.
-            return remove_slide_movie_caption_legacy(
-                editor,
-                slide_index,
-                drawable_object_id,
-                DrawableCaptionKind::Caption,
-            );
-        },
-        Err(error) => return Err(map_focused_movie_caption_error(error)),
-    };
-    if commit.patch().is_noop() {
-        return Ok(false);
-    }
-    replace_from_focused_movie_caption_commit(editor, commit)?;
-    Ok(had_caption)
-}
-
-fn movie_selector_for_drawable(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<MovieSelector> {
-    let movies = editor.slide_movies(slide_index)?;
-    let positions = movies
-        .iter()
-        .enumerate()
-        .filter(|(_, movie)| movie.drawable_object_id == drawable_object_id)
-        .map(|(position, _)| position)
-        .collect::<Vec<_>>();
-    match positions.as_slice() {
-        [position] => Ok(MovieSelector::index(*position)),
-        [] => Err(Error::InvalidFormat(format!(
-            "Keynote movie {drawable_object_id} is not a non-audio movie on slide {slide_index}"
-        ))),
-        _ => Err(Error::InvalidFormat(format!(
-            "Keynote movie {drawable_object_id} is ambiguous on slide {slide_index}"
-        ))),
-    }
-}
-
 fn focused_movie_caption_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
     let bytes = editor.to_bytes()?;
     litchi_keynote::Package::from_bytes(&bytes).map_err(|error| {
@@ -329,17 +210,6 @@ fn focused_movie_caption_package(editor: &KeynoteEditor) -> Result<litchi_keynot
             "focused Keynote movie caption source failed: {error}"
         ))
     })
-}
-
-fn focused_movie_caption(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<Option<String>> {
-    let selector = movie_selector_for_drawable(editor, slide_index, drawable_object_id)?;
-    focused_movie_caption_package(editor)?
-        .slide_movie_caption(Position::new(slide_index), selector)
-        .map_err(map_focused_movie_caption_error)
 }
 
 fn replace_from_focused_movie_caption_commit(
@@ -362,20 +232,20 @@ fn map_focused_movie_caption_error(error: litchi_keynote::SlideMovieCaptionError
     ))
 }
 
-fn set_slide_movie_caption_legacy(
+fn set_slide_movie_title_legacy(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
     text: &str,
-    kind: DrawableCaptionKind,
 ) -> Result<()> {
     let source = editor.require_file_movie(slide_index, drawable_object_id)?;
-    let slot = movie_caption_slot(editor, slide_index, drawable_object_id, kind)?;
-    let mut expected = movie_title_caption(editor, slide_index, drawable_object_id)?;
-    match kind {
-        DrawableCaptionKind::Caption => expected.caption = Some(text.to_owned()),
-        DrawableCaptionKind::Title => expected.title = Some(text.to_owned()),
-    }
+    let slot = movie_caption_slot(
+        editor,
+        slide_index,
+        drawable_object_id,
+        DrawableCaptionKind::Title,
+    )?;
+    let expected = Some(text.to_owned());
     let staged = if let Some(storage_id) = slot.storage_id {
         let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
@@ -390,14 +260,13 @@ fn set_slide_movie_caption_legacy(
             .width;
         let ids = CaptionObjectIds::allocate(next_object_identifier(editor.package())?)?;
         let mut staged = editor.package().clone();
-        insert_slide_movie_caption(
+        insert_slide_movie_title(
             &mut staged,
             &source.archive_name,
             drawable_object_id,
             slot.reference_id,
             drawable_width,
             text,
-            kind,
             context.caption_theme,
             context.language.as_deref(),
             ids,
@@ -407,39 +276,38 @@ fn set_slide_movie_caption_legacy(
         staged
     };
     let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if movie_title_caption(&verified, slide_index, drawable_object_id)? != expected {
+    if movie_title(&verified, slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
-            "Keynote movie title/caption update failed validation".to_owned(),
+            "Keynote movie title update failed validation".to_owned(),
         ));
     }
     *editor = verified;
     Ok(())
 }
 
-fn remove_slide_movie_caption_legacy(
+fn remove_slide_movie_title_legacy(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
-    kind: DrawableCaptionKind,
 ) -> Result<bool> {
     let source = editor.require_file_movie(slide_index, drawable_object_id)?;
-    let slot = movie_caption_slot(editor, slide_index, drawable_object_id, kind)?;
+    let slot = movie_caption_slot(
+        editor,
+        slide_index,
+        drawable_object_id,
+        DrawableCaptionKind::Title,
+    )?;
     if slot.storage_id.is_none() {
         return Ok(false);
     }
-    let mut expected = movie_title_caption(editor, slide_index, drawable_object_id)?;
-    match kind {
-        DrawableCaptionKind::Caption => expected.caption = None,
-        DrawableCaptionKind::Title => expected.title = None,
-    }
+    let expected = None;
     let standin_id = next_object_identifier(editor.package())?;
     let mut staged = editor.package().clone();
-    insert_slide_movie_caption_standin(
+    insert_slide_movie_title_standin(
         &mut staged,
         &source.archive_name,
         drawable_object_id,
         slot.reference_id,
-        kind,
         standin_id,
     )?;
     let component =
@@ -452,23 +320,22 @@ fn remove_slide_movie_caption_legacy(
     add_component_object_uuids(&mut staged, component, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
     let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if movie_title_caption(&verified, slide_index, drawable_object_id)? != expected {
+    if movie_title(&verified, slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
-            "Keynote movie title/caption removal failed validation".to_owned(),
+            "Keynote movie title removal failed validation".to_owned(),
         ));
     }
     *editor = verified;
     Ok(true)
 }
 
-fn insert_slide_movie_caption(
+fn insert_slide_movie_title(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_object_id: u64,
     old_reference_id: u64,
     drawable_width: f32,
     text: &str,
-    kind: DrawableCaptionKind,
     theme: CaptionThemeStyle,
     language: Option<&str>,
     ids: CaptionObjectIds,
@@ -478,7 +345,7 @@ fn insert_slide_movie_caption(
         drawable_object_id,
         drawable_width,
         text,
-        kind,
+        DrawableCaptionKind::Title,
         theme,
         language,
     )?;
@@ -486,76 +353,40 @@ fn insert_slide_movie_caption(
         for object in objects {
             archive.insert_object(object)?;
         }
-        replace_slide_movie_caption_reference(
+        replace_slide_movie_title_reference(
             archive,
             drawable_object_id,
             old_reference_id,
             ids.info,
-            kind,
         )?;
-        if kind == DrawableCaptionKind::Caption {
-            add_slide_movie_caption_style_reference(archive, drawable_object_id, ids.style)?;
-        }
         Ok(())
     })
 }
 
-fn add_slide_movie_caption_style_reference(
-    archive: &mut crate::archive::Archive,
-    drawable_object_id: u64,
-    style_id: u64,
-) -> Result<()> {
-    let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Keynote movie object {drawable_object_id} is missing"
-        ))
-    })?;
-    let indexes = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_, message)| message.type_ == MOVIE_MESSAGE_TYPE)
-        .map(|(index, _)| index)
-        .collect::<Vec<_>>();
-    let [message_index] = indexes.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote movie {drawable_object_id} must have exactly one MovieArchive payload"
-        )));
-    };
-    let references = &mut object.archive_info.message_infos[*message_index].object_references;
-    if !references.contains(&style_id) {
-        references.push(style_id);
-    }
-    Ok(())
-}
-
-fn insert_slide_movie_caption_standin(
+fn insert_slide_movie_title_standin(
     package: &mut IWorkPackage,
     archive_name: &str,
     drawable_object_id: u64,
     old_reference_id: u64,
-    kind: DrawableCaptionKind,
     standin_id: u64,
 ) -> Result<()> {
     let standin = standin_caption_object(standin_id)?;
     package.update_archive(archive_name, |archive| {
         archive.insert_object(standin)?;
-        replace_slide_movie_caption_reference(
+        replace_slide_movie_title_reference(
             archive,
             drawable_object_id,
             old_reference_id,
             standin_id,
-            kind,
         )
     })
 }
 
-fn replace_slide_movie_caption_reference(
+fn replace_slide_movie_title_reference(
     archive: &mut crate::archive::Archive,
     drawable_object_id: u64,
     old_reference_id: u64,
     replacement_id: u64,
-    kind: DrawableCaptionKind,
 ) -> Result<()> {
     let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -576,18 +407,14 @@ fn replace_slide_movie_caption_reference(
     };
     let original = object.messages[*message_index].data.as_slice();
     let current = tsd::MovieArchive::decode(original)?;
-    let current_reference_id = match kind {
-        DrawableCaptionKind::Caption => current.super_.caption,
-        DrawableCaptionKind::Title => current.super_.title,
-    }
-    .map(|reference| reference.identifier);
+    let current_reference_id = current.super_.title.map(|reference| reference.identifier);
     if current_reference_id != Some(old_reference_id) {
         return Err(Error::InvalidFormat(format!(
-            "Keynote movie {drawable_object_id} title/caption reference changed unexpectedly"
+            "Keynote movie {drawable_object_id} title reference changed unexpectedly"
         )));
     }
     let data = transform_length_delimited_field(original, 1, |drawable| {
-        patch_drawable_caption_reference(drawable, kind, replacement_id)
+        patch_drawable_caption_reference(drawable, DrawableCaptionKind::Title, replacement_id)
     })?;
     object.replace_message(
         *message_index,

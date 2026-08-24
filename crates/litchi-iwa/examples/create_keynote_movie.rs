@@ -66,15 +66,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_volume(Some(MediaVolume::new(0.75)?)),
     )?;
     editor.set_slide_movie_title(0, created.drawable_object_id, "Source-built Keynote movie")?;
-    editor.set_slide_movie_caption(
-        0,
-        created.drawable_object_id,
+    editor.set_slide_movie_caption_by_selector(
+        litchi_core::Position::new(0),
+        litchi_keynote::MovieSelector::index(0),
         &format!("Native title and caption for {movie_filename}"),
     )?;
-    let labels = editor.slide_movie_title_caption(0, created.drawable_object_id)?;
+    let title = editor.slide_movie_title_by_selector(
+        litchi_core::Position::new(0),
+        litchi_keynote::MovieSelector::index(0),
+    )?;
+    let caption = editor.slide_movie_caption_by_selector(
+        litchi_core::Position::new(0),
+        litchi_keynote::MovieSelector::index(0),
+    )?;
     editor.save(output)?;
     println!(
-        "created Keynote movie {} backed by video {:?} and poster {:?} with labels {labels:?}",
+        "created Keynote movie {} backed by video {:?} and poster {:?} with title {title:?} and caption {caption:?}",
         created.drawable_object_id,
         created.movie_data_identifier,
         created.poster_image_data_identifier,
