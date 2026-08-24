@@ -2776,6 +2776,11 @@ fn scan_global_comment_cells(
                 let cell_source = storage_buffer
                     .get(cell_range)
                     .ok_or(Error::InvalidSource { path })?;
+                // `BncCell::parse` walks the complete encoded cell. Charge
+                // those bytes on the adapter-wide scan budget before the
+                // handwritten parser runs, rather than treating every cell
+                // as one unit regardless of payload size.
+                charge_scan_work(scan_work, cell_source.len(), path)?;
                 let cell = crate::cell::wire::BncCell::parse(cell_source)
                     .map_err(|_| Error::InvalidSource { path })?;
                 let Some(comment_key) = cell.comment_identifier() else {
@@ -3037,15 +3042,42 @@ fn prove_archive_reference_ownership(
         occurrences: 0,
         unexpected: false,
     };
+    let maximum_references = source.state.options.semantic().max_references();
+    let mut inspected_references = 0usize;
+    let mut inspection_work = 0usize;
     for component in source.state.components.catalog().iter() {
         for object in &component.archive().objects {
-            object
+            let header_bytes =
+                usize::try_from(object.header_length).map_err(|_| Error::InvalidSource { path })?;
+            // The core inspection seam canonically projects, preflights, and
+            // decodes each source header. Keep a conservative aggregate
+            // charge across every component instead of resetting that work
+            // at each object boundary.
+            charge_scan_work(&mut inspection_work, header_bytes.saturating_mul(4), path)?;
+            let occurrences = object
                 .inspect_references_with_policy_and_limits(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
                 )
                 .map_err(|_| Error::UnsupportedDependency { path })?;
+            inspected_references =
+                inspected_references
+                    .checked_add(occurrences)
+                    .ok_or(Error::LimitExceeded {
+                        kind: LimitKind::References,
+                        observed: usize::MAX,
+                        maximum: maximum_references,
+                        path,
+                    })?;
+            if inspected_references > maximum_references {
+                return Err(Error::LimitExceeded {
+                    kind: LimitKind::References,
+                    observed: inspected_references,
+                    maximum: maximum_references,
+                    path,
+                });
+            }
         }
     }
     if census.occurrences != 1 || census.unexpected {
@@ -3255,7 +3287,11 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
         }
     }
     census_models_and_cells(source, &mut census, path)?;
-    census_alias_checks(&census, path)?;
+    census_alias_checks(
+        &census,
+        source.state.options.semantic().max_references(),
+        path,
+    )?;
     Ok(census)
 }
 
@@ -3313,25 +3349,105 @@ fn push_nonzero(values: &mut Vec<u64>, value: u64, path: Path) -> Result<(), Err
     Ok(())
 }
 
-fn census_alias_checks(census: &CommentOwnershipCensus, path: Path) -> Result<(), Error> {
-    let mut storage_ids = Vec::new();
+fn census_alias_checks(
+    census: &CommentOwnershipCensus,
+    maximum_references: usize,
+    path: Path,
+) -> Result<(), Error> {
+    let observed = [
+        census.comment_list_ids.len(),
+        census.rooted_segment_ids.len(),
+        census.list_entries.len(),
+        census.table_references.len(),
+        census.cell_comment_keys.len(),
+        census.storages.len(),
+        census.author_ids.len(),
+        census.reply_ids.len(),
+        census.uuids.len(),
+    ]
+    .into_iter()
+    .try_fold(0usize, usize::checked_add)
+    .ok_or(Error::LimitExceeded {
+        kind: LimitKind::References,
+        observed: usize::MAX,
+        maximum: maximum_references,
+        path,
+    })?;
+    if observed > maximum_references {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::References,
+            observed,
+            maximum: maximum_references,
+            path,
+        });
+    }
+
+    let mut storage_ids = HashSet::new();
     storage_ids
         .try_reserve(census.storages.len())
         .map_err(|_| Error::Allocation {
             amount: census.storages.len(),
             path,
         })?;
-    storage_ids.extend(census.storages.iter().map(|storage| storage.object_id));
+    for storage in &census.storages {
+        if !storage_ids.insert(storage.object_id) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+
+    let mut reply_ids = HashSet::new();
+    reply_ids
+        .try_reserve(census.reply_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.reply_ids.len(),
+            path,
+        })?;
+    for reply in &census.reply_ids {
+        if !reply_ids.insert(*reply) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+
+    let mut entry_storage_ids = HashSet::new();
+    entry_storage_ids
+        .try_reserve(census.entry_storage_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.entry_storage_ids.len(),
+            path,
+        })?;
+    entry_storage_ids.extend(census.entry_storage_ids.iter().copied());
+
+    let mut comment_list_ids = HashSet::new();
+    comment_list_ids
+        .try_reserve(census.comment_list_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.comment_list_ids.len(),
+            path,
+        })?;
+    comment_list_ids.extend(census.comment_list_ids.iter().copied());
+
+    let mut comment_entry_keys = HashSet::new();
+    comment_entry_keys
+        .try_reserve(census.list_entries.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.list_entries.len(),
+            path,
+        })?;
+    comment_entry_keys.extend(census.list_entries.iter().filter_map(|entry| {
+        (entry.list_type == tst::table_data_list::ListType::CommentStorage as i32)
+            .then_some(entry.key)
+    }));
+
     for author in &census.author_ids {
-        if census.reply_ids.contains(author)
-            || census.entry_storage_ids.contains(author)
+        if reply_ids.contains(author)
+            || entry_storage_ids.contains(author)
             || storage_ids.contains(author)
         {
             return Err(Error::InvalidSource { path });
         }
     }
     for table in &census.table_references {
-        if !census.comment_list_ids.contains(table) {
+        if !comment_list_ids.contains(table) {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -3344,7 +3460,7 @@ fn census_alias_checks(census: &CommentOwnershipCensus, path: Path) -> Result<()
         if storage.author_id == Some(storage.object_id)
             || storage
                 .author_id
-                .is_some_and(|author| census.reply_ids.contains(&author))
+                .is_some_and(|author| reply_ids.contains(&author))
             || storage
                 .reply_ids
                 .iter()
@@ -3355,35 +3471,24 @@ fn census_alias_checks(census: &CommentOwnershipCensus, path: Path) -> Result<()
         }
     }
     for key in &census.cell_comment_keys {
-        if !census.list_entries.iter().any(|entry| {
-            entry.list_type == tst::table_data_list::ListType::CommentStorage as i32
-                && entry.key == *key
-        }) {
+        if !comment_entry_keys.contains(key) {
             return Err(Error::InvalidSource { path });
         }
     }
     for reply in &census.reply_ids {
-        if census
-            .reply_ids
-            .iter()
-            .filter(|candidate| *candidate == reply)
-            .count()
-            != 1
-            || census.entry_storage_ids.contains(reply)
-            || !storage_ids.contains(reply)
-        {
+        if entry_storage_ids.contains(reply) || !storage_ids.contains(reply) {
             return Err(Error::InvalidSource { path });
         }
     }
+    let mut uuids = HashSet::new();
+    uuids
+        .try_reserve(census.uuids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.uuids.len(),
+            path,
+        })?;
     for uuid in &census.uuids {
-        if *uuid == (0, 0)
-            || census
-                .uuids
-                .iter()
-                .filter(|candidate| *candidate == uuid)
-                .count()
-                != 1
-        {
+        if *uuid == (0, 0) || !uuids.insert(*uuid) {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -3625,7 +3730,8 @@ fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> 
 #[cfg(test)]
 mod tests {
     use super::{
-        ArchiveMutation, Comment, Error, LimitKind, MessageRoute, Path, WireLimits, cell_ranges,
+        ArchiveMutation, Comment, CommentOwnershipCensus, CommentStorageFact, Error, LimitKind,
+        MessageRoute, Path, WireLimits, cell_ranges, census_alias_checks,
     };
 
     #[test]
@@ -3745,6 +3851,60 @@ mod tests {
 
         assert_eq!(ranges, vec![Some(0..3), Some(3..8)]);
         assert_eq!(scan_work, 4);
+    }
+
+    #[test]
+    fn comment_census_enforces_one_aggregate_reference_limit() {
+        let census = CommentOwnershipCensus {
+            comment_list_ids: vec![10],
+            rooted_segment_ids: vec![11],
+            ..CommentOwnershipCensus::default()
+        };
+
+        let error = census_alias_checks(&census, 1, Path::Package)
+            .expect_err("the complete census must share one reference ceiling");
+
+        assert_eq!(
+            error,
+            Error::LimitExceeded {
+                kind: LimitKind::References,
+                observed: 2,
+                maximum: 1,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn comment_census_rejects_duplicate_reply_and_uuid_aliases() {
+        let duplicate_reply = CommentOwnershipCensus {
+            storages: vec![CommentStorageFact {
+                object_id: 20,
+                author_id: None,
+                replies: 0,
+                reply_ids: Vec::new(),
+                storage_uuid: None,
+            }],
+            reply_ids: vec![20, 20],
+            ..CommentOwnershipCensus::default()
+        };
+        assert!(matches!(
+            census_alias_checks(&duplicate_reply, 16, Path::Package),
+            Err(Error::InvalidSource {
+                path: Path::Package
+            })
+        ));
+
+        let duplicate_uuid = CommentOwnershipCensus {
+            uuids: vec![(1, 2), (1, 2)],
+            ..CommentOwnershipCensus::default()
+        };
+        assert!(matches!(
+            census_alias_checks(&duplicate_uuid, 16, Path::Package),
+            Err(Error::InvalidSource {
+                path: Path::Package
+            })
+        ));
     }
 
     #[test]
