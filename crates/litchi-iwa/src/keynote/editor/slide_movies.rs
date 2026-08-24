@@ -1253,7 +1253,11 @@ mod tests {
             None
         );
         editor
-            .set_slide_movie_title(0, movie.drawable_object_id, "Quarterly highlight")
+            .set_slide_movie_title_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                "Quarterly highlight",
+            )
             .unwrap();
         editor
             .set_slide_movie_caption_by_selector(
@@ -1300,7 +1304,11 @@ mod tests {
         );
 
         editor
-            .set_slide_movie_title(0, movie.drawable_object_id, "Updated highlight")
+            .set_slide_movie_title_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                "Updated highlight",
+            )
             .unwrap();
         assert!(
             editor
@@ -1314,7 +1322,7 @@ mod tests {
         );
         assert!(
             editor
-                .remove_slide_movie_title(0, movie.drawable_object_id)
+                .remove_slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap()
         );
         assert_eq!(
@@ -1384,6 +1392,19 @@ mod tests {
                 "Caption after audio",
             )
             .unwrap();
+        editor
+            .set_slide_movie_title_by_selector(
+                Position::new(0),
+                MovieSelector::index(1),
+                "Title after audio",
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(1))
+                .unwrap(),
+            Some("Title after audio".to_owned())
+        );
         assert_eq!(
             editor
                 .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))

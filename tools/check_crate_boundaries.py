@@ -770,6 +770,279 @@ KEYNOTE_MOVIE_CAPTION_PACKAGE_BUDGET_TYPE = re.compile(
     r"(?m)^[ \t]*(?:pub[ \t]*\([ \t]*super[ \t]*\)[ \t]+)?struct[ \t]+"
     r"(?P<name>(?:Movie|Caption|Package)[A-Za-z0-9_]*Budget)\b"
 )
+
+# Wave75 moves the *title* edge of a Keynote movie into the same focused
+# package owner as the caption edge.  Keep this vocabulary separate from the
+# caption ratchet: a title implementation must prove its own semantic
+# facade, dual-edge codec, graph transition, and host retirement rather than
+# inheriting a caption-only marker by name.
+KEYNOTE_MOVIE_TITLE_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
+KEYNOTE_MOVIE_TITLE_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_movie_title.rs"
+)
+KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_MOVIE_TITLE_CANONICAL_TYPES = frozenset(
+    {
+        "SlideMovieTitleCommit",
+        "SlideMovieTitleDiagnostics",
+        "SlideMovieTitleEdit",
+        "SlideMovieTitleError",
+        "SlideMovieTitleLimitKind",
+        "SlideMovieTitlePatch",
+    }
+)
+KEYNOTE_MOVIE_TITLE_SELECTOR_TYPES = frozenset({"MovieSelector"})
+KEYNOTE_MOVIE_TITLE_PACKAGE_METHODS = frozenset(
+    {
+        "slide_movie_title",
+        "edit_slide_movie_title",
+        "apply_slide_movie_title",
+    }
+)
+KEYNOTE_MOVIE_TITLE_EDIT_METHODS = frozenset({"set", "clear", "commit"})
+KEYNOTE_MOVIE_TITLE_FLAT_ALIASES = frozenset(
+    {
+        "Title",
+        "TitleCommit",
+        "TitleDiagnostics",
+        "TitleEdit",
+        "TitleError",
+        "TitleLimitKind",
+        "TitlePatch",
+        "MovieTitle",
+        "MovieTitleCommit",
+        "MovieTitleDiagnostics",
+        "MovieTitleEdit",
+        "MovieTitleError",
+        "MovieTitleLimitKind",
+        "MovieTitlePatch",
+        "MovieTitleSnapshot",
+        "MovieTitleWrite",
+    }
+)
+KEYNOTE_MOVIE_TITLE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "MovieTitleSnapshot",
+        "MovieTitleWrite",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_MOVIE_TITLE_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_MOVIE_TITLE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsa", "tsp", "tsd", "litchi_iwa_protos"}
+)
+KEYNOTE_MOVIE_TITLE_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|title|caption|storage|reference|placement|style|"
+    r"native|archive|message|component|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_MOVIE_TITLE_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_movie_caption_codec.rs"
+)
+KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_chart_caption_graph_codec.rs"
+)
+KEYNOTE_MOVIE_TITLE_CODEC_MODULE = "keynote_movie_caption_codec"
+KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_MODULE = "keynote_chart_caption_graph_codec"
+KEYNOTE_MOVIE_TITLE_CODEC_FUNCTIONS = frozenset(
+    {
+        "decode_movie_caption",
+        "decode_movie_caption_with_report",
+        "rewrite_movie_caption_with_report",
+        "encode_caption_graph_with_kind_with_report",
+    }
+)
+KEYNOTE_MOVIE_TITLE_CODEC_TYPES = frozenset(
+    {
+        "MovieCaptionWrite",
+        "MovieCaptionSnapshot",
+        "CaptionGraphKind",
+        "CaptionGraphWrite",
+    }
+)
+KEYNOTE_MOVIE_TITLE_DUAL_EDGE_MARKERS = (
+    frozenset(
+        {
+            "MovieCaptionWrite::title",
+            "MovieCaptionSlot::Title",
+            "MOVIE_TITLE_FIELD",
+            "MOVIE_SUPER_FIELD",
+            "TITLE_FIELD",
+            "DRAWABLE_TITLE_FIELD",
+            "title_identifier",
+        }
+    ),
+    frozenset(
+        {
+            "CaptionGraphKind::Title",
+            "CaptionOrTitleKind::Title",
+            "DrawableCaptionKind::Title",
+            "CAPTION_INFO_MESSAGE_TYPE",
+            "CAPTION_INFO_FIELD",
+            "TITLE_INFO_FIELD",
+            "CaptionInfoArchive",
+            "CaptionInfo",
+            "caption_info",
+            "TITLE_KIND",
+        }
+    ),
+)
+KEYNOTE_MOVIE_TITLE_GRAPH_OPERATION_NAMES = frozenset(
+    {
+        "rewrite_movie_title_operation",
+        "rewrite_movie_title_graph_operation",
+        "rewrite_caption_graph_operation_with_budget",
+    }
+)
+KEYNOTE_MOVIE_TITLE_REFERENCE_TRANSITIONS = frozenset(
+    {"patch_movie_title_edge", "patch_title_edge", "patch_caption_edge"}
+)
+KEYNOTE_MOVIE_TITLE_GRAPH_MARKERS = frozenset(
+    {
+        "MovieTitleGraph",
+        "MovieTitleObjectIds",
+        "MovieTitleSlot",
+        "CaptionObjectIds",
+        "CaptionThemeStyle",
+        "DrawableCaptionKind::Title",
+        "title_objects",
+        "movie_title_slot",
+        "standin_title_object",
+        "insert_slide_movie_title",
+        "insert_slide_movie_title_standin",
+        "replace_slide_movie_title_reference",
+        "replace_movie_title_reference",
+        "next_object_identifier",
+        "keynote_movie_caption_codec",
+        "keynote_chart_caption_graph_codec",
+        "keynote_movie_caption_codec",
+    }
+)
+KEYNOTE_MOVIE_TITLE_METADATA_MARKERS = frozenset(
+    {
+        "prepare_package_metadata_additions_and_save_tokens",
+        "prepare_package_metadata_save_tokens",
+        "rewrite_package_metadata_additions_and_save_tokens",
+        "rewrite_package_metadata_save_tokens",
+        "AdditionSaveTokenBatch",
+        "ObjectUuidAddition",
+        "ExternalReferenceAddition",
+        "add_component_object_uuids",
+        "set_package_last_object_identifier",
+    }
+)
+KEYNOTE_MOVIE_TITLE_RESOURCE_CHARGE_PATTERNS = {
+    category: re.compile(
+        rf"\b(?:charge|account|reserve)[A-Za-z0-9_]*{category}"
+        rf"|\b{category}[A-Za-z0-9_]*\b[^;{{}}\n]{{0,180}}"
+        r"\b(?:charge|account|reserve)[A-Za-z0-9_]*\b",
+        re.I,
+    )
+    for category in ("archive", "snappy", "zip", "reopen", "artifact")
+}
+KEYNOTE_MOVIE_TITLE_CODEC_REPORT_CHARGE = re.compile(
+    r"\b(?:charge|account|reserve)[A-Za-z0-9_]*(?:codec|report|wire)"
+    r"|\b(?:codec|report|wire)[A-Za-z0-9_]*\b[^;{}\n]{0,180}"
+    r"\b(?:charge|account|reserve)[A-Za-z0-9_]*\b",
+    re.I,
+)
+KEYNOTE_MOVIE_TITLE_INVERSE_LOCALITY_MARKERS = frozenset(
+    {
+        "ExactArtifacts",
+        "verify_caption_graph_transition",
+        "verify_movie_title",
+        "verify_title_candidate",
+        "verify_candidate",
+        "locality",
+        "inverse",
+        "PatchConflict",
+    }
+)
+IWA_KEYNOTE_MOVIE_TITLE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_movies" / "caption.rs"
+)
+IWA_KEYNOTE_MOVIE_TITLE_TYPED_METHODS = frozenset(
+    {
+        "slide_movie_title_by_selector",
+        "set_slide_movie_title_by_selector",
+        "remove_slide_movie_title_by_selector",
+    }
+)
+IWA_KEYNOTE_MOVIE_TITLE_LEGACY_METHODS = frozenset(
+    {
+        "slide_movie_title",
+        "set_slide_movie_title",
+        "remove_slide_movie_title",
+        "set_slide_movie_title_legacy",
+        "remove_slide_movie_title_legacy",
+    }
+)
+IWA_KEYNOTE_MOVIE_TITLE_RAW_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_movie_title|"
+    r"set_slide_movie_title|remove_slide_movie_title)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_MOVIE_TITLE_IDENTIFIER_POSITION_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"movie_position_for_identifier|movie_position_from_identifier|"
+    r"movie_index_for_identifier|movie_index_from_identifier|"
+    r"movie_position_from_object|movie_index_from_object|"
+    r"position_for_movie_identifier|index_for_movie_identifier"
+    r")(?![A-Za-z0-9_])|"
+    r"\.position[ \t\r\n]*\([ \t\r\n]*\|[^{}\n|]{0,400}\b(?:"
+    r"drawable_object_id|movie_object_id|movie_id|native_id|object_id|identifier)"
+    r"[^{}\n|]{0,400}\)"
+)
+IWA_KEYNOTE_MOVIE_TITLE_GRAPH_HELPERS = frozenset(
+    {
+        "movie_title",
+        "movie_title_slot",
+        "movie_caption_slot",
+        "movie_caption_slot_from_reference",
+        "set_slide_movie_title_legacy",
+        "remove_slide_movie_title_legacy",
+        "insert_slide_movie_title",
+        "insert_slide_movie_title_standin",
+        "replace_slide_movie_title_reference",
+        "caption_objects",
+        "standin_caption_object",
+        "replace_object_reference",
+        "next_object_identifier",
+    }
+)
+IWA_KEYNOTE_MOVIE_TITLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_KEYNOTE_MOVIE_TITLE_CODEC_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:keynote_movie_title_codec|movie_title_codec)[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:decode|rewrite|validate)[A-Za-z0-9_]*\b"
+)
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -14766,6 +15039,37 @@ def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str
     return sorted(set(violations))
 
 
+def audit_keynote_movie_title_legacy_calls(root: Path = ROOT) -> list[str]:
+    """Keep focused Keynote movie-title code off legacy host mutations."""
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    violations: list[str] = []
+    legacy_call = re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_movie_title|"
+        r"remove_slide_movie_title)(?![A-Za-z0-9_])[ \t\r\n]*\("
+    )
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for match in legacy_call.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            line = source[line_start:line_end]
+            if re.search(r"\bfn[ \t\r\n]+(?:set|remove)_slide_movie_title\b", line):
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "focused litchi-keynote movie-title source retains legacy call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
 def audit_keynote_chart_caption_legacy_calls(root: Path = ROOT) -> list[str]:
     """Keep focused chart-caption code off raw-ID host mutation calls."""
 
@@ -15826,6 +16130,514 @@ def audit_keynote_movie_caption_facade_source_topology(
                             f"{source_path.relative_to(root)}:{line_number}"
                         )
 
+    return sorted(set(violations))
+
+
+def audit_keynote_movie_title_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the selector-first, archive-free movie-title package owner."""
+
+    owner_path = root / KEYNOTE_MOVIE_TITLE_OWNER_SOURCE
+    selector_path = root / KEYNOTE_MOVIE_TITLE_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[1]
+    if not owner_path.is_file():
+        return [
+            "focused litchi-keynote movie-title owner source is missing: "
+            f"{KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        ]
+
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    selector = (
+        _mask_rust_cfg_test_items(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+    package_code = _mask_rust_non_code(package)
+    package_library_code = _mask_rust_non_code(package + library)
+    if re.search(r"(?m)^mod[ \t]+slide_movie_title[ \t]*;", package_code) is None:
+        violations.append(
+            "focused litchi-keynote movie-title owner module is missing: "
+            f"{KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[0]}"
+        )
+    if re.search(r"(?m)^pub[ \t]+mod[ \t]+slide_movie_title\b", package_library_code):
+        violations.append(
+            "focused litchi-keynote movie-title owner module must remain private: "
+            f"{KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[0]}"
+        )
+
+    canonical_names = frozenset(KEYNOTE_MOVIE_TITLE_CANONICAL_TYPES)
+    owner_exports = _rust_canonical_exports(_mask_rust_non_code(owner), canonical_names)
+    package_exports = _rust_canonical_exports(package, canonical_names)
+    library_exports = _rust_canonical_exports(library, canonical_names)
+    for name in sorted(canonical_names):
+        if name not in owner_exports or name not in package_exports or name not in library_exports:
+            violations.append(
+                "focused litchi-keynote movie-title public API is missing canonical type "
+                f"{name}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+            )
+
+    selector_names = frozenset(KEYNOTE_MOVIE_TITLE_SELECTOR_TYPES)
+    if "MovieSelector" not in _rust_canonical_exports(selector, selector_names):
+        violations.append(
+            "focused litchi-keynote movie-title selector source is missing canonical "
+            f"MovieSelector: {KEYNOTE_MOVIE_TITLE_SELECTOR_SOURCE}"
+        )
+    if "MovieSelector" not in _rust_canonical_exports(library, selector_names):
+        violations.append(
+            "focused litchi-keynote movie-title public API is missing canonical "
+            f"MovieSelector re-export: {KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[1]}"
+        )
+
+    owner_code = _mask_rust_non_code(owner)
+    method_names = {
+        match.group(1)
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+            r"([A-Za-z_][A-Za-z0-9_]*)\b",
+            owner_code,
+        )
+    }
+    for name in sorted(KEYNOTE_MOVIE_TITLE_PACKAGE_METHODS - method_names):
+        violations.append(
+            "focused litchi-keynote movie-title Package method is missing "
+            f"{name}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?SlideMovieTitleEdit\b",
+        owner_code,
+    )
+    edit_body = ""
+    if edit_impl is not None:
+        opening = owner_code.find("{", edit_impl.end())
+        depth = 1
+        cursor = opening + 1 if opening >= 0 else len(owner_code)
+        while opening >= 0 and cursor < len(owner_code) and depth:
+            if owner_code[cursor] == "{":
+                depth += 1
+            elif owner_code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth == 0:
+            edit_body = owner_code[opening + 1 : cursor - 1]
+    edit_names = {
+        match.group(1)
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+            r"([A-Za-z_][A-Za-z0-9_]*)\b",
+            edit_body,
+        )
+    }
+    for name in sorted(KEYNOTE_MOVIE_TITLE_EDIT_METHODS - edit_names):
+        violations.append(
+            "focused litchi-keynote movie-title SlideMovieTitleEdit method is missing "
+            f"{name}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        canonical_names
+        | selector_names
+        | KEYNOTE_MOVIE_TITLE_PACKAGE_METHODS
+        | KEYNOTE_MOVIE_TITLE_FLAT_ALIASES
+        | {"SlideMovieTitleEdit"}
+    )
+    for source, source_path in (
+        (owner, owner_path),
+        (selector, selector_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = source_path in {owner_path, selector_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_MOVIE_TITLE_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_MOVIE_TITLE_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_MOVIE_TITLE_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote movie-title public API exposes "
+                        f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote movie-title public API exposes raw byte slice "
+                    f"{byte_slice}: {source_path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MOVIE_TITLE_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote movie-title public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {source_path.relative_to(root)}:{line_number}"
+                )
+            for alias in sorted(identifiers & KEYNOTE_MOVIE_TITLE_FLAT_ALIASES):
+                if alias in canonical_names:
+                    continue
+                violations.append(
+                    "focused litchi-keynote movie-title public API retains flat alias "
+                    f"{alias}: {source_path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_movie_title_source_topology(root: Path = ROOT) -> list[str]:
+    """Require a typed movie-title bridge and retire its raw graph host."""
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    path = root / IWA_KEYNOTE_MOVIE_TITLE_SOURCE
+    if not source_root.is_dir() or not path.is_file():
+        return []
+
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+
+    def records(source: str) -> list[tuple[str, str, str, int, int]]:
+        code = _mask_rust_non_code(source)
+        result: list[tuple[str, str, str, int, int]] = []
+        for match in declaration.finditer(code):
+            opening = code.find("{", match.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            result.append(
+                (
+                    match.group(1),
+                    code[match.start() : opening],
+                    code[opening + 1 : cursor - 1],
+                    match.start(),
+                    cursor,
+                )
+            )
+        return result
+
+    source_records: list[tuple[Path, str, list[tuple[str, str, str, int, int]]]] = []
+    for source_path in sorted(source_root.rglob("*.rs")):
+        if source_path.name in {"tests.rs", *KEYNOTE_TEST_ONLY_SOURCE_NAMES}:
+            continue
+        raw = _mask_rust_cfg_test_items(source_path.read_text(encoding="utf-8"))
+        source_records.append((source_path, _mask_rust_non_code(raw), records(raw)))
+    all_source = "\n".join(source for _path, source, _records in source_records)
+    all_records = [record for _path, _source, records_ in source_records for record in records_]
+    declared = {record[0] for record in all_records}
+    if not declared & (IWA_KEYNOTE_MOVIE_TITLE_LEGACY_METHODS | IWA_KEYNOTE_MOVIE_TITLE_TYPED_METHODS):
+        return []
+
+    violations: list[str] = []
+    for name in sorted(IWA_KEYNOTE_MOVIE_TITLE_TYPED_METHODS - declared):
+        violations.append(
+            "litchi-iwa Keynote movie-title selector bridge is missing "
+            f"{name}: {IWA_KEYNOTE_MOVIE_TITLE_SOURCE}"
+        )
+    typed_spans: list[tuple[int, int, str]] = []
+    for source_path, source, source_records_ in source_records:
+        relative = source_path.relative_to(root)
+        for name, signature, body, start, end in source_records_:
+            line_number = source.count("\n", 0, start) + 1
+            if name in IWA_KEYNOTE_MOVIE_TITLE_LEGACY_METHODS:
+                violations.append(
+                    "litchi-iwa Keynote movie-title raw-ID method/graph helper must be retired "
+                    f"{name}: {relative}:{line_number}"
+                )
+            if name not in IWA_KEYNOTE_MOVIE_TITLE_TYPED_METHODS:
+                continue
+            typed_spans.append((start, end, name))
+            if not re.search(
+                r"\bselector\b[ \t\r\n]*:[^,)]*\bMovieSelector\b", signature
+            ):
+                violations.append(
+                    "litchi-iwa Keynote movie-title selector bridge must accept a "
+                    f"MovieSelector parameter {name}: {relative}:{line_number}"
+                )
+            for parameter in KEYNOTE_MOVIE_TITLE_RAW_ID_PARAMETER.finditer(signature):
+                violations.append(
+                    "litchi-iwa Keynote movie-title raw identifier parameter must be retired "
+                    f"{parameter.group(0).strip()}: {relative}:{line_number}"
+                )
+            if name == "slide_movie_title_by_selector":
+                required = ("slide_movie_title",)
+            elif name == "set_slide_movie_title_by_selector":
+                required = ("edit_slide_movie_title", ".set(", ".commit(")
+            else:
+                required = ("edit_slide_movie_title", ".clear(", ".commit(")
+            if not all(marker in body for marker in required):
+                violations.append(
+                    "litchi-iwa Keynote movie-title selector mutation must route through "
+                    f"focused Package::{name.removesuffix('_by_selector')}: {relative}:{line_number}"
+                )
+
+    for source_path, source, _records in source_records:
+        relative = source_path.relative_to(root)
+        for match in IWA_KEYNOTE_MOVIE_TITLE_IDENTIFIER_POSITION_FALLBACK.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-title identifier-to-position fallback must be retired "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_MOVIE_TITLE_RAW_ID_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            line_end = len(source) if line_end < 0 else line_end
+            line = source[line_start:line_end]
+            if re.search(rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line):
+                continue
+            offset = match.start()
+            typed_call = any(start <= offset < end for start, end, _name in typed_spans)
+            if typed_call and "selector" in line:
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-title raw-ID call must be retired "
+                f"{match.group('method')}: {relative}:{line_number}"
+            )
+        # Generic graph utility names (for example ``next_object_identifier``
+        # and ``caption_objects``) are shared by image/shape/movie adapters.
+        # Attribute them to the dedicated movie-title source only; scanning
+        # every Keynote editor module would turn unrelated graph owners into
+        # false title-retirement findings.
+        if source_path != path:
+            continue
+        for marker in sorted(IWA_KEYNOTE_MOVIE_TITLE_GRAPH_HELPERS):
+            marker_match = re.search(
+                rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", source
+            )
+            if marker_match is None:
+                continue
+            line_number = source.count("\n", 0, marker_match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-title legacy graph helper must be retired "
+                f"{marker}: {relative}:{line_number}"
+            )
+
+    example_root = root / IWA_KEYNOTE_MOVIE_TITLE_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            raw = _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            source = _mask_rust_non_code(raw)
+            if (
+                not IWA_KEYNOTE_MOVIE_TITLE_RAW_ID_CALL.search(source)
+                and not any(marker in source for marker in IWA_KEYNOTE_MOVIE_TITLE_GRAPH_HELPERS)
+            ):
+                continue
+            relative = example_path.relative_to(root)
+            for match in IWA_KEYNOTE_MOVIE_TITLE_RAW_ID_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "litchi-iwa Keynote movie-title example retains raw-ID call "
+                    f"{match.group('method')}: {relative}:{line_number}"
+                )
+            for marker in sorted(IWA_KEYNOTE_MOVIE_TITLE_GRAPH_HELPERS):
+                marker_match = re.search(
+                    rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", source
+                )
+                if marker_match is None:
+                    continue
+                line_number = source.count("\n", 0, marker_match.start()) + 1
+                violations.append(
+                    "litchi-iwa Keynote movie-title example retains legacy graph helper "
+                    f"{marker}: {relative}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
+def audit_keynote_movie_title_codec_source_topology(root: Path = ROOT) -> list[str]:
+    """Require a strict source-preserving codec for both movie-title edges."""
+
+    owner_path = root / KEYNOTE_MOVIE_TITLE_OWNER_SOURCE
+    if not owner_path.is_file():
+        return []
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    codec_paths = (
+        root / KEYNOTE_MOVIE_TITLE_CODEC_SOURCE,
+        root / KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_SOURCE,
+    )
+    violations: list[str] = []
+    missing = [path for path in codec_paths if not path.is_file()]
+    if missing:
+        return [
+            "focused litchi-keynote movie-title owner is missing strict dual-edge codec: "
+            + ", ".join(str(path.relative_to(root)) for path in missing)
+        ]
+    shared_path = root / KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+    shared = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(shared_path.read_text(encoding="utf-8"))
+        )
+        if shared_path.is_file()
+        else ""
+    )
+    codec_parts = [
+        _mask_rust_non_code(_mask_rust_cfg_test_items(path.read_text(encoding="utf-8")))
+        for path in codec_paths
+    ]
+    blob = "\n".join((owner, shared, *codec_parts))
+    for function in sorted(KEYNOTE_MOVIE_TITLE_CODEC_FUNCTIONS):
+        if not re.search(rf"(?<![A-Za-z0-9_]){re.escape(function)}\b", blob):
+            violations.append(
+                "focused litchi-keynote movie-title codec is missing strict operation "
+                f"{function}: {KEYNOTE_MOVIE_TITLE_CODEC_SOURCE}"
+            )
+    if not any(
+        re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}\b", blob)
+        for name in KEYNOTE_MOVIE_TITLE_CODEC_TYPES
+    ):
+        violations.append(
+            "focused litchi-keynote movie-title codec is missing a typed source-preserving "
+            f"write/snapshot seam: {KEYNOTE_MOVIE_TITLE_CODEC_SOURCE}"
+        )
+    for edge_index, markers in enumerate(KEYNOTE_MOVIE_TITLE_DUAL_EDGE_MARKERS, start=1):
+        if not any(
+            re.search(rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", blob)
+            for marker in markers
+        ):
+            violations.append(
+                "focused litchi-keynote movie-title codec must validate dual-edge "
+                f"graph edge {edge_index}: {KEYNOTE_MOVIE_TITLE_CODEC_SOURCE}"
+            )
+    if KEYNOTE_MOVIE_TITLE_CODEC_MODULE not in blob:
+        violations.append(
+            "focused litchi-keynote movie-title owner must route through hidden "
+            f"{KEYNOTE_MOVIE_TITLE_CODEC_MODULE}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_MODULE not in blob:
+        violations.append(
+            "focused litchi-keynote movie-title owner must route through hidden "
+            f"{KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_MODULE}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if re.search(
+        r"\bprost[ \t\r\n]*::[ \t\r\n]*Message\b|::decode\s*\(",
+        "\n".join(codec_parts),
+    ):
+        violations.append(
+            "focused litchi-keynote movie-title codec retains eager/generated decode: "
+            f"{KEYNOTE_MOVIE_TITLE_CODEC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_movie_title_lifecycle_source_topology(root: Path = ROOT) -> list[str]:
+    """Require title graph creation/removal, metadata, and exact transaction proof."""
+
+    owner_path = root / KEYNOTE_MOVIE_TITLE_OWNER_SOURCE
+    if not owner_path.is_file():
+        return []
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    shared_path = root / KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+    shared = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(shared_path.read_text(encoding="utf-8"))
+        )
+        if shared_path.is_file()
+        else ""
+    )
+    blob = f"{owner}\n{shared}"
+    violations: list[str] = []
+    budget_matches = list(KEYNOTE_MOVIE_CAPTION_PACKAGE_BUDGET_TYPE.finditer(blob))
+    if not budget_matches:
+        violations.append(
+            "focused litchi-keynote movie-title owner is missing one private aggregate "
+            f"CaptionBudget: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    operation_names = KEYNOTE_MOVIE_TITLE_GRAPH_OPERATION_NAMES | {
+        name
+        for name in re.findall(
+            r"(?<![A-Za-z0-9_])fn[ \t\r\n]+(rewrite_[A-Za-z0-9_]+)[ \t\r\n]*\(", blob
+        )
+        if "movie" in name.lower() and "title" in name.lower()
+    }
+    operation_present = next(
+        (name for name in operation_names if re.search(rf"\b{re.escape(name)}\b", owner)),
+        None,
+    )
+    if operation_present is None and not re.search(
+        r"rewrite_caption_graph_operation_with_budget", owner
+    ):
+        violations.append(
+            "focused litchi-keynote movie-title graph operation helper is missing: "
+            f"{KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not re.search(r"\b(?:creating|creating_title|create)\b", blob):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must expose creation path: "
+            f"{KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not re.search(r"\b(?:removing|removing_title|remove)\b", blob):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must expose removal path: "
+            f"{KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not any(marker in blob for marker in KEYNOTE_MOVIE_TITLE_GRAPH_MARKERS):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must retain title graph markers: "
+            f"{KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not any(marker in blob for marker in KEYNOTE_MOVIE_TITLE_METADATA_MARKERS):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must update Metadata UUID/save-token "
+            f"registry: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not any(marker in blob for marker in KEYNOTE_MOVIE_TITLE_REFERENCE_TRANSITIONS):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must use a source-authoritative "
+            f"dual-edge reference transition: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not any(marker in blob for marker in KEYNOTE_MOVIE_TITLE_INVERSE_LOCALITY_MARKERS):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must verify exact inverse/locality "
+            f"artifacts: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    if not KEYNOTE_CHART_CAPTION_CODEC_REPORT_CHARGE.search(blob):
+        violations.append(
+            "focused litchi-keynote movie-title lifecycle must charge strict codec reports "
+            f"through CaptionBudget: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+        )
+    for category, pattern in KEYNOTE_CHART_CAPTION_RESOURCE_CHARGES.items():
+        if not pattern.search(blob):
+            violations.append(
+                "focused litchi-keynote movie-title lifecycle must charge prepublication "
+                f"{category} work through CaptionBudget: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
+            )
     return sorted(set(violations))
 
 
@@ -18158,6 +18970,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_package_no_eager_prost_source_topology()
         + audit_keynote_chart_title_legacy_calls()
         + audit_iwa_keynote_chart_title_source_topology()
+        + audit_keynote_movie_title_legacy_calls()
+        + audit_iwa_keynote_movie_title_source_topology()
+        + audit_keynote_movie_title_facade_source_topology()
+        + audit_keynote_movie_title_codec_source_topology()
+        + audit_keynote_movie_title_lifecycle_source_topology()
         + audit_keynote_chart_caption_legacy_calls()
         + audit_iwa_keynote_chart_caption_source_topology()
         + audit_keynote_chart_caption_facade_source_topology()

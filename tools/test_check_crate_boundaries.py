@@ -10731,6 +10731,247 @@ fn rewrite_movie_caption_operation(
             violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
             self.assertTrue(any("blanket" in item for item in violations), violations)
 
+    def _write_movie_title_facade_fixture(
+        self, root: Path
+    ) -> tuple[Path, Path, Path, Path]:
+        owner = root / boundaries.KEYNOTE_MOVIE_TITLE_OWNER_SOURCE
+        selector = root / boundaries.KEYNOTE_MOVIE_TITLE_SELECTOR_SOURCE
+        package = root / boundaries.KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[0]
+        library = root / boundaries.KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[1]
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        selector.parent.mkdir(parents=True, exist_ok=True)
+        canonical = sorted(boundaries.KEYNOTE_MOVIE_TITLE_CANONICAL_TYPES)
+        owner.write_text(
+            "\n".join(f"pub struct {name};" for name in canonical)
+            + "\nimpl Package {\n"
+            "    pub fn slide_movie_title(&self, selector: MovieSelector) -> Option<String> { let _ = selector; None }\n"
+            "    pub fn edit_slide_movie_title(&self, selector: MovieSelector) -> SlideMovieTitleEdit { let _ = selector; SlideMovieTitleEdit }\n"
+            "    pub fn apply_slide_movie_title(&self, patch: SlideMovieTitlePatch) -> SlideMovieTitleCommit { let _ = patch; SlideMovieTitleCommit }\n"
+            "}\n"
+            "impl SlideMovieTitleEdit {\n"
+            "    pub fn set(self, title: &str) -> Self { let _ = title; self }\n"
+            "    pub fn clear(self) -> Self { self }\n"
+            "    pub fn commit(self) -> SlideMovieTitleCommit { let _ = self; SlideMovieTitleCommit }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        selector.write_text("pub enum MovieSelector { Index(usize) }\n", encoding="utf-8")
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            "mod slide_movie_title;\n"
+            + "pub use slide_movie_title::{"
+            + ", ".join(canonical)
+            + "};\n",
+            encoding="utf-8",
+        )
+        library.write_text(
+            "pub use package::{"
+            + ", ".join(canonical)
+            + "};\n"
+            "pub use slide::movie::MovieSelector;\n",
+            encoding="utf-8",
+        )
+        return owner, selector, package, library
+
+    def test_focused_keynote_movie_title_facade_requires_selector_and_hides_physical_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, selector, package, library = self._write_movie_title_facade_fixture(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_title_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_movie_title(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n"
+                + "pub use litchi_iwa_protos::WireView;\n"
+                + "pub type MovieTitleEdit = SlideMovieTitleEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "selector: MovieSelector", "movie_id: u64"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_movie_title;", "pub mod slide_movie_title;"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+            selector.write_text("pub struct WrongSelector;\n", encoding="utf-8")
+            library.write_text(
+                library.read_text(encoding="utf-8").replace(
+                    "pub use slide::movie::MovieSelector;", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("missing canonical MovieSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical MovieSelector re-export" in item for item in violations), violations)
+
+    def test_focused_keynote_movie_title_facade_masks_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_title_facade_fixture(root)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "pub fn cfg_only_bad(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n"
+                + owner.read_text(encoding="utf-8")
+                + "pub fn production_bad(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertEqual(sum("raw byte slice" in item for item in violations), 1)
+            self.assertEqual(sum("raw identifier" in item for item in violations), 2)
+
+    def test_keynote_movie_title_host_retires_raw_graph_and_requires_typed_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_MOVIE_TITLE_SOURCE
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "pub fn set_slide_movie_title(&mut self, slide_index: usize, drawable_object_id: u64, title: &str) {}\n"
+                "pub fn remove_slide_movie_title(&mut self, slide_index: usize, drawable_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_title_source_topology(root)
+            self.assertTrue(any("selector bridge is missing" in item for item in violations), violations)
+            self.assertTrue(any("raw-ID method/graph helper must be retired" in item for item in violations), violations)
+
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_movie_title_by_selector(&self, selector: MovieSelector) { package.slide_movie_title(selector); }\n"
+                "    pub fn set_slide_movie_title_by_selector(&mut self, selector: impl Into<MovieSelector>, title: &str) { package.edit_slide_movie_title(selector).set(title).commit(); }\n"
+                "    pub fn remove_slide_movie_title_by_selector(&mut self, selector: impl Into<MovieSelector>) { package.edit_slide_movie_title(selector).clear().commit(); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_iwa_keynote_movie_title_source_topology(root), [])
+
+            source.write_text(
+                source.read_text(encoding="utf-8")
+                + "fn movie_title() {}\n"
+                + "fn insert_slide_movie_title() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_title_source_topology(root)
+            self.assertTrue(any("legacy graph helper" in item for item in violations), violations)
+
+            source.write_text(
+                "#[cfg(test)]\n"
+                "fn cfg_only_bridge(selector: MovieSelector) { package.slide_movie_title(selector); }\n"
+                "#[cfg(test)]\n"
+                "pub fn set_slide_movie_title(&mut self, slide_index: usize, drawable_object_id: u64, title: &str) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_iwa_keynote_movie_title_source_topology(root), [])
+
+    def test_keynote_movie_title_codec_and_lifecycle_require_dual_edge_and_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_title_facade_fixture(root)
+            violations = boundaries.audit_keynote_movie_title_codec_source_topology(root)
+            self.assertTrue(any("missing strict dual-edge codec" in item for item in violations), violations)
+            violations = boundaries.audit_keynote_movie_title_lifecycle_source_topology(root)
+            self.assertTrue(any("graph operation helper is missing" in item for item in violations), violations)
+
+            codec = root / boundaries.KEYNOTE_MOVIE_TITLE_CODEC_SOURCE
+            graph_codec = root / boundaries.KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            graph_codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "fn decode_movie_caption() {}\nfn decode_movie_caption_with_report() {}\n"
+                "fn rewrite_movie_caption_with_report() {}\n"
+                "struct MovieCaptionWrite; struct MovieCaptionSnapshot;\n"
+                "fn title_edge() { MovieCaptionWrite::title; MovieCaptionSlot::Title; }\n",
+                encoding="utf-8",
+            )
+            graph_codec.write_text(
+                "fn encode_caption_graph_with_kind_with_report() {}\n"
+                "struct CaptionGraphKind; struct CaptionGraphWrite;\n"
+                "fn title_profile() { CaptionGraphKind::Title; DrawableCaptionKind::Title; }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_codec_source_topology(root)
+            self.assertTrue(any("hidden" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + """
+struct CaptionBudget;
+fn rewrite_movie_title_operation(
+    budget: &mut CaptionBudget,
+    creating: bool,
+    removing: bool,
+) {
+    let _ = (budget, creating, removing);
+    validate_canonical_object_framing();
+    patch_movie_title_edge(expected_identifier, replacement_identifier);
+    keynote_movie_caption_codec::rewrite_movie_caption_with_report(bytes);
+    keynote_chart_caption_graph_codec::encode_caption_graph_with_kind_with_report(bytes);
+    let _ = (MOVIE_TITLE_FIELD, CAPTION_INFO_MESSAGE_TYPE, CaptionInfoArchive);
+    let _ = DrawableCaptionKind::Title;
+    prepare_package_metadata_additions_and_save_tokens();
+    ObjectUuidAddition;
+    budget.charge_codec_report(report);
+    budget.charge_archive_work();
+    budget.charge_snappy_work();
+    budget.charge_zip_work();
+    budget.charge_reopen_work();
+    budget.charge_exact_artifacts();
+    let _ = (ExactArtifacts, inverse, locality, PatchConflict);
+}
+""",
+                encoding="utf-8",
+            )
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "fn codec_route() { keynote_movie_caption_codec; }\n",
+                encoding="utf-8",
+            )
+            graph_codec.write_text(
+                graph_codec.read_text(encoding="utf-8")
+                + "fn graph_route() { keynote_chart_caption_graph_codec; }\n",
+                encoding="utf-8",
+            )
+            # The codec and owner now contain the complete marker profile, so
+            # both audits must accept the synthetic production shape.
+            self.assertEqual(
+                boundaries.audit_keynote_movie_title_codec_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_movie_title_lifecycle_source_topology(root), []
+            )
+
+    def test_keynote_movie_title_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_movie_title_legacy_calls()",
+            "+ audit_iwa_keynote_movie_title_source_topology()",
+            "+ audit_keynote_movie_title_facade_source_topology()",
+            "+ audit_keynote_movie_title_codec_source_topology()",
+            "+ audit_keynote_movie_title_lifecycle_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
     def test_pages_and_numbers_chart_caption_audits_require_neutral_edge_and_mask_tests(
         self,
     ) -> None:

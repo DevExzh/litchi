@@ -25,7 +25,7 @@ use litchi_iwa_archive::{
     package::{EntryEdit, ExactArtifacts, ReassemblyExecutionLimits},
 };
 use litchi_iwa_common::{
-    decode_varint_from_bytes,
+    WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
     wire::{WireView, append_length_delimited_field_with_limits, append_varint_field},
 };
@@ -72,6 +72,7 @@ const MAX_CAPTION_BYTES: usize = 64 * 1024 * 1024;
 pub(super) enum CaptionEdgeKind {
     Chart,
     Movie,
+    MovieTitle,
 }
 
 /// Operation-local accounting for the chart-caption owner.
@@ -375,6 +376,99 @@ impl CaptionBudget {
         self.charge_input(package.state.source.shared_source().len())?;
         self.charge_components(package.state.source.components().len())?;
         self.charge_work(work)
+    }
+
+    /// Charge a package-wide validation/ownership traversal.
+    ///
+    /// Selection and graph verification repeatedly walk the already parsed
+    /// physical catalog.  The initial catalog charge above accounts for the
+    /// first pass, but it must not make later ownership passes appear free.
+    /// This helper charges archive/message traversal work and every
+    /// aggregate/field reference inspected by `passes` additional traversals.
+    /// Source bytes are charged at the physical catalog/reopen seams. It
+    /// intentionally does not pretend to know the exact
+    /// number of temporary allocations made by lower-level semantic readers;
+    /// callers charge those at the operation boundary where they are known.
+    pub(super) fn charge_validation_scan(
+        &mut self,
+        package: &Package,
+        passes: usize,
+    ) -> Result<(), ChartCaptionError> {
+        if passes == 0 {
+            return Ok(());
+        }
+        let mut work = 0usize;
+        for component in package.state.source.components().iter() {
+            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            work = work
+                .checked_add(component.name().len())
+                .and_then(|value| value.checked_add(archive_bytes))
+                .ok_or(ChartCaptionError::InvalidSource)?;
+            for object in &component.archive().objects {
+                work = work
+                    .checked_add(1)
+                    .and_then(|value| value.checked_add(object.messages.len()))
+                    .and_then(|value| value.checked_add(object.archive_info.message_infos.len()))
+                    .ok_or(ChartCaptionError::InvalidSource)?;
+                for (message_index, message) in object.messages.iter().enumerate() {
+                    work = work
+                        .checked_add(message.data.len())
+                        .ok_or(ChartCaptionError::InvalidSource)?;
+                    let Some(info) = object.archive_info.message_infos.get(message_index) else {
+                        continue;
+                    };
+                    let mut local_references = info
+                        .object_references
+                        .len()
+                        .checked_add(info.data_references.len())
+                        .and_then(|value| value.checked_add(info.field_infos.len()))
+                        .ok_or(ChartCaptionError::InvalidSource)?;
+                    for field in &info.field_infos {
+                        local_references =
+                            local_references
+                                .checked_add(field.path.path.len())
+                                .and_then(|value| {
+                                    value.checked_add(field.object_references.len()).and_then(
+                                        |value| value.checked_add(field.data_references.len()),
+                                    )
+                                })
+                                .ok_or(ChartCaptionError::InvalidSource)?;
+                    }
+                    work = work
+                        .checked_add(local_references)
+                        .ok_or(ChartCaptionError::InvalidSource)?;
+                }
+            }
+        }
+        // The physical source bytes are charged by `charge_catalog_scan`,
+        // while a reopened candidate is charged by `charge_candidate_reopen`.
+        // Repeated validation traversals operate on those already materialized
+        // bytes, so charging the complete ZIP again would reject exact public
+        // input profiles without measuring a new ingress allocation. Their
+        // reference comparisons are included in work below rather than being
+        // charged against the one-package semantic reference ceiling again.
+        self.charge_work(
+            work.checked_mul(passes)
+                .ok_or(ChartCaptionError::InvalidSource)?,
+        )
+    }
+
+    /// Charge the bounded allocations made while resolving a movie/chart
+    /// selector.  The exact vector capacities are format-dependent, so this
+    /// records only the known selector scratch allocations; payload and
+    /// candidate buffers are charged by their owning codec/reassembler.
+    pub(super) fn charge_selection_scan(
+        &mut self,
+        package: &Package,
+        passes: usize,
+    ) -> Result<(), ChartCaptionError> {
+        self.charge_validation_scan(package, passes)?;
+        self.charge_allocation(
+            passes
+                .checked_mul(2)
+                .ok_or(ChartCaptionError::InvalidSource)?,
+            0,
+        )
     }
 
     fn charge_metadata_report(
@@ -749,12 +843,14 @@ impl<'a> ChartCaptionEdit<'a> {
         self.source.validate().map_err(map_read_error)?;
         let mut budget = CaptionBudget::for_package(self.source)?;
         budget.charge_catalog_scan(self.source)?;
+        budget.charge_selection_scan(self.source, 1)?;
         let (package, touched_components, deleted_previews) = rewrite_chart_caption_operation(
             self.source,
             &self.selection,
             self.after.as_deref(),
             &mut budget,
         )?;
+        budget.charge_selection_scan(&package, 1)?;
         let candidate = select_caption(
             &package,
             SlideSelector::position(self.selection.slide_position),
@@ -764,6 +860,7 @@ impl<'a> ChartCaptionEdit<'a> {
         if !candidate.same_chart_identity(&self.selection) || candidate.text != self.after {
             return Err(ChartCaptionError::Verification);
         }
+        budget.charge_validation_scan(&package, 1)?;
         verify_caption_candidate(
             self.source,
             &package,
@@ -1016,12 +1113,14 @@ impl Package {
         }
         let mut budget = CaptionBudget::for_package(self)?;
         budget.charge_catalog_scan(self)?;
+        budget.charge_selection_scan(self, 1)?;
         budget.charge_exact_artifacts(source.len(), patch.artifacts.target().len())?;
         budget.charge_candidate_reopen(patch.artifacts.target().len())?;
         let candidate =
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
+        budget.charge_selection_scan(&candidate, 1)?;
         let selected = select_caption(
             &candidate,
             SlideSelector::position(patch.selection.slide_position),
@@ -1031,6 +1130,7 @@ impl Package {
         if !selected.same_identity(&patch.target_selection) || selected.text != patch.after {
             return Err(ChartCaptionError::Verification);
         }
+        budget.charge_validation_scan(&candidate, 1)?;
         verify_caption_candidate(
             self,
             &candidate,
@@ -1738,6 +1838,12 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
         return Err(ChartCaptionError::UnsupportedDependency);
     }
 
+    // The graph transition performs package-wide metadata, identifier, theme,
+    // and dependency scans below.  Account the physical ownership traversal
+    // before any candidate archive allocation so those scans share the same
+    // operation-local budget as the codec and reassembler.
+    budget.charge_validation_scan(source, 1)?;
+
     let catalog = physical_catalog(source)?;
     let metadata_name = metadata_member_name(catalog, source)?;
     let slide_name = slide_component_name.to_owned();
@@ -1749,7 +1855,11 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
+    budget.charge_allocation(1, 0)?;
     let mut archives = Vec::new();
+    archives
+        .try_reserve_exact(2)
+        .map_err(|_| ChartCaptionError::Allocation { amount: 2 })?;
     for name in [&slide_name, &metadata_name] {
         let entry = catalog
             .package()
@@ -1807,6 +1917,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
                 theme.stylesheet,
                 theme.paragraph_style,
                 theme.language.as_deref(),
+                edge_kind,
                 budget,
             )?;
             budget.observe_graph_report(graph_report)?;
@@ -1814,10 +1925,15 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
                 ids,
                 ids.info,
                 objects,
-                (edge_kind == CaptionEdgeKind::Movie).then_some(ids.style),
+                matches!(
+                    edge_kind,
+                    CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle
+                )
+                .then_some(ids.style),
             )
         } else {
             let standin = first_identifier;
+            budget.charge_allocation(1, 0)?;
             let object = canonical_standin(standin)?;
             (
                 CaptionGraphIds::standin(standin),
@@ -1846,7 +1962,13 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     }
 
     let new_last = new_identifiers.last();
+    budget.charge_allocation(1, 0)?;
     let mut additions = Vec::new();
+    additions
+        .try_reserve_exact(new_identifiers.all().len())
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: new_identifiers.all().len(),
+        })?;
     for identifier in new_identifiers.all() {
         if identifier == 0 {
             continue;
@@ -1886,6 +2008,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     for (_, archive) in &archives {
         budget.charge_archive_snappy_plan(archive, archive_limits, snappy_limits)?;
     }
+    budget.charge_allocation(1, 0)?;
     let mut compressed = Vec::new();
     compressed
         .try_reserve_exact(archives.len())
@@ -1899,10 +2022,16 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
         let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
         compressed.push((name.clone(), data));
     }
-    let edits = compressed
-        .iter()
-        .map(|(name, data)| EntryEdit::new(name.as_str(), data.as_slice()))
-        .collect::<Vec<_>>();
+    budget.charge_allocation(1, 0)?;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(compressed.len())
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: compressed.len(),
+        })?;
+    for (name, data) in &compressed {
+        edits.push(EntryEdit::new(name.as_str(), data.as_slice()));
+    }
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
         .map_err(map_rendering_error)?;
     let prepared_reassembly = catalog
@@ -1931,6 +2060,11 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     let catalog = physical_catalog(source)?;
     let metadata_name = metadata_member_name(catalog, source)?;
     let deleted = preview_count(catalog);
+    // Storage replacement traverses the source graph before staging the native
+    // candidate.  Keep that ownership/selector pass visible to the enclosing
+    // transaction budget; the Metadata codec report accounts only its own
+    // protobuf passes.
+    budget.charge_validation_scan(source, 1)?;
     budget.precharge_intermediate_candidate(source, desired.len())?;
     let (native_candidate, touched) = super::slide_text::rewrite_owned_storage_text(
         source,
@@ -2600,7 +2734,8 @@ fn caption_graph_objects(
     stylesheet_identifier: u64,
     paragraph_style_identifier: u64,
     language: Option<&str>,
-    budget: &CaptionBudget,
+    edge_kind: CaptionEdgeKind,
+    budget: &mut CaptionBudget,
 ) -> Result<(Vec<ArchiveObject>, graph_codec::EncodeReport), ChartCaptionError> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let wire = graph_codec::EncodeOptions::for_text(text)
@@ -2614,7 +2749,11 @@ fn caption_graph_objects(
                 .min(u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX)),
         )
         .with_max_allocations(budget.remaining_allocations());
-    let output = graph_codec::encode_caption_graph_with_report(
+    let graph_kind = match edge_kind {
+        CaptionEdgeKind::MovieTitle => graph_codec::CaptionGraphKind::Title,
+        CaptionEdgeKind::Chart | CaptionEdgeKind::Movie => graph_codec::CaptionGraphKind::Caption,
+    };
+    let output = graph_codec::encode_caption_graph_with_kind_with_report(
         graph_codec::CaptionGraphWrite {
             drawable_identifier,
             style_identifier: ids.style,
@@ -2627,6 +2766,7 @@ fn caption_graph_objects(
             text,
             language,
         },
+        graph_kind,
         wire,
     )
     .map_err(map_graph_error)?;
@@ -2645,6 +2785,7 @@ fn caption_graph_objects(
         vec![paragraph_style_identifier],
         Vec::new(),
     ];
+    budget.charge_allocation(1, 0)?;
     let mut objects = Vec::new();
     objects
         .try_reserve_exact(4)
@@ -2766,10 +2907,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, ChartCaptionError> {
     })
 }
 
-fn reference_identifier(
-    payload: &[u8],
-    limits: litchi_iwa_common::WireLimits,
-) -> Result<u64, ChartCaptionError> {
+fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, ChartCaptionError> {
     let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 1) {
@@ -2792,7 +2930,7 @@ fn reference_identifier(
 fn first_reference_identifier(
     view: &WireView<'_>,
     number: u32,
-    limits: litchi_iwa_common::WireLimits,
+    limits: WireLimits,
 ) -> Result<u64, ChartCaptionError> {
     let mut first = None;
     for field in view.fields().filter(|field| field.number() == number) {
@@ -2860,7 +2998,11 @@ fn patch_caption_edge(
     edge_kind: CaptionEdgeKind,
     graph_style_identifier: Option<u64>,
 ) -> Result<(), ChartCaptionError> {
-    let missing_movie_edge = expected_identifier.is_none() && edge_kind == CaptionEdgeKind::Movie;
+    let missing_movie_edge = expected_identifier.is_none()
+        && matches!(
+            edge_kind,
+            CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle
+        );
     let mut expected_identifier = expected_identifier;
     if replacement_identifier == 0 {
         return Err(ChartCaptionError::InvalidSource);
@@ -2870,7 +3012,7 @@ fn patch_caption_edge(
         .ok_or(ChartCaptionError::InvalidSource)?;
     let message_type = match edge_kind {
         CaptionEdgeKind::Chart => CHART_MESSAGE_TYPE,
-        CaptionEdgeKind::Movie => 3_007,
+        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => 3_007,
     };
     if source_object.messages.len() != 1 || source_object.messages[0].type_ != message_type {
         return Err(ChartCaptionError::InvalidSource);
@@ -2924,6 +3066,7 @@ fn patch_caption_edge(
         after: Vec<u64>,
     }
     let mut field_states = Vec::new();
+    budget.charge_allocation(1, 0)?;
     field_states
         .try_reserve_exact(info.field_infos.len())
         .map_err(|_error| ChartCaptionError::Allocation {
@@ -2941,11 +3084,21 @@ fn patch_caption_edge(
         {
             return Err(ChartCaptionError::UnsupportedDependency);
         }
+        let edge_field = match edge_kind {
+            CaptionEdgeKind::Chart => 11,
+            CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => {
+                if edge_kind == CaptionEdgeKind::MovieTitle {
+                    10
+                } else {
+                    11
+                }
+            },
+        };
         if count != 0
-            && (!matches!(
-                field.path.path.as_slice(),
-                [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
-            ) || count != 1)
+            && (!matches!(field.path.path.as_slice(), [number, 1] if *number == edge_field)
+                && !matches!(field.path.path.as_slice(), [1, number, 1] if *number == edge_field)
+                && !matches!(field.path.path.as_slice(), [1, 1, number, 1] if *number == edge_field)
+                || count != 1)
         {
             return Err(ChartCaptionError::UnsupportedDependency);
         }
@@ -2993,9 +3146,15 @@ fn patch_caption_edge(
                 report.scratch_bytes(),
             )
         },
-        CaptionEdgeKind::Movie if missing_movie_edge => {
+        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle if missing_movie_edge => {
             let limits = package.wire_limits().map_err(map_wire_error)?;
-            let rewritten = insert_movie_caption_edge(&payload, replacement_identifier, limits)?;
+            let rewritten = insert_movie_caption_edge(
+                &payload,
+                replacement_identifier,
+                limits,
+                edge_kind,
+                budget,
+            )?;
             let input_bytes = payload.len();
             let output_bytes = rewritten.len();
             let source_view =
@@ -3034,13 +3193,20 @@ fn patch_caption_edge(
                 output_bytes,
             )
         },
-        CaptionEdgeKind::Movie => {
+        CaptionEdgeKind::Movie | CaptionEdgeKind::MovieTitle => {
             let options = movie_caption_rewrite_options(package, &payload, budget)?;
+            let write = match edge_kind {
+                CaptionEdgeKind::Movie => {
+                    keynote_movie_caption_codec::MovieCaptionWrite::caption(replacement_identifier)
+                },
+                CaptionEdgeKind::MovieTitle => {
+                    keynote_movie_caption_codec::MovieCaptionWrite::title(replacement_identifier)
+                },
+                CaptionEdgeKind::Chart => unreachable!(),
+            };
             let (rewritten, report) =
                 keynote_movie_caption_codec::rewrite_movie_caption_with_report(
-                    &payload,
-                    keynote_movie_caption_codec::MovieCaptionWrite::new(replacement_identifier),
-                    options,
+                    &payload, write, options,
                 )
                 .map_err(map_movie_caption_codec_error)?;
             (
@@ -3116,7 +3282,9 @@ fn patch_caption_edge(
 fn insert_movie_caption_edge(
     payload: &[u8],
     replacement_identifier: u64,
-    limits: litchi_iwa_common::WireLimits,
+    limits: WireLimits,
+    edge_kind: CaptionEdgeKind,
+    budget: &mut CaptionBudget,
 ) -> Result<Vec<u8>, ChartCaptionError> {
     if replacement_identifier == 0 {
         return Err(ChartCaptionError::InvalidSource);
@@ -3124,13 +3292,20 @@ fn insert_movie_caption_edge(
     let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let super_payload = unique_payload_field(&outer, 1)?.ok_or(ChartCaptionError::InvalidSource)?;
     let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
-    if drawable.fields().any(|field| field.number() == 11) {
+    let edge_field = match edge_kind {
+        CaptionEdgeKind::Movie => 11,
+        CaptionEdgeKind::MovieTitle => 10,
+        CaptionEdgeKind::Chart => return Err(ChartCaptionError::InvalidSource),
+    };
+    if drawable.fields().any(|field| field.number() == edge_field) {
         return Err(ChartCaptionError::InvalidSource);
     }
 
+    budget.charge_allocation(1, 0)?;
     let mut reference_payload = Vec::new();
     append_varint_field(&mut reference_payload, 1, replacement_identifier)
         .map_err(map_wire_error)?;
+    budget.charge_allocation(1, 0)?;
     let mut drawable_output = Vec::new();
     drawable_output
         .try_reserve_exact(
@@ -3148,9 +3323,15 @@ fn insert_movie_caption_edge(
         field.validate_canonical_framing().map_err(map_wire_error)?;
         drawable_output.extend_from_slice(field.raw());
     }
-    append_length_delimited_field_with_limits(&mut drawable_output, 11, &reference_payload, limits)
-        .map_err(map_wire_error)?;
+    append_length_delimited_field_with_limits(
+        &mut drawable_output,
+        edge_field,
+        &reference_payload,
+        limits,
+    )
+    .map_err(map_wire_error)?;
 
+    budget.charge_allocation(1, 0)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(payload.len().saturating_add(drawable_output.len()))
@@ -3180,7 +3361,12 @@ fn insert_movie_caption_edge(
         .with_max_output_bytes(limits.max_output_bytes()),
     )
     .map_err(map_movie_caption_codec_error)?;
-    if snapshot.caption_identifier() != Some(replacement_identifier) {
+    let actual = match edge_kind {
+        CaptionEdgeKind::Movie => snapshot.caption_identifier(),
+        CaptionEdgeKind::MovieTitle => snapshot.title_identifier(),
+        CaptionEdgeKind::Chart => None,
+    };
+    if actual != Some(replacement_identifier) {
         return Err(ChartCaptionError::Verification);
     }
     Ok(output)
