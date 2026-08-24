@@ -4836,3 +4836,27 @@ opened without repair and displayed the recorded Quarterly Results slide and
 Quarterly revenue chart/caption/data. This is bounded application acceptance,
 not Rust/native parity, performance/RSS, publication, or any monolith-exit
 evidence.
+
+## 2026-08-24 amendment: Wave69 shared chart-caption codec slice (not a monolith-exit gate)
+
+Commit `cd382f95dad52fecdfdb17a7fbb1565c489e6de1` centralizes one
+strict TSCH/TSD/TSP chart-caption reference edge and removes the Pages and
+Numbers caption-local generated `IWorkChartArchive` decodes and lossy nested
+patch helpers. The neutral hidden codec is shared with the already focused
+Keynote spelling; no generated type or raw object identifier is added to a
+public API.
+
+This is a bounded shared-codec and local-decode-retirement slice. Pages and
+Numbers remain compatibility-host owners for chart selection, creation and
+removal graphs, themes, caption storage/placement, UUID registration,
+PackageMetadata, save tokens, compression, archive publication, and native
+application compatibility. Wave69 does not create a focused Pages or Numbers
+chart-caption package owner and does not retire their semantic host methods.
+
+The `litchi-iwa` crate, remaining Keynote/Pages/Numbers compatibility hosts,
+manifest edges, ordered debts, generated schemas, Buffa/Prost owners, and
+monolith remain. No dependency edge, crate, host, debt, generated-schema
+owner, or normal Prost owner was removed. The Pages 14.4 record is bounded
+open/render/save/close/reopen evidence only, not Rust/native parity,
+performance/RSS, publication, full-workspace verification, or any
+crate/host/edge/debt/monolith-exit gate.

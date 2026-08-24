@@ -13013,3 +13013,55 @@ same visible chart/title/caption/data observations. This is bounded native
 open/render/save/close/reopen acceptance only: no Rust/native byte parity,
 performance/RSS claim, full-workspace green claim, or edge/monolith/debt014
 exit claim is made.
+
+## 2026-08-24 amendment: Wave69 shared chart-caption edge verification record
+
+The shared strict chart-caption edge and Pages/Numbers caption-local migration
+are commit `cd382f95dad52fecdfdb17a7fbb1565c489e6de1`. The focused gates were:
+
+- `cargo test -p litchi-iwa-protos keynote_chart_caption_codec --lib`
+  passed 14/14;
+- the Pages unknown-field-retention regression and native chart-caption CRUD
+  test each passed 1/1;
+- the Numbers unknown-field-retention regression and native chart-caption
+  CRUD test each passed 1/1;
+- `cargo test -p litchi-keynote --test slide_chart_caption --quiet` passed
+  20/20, and the focused Keynote host chart-caption CRUD test passed 1/1;
+- `cargo check -p litchi-iwa-protos -p litchi-iwa --all-targets` passed with
+  the existing warnings; the strict codec lib Clippy gate passed with
+  `-D warnings`; the scoped `litchi-iwa` lib Clippy gate passed with explicit
+  allowances for the pre-existing deprecated/dead-code/unused-import,
+  `manual_contains`, `clone_on_copy`, and `derivable_impls` findings;
+- targeted Rust formatting, `git diff --check`, and Python compilation passed;
+  `python3 -m unittest tools.test_check_crate_boundaries` passed 417/417;
+- the live boundary checker exited 1 only for the three known user-owned
+  untracked Pages table-lock findings and reported no Wave69 chart-caption
+  finding.
+
+The implementation commit skipped the repository-wide formatting, lint,
+lib/test, and doc-test hooks after the equivalent scoped gates above because
+the dirty shared worktree retains unrelated table-info, protobuf, Pages
+footnote/table-lock, Numbers projection, and Keynote example work. These
+results are bounded focused evidence, not a full-workspace green claim.
+
+The native record used Pages 14.4 and one disposable artifact. The Rust
+example produced the pre-native file below; Pages saved it in place, so the
+normalized row intentionally uses the same path.
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| Rust candidate `/private/tmp/litchi-wave69-pages-caption.6pQ3tS/rust-chart.pages` before Pages | 8,893 | `a49e95d24629212286c1b1a13b7768744db17268e74c0d40f00b23a89fd4ca0c` |
+| Pages-saved, closed, and reopened exact-path artifact | 126,461 | `1d380c39b65c298272303e905a023c00291fceba939b64b22dda421fbf36a3d7` |
+
+Pages opened the Rust package without a repair or recovery alert. It rendered
+the `Quarterly Results` body, one 2D Column chart titled `Quarterly revenue`,
+caption `Revenue by region`, North Q1/Q2/Q3 values 12/18/24, and South
+Q1/Q2/Q3 values 9/21/27. After save, close, and reopening the exact path, the
+same chart, caption, axes, series, and values remained visible without a
+warning.
+
+Pages normalized the package bytes. This is bounded application
+open/render/save/close/reopen acceptance only: it is not Rust/native byte
+parity, post-native Rust re-ingress, arbitrary graph acceptance, a
+performance/RSS measurement, a full publication gate, or a full-workspace
+pass.

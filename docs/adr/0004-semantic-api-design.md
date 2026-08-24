@@ -2653,3 +2653,30 @@ edge, generated schema owners, or monolith complete. The semantic package
 facade remains the authority for chart-title behavior, while any retained
 host adapter is selector-based and cannot widen the public API with native
 IDs.
+
+## 2026-08-24 amendment: shared strict chart-caption edge
+
+Commit `cd382f95dad52fecdfdb17a7fbb1565c489e6de1` moves the shared
+`TSCH.ChartDrawableArchive.super` to `TSD.DrawableArchive.caption` to
+`TSP.Reference.identifier` edge behind the format-neutral hidden
+`litchi_iwa_protos::chart_caption_codec` seam. The existing
+`keynote_chart_caption_codec` spelling remains as a compatibility name for
+the focused Keynote package, but generated Buffa/protobuf types and wire
+records do not cross the shared helper or any public facade.
+
+Pages `PagesEditor::{body_chart_caption, set_body_chart_caption,
+remove_body_chart_caption}` and Numbers
+`NumbersEditor::{sheet_chart_caption, set_sheet_chart_caption,
+remove_sheet_chart_caption}` retain their existing semantic behavior and
+signatures. Their caption-local read and retarget paths now use one bounded
+strict helper instead of decoding `IWorkChartArchive` locally or performing a
+lossy nested-field patch. Broader chart graph and absent-caption creation
+logic still owns its theme, storage, placement, UUID, Metadata, and component
+dependencies in the compatibility host.
+
+The selected reference requires canonical singular known fields, including
+the retained deprecated type and external flags. Unrelated source fields,
+unknown groups, and unknown scalar framing are preserved, while malformed,
+duplicate, wrong-wire, noncanonical, nonfinite-limit, or failed candidate
+readback states reject. This is a private shared codec boundary, not a new
+public raw-ID API or a focused Pages/Numbers package owner.
