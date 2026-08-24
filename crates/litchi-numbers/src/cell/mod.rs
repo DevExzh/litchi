@@ -180,6 +180,15 @@ pub(crate) mod wire {
             self.0.clear_value_with_limit(max_output_bytes)
         }
 
+        pub(crate) fn clear_comment_with_limit(
+            &self,
+            expected_identifier: u32,
+            max_output_bytes: usize,
+        ) -> Result<Vec<u8>, Error> {
+            self.0
+                .clear_comment_with_limit(expected_identifier, max_output_bytes)
+        }
+
         pub(crate) fn formula_cache_equals(&self, value: CachedScalar) -> bool {
             self.0.formula_cache_equals(value.into_native())
         }
