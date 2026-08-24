@@ -3566,7 +3566,7 @@ pub(crate) struct Field<'source> {
 impl<'source> Field<'source> {
     pub(crate) fn varint(self) -> Result<u64, DecodeError> {
         match self.value {
-            Value::Varint(value) if self.wire_type == 0 => Ok(value),
+            Value::Varint { value, canonical } if self.wire_type == 0 && canonical => Ok(value),
             _ => Err(DecodeError::invalid()),
         }
     }
@@ -3588,7 +3588,7 @@ impl<'source> Field<'source> {
 
 #[derive(Debug, Clone, Copy)]
 enum Value<'source> {
-    Varint(u64),
+    Varint { value: u64, canonical: bool },
     Fixed64,
     Bytes(&'source [u8]),
     Group,
@@ -3629,7 +3629,10 @@ fn parse_field<'source>(
         return Err(DecodeError::invalid());
     }
     let value = match wire_type {
-        0 => Value::Varint(take_varint(source)?),
+        0 => {
+            let (value, canonical) = take_varint_relaxed(source)?;
+            Value::Varint { value, canonical }
+        },
         1 => {
             let _ = take(source, 8)?;
             Value::Fixed64
@@ -3684,6 +3687,19 @@ fn take<'source>(source: &mut &'source [u8], amount: usize) -> Result<&'source [
 }
 
 fn take_varint(source: &mut &[u8]) -> Result<u64, DecodeError> {
+    let (value, canonical) = take_varint_relaxed(source)?;
+    if !canonical {
+        return Err(DecodeError::invalid());
+    }
+    Ok(value)
+}
+
+/// Read a protobuf varint while retaining whether its value used the minimal
+/// encoding. Keys and length prefixes call [`take_varint`] and therefore stay
+/// canonical; unknown scalar values use this relaxed route so their original
+/// bytes can be copied byte-for-byte by source-authoritative rewrites. Known
+/// scalar fields still call `Field::varint`, which rejects the relaxed bit.
+fn take_varint_relaxed(source: &mut &[u8]) -> Result<(u64, bool), DecodeError> {
     let original = *source;
     let mut value = 0u64;
     for index in 0..10usize {
@@ -3694,11 +3710,8 @@ fn take_varint(source: &mut &[u8]) -> Result<u64, DecodeError> {
         value |= u64::from(byte & 0x7f) << (index * 7);
         if byte & 0x80 == 0 {
             let consumed = index + 1;
-            if encoded_varint_len(value) != consumed {
-                return Err(DecodeError::invalid());
-            }
             *source = &original[consumed..];
-            return Ok(value);
+            return Ok((value, encoded_varint_len(value) == consumed));
         }
     }
     Err(DecodeError::invalid())
@@ -4567,6 +4580,35 @@ mod tests {
     }
 
     #[test]
+    fn header_bucket_preserves_unknown_overlong_scalars_and_groups() {
+        let mut record = header_record(1, 10.0f32.to_bits());
+        // Unknown scalar values may use a non-minimal varint.  The key and
+        // length framing remain canonical, while the complete source field
+        // must survive a selected size rewrite byte-for-byte.
+        key(&mut record, 99, 0);
+        record.extend_from_slice(&[0x80, 0x00]);
+        let mut group = Vec::new();
+        unknown_group(&mut group, 100, 101, 0x9000);
+        record.extend_from_slice(&group);
+        let mut source = header_bucket(&[record]);
+        key(&mut source, 102, 0);
+        source.extend_from_slice(&[0x81, 0x00]);
+
+        decode_header_storage_bucket(&source, rewrite_options()).unwrap();
+        let (rewritten, _) = rewrite_header_storage_bucket_sizes(
+            &source,
+            2,
+            &[HeaderSizeEdit::set(1, 20.0f32.to_bits())],
+            rewrite_options(),
+        )
+        .unwrap();
+        assert!(rewritten.windows(2).any(|window| window == [0x98, 0x06]));
+        assert!(rewritten.windows(2).any(|window| window == [0x80, 0x00]));
+        assert!(rewritten.windows(2).any(|window| window == [0x81, 0x00]));
+        assert!(rewritten.windows(group.len()).any(|window| window == group));
+    }
+
+    #[test]
     fn clear_removes_only_canonical_minimal_and_otherwise_patches_positive_zero() {
         let canonical = header_record(0, 25.0f32.to_bits());
         let mut unknown = header_record(1, 30.0f32.to_bits());
@@ -4588,6 +4630,29 @@ mod tests {
         assert_eq!(after.records[0].1.size_bits(), 0.0f32.to_bits());
         assert_eq!(after.records[0].1.cell_style().unwrap().identifier(), 9);
         assert!(after.records[0].0.ends_with(&unknown[unknown.len() - 2..]));
+    }
+
+    #[test]
+    fn removal_result_upper_bound_matches_candidate_work_and_fields() {
+        let source = header_bucket(&[
+            header_record(0, 25.0f32.to_bits()),
+            header_record(1, 30.0f32.to_bits()),
+        ]);
+        let edit = HeaderSizeEdit::remove(0);
+        let plan = plan_header_storage_bucket_sizes(&source, 2, &[edit], rewrite_options())
+            .expect("canonical removal should plan");
+        let requirements = plan.requirements();
+        let (candidate, report) =
+            execute_header_storage_bucket_size_plan(plan, rewrite_options()).unwrap();
+        assert_eq!(requirements.output_bytes(), candidate.len());
+        assert_eq!(
+            requirements.result_upper_bound().fields(),
+            report.result().fields()
+        );
+        assert_eq!(
+            requirements.result_upper_bound().work_bytes(),
+            report.result().work_bytes()
+        );
     }
 
     #[test]

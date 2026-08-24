@@ -63,6 +63,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "table_dimension"
+path = "fuzz_targets/table_dimension.rs"
+test = false
+doc = false
+bench = false
+
 
 [[bin]]
 name = "comment_storage_codec"

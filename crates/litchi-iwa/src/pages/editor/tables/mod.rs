@@ -5,7 +5,6 @@ mod comments;
 mod conditional_highlight;
 mod formula;
 mod hidden_axes;
-mod layout;
 mod semantic;
 mod sort;
 mod storage;
@@ -20,7 +19,6 @@ pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
-pub use layout::{PagesTableDimension, PagesTableDimensionSize, PagesTablePoints};
 pub use sort::{
     PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
     PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,

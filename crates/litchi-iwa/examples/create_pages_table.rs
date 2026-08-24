@@ -2,10 +2,10 @@ use std::env;
 
 use litchi_iwa::pages::{
     PagesCellValue, PagesDocumentBuilder, PagesEditor, PagesTableCellUpdate,
-    PagesTableDimensionSize, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
-    PagesTableFormulaExpression,
+    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
+use litchi_pages::table::dimension::{Dimension, Size};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_pages::table::title::Settings as PagesTableTitleSettings;
 use litchi_pages::{BodyTableSelector, Package};
@@ -56,20 +56,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut header_bytes = Vec::new();
     header_commit.package().write_to(&mut header_bytes)?;
     editor = PagesEditor::from_bytes(&header_bytes)?;
+    let mut dimensions = Package::from_bytes(&header_bytes)?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
-        editor.set_table_column_width(
-            table.model_object_id,
-            column,
-            PagesTableDimensionSize::points(width)?,
+        dimensions = set_body_table_dimension(
+            dimensions,
+            BodyTableSelector::name("Revenue"),
+            Dimension::Column(column),
+            Size::points(width)?,
         )?;
     }
     for (row, height) in [28.0, 34.0, 40.0, 46.0].into_iter().enumerate() {
-        editor.set_table_row_height(
-            table.model_object_id,
-            row,
-            PagesTableDimensionSize::points(height)?,
+        dimensions = set_body_table_dimension(
+            dimensions,
+            BodyTableSelector::name("Revenue"),
+            Dimension::Row(row),
+            Size::points(height)?,
         )?;
     }
+    let mut dimension_bytes = Vec::new();
+    dimensions.write_to(&mut dimension_bytes)?;
+    editor = PagesEditor::from_bytes(&dimension_bytes)?;
     editor.insert_table_row(table.model_object_id, RowInsertion::body(2))?;
     editor.insert_table_column(table.model_object_id, ColumnInsertion::body(1))?;
     editor.set_table_cells(
@@ -99,4 +105,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     commit.package().write_to(&mut bytes)?;
     std::fs::write(output, bytes)?;
     Ok(())
+}
+
+fn set_body_table_dimension(
+    package: Package,
+    selector: BodyTableSelector<'static>,
+    dimension: Dimension,
+    size: Size,
+) -> Result<Package, Box<dyn std::error::Error>> {
+    let commit = package
+        .edit_body_table_dimension_size(selector, dimension)?
+        .set(size)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(Package::from_bytes(&bytes)?)
 }

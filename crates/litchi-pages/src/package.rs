@@ -4,6 +4,7 @@
 //! and generated protobuf messages. It publishes [`Package`] snapshots whose
 //! semantic content is represented by the archive-free [`crate::Document`].
 
+pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_title;
 pub(crate) mod document_settings;
@@ -46,6 +47,10 @@ use crate::{
     MAX_SECTIONS, Root, Section, SectionType,
 };
 
+pub use body_table_dimension::{
+    BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
+    BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,
+};
 pub use body_table_headers::{
     BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit,
     BodyTableHeaderSettingsError, BodyTableHeaderSettingsInvalidReason,

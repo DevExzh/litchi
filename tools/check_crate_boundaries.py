@@ -3952,6 +3952,46 @@ IWA_PAGES_README_TABLE_HEADER_CALLS = (
         r"[ \t\r\n]*\(",
     ),
 )
+# Body-table dimensions remain in the compatibility host until the focused
+# Pages package owner is present.  The source audit is intentionally gated on
+# that owner so the live checker continues to report only the established
+# Pages table-lock baseline during the migration window.
+RETIRED_IWA_PAGES_TABLE_DIMENSION_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "layout.rs"
+)
+RETIRED_IWA_PAGES_TABLE_DIMENSION_METHODS = (
+    "table_dimension_size",
+    "set_table_dimension_size",
+    "table_row_height",
+    "set_table_row_height",
+    "table_column_width",
+    "set_table_column_width",
+)
+RETIRED_IWA_PAGES_TABLE_DIMENSION_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_DIMENSION_METHODS
+)
+IWA_PAGES_TABLE_DIMENSION_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"(?:litchi_numbers|numbers)[^;\n]*"
+        r"(?:table[ \t]*::[ \t]*dimension|Dimension|Points|Size)"
+    ),
+)
+IWA_PAGES_TABLE_DIMENSION_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_dimension_size|"
+    r"set_table_dimension_size|table_row_height|set_table_row_height|"
+    r"table_column_width|set_table_column_width)\b[ \t\r\n]*\(",
+)
+IWA_PAGES_TABLE_DIMENSION_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_TABLE_DIMENSION_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_dimension_size|set_table_dimension_size|"
+        r"table_row_height|set_table_row_height|table_column_width|"
+        r"set_table_column_width)\b[ \t\r\n]*\(",
+    ),
+)
 # Body-footnote text mutation is now owned by the focused Pages package.  The
 # host keeps the graph reader plus insertion/removal compatibility paths, but
 # the old public setter must not return.  Keep this ratchet item-scoped: the
@@ -4426,6 +4466,130 @@ PAGES_TABLE_HEADERS_WIRE_TYPES = frozenset(
 PAGES_TABLE_HEADERS_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
 )
+# Body-table dimensions are the remaining layout value family in the Pages
+# host.  Keep the semantic value archive-free and give the package owner its
+# own namespace so a future root glob cannot accidentally publish the private
+# transaction implementation.
+PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "dimension.rs"
+PAGES_TABLE_DIMENSION_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_dimension.rs"
+)
+PAGES_TABLE_DIMENSION_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_dimension"
+)
+PAGES_TABLE_DIMENSION_IMPLEMENTATION_SOURCES = (
+    PAGES_TABLE_DIMENSION_OWNER_SOURCE,
+    PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE,
+)
+PAGES_TABLE_DIMENSION_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_DIMENSION_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_TABLE_DIMENSION_SEMANTIC_TYPES = ("Dimension", "Points", "Size")
+PAGES_TABLE_DIMENSION_CANONICAL_TYPES = (
+    "BodyTableDimensionEdit",
+    "BodyTableDimensionPatch",
+    "BodyTableDimensionCommit",
+    "BodyTableDimensionDiagnostics",
+    "BodyTableDimensionError",
+    "BodyTableDimensionLimitKind",
+)
+PAGES_TABLE_DIMENSION_SHORT_NAMES = frozenset(
+    PAGES_TABLE_DIMENSION_CANONICAL_TYPES + PAGES_TABLE_DIMENSION_SEMANTIC_TYPES
+)
+PAGES_TABLE_DIMENSION_PUBLIC_NAMES = PAGES_TABLE_DIMENSION_SHORT_NAMES
+PAGES_TABLE_DIMENSION_PACKAGE_METHODS = (
+    "body_table_dimension_size",
+    "edit_body_table_dimension_size",
+    "apply_body_table_dimension_size",
+)
+PAGES_TABLE_DIMENSION_FLAT_METHODS = frozenset(
+    {"table_dimension_size", "edit_table_dimension_size", "apply_table_dimension_size"}
+)
+PAGES_TABLE_DIMENSION_FLAT_ALIASES = frozenset(
+    {
+        "DimensionEdit",
+        "DimensionPatch",
+        "DimensionCommit",
+        "DimensionDiagnostics",
+        "DimensionError",
+        "DimensionLimitKind",
+        "TableDimensionEdit",
+        "TableDimensionPatch",
+        "TableDimensionCommit",
+        "TableDimensionDiagnostics",
+        "TableDimensionError",
+        "TableDimensionLimitKind",
+        "TableDimensionSize",
+        "TableDimensionSizeEdit",
+        "TableDimensionSizePatch",
+        "TableDimensionSizeCommit",
+        "TableDimensionSizeDiagnostics",
+        "TableDimensionSizeError",
+        "TableDimensionSizeLimitKind",
+    }
+)
+PAGES_TABLE_DIMENSION_ALIAS_TARGETS = frozenset(
+    PAGES_TABLE_DIMENSION_CANONICAL_TYPES + PAGES_TABLE_DIMENSION_SEMANTIC_TYPES
+)
+PAGES_TABLE_DIMENSION_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_dimension|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?dimension)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_TABLE_DIMENSION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?dimension\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_PACKAGE_TABLE_DIMENSION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body_table_dimension\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_TABLE_DIMENSION_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_table_dimension\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_TABLE_DIMENSION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "DrawableArchive",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableDimensionArchive",
+        "TableDimensionSnapshot",
+        "TableModelArchive",
+        "TSTHeaderStorageBucket",
+    }
+)
+PAGES_TABLE_DIMENSION_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_TABLE_DIMENSION_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tst", "tsp", "tswp"}
+)
+
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
     "document_options",
     "set_document_options",
@@ -6881,6 +7045,21 @@ def _numbers_table_dimension_public_leak(identifier: str) -> str | None:
     return _iwork_public_leak(identifier)
 
 
+def _is_numbers_table_dimension_common_reexport(declaration: str) -> bool:
+    """Recognize only Numbers' canonical common-dimension compatibility path."""
+
+    match = re.fullmatch(
+        r"\s*pub\s+use\s+litchi_iwa_common\s*::\s*table\s*::\s*dimension"
+        r"\s*::\s*\{(?P<body>[^{}]*)\}\s*;?\s*",
+        declaration,
+        re.DOTALL,
+    )
+    if match is None:
+        return False
+    names = tuple(part.strip() for part in match.group("body").split(",") if part.strip())
+    return names == ("Dimension", "Error", "Points", "Size")
+
+
 def _numbers_table_dimension_owner_declaration(declaration: str) -> bool:
     identifiers = [
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -7176,6 +7355,57 @@ def _is_pages_table_headers_public_declaration(
     return bool(
         identifiers & (PAGES_TABLE_HEADERS_FLAT_ALIASES | PAGES_TABLE_HEADERS_FOCUSED_MARKERS)
     ) or _pages_table_headers_owner_declaration(declaration)
+
+
+def _pages_table_dimension_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in Pages dimensions."""
+
+    if identifier in PAGES_TABLE_DIMENSION_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_TABLE_DIMENSION_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_TABLE_DIMENSION_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_table_dimension_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_TABLE_DIMENSION_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_TABLE_DIMENSION_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_table_dimension_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (PAGES_TABLE_DIMENSION_FLAT_ALIASES | PAGES_TABLE_DIMENSION_PUBLIC_NAMES)
+    ) or _pages_table_dimension_owner_declaration(declaration)
 
 
 def _is_pages_table_lock_public_declaration(
@@ -10762,6 +10992,13 @@ def audit_numbers_table_dimension_facade_source_topology(
                 and bool(set(identifiers) & set(NUMBERS_TABLE_DIMENSION_SEMANTIC_TYPES))
                 and not bool(set(identifiers) & NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET)
             )
+            canonical_common_reexport = (
+                path == semantic_path
+                and _is_numbers_table_dimension_common_reexport(declaration)
+            )
+            canonical_semantic_reexport = (
+                canonical_semantic_reexport or canonical_common_reexport
+            )
             canonical_module = (
                 public_declaration
                 and identifiers[:3] in (["pub", "mod", "dimension"], ["pub", "mod", "transaction"])
@@ -10797,6 +11034,8 @@ def audit_numbers_table_dimension_facade_source_topology(
                 identifier_line = line_number + declaration.count(
                     "\n", 0, match.start(1)
                 )
+                if canonical_common_reexport and identifier == "litchi_iwa_common":
+                    continue
                 if public_declaration and identifier in NUMBERS_TABLE_DIMENSION_FLAT_ALIASES:
                     violations.append(
                         "focused litchi-numbers table-dimension public API retains "
@@ -12090,6 +12329,93 @@ def audit_iwa_pages_table_headers_source_topology(root: Path = ROOT) -> list[str
                 line_number = source.count("\n", 0, match.start("method")) + 1
                 violations.append(
                     "retired litchi-iwa Pages table-header README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_table_dimension_source_topology(root: Path = ROOT) -> list[str]:
+    """Retire the Pages raw table-dimension host once its package owner exists.
+
+    The conditional owner check is intentional: layout.rs still contains the
+    compatibility implementation in the migration window.  This ratchet
+    becomes active only when the selector-first package route is present, so
+    the live baseline does not misreport the known Pages table-lock debt.
+    """
+
+    owner_path = root / PAGES_TABLE_DIMENSION_OWNER_SOURCE
+    package_path = root / PAGES_TABLE_DIMENSION_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    if not owner_path.is_file() and PAGES_PACKAGE_TABLE_DIMENSION_MODULE.search(
+        package_source
+    ) is None:
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            code = _mask_rust_non_code(source)
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_TABLE_DIMENSION_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages table-dimension method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for pattern in IWA_PAGES_TABLE_DIMENSION_IMPORTS:
+                for match in pattern.finditer(code):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-dimension import: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_TABLE_DIMENSION_CALL.finditer(code):
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    code[line_start:line_end],
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-dimension call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_TABLE_DIMENSION_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            stem = example_path.stem.lower()
+            if "numbers" in stem and "pages" not in stem:
+                continue
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            )
+            for match in IWA_PAGES_TABLE_DIMENSION_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-dimension example call "
+                    f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_TABLE_DIMENSION_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-dimension README call "
                     f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
                 )
 
@@ -17999,6 +18325,284 @@ def audit_pages_table_headers_facade_source_topology(root: Path = ROOT) -> list[
     return sorted(set(violations))
 
 
+def audit_pages_table_dimension_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Pages table-dimension owner.
+
+    The owner is deliberately feature-gated by its private package source.
+    This lets the migration inventory land before the compatibility host is
+    retired, while still making the complete facade contract fail closed as
+    soon as the owner is introduced.
+    """
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    owner_path = root / PAGES_TABLE_DIMENSION_OWNER_SOURCE
+    package_path = root / PAGES_TABLE_DIMENSION_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    owner_present = owner_path.is_file() or (
+        PAGES_PACKAGE_TABLE_DIMENSION_MODULE.search(package_source) is not None
+    )
+    if not owner_present:
+        return []
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_TABLE_DIMENSION_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_TABLE_DIMENSION_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_TABLE_DIMENSION_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(PAGES_TABLE_DIMENSION_SEMANTIC_TYPES)
+    )
+    for name in PAGES_TABLE_DIMENSION_SEMANTIC_TYPES:
+        if name in semantic_exports:
+            continue
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing "
+            f"semantic table::dimension type {name}: "
+            f"{PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE}"
+        )
+
+    selector_path = root / PAGES_TABLE_DIMENSION_SELECTOR_SOURCE
+    selector_source = (
+        _mask_rust_non_code(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        selector_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing canonical "
+            f"BodyTableSelector: {PAGES_TABLE_DIMENSION_SELECTOR_SOURCE}"
+        )
+
+    owner_source = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+    canonical_exports = _rust_canonical_exports(
+        owner_source, frozenset(PAGES_TABLE_DIMENSION_CANONICAL_TYPES)
+    )
+    for name in PAGES_TABLE_DIMENSION_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing "
+            f"canonical package type {name}: {PAGES_TABLE_DIMENSION_OWNER_SOURCE}"
+        )
+
+    owner_methods = {
+        name
+        for declaration, _line_number in _rust_public_declarations(owner_source)
+        for name, _nested_line in _rust_function_declarations(declaration)
+    }
+    for method in PAGES_TABLE_DIMENSION_PACKAGE_METHODS:
+        if method in owner_methods:
+            continue
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing Package "
+            f"method {method}: {PAGES_TABLE_DIMENSION_OWNER_SOURCE}"
+        )
+    for method in sorted(PAGES_TABLE_DIMENSION_FLAT_METHODS & owner_methods):
+        violations.append(
+            "focused litchi-pages table-dimension public API retains flat Package "
+            f"method {method}: {PAGES_TABLE_DIMENSION_OWNER_SOURCE}"
+        )
+
+    lib_path = root / PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing canonical "
+            f"root table module: {PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]}"
+        )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        lib_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing root "
+            f"BodyTableSelector re-export: {PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]}"
+        )
+
+    table_path = root / PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_DIMENSION_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing canonical "
+            f"table::dimension module: {PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]}"
+        )
+    if PAGES_PACKAGE_TABLE_DIMENSION_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-pages table-dimension public API is missing private "
+            f"package owner module: {PAGES_TABLE_DIMENSION_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_PAGES_PACKAGE_TABLE_DIMENSION_MODULE.finditer(package_source):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-pages table-dimension public API exposes duplicate "
+            f"package::body_table_dimension module: {PAGES_TABLE_DIMENSION_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    # Scan every facade file after masking cfg(test) items individually.  A
+    # production sibling cannot launder an alternate alias through a glob.
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "body_table_dimension"]:
+                violations.append(
+                    "focused litchi-pages table-dimension public API exposes duplicate "
+                    f"body_table_dimension module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {
+                    "body_table_dimension",
+                    "dimension",
+                    "package",
+                } & set(identifiers):
+                    glob_label = (
+                        "table::dimension glob" if path == table_path else "owner glob"
+                    )
+                    violations.append(
+                        "focused litchi-pages table-dimension public API retains root "
+                        f"aliases via {glob_label}: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_DIMENSION_ALIAS_TARGETS
+                    or "body_table_dimension" in target_identifiers
+                    or "dimension" in target_identifiers
+                ) and alias and alias != target:
+                    if path == semantic_path and alias in {
+                        "Commit",
+                        "Diagnostics",
+                        "Edit",
+                        "Error",
+                        "LimitKind",
+                        "Patch",
+                    }:
+                        continue
+                    violations.append(
+                        "focused litchi-pages table-dimension public API retains "
+                        f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_DIMENSION_ALIAS_TARGETS
+                    or "body_table_dimension" in target_identifiers
+                    or "dimension" in target_identifiers
+                ) and alias != target:
+                    violations.append(
+                        "focused litchi-pages table-dimension public API retains "
+                        f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_pages_table_dimension_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages table-dimension public API retains root "
+                    f"aliases via table::dimension glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_TABLE_DIMENSION_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages table-dimension public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_table_dimension_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages table-dimension public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages table-dimension public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_settings_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Pages document-settings APIs and modules out of the host."""
 
@@ -19029,6 +19633,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_title_facade_source_topology()
         + audit_iwa_pages_table_headers_source_topology()
         + audit_pages_table_headers_facade_source_topology()
+        + audit_iwa_pages_table_dimension_source_topology()
+        + audit_pages_table_dimension_facade_source_topology()
         + audit_iwa_pages_chart_caption_source_topology()
         + audit_iwa_pages_drawable_order_source_topology()
         + audit_iwa_pages_document_settings_source_topology()

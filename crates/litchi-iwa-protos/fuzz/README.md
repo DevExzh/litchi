@@ -135,6 +135,49 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
+## Format-neutral table-dimension codec
+
+`table_dimension` drives the hidden `table_dimension_codec` facade over one
+`TST.HeaderStorageBucket` payload. Successful inputs compare scalar and
+reported reads, check source-ordered header callbacks borrow from the original
+source, and exercise exact no-op, size-set, and size-remove rewrites. The
+preflight/execute path is also exercised: the candidate must satisfy its exact
+output requirement, while an output ceiling one byte below that requirement
+must fail without changing the source. Malformed required fields, duplicate or
+wrong-wire selected fields, non-canonical varints, truncation, unknown scalar
+values, and balanced/unbalanced unknown groups are all kept in the fixed cases.
+
+The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
+fields, 256 KiB of work, 1,024 references, 64 KiB of text, and recursion depth
+64. The recipes under `corpus/table_dimension/` are hand-authored `hex:` wire
+encodings for empty, canonical, unknown-preserving, duplicate, wrong-wire,
+and truncated buckets; they are not copied from a native Numbers package.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check table_dimension
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-dimension-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/table_dimension/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  table_dimension "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root; set
+`KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
+
 `numbers_tile_storage` sends one bounded, caller-owned byte source through both
 tile entry points:
 

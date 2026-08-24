@@ -1287,6 +1287,30 @@ pub mod numbers_table_title_codec;
 #[doc(hidden)]
 pub mod numbers_table_cell_storage_codec;
 
+/// Format-neutral strict table-dimension/header-bucket seam.
+///
+/// The implementation remains in [`numbers_table_cell_storage_codec`] so
+/// Numbers' existing storage reader and attached-table adapters continue to
+/// share one source-authoritative parser. This alias deliberately exposes
+/// only the dimension-relevant borrowed snapshots, visitor, and plan/execute
+/// APIs; generated repeated storage never crosses the protos boundary.
+#[doc(hidden)]
+pub mod table_dimension_codec {
+    pub use super::numbers_table_cell_storage_codec::{
+        DataStoreSnapshot, DecodeError, DecodeLimit, DecodeOptions, DecodeReport,
+        DecodeResourceUpperBound, HeaderRecord, HeaderSizeEdit, HeaderSizeRewritePlan,
+        HeaderSizeRewriteReport, HeaderSizeRewriteRequirements, HeaderSnapshot,
+        HeaderStorageBucketSnapshot, HeaderStorageSnapshot, ReferenceRecord, ReferenceSnapshot,
+        StorageVisitor, TableModelSnapshot, decode_data_store, decode_data_store_with_report,
+        decode_data_store_with_visitor, decode_header, decode_header_storage,
+        decode_header_storage_bucket, decode_header_storage_bucket_with_report,
+        decode_header_storage_bucket_with_visitor, decode_header_storage_with_report,
+        decode_header_with_report, decode_table_model, decode_table_model_with_report,
+        decode_table_model_with_visitor, execute_header_storage_bucket_size_plan,
+        plan_header_storage_bucket_sizes, rewrite_header_storage_bucket_sizes,
+    };
+}
+
 /// Strict generated-free Numbers table-cell dependency/cache projection.
 #[doc(hidden)]
 pub mod numbers_table_cell_dependency_codec;
