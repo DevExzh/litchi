@@ -2589,3 +2589,39 @@ This is an intentional unpublished `0.0.1` breaking removal of an
 adapter-only surface; the host's remaining Keynote compatibility operations
 are unrelated and remain. The focused facade and boundary ratchets keep
 archive, metadata, wire, generated, and physical types private.
+
+## 2026-08-24 amendment: Keynote chart-caption source-authority hardening
+
+Commit `cd76c394e2cd6e360cd01e8bd61cb7594d837701` hardens the admitted
+chart-caption lifecycle without changing its selector-first public surface.
+`Package::{slide_chart_caption, edit_slide_chart_caption,
+apply_slide_chart_caption}`, `SlideSelector`, `ChartSelector`, and the
+semantic chart-caption transaction types remain the only public seam; no
+archive route, component or object identifier, Metadata record, protobuf
+message, or wire value is exposed.
+
+Existing-caption text replacement now requires one exact current Metadata
+component selector and advances the root and selected current component save
+tokens in the same private publication. Missing or ambiguous Metadata,
+selected-token overflow, malformed selected token fields, and unrelated
+Metadata changes fail closed. Root last-object-identifier and unselected or
+versioned component records remain source-preserved for this no-allocation
+graph path.
+
+Graph creation and stand-in removal now admit proven cross-component
+stylesheet and paragraph-style dependencies only when the selected current
+slide has the exact strong PackageMetadata external-reference tuples to the
+physical owner components and objects. Missing, duplicate, weak, versioned,
+or contradictory dependencies reject. The chart edge is rewritten with a
+source-authoritative MessageInfo reference transition: aggregate and
+field-local reference lists, retained raw ArchiveInfo header bytes, selected
+payload, and candidate readback are authorized together. Known chart,
+reference, theme, preset, geometry, and width fields require canonical
+singular wire forms, and every parsed IWA object requires canonical outer
+framing. Unknown retained header bytes remain exact rather than being
+normalized.
+
+The owner also rejects unrelated aggregate or FieldInfo owners of a selected
+caption graph and aliased caption stand-ins. These checks expand the
+fail-closed acceptance boundary; they do not claim support for arbitrary
+future Keynote caption graphs or normalize producer extensions.

@@ -12842,3 +12842,62 @@ limited to Keynote open/render/save/close/reopen acceptance. It is not focused
 Rust re-ingress, Rust/native byte parity, arbitrary normalized or
 cross-component graph acceptance, a publication gate, or a performance/RSS
 measurement.
+
+## 2026-08-24 amendment: Wave66 Keynote chart-caption hardening verification record
+
+The source-authority, cross-component dependency, Metadata save-token,
+adversarial integration, and boundary-ratchet changes are commit
+`cd76c394e2cd6e360cd01e8bd61cb7594d837701`.
+
+The exact focused gates were:
+
+- `cargo test -p litchi-keynote --test slide_chart_caption --quiet`: 17/17
+  passed;
+- `cargo test -p litchi-iwa-protos keynote_chart_caption_graph_codec --lib
+  --quiet`: 4/4 passed;
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib --quiet`:
+  34/34 passed;
+- `cargo test -p litchi-iwa --lib
+  keynote::editor::slide_charts::tests:: --quiet`: 55/55 passed;
+- `cargo check -p litchi-keynote -p litchi-iwa-protos -p litchi-iwa
+  --all-targets --quiet` passed with existing deprecation warnings;
+- warning-denied Clippy passed for the focused `litchi-keynote` library and
+  chart-caption integration target. The all-target Keynote command passed
+  with the explicit unrelated `-A deprecated` allowance for existing
+  `Show::slide` test calls;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 411/411 passed;
+  `py_compile`, targeted Rust formatting, and `git diff --check` passed;
+- direct Keynote chart-caption facade and migration-host audits returned no
+  findings.
+
+The live `python3 tools/check_crate_boundaries.py --explain` command exits 1
+only for the three known findings in the user-owned untracked Pages
+table-lock source and its two legacy methods; it reports no Keynote
+chart-caption finding. Repository-wide commit hooks were skipped after
+reproducing unrelated formatting differences in
+`crates/litchi-iwa/src/protobuf.rs` and
+`crates/litchi-iwa-protos/src/table_info_codec.rs`, together with the
+pre-existing Numbers `object_count` and `manual_contains` findings. The
+scoped results are not a full-workspace green claim.
+
+The bounded Keynote 14.4 native record used disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| compatibility-host source oracle `/private/tmp/litchi-wave64-chart-caption-native/host-source.key` | 11,977 | `f977851182891c4fb1b7cb1bbe5051bb9d40f012bdf526f4433ec26a5ef238f1` |
+| hardened Rust candidate before Keynote `/private/tmp/litchi-wave66-caption-native.K9zI18/rust-wave66-pre-keynote.key` | 11,990 | `49dc6dae1a589109241cb2c21150bfab4d388bd5e02b14e75f7565cdbfcef6da` |
+| exact inverse `/private/tmp/litchi-wave66-caption-native.K9zI18/inverse.key` | 11,977 | `f977851182891c4fb1b7cb1bbe5051bb9d40f012bdf526f4433ec26a5ef238f1` |
+| Keynote-saved/reopened `/private/tmp/litchi-wave66-caption-native.K9zI18/rust-wave66.key` | 70,341 | `3e00f5c192f175d5a7f8f8ef884f075259754a4687551e7b7b1aca95747ceba3` |
+
+The focused transaction changed `Native source caption` to `Wave66 hardened
+caption — 北区`, reported three touched physical components and no preview
+deletion, and produced an inverse byte-identical to the source. Keynote opened
+the Rust candidate without repair, rendered that caption with North April 17,
+May 26 and South April 55, May 43, saved it, closed it, and reopened the exact
+saved path with the same visible caption and data and no repair alert.
+
+Keynote normalized the package bytes. This record is bounded
+open/render/save/close/reopen application acceptance plus exact pre-native
+inverse evidence. It is not Rust/native byte parity, arbitrary
+cross-component graph acceptance, a performance/RSS measurement, or a full
+publication/workspace gate.
