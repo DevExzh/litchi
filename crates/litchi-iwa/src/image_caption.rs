@@ -237,12 +237,11 @@ impl<'package> DrawableCaptionArchives<'package> {
 pub(crate) fn drawable_caption_slot(
     package: &IWorkPackage,
     drawable_object_id: u64,
-    reference: Option<&tsp::Reference>,
+    reference_id: Option<u64>,
     kind: DrawableCaptionKind,
     drawable_label: &str,
 ) -> Result<DrawableCaptionSlot> {
-    let reference_id = reference
-        .map(|reference| reference.identifier)
+    let reference_id = reference_id
         .filter(|identifier| *identifier != 0)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(

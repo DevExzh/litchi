@@ -37,6 +37,7 @@ pub(crate) mod background_fill;
 pub(crate) mod bar_shape_3d;
 pub(crate) mod border;
 pub(crate) mod border_stroke;
+pub(crate) mod caption_edge;
 pub(crate) mod category_labels;
 mod data;
 pub(crate) mod depth_3d;

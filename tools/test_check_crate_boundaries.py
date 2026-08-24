@@ -10423,6 +10423,153 @@ class BoundaryPolicyTests(unittest.TestCase):
             "+ audit_keynote_chart_caption_facade_source_topology()", main_source
         )
 
+    def test_pages_and_numbers_chart_caption_audits_require_neutral_edge_and_mask_tests(
+        self,
+    ) -> None:
+        """Keep caption-local wire decoders out without banning chart graphs."""
+
+        def write_fixture(root: Path, *, caption_suffix: str = "") -> None:
+            helper = root / boundaries.IWA_CHART_CAPTION_CODEC_HELPER_SOURCE
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "use litchi_iwa_protos::chart_caption_codec;\n"
+                "fn chart_caption_identifier() {\n"
+                "    chart_caption_codec::decode_chart_caption_identifier(bytes);\n"
+                "}\n"
+                "fn rewrite_chart_caption_identifier() {\n"
+                "    chart_caption_codec::rewrite_chart_caption_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            page = root / boundaries.IWA_PAGES_CHART_CAPTION_SOURCE
+            numbers = root / boundaries.IWA_NUMBERS_CHART_CAPTION_SOURCE
+            page.parent.mkdir(parents=True, exist_ok=True)
+            numbers.parent.mkdir(parents=True, exist_ok=True)
+            common = (
+                "#[cfg(test)]\n"
+                "fn cfg_only_decoder() {\n"
+                "    let _ = IWorkChartArchive::decode(bytes);\n"
+                "}\n"
+                "use crate::charts::caption_edge::{chart_caption_identifier, "
+                "rewrite_chart_caption_identifier};\n"
+            )
+            page.write_text(
+                common
+                + "fn body_chart_caption_slot() { chart_caption_identifier(); }\n"
+                + "fn set_body_chart_caption() { rewrite_chart_caption_identifier(); }\n"
+                + caption_suffix,
+                encoding="utf-8",
+            )
+            numbers.write_text(
+                common
+                + "fn sheet_chart_caption_slot() { chart_caption_identifier(); }\n"
+                + "fn set_sheet_chart_caption() { rewrite_chart_caption_identifier(); }\n"
+                + caption_suffix,
+                encoding="utf-8",
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_fixture(root)
+            self.assertEqual(
+                boundaries.audit_iwa_pages_chart_caption_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_chart_caption_source_topology(root), []
+            )
+
+            graph = root / "crates/litchi-iwa/src/pages/editor/charts/graph.rs"
+            graph.parent.mkdir(parents=True, exist_ok=True)
+            graph.write_text(
+                "fn broader_chart_graph() { let _ = IWorkChartArchive::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            # Broader chart graph decodes are intentionally outside this
+            # caption-local boundary.
+            self.assertEqual(
+                boundaries.audit_iwa_pages_chart_caption_source_topology(root), []
+            )
+
+            production_bad = (
+                "fn production_decoder() { let _ = IWorkChartArchive::decode(bytes); }\n"
+            )
+            write_fixture(root, caption_suffix=production_bad)
+            violations = boundaries.audit_iwa_pages_chart_caption_source_topology(root)
+            self.assertTrue(any("IWorkChartArchive" in item for item in violations), violations)
+            violations = boundaries.audit_iwa_numbers_chart_caption_source_topology(root)
+            self.assertTrue(any("IWorkChartArchive" in item for item in violations), violations)
+
+            legacy_bad = (
+                "fn production_wire_patch() {\n"
+                "    transform_length_delimited_field();\n"
+                "    patch_drawable_caption_reference();\n"
+                "}\n"
+            )
+            write_fixture(root, caption_suffix=legacy_bad)
+            for audit in (
+                boundaries.audit_iwa_pages_chart_caption_source_topology,
+                boundaries.audit_iwa_numbers_chart_caption_source_topology,
+            ):
+                violations = audit(root)
+                self.assertTrue(any("transform_length_delimited_field" in item for item in violations), violations)
+                self.assertTrue(any("patch_drawable_caption_reference" in item for item in violations), violations)
+
+    def test_pages_and_numbers_chart_caption_audits_reject_missing_or_local_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            helper = root / boundaries.IWA_CHART_CAPTION_CODEC_HELPER_SOURCE
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "use litchi_iwa_protos::chart_caption_codec;\n",
+                encoding="utf-8",
+            )
+            for source_path, reader in (
+                (boundaries.IWA_PAGES_CHART_CAPTION_SOURCE, "body_chart_caption_slot"),
+                (
+                    boundaries.IWA_NUMBERS_CHART_CAPTION_SOURCE,
+                    "sheet_chart_caption_slot",
+                ),
+            ):
+                path = root / source_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    f"fn {reader}() {{}}\n"
+                    "fn local_caption_decoder() {\n"
+                    "    let _ = IWorkChartArchive::decode(bytes);\n"
+                    "    transform_length_delimited_field();\n"
+                    "}\n",
+                    encoding="utf-8",
+                )
+
+            page_violations = boundaries.audit_iwa_pages_chart_caption_source_topology(root)
+            numbers_violations = boundaries.audit_iwa_numbers_chart_caption_source_topology(root)
+            for violations in (page_violations, numbers_violations):
+                self.assertTrue(any("shared caption_edge" in item for item in violations), violations)
+                self.assertTrue(any("IWorkChartArchive" in item for item in violations), violations)
+                self.assertTrue(any("transform_length_delimited_field" in item for item in violations), violations)
+
+            (root / boundaries.IWA_CHART_CAPTION_CODEC_HELPER_SOURCE).unlink()
+            for audit in (
+                boundaries.audit_iwa_pages_chart_caption_source_topology,
+                boundaries.audit_iwa_numbers_chart_caption_source_topology,
+            ):
+                violations = audit(root)
+                self.assertTrue(
+                    any("missing the shared caption_edge helper" in item for item in violations),
+                    violations,
+                )
+
+    def test_pages_and_numbers_chart_caption_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_chart_caption_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_iwa_numbers_chart_caption_source_topology()", main_source
+        )
+
     def test_focused_keynote_chart_caption_requires_one_aggregate_budget_and_masks_decoys(
         self,
     ) -> None:

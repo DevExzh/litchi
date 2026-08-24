@@ -3022,6 +3022,76 @@ NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
 )
 IWA_PAGES_SOURCE_ROOT = Path("crates/litchi-iwa/src/pages")
 IWA_PAGES_EDITOR_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+IWA_PAGES_CHART_CAPTION_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "charts" / "caption.rs"
+)
+IWA_PAGES_CHART_CAPTION_READ_FUNCTIONS = ("body_chart_caption_slot",)
+IWA_PAGES_CHART_CAPTION_REWRITE_FUNCTIONS = (
+    "replace_body_chart_caption_reference",
+)
+IWA_NUMBERS_CHART_CAPTION_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "sheet_charts" / "caption.rs"
+)
+IWA_NUMBERS_CHART_CAPTION_READ_FUNCTIONS = ("sheet_chart_caption_slot",)
+IWA_NUMBERS_CHART_CAPTION_REWRITE_FUNCTIONS = (
+    "replace_sheet_chart_caption_reference",
+)
+# Pages and Numbers share the TSCH/TSD chart-caption edge. The generated
+# IWorkChartArchive remains in the compatibility host for broader chart graph
+# operations; only the caption source files below are required to use the
+# bounded neutral codec seam.
+IWA_CHART_CAPTION_CODEC_HELPER_SOURCE = Path(
+    "crates/litchi-iwa/src/charts/caption_edge.rs"
+)
+IWA_CHART_CAPTION_EDGE_API_NAMES = frozenset(
+    {"chart_caption_identifier", "rewrite_chart_caption_identifier"}
+)
+IWA_CHART_CAPTION_GENERATED_DECODE_PATTERNS = (
+    (
+        "IWorkChartArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?IWorkChartArchive"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "prost Message::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?Message"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "UFCS Prost decode",
+        re.compile(
+            r"<[\s\S]*?[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:(?:::)?(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+            r"[ \t\r\n]*::[ \t\r\n]*)*"
+            r"(?:r#)?Message[ \t\r\n]*>[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated decode_message helper",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?decode_message"
+            r"(?:[ \t\r\n]*::)?[ \t\r\n]*(?:<|\()"
+        ),
+    ),
+)
+IWA_CHART_CAPTION_LEGACY_CODEC_MARKERS = frozenset(
+    {
+        "keynote_chart_caption_codec",
+        "transform_length_delimited_field",
+        "patch_drawable_caption_reference",
+    }
+)
+IWA_PAGES_CHART_CAPTION_LEGACY_REWRITE_MARKERS = frozenset(
+    IWA_PAGES_CHART_CAPTION_REWRITE_FUNCTIONS
+)
+IWA_NUMBERS_CHART_CAPTION_LEGACY_REWRITE_MARKERS = frozenset(
+    IWA_NUMBERS_CHART_CAPTION_REWRITE_FUNCTIONS
+)
 IWA_PAGES_LEGACY_METHOD_SOURCE = (
     IWA_PAGES_SOURCE_ROOT / "editor" / "section_content.rs"
 )
@@ -11239,6 +11309,198 @@ def audit_iwa_pages_table_headers_source_topology(root: Path = ROOT) -> list[str
     return sorted(set(violations))
 
 
+def _audit_iwa_chart_caption_source_topology(
+    root: Path,
+    source_path: Path,
+    family: str,
+    read_functions: tuple[str, ...],
+    legacy_rewrite_markers: frozenset[str],
+) -> list[str]:
+    """Audit one host's focused chart-caption edge without scanning its graph.
+
+    Pages and Numbers still need their broader chart graph readers, including
+    generated ``IWorkChartArchive`` decodes in ``graph.rs``.  The caption
+    module is a narrower ownership boundary: its selected edge must go
+    through the neutral ``caption_edge`` helper, and its production source
+    must not retain the old generated/wire patch path.  Masking individual
+    ``cfg(test)`` items is
+    important here because both modules keep source-built compatibility
+    fixtures beside production functions.
+    """
+
+    path = root / source_path
+    if not path.is_file():
+        return [
+            f"focused litchi-iwa {family} chart-caption source is missing: "
+            f"{source_path}"
+        ]
+
+    violations: list[str] = []
+    relative = source_path
+    production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    source = _mask_rust_non_code(production_source)
+
+    helper_path = root / IWA_CHART_CAPTION_CODEC_HELPER_SOURCE
+    helper_source = ""
+    if not helper_path.is_file():
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source is missing the "
+            f"shared caption_edge helper: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}"
+        )
+    else:
+        helper_source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(helper_path.read_text(encoding="utf-8"))
+        )
+        neutral_helper = re.search(
+            r"\blitchi_iwa_protos\b[ \t\r\n]*::[ \t\r\n]*"
+            r"chart_caption_codec\b|\bchart_caption_codec\b",
+            helper_source,
+        )
+        if neutral_helper is None:
+            line_number = 1
+            violations.append(
+                f"focused litchi-iwa {family} chart-caption helper must route through "
+                f"neutral chart_caption_codec: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}:"
+                f"{line_number}"
+            )
+
+    edge_import = re.search(
+        r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?use[ \t\r\n]+"
+        r"(?:crate|self|super)[ \t\r\n]*::[ \t\r\n]*charts"
+        r"[ \t\r\n]*::[ \t\r\n]*caption_edge\b",
+        source,
+    )
+    if edge_import is None:
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source must use the shared "
+            f"caption_edge route: {relative}"
+        )
+    else:
+        for name in sorted(IWA_CHART_CAPTION_EDGE_API_NAMES):
+            if re.search(
+                rf"(?<![A-Za-z0-9_:#.])(?:r#)?{re.escape(name)}"
+                r"[ \t\r\n]*\(",
+                source,
+            ) is None:
+                line_number = source.count("\n", 0, edge_import.start()) + 1
+                violations.append(
+                    f"focused litchi-iwa {family} chart-caption source must call "
+                    f"shared {name}: {relative}:{line_number}"
+                )
+
+    # These are deliberately checked only in the caption source and shared
+    # edge helper.  Generated decodes in pages/.../charts/graph.rs and
+    # numbers/.../sheet_charts/graph.rs are broader chart ownership and are
+    # outside this focused edge ratchet.
+    generated_type = re.search(
+        r"(?<![A-Za-z0-9_#])(?:r#)?IWorkChartArchive\b", source
+    )
+    if generated_type is not None:
+        line_number = source.count("\n", 0, generated_type.start()) + 1
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source retains generated "
+            f"IWorkChartArchive type: {relative}:{line_number}"
+        )
+    for label, pattern in IWA_CHART_CAPTION_GENERATED_DECODE_PATTERNS:
+        for match in pattern.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"focused litchi-iwa {family} chart-caption source retains generated "
+                f"{label}: {relative}:{line_number}"
+            )
+    for marker in sorted(IWA_CHART_CAPTION_LEGACY_CODEC_MARKERS):
+        marker_match = re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", source
+        )
+        if marker_match is None:
+            continue
+        line_number = source.count("\n", 0, marker_match.start()) + 1
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source retains legacy "
+            f"{marker}: {relative}:{line_number}"
+        )
+    for marker in sorted(legacy_rewrite_markers):
+        marker_match = re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", source
+        )
+        if marker_match is None:
+            continue
+        line_number = source.count("\n", 0, marker_match.start()) + 1
+        violations.append(
+            f"focused litchi-iwa {family} chart-caption source retains caption-local "
+            f"rewrite helper {marker}: {relative}:{line_number}"
+        )
+
+    for name in read_functions:
+        if re.search(
+            rf"(?<![A-Za-z0-9_#])(?:r#)?{re.escape(name)}\b", source
+        ) is None:
+            violations.append(
+                f"focused litchi-iwa {family} chart-caption source is missing "
+                f"caption reader {name}: {relative}"
+            )
+
+    # A helper is part of this edge's reachability boundary.  Keep the same
+    # source-authority restrictions there, but do not walk the entire host
+    # graph: graph.rs intentionally remains a compatibility owner.
+    if helper_source:
+        helper_type = re.search(
+            r"(?<![A-Za-z0-9_#])(?:r#)?IWorkChartArchive\b", helper_source
+        )
+        if helper_type is not None:
+            line_number = helper_source.count("\n", 0, helper_type.start()) + 1
+            violations.append(
+                f"focused litchi-iwa {family} chart-caption helper retains generated "
+                f"IWorkChartArchive type: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}:"
+                f"{line_number}"
+            )
+        for label, pattern in IWA_CHART_CAPTION_GENERATED_DECODE_PATTERNS:
+            for match in pattern.finditer(helper_source):
+                line_number = helper_source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"focused litchi-iwa {family} chart-caption helper retains generated "
+                    f"{label}: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}:{line_number}"
+                )
+        for marker in sorted(IWA_CHART_CAPTION_LEGACY_CODEC_MARKERS):
+            marker_match = re.search(
+                rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                helper_source,
+            )
+            if marker_match is None:
+                continue
+            line_number = helper_source.count("\n", 0, marker_match.start()) + 1
+            violations.append(
+                f"focused litchi-iwa {family} chart-caption helper retains legacy "
+                f"{marker}: {IWA_CHART_CAPTION_CODEC_HELPER_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_chart_caption_source_topology(root: Path = ROOT) -> list[str]:
+    """Require Pages chart-caption edge access through the neutral codec seam."""
+
+    return _audit_iwa_chart_caption_source_topology(
+        root,
+        IWA_PAGES_CHART_CAPTION_SOURCE,
+        "Pages",
+        IWA_PAGES_CHART_CAPTION_READ_FUNCTIONS,
+        IWA_PAGES_CHART_CAPTION_LEGACY_REWRITE_MARKERS,
+    )
+
+
+def audit_iwa_numbers_chart_caption_source_topology(root: Path = ROOT) -> list[str]:
+    """Require Numbers chart-caption edge access through the neutral codec seam."""
+
+    return _audit_iwa_chart_caption_source_topology(
+        root,
+        IWA_NUMBERS_CHART_CAPTION_SOURCE,
+        "Numbers",
+        IWA_NUMBERS_CHART_CAPTION_READ_FUNCTIONS,
+        IWA_NUMBERS_CHART_CAPTION_LEGACY_REWRITE_MARKERS,
+    )
+
+
 def audit_iwa_pages_document_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -16405,6 +16667,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_sheet_order_facade_source_topology()
         + audit_iwa_numbers_table_header_settings_source_topology()
         + audit_numbers_table_header_settings_facade_source_topology()
+        + audit_iwa_numbers_chart_caption_source_topology()
         + audit_iwa_numbers_table_title_settings_source_topology()
         + audit_numbers_table_title_settings_facade_source_topology()
         + audit_iwa_numbers_table_dimension_source_topology()
@@ -16430,6 +16693,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_title_facade_source_topology()
         + audit_iwa_pages_table_headers_source_topology()
         + audit_pages_table_headers_facade_source_topology()
+        + audit_iwa_pages_chart_caption_source_topology()
         + audit_iwa_pages_document_settings_source_topology()
         + audit_pages_document_settings_facade_source_topology()
         + audit_iwa_pages_section_settings_source_topology()

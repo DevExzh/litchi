@@ -1,4 +1,4 @@
-//! Strict borrowed projection for the Keynote chart-caption edge.
+//! Strict borrowed projection for the shared iWork chart-caption edge.
 //!
 //! The selected path is deliberately only
 //! `TSCH.ChartDrawableArchive.super` -> `TSD.DrawableArchive.caption` ->
@@ -12,6 +12,9 @@
 
 use std::fmt;
 
+#[cfg(test)]
+use std::cell::Cell;
+
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_keynote_chart_caption_generated::LitchiIwaProjection as projection;
@@ -19,7 +22,10 @@ use crate::buffa_keynote_chart_caption_generated::LitchiIwaProjection as project
 const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_CAPTION_FIELD: u32 = 11;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
+const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;
 const MAX_RECURSION_LIMIT: u32 = 64;
+const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;
 
 /// Finite limits for one chart-caption payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,6 +145,12 @@ impl ChartCaptionWrite {
 pub struct RewriteReport {
     input_bytes: usize,
     output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
     changed: bool,
 }
 
@@ -155,10 +167,108 @@ impl RewriteReport {
         self.output_bytes
     }
 
+    /// Strict field visits across source, sizing, emission, and readback.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Aggregate bounded work charged by the complete rewrite transaction.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    /// Maximum protobuf nesting depth observed by the strict scanner.
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    /// Output-buffer allocation events owned by this handwritten codec.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Candidate bytes retained by the returned output.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Temporary scratch bytes allocated by this codec.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
     /// Whether the selected reference identifier changed.
     #[must_use]
     pub const fn changed(self) -> bool {
         self.changed
+    }
+}
+
+/// Exact finite consumption of one strict chart-caption decode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DecodeReport {
+    input_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+impl DecodeReport {
+    /// Source payload bytes inspected by the decoder.
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    /// Alias for callers that use the source terminology.
+    #[must_use]
+    pub const fn source_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    /// Strict field visits, including unknown fields and group contents.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Aggregate bounded work charged by the decoder.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    /// Maximum protobuf nesting depth observed by the strict scanner.
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    /// Handwritten output allocations performed by the decoder.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Borrowed source bytes retained by the snapshot contract.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Temporary scratch bytes allocated by the decoder.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
     }
 }
 
@@ -170,6 +280,8 @@ struct DrawableCaptionSnapshot {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ReferenceSnapshot {
     identifier: u64,
+    deprecated_type: Option<i32>,
+    deprecated_is_external: Option<bool>,
 }
 
 /// A byte or nesting resource classification for [`DecodeError`].
@@ -328,11 +440,11 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::Wire(error) => error.fmt(formatter),
             DecodeErrorKind::Resource(WireResourceLimit::Bytes { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-caption projection byte limit exceeded: observed {observed}, maximum {maximum}"
+                "iWork chart-caption projection byte limit exceeded: observed {observed}, maximum {maximum}"
             ),
             DecodeErrorKind::Resource(WireResourceLimit::Nesting { observed, maximum }) => write!(
                 formatter,
-                "Keynote chart-caption projection nesting limit exceeded: observed {observed}, maximum {maximum}"
+                "iWork chart-caption projection nesting limit exceeded: observed {observed}, maximum {maximum}"
             ),
             DecodeErrorKind::MissingRequired(field) => {
                 write!(formatter, "missing required field {field}")
@@ -345,22 +457,22 @@ impl fmt::Display for DecodeError {
             },
             DecodeErrorKind::FieldLimit { observed, maximum } => write!(
                 formatter,
-                "Keynote chart-caption projection visited {observed} fields; maximum is {maximum}"
+                "iWork chart-caption projection visited {observed} fields; maximum is {maximum}"
             ),
             DecodeErrorKind::WorkLimit { observed, maximum } => write!(
                 formatter,
-                "Keynote chart-caption projection requires {observed} work bytes; maximum is {maximum}"
+                "iWork chart-caption projection requires {observed} work bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::OutputLimit { observed, maximum } => write!(
                 formatter,
-                "Keynote chart-caption rewrite produced {observed} bytes; maximum is {maximum}"
+                "iWork chart-caption rewrite produced {observed} bytes; maximum is {maximum}"
             ),
             DecodeErrorKind::Allocation { amount } => write!(
                 formatter,
-                "cannot allocate Keynote chart-caption output for {amount} bytes"
+                "cannot allocate iWork chart-caption output for {amount} bytes"
             ),
             DecodeErrorKind::Projection => formatter.write_str(
-                "Keynote chart-caption strict preflight disagrees with the Buffa projection",
+                "iWork chart-caption strict preflight disagrees with the Buffa projection",
             ),
         }
     }
@@ -407,9 +519,18 @@ pub fn decode_chart_caption(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<ChartCaptionSnapshot, DecodeError> {
+    Ok(decode_chart_caption_with_report(source, options)?.0)
+}
+
+/// Strictly decode the bounded projection and return exact resource usage.
+pub fn decode_chart_caption_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(ChartCaptionSnapshot, DecodeReport), DecodeError> {
     validate_decode_input(source, options)?;
-    let mut budget = Budget::new(options);
-    decode_chart_caption_with_budget(source, options, &mut budget)
+    let mut budget = Budget::new(source, options);
+    let snapshot = decode_chart_caption_with_budget(source, options, &mut budget)?;
+    Ok((snapshot, budget.decode_report()))
 }
 
 /// Decode one chart-caption payload while charging an existing aggregate
@@ -441,6 +562,12 @@ fn decode_chart_caption_with_budget(
                     }
                     Ok(ReferenceSnapshot {
                         identifier: reference.identifier,
+                        // The generated sidecar deliberately projects only
+                        // `identifier`; selected deprecated fields are
+                        // validated by the strict raw pass above and remain
+                        // source-authoritative.
+                        deprecated_type: None,
+                        deprecated_is_external: None,
                     })
                 })
                 .transpose()?;
@@ -448,10 +575,22 @@ fn decode_chart_caption_with_budget(
         })
         .transpose()?;
     let projected = ChartCaptionSnapshot { drawable };
-    if projected != strict {
+    if !same_projected_edge(projected, strict) {
         return Err(DecodeError::projection());
     }
     Ok(strict)
+}
+
+fn same_projected_edge(projected: ChartCaptionSnapshot, strict: ChartCaptionSnapshot) -> bool {
+    match (projected.drawable, strict.drawable) {
+        (None, None) => true,
+        (Some(projected), Some(strict)) => match (projected.caption, strict.caption) {
+            (None, None) => true,
+            (Some(projected), Some(strict)) => projected.identifier == strict.identifier,
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 /// Rewrite the selected chart-caption reference identifier.
@@ -480,7 +619,7 @@ pub fn rewrite_chart_caption_with_report(
     // One budget spans source validation, sizing, emission, and candidate
     // readback so a rewrite cannot multiply the configured work ceiling by
     // the number of internal passes.
-    let mut budget = Budget::new(options);
+    let mut budget = Budget::new(source, options);
     let current = decode_chart_caption_with_budget(source, options, &mut budget)?;
     let current_identifier = current
         .caption_identifier()
@@ -492,13 +631,11 @@ pub fn rewrite_chart_caption_with_report(
                 options.max_output_bytes,
             ));
         }
+        let output = clone_output(source)?;
+        budget.record_allocation(output.len());
         return Ok((
-            clone_output(source)?,
-            RewriteReport {
-                input_bytes: source.len(),
-                output_bytes: source.len(),
-                changed: false,
-            },
+            output,
+            budget.rewrite_report(source.len(), source.len(), false),
         ));
     }
 
@@ -509,27 +646,38 @@ pub fn rewrite_chart_caption_with_report(
             options.max_output_bytes,
         ));
     }
-    let mut output = reserve_output(output_bytes)?;
-    rewrite_root_into(source, options, write, &mut budget, &mut output)?;
-    debug_assert_eq!(output.len(), output_bytes);
 
+    // `measure_rewrite_root` accounts for the sizing pass.  The actual
+    // emission has a slightly different traversal shape (the selected
+    // nested messages are measured immediately before they are emitted), and
+    // the candidate readback is a further full traversal.  Meter both shapes
+    // before reserving the output so field/work/nesting failures cannot occur
+    // after the sole candidate allocation.
+    let shape = measure_rewrite_path_lengths(source, options, write)?;
+    preflight_rewrite_pass(source, options, write, &mut budget)?;
     let readback_options = DecodeOptions {
-        max_message_bytes: options.max_message_bytes.max(output.len()),
-        max_output_bytes: options.max_output_bytes.max(output.len()),
+        max_message_bytes: options.max_message_bytes.max(output_bytes),
+        max_output_bytes: options.max_output_bytes.max(output_bytes),
         ..options
     };
+    preflight_candidate_readback(source, readback_options, shape, &mut budget)?;
+
+    let mut output = reserve_output(output_bytes)?;
+    budget.record_allocation(output_bytes);
+    let mut emission_budget = Budget::unlimited(source, options);
+    rewrite_root_into(source, options, write, &mut emission_budget, &mut output)?;
+    debug_assert_eq!(output.len(), output_bytes);
+
     validate_decode_input(&output, readback_options)?;
-    let readback = decode_chart_caption_with_budget(&output, readback_options, &mut budget)?;
+    let mut readback_budget = Budget::unlimited(&output, readback_options);
+    let readback =
+        decode_chart_caption_with_budget(&output, readback_options, &mut readback_budget)?;
     if readback.caption_identifier() != Some(write.identifier) {
         return Err(DecodeError::projection());
     }
     Ok((
         output,
-        RewriteReport {
-            input_bytes: source.len(),
-            output_bytes,
-            changed: true,
-        },
+        budget.rewrite_report(source.len(), output_bytes, true),
     ))
 }
 
@@ -539,7 +687,7 @@ fn measure_rewrite_root(
     write: ChartCaptionWrite,
     budget: &mut Budget,
 ) -> Result<usize, DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), 1)?;
     let nested_options = options.descend(budget)?;
     let mut remaining = source;
     let mut saw_super = false;
@@ -565,7 +713,7 @@ fn measure_rewrite_root(
             }
             saw_super = true;
             let nested = field.length_delimited()?;
-            let nested_bytes = measure_rewrite_drawable(nested, nested_options, write, budget)?;
+            let nested_bytes = measure_rewrite_drawable(nested, nested_options, write, budget, 2)?;
             length_delimited_field_len(CHART_DRAWABLE_SUPER_FIELD, nested_bytes)
         } else {
             end - start
@@ -585,8 +733,9 @@ fn measure_rewrite_drawable(
     options: DecodeOptions,
     write: ChartCaptionWrite,
     budget: &mut Budget,
+    depth: u32,
 ) -> Result<usize, DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), depth)?;
     let nested_options = options.descend(budget)?;
     let mut remaining = source;
     let mut saw_caption = false;
@@ -612,7 +761,8 @@ fn measure_rewrite_drawable(
             }
             saw_caption = true;
             let nested = field.length_delimited()?;
-            let nested_bytes = measure_rewrite_reference(nested, nested_options, write, budget)?;
+            let nested_bytes =
+                measure_rewrite_reference(nested, nested_options, write, budget, depth + 1)?;
             length_delimited_field_len(DRAWABLE_CAPTION_FIELD, nested_bytes)
         } else {
             end - start
@@ -630,10 +780,13 @@ fn measure_rewrite_reference(
     options: DecodeOptions,
     write: ChartCaptionWrite,
     budget: &mut Budget,
+    depth: u32,
 ) -> Result<usize, DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), depth)?;
     let mut remaining = source;
     let mut saw_identifier = false;
+    let mut saw_deprecated_type = false;
+    let mut saw_deprecated_is_external = false;
     let mut output_bytes = 0usize;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
@@ -648,15 +801,36 @@ fn measure_rewrite_reference(
                 Some(ParseItem::Field(_)) => DecodeError::projection(),
             });
         };
-        let replacement = if field.number == REFERENCE_IDENTIFIER_FIELD {
-            if saw_identifier {
-                return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
-            }
-            saw_identifier = true;
-            field.varint()?;
-            varint_field_len(REFERENCE_IDENTIFIER_FIELD, write.identifier)
-        } else {
-            end - start
+        let replacement = match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if saw_identifier {
+                    return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+                }
+                saw_identifier = true;
+                field.varint()?;
+                varint_field_len(REFERENCE_IDENTIFIER_FIELD, write.identifier)
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if saw_deprecated_type {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_type",
+                    ));
+                }
+                saw_deprecated_type = true;
+                require_canonical_int32(field.varint()?)?;
+                end - start
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if saw_deprecated_is_external {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_is_external",
+                    ));
+                }
+                saw_deprecated_is_external = true;
+                require_canonical_bool(field.varint()?)?;
+                end - start
+            },
+            _ => end - start,
         };
         output_bytes = checked_output_add(output_bytes, replacement, options)?;
     }
@@ -664,6 +838,289 @@ fn measure_rewrite_reference(
         return Err(DecodeError::missing_required("TSP.Reference.identifier"));
     }
     Ok(output_bytes)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RewritePathLengths {
+    root: usize,
+    drawable: usize,
+    reference: usize,
+}
+
+fn measure_rewrite_path_lengths(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+) -> Result<RewritePathLengths, DecodeError> {
+    let mut budget = Budget::unlimited(source, options);
+    let root = measure_rewrite_root(source, options, write, &mut budget)?;
+    let drawable_source = selected_payload(
+        source,
+        options,
+        CHART_DRAWABLE_SUPER_FIELD,
+        "TSCH.ChartDrawableArchive.super",
+        &mut budget,
+    )?;
+    let drawable_options = options.descend(&budget)?;
+    let drawable =
+        measure_rewrite_drawable(drawable_source, drawable_options, write, &mut budget, 2)?;
+    let reference_source = selected_payload(
+        drawable_source,
+        drawable_options,
+        DRAWABLE_CAPTION_FIELD,
+        "TSD.DrawableArchive.caption",
+        &mut budget,
+    )?;
+    let reference_options = drawable_options.descend(&budget)?;
+    let reference =
+        measure_rewrite_reference(reference_source, reference_options, write, &mut budget, 3)?;
+    Ok(RewritePathLengths {
+        root,
+        drawable,
+        reference,
+    })
+}
+
+fn selected_payload<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    selected_field: u32,
+    selected_name: &'static str,
+    budget: &mut Budget,
+) -> Result<&'source [u8], DecodeError> {
+    let mut remaining = source;
+    let mut payload = None;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        if field.number != selected_field {
+            continue;
+        }
+        if payload.is_some() {
+            return Err(DecodeError::duplicate_singular(selected_name));
+        }
+        payload = Some(field.length_delimited()?);
+    }
+    payload.ok_or_else(|| DecodeError::missing_required(selected_name))
+}
+
+fn preflight_rewrite_pass(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    budget.charge_message(source.len(), 1)?;
+    let nested_options = options.descend(budget)?;
+    let mut remaining = source;
+    let mut saw_super = false;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        if field.number != CHART_DRAWABLE_SUPER_FIELD {
+            continue;
+        }
+        if saw_super {
+            return Err(DecodeError::duplicate_singular(
+                "TSCH.ChartDrawableArchive.super",
+            ));
+        }
+        saw_super = true;
+        let nested = field.length_delimited()?;
+        // This is the sizing sub-pass performed by rewrite_root_into before
+        // it delegates to rewrite_drawable_into.
+        measure_rewrite_drawable(nested, nested_options, write, budget, 2)?;
+        preflight_rewrite_drawable_pass(nested, nested_options, write, budget, 2)?;
+    }
+    if !saw_super {
+        return Err(DecodeError::missing_required(
+            "TSCH.ChartDrawableArchive.super",
+        ));
+    }
+    Ok(())
+}
+
+fn preflight_rewrite_drawable_pass(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.charge_message(source.len(), depth)?;
+    let nested_options = options.descend(budget)?;
+    let mut remaining = source;
+    let mut saw_caption = false;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        if field.number != DRAWABLE_CAPTION_FIELD {
+            continue;
+        }
+        if saw_caption {
+            return Err(DecodeError::duplicate_singular(
+                "TSD.DrawableArchive.caption",
+            ));
+        }
+        saw_caption = true;
+        let nested = field.length_delimited()?;
+        measure_rewrite_reference(nested, nested_options, write, budget, depth + 1)?;
+        preflight_rewrite_reference_pass(nested, nested_options, budget, depth + 1)?;
+    }
+    if !saw_caption {
+        return Err(DecodeError::missing_required("TSD.DrawableArchive.caption"));
+    }
+    Ok(())
+}
+
+fn preflight_rewrite_reference_pass(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.charge_message(source.len(), depth)?;
+    let mut remaining = source;
+    let mut saw_identifier = false;
+    let mut saw_deprecated_type = false;
+    let mut saw_deprecated_is_external = false;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if saw_identifier {
+                    return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+                }
+                saw_identifier = true;
+                field.varint()?;
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if saw_deprecated_type {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_type",
+                    ));
+                }
+                saw_deprecated_type = true;
+                require_canonical_int32(field.varint()?)?;
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if saw_deprecated_is_external {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_is_external",
+                    ));
+                }
+                saw_deprecated_is_external = true;
+                require_canonical_bool(field.varint()?)?;
+            },
+            _ => {},
+        }
+    }
+    if !saw_identifier {
+        return Err(DecodeError::missing_required("TSP.Reference.identifier"));
+    }
+    Ok(())
+}
+
+fn preflight_candidate_readback(
+    source: &[u8],
+    options: DecodeOptions,
+    shape: RewritePathLengths,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    budget.charge_message(shape.root, 1)?;
+    let nested_options = options.descend(budget)?;
+    let mut remaining = source;
+    let mut saw_super = false;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        if field.number != CHART_DRAWABLE_SUPER_FIELD {
+            continue;
+        }
+        if saw_super {
+            return Err(DecodeError::duplicate_singular(
+                "TSCH.ChartDrawableArchive.super",
+            ));
+        }
+        saw_super = true;
+        let nested = field.length_delimited()?;
+        preflight_candidate_drawable(nested, nested_options, shape, budget, 2)?;
+    }
+    if !saw_super {
+        return Err(DecodeError::missing_required(
+            "TSCH.ChartDrawableArchive.super",
+        ));
+    }
+    Ok(())
+}
+
+fn preflight_candidate_drawable(
+    source: &[u8],
+    options: DecodeOptions,
+    shape: RewritePathLengths,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.charge_message(shape.drawable, depth)?;
+    let nested_options = options.descend(budget)?;
+    let mut remaining = source;
+    let mut saw_caption = false;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        if field.number != DRAWABLE_CAPTION_FIELD {
+            continue;
+        }
+        if saw_caption {
+            return Err(DecodeError::duplicate_singular(
+                "TSD.DrawableArchive.caption",
+            ));
+        }
+        saw_caption = true;
+        let nested = field.length_delimited()?;
+        preflight_candidate_reference(nested, nested_options, shape, budget, depth + 1)?;
+    }
+    if !saw_caption {
+        return Err(DecodeError::missing_required("TSD.DrawableArchive.caption"));
+    }
+    Ok(())
+}
+
+fn preflight_candidate_reference(
+    source: &[u8],
+    options: DecodeOptions,
+    shape: RewritePathLengths,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.charge_message(shape.reference, depth)?;
+    let mut remaining = source;
+    let mut saw_identifier = false;
+    let mut saw_deprecated_type = false;
+    let mut saw_deprecated_is_external = false;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if saw_identifier {
+                    return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+                }
+                saw_identifier = true;
+                field.varint()?;
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if saw_deprecated_type {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_type",
+                    ));
+                }
+                saw_deprecated_type = true;
+                require_canonical_int32(field.varint()?)?;
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if saw_deprecated_is_external {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_is_external",
+                    ));
+                }
+                saw_deprecated_is_external = true;
+                require_canonical_bool(field.varint()?)?;
+            },
+            _ => {},
+        }
+    }
+    if !saw_identifier {
+        return Err(DecodeError::missing_required("TSP.Reference.identifier"));
+    }
+    Ok(())
 }
 
 fn rewrite_root_into(
@@ -684,6 +1141,7 @@ fn rewrite_root_into(
         write,
         rewrite_drawable_into,
         "TSCH.ChartDrawableArchive.super",
+        1,
     )
 }
 
@@ -705,6 +1163,7 @@ fn rewrite_drawable_into(
         write,
         rewrite_reference_into,
         "TSD.DrawableArchive.caption",
+        2,
     )
 }
 
@@ -715,9 +1174,11 @@ fn rewrite_reference_into(
     budget: &mut Budget,
     output: &mut Vec<u8>,
 ) -> Result<(), DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), 3)?;
     let mut remaining = source;
     let mut saw_identifier = false;
+    let mut saw_deprecated_type = false;
+    let mut saw_deprecated_is_external = false;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
         let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
@@ -731,15 +1192,36 @@ fn rewrite_reference_into(
                 Some(ParseItem::Field(_)) => DecodeError::projection(),
             });
         };
-        if field.number == REFERENCE_IDENTIFIER_FIELD {
-            if saw_identifier {
-                return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
-            }
-            saw_identifier = true;
-            field.varint()?;
-            append_varint_field(output, REFERENCE_IDENTIFIER_FIELD, write.identifier);
-        } else {
-            output.extend_from_slice(&source[start..end]);
+        match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if saw_identifier {
+                    return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+                }
+                saw_identifier = true;
+                field.varint()?;
+                append_varint_field(output, REFERENCE_IDENTIFIER_FIELD, write.identifier);
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if saw_deprecated_type {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_type",
+                    ));
+                }
+                saw_deprecated_type = true;
+                require_canonical_int32(field.varint()?)?;
+                output.extend_from_slice(&source[start..end]);
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if saw_deprecated_is_external {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_is_external",
+                    ));
+                }
+                saw_deprecated_is_external = true;
+                require_canonical_bool(field.varint()?)?;
+                output.extend_from_slice(&source[start..end]);
+            },
+            _ => output.extend_from_slice(&source[start..end]),
         }
     }
     if !saw_identifier {
@@ -764,8 +1246,9 @@ fn rewrite_message_fields(
         &mut Vec<u8>,
     ) -> Result<(), DecodeError>,
     selected_name: &'static str,
+    depth: u32,
 ) -> Result<(), DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), depth)?;
     let mut remaining = source;
     let mut saw_selected = false;
     while !remaining.is_empty() {
@@ -792,17 +1275,17 @@ fn rewrite_message_fields(
         let nested = field.length_delimited()?;
         let nested_len = match selected_field {
             CHART_DRAWABLE_SUPER_FIELD => {
-                measure_rewrite_drawable(nested, nested_options, write, budget)?
+                measure_rewrite_drawable(nested, nested_options, write, budget, depth + 1)?
             },
             DRAWABLE_CAPTION_FIELD => {
-                measure_rewrite_reference(nested, nested_options, write, budget)?
+                measure_rewrite_reference(nested, nested_options, write, budget, depth + 1)?
             },
             _ => return Err(DecodeError::projection()),
         };
-        let mut nested_output = reserve_output(nested_len)?;
-        nested_rewrite(nested, nested_options, write, budget, &mut nested_output)?;
-        debug_assert_eq!(nested_output.len(), nested_len);
-        append_length_delimited_field(output, selected_field, &nested_output);
+        append_length_delimited_field_header(output, selected_field, nested_len);
+        let before = output.len();
+        nested_rewrite(nested, nested_options, write, budget, output)?;
+        debug_assert_eq!(output.len() - before, nested_len);
     }
     if !saw_selected {
         return Err(DecodeError::missing_required(selected_name));
@@ -833,6 +1316,8 @@ fn varint_field_len(number: u32, value: u64) -> usize {
 }
 
 fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
+    #[cfg(test)]
+    OUTPUT_ALLOCATIONS.with(|count| count.set(count.get().saturating_add(1)));
     let mut output = Vec::new();
     output
         .try_reserve_exact(amount)
@@ -843,16 +1328,30 @@ fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
     Ok(output)
 }
 
+#[cfg(test)]
+thread_local! {
+    static OUTPUT_ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+fn reset_output_allocations() {
+    OUTPUT_ALLOCATIONS.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+fn output_allocations() -> usize {
+    OUTPUT_ALLOCATIONS.with(Cell::get)
+}
+
 fn clone_output(source: &[u8]) -> Result<Vec<u8>, DecodeError> {
     let mut output = reserve_output(source.len())?;
     output.extend_from_slice(source);
     Ok(output)
 }
 
-fn append_length_delimited_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) {
+fn append_length_delimited_field_header(output: &mut Vec<u8>, number: u32, payload_len: usize) {
     append_varint(output, (u64::from(number) << 3) | 2);
-    append_varint(output, payload.len() as u64);
-    output.extend_from_slice(payload);
+    append_varint(output, payload_len as u64);
 }
 
 fn append_varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
@@ -877,23 +1376,69 @@ fn varint_len(mut value: u64) -> usize {
     length
 }
 
+fn require_canonical_bool(value: u64) -> Result<bool, DecodeError> {
+    if value > 1 {
+        return Err(DecodeError::noncanonical("bool scalar is not zero or one"));
+    }
+    Ok(value == 1)
+}
+
+fn require_canonical_int32(value: u64) -> Result<i32, DecodeError> {
+    if value > 0x7fff_ffff && value < MIN_SIGN_EXTENDED_INT32 {
+        return Err(DecodeError::noncanonical(
+            "int32 scalar is not a sign-extended 32-bit value",
+        ));
+    }
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        reason = "The strict range check proves this is a canonical int32 representation."
+    )]
+    Ok(value as i32)
+}
+
 #[derive(Debug)]
 struct Budget {
+    input_bytes: usize,
     fields: usize,
     work_bytes: usize,
     max_fields: usize,
     max_work_bytes: usize,
     max_nesting: u32,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
 }
 
 impl Budget {
-    const fn new(options: DecodeOptions) -> Self {
+    const fn new(source: &[u8], options: DecodeOptions) -> Self {
         Self {
+            input_bytes: source.len(),
             fields: 0,
             work_bytes: 0,
             max_fields: options.max_fields,
             max_work_bytes: options.max_work_bytes,
             max_nesting: options.recursion_limit,
+            max_depth: 0,
+            allocations: 0,
+            retained_bytes: source.len(),
+            scratch_bytes: 0,
+        }
+    }
+
+    const fn unlimited(source: &[u8], options: DecodeOptions) -> Self {
+        Self {
+            input_bytes: source.len(),
+            fields: 0,
+            work_bytes: 0,
+            max_fields: usize::MAX,
+            max_work_bytes: usize::MAX,
+            max_nesting: options.recursion_limit,
+            max_depth: 0,
+            allocations: 0,
+            retained_bytes: source.len(),
+            scratch_bytes: 0,
         }
     }
 
@@ -911,7 +1456,11 @@ impl Budget {
         Ok(())
     }
 
-    fn charge_message(&mut self, bytes: usize) -> Result<(), DecodeError> {
+    fn charge_message(&mut self, bytes: usize, depth: u32) -> Result<(), DecodeError> {
+        if depth > self.max_nesting {
+            return Err(self.nesting_limit_at(depth));
+        }
+        self.max_depth = self.max_depth.max(depth);
         let observed = self.work_bytes.saturating_add(bytes.saturating_mul(2));
         if observed > self.max_work_bytes {
             return Err(DecodeError {
@@ -931,6 +1480,57 @@ impl Budget {
                 observed: self.max_nesting.saturating_add(1),
                 maximum: self.max_nesting,
             }),
+        }
+    }
+
+    const fn nesting_limit_at(&self, observed: u32) -> DecodeError {
+        DecodeError {
+            kind: DecodeErrorKind::Resource(WireResourceLimit::Nesting {
+                observed,
+                maximum: self.max_nesting,
+            }),
+        }
+    }
+
+    fn record_allocation(&mut self, amount: usize) {
+        self.allocations = self.allocations.saturating_add(1);
+        self.retained_bytes = amount;
+    }
+
+    fn depth_for(&self, options: DecodeOptions) -> u32 {
+        self.max_nesting
+            .saturating_sub(options.recursion_limit)
+            .saturating_add(1)
+    }
+
+    const fn decode_report(&self) -> DecodeReport {
+        DecodeReport {
+            input_bytes: self.input_bytes,
+            fields: self.fields,
+            work_bytes: self.work_bytes,
+            max_depth: self.max_depth,
+            allocations: self.allocations,
+            retained_bytes: self.retained_bytes,
+            scratch_bytes: self.scratch_bytes,
+        }
+    }
+
+    const fn rewrite_report(
+        &self,
+        input_bytes: usize,
+        output_bytes: usize,
+        changed: bool,
+    ) -> RewriteReport {
+        RewriteReport {
+            input_bytes,
+            output_bytes,
+            fields: self.fields,
+            work_bytes: self.work_bytes,
+            max_depth: self.max_depth,
+            allocations: self.allocations,
+            retained_bytes: self.retained_bytes,
+            scratch_bytes: self.scratch_bytes,
+            changed,
         }
     }
 }
@@ -974,7 +1574,7 @@ fn preflight_chart_caption(
     options: DecodeOptions,
     budget: &mut Budget,
 ) -> Result<ChartCaptionSnapshot, DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), budget.depth_for(options))?;
     let nested_options = options.descend(budget)?;
     let mut drawable = None;
     let mut remaining = source;
@@ -1001,7 +1601,7 @@ fn preflight_drawable(
     options: DecodeOptions,
     budget: &mut Budget,
 ) -> Result<DrawableCaptionSnapshot, DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), budget.depth_for(options))?;
     let nested_options = options.descend(budget)?;
     let mut caption = None;
     let mut remaining = source;
@@ -1028,21 +1628,43 @@ fn preflight_reference(
     options: DecodeOptions,
     budget: &mut Budget,
 ) -> Result<ReferenceSnapshot, DecodeError> {
-    budget.charge_message(source.len())?;
+    budget.charge_message(source.len(), budget.depth_for(options))?;
     let mut identifier = None;
+    let mut deprecated_type = None;
+    let mut deprecated_is_external = None;
     let mut remaining = source;
     while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
-        if field.number != REFERENCE_IDENTIFIER_FIELD {
-            continue;
+        match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if identifier.is_some() {
+                    return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+                }
+                identifier = Some(field.varint()?);
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if deprecated_type.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_type",
+                    ));
+                }
+                deprecated_type = Some(require_canonical_int32(field.varint()?)?);
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if deprecated_is_external.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSP.Reference.deprecated_is_external",
+                    ));
+                }
+                deprecated_is_external = Some(require_canonical_bool(field.varint()?)?);
+            },
+            _ => {},
         }
-        if identifier.is_some() {
-            return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
-        }
-        identifier = Some(field.varint()?);
     }
     Ok(ReferenceSnapshot {
         identifier: identifier
             .ok_or_else(|| DecodeError::missing_required("TSP.Reference.identifier"))?,
+        deprecated_type,
+        deprecated_is_external,
     })
 }
 
@@ -1261,8 +1883,8 @@ mod tests {
         Budget, CHART_DRAWABLE_SUPER_FIELD, ChartCaptionSnapshot, ChartCaptionWrite,
         DRAWABLE_CAPTION_FIELD, DecodeOptions, WireResourceLimit, decode_chart_caption,
         decode_chart_caption_identifier, decode_chart_caption_with_budget, measure_rewrite_root,
-        reserve_output, rewrite_chart_caption_with_report, rewrite_root_into,
-        validate_decode_input,
+        output_allocations, reserve_output, reset_output_allocations,
+        rewrite_chart_caption_with_report, rewrite_root_into, validate_decode_input,
     };
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -1276,14 +1898,23 @@ mod tests {
 
     fn chart_with_caption(identifier: u64) -> Vec<u8> {
         let reference = [vec![0x08], varint(identifier)].concat();
-        let drawable = [vec![0x5a], varint(reference.len() as u64), reference].concat();
+        chart_with_reference(&reference)
+    }
+
+    fn chart_with_reference(reference: &[u8]) -> Vec<u8> {
+        let drawable = [
+            vec![0x5a],
+            varint(reference.len() as u64),
+            reference.to_vec(),
+        ]
+        .concat();
         [vec![0x0a], varint(drawable.len() as u64), drawable].concat()
     }
 
     fn aggregate_rewrite_work(source: &[u8], write: ChartCaptionWrite) -> (usize, usize) {
         let options = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 8)
             .with_max_output_bytes(source.len() + 32);
-        let mut budget = Budget::new(options);
+        let mut budget = Budget::new(source, options);
         decode_chart_caption_with_budget(source, options, &mut budget).expect("source decode");
         let output_bytes =
             measure_rewrite_root(source, options, write, &mut budget).expect("rewrite measure");
@@ -1528,6 +2159,149 @@ mod tests {
             decode_chart_caption_identifier(&source, options(&source)),
             Ok(Some(7))
         );
+    }
+
+    #[test]
+    fn selected_reference_known_optional_fields_are_strict_but_raw_preserved() {
+        let unknown_group = [0x9b, 0x03, 0x08, 0x01, 0x9c, 0x03];
+        let reference = [
+            field_varint(2, u64::MAX),
+            field_varint(1, 7),
+            field_varint(3, 1),
+            unknown_group.to_vec(),
+        ]
+        .concat();
+        let source = chart_with_reference(&reference);
+        let (rewritten, report) = rewrite_chart_caption_with_report(
+            &source,
+            ChartCaptionWrite::new(300),
+            DecodeOptions::new(source.len(), source.len() * 4, usize::MAX, 8)
+                .with_max_output_bytes(source.len() + 32),
+        )
+        .expect("canonical optional reference fields");
+        assert_eq!(
+            decode_chart_caption_identifier(&source, options(&source)),
+            Ok(Some(7))
+        );
+        assert_eq!(
+            decode_chart_caption_identifier(&rewritten, options(&rewritten)),
+            Ok(Some(300))
+        );
+        let canonical_type = field_varint(2, u64::MAX);
+        assert!(
+            rewritten
+                .windows(canonical_type.len())
+                .any(|window| window == canonical_type.as_slice())
+        );
+        assert!(
+            rewritten
+                .windows(unknown_group.len())
+                .any(|window| { window == unknown_group })
+        );
+        assert_eq!(report.allocations(), 1);
+        assert_eq!(report.retained_bytes(), rewritten.len());
+        assert_eq!(report.scratch_bytes(), 0);
+        assert!(report.fields() > 0);
+        assert!(report.work_bytes() > 0);
+    }
+
+    #[test]
+    fn selected_reference_known_optional_fields_reject_wrong_wire_duplicate_and_noncanonical() {
+        let malformed = [
+            chart_with_reference(&[0x12, 0x01, 0x01, 0x08, 0x01]), // deprecated_type bytes
+            chart_with_reference(&[0x18, 0x02, 0x08, 0x01]),       // bool value 2
+            chart_with_reference(&[0x10, 0x01, 0x10, 0x01, 0x08, 0x01]), // duplicate type
+            chart_with_reference(&[0x18, 0x01, 0x18, 0x01, 0x08, 0x01]), // duplicate bool
+            chart_with_reference(&[0x10, 0x81, 0x00, 0x08, 0x01]), // overlong type value
+            chart_with_reference(&[0x90, 0x00, 0x01, 0x08, 0x01]), // overlong type key
+        ];
+        for source in malformed {
+            assert!(
+                decode_chart_caption(&source, options(&source)).is_err(),
+                "malformed selected reference accepted: {source:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn rewrite_report_replays_exact_output_and_field_limits() {
+        let source = chart_with_caption(7);
+        let write = ChartCaptionWrite::new(300);
+        let permissive = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 8)
+            .with_max_output_bytes(source.len() + 32);
+        let (expected, report) = rewrite_chart_caption_with_report(&source, write, permissive)
+            .expect("permissive rewrite");
+        let exact = DecodeOptions::new(source.len(), report.fields(), report.work_bytes(), 8)
+            .with_max_output_bytes(report.output_bytes());
+        let (actual, replay) =
+            rewrite_chart_caption_with_report(&source, write, exact).expect("exact report replay");
+        assert_eq!(actual, expected);
+        assert_eq!(replay.output_bytes(), report.output_bytes());
+        assert_eq!(replay.fields(), report.fields());
+        assert_eq!(replay.work_bytes(), report.work_bytes());
+        let below_fields =
+            DecodeOptions::new(source.len(), report.fields() - 1, report.work_bytes(), 8)
+                .with_max_output_bytes(report.output_bytes());
+        assert!(
+            rewrite_chart_caption_with_report(&source, write, below_fields)
+                .expect_err("field budget below exact report")
+                .field_limit_values()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn rewrite_limit_failures_happen_before_output_allocation() {
+        let source = chart_with_caption(7);
+        let write = ChartCaptionWrite::new(300);
+        let permissive = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 8)
+            .with_max_output_bytes(source.len() + 32);
+        let (expected, report) = rewrite_chart_caption_with_report(&source, write, permissive)
+            .expect("permissive rewrite");
+
+        reset_output_allocations();
+        let (actual, _) = rewrite_chart_caption_with_report(
+            &source,
+            write,
+            DecodeOptions::new(source.len(), report.fields(), report.work_bytes(), 8)
+                .with_max_output_bytes(report.output_bytes()),
+        )
+        .expect("exact limits");
+        assert_eq!(actual, expected);
+        assert_eq!(output_allocations(), 1);
+
+        for (label, options) in [
+            (
+                "fields",
+                DecodeOptions::new(source.len(), report.fields() - 1, report.work_bytes(), 8)
+                    .with_max_output_bytes(report.output_bytes()),
+            ),
+            (
+                "work",
+                DecodeOptions::new(source.len(), report.fields(), report.work_bytes() - 1, 8)
+                    .with_max_output_bytes(report.output_bytes()),
+            ),
+            (
+                "output",
+                DecodeOptions::new(source.len(), report.fields(), report.work_bytes(), 8)
+                    .with_max_output_bytes(report.output_bytes() - 1),
+            ),
+            (
+                "depth",
+                DecodeOptions::new(
+                    source.len(),
+                    report.fields(),
+                    report.work_bytes(),
+                    report.max_depth() - 1,
+                )
+                .with_max_output_bytes(report.output_bytes()),
+            ),
+        ] {
+            reset_output_allocations();
+            let error =
+                rewrite_chart_caption_with_report(&source, write, options).expect_err(label);
+            assert_eq!(output_allocations(), 0, "{label} allocated output: {error}");
+        }
     }
 
     #[test]

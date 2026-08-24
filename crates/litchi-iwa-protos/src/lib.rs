@@ -1081,6 +1081,16 @@ pub mod keynote_document_codec;
 #[doc(hidden)]
 pub mod keynote_chart_caption_codec;
 
+/// Format-neutral strict chart-caption edge projection and wire rewrite.
+///
+/// `keynote_chart_caption_codec` remains the compatibility spelling used by
+/// the focused Keynote package; this alias owns the shared TSCH/TSD/TSP edge
+/// reused by Pages and Numbers without exposing generated Buffa types.
+#[doc(hidden)]
+pub mod chart_caption_codec {
+    pub use super::keynote_chart_caption_codec::*;
+}
+
 /// Internal generated-free encoder for one canonical inline Keynote chart
 /// caption graph. Generated protobuf types remain test-only or private to
 /// their existing owners.
