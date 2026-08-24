@@ -453,6 +453,29 @@ mod buffa_numbers_sheet_order_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for scalar fields of one Pages
+/// drawable-order reference. The repeated TP envelope remains handwritten and
+/// borrowed by `pages_drawable_order_codec`.
+#[doc(hidden)]
+mod buffa_pages_drawable_order_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-drawable-order/iwa_pages_drawable_order_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for Numbers table-title scalars.
 ///
 /// Title style references are routed from caller-owned bytes and forced
@@ -1189,6 +1212,11 @@ pub mod numbers_names_codec;
 
 #[doc(hidden)]
 pub mod numbers_sheet_order_codec;
+
+/// Internal strict Pages drawable-order projection. Generated scalar views
+/// remain private and the repeated TP archive stays source-authoritative.
+#[doc(hidden)]
+pub mod pages_drawable_order_codec;
 
 /// Internal strict Numbers table-header settings projection. Generated types
 /// remain private and scalar facts borrow only caller-owned source bytes.

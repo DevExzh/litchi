@@ -40,6 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_drawable_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
@@ -140,6 +141,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_comment_storage_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_names_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_sheet_order_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_drawable_order_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_table_header_settings_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -371,6 +376,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_numbers_sheet_order_projection_budget(&buffa_numbers_sheet_order_out_directory)?;
+
+    // Pages drawable ordering needs only the scalar fields of each repeated
+    // TSP.Reference. The repeated TP envelope stays handwritten and borrowed
+    // so no generated Vec/reference storage can cross the codec boundary.
+    let buffa_pages_drawable_order_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-drawable-order");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TPDrawableOrderReferenceArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_drawable_order_out_directory)
+        .include_file("iwa_pages_drawable_order_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_drawable_order_projection_budget(&buffa_pages_drawable_order_out_directory)?;
 
     // Numbers table-header settings require only dimensions and nine scalar
     // header/footer/freeze/repetition facts. Keep required style/data-store
@@ -834,6 +859,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "5ea19e0ad657c4367b1974d0730d1ea0a75602d4e38d2da4dfeb67b1ac753436",
         ),
         (
+            "TPDrawableOrderReferenceArchive.proto",
+            287,
+            "770783bc3a39d2c11cecd6a8774dd9aee6aa24bd781ebc36968271c862460787",
+        ),
+        (
             "TPDocumentBodyArchive.proto",
             2600,
             "3461ea3c1165a3fd82fba1aebbcd239a604dd56e8ea1052014e59900a3db0d7b",
@@ -1086,6 +1116,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/numbers_sheet_order_codec.rs",
             "crate::buffa_numbers_sheet_order_generated::",
             "mod buffa_numbers_sheet_order_generated {",
+        ),
+        (
+            "src/pages_drawable_order_codec.rs",
+            "crate::buffa_pages_drawable_order_generated::",
+            "mod buffa_pages_drawable_order_generated {",
         ),
         (
             "src/numbers_table_header_settings_codec.rs",
@@ -2340,6 +2375,97 @@ optional bool deprecated_is_external = 3;\n\
         || production_codec.contains(".encode(")
     {
         return Err("Numbers sheet-order projection/codec drifted from the exact TN/TSK/TSP reference routes, exposed generated code, introduced repeated storage, or added Prost/production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_drawable_order_projection_budget(
+    output_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let generated =
+        fs::read_to_string(output_directory.join("iwa_pages_drawable_order_buffa_protos.rs"))?;
+    if generated.len() > 24 * 1024
+        || generated.contains("Vec<")
+        || generated.contains("to_owned_message")
+        || generated.contains("encode_to_vec")
+        || generated.contains("try_encode")
+        || generated.contains("prost")
+    {
+        return Err(
+            "derived Pages drawable-order Buffa projection exceeded its bounded borrowed-view budget or exposed owned/generated encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_pages_drawable_order_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const Z_ORDER: &str =
+        "message DrawablesZOrderArchive {\n  repeated .TSP.Reference drawables = 1;\n}";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message PagesDrawableOrderReferenceArchive {\n\
+required uint64 identifier = 1;\n\
+optional int32 deprecated_type = 2;\n\
+optional bool deprecated_is_external = 3;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 12] = [
+        "const DRAWABLES_FIELD: u32 = 1;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "pub struct DrawableOrderSnapshot<'source>",
+        "pub struct DrawableOrderWrite<'identifiers>",
+        "pub fn decode_drawable_order(",
+        "pub fn decode_drawable_order_with_report(",
+        "pub fn rewrite_drawable_order(",
+        "pub fn rewrite_drawable_order_with_report(",
+        "fn scan_order(",
+        "fn emit_order(",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_pages_drawable_order_generated {",
+        "\"/buffa-pages-drawable-order/iwa_pages_drawable_order_buffa_protos.rs\"",
+    ];
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tp = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TPDrawableOrderReferenceArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/pages_drawable_order_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if tsp.matches(REFERENCE).count() != 1
+        || tp.matches(Z_ORDER).count() != 1
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.contains("repeated ")
+        || projection.len() > 1024
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains("Vec<ReferenceSnapshot")
+        || production_codec.contains("Vec<u64>")
+    {
+        return Err(
+            "derived Pages drawable-order projection/codec drifted from TP/TSP references, exposed repeated owned storage, or added Prost/production encoding"
+                .into(),
+        );
     }
     Ok(())
 }
