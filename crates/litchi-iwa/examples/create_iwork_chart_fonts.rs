@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Avenir Next Demi Bold")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Avenir Next Demi Bold")?;
     keynote.set_slide_chart_font(0, chart.drawable_object_id, font.clone())?;
     keynote.set_slide_chart_font_size(0, chart.drawable_object_id, size)?;
     assert_eq!(keynote.slide_chart_font(0, chart.drawable_object_id)?, font);

@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "75% depth")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "75% depth")?;
     keynote.set_slide_chart_3d_depth(0, chart.drawable_object_id, keynote_depth)?;
     assert_eq!(
         keynote.slide_chart_3d_depth(0, chart.drawable_object_id)?,

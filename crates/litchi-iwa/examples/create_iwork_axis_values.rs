@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     keynote.set_slide_chart_direction(0, ChartSelector::index(0), Direction::Columns)?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis values")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Axis values")?;
     set_keynote_axis_values(&mut keynote, chart.drawable_object_id, bounds, steps)?;
     keynote.save(output.join("axis-values-crate.key"))?;
 

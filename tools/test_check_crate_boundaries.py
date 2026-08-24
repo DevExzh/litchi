@@ -9818,7 +9818,7 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_keynote_chart_title_legacy_calls(root), [])
 
-    def test_iwa_keynote_chart_title_requires_typed_facade_and_deprecated_ids(
+    def test_iwa_keynote_chart_title_rejects_raw_id_surface_even_with_typed_names(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -9830,9 +9830,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    pub fn slide_chart_title(&self, id: u64) {}\n"
                 "    pub fn set_slide_chart_title(&mut self, id: u64) {}\n"
                 "    pub fn remove_slide_chart_title(&mut self, id: u64) {}\n"
-                "    pub fn slide_chart_title_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self) {}\n"
+                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
+                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
+                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -9840,35 +9840,31 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_title_source_topology(root),
                 [
-                    "litchi-iwa Keynote chart-title legacy method must remain "
-                    "deprecated remove_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
-                    "litchi-iwa Keynote chart-title legacy method must remain "
-                    "deprecated set_slide_chart_title: "
+                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
+                    "retired id: u64: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:2",
+                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
+                    "retired id: u64: "
                     "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
-                    "litchi-iwa Keynote chart-title legacy method must remain "
-                    "deprecated slide_chart_title: "
+                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
+                    "retired id: u64: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
+                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
+                    "remove_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
+                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
+                    "set_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
+                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
+                    "remove_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:4",
+                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
+                    "set_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
+                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
+                    "slide_chart_title: "
                     "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:2",
                 ],
-            )
-
-            source.write_text(
-                "impl KeynoteEditor {\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn slide_chart_title(&self, id: u64) {}\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn set_slide_chart_title(&mut self, id: u64) {}\n"
-                "    #[deprecated(note = \"compatibility\")]\n"
-                "    pub fn remove_slide_chart_title(&mut self, id: u64) {}\n"
-                "    pub fn slide_chart_title_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self) {}\n"
-                "}\n",
-                encoding="utf-8",
-            )
-
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_chart_title_source_topology(root), []
             )
 
     def test_iwa_keynote_chart_title_requires_all_selector_methods(self) -> None:
@@ -9891,6 +9887,30 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_title_source_topology(root),
                 [
+                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
+                    "retired id: u64: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
+                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
+                    "retired id: u64: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:5",
+                    "litchi-iwa Keynote chart-title raw identifier parameter must be "
+                    "retired id: u64: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:7",
+                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
+                    "remove_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:7",
+                    "litchi-iwa Keynote chart-title raw-ID call must be retired "
+                    "set_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:5",
+                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
+                    "remove_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:7",
+                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
+                    "set_slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:5",
+                    "litchi-iwa Keynote chart-title raw-ID method must be retired "
+                    "slide_chart_title: "
+                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs:3",
                     "litchi-iwa Keynote chart-title selector method is missing "
                     "remove_slide_chart_title_by_selector: "
                     "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
@@ -9903,7 +9923,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
-    def test_iwa_keynote_chart_title_preserves_legacy_compatibility_methods(
+    def test_iwa_keynote_chart_title_accepts_selector_bridge_without_legacy_methods(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -9912,27 +9932,74 @@ class BoundaryPolicyTests(unittest.TestCase):
             source.parent.mkdir(parents=True)
             source.write_text(
                 "impl KeynoteEditor {\n"
-                "    pub fn slide_chart_title_by_selector(&self) {}\n"
-                "    pub fn set_slide_chart_title_by_selector(&mut self) {}\n"
-                "    pub fn remove_slide_chart_title_by_selector(&mut self) {}\n"
+                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
+                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
+                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
                 "}\n",
                 encoding="utf-8",
             )
 
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_chart_title_source_topology(root),
-                [
-                    "litchi-iwa Keynote chart-title legacy method is missing "
-                    "remove_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
-                    "litchi-iwa Keynote chart-title legacy method is missing "
-                    "set_slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
-                    "litchi-iwa Keynote chart-title legacy method is missing "
-                    "slide_chart_title: "
-                    "crates/litchi-iwa/src/keynote/editor/slide_charts/title.rs",
-                ],
+            self.assertEqual(boundaries.audit_iwa_keynote_chart_title_source_topology(root), [])
+
+    def test_iwa_keynote_chart_title_rejects_private_calls_and_position_fallback(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
+                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
+                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
+                "    fn chart_position_for_identifier(&self, drawable_object_id: u64) -> usize {\n"
+                "        self.slide_charts(0).unwrap().iter().position(|chart| chart.drawable_object_id == drawable_object_id).unwrap()\n"
+                "    }\n"
+                "    fn set_legacy(&mut self, drawable_object_id: u64) {\n"
+                "        set_slide_chart_title(self, 0, drawable_object_id, \"title\");\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
             )
+
+            violations = boundaries.audit_iwa_keynote_chart_title_source_topology(root)
+            self.assertTrue(
+                any("raw identifier parameter must be retired" in item for item in violations)
+            )
+            self.assertTrue(
+                any("raw-ID call must be retired set_slide_chart_title" in item for item in violations)
+            )
+            self.assertTrue(
+                any("identifier-to-position fallback must be retired" in item for item in violations)
+            )
+
+    def test_iwa_keynote_chart_title_masks_cfg_test_legacy_items_without_truncating_production(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_CHART_TITLE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_title_by_selector(&self, selector: ChartSelector) {}\n"
+                "    pub fn set_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
+                "    pub fn remove_slide_chart_title_by_selector(&mut self, selector: ChartSelector) {}\n"
+                "}\n"
+                "\n"
+                "#[cfg(test)]\n"
+                "fn chart_position_for_identifier(&self, drawable_object_id: u64) {\n"
+                "    set_slide_chart_title(self, 0, drawable_object_id, \"test\");\n"
+                "}\n"
+                "\n"
+                "fn production_selector_helper(selector: ChartSelector) {\n"
+                "    let _ = selector;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_iwa_keynote_chart_title_source_topology(root), [])
 
     def test_focused_keynote_chart_caption_rejects_legacy_calls_and_ignores_near_names(
         self,

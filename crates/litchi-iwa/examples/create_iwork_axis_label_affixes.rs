@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Axis label affixes")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Axis label affixes")?;
     assert_eq!(
         keynote.slide_chart_axis_label_affixes(0, chart.drawable_object_id, Axis::Value)?,
         LabelAffixes::default()

@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 650.0,
         },
     )?;
-    keynote.set_slide_chart_title(0, chart.drawable_object_id, "Revenue thresholds")?;
+    keynote.set_slide_chart_title_by_selector(0, 0usize, "Revenue thresholds")?;
     keynote.set_slide_chart_reference_lines(0, chart.drawable_object_id, &reference_lines)?;
     assert_eq!(
         keynote.slide_chart_reference_lines(0, chart.drawable_object_id)?,
