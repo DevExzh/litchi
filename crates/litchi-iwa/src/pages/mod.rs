@@ -43,13 +43,12 @@ pub use editor::{
     PagesTableCellTextCapitalization, PagesTableCellTextCharacterSpacing, PagesTableCellTextColor,
     PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
     PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
-    PagesTableCellTextStyle, PagesTableCellUpdate, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
-    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
-    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, RemovedPagesAudio,
-    RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage, RemovedPagesMovie,
-    RemovedPagesTextBox,
+    PagesTableCellTextStyle, PagesTableCellUpdate, PagesTableFormulaAxisReference,
+    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
+    PagesTableFormulaExpression, PagesTableInfo, PagesTableSortColumnIndex,
+    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
+    PagesTableSortScope, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape,
+    RemovedPagesImage, RemovedPagesMovie, RemovedPagesTextBox,
 };
 pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
 pub use litchi_pages::{Section, SectionType};

@@ -31,6 +31,7 @@ use litchi_numbers::cell::data_format::{
     Scientific, Slider, StarRating, Stepper, Text as TextFormat,
 };
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
+use litchi_pages::table::dimension::{Dimension, Size};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
@@ -70,6 +71,78 @@ fn set_pages_table_header_settings(
     };
     *editor = PagesEditor::from_bytes(&bytes)?;
     Ok(())
+}
+
+fn pages_table_dimension_size(
+    editor: &PagesEditor,
+    selector: BodyTableSelector<'_>,
+    dimension: Dimension,
+) -> Result<Size> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(format!("Pages dimension package: {error}")))?;
+    package
+        .body_table_dimension_size(selector, dimension)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table dimension: {error}")))
+}
+
+fn set_pages_table_dimension_size(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+    dimension: Dimension,
+    size: Size,
+) -> Result<()> {
+    let bytes = {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages dimension package: {error}")))?;
+        let commit = package
+            .edit_body_table_dimension_size(selector, dimension)
+            .map_err(|error| Error::InvalidFormat(format!("Pages table dimension: {error}")))?
+            .set(size)
+            .commit()
+            .map_err(|error| Error::InvalidFormat(format!("Pages table dimension: {error}")))?;
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        bytes
+    };
+    *editor = PagesEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn pages_table_row_height(
+    editor: &PagesEditor,
+    selector: BodyTableSelector<'_>,
+    row: usize,
+) -> Result<Size> {
+    pages_table_dimension_size(editor, selector, Dimension::Row(row))
+}
+
+fn set_pages_table_row_height(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+    row: usize,
+    size: Size,
+) -> Result<()> {
+    set_pages_table_dimension_size(editor, selector, Dimension::Row(row), size)
+}
+
+fn pages_table_column_width(
+    editor: &PagesEditor,
+    selector: BodyTableSelector<'_>,
+    column: usize,
+) -> Result<Size> {
+    pages_table_dimension_size(editor, selector, Dimension::Column(column))
+}
+
+fn set_pages_table_column_width(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+    column: usize,
+    size: Size,
+) -> Result<()> {
+    set_pages_table_dimension_size(editor, selector, Dimension::Column(column), size)
 }
 
 #[test]
@@ -1234,8 +1307,8 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    let row_size = PagesTableDimensionSize::points(33.0).unwrap();
-    let column_size = PagesTableDimensionSize::points(77.0).unwrap();
+    let row_size = Size::points(33.0).unwrap();
+    let column_size = Size::points(77.0).unwrap();
     editor
         .set_table_cell(model_id, 1, 1, CellValue::Text("shift me".to_owned()))
         .unwrap();
@@ -1248,10 +1321,8 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             PagesTableFormulaCachedValue::number(7.0).expect("finite cached formula number"),
         )
         .unwrap();
-    editor.set_table_row_height(model_id, 1, row_size).unwrap();
-    editor
-        .set_table_column_width(model_id, 1, column_size)
-        .unwrap();
+    set_pages_table_row_height(&mut editor, BodyTableSelector::index(0), 1, row_size).unwrap();
+    set_pages_table_column_width(&mut editor, BodyTableSelector::index(0), 1, column_size).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor
@@ -1271,9 +1342,12 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
         table.get_cell(3, 3),
         Some(&CellValue::Formula("=B2".to_owned()))
     );
-    assert_eq!(reopened.table_row_height(model_id, 1).unwrap(), row_size);
     assert_eq!(
-        reopened.table_column_width(model_id, 1).unwrap(),
+        pages_table_row_height(&reopened, BodyTableSelector::index(0), 1).unwrap(),
+        row_size
+    );
+    assert_eq!(
+        pages_table_column_width(&reopened, BodyTableSelector::index(0), 1).unwrap(),
         column_size
     );
 
@@ -1630,7 +1704,6 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         .body_table("Layout", 4, 3)
         .build()
         .unwrap();
-    let model_id = editor.tables().unwrap()[0].model_object_id;
     let settings = HeaderSettings {
         header_rows: Some(HeaderCount::TWO),
         header_columns: Some(HeaderCount::ONE),
@@ -1639,12 +1712,20 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
     };
 
     set_pages_table_header_settings(&mut editor, BodyTableSelector::index(0), settings).unwrap();
-    editor
-        .set_table_column_width(model_id, 0, PagesTableDimensionSize::points(150.0).unwrap())
-        .unwrap();
-    editor
-        .set_table_row_height(model_id, 2, PagesTableDimensionSize::points(42.0).unwrap())
-        .unwrap();
+    set_pages_table_column_width(
+        &mut editor,
+        BodyTableSelector::index(0),
+        0,
+        Size::points(150.0).unwrap(),
+    )
+    .unwrap();
+    set_pages_table_row_height(
+        &mut editor,
+        BodyTableSelector::index(0),
+        2,
+        Size::points(42.0).unwrap(),
+    )
+    .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -1652,42 +1733,40 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         settings
     );
     assert_eq!(
-        reopened.table_column_width(model_id, 0).unwrap(),
-        PagesTableDimensionSize::points(150.0).unwrap()
+        pages_table_column_width(&reopened, BodyTableSelector::index(0), 0).unwrap(),
+        Size::points(150.0).unwrap()
     );
     assert_eq!(
-        reopened.table_row_height(model_id, 2).unwrap(),
-        PagesTableDimensionSize::points(42.0).unwrap()
+        pages_table_row_height(&reopened, BodyTableSelector::index(0), 2).unwrap(),
+        Size::points(42.0).unwrap()
     );
     assert_eq!(
-        reopened.table_column_width(model_id, 1).unwrap(),
-        PagesTableDimensionSize::Default
+        pages_table_column_width(&reopened, BodyTableSelector::index(0), 1).unwrap(),
+        Size::Default
     );
 
-    reopened
-        .set_table_column_width(model_id, 0, PagesTableDimensionSize::Default)
+    set_pages_table_column_width(&mut reopened, BodyTableSelector::index(0), 0, Size::Default)
         .unwrap();
-    reopened
-        .set_table_row_height(model_id, 2, PagesTableDimensionSize::Default)
+    set_pages_table_row_height(&mut reopened, BodyTableSelector::index(0), 2, Size::Default)
         .unwrap();
     assert_eq!(
-        reopened.table_column_width(model_id, 0).unwrap(),
-        PagesTableDimensionSize::Default
+        pages_table_column_width(&reopened, BodyTableSelector::index(0), 0).unwrap(),
+        Size::Default
     );
     assert_eq!(
-        reopened.table_row_height(model_id, 2).unwrap(),
-        PagesTableDimensionSize::Default
+        pages_table_row_height(&reopened, BodyTableSelector::index(0), 2).unwrap(),
+        Size::Default
     );
 
     let before = reopened.to_bytes().unwrap();
     assert!(
-        reopened
-            .set_table_row_height(
-                model_id,
-                usize::MAX,
-                PagesTableDimensionSize::points(20.0).unwrap(),
-            )
-            .is_err()
+        set_pages_table_row_height(
+            &mut reopened,
+            BodyTableSelector::index(0),
+            usize::MAX,
+            Size::points(20.0).unwrap(),
+        )
+        .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before);
     let before_header_error = reopened.to_bytes().unwrap();

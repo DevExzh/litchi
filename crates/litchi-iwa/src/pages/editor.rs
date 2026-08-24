@@ -4810,11 +4810,11 @@ pub use tables::{
     PagesTableCellTextDecorations, PagesTableCellTextFont, PagesTableCellTextLigatures,
     PagesTableCellTextOutline, PagesTableCellTextScript, PagesTableCellTextShadow,
     PagesTableCellTextStyle, PagesTableCellTextWrap, PagesTableCellUpdate,
-    PagesTableCellVerticalAlignment, PagesTableDimension, PagesTableDimensionSize,
-    PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
-    PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
-    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
-    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
+    PagesTableCellVerticalAlignment, PagesTableFormulaAxisReference,
+    PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
+    PagesTableFormulaExpression, PagesTableInfo, PagesTableSortColumnIndex,
+    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRowRange, PagesTableSortRule,
+    PagesTableSortScope,
 };
 
 #[cfg(test)]

@@ -663,6 +663,57 @@ def add_pages_table_headers_canonical_scaffold(root: Path) -> None:
     selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
 
 
+def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use crate::package::body_table_dimension::{"
+        "BodyTableDimensionCommit as Commit, BodyTableDimensionDiagnostics as Diagnostics, "
+        "BodyTableDimensionEdit as Edit, BodyTableDimensionError as Error, "
+        "BodyTableDimensionLimitKind as LimitKind, BodyTableDimensionPatch as Patch};\n"
+        "pub use litchi_iwa_common::table::dimension::{Dimension, Points, Size};\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+    package_export = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[1]
+    table_export = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+    selector = root / boundaries.PAGES_TABLE_DIMENSION_SELECTOR_SOURCE
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod table;\n"
+        "pub use selector::BodyTableSelector;\n"
+        "pub use package::{BodyTableDimensionCommit, BodyTableDimensionDiagnostics, "
+        "BodyTableDimensionEdit, BodyTableDimensionError, BodyTableDimensionLimitKind, "
+        "BodyTableDimensionPatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod body_table_dimension;\n"
+        "pub use body_table_dimension::{BodyTableDimensionCommit, "
+        "BodyTableDimensionDiagnostics, BodyTableDimensionEdit, BodyTableDimensionError, "
+        "BodyTableDimensionLimitKind, BodyTableDimensionPatch};\n",
+        encoding="utf-8",
+    )
+    table_export.write_text("pub mod dimension;\n", encoding="utf-8")
+    selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -14596,6 +14647,284 @@ fn rewrite_movie_title_operation(
             "+ audit_pages_table_headers_facade_source_topology()", main_source
         )
 
+    def test_pages_table_dimension_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_DIMENSION_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/layout.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_DIMENSION_METHODS,
+            (
+                "table_dimension_size",
+                "set_table_dimension_size",
+                "table_row_height",
+                "set_table_row_height",
+                "table_column_width",
+                "set_table_column_width",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_table_dimension.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS,
+            (
+                "body_table_dimension_size",
+                "edit_body_table_dimension_size",
+                "apply_body_table_dimension_size",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_DIMENSION_SEMANTIC_TYPES,
+            ("Dimension", "Points", "Size"),
+        )
+
+    def test_focused_pages_table_dimension_requires_canonical_types_and_methods(
+        self,
+    ) -> None:
+        for missing in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_dimension_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_dimension_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_dimension_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_dimension_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+    def test_focused_pages_table_dimension_requires_semantics_selector_and_root_export(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::body_table_dimension::{"
+                "BodyTableDimensionCommit as Commit};\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_DIMENSION_SELECTOR_SOURCE
+            selector.write_text("pub enum OtherSelector { Name }\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            lib.write_text("pub mod table;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_dimension_facade_source_topology(root)
+
+            for name in boundaries.PAGES_TABLE_DIMENSION_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"missing semantic table::dimension type {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations))
+            self.assertTrue(any("missing root BodyTableSelector re-export" in item for item in violations))
+
+    def test_focused_pages_table_dimension_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_dimension_size(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_dimension_size() {}\n"
+                "pub fn apply_body_table_dimension_size() {}\n"
+                "}\n"
+                "pub type TableDimensionPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableDimensionArchive as TableDimensionPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+            table.write_text("pub mod dimension;\npub use dimension::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_dimension_facade_source_topology(root)
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::dimension glob",
+                "retains flat alias TableDimensionPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_dimension_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomDimensionPatch = BodyTableDimensionPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyDimensionPatch = BodyTableDimensionPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableDimensionPatch as DimensionPatch;\n"
+                    "pub mod body_table_dimension;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use dimension::Size as DimensionSize;\n")
+
+            violations = boundaries.audit_pages_table_dimension_facade_source_topology(root)
+            for fragment in (
+                "alternate alias CustomDimensionPatch for BodyTableDimensionPatch",
+                "aliases via owner glob",
+                "alternate alias DimensionPatch for BodyTableDimensionPatch",
+                "alternate alias DimensionSize for Size",
+                "exposes duplicate body_table_dimension module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyDimensionPatch" in item for item in violations))
+
+    def test_focused_pages_table_dimension_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_dimension_size() {}\n"
+                "pub fn edit_body_table_dimension_size() {}\n"
+                "pub fn apply_body_table_dimension_size() {}\n"
+                "}\n"
+                "fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod dimension;\n"
+                "pub use dimension::{Dimension, Points, Size};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_dimension_facade_source_topology(root), []
+            )
+
+    def test_iwa_pages_table_dimension_audit_activates_only_with_package_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.RETIRED_IWA_PAGES_TABLE_DIMENSION_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_numbers::table::dimension::{Dimension, Points, Size};\n"
+                "pub fn table_dimension_size(model_object_id: u64) {}\n"
+                "pub fn set_table_dimension_size(model_object_id: u64) {}\n"
+                "pub fn table_row_height(model_object_id: u64) {}\n"
+                "pub fn set_table_row_height(model_object_id: u64) {}\n"
+                "pub fn table_column_width(model_object_id: u64) {}\n"
+                "pub fn set_table_column_width(model_object_id: u64) {}\n"
+                "#[cfg(test)]\n"
+                "pub fn table_dimension_size_for_test() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_dimension_source_topology(root), []
+            )
+            (root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE).parent.mkdir(
+                parents=True, exist_ok=True
+            )
+            (root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE).write_text(
+                "impl Package {}\n", encoding="utf-8"
+            )
+            violations = boundaries.audit_iwa_pages_table_dimension_source_topology(root)
+            for method in boundaries.RETIRED_IWA_PAGES_TABLE_DIMENSION_METHODS:
+                self.assertTrue(any(f"method {method}:" in item for item in violations))
+            self.assertTrue(any("table-dimension import" in item for item in violations))
+            self.assertFalse(any("for_test" in item for item in violations))
+
+    def test_focused_pages_table_dimension_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_table_dimension_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_pages_table_dimension_facade_source_topology()", main_source
+        )
+
     def test_pages_table_title_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_PAGES_TABLE_TITLE_SOURCE,
@@ -16152,6 +16481,39 @@ fn rewrite_movie_title_operation(
                     any(fragment in item for item in violations),
                     msg=f"missing violation containing {fragment!r}: {violations!r}",
                 )
+
+    def test_focused_numbers_table_dimension_allows_exact_common_compatibility_reexport(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_dimension_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use litchi_iwa_common::table::dimension::{"
+                "Dimension, Error, Points, Size};\n"
+                "pub mod transaction;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_dimension_facade_source_topology(root),
+                [],
+            )
+
+            semantic.write_text(
+                "pub use litchi_iwa_common::table::dimension::{"
+                "Dimension as Axis, Error, Points, Size};\n"
+                "pub mod transaction;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_dimension_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("public dimension owner alias" in item for item in violations),
+                violations,
+            )
 
     def test_pages_section_settings_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
