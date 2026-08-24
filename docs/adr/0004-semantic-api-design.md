@@ -2729,3 +2729,26 @@ The host still owns footnote reads and insert/remove graph lifecycle paths.
 This does not add a raw-ID replacement API, broaden accepted graph shapes, or
 move native identifiers, archive objects, generated messages, or wire values
 across the focused facade.
+
+## 2026-08-25 amendment: Wave72 shared chart-caption source hardening
+
+Commit `997e0bf55e8a1381296a4d446f83dd5217a15385` hardens the hidden shared
+chart-caption codec without changing the public semantic surfaces. Every
+internal projection, sizing, rewrite, and candidate-verification traversal is
+metered. Unknown overlong scalar values and complete source groups remain
+source-retained, while unknown keys and length framing, selected known fields,
+and exact group-depth accounting remain strict. Typed output and allocation
+failures stay on the existing bounded error seam.
+
+Pages and Numbers caption retargeting now preserves raw `ArchiveInfo` headers
+and the exact aggregate and `FieldInfo` reference sets. Shared or
+misattributed `CaptionInfo`/storage ownership rejects atomically rather than
+publishing a partial graph. The Keynote owner folds the residual codec report
+and candidate-reopen precharge into its existing private `CaptionBudget`.
+
+This is an internal source-authority and accounting refinement. It does not
+create a focused Pages or Numbers chart-caption package owner: graph/theme
+creation and the remaining chart lifecycle stay in the compatibility host.
+No raw-ID, archive, generated, Metadata, or wire type crosses a focused public
+facade, and the P2 follow-ups for duplicate known `MessageInfo` scalar
+canonicality and arbitrary unmodeled payload/reference parity remain open.
