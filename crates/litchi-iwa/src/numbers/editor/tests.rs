@@ -1331,6 +1331,26 @@ fn supported_cell_comment_replacement_delegates_to_focused_package_owner() {
 }
 
 #[test]
+fn supported_cell_comment_clear_delegates_to_focused_package_owner() {
+    let source = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../litchi-numbers/tests/fixtures/comment-edit-root.numbers"
+    ));
+    let mut editor = NumbersEditor::from_bytes(source).unwrap();
+    let table_id = editor.tables().unwrap()[0].native_id();
+    assert!(editor.cell_comment(table_id, 1, 1).unwrap().is_some());
+
+    editor.clear_cell_comment(table_id, 1, 1).unwrap();
+
+    assert!(editor.cell_comment(table_id, 1, 1).unwrap().is_none());
+    for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
+        assert!(editor.package().entry(preview).is_none());
+    }
+    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert!(reopened.cell_comment(table_id, 1, 1).unwrap().is_none());
+}
+
+#[test]
 fn unsupported_comment_graph_keeps_legacy_fallback_and_previews() {
     let mut package = test_package_with_comments(false);
     for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
