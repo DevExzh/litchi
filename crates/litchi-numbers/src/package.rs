@@ -22,6 +22,7 @@ mod function_map;
 )]
 mod index;
 mod limits;
+mod metadata;
 /// Exact-source sheet and table name transactions.
 pub(crate) mod names;
 #[allow(

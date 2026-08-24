@@ -153,7 +153,7 @@ impl Inspection {
             .components
             .catalog()
             .get_index(component_index)
-            .map(|component| normalized_locator(component.name()))
+            .map(|component| super::super::metadata::normalized_locator(component.name()))
             .ok_or(Error::InvalidSource { path })?;
         Ok(ComponentSelector::new(identity.identifier, locator))
     }
@@ -402,7 +402,7 @@ fn component_index(source: &Package, locator: &str) -> Option<usize> {
     while low < high {
         let middle = low + (high - low) / 2;
         let component = catalog.get_index(middle)?;
-        match normalized_locator(component.name()).cmp(locator) {
+        match super::super::metadata::normalized_locator(component.name()).cmp(locator) {
             std::cmp::Ordering::Less => low = middle + 1,
             std::cmp::Ordering::Greater => high = middle,
             std::cmp::Ordering::Equal => return Some(middle),
@@ -411,33 +411,15 @@ fn component_index(source: &Package, locator: &str) -> Option<usize> {
     None
 }
 
-fn normalized_locator(name: &str) -> &str {
-    name.strip_prefix("Index/")
-        .and_then(|name| name.strip_suffix(".iwa"))
-        .unwrap_or(name)
-}
-
 fn unique_metadata_route(source: &Package, path: Path) -> Result<MessageRoute, Error> {
-    let mut found = None;
-    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
-        for (object_index, object) in component.archive().objects.iter().enumerate() {
-            for (message_index, message) in object.messages.iter().enumerate() {
-                if message.type_ != PACKAGE_METADATA_TYPE {
-                    continue;
-                }
-                if found.is_some() {
-                    return Err(Error::InvalidSource { path });
-                }
-                found = Some(MessageRoute {
-                    component_index,
-                    object_index,
-                    message_index,
-                    message_type: PACKAGE_METADATA_TYPE,
-                });
-            }
-        }
-    }
-    found.ok_or(Error::InvalidSource { path })
+    let route = super::super::metadata::unique_message_route(source)
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(MessageRoute {
+        component_index: route.component_index,
+        object_index: route.object_index,
+        message_index: route.message_index,
+        message_type: PACKAGE_METADATA_TYPE,
+    })
 }
 
 fn message_payload(source: &Package, route: MessageRoute, path: Path) -> Result<&[u8], Error> {
