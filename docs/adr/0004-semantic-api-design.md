@@ -2680,3 +2680,27 @@ unknown groups, and unknown scalar framing are preserved, while malformed,
 duplicate, wrong-wire, noncanonical, nonfinite-limit, or failed candidate
 readback states reject. This is a private shared codec boundary, not a new
 public raw-ID API or a focused Pages/Numbers package owner.
+
+## 2026-08-24 amendment: Pages drawable-order strict internal ownership
+
+Commit `9b44e20ac0d3696aeb28f94d923612157446a83c` moves the complete
+`TP.DrawablesZOrderArchive` repeated `TSP.Reference` projection behind the
+hidden `litchi_iwa_protos::pages_drawable_order_codec` seam. The retained
+Pages compatibility host at `litchi-iwa/src/pages/editor/drawable_order.rs`
+no longer decodes the generated `DrawablesZOrderArchive` or imports Prost for
+this operation. No `litchi-pages` focused semantic owner was introduced: a
+document-wide drawable order has no meaningful public selector in the current
+facade, and no raw-ID facade was added or widened by this slice.
+
+The codec owns the complete repeated-reference path while preserving the
+source-authoritative records. Root unknown fields may be interleaved with the
+selected repeated field; complete nested references, unknown balanced groups,
+and overlong unknown scalar framing remain exact. Known keys, length prefixes,
+and identifier values are canonical and singular, identifiers are required,
+nonzero, and unique, and requested edits must be an exact permutation. The
+host retains semantic validation and transactional candidate/readback/reopen
+ownership; native identifiers remain inside that compatibility boundary.
+
+This is an internal strict-codec ownership step, not a public Pages API,
+facade migration, or claim that the remaining Pages drawable graph has moved
+out of `litchi-iwa`.

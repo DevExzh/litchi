@@ -1159,3 +1159,27 @@ serialization, Snappy compression, ZIP reassembly, Metadata, or package
 publication, and it makes no peak-memory, RSS, latency, throughput, or
 zero-copy claim. No manifest dependency, generated schema, Buffa owner,
 normal Prost owner, or workspace dependency changed.
+
+## 2026-08-24 amendment: Wave70 Pages drawable-order resource record
+
+Commit `9b44e20ac0d3696aeb28f94d923612157446a83c` gives the hidden
+`pages_drawable_order_codec` a bounded source projection and rewrite for the
+complete `TP.DrawablesZOrderArchive` repeated `TSP.Reference` field. Strict
+preflight charges input and exact output bytes, fields, work, nesting, and
+references, including the full source scan and identifier lookup work. The
+rewrite performs one output allocation only after exact sizing and all
+limits have passed; the host then charges its transactional archive
+candidate/readback/reopen path separately under its existing package limits.
+
+The codec keeps complete raw reference records and interleaved root fields as
+the preservation authority, including unknown balanced groups and overlong
+unknown scalar framing. It rejects noncanonical known keys, lengths, and
+values, missing or zero identifiers, duplicates, and non-permutation edits.
+The outer IWA object-length prefix may be canonicalized by the existing host
+serializer policy; this record does not promise raw outer-prefix preservation.
+
+These are operation-local resource bounds. They are not a package-wide
+allocation, peak-memory, RSS, latency, throughput, or zero-copy measurement,
+and no aggregate budget across archive serialization, compression, ZIP
+reassembly, or native application save is claimed. No manifest, generated
+schema, Buffa owner, normal Prost owner, or workspace dependency changed.

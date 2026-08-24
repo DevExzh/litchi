@@ -4860,3 +4860,29 @@ owner, or normal Prost owner was removed. The Pages 14.4 record is bounded
 open/render/save/close/reopen evidence only, not Rust/native parity,
 performance/RSS, publication, full-workspace verification, or any
 crate/host/edge/debt/monolith-exit gate.
+
+## 2026-08-24 amendment: Wave70 Pages drawable-order bounded internal codec slice (not a monolith-exit gate)
+
+Commit `9b44e20ac0d3696aeb28f94d923612157446a83c` moves the complete
+`TP.DrawablesZOrderArchive` repeated `TSP.Reference` edge from generated
+Prost decoding in the Pages compatibility host to the hidden strict
+`litchi_iwa_protos::pages_drawable_order_codec`. The host still owns document
+graph selection, semantic order validation, raw-preserving permutation,
+transactional candidate/readback/reopen, and native compatibility. There is
+no focused `litchi-pages` owner because the current document-wide operation
+has no meaningful public selector; this slice adds no raw-ID facade or public
+physical type.
+
+The codec preserves complete reference records, interleaved root unknowns,
+unknown balanced groups, and overlong unknown scalar framing while rejecting
+noncanonical known framing/value forms, missing or zero identifiers,
+duplicates, and non-permutation edits. Existing host serialization may
+canonicalize the outer IWA object-length prefix. The native Pages record is
+bounded open/render/save/reopen evidence only, not Rust/native byte parity,
+performance/RSS, broad graph acceptance, or publication completeness.
+
+The `litchi-iwa` migration host, Pages/Numbers/Keynote compatibility owners,
+manifest edges, all 13 ordered debts, generated schemas, Buffa/Prost owners,
+and monolith remain. Wave70 removes no crate, dependency edge, host
+responsibility, debt item, generated-schema owner, or normal Prost owner; it
+therefore makes no host-exit, dependency-removal, or monolith-deletion claim.
