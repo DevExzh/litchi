@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## Current matrix and gap (change 0272)
+
+[Change 0272](changes/0272-opc-source-overlay-multi-part-matrix.md) records
+three opt-in changed/equal-payload-no-op/mixed source-overlay selectors, nine
+records each over sizes 2/8/32 and small/large/media-incompressible payloads.
+The selectable matrix is **392 names** and the default remains **36 cases /
+198 records**. It has `performance_claim: none`; the dirty five-sample
+profile is a prioritization observation only. Clean retained evidence and
+explicit-context/scaling evidence for any recompression, parallel, or
+compression-policy change remain open.
+
 ## OPC timing correction and XLSX allocator probe (changes 0270-0271)
 
 [Change 0270](changes/0270-opc-relationship-open-timing.md) documents the
@@ -1378,7 +1389,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 
 The original stage-1 results below remain historical and descriptive evidence;
 the rows below are not current performance claims. The current
-harness contains **389 selectable cases**; 200 was the count before the
+harness contains **392 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -2858,7 +2869,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 389 selectable cases. Change
+The current standalone harness provides 392 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

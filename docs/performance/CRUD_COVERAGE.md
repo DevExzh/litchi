@@ -1,5 +1,13 @@
 # Performance CRUD coverage
 
+Change 0272 brings the selectable benchmark matrix to **392 names** through
+three opt-in source-overlay multi-part selectors and 27 records; the default
+remains **36 cases / 198 records**. The changed, equal-payload no-op, and mixed
+records are benchmark-only evidence coverage with `performance_claim: none`,
+not a CRUD completion or performance claim. Clean retained evidence and
+explicit-context/scaling evidence for recompression, parallel, or
+compression-policy work remain gaps.
+
 Changes 0270-0271 add evidence boundaries without changing CRUD coverage.
 Change 0270 times only the production OPC relationship-open operation and
 checks its relationship/package oracles afterward. Change 0271 probes the two
@@ -12,7 +20,7 @@ claims withheld.
 
 Date: 2026-08-24
 
-This is a coverage map, not a completion claim. It compares the 389 selectable
+This is a coverage map, not a completion claim. It compares the 392 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a

@@ -286,7 +286,7 @@ The four opt-in repeated-query selectors are:
 - `xlsx_source_repeated_store_medium_reacquisition_control`
 - `xlsx_source_repeated_store_oversized_reacquisition_control`
 
-They bring the current selectable matrix to **389 names** while the default
+They bring the current selectable matrix to **392 names** while the default
 remains **36 cases / 198 records**. The medium and oversized corpora are pinned
 to generator `litchi-xlsx-source-repeated-store-corpus-v1` and the selected
 `xl/worksheets/sheet1.xml` member. Each warm fresh-child sample runs `cell`,
@@ -922,6 +922,44 @@ which validates the selected payload, preserves the existing URI, content type,
 relationships and topology, raw-copies every other member, and writes to a
 sequential sink. Payload preparation and complete output verification stay
 outside timing.
+
+Measure the opt-in source-backed multi-Part overlay matrix with the three
+explicit operation modes:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 \
+  --case opc_source_overlay_multi_part_changed,\
+opc_source_overlay_multi_part_noop,opc_source_overlay_multi_part_mixed \
+  --json target/perf/opc-source-overlay-multi-part.json
+```
+
+Each selected mode emits nine records over the fixed 2/8/32-Part matrix and
+the `overlay-small` (32 x 1 KiB compressible), `overlay-large` (32 x 64 KiB
+incompressible), and `overlay-media-incompressible` (32 x 256 KiB
+incompressible) corpora. These selectors reject explicit `--shape` and
+`--payload` overrides so the matrix cannot drift. `elapsed_ns` covers four
+separate phase vectors: harness preparation, source-backed open, replacement
+planning, and production `write_part_overlays_to_stream` publication. The
+expected eager artifact, physical untouched-member records, bounded sink
+evidence, semantic reopen, digest, equal-payload no-op, and source/cache
+oracles run after the publication clock stops. The original source package is
+consumed by publication, so its source-cache evidence is captured before
+publication and by an untimed same-source replay probe after publication;
+the probe must show exactly one cold load and retained entry per selected Part
+with its uncompressed payload bytes. Reopened-output cache evidence is reported
+separately and remains a zero-cache lazy open. Observed source-read
+and payload-read totals are named `observed_after_publication_*`, not
+post-publication operation counts. Configured cache and sink ceilings are
+reported as ceilings, not counters. Untouched raw local/central records,
+local and central member order, and the archive comment are checked as the
+proven preservation scope; this does not claim preservation of ZIP preamble,
+EOCD, ZIP64, or trailing bytes. The phase summary reports
+`performance_claim: "none"`; these are bounded evidence selectors, not an
+eager/source speedup claim. `noop` submits a non-empty replacement plan whose
+selected payloads equal the source; it is a semantic no-op, not an empty plan.
+The ABBA fixed identity table pins archive size, archive SHA-256, and target
+payload SHA-256 from the compiled changed smoke report.
 
 Measure the matched XLSX scalar-cell controls on their deterministic
 media-rich four-sheet corpora:
@@ -2576,6 +2614,23 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   type and writing sequential output. Source reads and sink writes are
   reported; exact bytes, every reopened Part, and output digest are verified
   after timing.
+- `opc_source_overlay_multi_part_{changed,noop,mixed}`: emit the fixed
+  2/8/32-Part source-backed overlay matrix over small, large, and media/
+  incompressible members. Preparation, source-backed open, replacement
+  planning, and production multi-Part publication have separate phase vectors;
+  expected eager semantics, bounded sink, untouched/no-op raw member records,
+  local/central member order, and archive comment preservation,
+  without claiming ZIP preamble, EOCD, ZIP64, or trailing-byte preservation,
+  reopen/digest, equal-payload no-op, and source-cache replay versus
+  reopened-output cache evidence are post-timing gates. The consumed original
+  source package's cache is observed before publication and by an untimed
+  same-source replay probe with exact selected-Part cold-load/retention
+  evidence; it is distinct from the zero-cache lazy reopened output.
+  Cumulative read evidence uses `observed_after_publication_*` names.
+  Configured cache and sink ceilings are reported as ceilings, not counters;
+  `noop` is a non-empty equal-payload replacement plan rather than an empty
+  plan. The fixed corpus archive bytes, archive SHA-256, and target-payload
+  SHA-256 are pinned from the compiled changed smoke report.
 - `docx_source_backed_one_edit_save`: on a fixed 200-paragraph DOCX with eight
   incompressible 2 MiB images, time positional open, one source-backed
   main-document transaction, and its guarded one-Part overlay save. The path
