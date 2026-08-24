@@ -188,6 +188,52 @@ fn pages_chart_non_style_data(editor: &PagesEditor, drawable_object_id: u64) -> 
         .clone()
 }
 
+fn pages_chart_caption_data(editor: &PagesEditor, drawable_object_id: u64) -> Vec<u8> {
+    let graph = body_chart_graph(editor, drawable_object_id).unwrap();
+    let archive = editor.package().archive(&graph.archive_name).unwrap();
+    archive
+        .object(drawable_object_id)
+        .unwrap()
+        .messages
+        .iter()
+        .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+        .unwrap()
+        .data
+        .clone()
+}
+
+fn mutate_pages_chart_caption(
+    editor: &mut PagesEditor,
+    drawable_object_id: u64,
+    mutate: impl FnOnce(&mut Vec<u8>),
+) {
+    let graph = body_chart_graph(editor, drawable_object_id).unwrap();
+    let archive_name = graph.archive_name.clone();
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(drawable_object_id).unwrap();
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                .unwrap();
+            let message = object.messages[message_index].clone();
+            let mut data = message.data;
+            mutate(&mut data);
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: CHART_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    *editor = PagesEditor::from_package(package).unwrap();
+}
+
 fn raw_fields(data: &[u8], number: u32) -> Vec<Vec<u8>> {
     parse_wire_fields(data)
         .unwrap()
@@ -664,6 +710,42 @@ fn scratch_document_supports_native_chart_caption_crud() {
             .unwrap()
             .iter()
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}
+
+#[test]
+fn pages_chart_caption_rewrite_preserves_unknown_chart_fields() {
+    const UNKNOWN_CHART_FIELD: u32 = 4_096;
+
+    let mut editor = PagesEditor::create_with_text("Chart caption wire").unwrap();
+    let chart = editor
+        .add_body_chart(
+            "Chart caption wire".encode_utf16().count(),
+            Kind::Column2d,
+            sample_data(),
+            POSITION,
+            SIZE,
+        )
+        .unwrap();
+    mutate_pages_chart_caption(&mut editor, chart.drawable_object_id, |data| {
+        append_varint_field(data, UNKNOWN_CHART_FIELD, 42).unwrap();
+    });
+
+    let before = pages_chart_caption_data(&editor, chart.drawable_object_id);
+    let before_unknown = raw_fields(&before, UNKNOWN_CHART_FIELD);
+    editor
+        .set_body_chart_caption(chart.drawable_object_id, "Revenue by region")
+        .unwrap();
+    let after = pages_chart_caption_data(&editor, chart.drawable_object_id);
+
+    assert_eq!(
+        raw_fields(&after, UNKNOWN_CHART_FIELD),
+        before_unknown,
+        "caption edge rewrite must preserve unrelated TSCH fields"
+    );
+    assert_eq!(
+        editor.body_chart_caption(chart.drawable_object_id).unwrap(),
+        Some("Revenue by region".to_owned())
     );
 }
 

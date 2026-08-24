@@ -1203,6 +1203,69 @@ mod tests {
     }
 
     #[test]
+    fn native_chart_caption_rewrite_preserves_unknown_chart_fields() {
+        let mut editor = NumbersDocumentBuilder::new().build().unwrap();
+        let sheet_id = editor.sheets().unwrap()[0].object_id;
+        let source = editor
+            .add_sheet_chart(sheet_id, Kind::Column2d, sample_data(), POSITION, SIZE)
+            .unwrap();
+        editor
+            .set_sheet_chart_caption(sheet_id, source.drawable_object_id, "Revenue by region")
+            .unwrap();
+
+        let graph = chart_graph(&editor, sheet_id, source.drawable_object_id).unwrap();
+        let unknown = [0xc0, 0x0c, 0x07];
+        editor
+            .package
+            .update_archive(&graph.archive_name, |archive| {
+                let object = archive.object_mut(source.drawable_object_id).unwrap();
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == CHART_MESSAGE_TYPE)
+                    .unwrap();
+                let mut data = object.messages[message_index].data.clone();
+                data.extend_from_slice(&unknown);
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: CHART_MESSAGE_TYPE,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        assert!(
+            editor
+                .remove_sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap()
+        );
+        assert_eq!(
+            editor
+                .sheet_chart_caption(sheet_id, source.drawable_object_id)
+                .unwrap(),
+            None
+        );
+        let archive = editor.package.archive(&graph.archive_name).unwrap();
+        let chart_payload = archive
+            .object(source.drawable_object_id)
+            .unwrap()
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .unwrap()
+            .data
+            .as_slice();
+        assert!(
+            chart_payload
+                .windows(unknown.len())
+                .any(|window| window == unknown.as_slice())
+        );
+    }
+
+    #[test]
     fn scratch_spreadsheet_supports_native_chart_title_crud() {
         let mut editor = NumbersDocumentBuilder::new().build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;

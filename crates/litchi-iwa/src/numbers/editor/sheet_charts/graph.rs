@@ -81,7 +81,10 @@ pub(super) fn chart_graph(
     let caption = drawable_caption_slot(
         editor.package(),
         drawable_object_id,
-        drawable.caption.as_ref(),
+        drawable
+            .caption
+            .as_ref()
+            .map(|reference| reference.identifier),
         DrawableCaptionKind::Caption,
         "Numbers chart",
     )?;

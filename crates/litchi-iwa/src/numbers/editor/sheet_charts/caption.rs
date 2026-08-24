@@ -1,15 +1,13 @@
 //! Native caption CRUD for Numbers sheet charts.
 
 use super::*;
+use crate::charts::caption_edge::{chart_caption_identifier, rewrite_chart_caption_identifier};
 use crate::image_caption::{
     CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
     componentized_caption_objects, drawable_caption_slot, insert_componentized_caption_style,
-    patch_drawable_caption_reference, replace_object_reference, standin_caption_object,
+    replace_object_reference, standin_caption_object,
 };
-use crate::wire::transform_length_delimited_field;
 
-/// `TSCH.ChartDrawableArchive` embeds its `TSD.DrawableArchive` in field one.
-const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,16 +85,12 @@ pub(super) fn sheet_chart_caption_slot(
             "Numbers chart {drawable_object_id} must have exactly one chart payload"
         )));
     };
-    let chart = IWorkChartArchive::decode(message.data.as_slice())?;
-    let drawable = chart.drawable.super_.as_ref().ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Numbers chart {drawable_object_id} has no drawable payload"
-        ))
-    })?;
+    let caption_identifier =
+        chart_caption_identifier(editor.package.limits(), message.data.as_slice())?;
     drawable_caption_slot(
         &editor.package,
         drawable_object_id,
-        drawable.caption.as_ref(),
+        caption_identifier,
         DrawableCaptionKind::Caption,
         "Numbers chart",
     )
@@ -274,11 +268,13 @@ fn insert_sheet_chart_caption(
                 theme,
                 language,
             )?;
+            let codec_limits = package.limits();
             package.update_archive(archive_name, |archive| {
                 for object in objects {
                     archive.insert_object(object)?;
                 }
-                replace_sheet_chart_caption_reference(
+                retarget_sheet_chart_caption_edge(
+                    codec_limits,
                     archive,
                     drawable_object_id,
                     old_reference_id,
@@ -297,11 +293,13 @@ fn insert_sheet_chart_caption(
                 language,
             )?;
             insert_componentized_caption_style(package, archive_name, theme.stylesheet_id, style)?;
+            let codec_limits = package.limits();
             package.update_archive(archive_name, |archive| {
                 for object in [info, storage, placement] {
                     archive.insert_object(object)?;
                 }
-                replace_sheet_chart_caption_reference(
+                retarget_sheet_chart_caption_edge(
+                    codec_limits,
                     archive,
                     drawable_object_id,
                     old_reference_id,
@@ -341,9 +339,11 @@ fn insert_sheet_chart_caption_standin(
     standin_id: u64,
 ) -> Result<()> {
     let standin = standin_caption_object(standin_id)?;
+    let codec_limits = package.limits();
     package.update_archive(archive_name, |archive| {
         archive.insert_object(standin)?;
-        replace_sheet_chart_caption_reference(
+        retarget_sheet_chart_caption_edge(
+            codec_limits,
             archive,
             drawable_object_id,
             old_reference_id,
@@ -352,7 +352,8 @@ fn insert_sheet_chart_caption_standin(
     })
 }
 
-fn replace_sheet_chart_caption_reference(
+fn retarget_sheet_chart_caption_edge(
+    limits: crate::package::PackageLimits,
     archive: &mut crate::archive::Archive,
     drawable_object_id: u64,
     old_reference_id: u64,
@@ -373,28 +374,14 @@ fn replace_sheet_chart_caption_reference(
         )));
     };
     let original = object.messages[*message_index].data.as_slice();
-    let chart = IWorkChartArchive::decode(original)?;
-    let current_reference_id = chart
-        .drawable
-        .super_
-        .as_ref()
-        .and_then(|drawable| drawable.caption.as_ref())
-        .map(|reference| reference.identifier);
+    let current_reference_id = chart_caption_identifier(limits, original)?;
     if current_reference_id != Some(old_reference_id) {
         return Err(Error::InvalidFormat(format!(
             "Numbers chart {drawable_object_id} caption reference changed unexpectedly"
         )));
     }
-    let data =
-        transform_length_delimited_field(original, CHART_DRAWABLE_SUPER_FIELD, |drawable| {
-            patch_drawable_caption_reference(drawable, DrawableCaptionKind::Caption, replacement_id)
-        })?;
-    let actual_reference_id = IWorkChartArchive::decode(data.as_slice())?
-        .drawable
-        .super_
-        .as_ref()
-        .and_then(|drawable| drawable.caption.as_ref())
-        .map(|reference| reference.identifier);
+    let data = rewrite_chart_caption_identifier(limits, original, replacement_id)?;
+    let actual_reference_id = chart_caption_identifier(limits, data.as_slice())?;
     if actual_reference_id != Some(replacement_id) {
         return Err(Error::InvalidFormat(
             "Numbers chart caption reference patch failed validation".to_owned(),
