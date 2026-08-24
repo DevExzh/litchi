@@ -76,6 +76,10 @@ pub use package::{
     BodyTableLockLimitKind, BodyTableLockPatch,
 };
 pub use package::{
+    BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
+    BodyTableTitleLimitKind, BodyTableTitlePatch,
+};
+pub use package::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
     FootnoteTextLimitKind, FootnoteTextPatch,
 };
