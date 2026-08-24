@@ -25,6 +25,9 @@ const LEGACY_TABLE_INFO_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const UNKNOWN_TABLE_INFO_FIELD: u32 = 99;
 const ROOT_BODY_FIELD: u32 = 4;
+const DRAWABLE_FIELD: u32 = 1;
+const DRAWABLE_PARENT_FIELD: u32 = 2;
+const TABLE_INFO_SUPER_FIELD: u32 = 1;
 const TABLE_INFO_MODEL_FIELD: u32 = 2;
 const TABLE_BODY_FIELD: u32 = 9;
 
@@ -820,7 +823,7 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
             .iter()
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or("missing model message")?;
-        model.archive_info.message_infos[message_index].type_ = TABLE_INFO_MESSAGE_TYPE;
+        model.messages[message_index].type_ = LEGACY_TABLE_INFO_MESSAGE_TYPE;
         Ok(())
     })?;
     let drawable_merge = rewrite_document_archive(&source, |archive| {
@@ -1229,6 +1232,8 @@ fn body_table_lock_ignores_valid_unrelated_section_paths() -> TestResult<()> {
             .ok_or("missing body message")?;
         let mut storage =
             tswp::StorageArchive::decode(body.messages[message_index].data.as_slice())?;
+        let text = storage.text.first_mut().ok_or("missing body text")?;
+        text.replace_range(..1, "\u{0004}");
         storage.table_section = Some(tswp::ObjectAttributeTable {
             entries: vec![
                 tswp::object_attribute_table::ObjectAttribute {
@@ -1340,10 +1345,7 @@ fn missing_rooted_table_edge_fails_closed_at_the_table_lock_adapter() -> TestRes
         .entries
         .first_mut()
         .ok_or("missing table attachment entry")?
-        .object = Some(tswp::Reference {
-        identifier: Some(9_999),
-        ..Default::default()
-    });
+        .object = Some(reference(9_999));
     body.replace_message(
         body_message_index,
         RawMessage {
