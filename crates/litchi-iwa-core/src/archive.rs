@@ -144,6 +144,18 @@ pub trait ArchiveReferenceVisitor {
     fn visit_reference(&mut self, occurrence: ArchiveReferenceOccurrence) -> Result<()>;
 }
 
+/// Completeness policy for an archive-reference census.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArchiveReferencePolicy {
+    /// Report every known reference while retaining unknown metadata.
+    KnownReferences,
+    /// Refuse any unknown `ArchiveInfo`, `MessageInfo`, or `FieldInfo` field.
+    ///
+    /// This is the deletion-grade policy: an opaque future field could carry
+    /// an owner edge that the current schema cannot attribute.
+    RejectUnknownMetadata,
+}
+
 impl DataReferencePruning<'_> {
     const fn is_none(self) -> bool {
         matches!(self, Self::None | Self::Selected([]))
@@ -746,13 +758,31 @@ impl ArchiveObject {
     /// callbacks begin. This keeps producer-authored framing authoritative
     /// without exposing raw header bytes to format owners.
     pub fn inspect_references(&self, visitor: &mut impl ArchiveReferenceVisitor) -> Result<usize> {
-        self.inspect_references_with_limits(visitor, Limits::default())
+        self.inspect_references_with_policy_and_limits(
+            visitor,
+            ArchiveReferencePolicy::KnownReferences,
+            Limits::default(),
+        )
     }
 
     /// Stream physical metadata references under explicit resource limits.
     pub fn inspect_references_with_limits(
         &self,
         visitor: &mut impl ArchiveReferenceVisitor,
+        limits: Limits,
+    ) -> Result<usize> {
+        self.inspect_references_with_policy_and_limits(
+            visitor,
+            ArchiveReferencePolicy::KnownReferences,
+            limits,
+        )
+    }
+
+    /// Stream physical metadata references with an explicit completeness policy.
+    pub fn inspect_references_with_policy_and_limits(
+        &self,
+        visitor: &mut impl ArchiveReferenceVisitor,
+        policy: ArchiveReferencePolicy,
         limits: Limits,
     ) -> Result<usize> {
         let limits = limits.validate()?;
@@ -770,6 +800,14 @@ impl ArchiveObject {
             _ => canonical.as_slice(),
         };
         preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
+        if matches!(policy, ArchiveReferencePolicy::RejectUnknownMetadata)
+            && header_has_unknown_reference_metadata(source_header, limits)?
+        {
+            return Err(Error::invalid_archive(
+                0,
+                "archive reference census encountered unknown metadata",
+            ));
+        }
         let decoded = ArchiveInfo::decode_with_limits(source_header, limits)?;
         if decoded != self.archive_info {
             return Err(Error::invalid_archive(
@@ -5294,6 +5332,29 @@ fn preflight_header(data: &[u8], header: HeaderKind, limits: Limits) -> Result<W
     Ok(preflight)
 }
 
+fn header_has_unknown_reference_metadata(data: &[u8], limits: Limits) -> Result<bool> {
+    let wire_limits = header_wire_limits(limits)?;
+    let mut unknown = false;
+    preflight_wire_tree_with_limits(data, wire_limits, |visit| {
+        let node = node_at_path(HeaderNode::ArchiveInfo, visit.path());
+        let field = visit.field();
+        unknown |= !known_header_field(node, field.number());
+        Ok(descent_for(node, field.number()))
+    })
+    .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    Ok(unknown)
+}
+
+const fn known_header_field(node: Option<HeaderNode>, field: u32) -> bool {
+    match node {
+        Some(HeaderNode::ArchiveInfo) => matches!(field, 1..=3),
+        Some(HeaderNode::MessageInfo) => matches!(field, 1..=11),
+        Some(HeaderNode::FieldInfo) => matches!(field, 1..=8),
+        Some(HeaderNode::FieldPath) => field == 1,
+        None => false,
+    }
+}
+
 fn node_at_path(root: HeaderNode, path: &[u32]) -> Option<HeaderNode> {
     path.iter()
         .try_fold(root, |node, field| match (node, field) {
@@ -5675,9 +5736,10 @@ fn encode_varint(mut value: u64, output: &mut [u8; MAX_VARINT_BYTES]) -> &[u8] {
 mod tests {
     use super::{
         Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-        ArchiveReferenceScope, ArchiveReferenceVisitor, DataReferencePruning, Error, FieldInfo,
-        FieldObjectReferenceTransition, ObjectReferenceTransition, RawMessage, encode_archive_info,
-        encode_varint, encode_varint_with_width, varint_len,
+        ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
+        DataReferencePruning, Error, FieldInfo, FieldObjectReferenceTransition,
+        ObjectReferenceTransition, RawMessage, encode_archive_info, encode_varint,
+        encode_varint_with_width, varint_len,
     };
     use crate::{LimitKind, Limits, Result};
 
@@ -5764,6 +5826,37 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, Error::Limit { .. }));
         assert!(facts.0.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn deletion_grade_reference_inspection_rejects_unknown_header_metadata() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 7,
+                data: vec![1],
+            }],
+        )?;
+        object.archive_info.message_infos[0].object_references = vec![10];
+        let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
+        let mut raw = canonical.clone();
+        raw.extend_from_slice(&[0xb8, 0x3e, 0x01]);
+        object.original_header = Some(raw.into_boxed_slice());
+        object.original_canonical_header = Some(canonical.into_boxed_slice());
+
+        let mut permissive = ReferenceFacts::default();
+        assert_eq!(object.inspect_references(&mut permissive)?, 1);
+        let mut strict = ReferenceFacts::default();
+        let error = object
+            .inspect_references_with_policy_and_limits(
+                &mut strict,
+                ArchiveReferencePolicy::RejectUnknownMetadata,
+                Limits::default(),
+            )
+            .unwrap_err();
+        assert!(matches!(error, Error::InvalidArchive { .. }));
+        assert!(strict.0.is_empty());
         Ok(())
     }
 
