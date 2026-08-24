@@ -86,8 +86,11 @@ fn clear_cell_comment_with_focused_owner(
         litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
             Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
         })?;
-    let source_bytes = editor.to_bytes()?;
     let has_metadata = editor.package().contains_entry("Index/Metadata.iwa");
+    if !has_metadata {
+        return Ok(FocusedCommentReplacement::LegacyFallback);
+    }
+    let source_bytes = editor.to_bytes()?;
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
         Error::InvalidFormat(format!(
             "focused Numbers comment-clear source validation failed: {error}"
@@ -95,9 +98,6 @@ fn clear_cell_comment_with_focused_owner(
     })?;
     let commit = match source.clear_table_cell_comment(sheet, table, position) {
         Ok(commit) => commit,
-        Err(TableCellCommentError::UnsupportedDependency { .. }) if !has_metadata => {
-            return Ok(FocusedCommentReplacement::LegacyFallback);
-        },
         Err(error) => return Err(focused_comment_error(error)),
     };
     let mut bytes = Vec::new();
