@@ -1,5 +1,10 @@
 use super::Package;
 
+use litchi_iwa_protos::package_metadata_codec::{
+    ComponentDescriptor, DataReferenceOwnerDescriptor, ExternalReferenceDescriptor,
+    ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError,
+};
+
 pub(super) const ENTRY_NAME: &str = "Index/Metadata.iwa";
 pub(super) const MESSAGE_TYPE: u32 = 11_006;
 
@@ -36,4 +41,63 @@ pub(super) fn unique_message_route(source: &Package) -> Option<MessageRoute> {
         }
     }
     route
+}
+
+pub(super) struct ObjectOwnershipVisitor {
+    object_identifier: u64,
+    owned: bool,
+}
+
+impl ObjectOwnershipVisitor {
+    pub(super) const fn new(object_identifier: u64) -> Self {
+        Self {
+            object_identifier,
+            owned: false,
+        }
+    }
+
+    pub(super) const fn is_owned(&self) -> bool {
+        self.owned
+    }
+}
+
+impl PackageMetadataVisitor for ObjectOwnershipVisitor {
+    fn visit_object_uuid(&mut self, binding: ObjectUuidDescriptor<'_>) -> Result<(), RewriteError> {
+        self.owned |= binding.object_identifier() == self.object_identifier;
+        Ok(())
+    }
+
+    fn visit_external_reference(
+        &mut self,
+        reference: ExternalReferenceDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        self.owned |= reference.object_identifier() == Some(self.object_identifier);
+        Ok(())
+    }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        self.owned |= owner.object_identifier() == self.object_identifier;
+        Ok(())
+    }
+
+    fn visit_ambiguous_object_identifier(
+        &mut self,
+        _component: ComponentDescriptor<'_>,
+        identifier: u64,
+    ) -> Result<(), RewriteError> {
+        self.owned |= identifier == self.object_identifier;
+        Ok(())
+    }
+
+    fn visit_data_metadata_map(
+        &mut self,
+        object_identifier: u64,
+        _has_unknown_fields: bool,
+    ) -> Result<(), RewriteError> {
+        self.owned |= object_identifier == self.object_identifier;
+        Ok(())
+    }
 }
