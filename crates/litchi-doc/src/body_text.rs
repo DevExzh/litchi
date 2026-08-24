@@ -572,9 +572,9 @@ impl Snapshot {
     ) -> Result<Self> {
         let bytes = input.into();
         RevisionEditor::open(bytes.clone(), limits).map_err(Error::Invalid)?;
-        let mut package =
-            crate::Package::from_reader(Cursor::new(bytes.clone())).map_err(Error::Invalid)?;
-        package.document().map_err(Error::Invalid)?;
+        // Public validation borrows the input, removing only the second full
+        // Vec clone formerly used to hand bytes to the public reader.
+        validate_public_document(bytes.as_slice())?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             fingerprint_cache: OnceLock::new(),
@@ -613,12 +613,7 @@ impl Snapshot {
         observe_phase(
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
-            || {
-                let mut package = crate::Package::from_reader(Cursor::new(bytes.clone()))
-                    .map_err(Error::Invalid)?;
-                package.document().map_err(Error::Invalid)?;
-                Ok(())
-            },
+            || validate_public_document(bytes.as_slice()),
         )?;
         let source = observe_phase(&mut observer, DiagnosticPhase::SourceRetention, || {
             Ok(Arc::from(bytes.into_boxed_slice()))
@@ -1115,6 +1110,20 @@ impl Snapshot {
     fn lineage(&self) -> Lineage {
         Lineage(Arc::clone(&self.source))
     }
+}
+
+// This reader is validation-only and is dropped before source retention, so a
+// borrowed cursor removes the public-reader Vec clone without changing source
+// ownership or the subsequent exact-byte snapshot conversion.
+fn borrowed_public_reader(source: &[u8]) -> Cursor<&[u8]> {
+    Cursor::new(source)
+}
+
+fn validate_public_document(source: &[u8]) -> Result<()> {
+    let mut package =
+        crate::Package::from_reader(borrowed_public_reader(source)).map_err(Error::Invalid)?;
+    package.document().map_err(Error::Invalid)?;
+    Ok(())
 }
 
 impl std::fmt::Debug for Snapshot {
@@ -3805,7 +3814,8 @@ mod tests {
 
     use super::{
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
-        Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
+        Snapshot, Story, TextTarget, TransactionLimits, borrowed_public_reader, fingerprint,
+        validate_public_document,
     };
     #[cfg(feature = "performance-diagnostics")]
     use super::{DiagnosticEvent, DiagnosticOutcome, DiagnosticPhase, observe_phase};
@@ -4036,6 +4046,26 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn public_reader_validation_borrows_input_without_changing_storage() {
+        let source = doc(&["alpha", "bravo"]);
+        let mut bytes = Vec::with_capacity(source.len() + 4096);
+        bytes.extend_from_slice(&source);
+        assert!(bytes.capacity() > bytes.len());
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+        let reader = borrowed_public_reader(bytes.as_slice());
+        assert_eq!(reader.get_ref().as_ptr(), pointer);
+        assert_eq!(reader.get_ref().len(), bytes.len());
+        drop(reader);
+
+        validate_public_document(bytes.as_slice()).expect("public reader validation");
+
+        assert_eq!(bytes.as_ptr(), pointer);
+        assert_eq!(bytes.capacity(), capacity);
+        assert_eq!(bytes.as_slice(), source.as_slice());
     }
 
     #[cfg(feature = "performance-diagnostics")]
