@@ -13065,3 +13065,48 @@ open/render/save/close/reopen acceptance only: it is not Rust/native byte
 parity, post-native Rust re-ingress, arbitrary graph acceptance, a
 performance/RSS measurement, a full publication gate, or a full-workspace
 pass.
+
+## 2026-08-24 amendment: Wave70 Pages drawable-order verification record
+
+The strict internal drawable-order codec and host migration are commit
+`9b44e20ac0d3696aeb28f94d923612157446a83c`. Focused gates recorded for this
+slice were:
+
+- `cargo test -p litchi-iwa-protos pages_drawable_order_codec --lib`: 10/10
+  passed;
+- the focused `litchi-iwa` drawable-order tests: 5/5 passed;
+- `cargo check -p litchi-iwa-protos --all-targets`: passed;
+- `cargo check -p litchi-iwa --all-targets`: passed;
+- `cargo clippy -p litchi-iwa-protos --lib -- -D warnings`: passed;
+- the scoped `litchi-iwa` library Clippy gate passed with explicit allowances
+  for the existing `deprecated`, `dead_code`, `unused_imports`,
+  `clippy::manual_contains`, `clippy::clone_on_copy`, and
+  `clippy::derivable_impls` findings;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 420/420 passed;
+  Python compilation and `git diff --check` passed;
+- the live boundary checker exited 1 only for the three known untracked
+  Pages table-lock findings and reported no drawable-order finding.
+
+The full pre-commit hook was not a workspace-green gate. Rustfmt still
+reported unrelated unstaged differences in `crates/litchi-iwa/src/protobuf.rs`
+and `crates/litchi-iwa-protos/src/table_info_codec.rs`; cargo linting retained
+the unrelated Numbers `object_count` and `manual_contains` findings; the
+broad library-test hook also failed, and its truncated output was not used to
+attribute a cause; the doc-test gate passed. These results are scoped
+evidence, not a full-workspace pass.
+
+The bounded Pages 14.4 native record used one disposable artifact:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| Rust candidate before Pages `/private/tmp/litchi-wave70-pages-order.eRPth6/candidate.pages` | 6,365 | `6a2c73173def3f953ac9759c9c26e2ed6bbc10335cfe460d807a9f15ef7ddd61` |
+| Pages-saved, closed, and reopened exact-path artifact | 41,390 | `06264677d7565eaf4cb86791d667a4e1b28f6ae01acea09d81e423bfc58c8f2c` |
+
+Pages opened the Rust candidate without repair or recovery. The visible body
+text was `Layered Pages shapes created entirely by litchi-iwa`; the red
+rectangle `Moved to Front` was completely in front of the blue oval
+`Originally Front`. Pages saved, closed, and reopened the exact path, with
+the same stacking and text observations. This is bounded application
+open/render/save/reopen acceptance only: no Rust/native byte parity,
+performance/RSS, broad Pages graph, publication, or monolith-exit claim is
+made.
