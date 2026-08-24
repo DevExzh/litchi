@@ -15894,6 +15894,168 @@ class BoundaryPolicyTests(unittest.TestCase):
             "+ audit_iwa_package_metadata_read_source_topology()", main_source
         )
 
+    def _write_comment_clear_metadata_prerequisite_fixture(
+        self, root: Path, *, clear_body: str | None = None, commit_body: str | None = None
+    ) -> None:
+        codec = root / boundaries.PACKAGE_METADATA_CODEC_SOURCE
+        codec.parent.mkdir(parents=True, exist_ok=True)
+        codec.write_text(
+            "pub struct ComponentSelector<'a> { value: &'a str }\n"
+            "pub struct RemovalBatch<'a> { selector: ComponentSelector<'a> }\n"
+            "pub struct SaveTokenBatch<'a> { selector: ComponentSelector<'a> }\n"
+            "pub struct RemovalSaveTokenBatch<'a> {\n"
+            "    removals: RemovalBatch<'a>, save_tokens: SaveTokenBatch<'a>\n"
+            "}\n"
+            "pub struct RewriteOptions;\n"
+            "pub struct RewriteOutput;\n"
+            "pub struct RewriteError;\n"
+            "pub fn remove_package_metadata(\n"
+            "    source: &[u8], batch: RemovalBatch<'_>, options: RewriteOptions,\n"
+            ") -> Result<RewriteOutput, RewriteError> { todo!() }\n"
+            "pub fn rewrite_package_metadata_save_tokens(\n"
+            "    source: &[u8], batch: SaveTokenBatch<'_>, options: RewriteOptions,\n"
+            ") -> Result<RewriteOutput, RewriteError> { todo!() }\n"
+            "pub fn rewrite_package_metadata_removals_and_save_tokens(\n"
+            "    source: &[u8], batch: RemovalSaveTokenBatch<'_>, options: RewriteOptions,\n"
+            ") -> Result<RewriteOutput, RewriteError> { todo!() }\n",
+            encoding="utf-8",
+        )
+        comments = root / boundaries.NUMBERS_COMMENT_SOURCE
+        comments.parent.mkdir(parents=True, exist_ok=True)
+        comments.write_text(
+            "impl Package {\n"
+            "    pub fn clear_table_cell_comment(&self) -> Result<Commit, Error> {\n"
+            + (clear_body or "        self.edit_table_cell_comment().clear().commit()\n")
+            + "    }\n"
+            "}\n"
+            "fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {\n"
+            + (
+                commit_body
+                or "        if edit.before.is_some() && edit.after.is_none() {\n"
+                "            return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+                "        }\n"
+                "        rewrite_existing(edit)\n"
+            )
+            + "}\n",
+            encoding="utf-8",
+        )
+
+    def test_numbers_comment_clear_metadata_prerequisite_accepts_bounded_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(root)
+            self.assertEqual(
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_generated_codec_path(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(root)
+            codec = root / boundaries.PACKAGE_METADATA_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "use prost::Message;\n"
+                + "fn eager() { let _ = PackageMetadata::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("prost dependency marker" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("PackageMetadata::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_requires_typed_batches(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(root)
+            codec = root / boundaries.PACKAGE_METADATA_CODEC_SOURCE
+            source = codec.read_text(encoding="utf-8")
+            source = source.replace(
+                "batch: RemovalBatch<'_>", "batch: Batch<'_>"
+            ).replace("batch: SaveTokenBatch<'_>", "batch: Batch<'_>").replace(
+                "batch: RemovalSaveTokenBatch<'_>", "batch: Batch<'_>"
+            )
+            codec.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("remove_package_metadata must accept RemovalBatch" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "rewrite_package_metadata_save_tokens must accept SaveTokenBatch"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "rewrite_package_metadata_removals_and_save_tokens must accept "
+                    "RemovalSaveTokenBatch"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_keeps_clear_fail_closed(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root,
+                clear_body=(
+                    "        rewrite_package_metadata_save_tokens(source, batch, options)\n"
+                ),
+                commit_body="        rewrite_existing(edit)\n",
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("must not call PackageMetadata" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must fail with typed UnsupportedDependency" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_comment_clear_metadata_prerequisite_source_topology()",
+            main_source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
