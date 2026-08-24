@@ -1145,3 +1145,61 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
     );
     Ok(())
 }
+
+#[test]
+fn metadata_backed_root_comment_clear_reopens_and_inverts_exactly() -> TestResult {
+    let source = include_bytes!("fixtures/comment-edit-root.numbers").as_slice();
+    let package = Package::from_bytes(source)?;
+    let sheet = package
+        .sheets()
+        .first()
+        .ok_or_else(|| std::io::Error::other("fixture sheet is missing"))?;
+    let table = sheet
+        .tables()
+        .next()
+        .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
+    let mut selected = None;
+    'rows: for row in 0..table.dimensions().rows() {
+        for column in 0..table.dimensions().columns() {
+            let position = CellPosition::new(row, column);
+            if let Some(comment) =
+                package.table_cell_comment(sheet.name(), table.name(), position)?
+            {
+                selected = Some((position, comment));
+                break 'rows;
+            }
+        }
+    }
+    let (position, before) =
+        selected.ok_or_else(|| std::io::Error::other("fixture comment is missing"))?;
+
+    let cleared = package.clear_table_cell_comment(sheet.name(), table.name(), position)?;
+    assert!(cleared.diagnostics().changed());
+    assert_eq!(
+        cleared
+            .package()
+            .table_cell_comment(sheet.name(), table.name(), position)?,
+        None
+    );
+    let mut candidate_bytes = Vec::new();
+    cleared.package().write_to(&mut candidate_bytes)?;
+    let reopened = Package::from_bytes(&candidate_bytes)?;
+    assert_eq!(
+        reopened.table_cell_comment(sheet.name(), table.name(), position)?,
+        None
+    );
+
+    let restored = cleared
+        .package()
+        .apply_table_cell_comment(&cleared.patch().inverse())?;
+    assert_eq!(
+        restored
+            .package()
+            .table_cell_comment(sheet.name(), table.name(), position)?,
+        Some(before)
+    );
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes)?;
+    assert_eq!(restored_bytes, source);
+    Ok(())
+}
