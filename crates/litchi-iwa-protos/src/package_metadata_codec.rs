@@ -2100,6 +2100,32 @@ mod tests {
             InvalidReason::MalformedWire
         );
 
+        let duplicate_deprecated_type = base(&[0x08, 0x50, 0x10, 0x01, 0x10, 0x01]);
+        assert_eq!(
+            reason(
+                remove_package_metadata(
+                    &duplicate_deprecated_type,
+                    batch(80),
+                    options(&duplicate_deprecated_type),
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
+        let duplicate_deprecated_external = base(&[0x08, 0x50, 0x18, 0x00, 0x18, 0x00]);
+        assert_eq!(
+            reason(
+                remove_package_metadata(
+                    &duplicate_deprecated_external,
+                    batch(80),
+                    options(&duplicate_deprecated_external),
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
         let unknown = root_data_metadata_reference(80, None, None, true);
         let unknown_source = base(&unknown);
         assert_eq!(
@@ -5769,6 +5795,8 @@ fn decode_root_data_metadata_map(
     budget.reference()?;
     budget.message(source, depth)?;
     let mut identifier = None;
+    let mut deprecated_type = None;
+    let mut deprecated_is_external = None;
     let mut unknown_fields = false;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
@@ -5779,10 +5807,13 @@ fn decode_root_data_metadata_map(
                 // already enforces canonical varint framing and u64 overflow;
                 // the bit pattern is intentionally retained as an opaque
                 // signed value because it is not part of the ownership key.
-                let _ = field.varint()?;
+                set_once(&mut deprecated_type, field.varint()?)?;
             },
             3 => {
-                let _ = canonical_bool(field.varint()?)?;
+                set_once(
+                    &mut deprecated_is_external,
+                    canonical_bool(field.varint()?)?,
+                )?;
             },
             _ => unknown_fields = true,
         }
