@@ -1184,6 +1184,32 @@ and no aggregate budget across archive serialization, compression, ZIP
 reassembly, or native application save is claimed. No manifest, generated
 schema, Buffa owner, normal Prost owner, or workspace dependency changed.
 
+## 2026-08-25 amendment: Wave73 Keynote movie-caption resource record
+
+Commit `6ed7ee4e277c78a99f1b779a2b5530d7267beddf` gives the hidden movie-caption
+edge codec finite input, exact output, field, work, and nesting ceilings. The
+codec charges strict projection, selected-field validation, exact sizing, raw
+emission, and candidate readback before its single exact output reservation;
+its report includes input/output bytes, fields, work, maximum depth,
+allocation, retained/scratch, and change facts.
+
+The admitted `Some -> Some` package mutation reuses the private chart-caption
+physical transaction: bounded catalog and storage work, prepared Metadata
+save-token execution for every changed current component, archive sizing,
+Snappy compression, ZIP reassembly, preview deletion, complete candidate
+reopen, and exact locality verification. Split slide/storage and slide-node
+components are not undercounted as one semantic target: each changed current
+component receives the same new root save token and diagnostics include the
+Metadata member.
+
+Selection and the global ownership census remain separately governed by the
+package's finite semantic and wire limits rather than one newly claimed
+end-to-end allocation counter. This record therefore makes no package-wide
+single-allocation, peak-memory, RSS, latency, throughput, zero-copy, or
+performance claim. No manifest dependency, generated source schema owner,
+normal Prost owner, or workspace dependency edge was removed; the private
+Buffa projection remains an implementation detail of `litchi-iwa-protos`.
+
 ## 2026-08-25 amendment: Wave71 Pages exact-output resource record
 
 Commit `580a5343a2c75a1c1b185a5cc8aff4a87e2a5c11` makes

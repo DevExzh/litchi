@@ -13210,3 +13210,52 @@ application acceptance only: it is not Rust/native byte parity, a performance
 or RSS measurement, or a Numbers native claim. The P2 follow-ups for duplicate
 known `MessageInfo` scalar canonicality and arbitrary unmodeled
 payload/reference parity remain open.
+
+## 2026-08-25 amendment: Wave73 Keynote movie-caption verification record
+
+The focused owner and compatibility bridge are commit
+`6ed7ee4e277c78a99f1b779a2b5530d7267beddf`. Scoped verification was:
+
+- `cargo test -p litchi-iwa-protos keynote_movie_caption_codec --lib --quiet`:
+  7/7;
+- `cargo test -p litchi-keynote --test slide_movie_caption --quiet`: 13/13,
+  including parent/owner/title-alias, Metadata, inverse, malformed wire,
+  ownership, selector, patch-conflict, and limit cases;
+- the adjacent `slide_chart_caption` regression target: 21/21;
+- the focused compatibility-host movie title/caption CRUD test: 1/1;
+- `cargo check -p litchi-iwa-protos -p litchi-keynote --all-targets`, both
+  library Clippy gates with `-D warnings`, the movie-caption test Clippy gate,
+  and the new fuzz-target check: passed;
+- the full Keynote library run was 152/153; only the unrelated existing
+  `soundtrack_order` case failed, so no full-library green claim is made;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 437/437, Python
+  compilation, targeted rustfmt, and diff checks: passed. The live checker
+  exited 1 only for the three known user-owned untracked Pages table-lock
+  findings and reported no movie-caption violation.
+
+The repository-wide commit hook was bypassed after it encountered unrelated
+unstaged rustfmt differences in `table_info_codec.rs` and `protobuf.rs`, plus
+pre-existing Numbers `object_count`/`manual_contains` lint findings. The
+focused commands above are the verification authority; this is not a
+full-workspace-green claim.
+
+The fresh Keynote 14.4 record used one file-backed H.264 movie and poster:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| generated movie source `/private/tmp/litchi-wave73-movie-caption.4tBKv0/source.mov` | 178,553 | `b5098123bf93ef24e5f15cd9840e4f87d7c25041239167b116abf64500b15382` |
+| poster `/private/tmp/litchi-wave73-movie-caption.4tBKv0/poster.png` | 473,831 | `7e497501a28bcf9a353ccadf6eb9216bf098ac32888fb542fb9bfe71d486761f` |
+| host-built source `source.key` | 663,576 | `e3c89b820c84dc991c86e1cf5669b78f4805873bd1e4871fb67baacf0f6e1142` |
+| focused Rust candidate before Keynote `rust-caption.key` | 663,608 | `96e28949b325f3ce7736a1fb9b2b34ced69d1233fcf87dc6633266d40d413735` |
+| exact focused inverse `inverse.key` | 663,576 | `e3c89b820c84dc991c86e1cf5669b78f4805873bd1e4871fb67baacf0f6e1142` |
+| Keynote-saved, closed, and exact-path-reopened `rust-caption.key` | 738,207 | `e18605262e3e48612e5cc841ca91fad1887282c897445f3b63611956bf278cbb` |
+
+Keynote opened the Rust candidate without repair or recovery and displayed one
+slide with embedded movie `source.mov`, title `Source-built Keynote movie`, and
+caption `Wave73 focused movie caption — 北区`. Cmd-S, Cmd-W, and exact-path
+reopen retained the movie, title, caption, and 640x360 geometry. Keynote
+normalized the bytes, and the focused strict owner rejects that normalized
+graph with `InvalidSource`; consequently this is bounded application
+open/render/save/close/reopen acceptance only, not focused Rust re-ingress,
+Rust/native byte parity, arbitrary producer-graph acceptance, performance/RSS,
+or a publication/full-workspace gate.
