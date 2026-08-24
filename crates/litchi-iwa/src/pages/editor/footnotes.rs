@@ -28,10 +28,9 @@ use crate::package_metadata::{
 use crate::protobuf::{tsp, tswp};
 use crate::text::IWorkTextEditor;
 use crate::text::editor::storage_object_references;
-use crate::wire::{
-    patch_length_delimited_field, repeated_length_delimited_payloads,
-    rewrite_repeated_length_delimited_fields,
-};
+#[cfg(test)]
+use crate::wire::repeated_length_delimited_payloads;
+use crate::wire::{patch_length_delimited_field, rewrite_repeated_length_delimited_fields};
 use crate::{Error, IWorkPackage, Result};
 use litchi_pages::footnote::body::{Footnote, Position, Selector};
 
@@ -165,49 +164,6 @@ impl PagesEditor {
         }
         *self = verified;
         Ok(created)
-    }
-
-    /// Replace the user-visible text of one native body footnote.
-    pub fn set_body_footnote_text(
-        &mut self,
-        selector: Selector,
-        text: impl AsRef<str>,
-    ) -> Result<Footnote> {
-        let text = text.as_ref();
-        validate_footnote_text(text)?;
-        let current = body_footnote_by_selector(self, selector)?;
-        if current.footnote.text.as_ref() == text {
-            return Ok(current.footnote);
-        }
-        let storage = storage_at(self.package(), current.storage_id, "Pages footnote")?.1;
-        let content = storage.text.concat();
-        let prefix_units = FOOTNOTE_CONTENT_PREFIX.encode_utf16().count();
-        let content_units = content.encode_utf16().count();
-        if content_units < prefix_units {
-            return Err(Error::InvalidFormat(format!(
-                "Pages footnote storage {} is shorter than its native marker",
-                current.storage_id
-            )));
-        }
-
-        let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
-        text_editor.replace_text(
-            crate::text::native_storage_id(current.storage_id)?,
-            prefix_units..content_units,
-            text,
-        )?;
-        let verified = Self::from_bytes(&text_editor.into_package().to_bytes()?)?;
-        let updated = body_footnote_by_selector(&verified, selector)?.footnote;
-        if updated.position != current.footnote.position
-            || updated.text.as_ref() != text
-            || updated.custom_mark != current.footnote.custom_mark
-        {
-            return Err(Error::InvalidFormat(
-                "Pages footnote text update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(updated)
     }
 
     /// Delete one native body footnote, its body anchor, and its owned objects.
@@ -1847,7 +1803,33 @@ fn utf16_unit_at<F: AsRef<str>>(text: &[F], requested: u32) -> Option<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_pages::Package as PagesPackage;
     use litchi_pages::footnote::body::Footnote;
+
+    fn rewrite_body_footnote_text_via_pages(
+        editor: &mut PagesEditor,
+        selector: Selector,
+        text: &str,
+    ) -> Result<Footnote> {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote package: {error}")))?;
+        let mut edit = package
+            .edit_body_footnote_text(selector)
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote edit: {error}")))?;
+        edit.set(text)
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote edit: {error}")))?;
+        let commit = edit
+            .commit()
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote edit: {error}")))?;
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).map_err(|error| {
+            Error::InvalidFormat(format!("Pages footnote package write failed: {error}"))
+        })?;
+        let reopened = PagesEditor::from_bytes(&bytes)?;
+        let updated = body_footnote_by_selector(&reopened, selector)?.footnote;
+        *editor = reopened;
+        Ok(updated)
+    }
 
     #[test]
     fn footnote_collection_respects_wire_field_limit_before_reserving() {
@@ -1893,9 +1875,9 @@ mod tests {
         let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.body_footnotes().unwrap(), vec![note.clone()]);
 
-        let updated = editor
-            .set_body_footnote_text(Selector::Index(0), "Updated note")
-            .unwrap();
+        let updated =
+            rewrite_body_footnote_text_via_pages(&mut editor, Selector::Index(0), "Updated note")
+                .unwrap();
         assert_eq!(updated.text.as_ref(), "Updated note");
         assert_eq!(updated.position, note.position);
 
@@ -2047,9 +2029,7 @@ mod tests {
 
         let mut edited = PagesEditor::from_package(package).unwrap();
         assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
-        edited
-            .set_body_footnote_text(Selector::Index(0), "Updated")
-            .unwrap();
+        rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
         let marker_archive = find_object_archive(edited.package(), graph.marker_id).unwrap();
         let marker_archive_data = edited.package().archive(&marker_archive).unwrap();
         let marker = marker_archive_data.object(graph.marker_id).unwrap();
@@ -2086,8 +2066,7 @@ mod tests {
         let mut malformed = PagesEditor::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
-            malformed
-                .set_body_footnote_text(Selector::Index(0), "Updated")
+            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::Index(0), "Updated")
                 .is_err()
         );
         assert_eq!(malformed.to_bytes().unwrap(), baseline);
@@ -2124,9 +2103,7 @@ mod tests {
 
         let mut edited = PagesEditor::from_package(package).unwrap();
         assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
-        edited
-            .set_body_footnote_text(Selector::Index(0), "Updated")
-            .unwrap();
+        rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
         let reference_archive = find_object_archive(edited.package(), reference_id).unwrap();
         let reference_archive_data = edited.package().archive(&reference_archive).unwrap();
         let reference = reference_archive_data.object(reference_id).unwrap();
@@ -2164,8 +2141,7 @@ mod tests {
         let mut malformed = PagesEditor::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
-            malformed
-                .set_body_footnote_text(Selector::Index(0), "Updated")
+            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::Index(0), "Updated")
                 .is_err()
         );
         assert_eq!(malformed.to_bytes().unwrap(), baseline);
@@ -2227,9 +2203,7 @@ mod tests {
 
         let mut edited = PagesEditor::from_package(package).unwrap();
         assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
-        edited
-            .set_body_footnote_text(Selector::Index(0), "Updated")
-            .unwrap();
+        rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
         let body_archive = find_object_archive(edited.package(), body_storage_id).unwrap();
         let body_archive_data = edited.package().archive(&body_archive).unwrap();
         let body = body_archive_data.object(body_storage_id).unwrap();
@@ -2305,8 +2279,7 @@ mod tests {
         let mut malformed = PagesEditor::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
-            malformed
-                .set_body_footnote_text(Selector::Index(0), "Updated")
+            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::Index(0), "Updated")
                 .is_err()
         );
         assert_eq!(malformed.to_bytes().unwrap(), baseline);

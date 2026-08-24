@@ -1,14 +1,13 @@
 //! Edit one Pages section's pagination through a semantic selector.
 
 use std::error::Error;
-use std::fs::OpenOptions;
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use litchi_pages::{
     Package, SectionSelector,
     section::{PageNumber, PageNumbering, Start},
 };
+use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut arguments = std::env::args_os().skip(1);
@@ -48,12 +47,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     edit.set_page_numbering(numbering)?;
     edit.set_starting_page_number(page);
     let commit = edit.commit()?;
-    write_new(&output, commit.package().source_bytes())?;
+    write_new(&output, commit.package())?;
 
     if let Some(inverse_path) = inverse_output {
         let inverse = commit.patch().inverse();
         let restored = commit.package().apply_section_pagination(&inverse)?;
-        write_new(&inverse_path, restored.package().source_bytes())?;
+        write_new(&inverse_path, restored.package())?;
     }
     Ok(())
 }
@@ -69,9 +68,16 @@ fn text_argument(
     })
 }
 
-fn write_new(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
-    let mut destination = OpenOptions::new().write(true).create_new(true).open(path)?;
-    destination.write_all(bytes)?;
-    destination.sync_all()?;
+fn write_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = NamedTempFile::new_in(parent)?;
+    package.write_to(temporary.as_file_mut())?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .persist_noclobber(path)
+        .map_err(|error| Box::new(error.error))?;
     Ok(())
 }

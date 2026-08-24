@@ -53,7 +53,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         })
         .commit()?;
-    editor = PagesEditor::from_bytes(header_commit.package().source_bytes())?;
+    let mut header_bytes = Vec::new();
+    header_commit.package().write_to(&mut header_bytes)?;
+    editor = PagesEditor::from_bytes(&header_bytes)?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
         editor.set_table_column_width(
             table.model_object_id,
@@ -93,6 +95,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .edit_body_table_title(BodyTableSelector::name("Revenue"))?
         .set(PagesTableTitleSettings::new(Some(true), Some(true)))
         .commit()?;
-    std::fs::write(output, commit.package().source_bytes())?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    std::fs::write(output, bytes)?;
     Ok(())
 }

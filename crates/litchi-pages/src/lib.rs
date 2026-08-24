@@ -36,7 +36,11 @@
 //!
 //! let inverse = commit.patch().inverse();
 //! let restored = commit.package().apply_section_text(&inverse)?;
-//! assert_eq!(restored.package().source_bytes(), package.source_bytes());
+//! let mut original_bytes = Vec::new();
+//! package.write_to(&mut original_bytes)?;
+//! let mut restored_bytes = Vec::new();
+//! restored.package().write_to(&mut restored_bytes)?;
+//! assert_eq!(restored_bytes, original_bytes);
 //! # Ok(())
 //! # }
 //! ```
@@ -88,7 +92,7 @@ pub use package::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
     FootnoteTextLimitKind, FootnoteTextPatch,
 };
-pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats};
+pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats, WriteError};
 pub use package::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
     PageLayoutPatch,

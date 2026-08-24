@@ -31,6 +31,19 @@ const PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jp
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
 
+trait ExactBytes {
+    fn exact_bytes(&self) -> Vec<u8>;
+}
+
+impl ExactBytes for Package {
+    fn exact_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts package bytes");
+        bytes
+    }
+}
+
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
@@ -432,13 +445,13 @@ fn no_op_is_exact_and_presence_preserving() -> TestResult {
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().touched_components(), 0);
     assert_eq!(commit.diagnostics().deleted_previews(), 0);
-    assert_eq!(commit.package().source_bytes(), source.as_slice());
+    assert_eq!(commit.package().exact_bytes(), source.as_slice());
     assert_eq!(
         commit
             .package()
             .apply_body_table_title(commit.patch())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         source.as_slice()
     );
     Ok(())
@@ -459,10 +472,10 @@ fn changed_presence_preserves_unknowns_deletes_previews_and_inverts_exactly() ->
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
     assert!(commit.diagnostics().full_reparse_performed());
     assert_eq!(
-        sentinel(commit.package().source_bytes())?,
+        sentinel(&commit.package().exact_bytes())?,
         b"untouched-sentinel"
     );
-    let changed_model = model_payload(commit.package().source_bytes(), FIRST_MODEL_IDENTIFIER)?;
+    let changed_model = model_payload(&commit.package().exact_bytes(), FIRST_MODEL_IDENTIFIER)?;
     let unknown = WireView::parse(&changed_model)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
@@ -474,7 +487,7 @@ fn changed_presence_preserves_unknowns_deletes_previews_and_inverts_exactly() ->
     let restored = commit
         .package()
         .apply_body_table_title(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
     assert_eq!(
         restored.package().body_table_title_settings(0usize)?,
         Settings::new(Some(true), Some(false))
@@ -513,7 +526,7 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult {
             .and_then(|edit| edit.set(Settings::new(Some(false), None)).commit()),
         Err(Error::InvalidSource | Error::LimitExceeded { .. })
     ));
-    assert_eq!(malformed.source_bytes(), malformed_source.as_slice());
+    assert_eq!(malformed.exact_bytes(), malformed_source.as_slice());
     Ok(())
 }
 
@@ -543,7 +556,7 @@ fn title_dependencies_and_model_ownership_fail_closed_atomically() -> TestResult
             matches!(result, Err(Error::InvalidSource)),
             "{label} unexpectedly published: {result:?}"
         );
-        assert_eq!(package.source_bytes(), malformed.as_slice());
+        assert_eq!(package.exact_bytes(), malformed.as_slice());
     }
     Ok(())
 }

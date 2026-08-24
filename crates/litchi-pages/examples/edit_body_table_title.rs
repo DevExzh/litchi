@@ -6,7 +6,7 @@
 )]
 
 use std::error::Error;
-use std::io::{self, Write as _};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use litchi_pages::table::title::Settings;
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let restored = commit
         .package()
         .apply_body_table_title(&commit.patch().inverse())?;
-    if restored.package().source_bytes() != package.source_bytes() {
+    if exact_bytes(restored.package())? != exact_bytes(&package)? {
         return Err(invalid_input(
             "inverse patch did not restore the exact input package",
         ));
@@ -125,12 +125,18 @@ fn save_new(path: &Path, package: &Package) -> Result<(), Box<dyn Error>> {
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
-    temporary.write_all(package.source_bytes())?;
+    package.write_to(temporary.as_file_mut())?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)
         .map_err(|error| Box::new(error.error))?;
     Ok(())
+}
+
+fn exact_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
 }
 
 fn invalid_input(message: impl Into<String>) -> Box<dyn Error> {

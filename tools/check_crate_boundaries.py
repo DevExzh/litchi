@@ -3385,7 +3385,27 @@ IWA_PAGES_README_TABLE_HEADER_CALLS = (
         r"[ \t\r\n]*\(",
     ),
 )
+# Body-footnote text mutation is now owned by the focused Pages package.  The
+# host keeps the graph reader plus insertion/removal compatibility paths, but
+# the old public setter must not return.  Keep this ratchet item-scoped: the
+# surrounding ``footnotes.rs`` module contains private graph helpers and the
+# supported insert/remove methods that remain valid host responsibilities.
+RETIRED_IWA_PAGES_FOOTNOTE_TEXT_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "footnotes.rs"
+)
+RETIRED_IWA_PAGES_FOOTNOTE_TEXT_METHODS = ("set_body_footnote_text",)
+RETIRED_IWA_PAGES_FOOTNOTE_TEXT_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_FOOTNOTE_TEXT_METHODS
+)
+IWA_PAGES_FOOTNOTE_TEXT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_FOOTNOTE_TEXT_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+    r"set_body_footnote_text\b[ \t\r\n]*\("
+)
 PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
+PAGES_FOOTNOTE_TEXT_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "footnote_text.rs"
+PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD = "edit_body_footnote_text"
 PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
     PAGES_SOURCE_ROOT / "document.rs",
     PAGES_SOURCE_ROOT / "lib.rs",
@@ -3448,6 +3468,16 @@ PAGES_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS = (
         ),
     ),
 )
+# The package preserves exact source bytes internally, but the supported
+# output boundary is the streaming ``Package::write_to`` API.  Keep the
+# forbidden names explicit so a public method, alias, or root re-export cannot
+# silently recreate the old byte-oriented surface.
+PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE = PAGES_SOURCE_ROOT / "lib.rs"
+PAGES_PACKAGE_OUTPUT_FORBIDDEN_NAMES = frozenset(
+    {"source_bytes", "from_archive_bytes"}
+)
+PAGES_PACKAGE_OUTPUT_METHOD = "write_to"
+PAGES_PACKAGE_OUTPUT_ERROR = "WriteError"
 CARGO_SECTION_HEADER = re.compile(r"^[ \t]*\[([^\]]+)\][ \t]*(?:#.*)?$")
 CARGO_PROST_DEPENDENCY = re.compile(
     r"^[ \t]*(?:prost|\"prost\")(?:[ \t]*\.[ \t]*workspace)?[ \t]*="
@@ -5748,6 +5778,99 @@ def _rust_impl_headers(source: str) -> list[tuple[str, int]]:
             )
         )
     return headers
+
+
+def _rust_public_methods_in_impl(
+    source: str, type_name: str
+) -> list[tuple[str, str, int]]:
+    """Return public inherent-method declarations for one Rust type.
+
+    The existing declaration helpers intentionally do not retain item
+    ownership, which is enough for most facade scans but would let a free
+    ``write_to`` satisfy a ``Package::write_to`` requirement.  This narrow
+    helper records only public methods inside an inherent ``impl Type`` block,
+    preserving the source line and the declaration signature for return-type
+    checks.  Callers should mask ``cfg(test)`` items before invoking it.
+    """
+
+    code = _mask_rust_non_code(source)
+    impl_ranges: list[tuple[int, int]] = []
+    for implementation in RUST_IMPL_DECLARATION.finditer(code):
+        if code.count("{", 0, implementation.start()) != code.count(
+            "}", 0, implementation.start()
+        ):
+            continue
+        parentheses = 0
+        brackets = 0
+        opening = -1
+        cursor = implementation.end()
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif character == "{" and not parentheses and not brackets:
+                opening = cursor
+                break
+            cursor += 1
+        if opening < 0:
+            continue
+        header = re.sub(r"\s+", " ", code[implementation.start() : opening]).strip()
+        if re.match(
+            rf"^impl(?:\s*<[^>{{}}]*>)?\s+{re.escape(type_name)}"
+            rf"(?:\s*<[^>{{}}]*>)?(?:\s+where .*)?$",
+            header,
+        ) is None:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth == 0:
+            impl_ranges.append((opening + 1, cursor - 1))
+
+    method = re.compile(
+        r"(?<![A-Za-z0-9_#])pub(?![ \t\r\n]*\()[ \t\r\n]+"
+        r"(?:(?:unsafe|async|const)[ \t\r\n]+)*fn[ \t\r\n]+"
+        r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    methods: list[tuple[str, str, int]] = []
+    for match in method.finditer(code):
+        if not any(start <= match.start() < end for start, end in impl_ranges):
+            continue
+        parentheses = 0
+        brackets = 0
+        cursor = match.end()
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif not parentheses and not brackets and character in "{;":
+                break
+            cursor += 1
+        methods.append(
+            (
+                match.group("name"),
+                code[match.start() : cursor],
+                source.count("\n", 0, match.start()) + 1,
+            )
+        )
+    return methods
 
 
 def _rust_named_struct_body(source: str, name: str) -> tuple[str, int] | None:
@@ -11364,6 +11487,84 @@ def audit_iwa_pages_table_headers_source_topology(root: Path = ROOT) -> list[str
     return sorted(set(violations))
 
 
+def audit_iwa_pages_footnote_text_source_topology(root: Path = ROOT) -> list[str]:
+    """Retire the Pages host footnote-text setter while preserving graph APIs."""
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        for declaration, line_number in _rust_public_declarations(production_source):
+            for method in sorted(RETIRED_IWA_PAGES_FOOTNOTE_TEXT_METHOD_SET):
+                if re.search(
+                    rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(method)}\b",
+                    declaration,
+                ) is None:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages footnote-text public method "
+                    f"{method}: {path.relative_to(root)}:{line_number}"
+                )
+
+        code = _mask_rust_non_code(production_source)
+        for match in IWA_PAGES_FOOTNOTE_TEXT_CALL.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages footnote-text call "
+                f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+            )
+
+    example_root = root / IWA_PAGES_FOOTNOTE_TEXT_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            production_source = _mask_rust_cfg_test_items(
+                example_path.read_text(encoding="utf-8")
+            )
+            code = _mask_rust_non_code(production_source)
+            for match in IWA_PAGES_FOOTNOTE_TEXT_CALL.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Pages footnote-text example call "
+                    f"set_body_footnote_text: "
+                    f"{example_path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_pages_footnote_text_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the focused Pages package footnote-text edit route."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    owner_path = root / PAGES_FOOTNOTE_TEXT_OWNER_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    methods = {
+        name for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    if PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD in methods:
+        return []
+    return [
+        "focused litchi-pages footnote-text public API is missing Package method "
+        f"{PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD}: {PAGES_FOOTNOTE_TEXT_OWNER_SOURCE}"
+    ]
+
+
 def _audit_iwa_chart_caption_source_topology(
     root: Path,
     source_path: Path,
@@ -13820,6 +14021,110 @@ def audit_numbers_names_package_no_eager_prost_source_topology(
     return sorted(set(violations))
 
 
+def audit_pages_package_output_api_source_topology(root: Path = ROOT) -> list[str]:
+    """Enforce the focused Pages package output boundary.
+
+    Pages retains the exact native source internally for preservation, but the
+    supported package API publishes bytes only through ``Package::write_to``.
+    This audit deliberately scans the whole Pages source tree after masking
+    each ``cfg(test)`` item individually: a test fixture may keep private
+    byte-oriented helpers, but it cannot hide a later production declaration
+    or re-export.
+    """
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        for declaration, line_number in _rust_public_declarations(production_source):
+            for forbidden in sorted(PAGES_PACKAGE_OUTPUT_FORBIDDEN_NAMES):
+                identifier = next(
+                    (
+                        match
+                        for match in RUST_IDENTIFIER.finditer(declaration)
+                        if match.group(1) == forbidden
+                    ),
+                    None,
+                )
+                if identifier is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, identifier.start(1)
+                )
+                violations.append(
+                    "focused litchi-pages package output API retains public or "
+                    f"re-exported {forbidden}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+
+    package_path = root / PAGES_PACKAGE_SOURCE
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    methods = _rust_public_methods_in_impl(package_source, "Package")
+    write_methods = [
+        (declaration, line_number)
+        for name, declaration, line_number in methods
+        if name == PAGES_PACKAGE_OUTPUT_METHOD
+    ]
+    if not write_methods:
+        violations.append(
+            "focused litchi-pages package output API is missing production "
+            f"Package::{PAGES_PACKAGE_OUTPUT_METHOD}: {PAGES_PACKAGE_SOURCE}"
+        )
+    elif not any(
+        re.search(
+            rf"->[\s\S]*\b{re.escape(PAGES_PACKAGE_OUTPUT_ERROR)}\b",
+            declaration,
+        )
+        for declaration, _line_number in write_methods
+    ):
+        line_number = write_methods[0][1]
+        violations.append(
+            "focused litchi-pages package output API Package::write_to must "
+            f"return {PAGES_PACKAGE_OUTPUT_ERROR}: "
+            f"{PAGES_PACKAGE_SOURCE}:{line_number}"
+        )
+
+    public_error = False
+    for declaration, _line_number in _rust_public_declarations(package_source):
+        if re.search(
+            rf"\bpub[ \t\r\n]+(?:struct|enum|type)[ \t\r\n]+"
+            rf"(?:r#)?{re.escape(PAGES_PACKAGE_OUTPUT_ERROR)}\b",
+            declaration,
+        ):
+            public_error = True
+            break
+    if not public_error:
+        violations.append(
+            "focused litchi-pages package output API is missing public "
+            f"{PAGES_PACKAGE_OUTPUT_ERROR}: {PAGES_PACKAGE_SOURCE}"
+        )
+
+    export_path = root / PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE
+    export_source = (
+        _mask_rust_cfg_test_items(export_path.read_text(encoding="utf-8"))
+        if export_path.is_file()
+        else ""
+    )
+    if PAGES_PACKAGE_OUTPUT_ERROR not in _rust_canonical_exports(
+        export_source, frozenset({PAGES_PACKAGE_OUTPUT_ERROR})
+    ):
+        violations.append(
+            "focused litchi-pages package output API is missing root "
+            f"{PAGES_PACKAGE_OUTPUT_ERROR} export: "
+            f"{PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_pages_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -13830,11 +14135,7 @@ def audit_pages_package_no_eager_prost_source_topology(
     source_path = root / PAGES_PACKAGE_SOURCE
     if source_path.is_file():
         raw_source = source_path.read_text(encoding="utf-8")
-        masked_source = _mask_rust_non_code(raw_source)
-        test_module = PAGES_PACKAGE_TEST_MODULE.search(masked_source)
-        production_source = (
-            raw_source[: test_module.start()] if test_module is not None else raw_source
-        )
+        production_source = _mask_rust_cfg_test_items(raw_source)
         production_code = _mask_rust_non_code(production_source)
         for label, pattern in PAGES_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS:
             for match in pattern.finditer(production_code):
@@ -16819,7 +17120,10 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_document_public_api()
         + audit_iwa_pages_document_source_topology()
         + audit_pages_document_public_api()
+        + audit_pages_package_output_api_source_topology()
         + audit_pages_package_no_eager_prost_source_topology()
+        + audit_iwa_pages_footnote_text_source_topology()
+        + audit_pages_footnote_text_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()
         + audit_pages_page_layout_facade_source_topology()
         + audit_iwa_pages_table_lock_source_topology()

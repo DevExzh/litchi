@@ -28,6 +28,12 @@ type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
 fn assert_type_send_sync<T: Send + Sync>() {}
 
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn fixture_path() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/basic.pages")
@@ -538,7 +544,7 @@ fn selector_first_astral_edit_shifts_only_following_boundaries() -> TestResult<(
 
     let body = tswp::StorageArchive::decode(
         message_payload(
-            commit.package().source_bytes(),
+            &exact_bytes(commit.package())?,
             BODY_IDENTIFIER,
             STORAGE_MESSAGE_TYPE,
         )?
@@ -559,7 +565,6 @@ fn selector_first_astral_edit_shifts_only_following_boundaries() -> TestResult<(
 fn no_op_shares_exact_and_legacy_sources() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let package = Package::from_bytes(&bytes)?;
-    let source_pointer = package.source_bytes().as_ptr();
     let mut edit = package.edit_section_text(SectionSelector::index(0))?;
     edit.set("First😀")?;
     let noop = edit.commit()?;
@@ -567,14 +572,10 @@ fn no_op_shares_exact_and_legacy_sources() -> TestResult<()> {
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.diagnostics().touched_components(), 0);
     assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(noop.package())?, bytes);
     assert_eq!(
-        package
-            .apply_section_text(noop.patch())?
-            .package()
-            .source_bytes()
-            .as_ptr(),
-        source_pointer
+        exact_bytes(package.apply_section_text(noop.patch())?.package())?,
+        bytes
     );
 
     let legacy = legacy_package_bytes(&bytes)?;
@@ -583,7 +584,7 @@ fn no_op_shares_exact_and_legacy_sources() -> TestResult<()> {
     legacy_noop_edit.set("Third")?;
     let legacy_noop_commit = legacy_noop_edit.commit()?;
     assert!(legacy_noop_commit.patch().is_noop());
-    assert_eq!(legacy_noop_commit.package().source_bytes(), legacy);
+    assert_eq!(exact_bytes(legacy_noop_commit.package())?, legacy);
 
     let mut changed = legacy_package.edit_section_text(SectionSelector::index(2))?;
     changed.set("Changed")?;
@@ -605,10 +606,7 @@ fn single_section_body_convenience_resolves_without_native_identity() -> TestRes
     edit.set(original)?;
     let commit = edit.commit()?;
     assert!(commit.patch().is_noop());
-    assert_eq!(
-        commit.package().source_bytes().as_ptr(),
-        package.source_bytes().as_ptr()
-    );
+    assert_eq!(exact_bytes(commit.package())?, exact_bytes(&package)?);
     Ok(())
 }
 
@@ -627,7 +625,7 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     no_op.set(&original)?;
     let no_op_commit = no_op.commit()?;
     assert!(no_op_commit.patch().is_noop());
-    assert_eq!(no_op_commit.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(no_op_commit.package())?, bytes);
 
     let mut changed = package.edit_body_text()?;
     changed.set("replacement")?;
@@ -635,7 +633,7 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
         changed.commit(),
         Err(SectionTextError::UnsupportedSource)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
 
     let empty_bytes = rootless_fallback_package(&[""])?;
     let empty = Package::from_bytes(&empty_bytes)?;
@@ -675,9 +673,9 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
     assert!(!edit_debug.contains("replacement"));
     assert!(!edit_debug.contains("Index/"));
     let commit = edit.commit()?;
-    let target = commit.package().source_bytes();
-    let target_body = message_payload(target, BODY_IDENTIFIER, STORAGE_MESSAGE_TYPE)?;
-    let target_header = object_header(target, BODY_IDENTIFIER)?;
+    let target = exact_bytes(commit.package())?;
+    let target_body = message_payload(&target, BODY_IDENTIFIER, STORAGE_MESSAGE_TYPE)?;
+    let target_header = object_header(&target, BODY_IDENTIFIER)?;
     assert_eq!(
         body_fields_except_text_and_sections(&target_body)?,
         body_fields_except_text_and_sections(&source_body)?
@@ -698,33 +696,33 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
             .any(|field| field.number() == 99)
     );
     assert_eq!(
-        message_payload(target, FIRST_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?,
+        message_payload(&target, FIRST_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?,
         source_first_section
     );
     assert_eq!(
-        message_payload(target, BODY_IDENTIFIER, 777)?,
+        message_payload(&target, BODY_IDENTIFIER, 777)?,
         source_before_message
     );
     assert_eq!(
-        message_payload(target, BODY_IDENTIFIER, 778)?,
+        message_payload(&target, BODY_IDENTIFIER, 778)?,
         source_after_message
     );
     assert_eq!(
-        message_payload(target, BODY_IDENTIFIER, UNRELATED_STORAGE_MESSAGE_TYPE)?,
+        message_payload(&target, BODY_IDENTIFIER, UNRELATED_STORAGE_MESSAGE_TYPE)?,
         source_unrelated_storage
     );
     let target_text_fields = text_field_raw(&target_body)?;
     assert_eq!(target_text_fields.len(), source_text_fields.len());
     assert_eq!(target_text_fields[1], source_text_fields[1]);
-    assert_untouched_zip_members(&bytes, target)?;
+    assert_untouched_zip_members(&bytes, &target)?;
 
     let applied = package.apply_section_text(commit.patch())?;
-    assert_eq!(applied.package().source_bytes(), target);
+    assert_eq!(exact_bytes(applied.package())?, target);
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.before(), commit.patch().after());
     assert_eq!(inverse.after(), commit.patch().before());
     let restored = commit.package().apply_section_text(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(section_snapshot(restored.package())?, source_snapshot);
 
     let equivalent_bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
@@ -773,7 +771,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
 fn concurrent_section_text_commits_are_isolated_and_source_remains_immutable() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let package = Arc::new(Package::from_bytes(&bytes)?);
-    let source_pointer = package.source_bytes().as_ptr();
+    let original_bytes = exact_bytes(package.as_ref())?;
     let barrier = Arc::new(Barrier::new(3));
 
     let first_package = Arc::clone(&package);
@@ -826,19 +824,17 @@ fn concurrent_section_text_commits_are_isolated_and_source_remains_immutable() -
         last.package().section_text(SectionSelector::index(2))?,
         "parallel last"
     );
-    assert_ne!(
-        first.package().source_bytes(),
-        last.package().source_bytes()
-    );
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    let first_bytes = exact_bytes(first.package())?;
+    let last_bytes = exact_bytes(last.package())?;
+    assert_ne!(first_bytes, last_bytes);
+    assert_eq!(original_bytes, bytes);
 
     let first_restored = first
         .package()
         .apply_section_text(&first.patch().inverse())?;
-    assert_eq!(first_restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(first_restored.package())?, bytes);
     let last_restored = last.package().apply_section_text(&last.patch().inverse())?;
-    assert_eq!(last_restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(last_restored.package())?, bytes);
     assert!(matches!(
         first.package().apply_section_text(last.patch()),
         Err(SectionTextError::PatchConflict)
@@ -903,14 +899,14 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
 
     let referenced_bytes = package_with_hidden_bookmark_reference()?;
     let referenced_package = Package::from_bytes(&referenced_bytes)?;
-    let referenced_source = referenced_package.source_bytes().to_vec();
+    let referenced_source = exact_bytes(&referenced_package)?;
     let mut referenced_edit = referenced_package.edit_section_text(SectionSelector::index(0))?;
     referenced_edit.delete(TextSpan::from_utf16_indexes(2, 3)?)?;
     assert!(matches!(
         referenced_edit.commit(),
         Err(SectionTextError::DependentContent)
     ));
-    assert_eq!(referenced_package.source_bytes(), referenced_source);
+    assert_eq!(exact_bytes(&referenced_package)?, referenced_source);
 
     let duplicate_name_bytes = {
         let duplicate_source = synthetic_package()?;
@@ -1030,7 +1026,7 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 

@@ -21,7 +21,7 @@ mod text_storage;
 
 use std::fmt;
 use std::fs::{Metadata as FileMetadata, OpenOptions};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::num::NonZeroU64;
 use std::path::Path;
 use std::sync::Arc;
@@ -209,6 +209,53 @@ pub enum PackageError {
 
 /// Result type returned by [`Package`] operations.
 pub type PackageResult<T> = Result<T, PackageError>;
+
+/// Failure while streaming an exact Pages package artifact to a caller-owned
+/// sink.
+///
+/// Its `Display` and `Debug` representations report only the offset reached
+/// by prior conforming successful writes and the sink error kind; they never
+/// include package bytes or sink error text.
+#[derive(Error)]
+#[error("could not write Pages package after {bytes_written} bytes ({kind:?})")]
+pub struct WriteError {
+    error: std::io::Error,
+    kind: std::io::ErrorKind,
+    bytes_written: usize,
+}
+
+impl fmt::Debug for WriteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("WriteError")
+            .field("bytes_written", &self.bytes_written)
+            .field("io_error_kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+impl WriteError {
+    /// Return the byte offset reached by prior conforming successful writes.
+    ///
+    /// A `WriteZero` or trait-violating over-report is detected at this offset;
+    /// it does not establish how many bytes that call's sink actually accepted.
+    #[must_use]
+    pub const fn bytes_written(&self) -> usize {
+        self.bytes_written
+    }
+
+    /// Borrow the underlying sink error.
+    #[must_use]
+    pub const fn io_error(&self) -> &std::io::Error {
+        &self.error
+    }
+
+    /// Consume this error and return the underlying sink error.
+    #[must_use]
+    pub fn into_io_error(self) -> std::io::Error {
+        self.error
+    }
+}
 
 /// Immutable statistics captured while a Pages package is opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -469,37 +516,78 @@ impl Package {
         })
     }
 
-    /// Parse a Pages package from archive bytes.
-    ///
-    /// This is an explicit alias for [`Self::from_bytes`] for callers whose
-    /// input is already known to be a ZIP archive.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::from_bytes`].
-    #[deprecated(
-        since = "0.0.1",
-        note = "use Package::from_bytes; the archive-qualified alias is redundant"
-    )]
-    pub fn from_archive_bytes(bytes: &[u8]) -> PackageResult<Self> {
-        Self::from_bytes(bytes)
-    }
-
     /// Capture another cheap handle to the same native and semantic snapshot.
     #[must_use]
     pub fn snapshot(&self) -> Self {
         self.clone()
     }
 
-    /// Borrow the authoritative immutable package bytes.
+    /// Borrow exact package bytes for crate-internal preservation logic.
     ///
     /// The returned bytes are the exact artifact represented by this
-    /// snapshot. They can be written directly to publish a committed edit;
-    /// callers never need access to native object identifiers or package
-    /// members.
+    /// snapshot, including unsupported ZIP members and unmodeled protobuf
+    /// fields. Public callers should use [`Self::write_to`] to stream the
+    /// artifact to a caller-owned sink.
     #[must_use]
-    pub fn source_bytes(&self) -> &[u8] {
+    pub(crate) fn source_bytes(&self) -> &[u8] {
         self.state.source.source_bytes()
+    }
+
+    /// Write this exact immutable package artifact to a caller-owned sink.
+    ///
+    /// Unsupported ZIP members and unmodeled protobuf fields are emitted
+    /// unchanged. This method streams the retained source once without
+    /// allocating another package-sized buffer and does not flush `writer`.
+    /// Partial writes may leave bytes in the caller-owned sink.
+    ///
+    /// Callers that need durable or atomic publication must provide that
+    /// policy around the sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] with the byte offset reached by prior conforming
+    /// successful writes. A zero-length write or over-report is detected at
+    /// that offset; an over-report does not establish its actual accepted-byte
+    /// count.
+    pub fn write_to<W: Write + ?Sized>(&self, writer: &mut W) -> Result<(), WriteError> {
+        let source = self.source_bytes();
+        let mut bytes_written = 0_usize;
+        while bytes_written < source.len() {
+            let remaining = &source[bytes_written..];
+            match writer.write(remaining) {
+                Ok(0) => {
+                    return Err(WriteError {
+                        error: std::io::Error::new(
+                            std::io::ErrorKind::WriteZero,
+                            "sink accepted no package bytes",
+                        ),
+                        kind: std::io::ErrorKind::WriteZero,
+                        bytes_written,
+                    });
+                },
+                Ok(amount) if amount <= remaining.len() => bytes_written += amount,
+                Ok(_amount) => {
+                    return Err(WriteError {
+                        error: std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "sink reported accepting more bytes than supplied",
+                        ),
+                        kind: std::io::ErrorKind::InvalidData,
+                        bytes_written,
+                    });
+                },
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {},
+                Err(error) => {
+                    let kind = error.kind();
+                    return Err(WriteError {
+                        error,
+                        kind,
+                        bytes_written,
+                    });
+                },
+            }
+        }
+        Ok(())
     }
 
     /// Render all native Pages text through the immutable semantic snapshot.
@@ -2842,6 +2930,89 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy)]
+    enum PrefixWriteBehavior {
+        Failure,
+        Zero,
+        OverReport,
+    }
+
+    struct PrefixWriter {
+        prefix_remaining: usize,
+        behavior: PrefixWriteBehavior,
+        output: Vec<u8>,
+        flushes: usize,
+    }
+
+    impl PrefixWriter {
+        const fn new(behavior: PrefixWriteBehavior) -> Self {
+            Self {
+                prefix_remaining: 4,
+                behavior,
+                output: Vec::new(),
+                flushes: 0,
+            }
+        }
+    }
+
+    impl Write for PrefixWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.prefix_remaining != 0 {
+                let amount = bytes.len().min(self.prefix_remaining);
+                self.output.extend_from_slice(&bytes[..amount]);
+                self.prefix_remaining -= amount;
+                return Ok(amount);
+            }
+
+            match self.behavior {
+                PrefixWriteBehavior::Failure => Err(io::Error::other("pages sink authored secret")),
+                PrefixWriteBehavior::Zero => Ok(0),
+                PrefixWriteBehavior::OverReport => Ok(bytes.len().saturating_add(1)),
+            }
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.flushes += 1;
+            Ok(())
+        }
+    }
+
+    struct PrefixInterruptedWriter {
+        interruptions_remaining: usize,
+        interruptions_observed: usize,
+        output: Vec<u8>,
+        flushes: usize,
+    }
+
+    impl PrefixInterruptedWriter {
+        const fn new() -> Self {
+            Self {
+                interruptions_remaining: 3,
+                interruptions_observed: 0,
+                output: Vec::new(),
+                flushes: 0,
+            }
+        }
+    }
+
+    impl Write for PrefixInterruptedWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.interruptions_remaining != 0 {
+                self.interruptions_remaining -= 1;
+                self.interruptions_observed += 1;
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            let amount = bytes.len().min(1);
+            self.output.extend_from_slice(&bytes[..amount]);
+            Ok(amount)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.flushes += 1;
+            Ok(())
+        }
+    }
+
     fn limits_with_input_bytes(max_input_bytes: u64) -> PackageResult<Limits> {
         let defaults = Limits::default();
         Ok(Limits::new(
@@ -3117,6 +3288,44 @@ mod tests {
         )?)
     }
 
+    fn package_bytes_with_opaque_member() -> PackageResult<Vec<u8>> {
+        let source = package_bytes(Some("Opaque body"), true, true)?;
+        let catalog = Catalog::from_bytes(&source)?;
+        let mut entries: Vec<(&str, &[u8])> = catalog
+            .iter()
+            .map(|entry| (entry.name(), entry.data()))
+            .collect();
+        entries.push(("Data/opaque.bin", b"opaque Pages payload"));
+        let mut bytes = litchi_iwa_archive::package::to_bytes(entries, Limits::default())?;
+
+        const NAME: &[u8] = b"Data/opaque.bin";
+        const UNSUPPORTED_METHOD: [u8; 2] = 99_u16.to_le_bytes();
+        let mut cursor = 0usize;
+        let mut changed = 0usize;
+        while let Some(relative) = bytes[cursor..]
+            .windows(NAME.len())
+            .position(|candidate| candidate == NAME)
+        {
+            let position = cursor + relative;
+            if position >= 30 && bytes[position - 30..position - 26] == [0x50, 0x4b, 0x03, 0x04] {
+                bytes[position - 22..position - 20].copy_from_slice(&UNSUPPORTED_METHOD);
+                changed += 1;
+            } else if position >= 46
+                && bytes[position - 46..position - 42] == [0x50, 0x4b, 0x01, 0x02]
+            {
+                bytes[position - 36..position - 34].copy_from_slice(&UNSUPPORTED_METHOD);
+                changed += 1;
+            }
+            cursor = position.saturating_add(NAME.len());
+        }
+        if changed != 2 {
+            return Err(PackageError::InvalidFormat(
+                "opaque Pages test member did not have two ZIP records".to_owned(),
+            ));
+        }
+        Ok(bytes)
+    }
+
     fn section_payload(name: Option<&str>) -> RawMessage {
         RawMessage {
             type_: SECTION_MESSAGE_TYPE,
@@ -3349,6 +3558,98 @@ mod tests {
             package.semantic_document(),
             snapshot.semantic_document()
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn package_handles_and_write_errors_are_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<Package>();
+        assert_send_sync::<WriteError>();
+    }
+
+    #[test]
+    fn write_to_accepts_dynamic_dispatch_and_preserves_exact_opaque_bytes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = package_bytes_with_opaque_member()?;
+        let package = Package::from_bytes(&bytes)?;
+        let snapshot = package.snapshot();
+
+        assert!(Arc::ptr_eq(&package.state, &snapshot.state));
+        assert_eq!(
+            package.source_bytes().as_ptr(),
+            snapshot.source_bytes().as_ptr()
+        );
+        assert!(
+            package
+                .state
+                .source
+                .package()
+                .iter()
+                .any(|entry| entry.name() == "Data/opaque.bin" && entry.is_opaque())
+        );
+
+        let mut output = Vec::new();
+        let sink: &mut dyn Write = &mut output;
+        package.write_to(sink)?;
+        assert_eq!(output, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn write_to_retries_interruptions_without_flushing() -> PackageResult<()> {
+        let bytes = package_bytes(Some("Interrupted Pages output"), true, false)?;
+        let package = Package::from_bytes(&bytes)?;
+        let mut writer = PrefixInterruptedWriter::new();
+
+        package
+            .write_to(&mut writer)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+
+        assert_eq!(writer.interruptions_observed, 3);
+        assert_eq!(writer.output, bytes);
+        assert_eq!(writer.flushes, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn write_to_reports_prefix_progress_for_zero_overreport_and_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = package_bytes(Some("Adversarial Pages output"), true, false)?;
+        let package = Package::from_bytes(&bytes)?;
+
+        let mut failing = PrefixWriter::new(PrefixWriteBehavior::Failure);
+        let failure = package.write_to(&mut failing).unwrap_err();
+        assert_eq!(failure.bytes_written(), 4);
+        assert_eq!(failing.output, bytes[..4]);
+        assert_eq!(failing.flushes, 0);
+        assert_eq!(failure.io_error().kind(), io::ErrorKind::Other);
+        let display = failure.to_string();
+        let debug = format!("{failure:?}");
+        assert!(!display.contains("pages sink authored secret"));
+        assert!(!debug.contains("pages sink authored secret"));
+        assert!(std::error::Error::source(&failure).is_none());
+        let underlying = failure.into_io_error();
+        assert_eq!(underlying.kind(), io::ErrorKind::Other);
+        assert_eq!(underlying.to_string(), "pages sink authored secret");
+
+        let mut zero = PrefixWriter::new(PrefixWriteBehavior::Zero);
+        let zero_error = package.write_to(&mut zero).unwrap_err();
+        assert_eq!(zero_error.bytes_written(), 4);
+        assert_eq!(zero.output, bytes[..4]);
+        assert_eq!(zero.flushes, 0);
+        assert_eq!(zero_error.io_error().kind(), io::ErrorKind::WriteZero);
+
+        let mut over_report = PrefixWriter::new(PrefixWriteBehavior::OverReport);
+        let over_report_error = package.write_to(&mut over_report).unwrap_err();
+        assert_eq!(over_report_error.bytes_written(), 4);
+        assert_eq!(over_report.output, bytes[..4]);
+        assert_eq!(over_report.flushes, 0);
+        assert_eq!(
+            over_report_error.io_error().kind(),
+            io::ErrorKind::InvalidData
+        );
         Ok(())
     }
 

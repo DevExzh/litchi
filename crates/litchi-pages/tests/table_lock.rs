@@ -33,6 +33,19 @@ const TABLE_BODY_FIELD: u32 = 9;
 
 type TestResult<T> = Result<T, Box<dyn StdError>>;
 
+trait ExactBytes {
+    fn exact_bytes(&self) -> Vec<u8>;
+}
+
+impl ExactBytes for Package {
+    fn exact_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts package bytes");
+        bytes
+    }
+}
+
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
@@ -478,13 +491,13 @@ fn absent_and_explicit_false_are_unlocked_noop_states() -> TestResult<()> {
         let mut edit = package.edit_body_table_lock(BodyTableSelector::index(0))?;
         edit.unlock();
         let commit = edit.commit()?;
-        assert_eq!(commit.package().source_bytes(), source.as_slice());
+        assert_eq!(commit.package().exact_bytes(), source.as_slice());
         assert!(commit.patch().is_noop());
         assert!(!commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().touched_components(), 0);
         assert!(!commit.diagnostics().full_reparse_performed());
         assert_eq!(
-            lock_field(&table_info_payload(commit.package().source_bytes())?)?,
+            lock_field(&table_info_payload(&commit.package().exact_bytes())?)?,
             locked
         );
     }
@@ -504,24 +517,24 @@ fn changed_lock_preserves_unknown_wire_bytes_and_inverse_source() -> TestResult<
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert!(commit.diagnostics().full_reparse_performed());
     assert_eq!(
-        lock_field(&table_info_payload(commit.package().source_bytes())?)?,
+        lock_field(&table_info_payload(&commit.package().exact_bytes())?)?,
         Some(true)
     );
     assert!(has_unknown_table_info_field(&table_info_payload(
-        commit.package().source_bytes()
+        &commit.package().exact_bytes()
     )?)?);
 
     let restored = commit
         .package()
         .apply_body_table_lock(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
     assert_eq!(restored.package().body_table_lock(0usize)?, State::Unlocked);
     assert_eq!(
-        lock_field(&table_info_payload(restored.package().source_bytes())?)?,
+        lock_field(&table_info_payload(&restored.package().exact_bytes())?)?,
         None
     );
     assert!(has_unknown_table_info_field(&table_info_payload(
-        restored.package().source_bytes()
+        &restored.package().exact_bytes()
     )?)?);
     Ok(())
 }
@@ -543,9 +556,9 @@ fn selectors_conflicts_and_unrelated_members_are_checked() -> TestResult<()> {
     let mut edit = package.edit_body_table_lock(BodyTableSelector::name("Revenue"))?;
     edit.lock();
     let commit = edit.commit()?;
-    assert_eq!(package.source_bytes(), source.as_slice());
+    assert_eq!(package.exact_bytes(), source.as_slice());
     assert_eq!(
-        sentinel_payload(commit.package().source_bytes())?,
+        sentinel_payload(&commit.package().exact_bytes())?,
         b"untouched"
     );
 
@@ -590,16 +603,16 @@ fn explicit_false_lock_round_trip_is_exact_and_semantic() -> TestResult<()> {
     let commit = edit.commit()?;
     assert_eq!(commit.package().body_table_lock("Revenue")?, State::Locked);
     assert_eq!(
-        lock_field(&table_info_payload(commit.package().source_bytes())?)?,
+        lock_field(&table_info_payload(&commit.package().exact_bytes())?)?,
         Some(true)
     );
 
     let restored = commit
         .package()
         .apply_body_table_lock(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
     assert_eq!(
-        lock_field(&table_info_payload(restored.package().source_bytes())?)?,
+        lock_field(&table_info_payload(&restored.package().exact_bytes())?)?,
         Some(false)
     );
     Ok(())
@@ -632,7 +645,7 @@ fn legacy_table_info_message_type_round_trips_exactly() -> TestResult<()> {
     let restored = commit
         .package()
         .apply_body_table_lock(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
     Ok(())
 }
 
@@ -695,7 +708,7 @@ fn aggregate_only_native_ownership_locks_and_inverts_exactly() -> TestResult<()>
     let restored = commit
         .package()
         .apply_body_table_lock(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
     Ok(())
 }
 

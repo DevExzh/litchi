@@ -25,7 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         })
         .commit()?;
-    editor = litchi_iwa::pages::PagesEditor::from_bytes(header_commit.package().source_bytes())?;
+    let mut header_bytes = Vec::new();
+    header_commit.package().write_to(&mut header_bytes)?;
+    editor = litchi_iwa::pages::PagesEditor::from_bytes(&header_bytes)?;
     editor.set_table_cells(
         table_id,
         [

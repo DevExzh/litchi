@@ -74,8 +74,7 @@ fn native_package() -> &'static Package {
 
 fn exercise_package(package: &Package, data: &[u8]) {
     black_box((package.stats(), package.sections().len()));
-    let source_before = package.source_bytes().to_vec();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_before = package_bytes(package);
 
     observe_result(package.section_pagination(SectionSelector::index(0)));
     observe_result(package.section_pagination(SectionSelector::index(package.sections().len())));
@@ -89,7 +88,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
         Ok(value) => value,
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(package, &source_before, source_pointer);
+            assert_source_unchanged(package, &source_before);
             return;
         },
     };
@@ -100,7 +99,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
         Ok(edit) => edit,
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(package, &source_before, source_pointer);
+            assert_source_unchanged(package, &source_before);
             return;
         },
     };
@@ -121,22 +120,16 @@ fn exercise_package(package: &Package, data: &[u8]) {
     assert_eq!(invalid.pagination(), before);
     drop(invalid);
 
-    exercise_transaction(package, before, data, &source_before, source_pointer);
+    exercise_transaction(package, before, data, &source_before);
 }
 
-fn exercise_transaction(
-    package: &Package,
-    before: Pagination,
-    data: &[u8],
-    source_before: &[u8],
-    source_pointer: *const u8,
-) {
+fn exercise_transaction(package: &Package, before: Pagination, data: &[u8], source_before: &[u8]) {
     let after = mutated_pagination(before, data);
     let mut edit = match package.edit_section_pagination(SectionSelector::index(0)) {
         Ok(edit) => edit,
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(package, source_before, source_pointer);
+            assert_source_unchanged(package, source_before);
             return;
         },
     };
@@ -163,7 +156,7 @@ fn exercise_transaction(
     };
     if let Err(error) = staged {
         observe_error(error);
-        assert_source_unchanged(package, source_before, source_pointer);
+        assert_source_unchanged(package, source_before);
         return;
     }
 
@@ -210,11 +203,11 @@ fn exercise_transaction(
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(package, source_before, source_pointer);
+            assert_source_unchanged(package, source_before);
             return;
         },
     };
-    assert_source_unchanged(package, source_before, source_pointer);
+    assert_source_unchanged(package, source_before);
 
     let patch = commit.patch().clone();
     let diagnostics = *commit.diagnostics();
@@ -251,8 +244,8 @@ fn exercise_transaction(
         expected
     );
     assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
+        package_bytes(applied.package()),
+        package_bytes(commit.package())
     );
 
     let inverse = patch.inverse();
@@ -271,7 +264,7 @@ fn exercise_transaction(
         .package()
         .apply_section_pagination(&inverse)
         .unwrap_or_else(|error| panic!("pagination inverse must apply: {error}"));
-    assert_eq!(restored.package().source_bytes(), source_before);
+    assert_eq!(package_bytes(restored.package()), source_before);
     assert_eq!(
         restored
             .package()
@@ -279,7 +272,7 @@ fn exercise_transaction(
             .unwrap_or_else(|error| panic!("restored pagination must be readable: {error}")),
         before
     );
-    assert_source_unchanged(package, source_before, source_pointer);
+    assert_source_unchanged(package, source_before);
 }
 
 fn exercise_resource_mutation(data: &[u8]) {
@@ -309,13 +302,12 @@ fn exercise_resource_mutation(data: &[u8]) {
             return;
         },
     };
-    let source_before = package.source_bytes().to_vec();
-    let source_pointer = package.source_bytes().as_ptr();
+    let source_before = package_bytes(&package);
     let before = match package.section_pagination(SectionSelector::index(0)) {
         Ok(value) => value,
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(&package, &source_before, source_pointer);
+            assert_source_unchanged(&package, &source_before);
             return;
         },
     };
@@ -324,7 +316,7 @@ fn exercise_resource_mutation(data: &[u8]) {
         Ok(edit) => edit,
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(&package, &source_before, source_pointer);
+            assert_source_unchanged(&package, &source_before);
             return;
         },
     };
@@ -332,13 +324,13 @@ fn exercise_resource_mutation(data: &[u8]) {
         .unwrap_or_else(|error| panic!("maximal canonical pagination is valid: {error}"));
     match edit.commit() {
         Ok(commit) => {
-            assert_source_unchanged(&package, &source_before, source_pointer);
+            assert_source_unchanged(&package, &source_before);
             let inverse = commit.patch().inverse();
             let restored = commit
                 .package()
                 .apply_section_pagination(&inverse)
                 .unwrap_or_else(|error| panic!("resource-profile inverse must apply: {error}"));
-            assert_eq!(restored.package().source_bytes(), source_before);
+            assert_eq!(package_bytes(restored.package()), source_before);
             assert_eq!(
                 restored
                     .package()
@@ -351,7 +343,7 @@ fn exercise_resource_mutation(data: &[u8]) {
         },
         Err(error) => {
             observe_error(error);
-            assert_source_unchanged(&package, &source_before, source_pointer);
+            assert_source_unchanged(&package, &source_before);
         },
     }
 }
@@ -510,9 +502,8 @@ fn pagination(
     value
 }
 
-fn assert_source_unchanged(package: &Package, source_before: &[u8], source_pointer: *const u8) {
-    assert_eq!(package.source_bytes(), source_before);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+fn assert_source_unchanged(package: &Package, source_before: &[u8]) {
+    assert_eq!(package_bytes(package), source_before);
 }
 
 fn read_u32(data: &[u8], offset: usize) -> u32 {
@@ -526,6 +517,14 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 fn control(data: &[u8], index: usize) -> u8 {
     data.get(index).copied().unwrap_or_default()
+}
+
+fn package_bytes(package: &Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("writing a Pages package to memory must succeed: {error}"));
+    bytes
 }
 
 fn observe_result<T, E>(result: Result<T, E>)

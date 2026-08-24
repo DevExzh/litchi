@@ -61,6 +61,7 @@ fn native_package() -> &'static Package {
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
+    let source = package_bytes(package);
     let before = match package.page_layout() {
         Ok(layout) => layout,
         Err(error) => {
@@ -178,7 +179,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
             .unwrap_or_else(|error| panic!("restored page layout must be readable: {error}")),
         before,
     );
-    assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(package_bytes(restored.package()), source);
 }
 
 fn exercise_layout_values(data: &[u8]) {
@@ -226,6 +227,14 @@ fn read_u32(data: &[u8], offset: usize) -> u32 {
 
 fn control(data: &[u8], index: usize) -> u8 {
     data.get(index).copied().unwrap_or_default()
+}
+
+fn package_bytes(package: &Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .unwrap_or_else(|error| panic!("writing a Pages package to memory must succeed: {error}"));
+    bytes
 }
 
 fn observe_result<T, E>(result: Result<T, E>)

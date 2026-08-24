@@ -484,6 +484,36 @@ def add_pages_section_background_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_pages_output_canonical_scaffold(
+    root: Path,
+    *,
+    write_signature: str = (
+        "pub fn write_to<W: Write + ?Sized>(self, writer: &mut W) "
+        "-> Result<(), WriteError>"
+    ),
+    error_declaration: str = "pub struct WriteError;",
+    root_export: str = "pub use package::WriteError;",
+) -> None:
+    package = root / boundaries.PAGES_PACKAGE_SOURCE
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        f"{error_declaration}\n"
+        "impl Package {\n"
+        f"    {write_signature} {{ todo!() }}\n"
+        "    fn source_bytes(&self) -> &[u8] { &[] }\n"
+        "}\n"
+        "#[cfg(test)]\n"
+        "mod tests {\n"
+        "    pub fn source_bytes() {}\n"
+        "    pub fn from_archive_bytes() {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    export = root / boundaries.PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE
+    export.parent.mkdir(parents=True, exist_ok=True)
+    export.write_text(root_export + "\n", encoding="utf-8")
+
+
 def add_pages_table_lock_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_TABLE_LOCK_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -12505,6 +12535,278 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_pages_package_no_eager_prost_source_topology(root),
                 [],
+            )
+
+    def test_pages_output_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.PAGES_PACKAGE_OUTPUT_FORBIDDEN_NAMES,
+            frozenset({"source_bytes", "from_archive_bytes"}),
+        )
+        self.assertEqual(boundaries.PAGES_PACKAGE_OUTPUT_METHOD, "write_to")
+        self.assertEqual(boundaries.PAGES_PACKAGE_OUTPUT_ERROR, "WriteError")
+        self.assertEqual(
+            boundaries.PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE,
+            Path("crates/litchi-pages/src/lib.rs"),
+        )
+
+    def test_focused_pages_output_boundary_allows_private_bytes_and_valid_writer(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_output_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_pages_package_output_api_source_topology(root), []
+            )
+
+    def test_focused_pages_output_boundary_rejects_public_bytes_and_reexports_after_cfg_test(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_output_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "output_aliases.rs"
+            extra.write_text(
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    pub fn source_bytes() {}\n"
+                "    pub fn from_archive_bytes() {}\n"
+                "}\n"
+                "pub fn source_bytes() {}\n"
+                "pub use package::from_archive_bytes;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_package_output_api_source_topology(
+                root
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                any(
+                    "public or re-exported source_bytes" in violation
+                    and "output_aliases.rs:6" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "public or re-exported from_archive_bytes" in violation
+                    and "output_aliases.rs:7" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
+    def test_focused_pages_output_boundary_requires_production_writer_error_and_root_export(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "wrong return",
+                {"write_signature": "pub fn write_to(&self) -> Result<(), OtherError>"},
+                "Package::write_to must return WriteError",
+            ),
+            (
+                "private error",
+                {"error_declaration": "struct WriteError;"},
+                "missing public WriteError",
+            ),
+            (
+                "missing root export",
+                {"root_export": "pub mod package;"},
+                "missing root WriteError export",
+            ),
+        )
+        for label, overrides, fragment in cases:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_output_canonical_scaffold(root, **overrides)
+                    violations = (
+                        boundaries.audit_pages_package_output_api_source_topology(root)
+                    )
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_focused_pages_output_boundary_rejects_cfg_test_only_writer_and_free_writer(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            package = root / boundaries.PAGES_PACKAGE_SOURCE
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text(
+                "pub struct WriteError;\n"
+                "pub fn write_to() -> Result<(), WriteError> { todo!() }\n"
+                "#[cfg(test)]\n"
+                "impl Package {\n"
+                "    pub fn write_to() -> Result<(), WriteError> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            export = root / boundaries.PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE
+            export.parent.mkdir(parents=True, exist_ok=True)
+            export.write_text("pub use package::WriteError;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_package_output_api_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("missing production Package::write_to" in item for item in violations),
+                violations,
+            )
+
+    def test_retired_pages_footnote_text_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_FOOTNOTE_TEXT_METHODS,
+            ("set_body_footnote_text",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_FOOTNOTE_TEXT_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/footnotes.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD,
+            "edit_body_footnote_text",
+        )
+
+    def test_retired_pages_footnote_text_allows_graph_helpers_insert_remove_and_cfg_tests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.RETIRED_IWA_PAGES_FOOTNOTE_TEXT_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn body_footnotes() {}\n"
+                "pub(super) fn body_footnote_graphs() {}\n"
+                "fn body_footnote_by_selector() {}\n"
+                "pub fn insert_body_footnote() {}\n"
+                "pub fn remove_body_footnote() {}\n"
+                "#[cfg(test)]\n"
+                "pub fn set_body_footnote_text() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_PAGES_FOOTNOTE_TEXT_EXAMPLE_ROOT / "safe.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn main() { editor.insert_body_footnote(); editor.remove_body_footnote(); }\n"
+                "#[cfg(test)]\n"
+                "fn test_only() { editor.set_body_footnote_text(); }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_footnote_text_source_topology(root), []
+            )
+
+    def test_retired_pages_footnote_text_rejects_public_method_calls_and_examples(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/renamed.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn set_body_footnote_text() {}\n"
+                "fn compatibility_bridge(editor: &mut PagesEditor) {\n"
+                "    editor.set_body_footnote_text();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_PAGES_FOOTNOTE_TEXT_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "aliases.rs").write_text(
+                "fn main() { pages.set_body_footnote_text(); }\n"
+                "fn ufcs() { PagesEditor::set_body_footnote_text(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_footnote_text_source_topology(root)
+
+            self.assertTrue(
+                any("public method set_body_footnote_text" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("footnote-text call" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("example call set_body_footnote_text" in item for item in violations),
+                violations,
+            )
+
+    def test_retired_pages_footnote_text_masks_cfg_tests_item_by_item_and_ignores_non_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/fixtures.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    pub fn set_body_footnote_text() {}\n"
+                "}\n"
+                "// editor.set_body_footnote_text();\n"
+                'const NOTE: &str = "PagesEditor::set_body_footnote_text()";\n'
+                "pub fn body_footnote_graphs() {}\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_PAGES_FOOTNOTE_TEXT_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "fixtures.rs").write_text(
+                "#[cfg(test)]\n"
+                "fn test_only() { editor.set_body_footnote_text(); }\n"
+                "// editor.set_body_footnote_text();\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_footnote_text_source_topology(root), []
+            )
+
+    def test_focused_pages_footnote_text_requires_production_edit_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_FOOTNOTE_TEXT_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "impl Package {\n"
+                "    pub fn edit_body_footnote_text(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_text_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("missing Package method edit_body_footnote_text", violations[0])
+
+    def test_focused_pages_footnote_text_allows_production_edit_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_FOOTNOTE_TEXT_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn edit_body_footnote_text(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_footnote_text_facade_source_topology(root), []
             )
 
     def test_retired_iwa_pages_page_layout_method_inventory_is_exact(self) -> None:

@@ -36,6 +36,12 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
 fn assert_type_send_sync<T: Send + Sync>() {}
 
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn fixture_path() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/basic.pages")
@@ -524,7 +530,6 @@ fn native_fixture_noop_change_preview_deletion_semantics_and_inverse() -> TestRe
     let package = Package::from_bytes(&bytes)?;
     let before = package.page_layout()?;
     let text = package.text()?;
-    let source_pointer = package.source_bytes().as_ptr();
     let preview_count = PREVIEW_NAMES
         .iter()
         .filter(|name| {
@@ -541,9 +546,9 @@ fn native_fixture_noop_change_preview_deletion_semantics_and_inverse() -> TestRe
     assert_eq!(noop.diagnostics().touched_components(), 0);
     assert_eq!(noop.diagnostics().deleted_previews(), 0);
     assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(noop.package())?, bytes);
     assert_eq!(
-        entry_names(noop.package().source_bytes())?,
+        entry_names(&exact_bytes(noop.package())?)?,
         entry_names(&bytes)?
     );
 
@@ -561,18 +566,17 @@ fn native_fixture_noop_change_preview_deletion_semantics_and_inverse() -> TestRe
     assert_eq!(changed.package().text()?, text);
     for preview in PREVIEW_NAMES {
         assert!(
-            entry_names(changed.package().source_bytes())?
+            entry_names(&exact_bytes(changed.package())?)?
                 .iter()
                 .all(|name| name != preview)
         );
     }
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(&package)?, bytes);
 
     let restored = changed
         .package()
         .apply_page_layout(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(restored.package().page_layout()?, before);
     assert_eq!(restored.package().text()?, text);
     Ok(())
@@ -617,37 +621,32 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     let mut edit = package.edit_page_layout()?;
     edit.set_layout(after_layout)?;
     let changed = edit.commit()?;
+    let changed_bytes = exact_bytes(changed.package())?;
     assert_eq!(changed.package().page_layout()?, after_layout);
     assert_eq!(changed.package().text()?, source_text);
     assert_eq!(changed.diagnostics().touched_components(), 2);
     assert_eq!(changed.diagnostics().deleted_previews(), 3);
-    assert_only_layout_components_and_previews_changed(&bytes, changed.package().source_bytes())?;
+    assert_only_layout_components_and_previews_changed(&bytes, &changed_bytes)?;
     assert_eq!(
-        message_payload(changed.package().source_bytes(), DOCUMENT_IDENTIFIER, 777)?,
+        message_payload(&changed_bytes, DOCUMENT_IDENTIFIER, 777)?,
         source_before
     );
     assert_eq!(
-        message_payload(changed.package().source_bytes(), DOCUMENT_IDENTIFIER, 778)?,
+        message_payload(&changed_bytes, DOCUMENT_IDENTIFIER, 778)?,
         source_after
     );
-    let target_document = message_payload(
-        changed.package().source_bytes(),
-        DOCUMENT_IDENTIFIER,
-        DOCUMENT_MESSAGE_TYPE,
-    )?;
+    let target_document =
+        message_payload(&changed_bytes, DOCUMENT_IDENTIFIER, DOCUMENT_MESSAGE_TYPE)?;
     assert_eq!(
         raw_fields(&target_document, 99)?,
         raw_fields(&source_document, 99)?
     );
     assert_eq!(
-        raw_fields(
-            &object_header(changed.package().source_bytes(), DOCUMENT_IDENTIFIER)?,
-            99,
-        )?,
+        raw_fields(&object_header(&changed_bytes, DOCUMENT_IDENTIFIER)?, 99,)?,
         raw_fields(&source_header, 99)?
     );
     let target_view = message_payload_in(
-        changed.package().source_bytes(),
+        &changed_bytes,
         VIEW_STATE_MEMBER,
         VIEW_STATE_ROOT_IDENTIFIER,
         VIEW_STATE_ROOT_MESSAGE_TYPE,
@@ -656,7 +655,7 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     assert_eq!(raw_fields(&target_view, 99)?, raw_fields(&source_view, 99)?);
     assert_eq!(
         message_payload_in(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             VIEW_STATE_ROOT_IDENTIFIER,
             779,
@@ -665,7 +664,7 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     );
     assert_eq!(
         message_payload_in(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             VIEW_STATE_ROOT_IDENTIFIER,
             780,
@@ -674,7 +673,7 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     );
     assert_eq!(
         message_payload_in(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             LAYOUT_STATE_IDENTIFIER,
             10_148,
@@ -683,7 +682,7 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     );
     assert_eq!(
         message_payload_in(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             DETACHED_VIEW_STATE_ROOT_IDENTIFIER,
             VIEW_STATE_ROOT_MESSAGE_TYPE,
@@ -692,17 +691,14 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     );
     assert_eq!(
         message_payload_in(
-            changed.package().source_bytes(),
+            &changed_bytes,
             VIEW_STATE_MEMBER,
             DETACHED_LAYOUT_STATE_IDENTIFIER,
             10_148,
         )?,
         source_detached_cache
     );
-    let changed_archive = Archive::parse(&component_stream(
-        changed.package().source_bytes(),
-        VIEW_STATE_MEMBER,
-    )?)?;
+    let changed_archive = Archive::parse(&component_stream(&changed_bytes, VIEW_STATE_MEMBER)?)?;
     let view_object = changed_archive
         .object(VIEW_STATE_ROOT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("changed view-state root is missing"))?;
@@ -726,7 +722,7 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
     let restored = changed
         .package()
         .apply_page_layout(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     Ok(())
 }
 
@@ -746,33 +742,30 @@ fn shared_component_rooted_view_state_is_invalidated_but_detached_collision_is_p
     let mut edit = package.edit_page_layout()?;
     edit.set_layout(changed_layout(before)?)?;
     let changed = edit.commit()?;
+    let changed_bytes = exact_bytes(changed.package())?;
     assert_eq!(changed.diagnostics().touched_components(), 1);
     let rooted = message_payload(
-        changed.package().source_bytes(),
+        &changed_bytes,
         VIEW_STATE_ROOT_IDENTIFIER,
         VIEW_STATE_ROOT_MESSAGE_TYPE,
     )?;
     assert!(raw_fields(&rooted, 1)?.is_empty());
     assert_eq!(
         message_payload(
-            changed.package().source_bytes(),
+            &changed_bytes,
             DETACHED_VIEW_STATE_ROOT_IDENTIFIER,
             VIEW_STATE_ROOT_MESSAGE_TYPE,
         )?,
         detached
     );
     assert_eq!(
-        message_payload(
-            changed.package().source_bytes(),
-            DETACHED_LAYOUT_STATE_IDENTIFIER,
-            10_148,
-        )?,
+        message_payload(&changed_bytes, DETACHED_LAYOUT_STATE_IDENTIFIER, 10_148,)?,
         detached_cache
     );
     let restored = changed
         .package()
         .apply_page_layout(&changed.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     Ok(())
 }
 
@@ -819,7 +812,7 @@ fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult 
             Err(_ingress_error) => {},
             Ok(package) => {
                 assert!(package.page_layout().is_err());
-                assert_eq!(package.source_bytes(), malformed);
+                assert_eq!(exact_bytes(&package)?, malformed);
             },
         }
     }
@@ -869,7 +862,7 @@ fn rooted_view_state_header_reference_proof_fails_closed_at_every_hop() -> TestR
         let mut edit = package.edit_page_layout()?;
         edit.set_layout(changed_layout(before)?)?;
         assert!(matches!(edit.commit(), Err(PageLayoutError::InvalidSource)));
-        assert_eq!(package.source_bytes(), malformed);
+        assert_eq!(exact_bytes(&package)?, malformed);
     }
     Ok(())
 }
@@ -947,7 +940,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
         group_edit.commit(),
         Err(PageLayoutError::InvalidSource)
     ));
-    assert_eq!(group_package.source_bytes(), unknown_group);
+    assert_eq!(exact_bytes(&group_package)?, unknown_group);
 
     for (label, adversarial) in [
         ("noncanonical", noncanonical),
@@ -966,7 +959,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
         let mut edit = package.edit_page_layout()?;
         edit.set_layout(changed_layout(before)?)?;
         assert!(matches!(edit.commit(), Err(PageLayoutError::InvalidSource)));
-        assert_eq!(package.source_bytes(), adversarial);
+        assert_eq!(exact_bytes(&package)?, adversarial);
     }
     Ok(())
 }
@@ -982,7 +975,7 @@ fn legacy_nested_source_allows_noop_but_refuses_changed_layout() -> TestResult {
     noop.set_layout(before)?;
     let noop = noop.commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(noop.package())?, bytes);
 
     let mut edit = package.edit_page_layout()?;
     edit.set_layout(changed_layout(before)?)?;
@@ -990,7 +983,7 @@ fn legacy_nested_source_allows_noop_but_refuses_changed_layout() -> TestResult {
         edit.commit(),
         Err(PageLayoutError::UnsupportedSource)
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -1033,7 +1026,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     let mut growth = unconstrained.edit_page_layout()?;
     growth.set_layout(full_layout()?)?;
     let growth = growth.commit()?;
-    assert!(growth.package().source_bytes().len() > bytes.len());
+    assert!(exact_bytes(growth.package())?.len() > bytes.len());
 
     let limits = Limits::new(
         u64::try_from(bytes.len())?,
@@ -1052,7 +1045,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
 }
 
@@ -1061,7 +1054,7 @@ fn public_transactions_are_send_sync_and_concurrent_reads_are_stable() -> TestRe
     let bytes = synthetic_package(full_layout()?, true, true)?;
     let package = Arc::new(Package::from_bytes(&bytes)?);
     let expected = package.page_layout()?;
-    let pointer = package.source_bytes().as_ptr();
+    let original_bytes = exact_bytes(package.as_ref())?;
     let handles = (0..8)
         .map(|_| {
             let package = Arc::clone(&package);
@@ -1076,8 +1069,7 @@ fn public_transactions_are_send_sync_and_concurrent_reads_are_stable() -> TestRe
             expected
         );
     }
-    assert_eq!(package.source_bytes(), bytes);
-    assert_eq!(package.source_bytes().as_ptr(), pointer);
+    assert_eq!(original_bytes, bytes);
     assert_send_sync(package.as_ref());
     assert_type_send_sync::<Layout>();
     assert_type_send_sync::<PageLayoutEdit<'static>>();

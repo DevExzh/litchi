@@ -34,6 +34,19 @@ const PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jp
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
 
+trait ExactBytes {
+    fn exact_bytes(&self) -> Vec<u8>;
+}
+
+impl ExactBytes for Package {
+    fn exact_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts package bytes");
+        bytes
+    }
+}
+
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
@@ -444,13 +457,13 @@ fn no_op_is_exact_and_presence_preserving() -> TestResult {
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().touched_components(), 0);
     assert_eq!(commit.diagnostics().deleted_previews(), 0);
-    assert_eq!(commit.package().source_bytes(), source.as_slice());
+    assert_eq!(commit.package().exact_bytes(), source.as_slice());
     assert_eq!(
         commit
             .package()
             .apply_body_table_header_settings(commit.patch())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         source.as_slice()
     );
     Ok(())
@@ -474,10 +487,10 @@ fn changed_settings_preserve_unknowns_delete_previews_and_inverse_exactly() -> T
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
     assert!(commit.diagnostics().full_reparse_performed());
     assert_eq!(
-        sentinel(commit.package().source_bytes())?,
+        sentinel(&commit.package().exact_bytes())?,
         b"untouched-sentinel"
     );
-    let changed_model = model_payload(commit.package().source_bytes(), FIRST_MODEL_IDENTIFIER)?;
+    let changed_model = model_payload(&commit.package().exact_bytes(), FIRST_MODEL_IDENTIFIER)?;
     let unknown = WireView::parse(&changed_model)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
@@ -489,7 +502,7 @@ fn changed_settings_preserve_unknowns_delete_previews_and_inverse_exactly() -> T
     let restored = commit
         .package()
         .apply_body_table_header_settings(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    assert_eq!(restored.package().exact_bytes(), source.as_slice());
     assert_eq!(
         restored.package().body_table_header_settings(0usize)?,
         fixture_settings()
@@ -531,12 +544,12 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
             Catalog::from_bytes(&malformed_source)?;
             continue;
         };
-        let before = malformed.source_bytes().to_vec();
+        let before = malformed.exact_bytes();
         assert!(matches!(
             malformed.body_table_header_settings(0usize),
             Err(Error::InvalidSource) | Err(Error::LimitExceeded { .. })
         ));
-        assert_eq!(malformed.source_bytes(), before.as_slice());
+        assert_eq!(malformed.exact_bytes(), before.as_slice());
     }
     Ok(())
 }
@@ -551,7 +564,7 @@ fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze()
         .commit()
         .expect_err("a locked table must reject a changed header edit");
     assert!(matches!(locked_error, Error::TableLocked));
-    assert_eq!(locked.source_bytes(), locked_source.as_slice());
+    assert_eq!(locked.exact_bytes(), locked_source.as_slice());
 
     let dependency_source =
         append_dependency_field(&synthetic_package(["Revenue", "Costs"], None)?)?;
@@ -560,7 +573,7 @@ fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze()
         .edit_body_table_header_settings(0usize)
         .and_then(|edit| edit.set(changed_settings()).commit());
     assert!(result.is_err(), "dependent topology must fail closed");
-    assert_eq!(dependent.source_bytes(), dependency_source.as_slice());
+    assert_eq!(dependent.exact_bytes(), dependency_source.as_slice());
 
     let before = dependent.body_table_header_settings(0usize)?;
     let freeze_only = Settings {
@@ -602,7 +615,7 @@ fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestRes
         make_table_model_reference_external(&source)?,
     ] {
         let package = Package::from_bytes(&malformed_source)?;
-        let before = package.source_bytes().to_vec();
+        let before = package.exact_bytes();
         let result = package
             .edit_body_table_header_settings(0usize)
             .and_then(|edit| {
@@ -613,7 +626,7 @@ fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestRes
                 edit.set(settings).commit()
             });
         assert!(matches!(result, Err(Error::InvalidSource)));
-        assert_eq!(package.source_bytes(), before.as_slice());
+        assert_eq!(package.exact_bytes(), before.as_slice());
     }
     Ok(())
 }
@@ -628,12 +641,12 @@ fn finite_limits_fail_closed_before_publication() -> TestResult<()> {
         let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
             continue;
         };
-        let before = package.source_bytes().to_vec();
+        let before = package.exact_bytes();
         let result = package
             .edit_body_table_header_settings(0usize)
             .and_then(|edit| edit.set(changed_settings()).commit());
         if matches!(result, Err(Error::LimitExceeded { .. })) {
-            assert_eq!(package.source_bytes(), before.as_slice());
+            assert_eq!(package.exact_bytes(), before.as_slice());
             transaction_rejected = true;
             break;
         }

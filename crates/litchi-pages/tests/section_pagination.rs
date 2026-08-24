@@ -20,6 +20,19 @@ const SECTION_MESSAGE_TYPE: u32 = 10_011;
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+trait ExactBytes {
+    fn exact_bytes(&self) -> Vec<u8>;
+}
+
+impl ExactBytes for Package {
+    fn exact_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)
+            .expect("an in-memory Vec accepts package bytes");
+        bytes
+    }
+}
+
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
 
 fn assert_type_send_sync<T: Send + Sync>() {}
@@ -422,13 +435,13 @@ fn all_presence_states_round_trip_and_noops_share_source() -> TestResult<()> {
                     package.section_pagination(SectionSelector::index(0))?,
                     expected
                 );
-                let source_pointer = package.source_bytes().as_ptr();
+                let source_bytes = package.exact_bytes();
                 let mut edit = package.edit_section_pagination(SectionSelector::index(0))?;
                 edit.set_pagination(expected)?;
                 let commit = edit.commit()?;
                 assert!(commit.patch().is_noop());
-                assert_eq!(commit.package().source_bytes(), bytes);
-                assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+                assert_eq!(commit.package().exact_bytes(), bytes);
+                assert_eq!(commit.package().exact_bytes(), source_bytes);
                 assert!(!commit.diagnostics().changed());
                 assert_eq!(commit.diagnostics().touched_components(), 0);
                 assert!(!commit.diagnostics().full_reparse_performed());
@@ -463,7 +476,7 @@ fn selector_validation_and_malformed_wire_fail_before_publication() -> TestResul
         Err(SectionPaginationError::InvalidPagination(_))
     ));
     assert_eq!(edit.pagination(), empty);
-    assert_eq!(selector_package.source_bytes(), selector_bytes);
+    assert_eq!(selector_package.exact_bytes(), selector_bytes);
 
     let canonical = section_message("Alpha", empty, 7_777)?;
     let mut malformed_payloads = Vec::new();
@@ -507,7 +520,7 @@ fn selector_validation_and_malformed_wire_fail_before_publication() -> TestResul
             malformed_package.edit_section_pagination(SectionSelector::index(0)),
             Err(SectionPaginationError::InvalidSource)
         ));
-        assert_eq!(malformed_package.source_bytes(), malformed_bytes);
+        assert_eq!(malformed_package.exact_bytes(), malformed_bytes);
     }
     Ok(())
 }
@@ -527,12 +540,12 @@ fn no_op_supports_legacy_but_changed_legacy_source_is_refused() -> TestResult<()
     noop_edit.set_pagination(original)?;
     let noop_commit = noop_edit.commit()?;
     assert!(noop_commit.patch().is_noop());
-    assert_eq!(noop_commit.package().source_bytes(), legacy);
+    assert_eq!(noop_commit.package().exact_bytes(), legacy);
     assert_eq!(
         package
             .apply_section_pagination(noop_commit.patch())?
             .package()
-            .source_bytes(),
+            .exact_bytes(),
         legacy
     );
 
@@ -579,7 +592,7 @@ fn changed_pagination_preserves_opaque_content_and_inverse_restores_source() -> 
         commit.patch().source_fingerprint(),
         commit.patch().target_fingerprint()
     );
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     assert_eq!(commit.package().text()?, source_text);
     assert_eq!(
         commit
@@ -594,10 +607,10 @@ fn changed_pagination_preserves_opaque_content_and_inverse_restores_source() -> 
         unchanged
     );
 
-    let target = commit.package().source_bytes();
+    let target = commit.package().exact_bytes();
     let target_first_payload =
-        message_payload(target, FIRST_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?;
-    let target_first_header = object_header(target, FIRST_SECTION_IDENTIFIER)?;
+        message_payload(&target, FIRST_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?;
+    let target_first_header = object_header(&target, FIRST_SECTION_IDENTIFIER)?;
     assert_eq!(
         fields_except_pagination(&target_first_payload)?,
         fields_except_pagination(&source_first_payload)?
@@ -618,22 +631,22 @@ fn changed_pagination_preserves_opaque_content_and_inverse_restores_source() -> 
             .any(|field| field.number() == 99)
     );
     assert_eq!(
-        message_payload(target, SECOND_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?,
+        message_payload(&target, SECOND_SECTION_IDENTIFIER, SECTION_MESSAGE_TYPE)?,
         source_second_payload
     );
     assert_eq!(
-        message_payload(target, BODY_IDENTIFIER, 2_001)?,
+        message_payload(&target, BODY_IDENTIFIER, 2_001)?,
         source_body_payload
     );
-    assert_untouched_zip_members(&bytes, target)?;
+    assert_untouched_zip_members(&bytes, &target)?;
 
     let applied = package.apply_section_pagination(commit.patch())?;
-    assert_eq!(applied.package().source_bytes(), target);
+    assert_eq!(applied.package().exact_bytes(), target);
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.before(), after);
     assert_eq!(inverse.after(), before);
     let restored = commit.package().apply_section_pagination(&inverse)?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(restored.package().exact_bytes(), bytes);
     assert_eq!(
         restored
             .package()
@@ -672,7 +685,7 @@ fn changed_pagination_respects_retained_output_limit() -> TestResult<()> {
     let unrestricted = Package::from_bytes(&bytes)?;
     let mut unrestricted_edit = unrestricted.edit_section_pagination(SectionSelector::index(0))?;
     unrestricted_edit.set_pagination(target)?;
-    let target_length = unrestricted_edit.commit()?.package().source_bytes().len();
+    let target_length = unrestricted_edit.commit()?.package().exact_bytes().len();
     assert!(target_length > bytes.len());
 
     let maximum = u64::try_from(target_length - 1)?;
@@ -687,6 +700,6 @@ fn changed_pagination_respects_retained_output_limit() -> TestResult<()> {
             ..
         })
     ));
-    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.exact_bytes(), bytes);
     Ok(())
 }

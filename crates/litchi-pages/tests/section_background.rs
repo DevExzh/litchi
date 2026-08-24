@@ -26,6 +26,12 @@ const PRIVATE_MARKER: &str = "private-pages-background-marker-998244353";
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
 fn assert_type_send_sync<T: Send + Sync>() {}
 
@@ -317,13 +323,12 @@ fn reads_absent_solid_and_unsupported_losslessly() -> TestResult<()> {
         unsupported.section_background(SectionSelector::index(0))?,
         Background::Unsupported
     );
-    let source_pointer = unsupported.source_bytes().as_ptr();
+    let unsupported_bytes = exact_bytes(&unsupported)?;
     let noop = unsupported
         .edit_section_background(SectionSelector::index(0))?
         .commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes(), unsupported.source_bytes());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_pointer);
+    assert_eq!(exact_bytes(noop.package())?, unsupported_bytes);
     Ok(())
 }
 
@@ -443,7 +448,7 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
             source.edit_section_background(SectionSelector::index(0)),
             Err(Error::InvalidSource { .. })
         ));
-        assert_eq!(source.source_bytes(), bytes);
+        assert_eq!(exact_bytes(&source)?, bytes);
     }
     Ok(())
 }
@@ -544,12 +549,12 @@ fn color_projection_is_strict_but_preserves_supported_display_p3() -> TestResult
 fn set_clear_noop_and_patch_lifecycle_preserve_exact_source_rules() -> TestResult<()> {
     let bytes = package(None, Some(&solid_payload(0.7, 0.6, 0.5, 1.0)))?;
     let source = Package::from_bytes(&bytes)?;
-    let source_ptr = source.source_bytes().as_ptr();
+    let source_snapshot = exact_bytes(&source)?;
     let mut noop = source.edit_section_background(SectionSelector::index(0))?;
     noop.clear();
     let noop = noop.commit()?;
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().source_bytes().as_ptr(), source_ptr);
+    assert_eq!(exact_bytes(noop.package())?, source_snapshot);
     assert!(!noop.diagnostics().changed());
 
     let target_background = solid(0.1, 0.2, 0.3, 0.4);
@@ -559,7 +564,7 @@ fn set_clear_noop_and_patch_lifecycle_preserve_exact_source_rules() -> TestResul
         _ => unreachable!(),
     })?;
     let commit = edit.commit()?;
-    assert_eq!(source.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&source)?, bytes);
     assert_eq!(
         commit
             .package()
@@ -576,14 +581,12 @@ fn set_clear_noop_and_patch_lifecycle_preserve_exact_source_rules() -> TestResul
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert!(commit.diagnostics().full_reparse_performed());
     let applied = source.apply_section_background(commit.patch())?;
-    assert_eq!(
-        applied.package().source_bytes(),
-        commit.package().source_bytes()
-    );
+    let commit_bytes = exact_bytes(commit.package())?;
+    assert_eq!(exact_bytes(applied.package())?, commit_bytes);
     let restored = commit
         .package()
         .apply_section_background(&commit.patch().inverse())?;
-    assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(commit.patch().inverse().inverse(), commit.patch().clone());
 
     let unrelated = Package::from_bytes(&package(Some(&solid_payload(0.9, 0.8, 0.7, 1.0)), None)?)?;
@@ -620,17 +623,17 @@ fn clear_and_changed_legacy_sources_obey_exact_source_rules() -> TestResult<()> 
             .section_background(SectionSelector::index(0))?,
         Background::None
     );
-    let target_payload =
-        message_payload(commit.package().source_bytes(), FIRST_SECTION_IDENTIFIER)?;
+    let target_bytes = exact_bytes(commit.package())?;
+    let target_payload = message_payload(&target_bytes, FIRST_SECTION_IDENTIFIER)?;
     assert_eq!(
         fields_except_background(&target_payload)?,
         fields_except_background(&source_payload)?
     );
     assert_eq!(
-        background_payload(commit.package().source_bytes(), FIRST_SECTION_IDENTIFIER)?,
+        background_payload(&target_bytes, FIRST_SECTION_IDENTIFIER)?,
         None
     );
-    assert_untouched_zip_members(&bytes, commit.package().source_bytes())?;
+    assert_untouched_zip_members(&bytes, &target_bytes)?;
 
     let legacy = Package::from_bytes(&legacy_package_bytes(&bytes)?)?;
     let mut noop = legacy.edit_section_background(SectionSelector::index(0))?;
@@ -661,13 +664,13 @@ fn changed_background_preserves_nested_unknowns_and_package_locality() -> TestRe
         _ => unreachable!(),
     })?;
     let commit = edit.commit()?;
-    let target = commit.package().source_bytes();
-    let target_payload = message_payload(target, FIRST_SECTION_IDENTIFIER)?;
+    let target = exact_bytes(commit.package())?;
+    let target_payload = message_payload(&target, FIRST_SECTION_IDENTIFIER)?;
     assert_eq!(
         fields_except_background(&source_payload)?,
         fields_except_background(&target_payload)?
     );
-    let edited_fill = background_payload(target, FIRST_SECTION_IDENTIFIER)?
+    let edited_fill = background_payload(&target, FIRST_SECTION_IDENTIFIER)?
         .ok_or_else(|| io::Error::other("edited fill missing"))?;
     let fill_view = WireView::parse(&edited_fill)?;
     assert!(fill_view.fields().any(|field| field.number() == 98));
@@ -681,10 +684,10 @@ fn changed_background_preserves_nested_unknowns_and_package_locality() -> TestRe
             .any(|field| field.number() == 99)
     );
     assert_eq!(
-        message_payload(target, SECOND_SECTION_IDENTIFIER)?,
+        message_payload(&target, SECOND_SECTION_IDENTIFIER)?,
         source_second
     );
-    assert_untouched_zip_members(&bytes, target)?;
+    assert_untouched_zip_members(&bytes, &target)?;
     Ok(())
 }
 
@@ -698,7 +701,7 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
         clear.commit(),
         Err(Error::UnsupportedSource { .. })
     ));
-    assert_eq!(unsupported.source_bytes(), unsupported_bytes);
+    assert_eq!(exact_bytes(&unsupported)?, unsupported_bytes);
     let mut replace = unsupported.edit_section_background(SectionSelector::index(0))?;
     replace.set_solid(match solid(0.1, 0.2, 0.3, 1.0) {
         Background::Solid(value) => value,
@@ -708,7 +711,7 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
         replace.commit(),
         Err(Error::UnsupportedSource { .. })
     ));
-    assert_eq!(unsupported.source_bytes(), unsupported_bytes);
+    assert_eq!(exact_bytes(&unsupported)?, unsupported_bytes);
 
     for bytes in [
         package_with_first_message_metadata(
@@ -746,7 +749,7 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
             edit.commit(),
             Err(Error::InvalidSource { .. } | Error::UnsupportedSource { .. })
         ));
-        assert_eq!(source.source_bytes(), bytes);
+        assert_eq!(exact_bytes(&source)?, bytes);
     }
 
     let aliased = package_with_first_message_metadata(
@@ -779,7 +782,7 @@ fn output_limits_are_atomic() -> TestResult<()> {
         Background::Solid(value) => value,
         _ => unreachable!(),
     })?;
-    let target_length = edit.commit()?.package().source_bytes().len();
+    let target_length = exact_bytes(edit.commit()?.package())?.len();
     let limits = Limits::new(
         u64::try_from(target_length - 1)?,
         8,
@@ -800,6 +803,6 @@ fn output_limits_are_atomic() -> TestResult<()> {
             ..
         })
     ));
-    assert_eq!(limited.source_bytes(), bytes);
+    assert_eq!(exact_bytes(&limited)?, bytes);
     Ok(())
 }
