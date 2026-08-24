@@ -29,8 +29,7 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
     numbers_names_codec, numbers_table_cell_dependency_codec as dependency_codec,
     package_metadata_codec::{
-        ComponentDescriptor, ComponentSelector, PackageMetadataVisitor, RewriteOptions,
-        SaveTokenBatch, inspect_package_metadata_with_visitor,
+        RewriteOptions, SaveTokenBatch, inspect_package_metadata_with_visitor,
         rewrite_package_metadata_save_tokens,
     },
     table_info_codec,
@@ -1980,55 +1979,6 @@ struct MetadataRoute {
     message_index: usize,
 }
 
-struct MetadataSelectorVisitor<'source> {
-    target_locators: &'source [&'source str],
-    identifiers: Vec<Option<u64>>,
-    duplicate: bool,
-}
-
-impl<'source> MetadataSelectorVisitor<'source> {
-    fn new(target_locators: &'source [&'source str]) -> Result<Self, Error> {
-        let mut identifiers = Vec::new();
-        identifiers
-            .try_reserve_exact(target_locators.len())
-            .map_err(|_allocation| Error::Allocation {
-                amount: target_locators.len(),
-            })?;
-        identifiers.resize(target_locators.len(), None);
-        Ok(Self {
-            target_locators,
-            identifiers,
-            duplicate: false,
-        })
-    }
-}
-
-impl PackageMetadataVisitor for MetadataSelectorVisitor<'_> {
-    fn visit_component(
-        &mut self,
-        component: ComponentDescriptor<'_>,
-    ) -> Result<(), litchi_iwa_protos::package_metadata_codec::RewriteError> {
-        if !component.is_current() {
-            return Ok(());
-        }
-        // The visitor is initialized with one slot per selected native
-        // component. Matching by effective locator makes the metadata route
-        // independent of whether ComponentInfo stores locator or preferred
-        // locator, while retaining the codec's exact identifier check.
-        for (index, locator) in self.target_locators.iter().enumerate() {
-            if component.effective_locator() == *locator {
-                if self.identifiers[index].is_some() {
-                    self.duplicate = true;
-                } else {
-                    self.identifiers[index] = Some(component.identifier());
-                }
-                break;
-            }
-        }
-        Ok(())
-    }
-}
-
 fn metadata_route(source: &Package) -> Result<MetadataRoute, Error> {
     let route = super::metadata::unique_message_route(source).ok_or(Error::InvalidSource)?;
     let object = source
@@ -2179,26 +2129,19 @@ fn rewrite_metadata_entry(
             .ok_or(Error::InvalidSource)?;
         target_locators.push(super::metadata::normalized_locator(component.name()));
     }
-    let mut visitor = MetadataSelectorVisitor::new(&target_locators)?;
+    let mut visitor = super::metadata::ComponentSelectorVisitor::new(&target_locators)
+        .map_err(|amount| Error::Allocation { amount })?;
     let options =
         metadata_rewrite_options(source, metadata_message.data.len(), target_locators.len())?;
     inspect_package_metadata_with_visitor(metadata_message.data.as_slice(), options, &mut visitor)
         .map_err(map_metadata_codec_error)?;
-    if visitor.duplicate || visitor.identifiers.iter().any(Option::is_none) {
-        return Err(Error::InvalidSource);
-    }
-    let mut selectors = Vec::new();
-    selectors
-        .try_reserve_exact(visitor.identifiers.len())
-        .map_err(|_allocation| Error::Allocation {
-            amount: visitor.identifiers.len(),
-        })?;
-    for (index, identifier) in visitor.identifiers.into_iter().enumerate() {
-        selectors.push(ComponentSelector::new(
-            identifier.ok_or(Error::InvalidSource)?,
-            target_locators[index],
-        ));
-    }
+    let selectors = visitor.into_selectors().map_err(|amount| {
+        if amount == 0 {
+            Error::InvalidSource
+        } else {
+            Error::Allocation { amount }
+        }
+    })?;
     let batch = SaveTokenBatch::new(&selectors);
     let rewritten_payload =
         rewrite_package_metadata_save_tokens(metadata_message.data.as_slice(), batch, options)
