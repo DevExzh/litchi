@@ -4964,3 +4964,29 @@ evidence for the pre-Keynote focused candidate. Keynote's normalized artifact
 does not pass the focused strict re-ingress policy; no Rust/native parity,
 arbitrary graph acceptance, performance/RSS, durable publication,
 full-workspace, or monolith-exit claim follows.
+
+## 2026-08-25 amendment: Wave74 full Keynote movie-caption owner (not a monolith-exit gate)
+
+Implementation commit `40c3d0b217e4b17304efca24c6a81b9d1240246b`
+moves the canonical Keynote file-movie caption lifecycle behind the
+selector-first `litchi-keynote::Package` owner. The focused owner now performs
+read, no-op, replacement, stand-in-to-four-object creation, active-caption-to-
+fresh-stand-in removal, Metadata UUID/watermark/save-token updates, preview and
+locality verification, exact patch inverse, and candidate reopen. The
+`litchi-iwa` compatibility host delegates through typed slide/movie selectors;
+its raw caption ID methods and legacy caption graph fallback are retired.
+
+This is a bounded owner slice, not a monolith-exit gate. Movie-title CRUD and
+broader movie/media/build/theme compatibility remain in `litchi-iwa`.
+Noncanonical, cross-component, shared, or unproven caption graphs continue to
+fail closed rather than expanding the accepted producer graph. The
+`litchi-iwa` to `litchi-keynote` dependency edge, its ordered migration debt,
+the compatibility host, generated schema/Buffa/Prost owners, and the IWA
+monolith remain; no crate, dependency edge, debt item, generated owner, or
+normal Prost edge is deleted by Wave74.
+
+The fresh Keynote 14.4 record establishes bounded creation/removal
+open/render/save/close/reopen acceptance and Rust structural reread of the
+normalized packages. It does not establish byte parity, arbitrary native graph
+acceptance, performance/RSS, full-workspace health, or a host/edge/debt/
+monolith retirement gate.

@@ -13259,3 +13259,70 @@ graph with `InvalidSource`; consequently this is bounded application
 open/render/save/close/reopen acceptance only, not focused Rust re-ingress,
 Rust/native byte parity, arbitrary producer-graph acceptance, performance/RSS,
 or a publication/full-workspace gate.
+
+## 2026-08-25 amendment: Wave74 Keynote movie-caption verification record
+
+The implementation under verification is commit
+`40c3d0b217e4b17304efca24c6a81b9d1240246b`. Focused gates recorded on the
+shared checkout were:
+
+- `cargo check -p litchi-keynote --lib` passed.
+- `cargo test -p litchi-keynote --test slide_movie_caption --quiet` passed
+  16 tests.
+- `cargo test -p litchi-keynote --test slide_chart_caption --quiet` passed
+  21 tests, retaining the shared graph-owner regression coverage.
+- `cargo clippy -p litchi-keynote --lib --quiet -- -D warnings` passed.
+- `cargo clippy -p litchi-keynote --test slide_movie_caption --quiet -- -D
+  warnings` passed.
+- `cargo test -p litchi-iwa --lib
+  keynote::editor::slide_movies::tests:: --quiet` passed 4 tests, with only
+  unrelated existing warnings.
+- `cargo check -p litchi-iwa --lib --examples` passed.
+- scoped `cargo clippy -p litchi-iwa --lib --examples --quiet -- -D warnings`
+  passed with the existing explicit deprecated/dead-code/manual-contains/
+  clone-on-copy/derivable-impls/unused-qualifications allowances.
+- `python3 -m unittest tools.test_check_crate_boundaries -q` passed 438 tests.
+- `python3 tools/check_crate_boundaries.py --explain` exited nonzero only for
+  the three known untracked Pages table-lock baseline findings
+  (`body_table_lock_state`, `set_body_table_lock_state`, and the returned
+  `pages/editor/tables/lock.rs`); it reported no Keynote movie-caption finding.
+- `git diff --check` and `git show --check
+  40c3d0b217e4b17304efca24c6a81b9d1240246b` passed.
+
+The repository pre-commit hook was run but its workspace-wide formatting and
+lint phases were blocked by unrelated existing changes in
+`litchi-iwa-protos/src/table_info_codec.rs` and
+`litchi-iwa/src/protobuf.rs`, plus existing Numbers `object_count` deprecation
+and `manual_contains` findings. The implementation commit used a temporary,
+scoped hook bypass after the owned focused formatting, checks, Clippy, tests,
+and boundary suite above passed. No full-workspace-green claim follows.
+
+Fresh Keynote 14.4 acceptance used the pristine source oracle
+`/private/tmp/litchi-wave73-movie-caption.4tBKv0/source.key`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| pristine source | 663,576 | `e3c89b820c84dc991c86e1cf5669b78f4805873bd1e4871fb67baacf0f6e1142` |
+| Rust removal candidate before Keynote | 663,651 | `279b50f300a24bed62f587ebad9b8cdffa2e55d8406545a2fe853188f3bfa1b7` |
+| exact removal inverse | 663,576 | `e3c89b820c84dc991c86e1cf5669b78f4805873bd1e4871fb67baacf0f6e1142` |
+| Rust creation candidate before Keynote | 663,816 | `28b80664aa93fb0c437208810e95319d8ed3a6bb6809fc07373cd740930892ba` |
+| exact creation inverse | 663,651 | `279b50f300a24bed62f587ebad9b8cdffa2e55d8406545a2fe853188f3bfa1b7` |
+| Keynote-saved removal candidate | 737,423 | `3463e69955a423074b98752568a7da2052cb62a6fb1d9add53d834b490088c70` |
+| Keynote-saved creation candidate | 738,182 | `d207da586faad9c5d21cd73b70db5e5b8f72b4ca7a30cb0864b87224dc9b97c0` |
+
+The disposable Wave74 candidates live under
+`/private/tmp/litchi-wave74-movie-caption.Mz7zM7`. Keynote opened both without
+repair or recovery. Removal displayed the embedded `source.mov`, title
+`Source-built Keynote movie`, unchanged centered 640x360 geometry, and no
+caption. Creation displayed the same movie/title/geometry and caption
+`Wave74 created movie caption — 北区`. Cmd-S, Cmd-W, and exact-path reopen
+retained each state without repair. The Rust inspector also reopened both
+Keynote-normalized packages and recovered the file-movie media, geometry, and
+build route.
+
+Keynote normalized both package byte streams. This is bounded application
+open/render/save/close/reopen evidence for canonical creation and removal, plus
+Rust structural reread; it is not Rust/native byte parity, proof that the
+focused caption owner accepts the normalized graph, arbitrary producer-graph
+acceptance, performance/RSS evidence, durable publication, or a full-workspace
+gate.

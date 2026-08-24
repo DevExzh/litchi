@@ -2781,3 +2781,34 @@ host routes active-caption reads/replacements through the focused package but
 retains title CRUD and legacy caption create/remove graph lifecycle. This is a
 bounded semantic owner, not a raw-ID replacement API or full movie lifecycle
 retirement.
+
+## 2026-08-25 amendment: full Keynote movie-caption lifecycle ownership
+
+Implementation commit `40c3d0b217e4b17304efca24c6a81b9d1240246b`
+completes the canonical focused movie-caption lifecycle. The selector-first
+surface remains
+`Package::{slide_movie_caption, edit_slide_movie_caption,
+apply_slide_movie_caption}` with `SlideSelector` and `MovieSelector`;
+`SlideMovieCaptionEdit::{set, clear}` now admits exact no-ops, active-caption
+replacement, canonical stand-in-to-caption creation, and active-caption-to-new-
+stand-in removal. `SlideMovieCaptionPatch` retains exact source and target
+artifacts, supports exact inverse application, and publishes no native object
+identifier.
+
+Creation is deliberately narrow: a canonical, co-located, exclusively owned
+stand-in is replaced by a four-object caption graph (style, info, storage, and
+placement). Removal redirects the selected movie to a fresh stand-in while
+retaining the old caption graph and its UUID registrations. Both routes update
+the exact current Metadata component selector, UUID registry, root object-ID
+watermark, root save token, and selected component save token in the same
+publication transaction. Malformed, shared, ambiguously owned, resource-owned,
+cross-component, or otherwise unproven graphs fail closed.
+
+The compatibility host now exposes only selector-typed movie-caption methods
+and delegates reads, replacement, creation, and removal to this package owner.
+Its raw movie-caption ID methods and legacy caption graph fallback are retired.
+Movie-title mutation remains a separate compatibility-host responsibility and
+retains its legacy raw-ID methods; this amendment does not claim a full movie
+or Keynote-host retirement. The selected MovieArchive caption edge continues
+through the hidden strict handwritten codec; generated schemas, Buffa
+projections, and Prost types do not cross the public Keynote facade.
