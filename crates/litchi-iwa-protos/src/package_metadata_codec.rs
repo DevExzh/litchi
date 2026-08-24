@@ -2340,6 +2340,70 @@ mod tests {
     }
 
     #[test]
+    fn combined_absent_tokens_replay_exact_work_and_fields_before_allocation() {
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = UuidBits::new(10, 20);
+        let source = metadata(10, &[component(1, "a.iwa", None, &[(5, uuid)], &[])], &[]);
+        let removals = [ObjectUuidRemoval::new(selector, 5, uuid)];
+        let batch = RemovalSaveTokenBatch::new(
+            RemovalBatch::new(10, &removals, &[], &[]),
+            SaveTokenBatch::new(core::slice::from_ref(&selector)),
+        );
+
+        // This source omits both root field 8 and selected component field
+        // 12.  The candidate therefore grows by two fields, and both
+        // verification traversals must be covered by the exact report.
+        reset_work_charges();
+        let baseline =
+            rewrite_package_metadata_removals_and_save_tokens(&source, batch, options(&source))
+                .unwrap();
+        let report = baseline.report();
+        assert_eq!(work_charges(), report.work_bytes());
+        assert_eq!(scalar_values(baseline.bytes(), 8), vec![1]);
+        assert_eq!(component_scalar_values(baseline.bytes(), 1, 12), vec![1]);
+
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.removals(),
+        );
+        reset_work_charges();
+        let allocations = output_allocations();
+        let replay = rewrite_package_metadata_removals_and_save_tokens(&source, batch, exact)
+            .expect("absent-token report must be replayable at exact limits");
+        assert_eq!(replay.bytes(), baseline.bytes());
+        assert_eq!(replay.report(), report);
+        assert_eq!(work_charges(), report.work_bytes());
+        assert_eq!(output_allocations(), allocations + 1);
+
+        for (fields, work) in [
+            (report.fields().saturating_sub(1), report.work_bytes()),
+            (report.fields(), report.work_bytes().saturating_sub(1)),
+        ] {
+            let limited = RewriteOptions::new(
+                source.len(),
+                report.output_bytes(),
+                fields,
+                work,
+                report.max_depth(),
+                report.components_scanned(),
+                report.references_scanned(),
+                report.removals(),
+            );
+            let before = output_allocations();
+            let error = rewrite_package_metadata_removals_and_save_tokens(&source, batch, limited)
+                .expect_err("max-minus-one candidate budget must fail before allocation");
+            assert!(error.resource_limit().is_some());
+            assert_eq!(output_allocations(), before);
+        }
+    }
+
+    #[test]
     fn removal_output_limit_is_inclusive_and_max_minus_one_precedes_allocation() {
         let selector = ComponentSelector::new(1, "a.iwa");
         let uuid = UuidBits::new(10, 20);
@@ -4131,8 +4195,44 @@ fn charge_combined_candidate_verification(
         None,
         budget,
     )?;
+    // Both verification traversals consume the candidate message.  The
+    // source scan above is a conservative shape for each traversal, but a
+    // token append can make the candidate larger than the source.  Charge
+    // that growth for both traversals; otherwise a highly compressible
+    // metadata payload with absent tokens could cross the work limit only
+    // after the output allocation.
     if output_size > source.len() {
-        budget.work(output_size - source.len())?;
+        let growth = output_size - source.len();
+        budget.work(
+            growth
+                .checked_mul(2)
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+        )?;
+    }
+
+    // `scan_removal_metadata` and `scan_save_token_metadata` both parse every
+    // candidate field.  The source scan cannot see the root field 8 or a
+    // selected component field 12 that the rewrite will append, so charge
+    // those fields once per candidate traversal before reserving the output.
+    let inserted_fields = usize::from(save_state.root_token.is_none())
+        .checked_add(
+            save_state
+                .selectors
+                .iter()
+                .filter(|matched| {
+                    matched.identifier == 1
+                        && matched.locator == 1
+                        && matched.exact == 1
+                        && matched.token.is_none()
+                })
+                .count(),
+        )
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let inserted_fields = inserted_fields
+        .checked_mul(2)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    for _ in 0..inserted_fields {
+        budget.field()?;
     }
     let _ = new_root;
     Ok(())
@@ -4154,13 +4254,13 @@ fn rewrite_combined_into(
             8 => {
                 let _ = field.varint()?;
                 has_root_token = true;
-                put_varint_field(output, 8, new_root);
+                checked_put_varint_field(output, 8, new_root)?;
             },
-            _ => output.extend_from_slice(field.raw),
+            _ => checked_append(output, field.raw)?,
         }
     }
     if !has_root_token {
-        put_varint_field(output, 8, new_root);
+        checked_put_varint_field(output, 8, new_root)?;
     }
     Ok(())
 }
@@ -4179,16 +4279,16 @@ fn rewrite_combined_component(
         source, identifier, locator, batch, new_root, true, budget, depth,
     )?;
     if !changed {
-        output.extend_from_slice(field.raw);
+        checked_append(output, field.raw)?;
         return Ok(());
     }
     budget.changed_component()?;
-    put_key(output, field.number, 2);
-    put_varint(
+    checked_put_key(output, field.number, 2)?;
+    checked_put_varint(
         output,
         u64::try_from(size)
             .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
-    );
+    )?;
     rewrite_combined_component_payload(
         source, identifier, locator, batch, new_root, output, budget, depth,
     )?;
@@ -4243,13 +4343,13 @@ fn rewrite_combined_component_payload(
                     return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
                 }
                 token_seen = true;
-                put_varint_field(output, 12, new_root);
+                checked_put_varint_field(output, 12, new_root)?;
             },
-            _ => output.extend_from_slice(field.raw),
+            _ => checked_append(output, field.raw)?,
         }
     }
     if selected_token && !token_seen {
-        put_varint_field(output, 12, new_root);
+        checked_put_varint_field(output, 12, new_root)?;
     }
     Ok(())
 }
@@ -5563,7 +5663,7 @@ fn rewrite_data_reference_field(
     let source = field.bytes()?;
     let rewrite = data_reference_rewrite(source, component, locator, batch, budget, depth)?;
     if rewrite.selected == 0 {
-        output.extend_from_slice(field.raw);
+        checked_append(output, field.raw)?;
         return Ok(());
     }
     if rewrite.surviving_owners == 0 {
@@ -5578,12 +5678,12 @@ fn rewrite_data_reference_field(
     }
     let data_identifier =
         data_identifier.ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
-    put_key(output, 7, 2);
-    put_varint(
+    checked_put_key(output, 7, 2)?;
+    checked_put_varint(
         output,
         u64::try_from(rewrite.payload_size)
             .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
-    );
+    )?;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         if field.number == 2 {
@@ -5605,7 +5705,7 @@ fn rewrite_data_reference_field(
                 continue;
             }
         }
-        output.extend_from_slice(field.raw);
+        checked_append(output, field.raw)?;
     }
     Ok(())
 }
@@ -6501,6 +6601,46 @@ fn repeated_counter(measured: usize, current: usize) -> Result<usize, RewriteErr
 fn put_varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
     put_key(output, number, 0);
     put_varint(output, value);
+}
+
+/// Append to an already exactly-sized candidate without allowing an implicit
+/// `Vec` growth.  A sizing/rewrite disagreement is an atomic allocation
+/// error, not a silent capacity expansion after preflight.
+fn checked_append(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), RewriteError> {
+    let required = output
+        .len()
+        .checked_add(bytes.len())
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    if required > output.capacity() {
+        return Err(RewriteError::allocation(required));
+    }
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn checked_put_key(output: &mut Vec<u8>, number: u32, wire: u8) -> Result<(), RewriteError> {
+    checked_put_varint(output, (u64::from(number) << 3) | u64::from(wire))
+}
+
+fn checked_put_varint(output: &mut Vec<u8>, value: u64) -> Result<(), RewriteError> {
+    let required = output
+        .len()
+        .checked_add(encoded_varint_len(value))
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    if required > output.capacity() {
+        return Err(RewriteError::allocation(required));
+    }
+    put_varint(output, value);
+    Ok(())
+}
+
+fn checked_put_varint_field(
+    output: &mut Vec<u8>,
+    number: u32,
+    value: u64,
+) -> Result<(), RewriteError> {
+    checked_put_key(output, number, 0)?;
+    checked_put_varint(output, value)
 }
 
 fn put_key(output: &mut Vec<u8>, number: u32, wire: u8) {
