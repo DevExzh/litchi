@@ -111,6 +111,39 @@ pub enum DataReferencePruning<'a> {
     All,
 }
 
+/// Reference kind carried by physical `ArchiveInfo` metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ArchiveReferenceKind {
+    /// An archive-object identifier.
+    Object,
+    /// A package data identifier.
+    Data,
+}
+
+/// Location of one reference occurrence inside an archive object's metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ArchiveReferenceScope {
+    /// The aggregate list on one `MessageInfo`.
+    Message,
+    /// A list on one nested `FieldInfo`.
+    Field { field_index: usize },
+}
+
+/// One source-authoritative physical metadata reference occurrence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ArchiveReferenceOccurrence {
+    pub object_identifier: u64,
+    pub message_index: usize,
+    pub scope: ArchiveReferenceScope,
+    pub kind: ArchiveReferenceKind,
+    pub referenced_identifier: u64,
+}
+
+/// Visitor for bounded archive-reference inspection.
+pub trait ArchiveReferenceVisitor {
+    fn visit_reference(&mut self, occurrence: ArchiveReferenceOccurrence) -> Result<()>;
+}
+
 impl DataReferencePruning<'_> {
     const fn is_none(self) -> bool {
         matches!(self, Self::None | Self::Selected([]))
@@ -704,6 +737,112 @@ impl ArchiveObject {
             && self.data_length == other.data_length
             && self.original_header == other.original_header
             && self.original_canonical_header == other.original_canonical_header
+    }
+
+    /// Stream every aggregate and field-level object/data reference.
+    ///
+    /// The retained raw header is preflighted under the same rule used for
+    /// publication, then cross-checked against the neutral projection before
+    /// callbacks begin. This keeps producer-authored framing authoritative
+    /// without exposing raw header bytes to format owners.
+    pub fn inspect_references(&self, visitor: &mut impl ArchiveReferenceVisitor) -> Result<usize> {
+        self.inspect_references_with_limits(visitor, Limits::default())
+    }
+
+    /// Stream physical metadata references under explicit resource limits.
+    pub fn inspect_references_with_limits(
+        &self,
+        visitor: &mut impl ArchiveReferenceVisitor,
+        limits: Limits,
+    ) -> Result<usize> {
+        let limits = limits.validate()?;
+        self.validate_with_limits(limits)?;
+        let canonical = encode_archive_info(&self.archive_info, limits)?;
+        let source_header = match (
+            self.original_header.as_deref(),
+            self.original_canonical_header.as_deref(),
+        ) {
+            (Some(original), Some(original_canonical))
+                if original_canonical == canonical.as_slice() =>
+            {
+                original
+            },
+            _ => canonical.as_slice(),
+        };
+        preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
+        let decoded = ArchiveInfo::decode_with_limits(source_header, limits)?;
+        if decoded != self.archive_info {
+            return Err(Error::invalid_archive(
+                0,
+                "source ArchiveInfo does not match its neutral projection",
+            ));
+        }
+        let object_identifier = decoded
+            .identifier
+            .ok_or_else(|| Error::invalid_archive(0, "object identifier is missing"))?;
+        let mut occurrences = 0usize;
+        for (message_index, message) in decoded.message_infos.iter().enumerate() {
+            for (kind, identifiers) in [
+                (
+                    ArchiveReferenceKind::Object,
+                    message.object_references.as_slice(),
+                ),
+                (
+                    ArchiveReferenceKind::Data,
+                    message.data_references.as_slice(),
+                ),
+            ] {
+                for referenced_identifier in identifiers {
+                    occurrences = occurrences.checked_add(1).ok_or_else(|| {
+                        Error::invalid_archive(message_index, "reference count overflow")
+                    })?;
+                    if occurrences > limits.max_metadata_items() {
+                        return Err(limit(
+                            LimitKind::MetadataItems,
+                            occurrences,
+                            limits.max_metadata_items(),
+                        ));
+                    }
+                    visitor.visit_reference(ArchiveReferenceOccurrence {
+                        object_identifier,
+                        message_index,
+                        scope: ArchiveReferenceScope::Message,
+                        kind,
+                        referenced_identifier: *referenced_identifier,
+                    })?;
+                }
+            }
+            for (field_index, field) in message.field_infos.iter().enumerate() {
+                for (kind, identifiers) in [
+                    (
+                        ArchiveReferenceKind::Object,
+                        field.object_references.as_slice(),
+                    ),
+                    (ArchiveReferenceKind::Data, field.data_references.as_slice()),
+                ] {
+                    for referenced_identifier in identifiers {
+                        occurrences = occurrences.checked_add(1).ok_or_else(|| {
+                            Error::invalid_archive(message_index, "reference count overflow")
+                        })?;
+                        if occurrences > limits.max_metadata_items() {
+                            return Err(limit(
+                                LimitKind::MetadataItems,
+                                occurrences,
+                                limits.max_metadata_items(),
+                            ));
+                        }
+                        visitor.visit_reference(ArchiveReferenceOccurrence {
+                            object_identifier,
+                            message_index,
+                            scope: ArchiveReferenceScope::Field { field_index },
+                            kind,
+                            referenced_identifier: *referenced_identifier,
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(occurrences)
     }
 
     /// Replace one payload and synchronize its physical metadata atomically.
@@ -5535,7 +5674,8 @@ fn encode_varint(mut value: u64, output: &mut [u8; MAX_VARINT_BYTES]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::{
-        Archive, ArchiveObject, DataReferencePruning, Error, FieldInfo,
+        Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
+        ArchiveReferenceScope, ArchiveReferenceVisitor, DataReferencePruning, Error, FieldInfo,
         FieldObjectReferenceTransition, ObjectReferenceTransition, RawMessage, encode_archive_info,
         encode_varint, encode_varint_with_width, varint_len,
     };
@@ -5562,6 +5702,69 @@ mod tests {
     struct ReferenceTransitionFixture {
         source: Vec<u8>,
         transitioned_header: Vec<u8>,
+    }
+
+    #[derive(Default)]
+    struct ReferenceFacts(Vec<ArchiveReferenceOccurrence>);
+
+    impl ArchiveReferenceVisitor for ReferenceFacts {
+        fn visit_reference(&mut self, occurrence: ArchiveReferenceOccurrence) -> Result<()> {
+            self.0.push(occurrence);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn reference_inspection_streams_aggregate_and_field_occurrences() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 7,
+                data: vec![1],
+            }],
+        )?;
+        let message = &mut object.archive_info.message_infos[0];
+        message.object_references = vec![10, 10];
+        message.data_references = vec![20];
+        let mut field = FieldInfo::new(vec![1, 2]);
+        field.object_references = vec![11];
+        field.data_references = vec![21, 21];
+        message.field_infos.push(field);
+
+        let mut facts = ReferenceFacts::default();
+        assert_eq!(object.inspect_references(&mut facts)?, 6);
+        assert_eq!(facts.0.len(), 6);
+        assert_eq!(facts.0[0].object_identifier, 42);
+        assert_eq!(facts.0[0].scope, ArchiveReferenceScope::Message);
+        assert_eq!(facts.0[0].kind, ArchiveReferenceKind::Object);
+        assert_eq!(facts.0[0].referenced_identifier, 10);
+        assert_eq!(
+            facts.0[3].scope,
+            ArchiveReferenceScope::Field { field_index: 0 }
+        );
+        assert_eq!(facts.0[3].referenced_identifier, 11);
+        assert_eq!(facts.0[4].kind, ArchiveReferenceKind::Data);
+        Ok(())
+    }
+
+    #[test]
+    fn reference_inspection_enforces_metadata_limit_before_late_callbacks() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 7,
+                data: vec![1],
+            }],
+        )?;
+        object.archive_info.message_infos[0].object_references = vec![10, 11, 12];
+        let limits = Limits::default().with_metadata_items(3)?;
+        let mut facts = ReferenceFacts::default();
+        let error = object
+            .inspect_references_with_limits(&mut facts, limits)
+            .unwrap_err();
+        assert!(matches!(error, Error::Limit { .. }));
+        assert!(facts.0.is_empty());
+        Ok(())
     }
 
     #[test]
