@@ -65,7 +65,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_loop_mode(Some(MediaLoopMode::Repeat))
             .with_volume(Some(MediaVolume::new(0.75)?)),
     )?;
-    editor.set_slide_movie_title(0, created.drawable_object_id, "Source-built Keynote movie")?;
+    editor.set_slide_movie_title_by_selector(
+        litchi_core::Position::new(0),
+        litchi_keynote::MovieSelector::index(0),
+        "Source-built Keynote movie",
+    )?;
     editor.set_slide_movie_caption_by_selector(
         litchi_core::Position::new(0),
         litchi_keynote::MovieSelector::index(0),

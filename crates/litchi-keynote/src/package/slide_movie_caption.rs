@@ -37,6 +37,36 @@ const DRAWABLE_PARENT_FIELD: u32 = 2;
 
 const MAX_CAPTION_BYTES: usize = 64 * 1024 * 1024;
 
+/// The two semantic text edges exposed by a Keynote movie drawable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MovieTextKind {
+    Caption,
+    Title,
+}
+
+impl MovieTextKind {
+    const fn expected_child_info_kind(self) -> i32 {
+        match self {
+            Self::Caption => 1,
+            Self::Title => 2,
+        }
+    }
+
+    const fn edge_field_path(self) -> [u32; 2] {
+        match self {
+            Self::Caption => [11, 1],
+            Self::Title => [10, 1],
+        }
+    }
+
+    fn accepts_edge_path(self, path: &[u32]) -> bool {
+        let field = self.edge_field_path()[0];
+        matches!(path, [number, 1] if *number == field)
+            || matches!(path, [1, number, 1] if *number == field)
+            || matches!(path, [1, 1, number, 1] if *number == field)
+    }
+}
+
 /// A finite resource governed while a movie-caption transaction is prepared
 /// or published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -262,6 +292,9 @@ impl<'a> SlideMovieCaptionEdit<'a> {
         budget
             .charge_catalog_scan(self.source)
             .map_err(map_chart_caption_error)?;
+        budget
+            .charge_selection_scan(self.source, 1)
+            .map_err(map_chart_caption_error)?;
         let (package, touched_components, deleted_previews) =
             match (self.selection.storage_identifier, self.after.as_deref()) {
                 (Some(storage_identifier), Some(desired)) => {
@@ -311,6 +344,9 @@ impl<'a> SlideMovieCaptionEdit<'a> {
                 },
                 (None, None) => return Err(SlideMovieCaptionError::InvalidSource),
             };
+        budget
+            .charge_selection_scan(&package, 1)
+            .map_err(map_chart_caption_error)?;
         let candidate = select_caption(
             &package,
             SlideSelector::position(self.selection.slide_position),
@@ -320,6 +356,9 @@ impl<'a> SlideMovieCaptionEdit<'a> {
         if !candidate.same_movie_identity(&self.selection) || candidate.text != self.after {
             return Err(SlideMovieCaptionError::Verification);
         }
+        budget
+            .charge_validation_scan(&package, 1)
+            .map_err(map_chart_caption_error)?;
         if self.selection.storage_identifier.is_some() && candidate.storage_identifier.is_some() {
             super::slide_chart_caption::verify_existing_text_metadata_candidate(
                 self.source,
@@ -611,6 +650,9 @@ impl Package {
             .charge_catalog_scan(self)
             .map_err(map_chart_caption_error)?;
         budget
+            .charge_selection_scan(self, 1)
+            .map_err(map_chart_caption_error)?;
+        budget
             .charge_exact_artifacts(source.len(), patch.artifacts.target().len())
             .map_err(map_chart_caption_error)?;
         budget
@@ -620,6 +662,9 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
+        budget
+            .charge_selection_scan(&candidate, 1)
+            .map_err(map_chart_caption_error)?;
         let selected = select_caption(
             &candidate,
             SlideSelector::position(patch.selection.slide_position),
@@ -629,6 +674,9 @@ impl Package {
         if !selected.same_identity(&patch.target_selection) || selected.text != patch.after {
             return Err(SlideMovieCaptionError::Verification);
         }
+        budget
+            .charge_validation_scan(&candidate, 1)
+            .map_err(map_chart_caption_error)?;
         if patch.selection.storage_identifier.is_some()
             && patch.target_selection.storage_identifier.is_some()
         {
@@ -700,23 +748,23 @@ impl Package {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct MovieCaptionSelection {
-    slide_position: Position,
-    movie_position: Position,
-    slide_identifier: u64,
-    slide_node_identifier: u64,
-    movie_identifier: u64,
-    slide_component_name: String,
-    reference_identifier: Option<u64>,
-    caption_info_identifier: Option<u64>,
-    storage_identifier: Option<u64>,
-    placement_identifier: Option<u64>,
-    style_identifier: Option<u64>,
-    text: Option<String>,
+pub(super) struct MovieCaptionSelection {
+    pub(super) slide_position: Position,
+    pub(super) movie_position: Position,
+    pub(super) slide_identifier: u64,
+    pub(super) slide_node_identifier: u64,
+    pub(super) movie_identifier: u64,
+    pub(super) slide_component_name: String,
+    pub(super) reference_identifier: Option<u64>,
+    pub(super) caption_info_identifier: Option<u64>,
+    pub(super) storage_identifier: Option<u64>,
+    pub(super) placement_identifier: Option<u64>,
+    pub(super) style_identifier: Option<u64>,
+    pub(super) text: Option<String>,
 }
 
 impl MovieCaptionSelection {
-    fn same_movie_identity(&self, other: &Self) -> bool {
+    pub(super) fn same_movie_identity(&self, other: &Self) -> bool {
         self.slide_position == other.slide_position
             && self.movie_position == other.movie_position
             && self.slide_identifier == other.slide_identifier
@@ -725,7 +773,7 @@ impl MovieCaptionSelection {
             && self.slide_component_name == other.slide_component_name
     }
 
-    fn same_identity(&self, other: &Self) -> bool {
+    pub(super) fn same_identity(&self, other: &Self) -> bool {
         self.same_movie_identity(other)
             && self.reference_identifier == other.reference_identifier
             && self.caption_info_identifier == other.caption_info_identifier
@@ -740,6 +788,24 @@ fn select_caption(
     slide_selector: SlideSelector<'_>,
     movie_selector: MovieSelector,
     mutation_guards: bool,
+) -> Result<MovieCaptionSelection, SlideMovieCaptionError> {
+    select_movie_text(
+        package,
+        slide_selector,
+        movie_selector,
+        mutation_guards,
+        MovieTextKind::Caption,
+    )
+}
+
+/// Resolve either the movie caption or title edge while retaining one strict
+/// ownership census and one semantic selection representation.
+pub(super) fn select_movie_text(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    mutation_guards: bool,
+    kind: MovieTextKind,
 ) -> Result<MovieCaptionSelection, SlideMovieCaptionError> {
     let slide_position = resolve_slide_position(package, slide_selector)?;
     let record = package
@@ -815,8 +881,15 @@ fn select_caption(
     if movie_parent_identifier(movie_payload, limits)? != record.slide_identifier {
         return Err(SlideMovieCaptionError::InvalidSource);
     }
-    let reference_identifier = movie_snapshot.caption_identifier();
-    if reference_identifier.is_some() && reference_identifier == movie_snapshot.title_identifier() {
+    let reference_identifier = match kind {
+        MovieTextKind::Caption => movie_snapshot.caption_identifier(),
+        MovieTextKind::Title => movie_snapshot.title_identifier(),
+    };
+    let opposite_identifier = match kind {
+        MovieTextKind::Caption => movie_snapshot.title_identifier(),
+        MovieTextKind::Title => movie_snapshot.caption_identifier(),
+    };
+    if reference_identifier.is_some() && reference_identifier == opposite_identifier {
         return Err(SlideMovieCaptionError::InvalidSource);
     }
     if mutation_guards {
@@ -851,7 +924,7 @@ fn select_caption(
             return Err(SlideMovieCaptionError::InvalidSource);
         }
         if mutation_guards {
-            prove_exclusive_caption_standin(package, movie_identifier, reference_identifier)?;
+            prove_exclusive_caption_standin(package, movie_identifier, reference_identifier, kind)?;
         }
         return Ok(empty(Some(reference_identifier)));
     }
@@ -872,7 +945,7 @@ fn select_caption(
         || snapshot.deprecated_storage_identifier() != Some(storage_identifier)
         || snapshot.parent_identifier() != movie_identifier
         || snapshot.is_text_box() != Some(true)
-        || snapshot.child_info_kind() != Some(1)
+        || snapshot.child_info_kind() != Some(kind.expected_child_info_kind())
     {
         return Err(SlideMovieCaptionError::InvalidSource);
     }
@@ -922,6 +995,7 @@ fn select_caption(
             storage_identifier,
             placement_identifier,
             style_identifier,
+            kind,
         )?;
     }
     let text = super::slide_text::read_owned_storage_text(package, storage_identifier)
@@ -1176,6 +1250,7 @@ fn prove_exclusive_caption_storage(
     storage_identifier: u64,
     placement_identifier: u64,
     style_identifier: u64,
+    kind: MovieTextKind,
 ) -> Result<(), SlideMovieCaptionError> {
     let mut movie_edges = 0usize;
     let mut info_aggregate_edges = 0usize;
@@ -1207,10 +1282,18 @@ fn prove_exclusive_caption_storage(
                         movie_decode_options(package, &message.data)?,
                     )
                     .map_err(map_movie_codec_error)?;
-                    if snapshot.title_identifier() == Some(caption_info_identifier) {
+                    let opposite_identifier = match kind {
+                        MovieTextKind::Caption => snapshot.title_identifier(),
+                        MovieTextKind::Title => snapshot.caption_identifier(),
+                    };
+                    if opposite_identifier == Some(caption_info_identifier) {
                         return Err(SlideMovieCaptionError::UnsupportedDependency);
                     }
-                    if snapshot.caption_identifier() == Some(caption_info_identifier) {
+                    let edge_identifier = match kind {
+                        MovieTextKind::Caption => snapshot.caption_identifier(),
+                        MovieTextKind::Title => snapshot.title_identifier(),
+                    };
+                    if edge_identifier == Some(caption_info_identifier) {
                         movie_edges = movie_edges
                             .checked_add(1)
                             .ok_or(SlideMovieCaptionError::InvalidSource)?;
@@ -1251,10 +1334,7 @@ fn prove_exclusive_caption_storage(
                         if owner_identifier != movie_identifier
                             || message.type_ != MOVIE_MESSAGE_TYPE
                             || field_count != 1
-                            || !matches!(
-                                field.path.path.as_slice(),
-                                [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
-                            )
+                            || !kind.accepts_edge_path(field.path.path.as_slice())
                         {
                             return Err(SlideMovieCaptionError::UnsupportedDependency);
                         }
@@ -1480,6 +1560,7 @@ fn prove_exclusive_caption_standin(
     package: &Package,
     movie_identifier: u64,
     standin_identifier: u64,
+    kind: MovieTextKind,
 ) -> Result<(), SlideMovieCaptionError> {
     let mut payload_edges = 0usize;
     let mut aggregate_edges = 0usize;
@@ -1497,10 +1578,18 @@ fn prove_exclusive_caption_standin(
                         movie_decode_options(package, &message.data)?,
                     )
                     .map_err(map_movie_codec_error)?;
-                    if snapshot.title_identifier() == Some(standin_identifier) {
+                    let opposite_identifier = match kind {
+                        MovieTextKind::Caption => snapshot.title_identifier(),
+                        MovieTextKind::Title => snapshot.caption_identifier(),
+                    };
+                    if opposite_identifier == Some(standin_identifier) {
                         return Err(SlideMovieCaptionError::UnsupportedDependency);
                     }
-                    if snapshot.caption_identifier() == Some(standin_identifier) {
+                    let edge_identifier = match kind {
+                        MovieTextKind::Caption => snapshot.caption_identifier(),
+                        MovieTextKind::Title => snapshot.title_identifier(),
+                    };
+                    if edge_identifier == Some(standin_identifier) {
                         payload_edges += 1;
                         if payload_edges > 1 || owner_identifier != movie_identifier {
                             return Err(SlideMovieCaptionError::UnsupportedDependency);
@@ -1542,10 +1631,7 @@ fn prove_exclusive_caption_standin(
                         if owner_identifier != movie_identifier
                             || message.type_ != MOVIE_MESSAGE_TYPE
                             || field_count != 1
-                            || !matches!(
-                                field.path.path.as_slice(),
-                                [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
-                            )
+                            || !kind.accepts_edge_path(field.path.path.as_slice())
                         {
                             return Err(SlideMovieCaptionError::UnsupportedDependency);
                         }
@@ -1619,7 +1705,7 @@ fn copy_caption(value: &str) -> Result<String, SlideMovieCaptionError> {
     Ok(copy)
 }
 
-fn contains_dependent_marker(text: &str) -> bool {
+pub(super) fn contains_dependent_marker(text: &str) -> bool {
     text.contains('\u{000e}') || text.contains('\u{fffc}')
 }
 

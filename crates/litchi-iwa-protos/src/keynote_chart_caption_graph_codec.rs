@@ -8,11 +8,62 @@
 
 use std::fmt;
 
-const STYLE_IDENTIFIER: &str = "captions-0-shapestyle-Object Caption";
+const CAPTION_STYLE_IDENTIFIER: &str = "captions-0-shapestyle-Object Caption";
+const TITLE_STYLE_IDENTIFIER: &str = "captions-0-shapestyle-Object Title";
 const GRAPH_OBJECTS: usize = 4;
 const GRAPH_DEPTH: u32 = 9;
 const GRAPH_FIELDS_WITHOUT_LANGUAGE: usize = 162;
 const GRAPH_FIELDS_WITH_LANGUAGE: usize = 166;
+
+/// The native inline child represented by a freshly authored graph.
+///
+/// The graph shape is shared by chart titles and captions.  The kind is
+/// explicit so callers cannot accidentally author a title using the caption
+/// style/placement defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptionGraphKind {
+    Caption,
+    Title,
+}
+
+impl CaptionGraphKind {
+    const fn style_identifier(self) -> &'static str {
+        match self {
+            Self::Caption => CAPTION_STYLE_IDENTIFIER,
+            Self::Title => TITLE_STYLE_IDENTIFIER,
+        }
+    }
+
+    const fn child_info_kind(self) -> u64 {
+        match self {
+            Self::Caption => 1,
+            Self::Title => 2,
+        }
+    }
+
+    const fn placement_anchors(self) -> (u64, u64) {
+        match self {
+            // TSA.CaptionPlacementArchive.caption_anchor_location,
+            // TSA.CaptionPlacementArchive.drawable_anchor_location.
+            Self::Caption => (7, 1),
+            Self::Title => (1, 7),
+        }
+    }
+}
+
+/// Layout profile for a fresh caption graph.
+///
+/// Only the inline profile is currently admitted by this codec.  Keeping the
+/// profile typed leaves the componentized graph variant out of this narrowly
+/// bounded authoring seam instead of silently applying inline defaults to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptionGraphProfile {
+    Inline,
+}
+
+/// Short aliases for callers that use the generic graph terminology.
+pub type GraphKind = CaptionGraphKind;
+pub type GraphProfile = CaptionGraphProfile;
 
 /// Finite limits for one fresh caption graph encoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -264,12 +315,46 @@ pub fn encode_caption_graph_with_report(
     write: CaptionGraphWrite<'_>,
     options: EncodeOptions,
 ) -> Result<EncodeOutput, EncodeError> {
+    encode_caption_graph_with_profile_with_report(
+        write,
+        CaptionGraphKind::Caption,
+        CaptionGraphProfile::Inline,
+        options,
+    )
+}
+
+/// Encode a fresh inline title or caption graph with an explicit kind/profile.
+pub fn encode_caption_graph_with_profile_with_report(
+    write: CaptionGraphWrite<'_>,
+    kind: CaptionGraphKind,
+    profile: CaptionGraphProfile,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
+    match profile {
+        CaptionGraphProfile::Inline => encode_inline_graph_with_report(write, kind, options),
+    }
+}
+
+/// Encode a fresh inline title or caption graph with an explicit kind.
+pub fn encode_caption_graph_with_kind_with_report(
+    write: CaptionGraphWrite<'_>,
+    kind: CaptionGraphKind,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
+    encode_caption_graph_with_profile_with_report(write, kind, CaptionGraphProfile::Inline, options)
+}
+
+fn encode_inline_graph_with_report(
+    write: CaptionGraphWrite<'_>,
+    kind: CaptionGraphKind,
+    options: EncodeOptions,
+) -> Result<EncodeOutput, EncodeError> {
     validate_write(write)?;
     let sizes = [
-        style_size(write),
-        info_size(write),
+        style_size(write, kind),
+        info_size(write, kind),
         storage_size(write),
-        placement_size(),
+        placement_size(kind),
     ];
     let output_bytes = sizes
         .into_iter()
@@ -295,13 +380,13 @@ pub fn encode_caption_graph_with_report(
     preflight(report, options)?;
 
     let mut style = reserve_exact(sizes[0])?;
-    encode_style(&mut style, write);
+    encode_style(&mut style, write, kind);
     let mut info = reserve_exact(sizes[1])?;
-    encode_info(&mut info, write);
+    encode_info(&mut info, write, kind);
     let mut storage = reserve_exact(sizes[2])?;
     encode_storage(&mut storage, write);
     let mut placement = reserve_exact(sizes[3])?;
-    encode_placement(&mut placement);
+    encode_placement(&mut placement, kind);
     if [style.len(), info.len(), storage.len(), placement.len()] != sizes {
         return Err(EncodeError::Verification);
     }
@@ -458,8 +543,8 @@ fn encode_reference(output: &mut Vec<u8>, identifier: u64) {
     put_varint_field(output, 1, identifier);
 }
 
-fn style_size(write: CaptionGraphWrite<'_>) -> usize {
-    let style_archive = bytes_field_size(2, STYLE_IDENTIFIER.len())
+fn style_size(write: CaptionGraphWrite<'_>, kind: CaptionGraphKind) -> usize {
+    let style_archive = bytes_field_size(2, kind.style_identifier().len())
         + bytes_field_size(5, reference_size(write.stylesheet_identifier));
     let color_transparent = color_size(0.0);
     let color_opaque = color_size(1.0);
@@ -497,8 +582,8 @@ fn style_size(write: CaptionGraphWrite<'_>) -> usize {
         + bytes_field_size(11, text_properties)
 }
 
-fn encode_style(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>) {
-    let style_archive = bytes_field_size(2, STYLE_IDENTIFIER.len())
+fn encode_style(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>, kind: CaptionGraphKind) {
+    let style_archive = bytes_field_size(2, kind.style_identifier().len())
         + bytes_field_size(5, reference_size(write.stylesheet_identifier));
     let color_transparent = color_size(0.0);
     let color_opaque = color_size(1.0);
@@ -537,7 +622,7 @@ fn encode_style(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>) {
 
     put_message_header(output, 1, tsd_style);
     put_message_header(output, 1, style_archive);
-    put_bytes_field(output, 2, STYLE_IDENTIFIER.as_bytes());
+    put_bytes_field(output, 2, kind.style_identifier().as_bytes());
     put_message_header(output, 5, reference_size(write.stylesheet_identifier));
     encode_reference(output, write.stylesheet_identifier);
     put_varint_field(output, 10, 7);
@@ -599,7 +684,7 @@ fn encode_color(output: &mut Vec<u8>, alpha: f32) {
     put_varint_field(output, 12, 1);
 }
 
-fn info_size(write: CaptionGraphWrite<'_>) -> usize {
+fn info_size(write: CaptionGraphWrite<'_>, kind: CaptionGraphKind) -> usize {
     let point = 2 * fixed32_field_size(1);
     let size = fixed32_field_size(1) + fixed32_field_size(2);
     let geometry = bytes_field_size(1, point)
@@ -630,10 +715,10 @@ fn info_size(write: CaptionGraphWrite<'_>) -> usize {
         + varint_field_size(6, 1);
     bytes_field_size(1, shape_info)
         + bytes_field_size(2, reference_size(write.placement_identifier))
-        + varint_field_size(3, 1)
+        + varint_field_size(3, kind.child_info_kind())
 }
 
-fn encode_info(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>) {
+fn encode_info(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>, kind: CaptionGraphKind) {
     let point = fixed32_field_size(1) + fixed32_field_size(2);
     let size = fixed32_field_size(1) + fixed32_field_size(2);
     let geometry = bytes_field_size(1, point)
@@ -699,7 +784,7 @@ fn encode_info(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>) {
     put_varint_field(output, 6, 1);
     put_message_header(output, 2, reference_size(write.placement_identifier));
     encode_reference(output, write.placement_identifier);
-    put_varint_field(output, 3, 1);
+    put_varint_field(output, 3, kind.child_info_kind());
 }
 
 fn path_source_size(_width: f32) -> usize {
@@ -844,13 +929,15 @@ fn encode_storage(output: &mut Vec<u8>, write: CaptionGraphWrite<'_>) {
     encode_object_attribute(output, None);
 }
 
-fn placement_size() -> usize {
-    varint_field_size(1, 7) + varint_field_size(2, 1)
+fn placement_size(kind: CaptionGraphKind) -> usize {
+    let (caption_anchor, drawable_anchor) = kind.placement_anchors();
+    varint_field_size(1, caption_anchor) + varint_field_size(2, drawable_anchor)
 }
 
-fn encode_placement(output: &mut Vec<u8>) {
-    put_varint_field(output, 1, 7);
-    put_varint_field(output, 2, 1);
+fn encode_placement(output: &mut Vec<u8>, kind: CaptionGraphKind) {
+    let (caption_anchor, drawable_anchor) = kind.placement_anchors();
+    put_varint_field(output, 1, caption_anchor);
+    put_varint_field(output, 2, drawable_anchor);
 }
 
 #[cfg(test)]
@@ -899,10 +986,14 @@ mod tests {
     }
 
     fn oracle_style(write: CaptionGraphWrite<'_>) -> Vec<u8> {
+        oracle_style_kind(write, CaptionGraphKind::Caption)
+    }
+
+    fn oracle_style_kind(write: CaptionGraphWrite<'_>, kind: CaptionGraphKind) -> Vec<u8> {
         tswp::ShapeStyleArchive {
             super_: tsd::ShapeStyleArchive {
                 super_: tss::StyleArchive {
-                    style_identifier: Some(STYLE_IDENTIFIER.to_owned()),
+                    style_identifier: Some(kind.style_identifier().to_owned()),
                     stylesheet: Some(reference(write.stylesheet_identifier)),
                     ..Default::default()
                 },
@@ -981,6 +1072,10 @@ mod tests {
     }
 
     fn oracle_info(write: CaptionGraphWrite<'_>) -> Vec<u8> {
+        oracle_info_kind(write, CaptionGraphKind::Caption)
+    }
+
+    fn oracle_info_kind(write: CaptionGraphWrite<'_>, kind: CaptionGraphKind) -> Vec<u8> {
         tsa::CaptionInfoArchive {
             super_: tswp::ShapeInfoArchive {
                 super_: tsd::ShapeArchive {
@@ -1020,7 +1115,7 @@ mod tests {
                 ..Default::default()
             },
             placement: Some(reference(write.placement_identifier)),
-            child_info_kind: Some(1),
+            child_info_kind: Some(kind.child_info_kind() as i32),
         }
         .encode_to_vec()
     }
@@ -1049,9 +1144,14 @@ mod tests {
     }
 
     fn oracle_placement() -> Vec<u8> {
+        oracle_placement_kind(CaptionGraphKind::Caption)
+    }
+
+    fn oracle_placement_kind(kind: CaptionGraphKind) -> Vec<u8> {
+        let (caption_anchor, drawable_anchor) = kind.placement_anchors();
         tsa::CaptionPlacementArchive {
-            caption_anchor_location: Some(7),
-            drawable_anchor_location: Some(1),
+            caption_anchor_location: Some(caption_anchor as i32),
+            drawable_anchor_location: Some(drawable_anchor as i32),
         }
         .encode_to_vec()
     }
@@ -1091,6 +1191,95 @@ mod tests {
         );
         assert_eq!(output.report().fields(), GRAPH_FIELDS_WITH_LANGUAGE);
         assert_eq!(output.report().allocations(), GRAPH_OBJECTS);
+    }
+
+    #[test]
+    fn inline_title_profile_matches_generated_oracle_and_anchors() {
+        let write = write("Title — 北区", Some("zh-Hans"));
+        let output = encode_caption_graph_with_profile_with_report(
+            write,
+            CaptionGraphKind::Title,
+            CaptionGraphProfile::Inline,
+            EncodeOptions::for_text(write.text),
+        )
+        .expect("canonical title graph");
+        assert_eq!(
+            output.payloads().style(),
+            oracle_style_kind(write, CaptionGraphKind::Title)
+        );
+        assert_eq!(
+            output.payloads().info(),
+            oracle_info_kind(write, CaptionGraphKind::Title)
+        );
+        assert_eq!(output.payloads().storage(), oracle_storage(write));
+        assert_eq!(
+            output.payloads().placement(),
+            oracle_placement_kind(CaptionGraphKind::Title)
+        );
+
+        let style = tswp::ShapeStyleArchive::decode(output.payloads().style()).expect("style");
+        assert_eq!(
+            style.super_.super_.style_identifier.as_deref(),
+            Some(TITLE_STYLE_IDENTIFIER)
+        );
+        let info = tsa::CaptionInfoArchive::decode(output.payloads().info()).expect("info");
+        assert_eq!(info.child_info_kind, Some(2));
+        let placement =
+            tsa::CaptionPlacementArchive::decode(output.payloads().placement()).expect("placement");
+        assert_eq!(placement.caption_anchor_location, Some(1));
+        assert_eq!(placement.drawable_anchor_location, Some(7));
+    }
+
+    #[test]
+    fn legacy_caption_entry_point_is_exact_inline_caption_profile() {
+        let write = write("Caption compatibility", None);
+        let legacy = encode_caption_graph_with_report(write, EncodeOptions::for_text(write.text))
+            .expect("legacy caption graph");
+        let explicit = encode_caption_graph_with_profile_with_report(
+            write,
+            CaptionGraphKind::Caption,
+            CaptionGraphProfile::Inline,
+            EncodeOptions::for_text(write.text),
+        )
+        .expect("explicit caption graph");
+        assert_eq!(legacy, explicit);
+    }
+
+    #[test]
+    fn inline_title_profile_replays_exact_report_limits() {
+        let write = write("bounded title", Some("en"));
+        let baseline = encode_caption_graph_with_kind_with_report(
+            write,
+            CaptionGraphKind::Title,
+            EncodeOptions::for_text(write.text),
+        )
+        .expect("baseline title graph");
+        let report = baseline.report();
+        let exact = EncodeOptions::new(
+            report.output_bytes(),
+            report.text_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.allocations(),
+        );
+        assert!(
+            encode_caption_graph_with_kind_with_report(write, CaptionGraphKind::Title, exact)
+                .is_ok()
+        );
+        for limited in [
+            exact.with_max_output_bytes(report.output_bytes() - 1),
+            exact.with_max_text_bytes(report.text_bytes() - 1),
+            exact.with_max_fields(report.fields() - 1),
+            exact.with_max_work_bytes(report.work_bytes() - 1),
+            exact.with_max_depth(report.max_depth() - 1),
+            exact.with_max_allocations(report.allocations() - 1),
+        ] {
+            assert!(matches!(
+                encode_caption_graph_with_kind_with_report(write, CaptionGraphKind::Title, limited),
+                Err(EncodeError::Resource(_))
+            ));
+        }
     }
 
     #[test]
