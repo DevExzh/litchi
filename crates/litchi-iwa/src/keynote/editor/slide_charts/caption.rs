@@ -1,71 +1,8 @@
-//! Native caption CRUD for Keynote slide charts.
+//! Selector-first native caption CRUD for Keynote slide charts.
 
 use super::*;
-use crate::image_caption::{
-    CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
-    drawable_caption_slot, replace_object_reference, standin_caption_object,
-};
-use crate::protobuf::kn;
-use litchi_iwa_protos::keynote_chart_caption_codec::{
-    ChartCaptionWrite, DecodeError as ChartCaptionDecodeError, DecodeOptions,
-    decode_chart_caption_identifier, rewrite_chart_caption,
-};
-
-/// The private caption codec only rewrites the selected chart-caption edge.
-/// Keep a small headroom for the three enclosing length prefixes and a larger
-/// replacement identifier; all other chart bytes remain source-owned.
-const CHART_CAPTION_REWRITE_HEADROOM: usize = 32;
-/// Rewrites account for source decode, sizing, emission, and candidate
-/// readback in one aggregate budget. The selected edge has three nested
-/// envelopes, so the per-pass 8x source profile is insufficient once those
-/// passes are retained together.
-const CHART_CAPTION_REWRITE_WORK_MULTIPLIER: usize = 32;
 
 impl KeynoteEditor {
-    /// Read the native caption attached to one slide chart.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Keynote chart-caption API; use slide_chart_caption_by_selector with ChartSelector; retained for migration-host compatibility"
-    )]
-    pub fn slide_chart_caption(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<Option<String>> {
-        slide_chart_caption(self, slide_index, drawable_object_id)
-    }
-
-    /// Create or replace the native caption attached to one slide chart.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Keynote chart-caption API; use set_slide_chart_caption_by_selector with ChartSelector; retained for migration-host compatibility"
-    )]
-    pub fn set_slide_chart_caption(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        caption: &str,
-    ) -> Result<()> {
-        set_slide_chart_caption(self, slide_index, drawable_object_id, caption)
-    }
-
-    /// Remove the native caption attached to one slide chart.
-    ///
-    /// Returns whether a caption was present. Native iWork removal preserves
-    /// the prior caption graph for undo history and attaches a fresh empty
-    /// stand-in.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Keynote chart-caption API; use remove_slide_chart_caption_by_selector with ChartSelector; retained for migration-host compatibility"
-    )]
-    pub fn remove_slide_chart_caption(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<bool> {
-        remove_slide_chart_caption(self, slide_index, drawable_object_id)
-    }
-
     /// Read one chart caption through semantic slide/chart selection.
     pub fn slide_chart_caption_by_selector<'selector>(
         &self,
@@ -73,17 +10,12 @@ impl KeynoteEditor {
         selector: impl Into<ChartSelector<'selector>>,
     ) -> Result<Option<String>> {
         let selector = selector.into();
-        self.resolve_chart_selector(slide_index, selector)?;
         focused_chart_caption_package(self)?
             .slide_chart_caption(litchi_core::Position::new(slide_index), selector)
             .map_err(map_focused_chart_caption_error)
     }
 
     /// Create or replace one chart caption through semantic selection.
-    ///
-    /// Existing text is owned by the focused transaction. Native graph
-    /// creation remains a compatibility fallback until object allocation and
-    /// metadata registration move into `litchi-keynote`.
     pub fn set_slide_chart_caption_by_selector<'selector>(
         &mut self,
         slide_index: usize,
@@ -91,20 +23,10 @@ impl KeynoteEditor {
         caption: impl AsRef<str>,
     ) -> Result<()> {
         let selector = selector.into();
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let package = focused_chart_caption_package(self)?;
-        let edit = package
+        let commit = package
             .edit_slide_chart_caption(litchi_core::Position::new(slide_index), selector)
-            .map_err(map_focused_chart_caption_error)?;
-        if edit.before().is_none() {
-            return set_slide_chart_caption(
-                self,
-                slide_index,
-                drawable_object_id,
-                caption.as_ref(),
-            );
-        }
-        let commit = edit
+            .map_err(map_focused_chart_caption_error)?
             .set(caption)
             .map_err(map_focused_chart_caption_error)?
             .commit()
@@ -117,23 +39,29 @@ impl KeynoteEditor {
 
     /// Remove one chart caption through semantic selection.
     ///
-    /// Stand-in allocation is still performed by the compatibility graph
-    /// owner; the focused package transaction intentionally refuses it.
+    /// Returns whether a caption was present. Clearing an absent caption is
+    /// an exact package-level no-op.
     pub fn remove_slide_chart_caption_by_selector<'selector>(
         &mut self,
         slide_index: usize,
         selector: impl Into<ChartSelector<'selector>>,
     ) -> Result<bool> {
         let selector = selector.into();
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
-        if focused_chart_caption_package(self)?
-            .slide_chart_caption(litchi_core::Position::new(slide_index), selector)
+        let package = focused_chart_caption_package(self)?;
+        let edit = package
+            .edit_slide_chart_caption(litchi_core::Position::new(slide_index), selector)
+            .map_err(map_focused_chart_caption_error)?;
+        let had_caption = edit.before().is_some();
+        let commit = edit
+            .clear()
             .map_err(map_focused_chart_caption_error)?
-            .is_none()
-        {
+            .commit()
+            .map_err(map_focused_chart_caption_error)?;
+        if commit.patch().is_noop() {
             return Ok(false);
         }
-        remove_slide_chart_caption(self, slide_index, drawable_object_id)
+        replace_from_focused_chart_caption_commit(self, commit)?;
+        Ok(had_caption)
     }
 }
 
@@ -164,337 +92,4 @@ fn map_focused_chart_caption_error(error: litchi_keynote::ChartCaptionError) -> 
     Error::InvalidFormat(format!(
         "focused Keynote chart caption operation failed: {error}"
     ))
-}
-
-fn slide_chart_caption(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<Option<String>> {
-    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
-    focused_chart_caption_package(editor)?
-        .slide_chart_caption(
-            litchi_core::Position::new(slide_index),
-            ChartSelector::index(chart_position),
-        )
-        .map_err(map_focused_chart_caption_error)
-}
-
-fn slide_chart_caption_slot(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<DrawableCaptionSlot> {
-    let source = chart_graph(editor, slide_index, drawable_object_id)?;
-    let archive = editor.package().archive(&source.archive_name)?;
-    let object = archive.object(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
-    })?;
-    let messages = object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    let [message] = messages.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote chart {drawable_object_id} must have exactly one chart payload"
-        )));
-    };
-    let caption_reference_id = decode_chart_caption_identifier(
-        message.data.as_slice(),
-        chart_caption_decode_options(message.data.as_slice()),
-    )
-    .map_err(chart_caption_codec_error)?;
-    let caption_reference =
-        caption_reference_id.map(|identifier| crate::protobuf::tsp::Reference {
-            identifier,
-            ..Default::default()
-        });
-    drawable_caption_slot(
-        editor.package(),
-        drawable_object_id,
-        caption_reference.as_ref(),
-        DrawableCaptionKind::Caption,
-        "Keynote chart",
-    )
-}
-
-fn set_slide_chart_caption(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-    text: &str,
-) -> Result<()> {
-    let source = chart_graph(editor, slide_index, drawable_object_id)?;
-    let slot = slide_chart_caption_slot(editor, slide_index, drawable_object_id)?;
-    let expected = Some(text.to_owned());
-    let staged = if slot.storage_id.is_some() {
-        let chart_position =
-            chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
-        let package = focused_chart_caption_package(editor)?;
-        let commit = package
-            .edit_slide_chart_caption(
-                litchi_core::Position::new(slide_index),
-                ChartSelector::index(chart_position),
-            )
-            .map_err(map_focused_chart_caption_error)?
-            .set(text)
-            .map_err(map_focused_chart_caption_error)?
-            .commit()
-            .map_err(map_focused_chart_caption_error)?;
-        let mut bytes = Vec::new();
-        commit.package().write_to(&mut bytes).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "focused Keynote chart caption write failed: {error}"
-            ))
-        })?;
-        KeynoteEditor::from_bytes(&bytes)?.package().clone()
-    } else {
-        let (theme, language) = slide_chart_caption_theme(editor)?;
-        let drawable_width = source
-            .info
-            .geometry
-            .size
-            .ok_or_else(|| Error::InvalidFormat("Keynote chart has no displayed size".to_owned()))?
-            .width;
-        let ids = CaptionObjectIds::allocate(next_object_identifier(editor.package())?)?;
-        let mut staged = editor.package().clone();
-        insert_slide_chart_caption(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            slot.reference_id,
-            drawable_width,
-            text,
-            theme,
-            language.as_deref(),
-            ids,
-        )?;
-        add_component_object_uuids(&mut staged, source.component_id, &ids.all())?;
-        set_package_last_object_identifier(&mut staged, ids.last())?;
-        staged
-    };
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if slide_chart_caption(&verified, slide_index, drawable_object_id)? != expected {
-        return Err(Error::InvalidFormat(
-            "Keynote chart caption update failed validation".to_owned(),
-        ));
-    }
-    *editor = verified;
-    Ok(())
-}
-
-fn chart_position_for_identifier(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<usize> {
-    editor
-        .slide_charts(slide_index)?
-        .iter()
-        .position(|chart| chart.drawable_object_id == drawable_object_id)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote slide {slide_index} has no chart {drawable_object_id}"
-            ))
-        })
-}
-
-fn remove_slide_chart_caption(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<bool> {
-    let source = chart_graph(editor, slide_index, drawable_object_id)?;
-    let slot = slide_chart_caption_slot(editor, slide_index, drawable_object_id)?;
-    if slot.storage_id.is_none() {
-        return Ok(false);
-    }
-    let standin_id = next_object_identifier(editor.package())?;
-    let mut staged = editor.package().clone();
-    insert_slide_chart_caption_standin(
-        &mut staged,
-        &source.archive_name,
-        drawable_object_id,
-        slot.reference_id,
-        standin_id,
-    )?;
-    add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
-    set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if slide_chart_caption(&verified, slide_index, drawable_object_id)?.is_some() {
-        return Err(Error::InvalidFormat(
-            "Keynote chart caption removal failed validation".to_owned(),
-        ));
-    }
-    *editor = verified;
-    Ok(true)
-}
-
-fn slide_chart_caption_theme(
-    editor: &KeynoteEditor,
-) -> Result<(CaptionThemeStyle, Option<String>)> {
-    let graph = ObjectGraph::read(editor.package())?;
-    let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
-    let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
-    let theme = IWorkThemeArchive::decode(graph.message_data_type(
-        show.theme.identifier,
-        KEYNOTE_THEME_MESSAGE_TYPE,
-        "KN.ThemeArchive",
-    )?)?;
-    let paragraph_style_id = theme
-        .extensions
-        .application
-        .ok_or_else(|| Error::InvalidFormat("Keynote theme has no application presets".to_owned()))?
-        .caption_style_presets
-        .into_iter()
-        .next()
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| {
-            Error::InvalidFormat("Keynote theme has no caption style preset".to_owned())
-        })?;
-    if !graph.objects.contains_key(&paragraph_style_id) {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote caption paragraph style {paragraph_style_id} is missing"
-        )));
-    }
-    Ok((
-        CaptionThemeStyle {
-            stylesheet_id: show.stylesheet.identifier,
-            paragraph_style_id,
-        },
-        document.super_.document_language,
-    ))
-}
-
-fn insert_slide_chart_caption(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    old_reference_id: u64,
-    drawable_width: f32,
-    text: &str,
-    theme: CaptionThemeStyle,
-    language: Option<&str>,
-    ids: CaptionObjectIds,
-) -> Result<()> {
-    let objects = caption_objects(
-        ids,
-        drawable_object_id,
-        drawable_width,
-        text,
-        DrawableCaptionKind::Caption,
-        theme,
-        language,
-    )?;
-    package.update_archive(archive_name, |archive| {
-        for object in objects {
-            archive.insert_object(object)?;
-        }
-        replace_slide_chart_caption_reference(
-            archive,
-            drawable_object_id,
-            old_reference_id,
-            ids.info,
-        )
-    })
-}
-
-fn insert_slide_chart_caption_standin(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    drawable_object_id: u64,
-    old_reference_id: u64,
-    standin_id: u64,
-) -> Result<()> {
-    let standin = standin_caption_object(standin_id)?;
-    package.update_archive(archive_name, |archive| {
-        archive.insert_object(standin)?;
-        replace_slide_chart_caption_reference(
-            archive,
-            drawable_object_id,
-            old_reference_id,
-            standin_id,
-        )
-    })
-}
-
-fn replace_slide_chart_caption_reference(
-    archive: &mut crate::archive::Archive,
-    drawable_object_id: u64,
-    old_reference_id: u64,
-    replacement_id: u64,
-) -> Result<()> {
-    let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
-    })?;
-    let message_indexes = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter_map(|(index, message)| (message.type_ == CHART_MESSAGE_TYPE).then_some(index))
-        .collect::<Vec<_>>();
-    let [message_index] = message_indexes.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote chart {drawable_object_id} must have exactly one chart payload"
-        )));
-    };
-    let original = object.messages[*message_index].data.as_slice();
-    let current_reference_id =
-        decode_chart_caption_identifier(original, chart_caption_decode_options(original))
-            .map_err(chart_caption_codec_error)?;
-    if current_reference_id != Some(old_reference_id) {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote chart {drawable_object_id} caption reference changed unexpectedly"
-        )));
-    }
-    let data = rewrite_chart_caption(
-        original,
-        ChartCaptionWrite::new(replacement_id),
-        chart_caption_decode_options(original),
-    )
-    .map_err(chart_caption_codec_error)?;
-    let actual_reference_id = decode_chart_caption_identifier(
-        data.as_slice(),
-        chart_caption_decode_options(data.as_slice()),
-    )
-    .map_err(chart_caption_codec_error)?;
-    if actual_reference_id != Some(replacement_id) {
-        return Err(Error::InvalidFormat(
-            "Keynote chart caption reference patch failed validation".to_owned(),
-        ));
-    }
-    object.replace_message(
-        *message_index,
-        RawMessage {
-            type_: CHART_MESSAGE_TYPE,
-            data,
-        },
-    )?;
-    replace_object_reference(
-        &mut object.archive_info.message_infos[*message_index].object_references,
-        old_reference_id,
-        replacement_id,
-    );
-    Ok(())
-}
-
-fn chart_caption_decode_options(source: &[u8]) -> DecodeOptions {
-    let source_bytes = source.len().max(1);
-    let output_bytes = source_bytes
-        .saturating_add(CHART_CAPTION_REWRITE_HEADROOM)
-        .max(1);
-    DecodeOptions::new(
-        source_bytes,
-        output_bytes.saturating_mul(4).max(1),
-        output_bytes
-            .saturating_mul(CHART_CAPTION_REWRITE_WORK_MULTIPLIER)
-            .max(1),
-        8,
-    )
-    .with_max_output_bytes(output_bytes)
-}
-
-fn chart_caption_codec_error(error: ChartCaptionDecodeError) -> Error {
-    Error::InvalidFormat(format!("invalid Keynote chart caption wire: {error}"))
 }

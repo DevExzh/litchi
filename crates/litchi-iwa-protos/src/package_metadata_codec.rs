@@ -482,6 +482,40 @@ impl<'source> RemovalSaveTokenBatch<'source> {
     }
 }
 
+/// One atomic registry-addition and save-token transition.
+///
+/// The additions update the root last-object watermark and append the
+/// requested current-component UUID/external-reference records.  The save
+/// token batch must cover exactly the current source components touched by
+/// those additions; each covered component receives the one new root token.
+/// The two borrowed requests are evaluated against one source snapshot and
+/// published as one candidate.
+#[derive(Debug, Clone, Copy)]
+pub struct AdditionSaveTokenBatch<'source> {
+    additions: Batch<'source>,
+    save_tokens: SaveTokenBatch<'source>,
+}
+
+impl<'source> AdditionSaveTokenBatch<'source> {
+    #[must_use]
+    pub const fn new(additions: Batch<'source>, save_tokens: SaveTokenBatch<'source>) -> Self {
+        Self {
+            additions,
+            save_tokens,
+        }
+    }
+
+    #[must_use]
+    pub const fn additions(self) -> Batch<'source> {
+        self.additions
+    }
+
+    #[must_use]
+    pub const fn save_tokens(self) -> SaveTokenBatch<'source> {
+        self.save_tokens
+    }
+}
+
 impl<'source> ExternalReferenceAddition<'source> {
     #[must_use]
     pub const fn new(
@@ -3351,6 +3385,165 @@ mod tests {
     }
 
     #[test]
+    fn additions_and_save_tokens_are_one_raw_preserving_transition() {
+        let selected = token_component(1, "a.iwa", Some(5), false, true);
+        let unselected = token_component(2, "b.iwa", Some(4), false, true);
+        let versioned = token_component(1, "old.iwa", Some(5), false, true);
+        let source = token_metadata(
+            10,
+            Some(5),
+            &[selected.clone(), unselected.clone()],
+            core::slice::from_ref(&versioned),
+        );
+        let selected_selector = ComponentSelector::new(1, "a.iwa");
+        let target_selector = ComponentSelector::new(2, "b.iwa");
+        let uuid = UuidBits::new(100, 200);
+        let object_addition = [ObjectUuidAddition::new(selected_selector, 11, uuid)];
+        let reference_addition = [ExternalReferenceAddition::new(
+            selected_selector,
+            target_selector,
+            12,
+            Some(false),
+        )];
+        let additions = Batch::new(10, 12, &object_addition, &reference_addition);
+        let save_tokens = SaveTokenBatch::new(core::slice::from_ref(&selected_selector));
+        let output_allocations_before = output_allocations();
+        let output = rewrite_package_metadata_additions_and_save_tokens(
+            &source,
+            AdditionSaveTokenBatch::new(additions, save_tokens),
+            options(&source),
+        )
+        .unwrap();
+
+        assert_eq!(scalar_values(output.bytes(), 1), vec![12]);
+        assert_eq!(scalar_values(output.bytes(), 8), vec![6]);
+        assert_eq!(component_scalar_values(output.bytes(), 1, 12), vec![6]);
+        assert!(
+            output
+                .bytes()
+                .windows(unselected.len())
+                .any(|window| window == unselected)
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(versioned.len())
+                .any(|window| window == versioned)
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(6)
+                .any(|window| window == [0x9b, 0x03, 0x08, 0x00, 0x9c, 0x03])
+        );
+
+        let mut facts = Facts::default();
+        inspect_package_metadata_with_visitor(output.bytes(), options(output.bytes()), &mut facts)
+            .unwrap();
+        assert!(
+            facts
+                .uuids
+                .iter()
+                .any(|(component, object, found, current)| {
+                    *component == 1 && *object == 11 && *found == uuid && *current
+                })
+        );
+        assert!(
+            facts
+                .references
+                .iter()
+                .any(|(component, target, object, weak, versioned)| {
+                    *component == 1
+                        && *target == 2
+                        && *object == Some(12)
+                        && *weak == Some(false)
+                        && !*versioned
+                })
+        );
+        assert_eq!(
+            output_allocations() - output_allocations_before,
+            1,
+            "one candidate output allocation"
+        );
+        let report = output.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.additions(),
+        );
+        rewrite_package_metadata_additions_and_save_tokens(
+            &source,
+            AdditionSaveTokenBatch::new(additions, save_tokens),
+            exact,
+        )
+        .unwrap();
+
+        let limited = RewriteOptions::new(
+            source.len(),
+            report.output_bytes() - 1,
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.additions(),
+        );
+        let allocations_before = output_allocations();
+        let error = rewrite_package_metadata_additions_and_save_tokens(
+            &source,
+            AdditionSaveTokenBatch::new(additions, save_tokens),
+            limited,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(RewriteLimit::OutputBytes { .. })
+        ));
+        assert_eq!(output_allocations(), allocations_before);
+    }
+
+    #[test]
+    fn additions_and_save_tokens_append_absent_root_and_component_fields() {
+        let selected = token_component(1, "a.iwa", None, false, false);
+        let source = token_metadata(10, None, core::slice::from_ref(&selected), &[]);
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let uuid = [ObjectUuidAddition::new(selector, 11, UuidBits::new(7, 8))];
+        let additions = Batch::new(10, 11, &uuid, &[]);
+        let save_tokens = SaveTokenBatch::new(core::slice::from_ref(&selector));
+        let output = rewrite_package_metadata_additions_and_save_tokens(
+            &source,
+            AdditionSaveTokenBatch::new(additions, save_tokens),
+            options(&source),
+        )
+        .unwrap();
+        assert_eq!(scalar_values(output.bytes(), 1), vec![11]);
+        assert_eq!(scalar_values(output.bytes(), 8), vec![1]);
+        assert_eq!(component_scalar_values(output.bytes(), 1, 12), vec![1]);
+        let report = output.report();
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            report.additions(),
+        );
+        rewrite_package_metadata_additions_and_save_tokens(
+            &source,
+            AdditionSaveTokenBatch::new(additions, save_tokens),
+            exact,
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn save_tokens_add_absent_fields_and_preserve_last_identifier_raw_bytes() {
         let component = token_component(1, "a.iwa", None, false, false);
         let source = token_metadata(77, None, core::slice::from_ref(&component), &[]);
@@ -3908,6 +4101,24 @@ impl SaveTokenScanState {
     }
 }
 
+struct AdditionSaveTokenScanState {
+    additions: ScanState,
+    save_tokens: SaveTokenScanState,
+}
+
+impl AdditionSaveTokenScanState {
+    fn new(
+        additions: Batch<'_>,
+        save_tokens: SaveTokenBatch<'_>,
+        budget: &mut Budget,
+    ) -> Result<Self, RewriteError> {
+        Ok(Self {
+            additions: ScanState::new(additions, budget)?,
+            save_tokens: SaveTokenScanState::new(save_tokens, budget)?,
+        })
+    }
+}
+
 /// Rewrite the package root save token and the selected current component
 /// save tokens in one raw-preserving atomic candidate.
 pub fn rewrite_package_metadata_save_tokens(
@@ -3978,6 +4189,156 @@ pub fn rewrite_package_metadata_save_tokens(
         &mut budget,
     )?;
     candidate_state.validate_candidate(new_root)?;
+    budget.output_bytes = candidate.len();
+    budget.retained_bytes = candidate.len();
+    Ok(RewriteOutput {
+        bytes: candidate,
+        report: budget.report(),
+    })
+}
+
+/// Atomically append registry records, advance the root object watermark, and
+/// advance the selected current-component save tokens.
+///
+/// This is the addition counterpart to
+/// [`rewrite_package_metadata_removals_and_save_tokens`].  The source is
+/// scanned once for both transitions, one exact output size is computed, and
+/// one candidate is reserved and verified before it is returned.  All
+/// unselected and versioned metadata remains source-authoritative.
+pub fn rewrite_package_metadata_additions_and_save_tokens(
+    source: &[u8],
+    batch: AdditionSaveTokenBatch<'_>,
+    options: RewriteOptions,
+) -> Result<RewriteOutput, RewriteError> {
+    validate_batch(batch.additions, options)?;
+    validate_save_token_batch(batch.save_tokens, options)?;
+    let selector_count = selector_count(batch.additions);
+    if selector_count > options.max_components {
+        return Err(RewriteError::limited(RewriteLimit::Components {
+            observed: selector_count,
+            maximum: options.max_components,
+        }));
+    }
+
+    let mut budget = Budget::new(source, batch.additions, options)?;
+    budget.additions = batch
+        .additions
+        .object_uuids
+        .len()
+        .checked_add(batch.additions.external_references.len())
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    validate_batch_duplicates(batch.additions, &mut budget)?;
+    validate_save_token_selector_duplicates(batch.save_tokens, &mut budget)?;
+    validate_addition_save_token_selector_coverage(batch, &mut budget)?;
+
+    let mut source_state =
+        AdditionSaveTokenScanState::new(batch.additions, batch.save_tokens, &mut budget)?;
+    scan_addition_save_token_metadata(
+        source,
+        batch,
+        ScanMode::Source,
+        &mut source_state,
+        None,
+        &mut budget,
+    )?;
+    source_state.additions.validate_selectors()?;
+    let old_root = source_state.save_tokens.validate_source()?;
+    if source_state
+        .save_tokens
+        .last
+        .is_none_or(|value| value != batch.additions.expected_last_object_identifier)
+    {
+        return Err(RewriteError::invalid(InvalidReason::LastIdentifierMismatch));
+    }
+    let new_root = batch.additions.new_last_object_identifier;
+    let new_token = old_root
+        .checked_add(1)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::SaveTokenOverflow))?;
+
+    let output_size =
+        addition_save_token_output_size(source, batch, new_root, new_token, &mut budget)?;
+    budget.output_size(output_size)?;
+    let before_execution = budget.clone();
+    precharge_addition_save_token_rewrite_and_verification(
+        source,
+        batch,
+        new_token,
+        output_size,
+        &mut budget,
+    )?;
+    budget.preflight_repeat_delta(&before_execution)?;
+    let planned_fields = repeated_counter(before_execution.fields, budget.fields)?
+        .checked_add(before_execution.fields)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let planned_work = repeated_counter(before_execution.work_bytes, budget.work_bytes)?
+        .checked_add(before_execution.work_bytes)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let planned_components = repeated_counter(
+        before_execution.components_scanned,
+        budget.components_scanned,
+    )?
+    .checked_add(before_execution.components_scanned)
+    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let planned_references = repeated_counter(
+        before_execution.references_scanned,
+        budget.references_scanned,
+    )?
+    .checked_add(before_execution.references_scanned)
+    .and_then(|value| {
+        value.checked_add(
+            batch
+                .additions
+                .object_uuids
+                .len()
+                .checked_add(batch.additions.external_references.len())?,
+        )
+    })
+    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+
+    let mut candidate = Vec::new();
+    #[cfg(test)]
+    record_output_allocation();
+    candidate
+        .try_reserve_exact(output_size)
+        .map_err(|_error| RewriteError::allocation(output_size))?;
+    if candidate.capacity() != output_size {
+        return Err(RewriteError::allocation(output_size));
+    }
+    budget.allocation(0)?;
+    rewrite_addition_save_token_into(
+        source,
+        batch,
+        new_root,
+        new_token,
+        &mut candidate,
+        &mut budget,
+    )?;
+    if candidate.len() != output_size {
+        return Err(RewriteError::invalid(InvalidReason::Verification));
+    }
+
+    budget.source_phase = false;
+    let mut candidate_state =
+        AdditionSaveTokenScanState::new(batch.additions, batch.save_tokens, &mut budget)?;
+    scan_addition_save_token_metadata(
+        &candidate,
+        batch,
+        ScanMode::Verification,
+        &mut candidate_state,
+        Some((new_root, new_token)),
+        &mut budget,
+    )?;
+    candidate_state.additions.validate_verification()?;
+    candidate_state.save_tokens.validate_candidate(new_token)?;
+    if candidate_state.save_tokens.last != Some(new_root) {
+        return Err(RewriteError::invalid(InvalidReason::Verification));
+    }
+    budget.pad_repeated_counters(
+        planned_fields,
+        planned_work,
+        planned_components,
+        planned_references,
+    )?;
     budget.output_bytes = candidate.len();
     budget.retained_bytes = candidate.len();
     Ok(RewriteOutput {
@@ -4164,6 +4525,611 @@ fn validate_save_token_selector_duplicates(
                 return Err(RewriteError::invalid(InvalidReason::DuplicateSelector));
             }
         }
+    }
+    Ok(())
+}
+
+fn addition_source_selector_count(batch: Batch<'_>) -> Result<usize, RewriteError> {
+    batch
+        .object_uuids
+        .len()
+        .checked_add(batch.external_references.len())
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))
+}
+
+fn addition_source_selector_at<'source>(
+    batch: Batch<'source>,
+    index: usize,
+) -> ComponentSelector<'source> {
+    if index < batch.object_uuids.len() {
+        batch.object_uuids[index].component
+    } else {
+        batch.external_references[index - batch.object_uuids.len()].source
+    }
+}
+
+/// Require the token selectors to cover exactly the current components whose
+/// registries are changed by the additions.  Several additions may share one
+/// source component, so comparisons are made over the distinct source set.
+fn validate_addition_save_token_selector_coverage(
+    batch: AdditionSaveTokenBatch<'_>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    let count = addition_source_selector_count(batch.additions)?;
+    for index in 0..count {
+        let selector = addition_source_selector_at(batch.additions, index);
+        let mut duplicate = false;
+        for prior_index in 0..index {
+            let prior = addition_source_selector_at(batch.additions, prior_index);
+            budget.work(
+                selector
+                    .locator
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )?;
+            if prior == selector {
+                duplicate = true;
+                break;
+            }
+        }
+        if duplicate {
+            continue;
+        }
+        let mut found = false;
+        for candidate in batch.save_tokens.components.iter().copied() {
+            budget.work(
+                selector
+                    .locator
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )?;
+            if candidate == selector {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(RewriteError::invalid(InvalidReason::ComponentMismatch));
+        }
+    }
+    for selector in batch.save_tokens.components.iter().copied() {
+        let mut found = false;
+        for index in 0..count {
+            let candidate = addition_source_selector_at(batch.additions, index);
+            budget.work(
+                selector
+                    .locator
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )?;
+            if candidate == selector {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(RewriteError::invalid(InvalidReason::ComponentMismatch));
+        }
+    }
+    Ok(())
+}
+
+fn scan_addition_save_token_metadata(
+    source: &[u8],
+    batch: AdditionSaveTokenBatch<'_>,
+    mode: ScanMode,
+    state: &mut AdditionSaveTokenScanState,
+    expected: Option<(u64, u64)>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        match field.number {
+            1 => set_once(&mut state.save_tokens.last, field.varint()?)?,
+            3 | 11 => scan_addition_save_token_component(
+                field.bytes()?,
+                field.number == 3,
+                batch,
+                mode,
+                state,
+                expected.map(|(_, token)| token),
+                budget,
+                2,
+            )?,
+            8 => {
+                let value = field.varint()?;
+                if state.save_tokens.root_token.replace(value).is_some() {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+            },
+            _ => {},
+        }
+    }
+
+    let expected_last = expected.map_or(
+        batch.additions.expected_last_object_identifier,
+        |(last, _)| last,
+    );
+    if state.save_tokens.last != Some(expected_last) {
+        return Err(RewriteError::invalid(match mode {
+            ScanMode::Source => InvalidReason::LastIdentifierMismatch,
+            ScanMode::Verification => InvalidReason::Verification,
+        }));
+    }
+    let view: projection::PackageMetadataArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    if !view.has_last_object_identifier()
+        || view.last_object_identifier != expected_last
+        || view.save_token != state.save_tokens.root_token
+    {
+        return Err(RewriteError::invalid(InvalidReason::MalformedWire));
+    }
+    if let Some((_, expected_token)) = expected {
+        if state.save_tokens.root_token != Some(expected_token) {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+    }
+    Ok(())
+}
+
+fn scan_addition_save_token_component(
+    source: &[u8],
+    current: bool,
+    batch: AdditionSaveTokenBatch<'_>,
+    mode: ScanMode,
+    state: &mut AdditionSaveTokenScanState,
+    expected_token: Option<u64>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    budget.component()?;
+    budget.message(source, depth)?;
+    let child_depth = depth
+        .checked_add(1)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let mut identifier = None;
+    let mut preferred_locator = None;
+    let mut locator = None;
+    let mut token = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut identifier, field.varint()?)?,
+            2 => set_once(&mut preferred_locator, strict_utf8(field.bytes()?)?)?,
+            3 => set_once(&mut locator, strict_utf8(field.bytes()?)?)?,
+            12 => {
+                let value = field.varint()?;
+                if token.replace(value).is_some() {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+            },
+            _ => {},
+        }
+    }
+    let identifier = identifier
+        .filter(|value| *value != 0)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?;
+    let preferred_locator =
+        preferred_locator.ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let effective_locator = locator.unwrap_or(preferred_locator);
+    let view: projection::ComponentInfoArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    if !view.has_identifier()
+        || !view.has_preferred_locator()
+        || view.identifier != identifier
+        || view.preferred_locator != preferred_locator
+        || view.locator != locator
+        || view.save_token != token
+    {
+        return Err(RewriteError::invalid(InvalidReason::MalformedWire));
+    }
+
+    if current {
+        for index in 0..selector_count(batch.additions) {
+            budget.work(1)?;
+            let selector = selector_at(batch.additions, index);
+            let count = &mut state.additions.selectors[index];
+            if identifier == selector.identifier {
+                count.identifier = count
+                    .identifier
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            }
+            if effective_locator == selector.locator {
+                count.locator = count
+                    .locator
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            }
+            if identifier == selector.identifier && effective_locator == selector.locator {
+                count.exact = count
+                    .exact
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            }
+        }
+        for (index, selector) in batch.save_tokens.components.iter().copied().enumerate() {
+            budget.work(
+                selector
+                    .locator
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )?;
+            let matched = &mut state.save_tokens.selectors[index];
+            if identifier == selector.identifier {
+                matched.identifier = matched
+                    .identifier
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            }
+            if effective_locator == selector.locator {
+                matched.locator = matched
+                    .locator
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            }
+            if identifier == selector.identifier && effective_locator == selector.locator {
+                matched.exact = matched
+                    .exact
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+                matched.token = token;
+                if matches!(mode, ScanMode::Verification) && token != expected_token {
+                    return Err(RewriteError::invalid(InvalidReason::Verification));
+                }
+            }
+        }
+    }
+
+    budget.message(source, depth)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            6 | 18 => {
+                let reference = decode_external_reference(field.bytes()?, budget, child_depth)?;
+                scan_external_collision(
+                    identifier,
+                    effective_locator,
+                    reference,
+                    batch.additions,
+                    mode,
+                    &mut state.additions,
+                    budget,
+                )?;
+            },
+            11 => {
+                let entry = decode_object_uuid(field.bytes()?, budget, child_depth)?;
+                scan_object_collision(
+                    identifier,
+                    effective_locator,
+                    entry,
+                    batch.additions,
+                    mode,
+                    &mut state.additions,
+                    budget,
+                )?;
+            },
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn addition_save_token_output_size(
+    source: &[u8],
+    batch: AdditionSaveTokenBatch<'_>,
+    new_last: u64,
+    new_token: u64,
+    budget: &mut Budget,
+) -> Result<usize, RewriteError> {
+    budget.message(source, 1)?;
+    let mut output = 0usize;
+    let mut has_root_token = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        match field.number {
+            1 => {
+                let _ = field.varint()?;
+                output = checked_add(output, varint_field_len(1, new_last))?;
+            },
+            8 => {
+                let _ = field.varint()?;
+                if has_root_token {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+                has_root_token = true;
+                output = checked_add(output, varint_field_len(8, new_token))?;
+            },
+            3 | 11 => {
+                let payload = field.bytes()?;
+                let (new_len, changed) = addition_save_token_component_size(
+                    payload,
+                    field.number == 3,
+                    batch,
+                    new_token,
+                    budget,
+                    2,
+                )?;
+                output = checked_add(
+                    output,
+                    if changed {
+                        length_delimited_field_len(field.number, new_len)?
+                    } else {
+                        field.raw.len()
+                    },
+                )?;
+            },
+            _ => output = checked_add(output, field.raw.len())?,
+        }
+    }
+    if !has_root_token {
+        output = checked_add(output, varint_field_len(8, new_token))?;
+    }
+    Ok(output)
+}
+
+fn addition_save_token_component_size(
+    source: &[u8],
+    current: bool,
+    batch: AdditionSaveTokenBatch<'_>,
+    new_token: u64,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(usize, bool), RewriteError> {
+    budget.message(source, depth)?;
+    let mut output = 0usize;
+    let mut identifier = None;
+    let mut preferred_locator = None;
+    let mut locator = None;
+    let mut token_raw = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut identifier, field.varint()?)?,
+            2 => set_once(&mut preferred_locator, strict_utf8(field.bytes()?)?)?,
+            3 => set_once(&mut locator, strict_utf8(field.bytes()?)?)?,
+            12 => {
+                let _ = field.varint()?;
+                if token_raw.replace(field.raw).is_some() {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+            },
+            _ => {},
+        }
+        output = checked_add(output, field.raw.len())?;
+    }
+    if !current {
+        return Ok((output, false));
+    }
+    let identifier = identifier
+        .filter(|value| *value != 0)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?;
+    let preferred_locator =
+        preferred_locator.ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let effective_locator = locator.unwrap_or(preferred_locator);
+    let selected = batch
+        .save_tokens
+        .components
+        .iter()
+        .copied()
+        .any(|selector| selector.identifier == identifier && selector.locator == effective_locator);
+    budget.work(
+        batch
+            .save_tokens
+            .components
+            .len()
+            .checked_mul(
+                effective_locator
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+            )
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    )?;
+    let append = component_append_len(identifier, effective_locator, batch.additions)?;
+    budget.work(
+        batch
+            .additions
+            .object_uuids
+            .len()
+            .checked_add(batch.additions.external_references.len())
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    )?;
+    let mut changed = append != 0;
+    if selected {
+        changed = true;
+        if let Some(raw) = token_raw {
+            output = output
+                .checked_sub(raw.len())
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?;
+        }
+        output = checked_add(output, varint_field_len(12, new_token))?;
+    }
+    output = checked_add(output, append)?;
+    Ok((output, changed))
+}
+
+fn precharge_addition_save_token_rewrite_and_verification(
+    source: &[u8],
+    batch: AdditionSaveTokenBatch<'_>,
+    new_token: u64,
+    output_size: usize,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    let measured = budget.clone();
+    budget.message(source, 1)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if !matches!(field.number, 3 | 11) {
+            continue;
+        }
+        let payload = field.bytes()?;
+        let _ = addition_save_token_component_size(
+            payload,
+            field.number == 3,
+            batch,
+            new_token,
+            budget,
+            2,
+        )?;
+    }
+
+    budget.source_phase = false;
+    budget.message_len(output_size, 1)?;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        if !matches!(field.number, 3 | 11) {
+            continue;
+        }
+        let payload = field.bytes()?;
+        let (candidate_len, _changed) = addition_save_token_component_size(
+            payload,
+            field.number == 3,
+            batch,
+            new_token,
+            budget,
+            2,
+        )?;
+        budget.message_len(candidate_len, 2)?;
+        if field.number == 3 {
+            let (identifier, locator) = raw_component_header(payload, budget, 2)?;
+            for addition in batch.additions.object_uuids.iter().filter(|addition| {
+                addition.component.identifier == identifier && addition.component.locator == locator
+            }) {
+                precharge_object_uuid(*addition, budget, 3)?;
+                budget.work(batch.additions.object_uuids.len())?;
+            }
+            for addition in batch
+                .additions
+                .external_references
+                .iter()
+                .filter(|addition| {
+                    addition.source.identifier == identifier && addition.source.locator == locator
+                })
+            {
+                precharge_external(*addition, budget, 3)?;
+                budget.work(batch.additions.external_references.len())?;
+            }
+        }
+    }
+    budget.message_len(output_size, 1)?;
+    budget.preflight_repeat_delta(&measured)?;
+    Ok(())
+}
+
+fn rewrite_addition_save_token_into(
+    source: &[u8],
+    batch: AdditionSaveTokenBatch<'_>,
+    new_last: u64,
+    new_token: u64,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+) -> Result<(), RewriteError> {
+    budget.message(source, 1)?;
+    let mut has_root_token = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 1)? {
+        match field.number {
+            1 => {
+                let _ = field.varint()?;
+                put_varint_field(output, 1, new_last);
+            },
+            8 => {
+                let _ = field.varint()?;
+                if has_root_token {
+                    return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
+                }
+                has_root_token = true;
+                put_varint_field(output, 8, new_token);
+            },
+            3 => rewrite_addition_save_token_component(
+                field, true, batch, new_token, output, budget, 2,
+            )?,
+            11 => output.extend_from_slice(field.raw),
+            _ => output.extend_from_slice(field.raw),
+        }
+    }
+    if !has_root_token {
+        put_varint_field(output, 8, new_token);
+    }
+    Ok(())
+}
+
+fn rewrite_addition_save_token_component(
+    field: Field<'_>,
+    current: bool,
+    batch: AdditionSaveTokenBatch<'_>,
+    new_token: u64,
+    output: &mut Vec<u8>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), RewriteError> {
+    let source = field.bytes()?;
+    let (identifier, locator) = raw_component_header(source, budget, depth)?;
+    let (size, changed) =
+        addition_save_token_component_size(source, current, batch, new_token, budget, depth)?;
+    if !changed {
+        output.extend_from_slice(field.raw);
+        return Ok(());
+    }
+    budget.changed_component()?;
+    put_key(output, field.number, 2);
+    put_varint(
+        output,
+        u64::try_from(size)
+            .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    );
+    budget.message(source, depth)?;
+    let mut token_seen = false;
+    let mut remaining = source;
+    while let Some(nested) = next_field(&mut remaining, budget, depth)? {
+        if nested.number == 12 && current {
+            let _ = nested.varint()?;
+            token_seen = true;
+            put_varint_field(output, 12, new_token);
+        } else {
+            output.extend_from_slice(nested.raw);
+        }
+    }
+    let selected = current
+        && batch
+            .save_tokens
+            .components
+            .iter()
+            .copied()
+            .any(|selector| selector.identifier == identifier && selector.locator == locator);
+    if selected && !token_seen {
+        put_varint_field(output, 12, new_token);
+    }
+    for addition in batch.additions.object_uuids.iter().filter(|addition| {
+        current
+            && addition.component.identifier == identifier
+            && addition.component.locator == locator
+    }) {
+        append_object_uuid(output, *addition)?;
+    }
+    for addition in batch
+        .additions
+        .external_references
+        .iter()
+        .filter(|addition| {
+            current
+                && addition.source.identifier == identifier
+                && addition.source.locator == locator
+        })
+    {
+        append_external(output, *addition)?;
     }
     Ok(())
 }
@@ -5296,6 +6262,7 @@ pub fn prepare_package_metadata_rewrite<'source, 'batch>(
 ) -> Result<PreparedPackageMetadataRewrite<'source, 'batch>, RewriteError> {
     validate_batch(batch, options)?;
     let mut budget = Budget::new(source, batch, options)?;
+    validate_batch_duplicates(batch, &mut budget)?;
 
     let mut source_state = ScanState::new(batch, &mut budget)?;
     scan_metadata(
@@ -6825,7 +7792,7 @@ fn validate_batch(batch: Batch<'_>, options: RewriteOptions) -> Result<(), Rewri
             InvalidReason::LastIdentifierNotIncreasing,
         ));
     }
-    for (index, addition) in batch.object_uuids.iter().enumerate() {
+    for addition in batch.object_uuids.iter() {
         validate_selector(addition.component)?;
         if addition.object_identifier <= batch.expected_last_object_identifier
             || addition.object_identifier > batch.new_last_object_identifier
@@ -6835,13 +7802,8 @@ fn validate_batch(batch: Batch<'_>, options: RewriteOptions) -> Result<(), Rewri
         if addition.uuid == UuidBits::new(0, 0) {
             return Err(RewriteError::invalid(InvalidReason::InvalidUuid));
         }
-        if batch.object_uuids[..index].iter().any(|prior| {
-            prior.object_identifier == addition.object_identifier || prior.uuid == addition.uuid
-        }) {
-            return Err(RewriteError::invalid(InvalidReason::DuplicateAddition));
-        }
     }
-    for (index, addition) in batch.external_references.iter().enumerate() {
+    for addition in batch.external_references.iter() {
         validate_selector(addition.source)?;
         validate_selector(addition.target)?;
         if addition.object_identifier == 0
@@ -6849,12 +7811,29 @@ fn validate_batch(batch: Batch<'_>, options: RewriteOptions) -> Result<(), Rewri
         {
             return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
         }
-        if batch.external_references[..index].iter().any(|prior| {
-            prior.source == addition.source
+    }
+    Ok(())
+}
+
+fn validate_batch_duplicates(batch: Batch<'_>, budget: &mut Budget) -> Result<(), RewriteError> {
+    for (index, addition) in batch.object_uuids.iter().enumerate() {
+        for prior in batch.object_uuids[..index].iter() {
+            budget.work(1)?;
+            if prior.object_identifier == addition.object_identifier || prior.uuid == addition.uuid
+            {
+                return Err(RewriteError::invalid(InvalidReason::DuplicateAddition));
+            }
+        }
+    }
+    for (index, addition) in batch.external_references.iter().enumerate() {
+        for prior in batch.external_references[..index].iter() {
+            budget.work(1)?;
+            if prior.source == addition.source
                 && prior.target.identifier == addition.target.identifier
                 && prior.object_identifier == addition.object_identifier
-        }) {
-            return Err(RewriteError::invalid(InvalidReason::DuplicateAddition));
+            {
+                return Err(RewriteError::invalid(InvalidReason::DuplicateAddition));
+            }
         }
     }
     Ok(())

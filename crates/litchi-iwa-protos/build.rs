@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_document_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_caption_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_chart_caption_graph_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
@@ -1172,7 +1173,10 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
     // bypass the production ingress review.  Raw entries are checked below
     // for the same forbidden Prost/owned-view markers and for accidental
     // Buffa usage.
-    const RAW_CODECS: &[&str] = &["src/hyperlink_codec.rs"];
+    const RAW_CODECS: &[&str] = &[
+        "src/hyperlink_codec.rs",
+        "src/keynote_chart_caption_graph_codec.rs",
+    ];
 
     let mut expected_paths = CODECS
         .iter()

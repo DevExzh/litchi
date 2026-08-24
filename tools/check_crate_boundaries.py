@@ -291,6 +291,15 @@ KEYNOTE_CHART_CAPTION_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_caption|"
     r"remove_slide_chart_caption)(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
+KEYNOTE_CHART_CAPTION_ALL_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_chart_caption|"
+    r"set_slide_chart_caption|remove_slide_chart_caption)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+KEYNOTE_CHART_CAPTION_BARE_GETTER_CALL = re.compile(
+    r"(?<![:.A-Za-z0-9_])(?:r#)?slide_chart_caption"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
 IWA_KEYNOTE_CHART_CAPTION_SOURCE = (
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts" / "caption.rs"
 )
@@ -304,6 +313,100 @@ IWA_KEYNOTE_CHART_CAPTION_TYPED_METHODS = frozenset(
         "remove_slide_chart_caption_by_selector",
     }
 )
+KEYNOTE_CHART_CAPTION_EDIT_METHODS = frozenset({"set", "clear", "commit"})
+KEYNOTE_CHART_CAPTION_GRAPH_HELPERS = frozenset(
+    {
+        "slide_chart_caption_slot",
+        "insert_slide_chart_caption",
+        "insert_slide_chart_caption_standin",
+        "replace_slide_chart_caption_reference",
+        "slide_chart_caption_theme",
+        "chart_position_for_identifier",
+    }
+)
+KEYNOTE_CHART_CAPTION_GRAPH_MARKERS = frozenset(
+    {
+        "CaptionObjectIds",
+        "CaptionThemeStyle",
+        "DrawableCaptionKind",
+        "DrawableCaptionSlot",
+        "IWorkThemeArchive",
+        "ObjectGraph",
+        "ArchiveObject",
+        "RawMessage",
+        "WireView",
+        "DecodeOptions",
+        "ChartCaptionWrite",
+        "ChartCaptionDecodeError",
+        "decode_chart_caption_identifier",
+        "rewrite_chart_caption",
+        "caption_objects",
+        "drawable_caption_slot",
+        "replace_object_reference",
+        "standin_caption_object",
+        "next_object_identifier",
+        "add_component_object_uuids",
+        "set_package_last_object_identifier",
+        "keynote_chart_caption_codec",
+        "pages_movie_caption_codec",
+        "litchi_iwa_protos",
+        "prost",
+        "prost_types",
+        "kn",
+        "tsp",
+    }
+)
+KEYNOTE_CHART_CAPTION_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|caption|storage|reference|placement|style|chart)"
+    r"[A-Za-z_]*(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*u64\b"
+)
+KEYNOTE_CHART_CAPTION_FLAT_ALIASES = frozenset(
+    {
+        "Caption",
+        "CaptionCommit",
+        "CaptionDiagnostics",
+        "CaptionEdit",
+        "CaptionError",
+        "CaptionLimitKind",
+        "CaptionPatch",
+        "ChartCaption",
+        "ChartCaptionSnapshot",
+        "ChartCaptionWrite",
+    }
+)
+KEYNOTE_CHART_CAPTION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+        "ChartCaptionSnapshot",
+        "ChartCaptionWrite",
+    }
+)
+KEYNOTE_CHART_CAPTION_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_CHART_CAPTION_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsp", "tsd", "litchi_iwa_protos"}
+)
+IWA_KEYNOTE_CHART_CAPTION_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 KEYNOTE_CHART_CAPTION_OWNER_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_caption.rs"
 )
@@ -13397,7 +13500,9 @@ def audit_keynote_chart_caption_legacy_calls(root: Path = ROOT) -> list[str]:
         return []
     violations: list[str] = []
     for path in sorted(source_root.rglob("*.rs")):
-        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
         for match in KEYNOTE_CHART_CAPTION_LEGACY_CALL.finditer(source):
             line_number = source.count("\n", 0, match.start("method")) + 1
             violations.append(
@@ -13408,7 +13513,14 @@ def audit_keynote_chart_caption_legacy_calls(root: Path = ROOT) -> list[str]:
 
 
 def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[str]:
-    """Keep raw-ID chart captions deprecated beside the typed selector facade."""
+    """Require full selector-first chart-caption ownership in litchi-iwa.
+
+    The compatibility host no longer gets a raw-ID escape hatch once the
+    focused package owns graph creation and stand-in removal.  Test fixtures
+    may still exercise the old graph under ``#[cfg(test)]``; every production
+    source and example is masked item-by-item before this audit so a test-only
+    import or helper cannot hide a later production leak.
+    """
 
     path = root / IWA_KEYNOTE_CHART_CAPTION_SOURCE
     if not path.is_file():
@@ -13416,41 +13528,220 @@ def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[s
             "litchi-iwa Keynote chart-caption compatibility source is missing: "
             f"{IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
         ]
-    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
     violations: list[str] = []
-    declaration = re.compile(
-        r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
-        r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    source_paths = (
+        sorted(source_root.rglob("*.rs")) if source_root.is_dir() else [path]
     )
-    declarations = {match.group(1) for match in declaration.finditer(source)}
-    for name in sorted(IWA_KEYNOTE_CHART_CAPTION_TYPED_METHODS - declarations):
-        violations.append(
-            "litchi-iwa Keynote chart-caption selector method is missing "
-            f"{name}: {IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
+
+    def caption_scope(path: Path) -> bool:
+        # Shape/movie captions and chart arrangement/title helpers use some
+        # of the same vocabulary but are separate compatibility owners.  The
+        # graph/wire audit is therefore limited to the dedicated chart
+        # caption source; raw chart method names are still checked globally.
+        return path == root / IWA_KEYNOTE_CHART_CAPTION_SOURCE
+
+    def function_body(code: str, name: str) -> tuple[str, int] | None:
+        declaration = re.search(
+            rf"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+            rf"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+            rf"fn[ \t\r\n]+(?:r#)?{re.escape(name)}\b",
+            code,
         )
-    for name in sorted(IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS - declarations):
-        violations.append(
-            "litchi-iwa Keynote chart-caption legacy method is missing "
-            f"{name}: {IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
-        )
-    for match in declaration.finditer(source):
-        name = match.group(1)
-        if name not in IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS:
+        if declaration is None:
+            return None
+        opening = code.find("{", declaration.end())
+        if opening < 0:
+            return None
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth:
+            return None
+        return code[opening + 1 : cursor - 1], declaration.start()
+
+    for source_path in source_paths:
+        # The Keynote editor keeps source-built regressions in sibling
+        # ``tests.rs`` modules selected by ``#[cfg(test)]`` at the parent.
+        # They are test-only even when the child file itself has no
+        # attribute; do not turn their compatibility calls into production
+        # boundary findings.
+        if source_path.name in {"tests.rs", *KEYNOTE_TEST_ONLY_SOURCE_NAMES}:
             continue
-        prefix = source[: match.start()]
-        attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
-        nearest = attributes[-1] if attributes else None
-        deprecated = False
-        if nearest is not None:
-            attribute = prefix[nearest.start() :]
-            if re.match(r"[ \t]*#[ \t]*\[[ \t]*deprecated\b", attribute):
-                closing = attribute.find("]")
-                deprecated = closing >= 0 and not attribute[closing + 1 :].strip()
-        if not deprecated:
+        raw_source = source_path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        source = _mask_rust_non_code(production_source)
+        relative = source_path.relative_to(root)
+        declarations = _rust_function_declarations(production_source)
+        declared_names = {name for name, _line_number in declarations}
+
+        if source_path == path:
+            for name in sorted(IWA_KEYNOTE_CHART_CAPTION_TYPED_METHODS - declared_names):
+                violations.append(
+                    "litchi-iwa Keynote chart-caption selector method is missing "
+                    f"{name}: {IWA_KEYNOTE_CHART_CAPTION_SOURCE}"
+                )
+
+        for name, line_number in declarations:
+            if name in IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS:
+                violations.append(
+                    "litchi-iwa Keynote chart-caption raw-ID method must be retired "
+                    f"{name}: {relative}:{line_number}"
+                )
+            elif name in KEYNOTE_CHART_CAPTION_GRAPH_HELPERS and (
+                name != "chart_position_for_identifier"
+                or caption_scope(source_path)
+            ):
+                violations.append(
+                    "litchi-iwa Keynote chart-caption native graph helper must be retired "
+                    f"{name}: {relative}:{line_number}"
+                )
+
+        for match in KEYNOTE_CHART_CAPTION_LEGACY_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                source[line_start:line_end],
+            ):
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-caption raw-ID call must be retired "
+                f"{match.group('method')}: {relative}:{line_number}"
+            )
+
+        for match in KEYNOTE_CHART_CAPTION_BARE_GETTER_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            if re.search(
+                r"\bfn[ \t\r\n]+slide_chart_caption\b",
+                source[line_start:line_end],
+            ):
+                continue
             line_number = source.count("\n", 0, match.start()) + 1
             violations.append(
-                "litchi-iwa Keynote chart-caption legacy method must remain deprecated "
-                f"{name}: {IWA_KEYNOTE_CHART_CAPTION_SOURCE}:{line_number}"
+                "litchi-iwa Keynote chart-caption raw-ID getter call must be retired "
+                f"slide_chart_caption: {relative}:{line_number}"
+            )
+
+        if not caption_scope(source_path):
+            continue
+
+        for match in KEYNOTE_CHART_CAPTION_RAW_ID_PARAMETER.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-caption raw identifier parameter must be retired "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+
+        for marker in sorted(KEYNOTE_CHART_CAPTION_GRAPH_MARKERS):
+            marker_match = re.search(
+                rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                source,
+            )
+            if marker_match is None:
+                continue
+            label = (
+                "protobuf"
+                if marker in KEYNOTE_CHART_CAPTION_PROTO_ORIGINS
+                else "wire"
+                if marker in KEYNOTE_CHART_CAPTION_WIRE_TYPES
+                else "native graph"
+            )
+            line_number = source.count("\n", 0, marker_match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-caption compatibility source retains "
+                f"{label} marker {marker}: {relative}:{line_number}"
+            )
+
+        for method, requirements in (
+            (
+                "set_slide_chart_caption_by_selector",
+                ("edit_slide_chart_caption", ".set(", ".commit("),
+            ),
+            (
+                "remove_slide_chart_caption_by_selector",
+                ("edit_slide_chart_caption", ".clear(", ".commit("),
+            ),
+        ):
+            body_result = function_body(source, method)
+            if body_result is None:
+                continue
+            body, declaration_offset = body_result
+            missing = [requirement for requirement in requirements if requirement not in body]
+            if missing:
+                line_number = source.count("\n", 0, declaration_offset) + 1
+                violations.append(
+                    "litchi-iwa Keynote chart-caption selector mutation must route through "
+                    f"focused Package::{method.removesuffix('_by_selector')}: "
+                    f"{relative}:{line_number}"
+                )
+
+    example_root = root / IWA_KEYNOTE_CHART_CAPTION_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            production_source = _mask_rust_cfg_test_items(
+                example_path.read_text(encoding="utf-8")
+            )
+            source = _mask_rust_non_code(production_source)
+            relative = example_path.relative_to(root)
+            caption_relevant_example = (
+                example_path.name == "create_keynote_chart.rs"
+                or (
+                    "keynote" in example_path.stem.lower()
+                    and "caption" in example_path.stem.lower()
+                )
+                or KEYNOTE_CHART_CAPTION_ALL_LEGACY_CALL.search(source) is not None
+            )
+            for name, line_number in _rust_function_declarations(production_source):
+                if name in IWA_KEYNOTE_CHART_CAPTION_LEGACY_METHODS:
+                    violations.append(
+                        "litchi-iwa Keynote chart-caption example retains raw-ID helper "
+                        f"{name}: {relative}:{line_number}"
+                    )
+                elif name in KEYNOTE_CHART_CAPTION_GRAPH_HELPERS:
+                    violations.append(
+                        "litchi-iwa Keynote chart-caption example retains native graph helper "
+                        f"{name}: {relative}:{line_number}"
+                    )
+            if caption_relevant_example:
+                for match in KEYNOTE_CHART_CAPTION_RAW_ID_PARAMETER.finditer(source):
+                    line_number = source.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "litchi-iwa Keynote chart-caption example retains raw identifier "
+                        f"{match.group(0).strip()}: {relative}:{line_number}"
+                    )
+            for match in KEYNOTE_CHART_CAPTION_ALL_LEGACY_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "litchi-iwa Keynote chart-caption example retains raw-ID call "
+                    f"{match.group('method')}: {relative}:{line_number}"
+                )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for match in KEYNOTE_CHART_CAPTION_RAW_ID_PARAMETER.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-caption README retains raw identifier "
+                f"{match.group(0).strip()}: {IWA_KEYNOTE_README}:{line_number}"
+            )
+        for match in KEYNOTE_CHART_CAPTION_ALL_LEGACY_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-caption README retains raw-ID call "
+                f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
             )
     return sorted(set(violations))
 
@@ -13458,7 +13749,14 @@ def audit_iwa_keynote_chart_caption_source_topology(root: Path = ROOT) -> list[s
 def audit_keynote_chart_caption_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Require the selector-first, archive-free chart-caption package owner."""
+    """Require the selector-first, archive-free chart-caption package owner.
+
+    The package may keep physical parsing and wire helpers private, but none
+    of that vocabulary may cross its public declarations or re-export lists.
+    This distinction matters: scanning the whole implementation would reject
+    the owner for doing its job, while scanning only methods misses public
+    fields and ``pub use`` aliases that expose the same physical graph.
+    """
 
     owner_path = root / KEYNOTE_CHART_CAPTION_OWNER_SOURCE
     package_path = root / KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
@@ -13469,40 +13767,48 @@ def audit_keynote_chart_caption_facade_source_topology(
             "focused litchi-keynote chart-caption owner source is missing: "
             f"{KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
         ]
-    owner = owner_path.read_text(encoding="utf-8")
-    package = package_path.read_text(encoding="utf-8") if package_path.is_file() else ""
-    library = lib_path.read_text(encoding="utf-8") if lib_path.is_file() else ""
-    if re.search(r"(?m)^mod[ \t]+slide_chart_caption[ \t]*;", package) is None:
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    package_code = _mask_rust_non_code(package)
+    package_library_code = _mask_rust_non_code(package + library)
+    if re.search(r"(?m)^mod[ \t]+slide_chart_caption[ \t]*;", package_code) is None:
         violations.append(
             "focused litchi-keynote chart-caption owner module is missing: "
             f"{KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]}"
         )
-    if re.search(r"(?m)^pub[ \t]+mod[ \t]+slide_chart_caption\b", package + library):
+    if re.search(r"(?m)^pub[ \t]+mod[ \t]+slide_chart_caption\b", package_library_code):
         violations.append(
             "focused litchi-keynote chart-caption owner module must remain private: "
             f"{KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]}"
         )
-    owner_exports = _rust_canonical_exports(
-        owner, frozenset(KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
-    )
+    canonical_names = frozenset(KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+    owner_exports = _rust_canonical_exports(owner, canonical_names)
     package_exports = _rust_canonical_exports(
-        package, frozenset(KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+        package, canonical_names
     )
-    lib_exports = _rust_canonical_exports(
-        library, frozenset(KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
-    )
+    lib_exports = _rust_canonical_exports(library, canonical_names)
     for name in sorted(KEYNOTE_CHART_CAPTION_CANONICAL_TYPES):
         if name not in owner_exports or name not in package_exports or name not in lib_exports:
             violations.append(
                 "focused litchi-keynote chart-caption public API is missing canonical type "
                 f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
             )
+    owner_code = _mask_rust_non_code(owner)
     method_names = {
         match.group(1)
         for match in re.finditer(
             r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
             r"([A-Za-z_][A-Za-z0-9_]*)\b",
-            _mask_rust_non_code(owner),
+            owner_code,
         )
     }
     for name in sorted(KEYNOTE_CHART_CAPTION_PACKAGE_METHODS - method_names):
@@ -13510,21 +13816,141 @@ def audit_keynote_chart_caption_facade_source_topology(
             "focused litchi-keynote chart-caption Package method is missing "
             f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
         )
-    physical = re.compile(
-        r"\b(?:ArchiveObject|RawMessage|SourceCatalog|Wire[A-Za-z0-9_]*|"
-        r"ChartCaptionSnapshot|ChartCaptionWrite|drawable_object_id)\b|"
-        r"\b(?:object|drawable|identifier)[A-Za-z0-9_]*[ \t]*:[ \t]*u64\b|"
-        r"&[ \t]*\[[ \t]*u8[ \t]*\]"
+
+    # Require the complete edit lifecycle on ChartCaptionEdit itself.  A
+    # similarly named Package helper must not satisfy this check accidentally.
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?ChartCaptionEdit\b",
+        owner_code,
     )
-    for declaration, line_number in _rust_public_declarations(owner):
-        if re.search(r"\bfn\b", declaration) is None:
-            continue
-        match = physical.search(declaration)
-        if match is not None:
-            violations.append(
-                "focused litchi-keynote chart-caption public method exposes physical type "
-                f"{match.group(0)}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}:{line_number}"
+    if edit_impl is None:
+        edit_names: set[str] = set()
+    else:
+        opening = owner_code.find("{", edit_impl.end())
+        depth = 1
+        cursor = opening + 1 if opening >= 0 else len(owner_code)
+        while opening >= 0 and cursor < len(owner_code) and depth:
+            if owner_code[cursor] == "{":
+                depth += 1
+            elif owner_code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        edit_body = owner_code[opening + 1 : cursor - 1] if depth == 0 else ""
+        edit_names = {
+            match.group(1)
+            for match in re.finditer(
+                r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+                r"([A-Za-z_][A-Za-z0-9_]*)\b",
+                edit_body,
             )
+        }
+    for name in sorted(KEYNOTE_CHART_CAPTION_EDIT_METHODS - edit_names):
+        violations.append(
+            "focused litchi-keynote chart-caption ChartCaptionEdit method is missing "
+            f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
+        )
+
+    # Inspect every public declaration, not just methods.  This catches
+    # public struct fields, aliases, and re-exports while leaving private
+    # package implementation imports free to use the archive/wire layers.
+    for source, source_path in (
+        (owner, owner_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if source_path != owner_path and not (
+                identifiers
+                & (
+                    canonical_names
+                    | KEYNOTE_CHART_CAPTION_FLAT_ALIASES
+                    | KEYNOTE_CHART_CAPTION_PACKAGE_METHODS
+                    | {"slide_chart_caption", "ChartCaptionEdit"}
+                )
+            ):
+                # package.rs/lib.rs contain many unrelated public archive
+                # helpers.  Only declarations that can participate in this
+                # caption facade are in scope; the owner itself is scanned in
+                # full, including its public fields.
+                continue
+            for identifier in sorted(identifiers):
+                reason = None
+                if identifier in KEYNOTE_CHART_CAPTION_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_CHART_CAPTION_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_CHART_CAPTION_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-keynote chart-caption public API exposes "
+                    f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                )
+
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote chart-caption public API exposes "
+                    f"raw byte slice {byte_slice}: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+
+            for match in KEYNOTE_CHART_CAPTION_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote chart-caption public API exposes "
+                    f"raw identifier parameter {match.group(0).strip()}: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+
+            if "pub use" in declaration or re.search(r"\bpub[ \t]+type\b", declaration):
+                aliases = {
+                    match.group(1)
+                    for match in RUST_IDENTIFIER.finditer(declaration)
+                    if match.group(1) in KEYNOTE_CHART_CAPTION_FLAT_ALIASES
+                }
+                for alias in sorted(aliases):
+                    if alias in canonical_names:
+                        continue
+                    violations.append(
+                        "focused litchi-keynote chart-caption public API retains flat alias "
+                        f"{alias}: {source_path.relative_to(root)}:{line_number}"
+                    )
+                for match in re.finditer(
+                    r"(?<![A-Za-z0-9_#])(?:r#)?([A-Za-z_][A-Za-z0-9_]*)"
+                    r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+                    declaration,
+                ):
+                    original, public_name = match.groups()
+                    if original in canonical_names and public_name != original:
+                        violations.append(
+                            "focused litchi-keynote chart-caption public API retains "
+                            f"alternate alias {public_name} for {original}: "
+                            f"{source_path.relative_to(root)}:{line_number}"
+                        )
+                type_alias = re.search(
+                    r"\bpub[ \t]+type[ \t]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)"
+                    r"(?:[ \t]*<[^;=]*>)?[ \t]*=[ \t]*(?:[A-Za-z_][A-Za-z0-9_]*::)*"
+                    r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+                    declaration,
+                )
+                if type_alias is not None:
+                    alias, target = type_alias.groups()
+                    if target in canonical_names and alias != target:
+                        violations.append(
+                            "focused litchi-keynote chart-caption public API retains "
+                            f"alternate alias {alias} for {target}: "
+                            f"{source_path.relative_to(root)}:{line_number}"
+                        )
+
     return sorted(set(violations))
 
 
