@@ -1692,10 +1692,11 @@ See `litchi-numbers/examples/edit_table_title.rs` for synchronized
 sibling-temporary, distinct-output, no-clobber publication through
 `Package::write_to`.
 
-This transfer is Numbers-only: `PagesEditor::table_title_settings` /
-`set_table_title_settings` and `KeynoteEditor::slide_table_title_settings` /
-`set_slide_table_title_settings` remain migration-host table-title helpers,
-along with their format-specific table CRUD.
+Pages body-table titles use the same focused transaction shape through
+`litchi_pages::Package::{body_table_title_settings, edit_body_table_title,
+apply_body_table_title}` and `BodyTableSelector`; the former raw-object-ID
+`PagesEditor` title helpers were removed. Keynote's slide-table title methods
+remain migration-host helpers with their format-specific table CRUD.
 
 ### Numbers sheet and table names use the focused package transaction
 

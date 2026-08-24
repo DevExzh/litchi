@@ -4814,7 +4814,7 @@ pub use tables::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression, PagesTableInfo, PagesTablePoints,
     PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
-    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope, PagesTableTitleSettings,
+    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
 };
 
 #[cfg(test)]

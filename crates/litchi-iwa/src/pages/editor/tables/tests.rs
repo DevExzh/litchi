@@ -31,7 +31,6 @@ use litchi_numbers::cell::data_format::{
     Scientific, Slider, StarRating, Stepper, Text as TextFormat,
 };
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
-use litchi_numbers::table::title::Settings as TitleSettings;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
@@ -1394,54 +1393,6 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         value,
         CellValue::Text(text) if text == "Header" || text == "Footer"
     )));
-}
-
-#[test]
-fn source_built_table_roundtrips_title_settings_transactionally() {
-    let mut editor = PagesDocumentBuilder::new()
-        .body_table("Revenue", 2, 2)
-        .build()
-        .unwrap();
-    let model_id = editor.tables().unwrap()[0].model_object_id;
-    let visible = TitleSettings::new(Some(true), Some(true));
-    let initially_hidden = TitleSettings::new(Some(false), None);
-    assert_eq!(
-        editor.table_title_settings(model_id).unwrap(),
-        initially_hidden
-    );
-    editor.set_table_title_settings(model_id, visible).unwrap();
-
-    let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reopened.table_title_settings(model_id).unwrap(), visible);
-    let unchanged = reopened.to_bytes().unwrap();
-    reopened
-        .set_table_title_settings(model_id, visible)
-        .unwrap();
-    assert_eq!(reopened.to_bytes().unwrap(), unchanged);
-
-    let explicit_hidden = TitleSettings::new(Some(false), Some(false));
-    reopened
-        .set_table_title_settings(model_id, explicit_hidden)
-        .unwrap();
-    assert_eq!(
-        reopened.table_title_settings(model_id).unwrap(),
-        explicit_hidden
-    );
-    reopened
-        .set_table_title_settings(model_id, TitleSettings::default())
-        .unwrap();
-    assert_eq!(
-        reopened.table_title_settings(model_id).unwrap(),
-        TitleSettings::default()
-    );
-
-    let before_error = reopened.to_bytes().unwrap();
-    assert!(
-        reopened
-            .set_table_title_settings(u64::MAX, visible)
-            .is_err()
-    );
-    assert_eq!(reopened.to_bytes().unwrap(), before_error);
 }
 
 #[test]

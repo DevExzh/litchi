@@ -9,7 +9,6 @@ mod layout;
 mod semantic;
 mod sort;
 mod storage;
-mod title;
 mod topology;
 mod validation;
 
@@ -26,8 +25,6 @@ pub use sort::{
     PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
     PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
 };
-pub use title::PagesTableTitleSettings;
-
 use std::collections::{HashMap, HashSet};
 
 use prost::Message;
