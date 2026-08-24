@@ -14984,6 +14984,42 @@ class BoundaryPolicyTests(unittest.TestCase):
                 violations,
             )
 
+    def _write_iwa_comment_clear_delegation_fixture(
+        self,
+        root: Path,
+        *,
+        host_call: str = "clear_cell_comment_with_focused_owner(self, table_id, row, column)?",
+        focused_arguments: str = "sheet, table, position",
+        metadata_expression: str = 'editor.package().contains_entry("Index/Metadata.iwa")',
+        extra_arm: str = "",
+    ) -> Path:
+        table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+        table.parent.mkdir(parents=True, exist_ok=True)
+        table.write_text(
+            "fn clear_cell_comment_with_focused_owner(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Result<Route> {\n"
+            "    let (sheet, table) = focused_table_location(editor, table_id)?;\n"
+            "    let position = CellPosition::try_from_usize(row, column)?;\n"
+            f"    let has_metadata = {metadata_expression};\n"
+            "    if !has_metadata { return Ok(Route::LegacyFallback); }\n"
+            "    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)?;\n"
+            f"    match source.clear_table_cell_comment({focused_arguments}) {{\n"
+            "        Ok(commit) => { let bytes = commit.to_bytes()?; let _ = NumbersEditor::from_bytes(&bytes)?; Ok(Route::Published) },\n"
+            + extra_arm
+            + "        Err(error) => Err(error.into()),\n"
+            "    }\n"
+            "}\n"
+            "impl NumbersEditor {\n"
+            "    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {\n"
+            f"        match {host_call} {{\n"
+            "            Route::Published => Ok(()),\n"
+            "            Route::LegacyFallback => clear_cell_comment_in_package(&mut self.package, table_id, row, column),\n"
+            "        }\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        return table
+
     def test_iwa_numbers_cell_comment_clear_delegation_requires_metadata_gate(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -14993,11 +15029,11 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "fn clear_cell_comment_with_focused_owner(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Result<Route> {\n"
                 "    let (sheet, table) = focused_table_location(editor, table_id)?;\n"
                 "    let position = CellPosition::try_from_usize(row, column)?;\n"
-                "    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)?;\n"
                 "    let has_metadata = editor.package().contains_entry(\"Index/Metadata.iwa\");\n"
+                "    if !has_metadata { return Ok(Route::LegacyFallback); }\n"
+                "    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)?;\n"
                 "    match source.clear_table_cell_comment(sheet, table, position) {\n"
                 "        Ok(commit) => { let bytes = commit.to_bytes()?; let _ = NumbersEditor::from_bytes(&bytes)?; Ok(Route::Published) },\n"
-                "        Err(TableCellCommentError::UnsupportedDependency { .. }) if !has_metadata => Ok(Route::LegacyFallback),\n"
                 "        Err(error) => Err(error.into()),\n"
                 "    }\n"
                 "}\n"
@@ -15017,12 +15053,44 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             table.write_text(
                 table.read_text(encoding="utf-8").replace(
-                    " if !has_metadata", ""
+                    "editor.package().contains_entry(\"Index/Metadata.iwa\")", "false"
                 ),
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
-            self.assertTrue(any("without PackageMetadata" in item for item in violations), violations)
+            self.assertTrue(any("metadata gate" in item for item in violations), violations)
+
+    def test_iwa_numbers_cell_comment_clear_rejects_disconnected_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwa_comment_clear_delegation_fixture(
+                root,
+                host_call="clear_cell_comment_in_package(&mut self.package, table_id, row, column)?; Route::Published",
+            )
+            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
+            self.assertTrue(any("host does not call" in item for item in violations), violations)
+
+    def test_iwa_numbers_cell_comment_clear_rejects_raw_id_focused_call(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwa_comment_clear_delegation_fixture(
+                root, focused_arguments="table_id, table_id, position"
+            )
+            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
+            self.assertTrue(any("raw native identifier" in item for item in violations), violations)
+
+    def test_iwa_numbers_cell_comment_clear_rejects_comment_not_found_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwa_comment_clear_delegation_fixture(
+                root,
+                extra_arm=(
+                    "        Err(TableCellCommentError::CommentNotFound { .. }) => "
+                    "Ok(Route::LegacyFallback),\n"
+                ),
+            )
+            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
+            self.assertTrue(any("CommentNotFound" in item for item in violations), violations)
 
     def test_iwa_numbers_table_cell_fixture_helpers_stay_test_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -16074,6 +16142,38 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             self.assertTrue(
                 any("unsupported entry owner guard" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_unpublished_preparation(
+        self,
+    ) -> None:
+        prepared_only = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) || entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 || located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            prove_archive_reference_ownership(edit.source, &located)?;\n"
+            "            inspect_references_with_policy_and_limits(visitor, ArchiveReferencePolicy::RejectUnknownMetadata, limits)?;\n"
+            "            prepare_root_clear(edit.source, &located)?;\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=prepared_only
+            )
+            violations = boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(root)
+            self.assertTrue(
+                any("must rewrite and publish" in item for item in violations),
                 violations,
             )
 

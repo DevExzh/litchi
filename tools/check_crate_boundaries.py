@@ -10153,6 +10153,11 @@ def audit_iwa_numbers_cell_comment_clear_delegation_source_topology(
             "litchi-iwa Numbers cell-comment clear is missing its focused host route: "
             f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
         ]
+    if re.search(r"\bclear_cell_comment_with_focused_owner\s*\(", host) is None:
+        violations.append(
+            "litchi-iwa Numbers cell-comment clear host does not call its focused helper: "
+            f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+        )
     route = host + "\n" + helper
     required = (
         ("selector mapping", r"\bfocused_table_location\s*\("),
@@ -10166,8 +10171,10 @@ def audit_iwa_numbers_cell_comment_clear_delegation_source_topology(
             "legacy fallback",
             rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_LEGACY_HELPER)}\s*\(",
         ),
-        ("metadata gate", r"\bhas_metadata\b"),
-        ("typed unsupported case", r"\bUnsupportedDependency\b"),
+        (
+            "metadata gate",
+            r"\.contains_entry\s*\(",
+        ),
         ("verified reopen", r"\bNumbersEditor\s*::\s*from_bytes\s*\("),
     )
     for label, pattern in required:
@@ -10176,19 +10183,49 @@ def audit_iwa_numbers_cell_comment_clear_delegation_source_topology(
                 f"litchi-iwa Numbers cell-comment clear is missing {label}: "
                 f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
             )
-    if re.search(
-        r"Err\s*\(\s*TableCellCommentError\s*::\s*UnsupportedDependency[\s\S]{0,160}"
-        r"if\s*!\s*has_metadata",
-        helper,
-    ) is None:
+    if '"Index/Metadata.iwa"' not in source:
         violations.append(
-            "litchi-iwa Numbers cell-comment clear may fall back only for an "
-            "unsupported graph without PackageMetadata"
+            "litchi-iwa Numbers cell-comment clear metadata gate must target "
+            "Index/Metadata.iwa"
+        )
+    metadata_fallback = re.search(
+        r"if\s*!\s*has_metadata\s*\{[\s\S]{0,180}LegacyFallback", helper
+    )
+    parse = re.search(r"\bFocusedNumbersPackage\s*::\s*from_bytes\s*\(", helper)
+    if metadata_fallback is None or parse is None or metadata_fallback.start() > parse.start():
+        violations.append(
+            "litchi-iwa Numbers cell-comment clear must choose no-Metadata legacy "
+            "fallback before focused parsing"
         )
     if re.search(r"Err\s*\(\s*_\s*\)[\s\S]{0,160}LegacyFallback", helper):
         violations.append(
             "litchi-iwa Numbers cell-comment clear must not broadly fall back on focused errors"
         )
+    if re.search(r"\bCommentNotFound\b[\s\S]{0,180}LegacyFallback", helper):
+        violations.append(
+            "litchi-iwa Numbers cell-comment clear must not treat CommentNotFound "
+            "as legacy-compatible"
+        )
+    focused_call = re.search(
+        rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD)}\s*\(", helper
+    )
+    if focused_call is not None:
+        cursor = focused_call.end()
+        depth = 1
+        while cursor < len(helper) and depth:
+            depth += helper[cursor] == "("
+            depth -= helper[cursor] == ")"
+            cursor += 1
+        arguments = helper[focused_call.end() : cursor - 1] if depth == 0 else ""
+        raw = re.search(
+            r"\b(?:table_id|native_id|object_id|object_identifier|raw_object_id)\b",
+            arguments,
+        )
+        if raw is not None:
+            violations.append(
+                "litchi-iwa Numbers cell-comment focused clear passes a raw native "
+                f"identifier ({raw.group(0)}) instead of selectors"
+            )
     return sorted(set(violations))
 
 
@@ -12271,6 +12308,12 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
                 f"clear path: {NUMBERS_COMMENT_SOURCE}"
             )
 
+    prepared_markers = (
+        r"\bprepare_metadata_token_entry[ \t\r\n]*\(",
+        rf"\b{re.escape(PACKAGE_METADATA_SAVE_TOKEN_FUNCTION)}[ \t\r\n]*\(",
+        r"\bmetadata_entry\b",
+        r"\bEntryEdit[ \t\r\n]*::[ \t\r\n]*new[ \t\r\n]*\(",
+    )
     commit_body = function_bodies.get(NUMBERS_COMMENT_COMMIT_FUNCTION)
     if commit_body is None:
         violations.append(
@@ -12286,7 +12329,15 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
             reachable_code,
         )
         prepared_route = re.search(r"\bprepare_root_clear[ \t\r\n]*\(", reachable_code)
-        has_combined_route = combined_call is not None or prepared_route is not None
+        prepared_route_complete = prepared_route is not None and all(
+            re.search(marker, reachable_code) is not None for marker in prepared_markers
+        )
+        if prepared_route is not None and not prepared_route_complete:
+            violations.append(
+                "focused Numbers prepared comment clear must rewrite and publish "
+                f"the metadata token artifact: {NUMBERS_COMMENT_SOURCE}"
+            )
+        has_combined_route = combined_call is not None or prepared_route_complete
 
         unsupported = commit_body.find(NUMBERS_COMMENT_CLEAR_UNSUPPORTED_ERROR)
         rewrite = commit_body.find("rewrite_existing")
@@ -12309,7 +12360,7 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
             # stale.
             forbidden_standalone = (
                 (PACKAGE_METADATA_REMOVE_FUNCTION,)
-                if prepared_route is not None
+                if prepared_route_complete
                 else (PACKAGE_METADATA_REMOVE_FUNCTION, PACKAGE_METADATA_SAVE_TOKEN_FUNCTION)
             )
             for function_name in forbidden_standalone:
@@ -12451,7 +12502,10 @@ def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
         rf"\b{re.escape(PACKAGE_METADATA_COMBINED_FUNCTION)}"
         r"[ \t\r\n]*\(",
         reachable_code,
-    ) is not None or re.search(r"\bprepare_root_clear[ \t\r\n]*\(", reachable_code) is not None
+    ) is not None or (
+        re.search(r"\bprepare_root_clear[ \t\r\n]*\(", reachable_code) is not None
+        and all(re.search(marker, reachable_code) is not None for marker in prepared_markers)
+    )
     for function_name in (
         PACKAGE_METADATA_REMOVE_FUNCTION,
         PACKAGE_METADATA_SAVE_TOKEN_FUNCTION,
