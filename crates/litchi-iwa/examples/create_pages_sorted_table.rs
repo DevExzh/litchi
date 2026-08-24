@@ -1,12 +1,12 @@
 //! Create and physically sort a plain-text Pages table without an input document.
-use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
-
 use std::env;
 
 use litchi_iwa::pages::{
     PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableSortColumnIndex,
     PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule,
 };
+use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_pages::{BodyTableSelector, Package};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = env::args()
@@ -17,13 +17,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .body_table("Cities", 5, 2)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
-    editor.set_table_header_settings(
-        table_id,
-        HeaderSettings {
+    let focused = Package::from_bytes(&editor.to_bytes()?)?;
+    let header_commit = focused
+        .edit_body_table_header_settings(BodyTableSelector::index(0))?
+        .set(HeaderSettings {
             header_rows: Some(HeaderCount::ONE),
             ..Default::default()
-        },
-    )?;
+        })
+        .commit()?;
+    editor = litchi_iwa::pages::PagesEditor::from_bytes(header_commit.package().source_bytes())?;
     editor.set_table_cells(
         table_id,
         [

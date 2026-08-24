@@ -11,6 +11,8 @@ use litchi_iwa::table_appearance::{
     TableAppearance, TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
 };
 use litchi_numbers::{Package, SheetSelector, TableSelector};
+use litchi_pages::table::headers::{Count as PagesHeaderCount, Settings as PagesHeaderSettings};
+use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 const APPEARANCE: TableAppearance = TableAppearance {
     row_banding: TableRowBanding::Enabled,
@@ -60,12 +62,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .body_table("Appearance", 6, 3)
         .build()?;
     let pages_table = pages.tables()?.remove(0);
-    pages.set_table_header_settings(
-        pages_table.model_object_id,
-        HeaderSettings {
-            header_rows: Some(HeaderCount::ONE),
-            header_columns: Some(HeaderCount::ONE),
-            footer_rows: Some(HeaderCount::ONE),
+    set_focused_pages_table_headers(
+        &mut pages,
+        PagesHeaderSettings {
+            header_rows: Some(PagesHeaderCount::ONE),
+            header_columns: Some(PagesHeaderCount::ONE),
+            footer_rows: Some(PagesHeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -123,4 +125,17 @@ fn set_focused_table_headers(
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
     Ok(NumbersEditor::from_bytes(&bytes)?)
+}
+
+fn set_focused_pages_table_headers(
+    editor: &mut PagesEditor,
+    settings: PagesHeaderSettings,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_body_table_header_settings(BodyTableSelector::index(0))?
+        .set(settings)
+        .commit()?;
+    *editor = PagesEditor::from_bytes(commit.package().source_bytes())?;
+    Ok(())
 }

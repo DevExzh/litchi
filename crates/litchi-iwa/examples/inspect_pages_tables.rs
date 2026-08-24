@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (position, table) in editor.tables()?.into_iter().enumerate() {
         let materialized = editor.table(table.model_object_id)?;
         let cells = materialized.iter_cells().collect::<Vec<_>>();
-        let headers = editor.table_header_settings(table.model_object_id)?;
+        let headers = focused.body_table_header_settings(BodyTableSelector::index(position))?;
         let title =
             focused.body_table_title_settings(BodyTableSelector::position(position.into()))?;
         let row_heights = (0..table.rows)

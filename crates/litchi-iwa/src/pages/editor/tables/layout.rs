@@ -2,7 +2,6 @@
 
 use super::*;
 
-use litchi_numbers::table::headers::Settings as HeaderSettings;
 /// One row or column addressed by zero-based index.
 pub type PagesTableDimension = crate::numbers::NumbersTableDimension;
 /// A validated positive point measurement for a table axis.
@@ -11,40 +10,6 @@ pub type PagesTablePoints = crate::numbers::NumbersTablePoints;
 pub type PagesTableDimensionSize = crate::numbers::NumbersTableDimensionSize;
 
 impl PagesEditor {
-    /// Read a body table's lossless header and footer configuration.
-    pub fn table_header_settings(&self, model_object_id: u64) -> Result<HeaderSettings> {
-        self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
-    }
-
-    /// Replace a body table's header and footer configuration transactionally.
-    pub fn set_table_header_settings(
-        &mut self,
-        model_object_id: u64,
-        settings: HeaderSettings,
-    ) -> Result<()> {
-        self.require_body_table(model_object_id)?;
-        if self.table_header_settings(model_object_id)? == settings {
-            return Ok(());
-        }
-
-        let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_header_settings_in_package(
-            &mut staged,
-            model_object_id,
-            settings,
-        )?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        verified.require_body_table(model_object_id)?;
-        if verified.table_header_settings(model_object_id)? != settings {
-            return Err(Error::InvalidFormat(
-                "Pages table header settings failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Read one row-height or column-width override.
     pub fn table_dimension_size(
         &self,
