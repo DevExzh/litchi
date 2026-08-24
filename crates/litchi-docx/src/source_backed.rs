@@ -24,6 +24,7 @@ use crate::parts::document_part::{
 };
 use crate::redact;
 use crate::sanitize::{self, RelationshipState};
+use crate::section::layout;
 use crate::settings::DocumentSettings;
 use crate::variables;
 #[cfg(any(unix, windows))]
@@ -31,8 +32,8 @@ use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, Part, PartData, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
-    SourceCacheDiagnostics, SourceCacheLimits,
+    BlobPart, PackURI, Part, PartData, SourceArtifact, SourceArtifactFingerprint,
+    SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
 };
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -76,7 +77,7 @@ impl From<usize> for AltChunkSelector {
 }
 
 struct DocumentVariablesSource {
-    partname: litchi_opc::PackURI,
+    partname: PackURI,
     snapshot: variables::Snapshot,
     protected: bool,
     unique_inbound_owner: bool,
@@ -110,7 +111,7 @@ impl<W: Write> Write for FingerprintingWriter<W> {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!(
-                    "document-variable sink reported {written} bytes for a {}-byte write",
+                    "source-backed publication sink reported {written} bytes for a {}-byte write",
                     bytes.len()
                 ),
             ));
@@ -478,6 +479,40 @@ impl Package {
         snapshot
     }
 
+    /// Capture an exact-source snapshot for editing locally authored page
+    /// layout on one existing main-story section.
+    pub fn section_layout_snapshot(&self) -> Result<layout::Snapshot> {
+        self.section_layout_snapshot_with_limits(&crate::section::Limits::default())
+    }
+
+    /// Capture a bounded exact-source page-layout snapshot.
+    pub fn section_layout_snapshot_with_limits(
+        &self,
+        limits: &crate::section::Limits,
+    ) -> Result<layout::Snapshot> {
+        let (_, snapshot) = self.main_section_layout_snapshot("section_layout_snapshot", limits)?;
+        Ok(snapshot)
+    }
+
+    /// Start an isolated edit of one existing locally authored section.
+    pub fn edit_section_layout(
+        &self,
+        selector: impl Into<crate::section::Selector>,
+    ) -> Result<layout::Edit> {
+        self.section_layout_snapshot()?.edit(selector)
+    }
+
+    /// Start an isolated bounded edit of one existing locally authored
+    /// section.
+    pub fn edit_section_layout_with_limits(
+        &self,
+        selector: impl Into<crate::section::Selector>,
+        limits: &crate::section::Limits,
+    ) -> Result<layout::Edit> {
+        self.section_layout_snapshot_with_limits(limits)?
+            .edit(selector)
+    }
+
     /// Return content-free cache activity for this source-backed DOCX.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
@@ -646,6 +681,80 @@ impl Package {
         }
         publication.original_artifact.write_to_stream(writer)?;
         Ok(publication.original_snapshot.clone())
+    }
+
+    /// Publish one exact-source-checked existing-section layout commit to a
+    /// sequential stream. Only the existing main-document Part is overlaid;
+    /// all other ZIP members are copied through the source-backed preservation
+    /// plan.
+    pub fn publish_section_layout_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &layout::Commit,
+    ) -> Result<layout::Publication> {
+        self.publish_section_layout_patch_to_stream(writer, commit.patch())
+    }
+
+    /// Publish an exact-source-checked section-layout patch to a sequential
+    /// stream. The returned publication retains an inverse authorization for
+    /// the exact emitted artifact.
+    pub fn publish_section_layout_patch_to_stream<W: Write>(
+        self,
+        writer: W,
+        patch: &layout::Patch,
+    ) -> Result<layout::Publication> {
+        let (main, current) = self.main_section_layout_snapshot(
+            "publish_section_layout_patch_to_stream",
+            patch.limits(),
+        )?;
+        let target = patch.apply(&current)?;
+        let original_artifact = self.package.source_artifact();
+        let mut output = FingerprintingWriter {
+            inner: writer,
+            hasher: Sha256::new(),
+        };
+        if patch.is_noop() {
+            original_artifact.write_to_stream(&mut output)?;
+        } else {
+            self.package.write_part_overlay_shared_to_stream(
+                &mut output,
+                &main,
+                target.shared_xml(),
+            )?;
+        }
+        let published_fingerprint =
+            SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
+        let mut inverse_patch = patch.inverse();
+        inverse_patch.reauthorize_for_artifact(published_fingerprint);
+        Ok(layout::Publication::new(
+            target.with_artifact_fingerprint(published_fingerprint),
+            current,
+            original_artifact,
+            inverse_patch,
+        ))
+    }
+
+    /// Restore the exact original package from a section-layout publication.
+    ///
+    /// This is the explicit reauthorization boundary for a reopened emitted
+    /// artifact. The complete emitted ZIP fingerprint and target main-story
+    /// bytes are checked before the sink receives any output; a foreign or
+    /// stale package is rejected without partial output.
+    pub fn publish_section_layout_inverse_to_stream<W: Write>(
+        self,
+        writer: W,
+        publication: &layout::Publication,
+    ) -> Result<layout::Snapshot> {
+        let (_, current) = self.main_section_layout_snapshot(
+            "publish_section_layout_inverse_to_stream",
+            publication.snapshot().limits(),
+        )?;
+        publication.inverse_patch().apply(&current)?;
+        publication
+            .original_artifact()
+            .write_to_stream(writer)
+            .map_err(Error::from)?;
+        Ok(publication.original_snapshot().clone())
     }
 
     /// Capture the exact source closure used to detach external hyperlinks in
@@ -1019,7 +1128,7 @@ impl Package {
         selector: AltChunkSelector,
         media_type: &str,
         extension: &str,
-    ) -> Result<litchi_opc::PackURI> {
+    ) -> Result<PackURI> {
         self.package.check_execution()?;
         let main = self.package.main_document_part()?;
         let main_name = main.partname().clone();
@@ -1152,7 +1261,7 @@ impl Package {
     fn main_document_snapshot(
         &self,
         operation: &'static str,
-    ) -> TransactionResult<(litchi_opc::PackURI, Snapshot)> {
+    ) -> TransactionResult<(PackURI, Snapshot)> {
         self.package.check_execution().map_err(Error::from)?;
         let main = self.package.main_document_part().map_err(Error::from)?;
         validate_document_main_content_type(main.content_type())?;
@@ -1181,6 +1290,48 @@ impl Package {
         })();
         self.package.source_version().map_err(Error::from)?;
         self.package.check_execution().map_err(Error::from)?;
+        Ok((partname, snapshot?))
+    }
+
+    fn main_section_layout_snapshot(
+        &self,
+        operation: &'static str,
+        limits: &crate::section::Limits,
+    ) -> Result<(PackURI, layout::Snapshot)> {
+        self.package.check_execution()?;
+        let main = self.package.main_document_part()?;
+        validate_document_main_content_type(main.content_type())?;
+        let partname = main.partname().clone();
+        if self.package.cache_diagnostics().budget_managed {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "source-backed section layout edits require an owned immutable main-document snapshot",
+            });
+        }
+        let source_version = self.package.source_version()?;
+        let lineage = self.package.source_lineage();
+        let data = main.data()?;
+        let raw = data.into_arc()?;
+        let artifact_fingerprint = self.package.source_artifact().fingerprint()?;
+        let snapshot = (|| {
+            layout::Snapshot::from_source_xml(
+                Arc::clone(&raw),
+                source_version,
+                lineage.clone(),
+                artifact_fingerprint,
+                limits,
+            )
+        })();
+        let observed = self.package.source_version()?;
+        if observed != source_version {
+            return Err(litchi_opc::OpcError::SourceChanged {
+                expected: source_version,
+                actual: observed,
+            }
+            .into());
+        }
+        self.package.check_execution()?;
         Ok((partname, snapshot?))
     }
 
@@ -1679,7 +1830,10 @@ fn ensure_source_document_name_length(name: &[u8]) -> Result<()> {
 /// used by compatibility callers. A source-bound inventory cannot publish a
 /// descriptor whose semantics came from an unbudgeted MCE projection or from
 /// entity expansion, so reject those constructs before that parser runs.
-fn ensure_source_section_inventory_xml(xml: &[u8], limits: &crate::section::Limits) -> Result<()> {
+pub(crate) fn ensure_source_section_inventory_xml(
+    xml: &[u8],
+    limits: &crate::section::Limits,
+) -> Result<()> {
     if xml.len() > limits.max_input_bytes {
         return Err(Error::SectionInventoryLimit {
             resource: "input bytes",

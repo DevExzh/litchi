@@ -1,10 +1,19 @@
 # Performance hotspot inventory
 
+## Latest DOCX section-layout closure (change 0273)
+
+[Change 0273](changes/0273-docx-source-backed-section-layout.md) adds one
+opt-in typed existing-main-story section-layout selector and takes the current
+selectable matrix to **393 names**; the default remains **36 cases / 198
+records**. It is correctness/CRUD coverage with `performance_claim: none`.
+The dirty five-sample whole-process profile is prioritization evidence only;
+clean retained performance and any production hotspot claim remain open.
+
 ## Current count and gap (change 0272)
 
 The three opt-in source-overlay multi-part selectors add 27 benchmark records
 across changed, equal-payload no-op, and mixed paths. The selectable matrix is
-now **392 names** while the default remains **36 cases / 198 records**.
+now **393 names** while the default remains **36 cases / 198 records**.
 `performance_claim: none`: the dirty five-sample profile is only a
 prioritization observation. The open gap is clean retained evidence and
 explicit-context/scaling evidence before considering recompression, parallel,

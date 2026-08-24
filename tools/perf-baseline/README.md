@@ -286,7 +286,7 @@ The four opt-in repeated-query selectors are:
 - `xlsx_source_repeated_store_medium_reacquisition_control`
 - `xlsx_source_repeated_store_oversized_reacquisition_control`
 
-They bring the current selectable matrix to **392 names** while the default
+They bring the current selectable matrix to **393 names** while the default
 remains **36 cases / 198 records**. The medium and oversized corpora are pinned
 to generator `litchi-xlsx-source-repeated-store-corpus-v1` and the selected
 `xl/worksheets/sheet1.xml` member. Each warm fresh-child sample runs `cell`,
@@ -1257,6 +1257,30 @@ public migration through `SourceBackedPackage::into_opc_package`, one semantic
 paragraph transaction, and sequential publication. Complete DOCX readback,
 media and topology checks, patch/inverse/stale checks, and output hashing stay
 outside timing.
+
+Measure the opt-in source-backed DOCX existing-section layout closure:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 \
+  --case docx_source_backed_existing_section_layout_edit_save \
+  --json target/perf/docx-section-layout.json
+```
+
+The fixed `litchi-docx-section-layout-source-v1` corpus has 256 direct
+paragraphs, paragraph-owned `sectPr` elements at direct paragraph indices 63
+and 128 (logical inventory positions 64 and 129 because the table-cell
+paragraph is counted), a table-cell `sectPr` sentinel excluded from section
+ownership, a body-final section,
+header/footer relationships, and four deterministic incompressible 512 KiB
+media Parts. The timed sum is exactly preparation, source-backed open, section
+query, one paragraph-owned `w:cols` edit from 2 to 3, commit, and sequential
+publication. Reopen/section semantics, cell-sentinel exclusion, patch replay
+and inverse publication, stale/foreign/signed/no-op/limit/partial-sink
+refusals, source/cache/sink counters, source immutability, and raw untouched
+member plus local/central order/comment preservation are outside timing. The
+report records `performance_claim: "none"` and phase vectors aligned to
+`elapsed_ns.sample_order`; shape and payload overrides are rejected.
 
 Measure the media-rich PPTX source-backed semantic publication:
 
@@ -2637,6 +2661,12 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   reports one semantic Part materialization per sample;
   complete paragraph/media/topology and reversible-patch checks remain
   untimed.
+- `docx_source_backed_existing_section_layout_edit_save`: on the fixed
+  256-direct-paragraph, three-section DOCX layout corpus, time the separated
+  source-backed section query, one paragraph-owned columns edit, commit, and
+  sequential publication phases. The complete section/cell-sentinel,
+  reversible-publication, refusal, cache/source/sink, relationship, and raw
+  untouched-member/layout gates remain untimed.
 - `pptx_source_backed_one_edit_save`: on a fixed 200-slide PPTX with eight text
   boxes per slide and eight incompressible 2 MiB inert PNG parts, time
   positional open, one guarded source-backed shape transaction, and one-Part

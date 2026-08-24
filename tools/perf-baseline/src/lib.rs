@@ -102,6 +102,7 @@ const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR: &str = "litchi-xlsx-named-sheet-lookup-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
+const DOCX_SECTION_LAYOUT_CORPUS_GENERATOR: &str = "litchi-docx-section-layout-source-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
 const PPTX_SLIDE_NAME_INDEX_CORPUS_GENERATOR: &str = "litchi-pptx-slide-name-index-v1";
 const PPTX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-pptx-source-edit-media-v1";
@@ -189,6 +190,13 @@ const ODS_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const ODS_CELL_SWEEP_REPETITIONS: usize = 4;
 const DOCX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
 const DOCX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
+const DOCX_SECTION_LAYOUT_DIRECT_PARAGRAPH_COUNT: usize = 256;
+const DOCX_SECTION_LAYOUT_TOTAL_MAIN_STORY_PARAGRAPH_COUNT: usize =
+    DOCX_SECTION_LAYOUT_DIRECT_PARAGRAPH_COUNT + 1;
+const DOCX_SECTION_LAYOUT_DIRECT_SECTPR_INDICES: [usize; 2] = [63, 128];
+const DOCX_SECTION_LAYOUT_SECTION_POSITIONS: [usize; 2] = [64, 129];
+const DOCX_SECTION_LAYOUT_MEDIA_ENTRY_COUNT: usize = 4;
+const DOCX_SECTION_LAYOUT_MEDIA_ENTRY_BYTES: usize = 512 * 1024;
 const PPTX_SOURCE_MEDIA_ENTRY_COUNT: usize = 8;
 const PPTX_SOURCE_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const PPTX_SOURCE_SLIDE_COUNT: usize = 200;
@@ -967,6 +975,7 @@ enum Case {
     OdtFileEagerOpenFullTextLifecycle,
     OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
+    DocxSourceBackedExistingSectionLayoutEditSave,
     DocxStoryHyperlinkPlan,
     DocxStoryHyperlinkNoopSave,
     DocxStoryHyperlinkRedactionSave,
@@ -1419,6 +1428,9 @@ impl Case {
             Self::OdtFileEagerOpenFullTextLifecycle => "odt_file_eager_open_full_text_lifecycle",
             Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
+            Self::DocxSourceBackedExistingSectionLayoutEditSave => {
+                "docx_source_backed_existing_section_layout_edit_save"
+            },
             Self::DocxStoryHyperlinkPlan => "docx_story_hyperlink_plan",
             Self::DocxStoryHyperlinkNoopSave => "docx_story_hyperlink_noop_save",
             Self::DocxStoryHyperlinkRedactionSave => "docx_story_hyperlink_redaction_save",
@@ -2714,6 +2726,10 @@ impl Case {
         matches!(self, Self::DocxSourceBackedOneEditSave)
     }
 
+    const fn is_docx_section_layout_edit_save(self) -> bool {
+        matches!(self, Self::DocxSourceBackedExistingSectionLayoutEditSave)
+    }
+
     const fn is_docx_story_hyperlink_plan(self) -> bool {
         matches!(self, Self::DocxStoryHyperlinkPlan)
     }
@@ -3713,6 +3729,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_story_hyperlink_publication:
         Option<docx_story_hyperlink_publication::DocxStoryHyperlinkPublicationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_section_layout: Option<DocxSectionLayoutSummary>,
 }
 
 /// Exact, untimed identity and per-sample count gates for the relationship
@@ -3813,6 +3831,55 @@ struct OpcSourceOverlaySummary {
     raw_members_and_order_preservation_verified: bool,
     equal_payload_noop_source_verified: bool,
     observed_output_sha256: Vec<String>,
+}
+
+/// Untimed correctness and phase evidence for the fixed DOCX section-layout
+/// source-backed publication corpus. The phase vectors are reordered to the
+/// top-level elapsed_ns.sample_order before serialization.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct DocxSectionLayoutSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_bytes: u64,
+    source_sha256: String,
+    expected_output_sha256: String,
+    total_main_story_paragraph_count: usize,
+    section_count: usize,
+    paragraph_owned_section_positions: Vec<usize>,
+    selected_paragraph: usize,
+    columns_before: u16,
+    columns_after: u16,
+    media_count: usize,
+    media_bytes: usize,
+    sample_order: Vec<usize>,
+    preparation_ns: Vec<u64>,
+    open_ns: Vec<u64>,
+    query_ns: Vec<u64>,
+    edit_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    ordinary_payload_materializations: Vec<u64>,
+    source_cache_before_publication_after_commit_hits: Vec<u64>,
+    source_cache_before_publication_after_commit_cold_loads: Vec<u64>,
+    source_cache_before_publication_after_commit_successful_loads: Vec<u64>,
+    source_cache_before_publication_after_commit_retained_entries: Vec<usize>,
+    source_cache_before_publication_after_commit_retained_bytes: Vec<usize>,
+    output_sha256: Vec<String>,
+    phase_sum_verified: bool,
+    semantic_reopen_all_sections_verified: bool,
+    table_cell_sectpr_excluded_verified: bool,
+    raw_untouched_members_verified: bool,
+    raw_member_order_and_comment_verified: bool,
+    header_footer_relationships_verified: bool,
+    source_immutability_verified: bool,
+    patch_forward_inverse_verified: bool,
+    publication_inverse_exact_source_verified: bool,
+    stale_foreign_signed_noop_limits_partial_sink_verified: bool,
+    cache_counters_verified: bool,
+    sink_counters_verified: bool,
 }
 
 /// Actual member-count evidence retained by the ZIP index selector.  The
@@ -7410,6 +7477,24 @@ fn validate_opc_source_overlay_multi_part_options(
     Ok(())
 }
 
+fn validate_docx_section_layout_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+) -> Result<(), Box<dyn Error>> {
+    if cases
+        .iter()
+        .any(|case| case.is_docx_section_layout_edit_save())
+        && (shapes != CorpusShape::ALL.as_slice() || payloads != PayloadKind::ALL.as_slice())
+    {
+        return Err(
+            "DOCX section-layout selector uses a fixed existing-section-layout corpus; omit --shape and --payload"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 pub fn run() -> Result<(), Box<dyn Error>> {
     if filesystem::run_child_if_requested()? {
         return Ok(());
@@ -7432,6 +7517,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         &options.shapes,
         &options.payloads,
     )?;
+    validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
     let mut results = Vec::new();
     let filesystem_runs = filesystem::run_selected(
         &options.cases,
@@ -7572,6 +7658,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_opc_source_cache_evidence()
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
+                    && !case.is_docx_section_layout_edit_save()
                     && !case.is_docx_story_hyperlink_plan()
                     && !case.is_docx_story_hyperlink_publication()
                     && !case.is_ooxml_tracker_scan()
@@ -8012,6 +8099,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     {
         let corpus = build_docx_source_edit_corpus()?;
         results.push(run_docx_source_backed_one_edit_save(
+            &corpus,
+            options.warmup_iterations,
+            options.samples,
+        )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_docx_section_layout_edit_save())
+    {
+        let corpus = build_docx_section_layout_corpus()?;
+        results.push(run_docx_source_backed_existing_section_layout_edit_save(
             &corpus,
             options.warmup_iterations,
             options.samples,
@@ -9609,6 +9709,9 @@ fn parse_case(value: &str) -> Option<Case> {
             Some(Case::CfbOpenStreamSimulatedMini4095SharedRepeat8)
         },
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
+        "docx_source_backed_existing_section_layout_edit_save" => {
+            Some(Case::DocxSourceBackedExistingSectionLayoutEditSave)
+        },
         "docx_story_hyperlink_plan" => Some(Case::DocxStoryHyperlinkPlan),
         "docx_story_hyperlink_noop_save" => Some(Case::DocxStoryHyperlinkNoopSave),
         "docx_story_hyperlink_redaction_save" => Some(Case::DocxStoryHyperlinkRedactionSave),
@@ -10127,6 +10230,7 @@ fn usage_text() -> String {
                                        odt_file_eager_open_full_text_lifecycle,\n\
                                        odt_file_source_open_full_text_lifecycle,\n\
                                        docx_source_backed_one_edit_save,\n\
+                                       docx_source_backed_existing_section_layout_edit_save,\n\
                                        docx_story_hyperlink_plan,\n\
                                        docx_story_hyperlink_noop_save,\n\
                                        docx_story_hyperlink_redaction_save,\n\
@@ -12229,6 +12333,185 @@ fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     let mut output = Cursor::new(Vec::new());
     package.to_stream(&mut output)?;
     Ok(output.into_inner())
+}
+
+fn docx_section_layout_media_payload(index: usize) -> Vec<u8> {
+    let mut bytes = payload_bytes(
+        PayloadKind::Incompressible,
+        70_000 + index,
+        DOCX_SECTION_LAYOUT_MEDIA_ENTRY_BYTES,
+    );
+    bytes[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+    bytes
+}
+
+fn docx_section_layout_document(header_rid: &str, footer_rid: &str) -> Vec<u8> {
+    const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    let mut document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:x="urn:litchi:section-layout"><w:body>"#
+    );
+    for index in 0..DOCX_SECTION_LAYOUT_DIRECT_PARAGRAPH_COUNT {
+        if index == 0 {
+            document.push_str(
+                r#"<w:tbl><w:tr><w:tc><w:p><w:pPr><w:sectPr x:section="cell-sentinel"><w:cols w:num="9" x:opaque="cell-columns"/><x:opaque x:sentinel="table-cell"/></w:sectPr></w:pPr></w:p></w:tc></w:tr></w:tbl>"#,
+            );
+        }
+        if DOCX_SECTION_LAYOUT_DIRECT_SECTPR_INDICES.contains(&index) {
+            document.push_str(&format!(
+                r#"<w:p><w:pPr><w:sectPr x:section="paragraph-{index}" x:unknown="preserve"><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840" x:opaque="page-size"/><w:pgMar w:left="720" w:right="720" x:opaque="margins"/><w:cols w:num="2" w:space="240" w:sep="1" x:opaque="columns-{index}"/><x:opaque x:marker="paragraph-{index}"/></w:sectPr></w:pPr><w:r><w:t>litchi-section-layout-paragraph-{index:03}</w:t></w:r></w:p>"#
+            ));
+        } else {
+            document.push_str(&format!(
+                r#"<w:p><w:r><w:t>litchi-section-layout-paragraph-{index:03}</w:t></w:r></w:p>"#
+            ));
+        }
+    }
+    document.push_str(&format!(
+        r#"<w:sectPr x:section="body-final" x:unknown="preserve"><w:headerReference w:type="default" r:id="{header_rid}"/><w:footerReference w:type="default" r:id="{footer_rid}"/><w:type w:val="nextPage"/><w:pgSz w:w="12240" w:h="15840" x:opaque="body-page-size"/><w:pgMar w:left="720" w:right="720" x:opaque="body-margins"/><w:cols w:num="2" x:opaque="body-columns"/><x:opaque x:marker="body-final"/></w:sectPr></w:body></w:document>"#
+    ));
+    document.into_bytes()
+}
+
+fn docx_section_layout_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = OpcPackage::new();
+    let mut main = BlobPart::new(
+        PackURI::new("/word/document.xml")?,
+        opc_content_type::WML_DOCUMENT_MAIN.to_owned(),
+        Vec::new(),
+    );
+    let header_rid = main.relate_to("header1.xml", relationship_type::HEADER);
+    let footer_rid = main.relate_to("footer1.xml", relationship_type::FOOTER);
+    for index in 0..DOCX_SECTION_LAYOUT_MEDIA_ENTRY_COUNT {
+        main.relate_to(
+            &format!("media/image{}.png", index + 1),
+            relationship_type::IMAGE,
+        );
+    }
+    main.set_blob(docx_section_layout_document(&header_rid, &footer_rid));
+    package.try_add_part(Box::new(main))?;
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new("/word/header1.xml")?,
+        opc_content_type::WML_HEADER.to_owned(),
+        br#"<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:litchi:section-layout"><w:p><w:r><w:t>litchi-section-layout-header-v1</w:t></w:r></w:p><x:opaque x:header="preserve"/></w:hdr>"#.to_vec(),
+    )))?;
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new("/word/footer1.xml")?,
+        opc_content_type::WML_FOOTER.to_owned(),
+        br#"<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:litchi:section-layout"><w:p><w:r><w:t>litchi-section-layout-footer-v1</w:t></w:r></w:p><x:opaque x:footer="preserve"/></w:ftr>"#.to_vec(),
+    )))?;
+    for index in 0..DOCX_SECTION_LAYOUT_MEDIA_ENTRY_COUNT {
+        package.try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/word/media/image{}.png", index + 1))?,
+            "image/png".to_owned(),
+            docx_section_layout_media_payload(index),
+        )))?;
+    }
+    package.relate_to("word/document.xml", relationship_type::OFFICE_DOCUMENT);
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn verify_docx_section_layout_snapshot(
+    snapshot: &litchi_docx::section::layout::Snapshot,
+    expected_columns: [u16; 3],
+) -> Result<(), Box<dyn Error>> {
+    let inventory = snapshot.inventory();
+    if inventory.paragraph_count() != DOCX_SECTION_LAYOUT_TOTAL_MAIN_STORY_PARAGRAPH_COUNT {
+        return Err(
+            "DOCX section-layout total main-story paragraph count differs from corpus".into(),
+        );
+    }
+    let sections = inventory.sections();
+    if sections.len() != 3 {
+        return Err("DOCX section-layout inventory does not contain three logical sections".into());
+    }
+    if sections[0].ownership()
+        != litchi_docx::section::Ownership::Paragraph(Position::new(
+            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        ))
+        || sections[1].ownership()
+            != litchi_docx::section::Ownership::Paragraph(Position::new(
+                DOCX_SECTION_LAYOUT_SECTION_POSITIONS[1],
+            ))
+        || sections[2].ownership() != litchi_docx::section::Ownership::BodyFinal
+    {
+        return Err("DOCX section-layout ownership differs from corpus".into());
+    }
+    for (index, section) in sections.iter().enumerate() {
+        let columns = section
+            .columns()
+            .ok_or("DOCX section-layout section has no column projection")?;
+        let expected_space = (index < 2).then_some(litchi_docx::section::Emu::from_twips(240));
+        let expected_separator = index < 2;
+        if columns.count != expected_columns[index]
+            || !columns.equal_width
+            || columns.space != expected_space
+            || columns.separator != expected_separator
+            || !columns.columns.is_empty()
+        {
+            return Err("DOCX section-layout column semantics differ from expected state".into());
+        }
+    }
+    if sections[2].headers().len() != 1 || sections[2].footers().len() != 1 {
+        return Err("DOCX section-layout body-final header/footer references are missing".into());
+    }
+    Ok(())
+}
+
+fn build_docx_section_layout_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let archive = docx_section_layout_bytes()?;
+    let source = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        archive.clone(),
+    )))?;
+    let snapshot = source.section_layout_snapshot()?;
+    verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
+    let opc = OpcPackage::from_bytes(&archive)?;
+    let main_xml = opc
+        .get_part(&PackURI::new("/word/document.xml")?)?
+        .blob()
+        .to_vec();
+    for index in 0..DOCX_SECTION_LAYOUT_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/word/media/image{}.png", index + 1))?;
+        if opc.get_part(&uri)?.blob() != docx_section_layout_media_payload(index) {
+            return Err("DOCX section-layout media payload differs from specification".into());
+        }
+    }
+    if !main_xml
+        .windows(b"cell-sentinel".len())
+        .any(|window| window == b"cell-sentinel")
+    {
+        return Err("DOCX section-layout corpus lost its table-cell sentinel".into());
+    }
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("DOCX section-layout logical byte count overflows usize")
+    })?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "docx-source-backed-existing-section-layout".to_owned(),
+            generator: DOCX_SECTION_LAYOUT_CORPUS_GENERATOR,
+            package_format: "DOCX/OPC/ZIP",
+            shape: "existing-section-layout",
+            payload_kind: "deterministic-incompressible-media",
+            compression: "deflate",
+            entry_count: opc.part_count(),
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: DOCX_SECTION_LAYOUT_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "word/document.xml".to_owned(),
+            target_payload_bytes: main_xml.len(),
+            target_payload_sha256: sha256_hex(&main_xml),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "word/document.xml".to_owned(),
+        target_payload: main_xml,
+        xlsx: None,
+    })
 }
 
 fn pptx_source_media_payload(index: usize) -> Vec<u8> {
@@ -18389,6 +18672,9 @@ fn run_case_with_config(
         },
         Case::DocxSourceBackedOneEditSave => {
             run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::DocxSourceBackedExistingSectionLayoutEditSave => {
+            Err("DOCX section-layout publication uses its dedicated fixed corpus runner".into())
         },
         Case::DocxStoryHyperlinkPlan => {
             Err("DOCX story-hyperlink planning uses its dedicated corpus runner".into())
@@ -36177,6 +36463,19 @@ fn docx_source_payload_ranges(
     ))
 }
 
+fn docx_section_layout_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
+    let ordinary = zip_member_ranges(&corpus.archive)?
+        .into_iter()
+        .filter_map(|(name, range)| {
+            (name != "[Content_Types].xml" && !name.ends_with(".rels")).then_some(range)
+        })
+        .collect::<Vec<_>>();
+    if ordinary.len() != corpus.manifest.entry_count {
+        return Err("DOCX section-layout payload count differs from corpus manifest".into());
+    }
+    Ok(ordinary)
+}
+
 fn pptx_source_payload_ranges(corpus: &Corpus) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
     let ordinary = zip_member_ranges(&corpus.archive)?
         .into_iter()
@@ -38843,6 +39142,182 @@ fn verify_docx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), 
     Ok(())
 }
 
+fn docx_section_layout_fragment(xml: &[u8], marker: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    let marker = marker.as_bytes();
+    let marker_start = xml
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .ok_or_else(|| format!("DOCX section-layout XML marker is missing: {marker:?}"))?;
+    let sect_open = b"<w:sectPr";
+    let start = xml[..marker_start]
+        .windows(sect_open.len())
+        .rposition(|window| window == sect_open)
+        .ok_or_else(|| format!("DOCX section-layout sectPr start is missing: {marker:?}"))?;
+    let close = b"</w:sectPr>";
+    let close_start = xml[start..]
+        .windows(close.len())
+        .position(|window| window == close)
+        .ok_or_else(|| format!("DOCX section-layout sectPr close is missing: {marker:?}"))?
+        + start;
+    let end = close_start + close.len();
+    Ok(xml[start..end].to_vec())
+}
+
+fn docx_section_layout_fragment_without_columns(
+    xml: &[u8],
+    marker: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let fragment = docx_section_layout_fragment(xml, marker)?;
+    let open = b"<w:cols";
+    let start = fragment
+        .windows(open.len())
+        .position(|window| window == open)
+        .ok_or_else(|| format!("DOCX section-layout columns element is missing: {marker:?}"))?;
+    let close = b"/>";
+    let end = fragment[start..]
+        .windows(close.len())
+        .position(|window| window == close)
+        .ok_or_else(|| format!("DOCX section-layout columns close is missing: {marker:?}"))?
+        + start
+        + close.len();
+    let mut without_columns = Vec::with_capacity(fragment.len().saturating_sub(end - start));
+    without_columns.extend_from_slice(&fragment[..start]);
+    without_columns.extend_from_slice(&fragment[end..]);
+    Ok(without_columns)
+}
+
+fn verify_docx_section_layout_output(
+    corpus: &Corpus,
+    output: &[u8],
+    expected_columns: [u16; 3],
+) -> Result<(), Box<dyn Error>> {
+    if output == corpus.archive.as_slice() {
+        return Err("DOCX section-layout changed publication is byte-identical to source".into());
+    }
+    let reopened = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        output.to_vec(),
+    )))?;
+    let snapshot = reopened.section_layout_snapshot()?;
+    verify_docx_section_layout_snapshot(&snapshot, expected_columns)?;
+
+    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate = OpcPackage::from_bytes(output)?;
+    if source.part_count() != corpus.manifest.entry_count
+        || candidate.part_count() != source.part_count()
+        || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
+    {
+        return Err("DOCX section-layout package topology differs from source".into());
+    }
+    let main_uri = PackURI::new("/word/document.xml")?;
+    for source_part in source.iter_parts() {
+        let candidate_part = candidate.get_part(source_part.partname())?;
+        if candidate_part.content_type() != source_part.content_type()
+            || relationship_signatures(candidate_part.rels())
+                != relationship_signatures(source_part.rels())
+        {
+            return Err("DOCX section-layout Part metadata differs from source".into());
+        }
+        if source_part.partname() == &main_uri {
+            if source_part.blob() == candidate_part.blob() {
+                return Err("DOCX section-layout selected document did not change".into());
+            }
+            if !candidate_part
+                .blob()
+                .windows(b"w:num=\"3\"".len())
+                .any(|window| window == b"w:num=\"3\"")
+            {
+                return Err("DOCX section-layout edited columns are absent from output".into());
+            }
+        } else if source_part.blob() != candidate_part.blob() {
+            return Err("DOCX section-layout changed an unselected Part payload".into());
+        }
+    }
+
+    let source_members = raw_zip_members(&corpus.archive)?;
+    let candidate_members = raw_zip_members(output)?;
+    if source_members.keys().ne(candidate_members.keys()) {
+        return Err("DOCX section-layout raw ZIP member set differs from source".into());
+    }
+    for (name, source_member) in &source_members {
+        if name != "word/document.xml" && candidate_members.get(name) != Some(source_member) {
+            return Err(
+                format!("DOCX section-layout changed raw untouched ZIP member {name}").into(),
+            );
+        }
+    }
+    let source_layout = raw_zip_layout(&corpus.archive)?;
+    let candidate_layout = raw_zip_layout(output)?;
+    if source_layout != candidate_layout {
+        return Err(
+            "DOCX section-layout changed raw local/central member order or archive comment".into(),
+        );
+    }
+    for name in [
+        "word/header1.xml",
+        "word/footer1.xml",
+        "word/_rels/document.xml.rels",
+        "_rels/.rels",
+    ] {
+        if candidate_members.get(name) != source_members.get(name) {
+            return Err(format!(
+                "DOCX section-layout changed header/footer or relationship member {name}"
+            )
+            .into());
+        }
+    }
+    for index in 0..DOCX_SECTION_LAYOUT_MEDIA_ENTRY_COUNT {
+        let uri = PackURI::new(format!("/word/media/image{}.png", index + 1))?;
+        if candidate.get_part(&uri)?.blob() != docx_section_layout_media_payload(index) {
+            return Err("DOCX section-layout media readback differs from specification".into());
+        }
+    }
+    let source_main = source.get_part(&main_uri)?.blob();
+    let candidate_main = candidate.get_part(&main_uri)?.blob();
+    if docx_section_layout_fragment_without_columns(source_main, "x:section=\"paragraph-63\"")?
+        != docx_section_layout_fragment_without_columns(
+            candidate_main,
+            "x:section=\"paragraph-63\"",
+        )?
+    {
+        return Err(
+            "DOCX section-layout changed selected-section sibling attributes or opaque fragments"
+                .into(),
+        );
+    }
+    for marker in [
+        "x:section=\"paragraph-128\"",
+        "x:section=\"body-final\"",
+        "x:section=\"cell-sentinel\"",
+    ] {
+        if docx_section_layout_fragment(source_main, marker)?
+            != docx_section_layout_fragment(candidate_main, marker)?
+        {
+            return Err(format!(
+                "DOCX section-layout changed untouched sectPr attributes or opaque fragments: {marker}"
+            )
+            .into());
+        }
+    }
+    let selected_fragment =
+        docx_section_layout_fragment(candidate_main, "x:section=\"paragraph-63\"")?;
+    if !selected_fragment
+        .windows(b"w:num=\"3\"".len())
+        .any(|window| window == b"w:num=\"3\"")
+        || !selected_fragment
+            .windows(b"w:space=\"240\"".len())
+            .any(|window| window == b"w:space=\"240\"")
+        || !selected_fragment
+            .windows(b"w:sep=\"1\"".len())
+            .any(|window| window == b"w:sep=\"1\"")
+        || !selected_fragment
+            .windows(b"x:opaque=\"columns-63\"".len())
+            .any(|window| window == b"x:opaque=\"columns-63\"")
+    {
+        return Err("DOCX section-layout selected Columns wire semantics are incomplete".into());
+    }
+    Ok(())
+}
+
 fn publish_docx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: W,
@@ -38949,6 +39424,552 @@ fn run_docx_source_backed_one_edit_save(
         cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: None,
+    })
+}
+
+#[derive(Debug)]
+struct DocxSectionLayoutFailingSink {
+    accepted: usize,
+    limit: usize,
+}
+
+impl Write for DocxSectionLayoutFailingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.limit {
+            return Err(io::Error::other(
+                "injected DOCX section-layout sink failure",
+            ));
+        }
+        let count = bytes.len().min(self.limit - self.accepted);
+        self.accepted += count;
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
+    // This is an explicitly test-only signed fixture builder.  It rewrites the
+    // raw ZIP rather than invoking PackageWriter, whose normal authoring path
+    // must reject introducing signature infrastructure without a policy.
+    let archive = ArchiveReader::new(&corpus.archive)?;
+    let mut writer = StreamingArchiveWriter::new();
+    let root_relationship = format!(
+        r#"<Relationship Id="rIdSectionLayoutSignature" Type="{}" Target="_xmlsignatures/origin.sigs"/>"#,
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN
+    );
+    let signature_override = format!(
+        r#"<Override PartName="/_xmlsignatures/origin.sigs" ContentType="{}"/>"#,
+        opc_content_type::OPC_DIGITAL_SIGNATURE_ORIGIN
+    );
+    for name in archive.file_names() {
+        let bytes = archive.read(name)?;
+        let bytes = match name {
+            "_rels/.rels" => {
+                let xml = std::str::from_utf8(&bytes)?;
+                let updated = xml.replacen(
+                    "</Relationships>",
+                    &format!("{root_relationship}</Relationships>"),
+                    1,
+                );
+                if updated == xml {
+                    return Err(
+                        "DOCX section-layout signed fixture lacks root relationships".into(),
+                    );
+                }
+                updated.into_bytes()
+            },
+            "[Content_Types].xml" => {
+                let xml = std::str::from_utf8(&bytes)?;
+                let updated = xml.replacen("</Types>", &format!("{signature_override}</Types>"), 1);
+                if updated == xml {
+                    return Err(
+                        "DOCX section-layout signed fixture lacks content types closure".into(),
+                    );
+                }
+                updated.into_bytes()
+            },
+            _ => bytes,
+        };
+        writer.write_stored(name, &bytes)?;
+    }
+    writer.write_stored("_xmlsignatures/origin.sigs", b"<origin/>")?;
+    let signed = writer.finish_to_bytes()?;
+    if !OpcPackage::from_bytes(&signed)?.is_signed() {
+        return Err("DOCX section-layout signed fixture was not classified as signed".into());
+    }
+    Ok(signed)
+}
+
+fn verify_docx_section_layout_controls(
+    corpus: &Corpus,
+    commit: &litchi_docx::section::layout::Commit,
+    publication: &litchi_docx::section::layout::Publication,
+) -> Result<(), Box<dyn Error>> {
+    let noop_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let noop_snapshot = noop_package.section_layout_snapshot()?;
+    let noop = noop_snapshot
+        .edit(litchi_docx::section::Selector::paragraph(Position::new(
+            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        )))?
+        .commit()?;
+    if !noop.patch().is_noop() {
+        return Err("DOCX section-layout no-op control produced a changed patch".into());
+    }
+    let mut noop_output = Vec::new();
+    noop_package.publish_section_layout_commit_to_stream(&mut noop_output, &noop)?;
+    if noop_output != corpus.archive {
+        return Err("DOCX section-layout no-op publication changed source bytes".into());
+    }
+
+    let foreign = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        corpus.archive.clone(),
+    )))?;
+    let mut foreign_output = Vec::new();
+    if !matches!(
+        foreign.publish_section_layout_commit_to_stream(&mut foreign_output, commit),
+        Err(litchi_docx::Error::SectionLayoutForeignSource)
+    ) || !foreign_output.is_empty()
+    {
+        return Err("DOCX section-layout foreign-source refusal is not typed".into());
+    }
+
+    let stale = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        corpus.archive.clone(),
+    )))?;
+    let mut stale_output = Vec::new();
+    if !matches!(
+        stale.publish_section_layout_inverse_to_stream(&mut stale_output, publication),
+        Err(litchi_docx::Error::SectionLayoutStaleSource)
+    ) || !stale_output.is_empty()
+    {
+        return Err("DOCX section-layout stale-source refusal is not typed".into());
+    }
+
+    let signed_archive = docx_section_layout_signed_archive(corpus)?;
+    let signed_noop = litchi_docx::source_backed::Package::from_read_at(Arc::new(
+        OwnedSource::new(signed_archive.clone()),
+    ))?;
+    let signed_noop_snapshot = signed_noop.section_layout_snapshot()?;
+    let signed_noop_commit = signed_noop_snapshot
+        .edit(litchi_docx::section::Selector::paragraph(Position::new(
+            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        )))?
+        .commit()?;
+    if !signed_noop_commit.patch().is_noop() {
+        return Err("DOCX section-layout signed no-op control produced a changed patch".into());
+    }
+    let mut signed_noop_output = Vec::new();
+    signed_noop
+        .publish_section_layout_commit_to_stream(&mut signed_noop_output, &signed_noop_commit)?;
+    if signed_noop_output != signed_archive {
+        return Err("DOCX section-layout signed no-op changed source bytes".into());
+    }
+
+    let signed = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        signed_archive,
+    )))?;
+    let signed_snapshot = signed.section_layout_snapshot()?;
+    let mut signed_edit = signed_snapshot.edit(litchi_docx::section::Selector::paragraph(
+        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+    ))?;
+    signed_edit.set_columns(Some(litchi_docx::section::Columns {
+        equal_width: true,
+        count: 3,
+        space: Some(litchi_docx::section::Emu::from_twips(240)),
+        separator: true,
+        columns: Vec::new(),
+    }))?;
+    let signed_commit = signed_edit.commit()?;
+    let mut signed_output = Vec::new();
+    if !matches!(
+        signed.publish_section_layout_commit_to_stream(&mut signed_output, &signed_commit),
+        Err(litchi_docx::Error::Opc(
+            OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    ) || !signed_output.is_empty()
+    {
+        return Err("DOCX section-layout signed-source refusal is not typed".into());
+    }
+
+    let limited = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        corpus.archive.clone(),
+    )))?;
+    if !matches!(
+        limited.section_layout_snapshot_with_limits(&litchi_docx::section::Limits {
+            max_section_bytes: 1,
+            ..litchi_docx::section::Limits::default()
+        }),
+        Err(litchi_docx::Error::SectionInventoryLimit { .. })
+    ) {
+        return Err("DOCX section-layout section limit refusal is not typed".into());
+    }
+
+    let partial = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
+        corpus.archive.clone(),
+    )))?;
+    let partial_snapshot = partial.section_layout_snapshot()?;
+    let mut partial_edit = partial_snapshot.edit(litchi_docx::section::Selector::paragraph(
+        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+    ))?;
+    partial_edit.set_columns(Some(litchi_docx::section::Columns {
+        equal_width: true,
+        count: 3,
+        space: Some(litchi_docx::section::Emu::from_twips(240)),
+        separator: true,
+        columns: Vec::new(),
+    }))?;
+    let partial_commit = partial_edit.commit()?;
+    let mut partial_sink = DocxSectionLayoutFailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+    if !matches!(
+        partial.publish_section_layout_commit_to_stream(&mut partial_sink, &partial_commit),
+        Err(litchi_docx::Error::Opc(OpcError::IncompleteOutput { .. }))
+    ) || partial_sink.accepted != 128
+    {
+        return Err("DOCX section-layout partial sink refusal is not typed".into());
+    }
+    Ok(())
+}
+
+fn run_docx_source_backed_existing_section_layout_edit_save(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != DOCX_SECTION_LAYOUT_CORPUS_GENERATOR {
+        return Err("DOCX section-layout case requires its fixed corpus".into());
+    }
+    if corpus.manifest.archive_sha256 != sha256_hex(&corpus.archive) {
+        return Err("DOCX section-layout manifest archive SHA-256 differs from archive".into());
+    }
+    let expected_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let expected_snapshot = expected_package.section_layout_snapshot()?;
+    verify_docx_section_layout_snapshot(&expected_snapshot, [2, 2, 2])?;
+    let mut expected_edit = expected_snapshot.edit(litchi_docx::section::Selector::paragraph(
+        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+    ))?;
+    expected_edit.set_columns(Some(litchi_docx::section::Columns {
+        equal_width: true,
+        count: 3,
+        space: Some(litchi_docx::section::Emu::from_twips(240)),
+        separator: true,
+        columns: Vec::new(),
+    }))?;
+    let expected_commit = expected_edit.commit()?;
+    if !expected_commit.patch().changed() || expected_commit.patch().is_noop() {
+        return Err("DOCX section-layout expected commit is not changed".into());
+    }
+    let mut expected_output = Vec::new();
+    let expected_publication = expected_package
+        .publish_section_layout_commit_to_stream(&mut expected_output, &expected_commit)?;
+    verify_docx_section_layout_output(corpus, &expected_output, [3, 2, 2])?;
+    verify_docx_section_layout_controls(corpus, &expected_commit, &expected_publication)?;
+    let expected_digest = sha256_hex(&expected_output);
+    let maximum = u64::try_from(expected_output.len())?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("DOCX section-layout sequential output ceiling overflows u64")?;
+    let payload_ranges = docx_section_layout_payload_ranges(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut section_summary = DocxSectionLayoutSummary {
+        implementation: "litchi-docx-source-backed-section-layout",
+        timing_scope: "preparation, source-backed open, section query, columns edit, commit, and sequential publication; correctness, reopen, patch, refusal, cache, source, sink, and ZIP gates are excluded",
+        performance_claim: "none",
+        source_bytes: u64::try_from(corpus.archive.len())?,
+        source_sha256: corpus.manifest.archive_sha256.clone(),
+        expected_output_sha256: expected_digest.clone(),
+        total_main_story_paragraph_count: DOCX_SECTION_LAYOUT_TOTAL_MAIN_STORY_PARAGRAPH_COUNT,
+        section_count: 3,
+        paragraph_owned_section_positions: DOCX_SECTION_LAYOUT_SECTION_POSITIONS.to_vec(),
+        selected_paragraph: DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        columns_before: 2,
+        columns_after: 3,
+        media_count: DOCX_SECTION_LAYOUT_MEDIA_ENTRY_COUNT,
+        media_bytes: DOCX_SECTION_LAYOUT_MEDIA_ENTRY_BYTES,
+        sample_order: Vec::new(),
+        preparation_ns: Vec::with_capacity(samples),
+        open_ns: Vec::with_capacity(samples),
+        query_ns: Vec::with_capacity(samples),
+        edit_ns: Vec::with_capacity(samples),
+        commit_ns: Vec::with_capacity(samples),
+        publication_ns: Vec::with_capacity(samples),
+        source_read_calls: Vec::with_capacity(samples),
+        source_read_bytes: Vec::with_capacity(samples),
+        ordinary_payload_materializations: Vec::with_capacity(samples),
+        source_cache_before_publication_after_commit_hits: Vec::with_capacity(samples),
+        source_cache_before_publication_after_commit_cold_loads: Vec::with_capacity(samples),
+        source_cache_before_publication_after_commit_successful_loads: Vec::with_capacity(samples),
+        source_cache_before_publication_after_commit_retained_entries: Vec::with_capacity(samples),
+        source_cache_before_publication_after_commit_retained_bytes: Vec::with_capacity(samples),
+        output_sha256: Vec::with_capacity(samples),
+        phase_sum_verified: true,
+        semantic_reopen_all_sections_verified: true,
+        table_cell_sectpr_excluded_verified: true,
+        raw_untouched_members_verified: true,
+        raw_member_order_and_comment_verified: true,
+        header_footer_relationships_verified: true,
+        source_immutability_verified: true,
+        patch_forward_inverse_verified: true,
+        publication_inverse_exact_source_verified: true,
+        stale_foreign_signed_noop_limits_partial_sink_verified: true,
+        cache_counters_verified: true,
+        sink_counters_verified: true,
+    };
+    let mut measured_digests = Vec::with_capacity(samples);
+    let mut cache_observation: Option<(u64, u64, u64, usize, usize)> = None;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let preparation_started = Instant::now();
+        let source = Arc::new(InstrumentedSource::new(
+            corpus.archive.clone(),
+            payload_ranges.clone(),
+        ));
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let mut sink = CountingSink::bounded(maximum, 64 * 1024);
+        sink.reserve_budget()?;
+        let preparation_ns = elapsed_ns(preparation_started.elapsed())?;
+
+        let open_started = Instant::now();
+        let package = litchi_docx::source_backed::Package::from_read_at(read_at)?;
+        std::hint::black_box(&package);
+        let open_ns = elapsed_ns(open_started.elapsed())?;
+
+        let query_started = Instant::now();
+        let snapshot = package.section_layout_snapshot()?;
+        std::hint::black_box(&snapshot);
+        let query_ns = elapsed_ns(query_started.elapsed())?;
+
+        let edit_started = Instant::now();
+        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
+            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        )))?;
+        edit.set_columns(Some(litchi_docx::section::Columns {
+            equal_width: true,
+            count: 3,
+            space: Some(litchi_docx::section::Emu::from_twips(240)),
+            separator: true,
+            columns: Vec::new(),
+        }))?;
+        std::hint::black_box(&edit);
+        let edit_ns = elapsed_ns(edit_started.elapsed())?;
+
+        let commit_started = Instant::now();
+        let commit = edit.commit()?;
+        std::hint::black_box(&commit);
+        let commit_ns = elapsed_ns(commit_started.elapsed())?;
+        let before_publication_after_commit = package.cache_diagnostics();
+
+        let publication_started = Instant::now();
+        let publication = package.publish_section_layout_commit_to_stream(&mut sink, &commit)?;
+        std::hint::black_box(&publication);
+        let publication_ns = elapsed_ns(publication_started.elapsed())?;
+        let total_ns = preparation_ns
+            .checked_add(open_ns)
+            .and_then(|value| value.checked_add(query_ns))
+            .and_then(|value| value.checked_add(edit_ns))
+            .and_then(|value| value.checked_add(commit_ns))
+            .and_then(|value| value.checked_add(publication_ns))
+            .ok_or("DOCX section-layout phase sum overflows u64")?;
+
+        verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
+        if !commit.patch().changed()
+            || commit.patch().is_noop()
+            || commit.snapshot().inventory().sections()[0]
+                .columns()
+                .map(|columns| columns.count)
+                != Some(3)
+        {
+            return Err("DOCX section-layout commit changed an unexpected section".into());
+        }
+        let replayed = commit.patch().apply(&snapshot)?;
+        let restored = commit.patch().inverse().apply(&replayed)?;
+        if restored.inventory().sections() != snapshot.inventory().sections()
+            || commit.patch().apply(commit.snapshot()).is_ok()
+        {
+            return Err("DOCX section-layout patch forward/inverse/stale oracle failed".into());
+        }
+        if publication
+            .inverse_patch()
+            .apply(publication.snapshot())
+            .is_err()
+        {
+            return Err("DOCX section-layout publication inverse patch is not applicable".into());
+        }
+        if sink.bytes != expected_output {
+            return Err("DOCX section-layout publication differs from expected output".into());
+        }
+        verify_docx_section_layout_output(corpus, &sink.bytes, [3, 2, 2])?;
+        let reopened = litchi_docx::source_backed::Package::from_read_at(Arc::new(
+            OwnedSource::new(sink.bytes.clone()),
+        ))?;
+        let mut restored_output = Vec::new();
+        reopened.publish_section_layout_inverse_to_stream(&mut restored_output, &publication)?;
+        if restored_output != corpus.archive {
+            return Err("DOCX section-layout inverse publication did not restore source".into());
+        }
+        let digest = sha256_hex(&sink.bytes);
+        if digest != expected_digest {
+            return Err("DOCX section-layout output digest differs from expected output".into());
+        }
+        if source.bytes.as_ref() != &corpus.archive {
+            return Err("DOCX section-layout source bytes were mutated".into());
+        }
+        if before_publication_after_commit.successful_loads != 1
+            || before_publication_after_commit.cold_loads != 1
+            || before_publication_after_commit.retained_entries != 1
+            || before_publication_after_commit.retained_bytes == 0
+        {
+            return Err(
+                "DOCX section-layout source cache counters differ from one-main-Part contract"
+                    .into(),
+            );
+        }
+        let observed_cache = (
+            before_publication_after_commit.hits,
+            before_publication_after_commit.cold_loads,
+            before_publication_after_commit.successful_loads,
+            before_publication_after_commit.retained_entries,
+            before_publication_after_commit.retained_bytes,
+        );
+        if let Some(expected_cache) = cache_observation {
+            if expected_cache != observed_cache {
+                return Err(
+                    "DOCX section-layout source cache counters are not deterministic".into(),
+                );
+            }
+        } else {
+            cache_observation = Some(observed_cache);
+        }
+        let metrics = source.snapshot();
+        if metrics.read_calls == 0
+            || metrics.read_bytes == 0
+            || metrics.ordinary_payload_read_calls == 0
+            || metrics.ordinary_payload_read_bytes == 0
+        {
+            return Err("DOCX section-layout source performed no ordinary reads".into());
+        }
+        if iteration >= warmup_iterations {
+            elapsed.push(total_ns);
+            section_summary.preparation_ns.push(preparation_ns);
+            section_summary.open_ns.push(open_ns);
+            section_summary.query_ns.push(query_ns);
+            section_summary.edit_ns.push(edit_ns);
+            section_summary.commit_ns.push(commit_ns);
+            section_summary.publication_ns.push(publication_ns);
+            section_summary.source_read_calls.push(metrics.read_calls);
+            section_summary.source_read_bytes.push(metrics.read_bytes);
+            section_summary
+                .ordinary_payload_materializations
+                .push(before_publication_after_commit.successful_loads);
+            section_summary
+                .source_cache_before_publication_after_commit_hits
+                .push(before_publication_after_commit.hits);
+            section_summary
+                .source_cache_before_publication_after_commit_cold_loads
+                .push(before_publication_after_commit.cold_loads);
+            section_summary
+                .source_cache_before_publication_after_commit_successful_loads
+                .push(before_publication_after_commit.successful_loads);
+            section_summary
+                .source_cache_before_publication_after_commit_retained_entries
+                .push(before_publication_after_commit.retained_entries);
+            section_summary
+                .source_cache_before_publication_after_commit_retained_bytes
+                .push(before_publication_after_commit.retained_bytes);
+            section_summary.output_sha256.push(digest.clone());
+            source_summary.record_opc(metrics, before_publication_after_commit.successful_loads);
+            sink_summaries.push(sink.summary());
+            measured_digests.push(digest);
+        }
+        std::hint::black_box(&sink.bytes);
+    }
+
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("DOCX section-layout measured output digests are not stable".into());
+    }
+    let elapsed_statistics = statistics(elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    reorder_sample_vector(&mut source_summary.read_calls, &sample_order)?;
+    reorder_sample_vector(&mut source_summary.read_bytes, &sample_order)?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
+    if let Some(materializations) = source_summary.ordinary_payload_materializations.as_mut() {
+        reorder_sample_vector(materializations, &sample_order)?;
+    } else {
+        return Err("DOCX section-layout source materialization evidence is missing".into());
+    }
+    reorder_sample_vector(&mut section_summary.preparation_ns, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.open_ns, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.query_ns, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.edit_ns, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.commit_ns, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.publication_ns, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.source_read_calls, &sample_order)?;
+    reorder_sample_vector(&mut section_summary.source_read_bytes, &sample_order)?;
+    reorder_sample_vector(
+        &mut section_summary.ordinary_payload_materializations,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut section_summary.source_cache_before_publication_after_commit_hits,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut section_summary.source_cache_before_publication_after_commit_cold_loads,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut section_summary.source_cache_before_publication_after_commit_successful_loads,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut section_summary.source_cache_before_publication_after_commit_retained_entries,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut section_summary.source_cache_before_publication_after_commit_retained_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(&mut section_summary.output_sha256, &sample_order)?;
+    section_summary.sample_order = sample_order;
+    let sink = deterministic_sink_summary(&sink_summaries, "DOCX section-layout publication")?;
+    if sink.accepted_bytes != u64::try_from(expected_output.len())?
+        || sink.largest_write > 64 * 1024
+    {
+        return Err("DOCX section-layout sink counters exceed the configured bounds".into());
+    }
+    source_summary.docx_section_layout = Some(section_summary);
+    Ok(CaseResult {
+        case: Case::DocxSourceBackedExistingSectionLayoutEditSave.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: elapsed_statistics,
         sink: Some(sink),
         source: Some(source_summary),
         execution: None,
@@ -46450,17 +47471,18 @@ mod tests {
         XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
-        build_detection_corpus, build_docx_source_edit_corpus, build_odf_repair_corpus,
-        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
-        build_odt_media_corpus, build_odt_repeated_text_corpus, build_odt_resource_batch_corpus,
-        build_ole_common_corpus, build_ooxml_tracker_corpus, build_opc_corpus,
-        build_opc_relationship_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
-        build_pptx_slide_name_index_corpus, build_pptx_source_backed_cross_copy_corpus,
-        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
-        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
-        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
-        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
-        build_xls_visibility_edit_corpus, build_xlsb_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,
+        build_odf_repair_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
+        build_ods_media_corpus, build_odt_media_corpus, build_odt_repeated_text_corpus,
+        build_odt_resource_batch_corpus, build_ole_common_corpus, build_ooxml_tracker_corpus,
+        build_opc_corpus, build_opc_relationship_corpus, build_ppt_pictures_corpus,
+        build_pptx_cross_copy_corpus, build_pptx_slide_name_index_corpus,
+        build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
+        build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
+        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        build_xlsb_corpus, build_xlsx_auto_filter_edit_corpus,
         build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
         build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
         build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
@@ -46473,6 +47495,7 @@ mod tests {
         parse_case, payload_bytes, pptx_named_slide_name, resolve_execution_workers, run_case,
         run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
         run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_existing_section_layout_edit_save,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
         run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
@@ -47057,7 +48080,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 392);
+        assert_eq!(selectable_count, 393);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -48673,6 +49696,83 @@ mod tests {
         let source = measured.source.unwrap();
         assert_eq!(source.read_calls.len(), 1);
         assert_eq!(source.ordinary_payload_materializations, Some(vec![1]));
+    }
+
+    #[test]
+    fn docx_section_layout_selector_is_fixed_and_emits_phase_evidence() {
+        let case = Case::DocxSourceBackedExistingSectionLayoutEditSave;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert!(!Case::DEFAULT.contains(&case));
+        assert!(usage_text().contains(case.name()));
+        assert!(
+            super::validate_docx_section_layout_options(
+                &[case],
+                &CorpusShape::ALL,
+                &PayloadKind::ALL,
+            )
+            .is_ok()
+        );
+        assert!(
+            super::validate_docx_section_layout_options(
+                &[case],
+                &[CorpusShape::Tiny],
+                &PayloadKind::ALL,
+            )
+            .is_err()
+        );
+
+        let corpus = build_docx_section_layout_corpus().unwrap();
+        let again = build_docx_section_layout_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(
+            corpus.manifest.generator,
+            "litchi-docx-section-layout-source-v1"
+        );
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+        assert_eq!(
+            corpus.manifest.target_payload_sha256,
+            sha256_hex(&corpus.target_payload)
+        );
+        let measured =
+            run_docx_source_backed_existing_section_layout_edit_save(&corpus, 0, 2).unwrap();
+        assert_eq!(measured.case, case.name());
+        assert_eq!(measured.elapsed_ns.samples.len(), 2);
+        assert_eq!(
+            measured.elapsed_ns.sample_order.len(),
+            measured.elapsed_ns.samples.len()
+        );
+        let serialized = serde_json::to_string(&measured).unwrap();
+        assert!(serialized.contains("docx_section_layout"));
+        assert!(serialized.contains("\"performance_claim\":\"none\""));
+        assert!(serialized.contains("\"sample_order\":["));
+        let sink = measured.sink.as_ref().unwrap();
+        assert!(sink.accepted_bytes > 0);
+        assert!(sink.largest_write <= 64 * 1024);
+        let source = measured.source.as_ref().unwrap();
+        assert_eq!(source.read_calls.len(), 2);
+        assert_eq!(source.ordinary_payload_materializations, Some(vec![1, 1]));
+        let section = source.docx_section_layout.as_ref().unwrap();
+        assert_eq!(
+            section.total_main_story_paragraph_count,
+            super::DOCX_SECTION_LAYOUT_TOTAL_MAIN_STORY_PARAGRAPH_COUNT
+        );
+        assert_eq!(section.paragraph_owned_section_positions, vec![64, 129]);
+        assert_eq!(section.selected_paragraph, 64);
+        assert_eq!(section.sample_order.len(), 2);
+        assert_eq!(section.preparation_ns.len(), 2);
+        assert_eq!(section.open_ns.len(), 2);
+        assert_eq!(section.query_ns.len(), 2);
+        assert_eq!(section.edit_ns.len(), 2);
+        assert_eq!(section.commit_ns.len(), 2);
+        assert_eq!(section.publication_ns.len(), 2);
+        assert!(section.phase_sum_verified);
+        assert!(section.semantic_reopen_all_sections_verified);
+        assert!(section.table_cell_sectpr_excluded_verified);
+        assert!(section.raw_untouched_members_verified);
+        assert!(section.raw_member_order_and_comment_verified);
+        assert!(section.header_footer_relationships_verified);
+        assert!(section.publication_inverse_exact_source_verified);
+        assert!(section.stale_foreign_signed_noop_limits_partial_sink_verified);
     }
 
     #[test]
