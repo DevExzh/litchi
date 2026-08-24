@@ -4703,3 +4703,26 @@ user-owned untracked Pages table-lock findings. Wave63 therefore satisfies no
 crate-exit, dependency-removal, generated-schema-retirement, or
 monolith-deletion gate and makes no performance, general publication, or
 full-workspace green claim.
+
+## 2026-08-24 amendment: Wave64 Keynote chart-caption bounded owner slice (not a monolith-exit gate)
+
+Commit `514b82bdf658d78ea0154f4fc075b1b85488f31c` adds the
+selector-first `litchi-keynote` chart-caption replacement transaction, reuses
+the strict internal caption/text codecs, delegates existing-caption host reads
+and replacements through semantic selectors, and ratchets the focused facade
+against raw-ID or legacy-call regressions. Exact patches, candidate reopen,
+unknown-field preservation, exclusive storage ownership, and native Keynote
+14.4 save/reopen acceptance are recorded in ADR 0008.
+
+This slice deliberately does not own caption graph creation or removal.
+`litchi-iwa` still allocates native caption objects, registers their graph, and
+applies native stand-in removal policy for compatibility callers. The
+deprecated raw-ID methods, remaining Keynote chart/style/text hosts, archive
+codecs, generated schemas, normal Prost owners, dependency edges, ordered
+debts, and the `litchi-iwa` monolith all remain. The live checker also retains
+the three user-owned untracked Pages table-lock findings.
+
+No manifest edge, generated-schema owner, migration-host crate, or workspace
+dependency was removed. Wave64 therefore satisfies no crate-exit,
+dependency-removal, generated-schema-retirement, or monolith-deletion gate and
+makes no arbitrary-caption-graph, performance, or full-workspace green claim.

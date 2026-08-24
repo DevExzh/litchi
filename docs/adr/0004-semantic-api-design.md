@@ -2517,3 +2517,35 @@ artifacts; no-ops remain exact.
 
 The tracked raw-identifier Pages header methods were retired in favor of this
 owner. Remaining migration-host compatibility operations are not removed.
+
+## 2026-08-24 amendment: focused Keynote chart-caption semantic ownership
+
+Commit `514b82bdf658d78ea0154f4fc075b1b85488f31c` establishes the
+selector-first Keynote chart-caption text owner. The public package surface is
+`Package::{slide_chart_caption, edit_slide_chart_caption,
+apply_slide_chart_caption}`, `SlideSelector`, `ChartSelector`, and the
+`ChartCaption{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` transaction
+types. `None` denotes an absent caption graph, while `Some("")` denotes an
+existing native caption storage containing empty text. No native object ID,
+component route, archive object, protobuf message, or wire payload crosses
+this public surface.
+
+The focused transaction intentionally owns replacement only. It resolves the
+selected chart, validates the canonical chart-to-caption edge, checks the
+caption-info parent, storage, placement, and style graph, proves that the text
+storage is exclusively owned, and delegates the selected storage rewrite to
+the strict internal Keynote text boundary. Creation of an absent graph and
+changed removal both remain `UnsupportedDependency` because they require
+object allocation, UUID/Metadata registration, or native stand-in policy.
+Clearing an already absent caption and replacing text with the same value are
+exact no-ops.
+
+Changed publication preserves unknown selected-storage fields, invalidates
+only the root previews, reopens the complete candidate, and returns exact
+source/target artifacts whose inverse restores the original package bytes.
+Shared storage, contradictory parentage, malformed selected wire fields,
+dependent text markers, hostile message-diff metadata, and unknown ownership
+fail closed. The `litchi-iwa` migration host now exposes selector methods and
+delegates existing-caption reads and replacements to this owner; native graph
+creation and stand-in removal remain compatibility-host operations. The old
+raw-ID methods remain deprecated rather than deleted in this slice.

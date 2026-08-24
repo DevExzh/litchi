@@ -1019,3 +1019,29 @@ generic ZIP/catalog staging retains its own bounded allocations. This is a
 finite resource contract, not a package-wide peak-memory, allocation-count,
 RSS, latency, throughput, or performance claim. No manifest edge, generated
 schema, Buffa owner, or normal Prost owner changed.
+
+## 2026-08-24 amendment: Wave64 Keynote chart-caption resource record
+
+Commit `514b82bdf658d78ea0154f4fc075b1b85488f31c` reuses the finite
+Keynote package, semantic, archive, ZIP, and wire ceilings for existing-caption
+replacement. Caption input is capped at 64 MiB and copied only after a
+fallible exact `String` reservation. Chart-caption and caption-info projections
+receive payload-sized `DecodeOptions` bounded by the package field, nesting,
+and rewrite-work limits. The selected text storage uses the existing strict
+text-wire rewrite limits, exact output sizing, fallible reservations, archive
+framing checks, Snappy compression limits, package-output ceiling, and complete
+candidate reopen.
+
+The ownership census visits the already prepared finite package object,
+message, and reference inventory and retains no unbounded caller-controlled
+graph collection. Exact patch artifacts remain bounded by the package input
+and output limits; unchanged commits reuse the exact source artifact. Preview
+deletion and storage/node component rewrites are counted in transaction
+diagnostics, but the public diagnostics do not expose native identifiers.
+
+These are operation-local bounds inherited from the focused package and codec
+seams, not a claim that every comparison is represented by one aggregate
+counter or that every candidate stage uses a single allocation. No latency,
+throughput, peak-memory, RSS, or package-wide allocation measurement was made.
+No manifest edge, generated schema, Buffa owner, normal Prost owner, or
+workspace-wide dependency changed.
