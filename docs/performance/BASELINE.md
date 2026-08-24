@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest OPC timing-boundary correction and XLSX allocator probe (changes 0270-0271)
+
+[Change 0270](changes/0270-opc-relationship-open-timing.md) corrects the
+`opc_relationship_open` boundary to production open only, fences the returned
+package with `black_box`, and runs relationship/package oracles after timing.
+It is evidence-boundary correction only; no performance claim follows.
+
+[Change 0271](changes/0271-xlsx-repeated-store-allocator-probe.md) records a
+tracked A1/B1/B2/A2, three-warmup/30-sample, warm fresh-child probe for the two
+opt-in repeated-store selectors. Operation-scoped allocator observations are
+medium `568 -> 560` calls and `225206 -> 81224` bytes, and oversized
+`816 -> 560` calls and `271112552 -> 81224` bytes; both pairings are identical
+across 20 compared metrics with zero regressions. Latency is excluded, RSS is
+descriptive only, and no operation-local peak/RSS, physical-I/O, decompression,
+copy, or broad XLSX claim follows. The default remains 36 cases / 198 records;
+claim-0269 remains latency-only. The checked-in artifacts and SHA-256/size
+manifest are under
+[`results/0271-xlsx-repeated-store-allocator-probe-20260824/`](results/0271-xlsx-repeated-store-allocator-probe-20260824/).
+
 Date: 2026-08-10
 Production revision: `2665d572b78f0b3efd9ecfc4bd1fda09f8786ae3`
 Branch: `feat/office-format-completeness`

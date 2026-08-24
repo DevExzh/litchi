@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## Current evidence-boundary additions (changes 0270-0271)
+
+Change 0270 preserves the existing OPC ownership and public API boundaries. Its
+timer covers only the production relationship-open operation, fences the
+returned package with `black_box`, and leaves correctness oracles after timing;
+it makes no performance claim.
+
+Change 0271 is harness/result documentation over the existing XLSX repeated-
+store selectors and allocator instrumentation. It adds no production
+dependency, public type, executor, lock, unsafe code, cache, or CRUD surface.
+The manifest binds control/candidate revisions, binaries, configuration,
+corpora, and all tracked evidence files. Allocation figures are exploratory,
+RSS is descriptive only, and latency, operation-local peak/RSS, physical-I/O,
+decompression, copy, and broad XLSX claims are withheld. The default remains
+36 cases / 198 records and claim-0269 remains latency-only.
+
 Status: working design gate
 
 Every production optimization must update this matrix before implementation

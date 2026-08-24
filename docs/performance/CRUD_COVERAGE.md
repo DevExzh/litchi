@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+Changes 0270-0271 add evidence boundaries without changing CRUD coverage.
+Change 0270 times only the production OPC relationship-open operation and
+checks its relationship/package oracles afterward. Change 0271 probes the two
+existing opt-in XLSX repeated-store selectors with three warmups and 30 warm
+samples per leg for operation-scoped allocator observations; it adds no
+default case and leaves the default at 36 cases / 198 records. The allocator
+and descriptive RSS observations are exploratory only, with latency,
+operation-local peak/RSS, physical-I/O, decompression, copy, and broad XLSX
+claims withheld.
+
 Date: 2026-08-24
 
 This is a coverage map, not a completion claim. It compares the 389 selectable

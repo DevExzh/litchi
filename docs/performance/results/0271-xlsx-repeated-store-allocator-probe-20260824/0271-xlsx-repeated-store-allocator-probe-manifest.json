@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "change_id": "0271-xlsx-repeated-store-allocator-probe",
+  "date": "2026-08-24",
+  "status": "exploratory_no_claim",
+  "tracked_artifacts": [
+    {
+      "path": "a1.json",
+      "role": "raw_control",
+      "bytes": 380003,
+      "sha256": "2671db941a64f2f6873d1961da0bde25fa7be71bc267f2792acf43c44c1d4a76"
+    },
+    {
+      "path": "b1.json",
+      "role": "raw_candidate",
+      "bytes": 376810,
+      "sha256": "0041df3ccb1282098b9c5160b762c42075c67458b7ead4bee6a3b6540ae40dc0"
+    },
+    {
+      "path": "b2.json",
+      "role": "raw_candidate",
+      "bytes": 376814,
+      "sha256": "f7b4e5b5d7570f891a520c2aa60272324079c4c72eb88da6fc7239492f68ec48"
+    },
+    {
+      "path": "a2.json",
+      "role": "raw_control",
+      "bytes": 379979,
+      "sha256": "fc41c234416ec7e0f3b95098a4e7b0cea7b01f2f19aa0df7a15a0afb726488d5"
+    },
+    {
+      "path": "a1-b1-comparison.json",
+      "role": "comparison",
+      "bytes": 16331,
+      "sha256": "6e5ffe3df78ec54b7b61f07f22f5055c0778bd6e897046cd38abacf244d904ac"
+    },
+    {
+      "path": "a2-b2-comparison.json",
+      "role": "comparison",
+      "bytes": 16331,
+      "sha256": "6e5ffe3df78ec54b7b61f07f22f5055c0778bd6e897046cd38abacf244d904ac"
+    },
+    {
+      "path": "a1-b1-summary.txt",
+      "role": "summary",
+      "bytes": 109,
+      "sha256": "710b87d510c34ca4b788c63f9bd08ebb568d07f5fa2aff6f53f0427c96f08c82"
+    },
+    {
+      "path": "a2-b2-summary.txt",
+      "role": "summary",
+      "bytes": 109,
+      "sha256": "710b87d510c34ca4b788c63f9bd08ebb568d07f5fa2aff6f53f0427c96f08c82"
+    }
+  ],
+  "protocol": {
+    "order": ["a1", "b1", "b2", "a2"],
+    "warmup_iterations_per_case": 3,
+    "samples_per_case": 30,
+    "filesystem_cache_states": ["warm"],
+    "fresh_child_per_sample": true,
+    "process_isolated": true,
+    "filesystem_root_selected": true,
+    "filesystem_type": "tmpfs",
+    "cpu_affinity": "2",
+    "execution_workers": [1],
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "instrumentation": "system_allocator_operation_scoped",
+    "allocation_scope": "operation_global_system_allocator"
+  },
+  "revisions": {
+    "control": {
+      "legs": ["a1", "a2"],
+      "git_revision": "18633404d27bc4c442c09915972e7655cdae813b"
+    },
+    "candidate": {
+      "legs": ["b1", "b2"],
+      "git_revision": "8a0ca40b1a9d77a9494c74c0cdca38dd61ee68b1"
+    }
+  },
+  "binaries": {
+    "control": {
+      "path": "/dev/shm/litchi-0269-target/release/litchi-perf-baseline-alloc",
+      "sha256": "7c535ab6e4a2363d0ecca2bf42fe191cbf6358c181e50a725a781c52f798b813",
+      "bytes": 50506680,
+      "mode_bits_by_leg": {"a1": 509, "a2": 493}
+    },
+    "candidate": {
+      "path": "/dev/shm/litchi-0269-target/release/litchi-perf-baseline-alloc",
+      "sha256": "518b6a93e24df399d06bb598fbfd7827a23aea4058dae090888bbed2e490119b",
+      "bytes": 50494328,
+      "mode_bits_by_leg": {"b1": 509, "b2": 509}
+    }
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "logical_cpus_available": 1,
+    "source_destination_same_device": true,
+    "source_destination_path_identity": "unavailable",
+    "device_identity": "unavailable",
+    "storage_identifier": null
+  },
+  "corpora": [
+    {
+      "case": "xlsx_source_repeated_store_medium",
+      "name": "xlsx-source-repeated-store-medium",
+      "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+      "package_format": "XLSX/OPC/ZIP",
+      "shape": "medium",
+      "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "archive_bytes": 4226429,
+      "archive_member_count": 17,
+      "entry_count": 9216,
+      "target_entry": "Sheet1!A1",
+      "selected_member": "xl/worksheets/sheet1.xml",
+      "selected_member_uncompressed_bytes": 63294
+    },
+    {
+      "case": "xlsx_source_repeated_store_oversized",
+      "name": "xlsx-source-repeated-store-oversized",
+      "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+      "package_format": "XLSX/OPC/ZIP",
+      "shape": "oversized",
+      "archive_sha256": "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec",
+      "archive_bytes": 4236114,
+      "archive_member_count": 17,
+      "entry_count": 9216,
+      "target_entry": "Sheet1!A1",
+      "selected_member": "xl/worksheets/sheet1.xml",
+      "selected_member_uncompressed_bytes": 8389041
+    }
+  ],
+  "comparison_policy": {
+    "metric_scope": "operation_metrics.allocation",
+    "maximum_regression_percent": 5.0,
+    "compared_metric_count_per_pair": 20,
+    "regressions_per_pair": 0,
+    "paired_results_identical": true,
+    "latency": "excluded",
+    "rss": "descriptive_only"
+  },
+  "claim_scope": {
+    "allocation": "exploratory_operation_scoped_observation_only",
+    "excluded": [
+      "latency",
+      "operation_local_peak_memory",
+      "operation_local_peak_rss",
+      "physical_io",
+      "decompression",
+      "copy",
+      "broad_xlsx_performance",
+      "real_producer_breadth"
+    ],
+    "default_case_count": 36,
+    "default_record_count": 198,
+    "claim_0269": "retained_latency_only",
+    "claim_registry_updated": false,
+    "historical_classification_tables_updated": false
+  }
+}

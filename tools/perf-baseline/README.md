@@ -3202,6 +3202,39 @@ allocator-only comparator; the checked normal policy continues to reject this
 binary identity. The existing raw `filesystem_evidence` samples remain
 unchanged.
 
+The separate checked XLSX repeated-store allocator policy is warm-only and
+pins exactly `xlsx_source_repeated_store_medium` and
+`xlsx_source_repeated_store_oversized` to the corpus-key manifest derived from
+change 0269. The retained allocator protocol uses 30 samples and 3 warmups.
+Use an explicit filesystem root so the child-process identity and corpus package
+are reproducible:
+
+```sh
+cargo build --release --locked --features allocator-metrics \
+  --bin litchi-perf-baseline-alloc \
+  --manifest-path tools/perf-baseline/Cargo.toml
+tools/perf-baseline/target/release/litchi-perf-baseline-alloc \
+  --warmup 3 --samples 30 --filesystem-cache warm \
+  --filesystem-root /path/on/ext4 \
+  --case xlsx_source_repeated_store_medium,xlsx_source_repeated_store_oversized \
+  --json target/perf/perf-xlsx-repeated-store-alloc.json
+python3 tools/perf_compare.py \
+  --policy docs/performance/perf-regression-policy-xlsx-allocator-v1.json \
+  --baseline target/perf/reference/perf-xlsx-repeated-store-alloc.json \
+  --current target/perf/current/perf-xlsx-repeated-store-alloc.json
+```
+
+The comparator withholds elapsed-latency comparisons for this allocator
+identity and compares only the required operation-scoped allocation vectors.
+The companion manifest is
+`docs/performance/results/perf-regression-xlsx-allocator-manifest-v1.json`.
+Selected-root identity is limited by the report schema to the selection boolean
+and the non-path environment fields `filesystem_type`,
+`source_destination_same_device`, and `storage_identifier`. The comparator
+requires those declared fields to match across baseline/current reports and
+checks per-sample XLSX source hashes and corpus identities; it does not claim a
+root path or physical-device identity when `storage_identifier` is null.
+
 In-process sink-only envelopes use `latency_claim: comparable_timed_operation`;
 filesystem envelopes use `evidence_only_filesystem_selector`. The Python
 comparator validates the claim on both reports, excludes evidence-only elapsed

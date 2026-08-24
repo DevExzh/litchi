@@ -63,15 +63,21 @@ _FILESYSTEM_CASE_PREFIXES = (
     "cfb_file_",
     "pptx_file_",
     "docx_file_",
+    "xlsx_source_",
     "odt_file_",
     "ods_file_",
     "odp_file_",
 )
 _OPTIONAL_POLICY_KEYS = {
+    "filesystem_identity_fields",
     "result_key_fields",
     "expected_build_identity",
     "require_binary_identity",
+    "require_sample_child_identity",
 }
+_FILESYSTEM_IDENTITY_FIELDS = frozenset(
+    {"filesystem_type", "source_destination_same_device", "storage_identifier"}
+)
 _BINARY_IDENTITY_FIELDS = frozenset(
     {"path", "binary_sha256", "binary_bytes", "mode_bits", "executable", "profile"}
 )
@@ -298,6 +304,27 @@ def validate_policy(raw: Any) -> dict[str, Any]:
         policy["require_binary_identity"], bool
     ):
         raise ComparisonInputError("policy.require_binary_identity must be boolean")
+    if "require_sample_child_identity" in policy and not isinstance(
+        policy["require_sample_child_identity"], bool
+    ):
+        raise ComparisonInputError(
+            "policy.require_sample_child_identity must be boolean"
+        )
+    filesystem_identity_fields = policy.get("filesystem_identity_fields")
+    if filesystem_identity_fields is not None and (
+        not isinstance(filesystem_identity_fields, list)
+        or not filesystem_identity_fields
+        or any(
+            not isinstance(field, str) or not field
+            for field in filesystem_identity_fields
+        )
+        or len(set(filesystem_identity_fields)) != len(filesystem_identity_fields)
+        or not set(filesystem_identity_fields) <= _FILESYSTEM_IDENTITY_FIELDS
+    ):
+        raise ComparisonInputError(
+            "policy.filesystem_identity_fields must contain unique supported "
+            "non-empty strings"
+        )
     tool = _require_object(policy["tool_identity"], "policy.tool_identity")
     for field in (
         "name",
@@ -393,6 +420,17 @@ def validate_policy(raw: Any) -> dict[str, Any]:
     if not expected_configuration:
         raise ComparisonInputError("policy.expected_configuration must not be empty")
     _reject_nonfinite_tree(expected_configuration, "policy.expected_configuration")
+    for field in (
+        "filesystem_fresh_child_per_sample",
+        "filesystem_process_isolated",
+        "filesystem_root_selected",
+    ):
+        if field in expected_configuration and not isinstance(
+            expected_configuration[field], bool
+        ):
+            raise ComparisonInputError(
+                f"policy.expected_configuration.{field} must be boolean"
+            )
     latency = _require_object(
         policy["latency_thresholds_percent"],
         "policy.latency_thresholds_percent",
@@ -1266,14 +1304,45 @@ def _validate_report_identity(
                 tool=report["tool"],
             )
         _require_object(report.get("environment"), f"{label}.environment")
+        environment = report["environment"]
+        for field in policy.get("filesystem_identity_fields", []):
+            if field not in environment:
+                raise ComparisonInputError(
+                    f"{label}.environment.{field} is required by filesystem identity policy"
+                )
+            value = environment[field]
+            if field == "filesystem_type" and (
+                not isinstance(value, str) or not value
+            ):
+                raise ComparisonInputError(
+                    f"{label}.environment.{field} must be a non-empty string"
+                )
+            if field == "source_destination_same_device" and not isinstance(
+                value, bool
+            ):
+                raise ComparisonInputError(
+                    f"{label}.environment.{field} must be boolean"
+                )
+            if field == "storage_identifier" and value is not None and (
+                not isinstance(value, str) or not value
+            ):
+                raise ComparisonInputError(
+                    f"{label}.environment.{field} must be null or a non-empty string"
+                )
         configuration = _require_object(
             report.get("configuration"), f"{label}.configuration"
         )
         for field, expected in policy["expected_configuration"].items():
-            if configuration.get(field) != expected:
+            actual = configuration.get(field)
+            matches = (
+                isinstance(actual, bool) and actual == expected
+                if isinstance(expected, bool)
+                else actual == expected
+            )
+            if not matches:
                 raise ComparisonInputError(
                     f"{label}.configuration.{field} does not match policy: "
-                    f"{configuration.get(field)!r} != {expected!r}"
+                    f"{actual!r} != {expected!r}"
                 )
         if configuration.get("cases") != policy["required_cases"]:
             raise ComparisonInputError(
@@ -1293,6 +1362,14 @@ def _validate_report_identity(
         )
     if baseline["configuration"] != current["configuration"]:
         raise ComparisonInputError("benchmark configuration mismatch between reports")
+    for field in policy.get("filesystem_identity_fields", []):
+        baseline_value = baseline["environment"][field]
+        current_value = current["environment"][field]
+        if baseline_value != current_value:
+            raise ComparisonInputError(
+                f"filesystem identity mismatch for {field!r}: "
+                f"{baseline_value!r} != {current_value!r}"
+            )
     revisions = []
     for label, report in (("baseline", baseline), ("current", current)):
         revision = report["environment"].get("git_revision")
@@ -2330,6 +2407,47 @@ def _validate_allocator_filesystem_evidence(
     expected_configuration = policy["expected_configuration"]
     expected_sample_count = expected_configuration.get("samples_per_case")
     expected_cache_states = expected_configuration.get("filesystem_cache_states")
+    require_fresh_child = (
+        expected_configuration.get("filesystem_fresh_child_per_sample") is True
+    )
+    require_process_isolation = (
+        expected_configuration.get("filesystem_process_isolated") is True
+    )
+    require_selected_root = (
+        expected_configuration.get("filesystem_root_selected") is True
+    )
+    require_child_process_ids = (
+        policy.get("require_sample_child_identity", False)
+        or require_process_isolation
+    )
+    result_corpora: dict[str, tuple[dict[str, Any], str]] = {}
+    results = report.get("results")
+    if not isinstance(results, list):
+        raise ComparisonInputError(f"{label}.results must be a list")
+    for result_index, raw_result in enumerate(results):
+        result = _require_object(raw_result, f"{label}.results[{result_index}]")
+        case = result.get("case")
+        if not isinstance(case, str) or not case:
+            raise ComparisonInputError(
+                f"{label}.results[{result_index}].case must be a non-empty string"
+            )
+        corpus = _require_object(
+            result.get("corpus"), f"{label}.results[{result_index}].corpus"
+        )
+        try:
+            corpus_identity = json.dumps(
+                corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+            )
+        except (TypeError, ValueError) as error:
+            raise ComparisonInputError(
+                f"{label}.results[{result_index}].corpus is not canonical JSON: {error}"
+            ) from error
+        previous = result_corpora.get(case)
+        if previous is not None and previous[1] != corpus_identity:
+            raise ComparisonInputError(
+                f"{label}.results has inconsistent corpus identity for case {case!r}"
+            )
+        result_corpora[case] = (corpus, corpus_identity)
     if (
         isinstance(expected_sample_count, bool)
         or not isinstance(expected_sample_count, int)
@@ -2350,6 +2468,7 @@ def _validate_allocator_filesystem_evidence(
     expected_sample_total = expected_sample_count * len(expected_cache_states)
     observed_cases: set[str] = set()
     raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
+    child_process_ids: set[int] = set()
     for index, raw_item in enumerate(evidence):
         item = _require_object(raw_item, f"{label}.filesystem_evidence[{index}]")
         case = item.get("case")
@@ -2364,6 +2483,38 @@ def _validate_allocator_filesystem_evidence(
                 f"{label}.filesystem_evidence contains duplicate case {case!r}"
             )
         observed_cases.add(case)
+        result_corpus_entry = result_corpora.get(case)
+        if result_corpus_entry is None:
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence[{index}].case has no result corpus identity"
+            )
+        expected_corpus, expected_corpus_identity = result_corpus_entry
+        if require_selected_root:
+            evidence_corpus = _require_object(
+                item.get("corpus"),
+                f"{label}.filesystem_evidence[{index}].corpus",
+            )
+            try:
+                evidence_corpus_identity = json.dumps(
+                    evidence_corpus,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            except (TypeError, ValueError) as error:
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}].corpus is not canonical JSON: {error}"
+                ) from error
+            if evidence_corpus_identity != expected_corpus_identity:
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}].corpus identity does not match "
+                    "the result corpus"
+                )
+        if require_fresh_child and item.get("fresh_child_per_sample") is not True:
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence[{index}].fresh_child_per_sample "
+                "must be true when required by policy"
+            )
         item_sample_count = item.get("sample_count")
         if (
             isinstance(item_sample_count, bool)
@@ -2417,6 +2568,36 @@ def _validate_allocator_filesystem_evidence(
                         f"allocation_metrics.{field} must be a non-negative integer"
                     )
                 raw_values[field] = value
+            if require_child_process_ids:
+                child_process_id = sample.get("child_process_id")
+                if (
+                    isinstance(child_process_id, bool)
+                    or not isinstance(child_process_id, int)
+                    or child_process_id <= 0
+                ):
+                    raise ComparisonInputError(
+                        f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                        "child_process_id must be a positive integer when child "
+                        "identity is required"
+                    )
+                if child_process_id in child_process_ids:
+                    raise ComparisonInputError(
+                        f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                        "child_process_id values must be unique per report"
+                    )
+                child_process_ids.add(child_process_id)
+            if require_selected_root and case.startswith("xlsx_"):
+                source_sha256 = expected_corpus.get("archive_sha256")
+                sample_source_sha256 = sample.get("xlsx_source_sha256")
+                if (
+                    not isinstance(source_sha256, str)
+                    or not source_sha256
+                    or sample_source_sha256 != source_sha256
+                ):
+                    raise ComparisonInputError(
+                        f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                        "xlsx_source_sha256 does not match the selected corpus archive"
+                    )
             cache_state = sample.get("cache_state")
             if cache_state not in sample_indices:
                 raise ComparisonInputError(

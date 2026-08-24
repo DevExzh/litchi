@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "policy_id": "litchi-hosted-xlsx-repeated-store-allocator-v1",
+  "minimum_samples": 30,
+  "expected_result_count": 2,
+  "expected_result_keys_sha256": "679776540ae864a066360d84b3e84c4163faff53ef8398891179892080b8a86e",
+  "result_key_fields": [
+    "case",
+    "corpus",
+    "cache_state"
+  ],
+  "required_cases": [
+    "xlsx_source_repeated_store_medium",
+    "xlsx_source_repeated_store_oversized"
+  ],
+  "require_clean_worktree": true,
+  "require_distinct_revisions": true,
+  "require_binary_identity": true,
+  "require_sample_child_identity": true,
+  "filesystem_identity_fields": [
+    "filesystem_type",
+    "source_destination_same_device",
+    "storage_identifier"
+  ],
+  "tool_identity": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline-alloc",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "build_identity_fields": [
+    "rustc_version",
+    "logical_cpus_available",
+    "allocator",
+    "rustflags",
+    "cargo_build_target",
+    "perf_event_paranoid",
+    "os",
+    "kernel",
+    "cpu_model",
+    "total_memory_bytes",
+    "page_size_bytes"
+  ],
+  "nullable_build_identity_fields": [
+    "rustflags",
+    "cargo_build_target"
+  ],
+  "expected_build_identity": {
+    "allocator": "CountingSystemAllocator(std::alloc::System)"
+  },
+  "expected_configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": true
+  },
+  "latency_thresholds_percent": {
+    "p50": 5.0,
+    "p95": 10.0,
+    "p99": 15.0
+  },
+  "metric_classes": [
+    {
+      "name": "allocation",
+      "max_regression_percent": 5.0,
+      "path_globs": [
+        "operation_metrics/allocation/allocation_calls/values",
+        "operation_metrics/allocation/deallocation_calls/values",
+        "operation_metrics/allocation/reallocation_calls/values",
+        "operation_metrics/allocation/failed_allocation_calls/values",
+        "operation_metrics/allocation/allocated_bytes/values",
+        "operation_metrics/allocation/deallocated_bytes/values",
+        "operation_metrics/allocation/live_bytes_before/values",
+        "operation_metrics/allocation/live_bytes_after/values",
+        "operation_metrics/allocation/peak_live_bytes_before/values",
+        "operation_metrics/allocation/peak_live_bytes_after/values"
+      ],
+      "presence": "required"
+    }
+  ]
+}
