@@ -782,6 +782,173 @@ impl RewriteOutput {
     }
 }
 
+/// Output-free, semantically validated save-token rewrite.
+pub struct PreparedPackageMetadataSaveTokenRewrite<'source, 'batch> {
+    source: &'source [u8],
+    batch: SaveTokenBatch<'batch>,
+    new_root: u64,
+    source_last_raw: RawFieldBytes,
+    source_last: u64,
+    budget: Budget,
+    prepare_report: RewriteReport,
+    requirements: RewriteExecutionRequirements,
+    output_size: usize,
+}
+
+impl PreparedPackageMetadataSaveTokenRewrite<'_, '_> {
+    #[must_use]
+    pub const fn prepare_report(&self) -> RewriteReport {
+        self.prepare_report
+    }
+
+    #[must_use]
+    pub const fn execution_requirements(&self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub fn execute(
+        mut self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, RewriteError> {
+        preflight_execution(self.requirements, limits)?;
+        let before = self.budget.report();
+        let mut candidate = Vec::new();
+        #[cfg(test)]
+        record_output_allocation();
+        candidate
+            .try_reserve_exact(self.output_size)
+            .map_err(|_error| RewriteError::allocation(self.output_size))?;
+        if candidate.capacity() != self.output_size {
+            return Err(RewriteError::allocation(self.output_size));
+        }
+        self.budget.allocation(0)?;
+        rewrite_save_token_into(
+            self.source,
+            self.batch,
+            self.new_root,
+            &mut candidate,
+            &mut self.budget,
+        )?;
+        if candidate.len() != self.output_size {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+
+        self.budget.source_phase = false;
+        let mut candidate_state = SaveTokenScanState::new(self.batch, &mut self.budget)?;
+        scan_save_token_metadata(
+            &candidate,
+            self.batch,
+            SaveTokenScanMode::Verification,
+            &mut candidate_state,
+            Some((self.source_last_raw, self.source_last, self.new_root)),
+            &mut self.budget,
+        )?;
+        candidate_state.validate_candidate(self.new_root)?;
+        self.budget.output_bytes = candidate.len();
+        self.budget.retained_bytes = candidate.len();
+        let report = subtract_report(self.budget.report(), before)?;
+        validate_execution_report(report, self.requirements)?;
+        Ok(RewriteOutput {
+            bytes: candidate,
+            report,
+        })
+    }
+}
+
+/// Output-free, semantically validated registry-addition and save-token
+/// rewrite.
+pub struct PreparedPackageMetadataAdditionSaveTokenRewrite<'source, 'batch> {
+    source: &'source [u8],
+    batch: AdditionSaveTokenBatch<'batch>,
+    new_last: u64,
+    new_token: u64,
+    budget: Budget,
+    prepare_report: RewriteReport,
+    requirements: RewriteExecutionRequirements,
+    output_size: usize,
+    planned_fields: usize,
+    planned_work: usize,
+    planned_components: usize,
+    planned_references: usize,
+}
+
+impl PreparedPackageMetadataAdditionSaveTokenRewrite<'_, '_> {
+    #[must_use]
+    pub const fn prepare_report(&self) -> RewriteReport {
+        self.prepare_report
+    }
+
+    #[must_use]
+    pub const fn execution_requirements(&self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub fn execute(
+        mut self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, RewriteError> {
+        preflight_execution(self.requirements, limits)?;
+        let before = self.budget.report();
+        let mut candidate = Vec::new();
+        #[cfg(test)]
+        record_output_allocation();
+        candidate
+            .try_reserve_exact(self.output_size)
+            .map_err(|_error| RewriteError::allocation(self.output_size))?;
+        if candidate.capacity() != self.output_size {
+            return Err(RewriteError::allocation(self.output_size));
+        }
+        self.budget.allocation(0)?;
+        rewrite_addition_save_token_into(
+            self.source,
+            self.batch,
+            self.new_last,
+            self.new_token,
+            &mut candidate,
+            &mut self.budget,
+        )?;
+        if candidate.len() != self.output_size {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+
+        self.budget.source_phase = false;
+        let mut candidate_state = AdditionSaveTokenScanState::new(
+            self.batch.additions,
+            self.batch.save_tokens,
+            &mut self.budget,
+        )?;
+        scan_addition_save_token_metadata(
+            &candidate,
+            self.batch,
+            ScanMode::Verification,
+            &mut candidate_state,
+            Some((self.new_last, self.new_token)),
+            &mut self.budget,
+        )?;
+        candidate_state.additions.validate_verification()?;
+        candidate_state
+            .save_tokens
+            .validate_candidate(self.new_token)?;
+        if candidate_state.save_tokens.last != Some(self.new_last) {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+        self.budget.pad_repeated_counters(
+            self.planned_fields,
+            self.planned_work,
+            self.planned_components,
+            self.planned_references,
+        )?;
+        self.budget.output_bytes = candidate.len();
+        self.budget.retained_bytes = candidate.len();
+        let report = subtract_report(self.budget.report(), before)?;
+        validate_execution_report(report, self.requirements)?;
+        Ok(RewriteOutput {
+            bytes: candidate,
+            report,
+        })
+    }
+}
+
 /// Borrowed identity and locator facts for one PackageMetadata component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ComponentDescriptor<'source> {
@@ -3998,6 +4165,142 @@ mod tests {
         ));
         assert_eq!(output_allocations(), allocations);
     }
+
+    #[test]
+    fn prepared_save_tokens_replay_exact_execution_limits_before_allocation() {
+        let component = token_component(1, "a.iwa", Some(536), false, false);
+        let versioned = token_component(1, "old.iwa", Some(536), false, true);
+        let source = token_metadata(
+            77,
+            Some(536),
+            core::slice::from_ref(&component),
+            core::slice::from_ref(&versioned),
+        );
+        let selector = ComponentSelector::new(1, "a.iwa");
+        let batch = SaveTokenBatch::new(core::slice::from_ref(&selector));
+        let baseline =
+            rewrite_package_metadata_save_tokens(&source, batch, options(&source)).unwrap();
+        let allocations_before = output_allocations();
+        let prepared =
+            prepare_package_metadata_save_tokens(&source, batch, options(&source)).unwrap();
+        assert_eq!(output_allocations(), allocations_before);
+        let prepare_report = prepared.prepare_report();
+        assert_eq!(prepare_report.output_bytes(), 0);
+        assert_eq!(prepare_report.retained_bytes(), 0);
+        let requirements = prepared.execution_requirements();
+        let execution = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(execution.bytes(), baseline.bytes());
+        assert_eq!(
+            add_reports(prepare_report, execution.report()).unwrap(),
+            baseline.report()
+        );
+
+        for axis in 0..8 {
+            let prepared =
+                prepare_package_metadata_save_tokens(&source, batch, options(&source)).unwrap();
+            let requirements = prepared.execution_requirements();
+            let mut limits = requirements.exact_limits();
+            let nonzero = match axis {
+                0 => requirements.output_bytes() != 0,
+                1 => requirements.fields() != 0,
+                2 => requirements.work_bytes() != 0,
+                3 => requirements.components() != 0,
+                4 => requirements.references() != 0,
+                5 => requirements.allocations() != 0,
+                6 => requirements.retained_bytes() != 0,
+                _ => requirements.scratch_bytes() != 0,
+            };
+            if !nonzero {
+                continue;
+            }
+            match axis {
+                0 => limits.max_output_bytes -= 1,
+                1 => limits.max_fields -= 1,
+                2 => limits.max_work_bytes -= 1,
+                3 => limits.max_components -= 1,
+                4 => limits.max_references -= 1,
+                5 => limits.max_allocations -= 1,
+                6 => limits.max_retained_bytes -= 1,
+                _ => limits.max_scratch_bytes -= 1,
+            }
+            let allocations_before = output_allocations();
+            let error = prepared.execute(limits).unwrap_err();
+            assert!(error.resource_limit().is_some() || error.allocation_request().is_some());
+            assert_eq!(output_allocations(), allocations_before);
+        }
+    }
+
+    #[test]
+    fn prepared_additions_and_save_tokens_replay_exact_execution_limits_before_allocation() {
+        let selected = token_component(1, "a.iwa", Some(5), false, true);
+        let unselected = token_component(2, "b.iwa", Some(4), false, true);
+        let versioned = token_component(1, "old.iwa", Some(5), false, true);
+        let source = token_metadata(
+            10,
+            Some(5),
+            &[selected, unselected],
+            core::slice::from_ref(&versioned),
+        );
+        let selected_selector = ComponentSelector::new(1, "a.iwa");
+        let target_selector = ComponentSelector::new(2, "b.iwa");
+        let object_addition = [ObjectUuidAddition::new(
+            selected_selector,
+            11,
+            UuidBits::new(100, 200),
+        )];
+        let reference_addition = [ExternalReferenceAddition::new(
+            selected_selector,
+            target_selector,
+            12,
+            Some(false),
+        )];
+        let additions = Batch::new(10, 12, &object_addition, &reference_addition);
+        let save_tokens = SaveTokenBatch::new(core::slice::from_ref(&selected_selector));
+        let batch = AdditionSaveTokenBatch::new(additions, save_tokens);
+        let baseline =
+            rewrite_package_metadata_additions_and_save_tokens(&source, batch, options(&source))
+                .unwrap();
+        let allocations_before = output_allocations();
+        let prepared =
+            prepare_package_metadata_additions_and_save_tokens(&source, batch, options(&source))
+                .unwrap();
+        assert_eq!(output_allocations(), allocations_before);
+        let prepare_report = prepared.prepare_report();
+        assert_eq!(prepare_report.output_bytes(), 0);
+        assert_eq!(prepare_report.retained_bytes(), 0);
+        let requirements = prepared.execution_requirements();
+        let execution = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(execution.bytes(), baseline.bytes());
+        assert_eq!(
+            add_reports(prepare_report, execution.report()).unwrap(),
+            baseline.report()
+        );
+
+        for axis in 0..8 {
+            let prepared = prepare_package_metadata_additions_and_save_tokens(
+                &source,
+                batch,
+                options(&source),
+            )
+            .unwrap();
+            let requirements = prepared.execution_requirements();
+            let mut limits = requirements.exact_limits();
+            match axis {
+                0 => limits.max_output_bytes -= 1,
+                1 => limits.max_fields -= 1,
+                2 => limits.max_work_bytes -= 1,
+                3 => limits.max_components -= 1,
+                4 => limits.max_references -= 1,
+                5 => limits.max_allocations -= 1,
+                6 => limits.max_retained_bytes -= 1,
+                _ => limits.max_scratch_bytes -= 1,
+            }
+            let allocations_before = output_allocations();
+            let error = prepared.execute(limits).unwrap_err();
+            assert!(error.resource_limit().is_some() || error.allocation_request().is_some());
+            assert_eq!(output_allocations(), allocations_before);
+        }
+    }
 }
 
 /// Strictly inspect PackageMetadata without materializing generated messages.
@@ -4121,11 +4424,11 @@ impl AdditionSaveTokenScanState {
 
 /// Rewrite the package root save token and the selected current component
 /// save tokens in one raw-preserving atomic candidate.
-pub fn rewrite_package_metadata_save_tokens(
-    source: &[u8],
-    batch: SaveTokenBatch<'_>,
+pub fn prepare_package_metadata_save_tokens<'source, 'batch>(
+    source: &'source [u8],
+    batch: SaveTokenBatch<'batch>,
     options: RewriteOptions,
-) -> Result<RewriteOutput, RewriteError> {
+) -> Result<PreparedPackageMetadataSaveTokenRewrite<'source, 'batch>, RewriteError> {
     validate_save_token_batch(batch, options)?;
     let mut budget = Budget::new_inspection(source, options)?;
     validate_save_token_selector_duplicates(batch, &mut budget)?;
@@ -4139,6 +4442,12 @@ pub fn rewrite_package_metadata_save_tokens(
         &mut budget,
     )?;
     let old_root = source_state.validate_source()?;
+    let source_last_raw = source_state
+        .last_raw
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?;
+    let source_last = source_state
+        .last
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?;
     let new_root = old_root
         .checked_add(1)
         .ok_or_else(|| RewriteError::invalid(InvalidReason::SaveTokenOverflow))?;
@@ -4154,47 +4463,33 @@ pub fn rewrite_package_metadata_save_tokens(
         &mut budget,
     )?;
     budget.preflight_repeat_delta(&before_execution)?;
-
-    let mut candidate = Vec::new();
-    #[cfg(test)]
-    record_output_allocation();
-    candidate
-        .try_reserve_exact(output_size)
-        .map_err(|_error| RewriteError::allocation(output_size))?;
-    if candidate.capacity() != output_size {
-        return Err(RewriteError::allocation(output_size));
-    }
-    budget.allocation(0)?;
-    rewrite_save_token_into(source, batch, new_root, &mut candidate, &mut budget)?;
-    if candidate.len() != output_size {
-        return Err(RewriteError::invalid(InvalidReason::Verification));
-    }
-
-    budget.source_phase = false;
-    let mut candidate_state = SaveTokenScanState::new(batch, &mut budget)?;
-    scan_save_token_metadata(
-        &candidate,
+    let predicted = subtract_report(budget.report(), before_execution.report())?;
+    let requirements = save_token_execution_requirements(batch, output_size, predicted)?;
+    let prepare_report = budget.report();
+    Ok(PreparedPackageMetadataSaveTokenRewrite {
+        source,
         batch,
-        SaveTokenScanMode::Verification,
-        &mut candidate_state,
-        Some((
-            source_state
-                .last_raw
-                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
-            source_state
-                .last
-                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
-            new_root,
-        )),
-        &mut budget,
-    )?;
-    candidate_state.validate_candidate(new_root)?;
-    budget.output_bytes = candidate.len();
-    budget.retained_bytes = candidate.len();
-    Ok(RewriteOutput {
-        bytes: candidate,
-        report: budget.report(),
+        new_root,
+        source_last_raw,
+        source_last,
+        budget,
+        prepare_report,
+        requirements,
+        output_size,
     })
+}
+
+pub fn rewrite_package_metadata_save_tokens(
+    source: &[u8],
+    batch: SaveTokenBatch<'_>,
+    options: RewriteOptions,
+) -> Result<RewriteOutput, RewriteError> {
+    let prepared = prepare_package_metadata_save_tokens(source, batch, options)?;
+    let prepare_report = prepared.prepare_report();
+    let limits = prepared.execution_requirements().exact_limits();
+    let mut output = prepared.execute(limits)?;
+    output.report = add_reports(prepare_report, output.report())?;
+    Ok(output)
 }
 
 /// Atomically append registry records, advance the root object watermark, and
@@ -4205,11 +4500,11 @@ pub fn rewrite_package_metadata_save_tokens(
 /// scanned once for both transitions, one exact output size is computed, and
 /// one candidate is reserved and verified before it is returned.  All
 /// unselected and versioned metadata remains source-authoritative.
-pub fn rewrite_package_metadata_additions_and_save_tokens(
-    source: &[u8],
-    batch: AdditionSaveTokenBatch<'_>,
+pub fn prepare_package_metadata_additions_and_save_tokens<'source, 'batch>(
+    source: &'source [u8],
+    batch: AdditionSaveTokenBatch<'batch>,
     options: RewriteOptions,
-) -> Result<RewriteOutput, RewriteError> {
+) -> Result<PreparedPackageMetadataAdditionSaveTokenRewrite<'source, 'batch>, RewriteError> {
     validate_batch(batch.additions, options)?;
     validate_save_token_batch(batch.save_tokens, options)?;
     let selector_count = selector_count(batch.additions);
@@ -4250,13 +4545,13 @@ pub fn rewrite_package_metadata_additions_and_save_tokens(
     {
         return Err(RewriteError::invalid(InvalidReason::LastIdentifierMismatch));
     }
-    let new_root = batch.additions.new_last_object_identifier;
+    let new_last = batch.additions.new_last_object_identifier;
     let new_token = old_root
         .checked_add(1)
         .ok_or_else(|| RewriteError::invalid(InvalidReason::SaveTokenOverflow))?;
 
     let output_size =
-        addition_save_token_output_size(source, batch, new_root, new_token, &mut budget)?;
+        addition_save_token_output_size(source, batch, new_last, new_token, &mut budget)?;
     budget.output_size(output_size)?;
     let before_execution = budget.clone();
     precharge_addition_save_token_rewrite_and_verification(
@@ -4294,57 +4589,59 @@ pub fn rewrite_package_metadata_additions_and_save_tokens(
         )
     })
     .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
-
-    let mut candidate = Vec::new();
-    #[cfg(test)]
-    record_output_allocation();
-    candidate
-        .try_reserve_exact(output_size)
-        .map_err(|_error| RewriteError::allocation(output_size))?;
-    if candidate.capacity() != output_size {
-        return Err(RewriteError::allocation(output_size));
-    }
-    budget.allocation(0)?;
-    rewrite_addition_save_token_into(
+    let prepare_report = budget.report();
+    let execution = RewriteReport {
+        input_bytes: 0,
+        output_bytes: 0,
+        fields: planned_fields
+            .checked_sub(prepare_report.fields())
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
+        work_bytes: planned_work
+            .checked_sub(prepare_report.work_bytes())
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
+        max_depth: prepare_report.max_depth(),
+        components_scanned: planned_components
+            .checked_sub(prepare_report.components_scanned())
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
+        components_changed: 0,
+        references_scanned: planned_references
+            .checked_sub(prepare_report.references_scanned())
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?,
+        source_references_scanned: 0,
+        additions: 0,
+        removals: 0,
+        allocations: 0,
+        retained_bytes: 0,
+        scratch_bytes: 0,
+    };
+    let requirements = addition_save_token_execution_requirements(batch, output_size, execution)?;
+    Ok(PreparedPackageMetadataAdditionSaveTokenRewrite {
         source,
         batch,
-        new_root,
+        new_last,
         new_token,
-        &mut candidate,
-        &mut budget,
-    )?;
-    if candidate.len() != output_size {
-        return Err(RewriteError::invalid(InvalidReason::Verification));
-    }
-
-    budget.source_phase = false;
-    let mut candidate_state =
-        AdditionSaveTokenScanState::new(batch.additions, batch.save_tokens, &mut budget)?;
-    scan_addition_save_token_metadata(
-        &candidate,
-        batch,
-        ScanMode::Verification,
-        &mut candidate_state,
-        Some((new_root, new_token)),
-        &mut budget,
-    )?;
-    candidate_state.additions.validate_verification()?;
-    candidate_state.save_tokens.validate_candidate(new_token)?;
-    if candidate_state.save_tokens.last != Some(new_root) {
-        return Err(RewriteError::invalid(InvalidReason::Verification));
-    }
-    budget.pad_repeated_counters(
+        budget,
+        prepare_report,
+        requirements,
+        output_size,
         planned_fields,
         planned_work,
         planned_components,
         planned_references,
-    )?;
-    budget.output_bytes = candidate.len();
-    budget.retained_bytes = candidate.len();
-    Ok(RewriteOutput {
-        bytes: candidate,
-        report: budget.report(),
     })
+}
+
+pub fn rewrite_package_metadata_additions_and_save_tokens(
+    source: &[u8],
+    batch: AdditionSaveTokenBatch<'_>,
+    options: RewriteOptions,
+) -> Result<RewriteOutput, RewriteError> {
+    let prepared = prepare_package_metadata_additions_and_save_tokens(source, batch, options)?;
+    let prepare_report = prepared.prepare_report();
+    let limits = prepared.execution_requirements().exact_limits();
+    let mut output = prepared.execute(limits)?;
+    output.report = add_reports(prepare_report, output.report())?;
+    Ok(output)
 }
 
 /// Atomically remove exact registry ownership records and advance the root
@@ -6333,6 +6630,68 @@ fn scan_state_allocations(batch: Batch<'_>) -> Result<usize, RewriteError> {
         total
             .checked_add(usize::from(amount != 0))
             .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))
+    })
+}
+
+fn save_token_state_scratch_bytes(batch: SaveTokenBatch<'_>) -> Result<usize, RewriteError> {
+    batch
+        .components
+        .len()
+        .checked_mul(size_of::<SaveTokenMatch>())
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))
+}
+
+fn save_token_state_allocations(batch: SaveTokenBatch<'_>) -> usize {
+    usize::from(!batch.components.is_empty())
+}
+
+fn save_token_execution_requirements(
+    batch: SaveTokenBatch<'_>,
+    output_size: usize,
+    predicted: RewriteReport,
+) -> Result<RewriteExecutionRequirements, RewriteError> {
+    let verification_scratch = save_token_state_scratch_bytes(batch)?;
+    let verification_allocations = save_token_state_allocations(batch);
+    Ok(RewriteExecutionRequirements {
+        output_bytes: output_size,
+        fields: predicted.fields,
+        work_bytes: predicted.work_bytes,
+        components: predicted.components_scanned,
+        references: predicted.references_scanned,
+        allocations: verification_allocations
+            .checked_add(1)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+        retained_bytes: output_size,
+        scratch_bytes: output_size
+            .checked_add(verification_scratch)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+    })
+}
+
+fn addition_save_token_execution_requirements(
+    batch: AdditionSaveTokenBatch<'_>,
+    output_size: usize,
+    predicted: RewriteReport,
+) -> Result<RewriteExecutionRequirements, RewriteError> {
+    let verification_scratch = scan_state_scratch_bytes(batch.additions)?
+        .checked_add(save_token_state_scratch_bytes(batch.save_tokens)?)
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    let verification_allocations = scan_state_allocations(batch.additions)?
+        .checked_add(save_token_state_allocations(batch.save_tokens))
+        .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+    Ok(RewriteExecutionRequirements {
+        output_bytes: output_size,
+        fields: predicted.fields,
+        work_bytes: predicted.work_bytes,
+        components: predicted.components_scanned,
+        references: predicted.references_scanned,
+        allocations: verification_allocations
+            .checked_add(1)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
+        retained_bytes: output_size,
+        scratch_bytes: output_size
+            .checked_add(verification_scratch)
+            .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?,
     })
 }
 

@@ -1,4 +1,4 @@
-use snap::raw::{Decoder, Encoder, decompress_len};
+use snap::raw::{Decoder, Encoder, decompress_len, max_compress_len};
 
 use crate::error::{Error, LimitKind, Result};
 
@@ -154,6 +154,63 @@ impl SnappyStream {
     /// Size of independently compressed frames emitted by [`Self::compress`].
     pub const WRITE_CHUNK_SIZE: usize = 64 * 1024;
 
+    /// Return a checked upper bound for [`Self::compress`] output.
+    ///
+    /// The bound includes one four-byte IWA frame header per independently
+    /// compressed write chunk and uses Snappy's conservative raw-block bound
+    /// for each chunk. No input or output buffer is allocated. The returned
+    /// value is guaranteed to be at least the size of every successful
+    /// [`Self::compress`] result for the same input length.
+    pub fn maximum_compressed_len(input_len: usize) -> Result<usize> {
+        if input_len > Self::MAX_DECOMPRESSED_STREAM {
+            return Err(Error::limit(
+                LimitKind::SnappyStreamBytes,
+                input_len,
+                Self::MAX_DECOMPRESSED_STREAM,
+            ));
+        }
+
+        let frame_count = input_len
+            .checked_add(Self::WRITE_CHUNK_SIZE - 1)
+            .map_or(0, |length| length / Self::WRITE_CHUNK_SIZE);
+        if frame_count > Self::MAX_FRAMES {
+            return Err(Error::limit(
+                LimitKind::SnappyFrames,
+                frame_count,
+                Self::MAX_FRAMES,
+            ));
+        }
+
+        let mut remaining = input_len;
+        let mut maximum = 0usize;
+        while remaining != 0 {
+            let chunk_length = remaining.min(Self::WRITE_CHUNK_SIZE);
+            let compressed_length = max_compress_len(chunk_length);
+            if compressed_length == 0 || compressed_length > Self::MAX_COMPRESSED_CHUNK {
+                return Err(Error::limit(
+                    LimitKind::SnappyCompressedChunkBytes,
+                    compressed_length,
+                    Self::MAX_COMPRESSED_CHUNK,
+                ));
+            }
+            let frame_length = FRAME_HEADER_BYTES
+                .checked_add(compressed_length)
+                .ok_or_else(|| Error::snappy("Snappy maximum frame length overflow"))?;
+            maximum = maximum
+                .checked_add(frame_length)
+                .ok_or_else(|| Error::snappy("Snappy maximum stream length overflow"))?;
+            if maximum > Self::MAX_COMPRESSED_STREAM {
+                return Err(Error::limit(
+                    LimitKind::SnappyCompressedStreamBytes,
+                    maximum,
+                    Self::MAX_COMPRESSED_STREAM,
+                ));
+            }
+            remaining -= chunk_length;
+        }
+        Ok(maximum)
+    }
+
     /// Decode one complete Apple IWA Snappy stream.
     ///
     /// # Errors
@@ -304,7 +361,13 @@ impl SnappyStream {
             ));
         }
 
+        let maximum_output = Self::maximum_compressed_len(data.len())?;
         let mut output = Vec::new();
+        output
+            .try_reserve_exact(maximum_output)
+            .map_err(|_allocation_error| {
+                Error::allocation("compressed Snappy stream", maximum_output)
+            })?;
         let mut encoder = Encoder::new();
         for chunk in data.chunks(Self::WRITE_CHUNK_SIZE) {
             let compressed = encoder
@@ -366,6 +429,94 @@ impl SnappyStream {
 impl AsRef<[u8]> for SnappyStream {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use snap::raw::max_compress_len;
+
+    use super::{FRAME_HEADER_BYTES, SnappyStream};
+    use crate::{Error, LimitKind};
+
+    #[test]
+    fn maximum_compressed_len_bounds_every_emitted_stream() -> crate::Result<()> {
+        for length in [
+            0,
+            1,
+            15,
+            16,
+            SnappyStream::WRITE_CHUNK_SIZE - 1,
+            SnappyStream::WRITE_CHUNK_SIZE,
+            SnappyStream::WRITE_CHUNK_SIZE + 1,
+            SnappyStream::WRITE_CHUNK_SIZE * 2 + 17,
+        ] {
+            let input = (0..length)
+                .map(|index| (index as u8).wrapping_mul(31))
+                .collect::<Vec<_>>();
+            let maximum = SnappyStream::maximum_compressed_len(length)?;
+            let compressed = SnappyStream::compress(&input)?;
+            assert!(
+                compressed.len() <= maximum,
+                "compressed {} bytes to {}, bound was {}",
+                input.len(),
+                compressed.len(),
+                maximum
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn maximum_compressed_len_matches_checked_chunk_boundaries() -> crate::Result<()> {
+        for length in [
+            0,
+            1,
+            SnappyStream::WRITE_CHUNK_SIZE - 1,
+            SnappyStream::WRITE_CHUNK_SIZE,
+            SnappyStream::WRITE_CHUNK_SIZE + 1,
+        ] {
+            let mut expected = 0usize;
+            let mut remaining = length;
+            while remaining != 0 {
+                let chunk = remaining.min(SnappyStream::WRITE_CHUNK_SIZE);
+                expected = expected
+                    .checked_add(FRAME_HEADER_BYTES + max_compress_len(chunk))
+                    .ok_or_else(|| Error::snappy("test bound overflow"))?;
+                remaining -= chunk;
+            }
+            assert_eq!(SnappyStream::maximum_compressed_len(length)?, expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn maximum_compressed_len_enforces_hard_input_and_output_ceilings() {
+        let maximum = SnappyStream::maximum_compressed_len(SnappyStream::MAX_DECOMPRESSED_STREAM)
+            .expect("hard maximum should have a finite framed bound");
+        assert!(maximum <= SnappyStream::MAX_COMPRESSED_STREAM);
+
+        let error = SnappyStream::maximum_compressed_len(SnappyStream::MAX_DECOMPRESSED_STREAM + 1)
+            .expect_err("input above the hard stream ceiling must fail");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::SnappyStreamBytes,
+                observed,
+                maximum: SnappyStream::MAX_DECOMPRESSED_STREAM,
+            } if observed == SnappyStream::MAX_DECOMPRESSED_STREAM + 1
+        ));
+
+        let error = SnappyStream::maximum_compressed_len(usize::MAX)
+            .expect_err("usize overflow input must fail closed");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::SnappyStreamBytes,
+                observed: usize::MAX,
+                maximum: SnappyStream::MAX_DECOMPRESSED_STREAM,
+            }
+        ));
     }
 }
 

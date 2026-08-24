@@ -8,6 +8,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io::{self, Write};
+use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -137,8 +138,9 @@ impl PartialEq for SharedBytes {
 impl Eq for SharedBytes {}
 
 #[derive(Debug)]
-struct PreparedEdit {
-    compressed: Vec<u8>,
+struct PreparedEdit<'a> {
+    data: &'a [u8],
+    compressed_size: usize,
     crc32: u32,
     uncompressed_size: u64,
     descriptor_start: Option<usize>,
@@ -157,44 +159,405 @@ struct MatchedEdit<'a> {
 }
 
 #[derive(Debug)]
-struct BoundedBuffer {
-    bytes: Vec<u8>,
+struct CountingBuffer {
+    written: usize,
     maximum: usize,
 }
 
-impl BoundedBuffer {
+impl CountingBuffer {
     const fn new(maximum: usize) -> Self {
         Self {
-            bytes: Vec::new(),
+            written: 0,
             maximum,
         }
     }
 
-    fn into_inner(self) -> Vec<u8> {
-        self.bytes
+    const fn written(&self) -> usize {
+        self.written
     }
 }
 
-impl Write for BoundedBuffer {
+impl Write for CountingBuffer {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let new_len = self
-            .bytes
-            .len()
+            .written
             .checked_add(bytes.len())
             .ok_or_else(|| io::Error::other("bounded ZIP buffer length overflows usize"))?;
         if new_len > self.maximum {
             return Err(io::Error::other("bounded ZIP output limit exceeded"));
         }
-        self.bytes
-            .try_reserve(bytes.len())
-            .map_err(|error| io::Error::other(format!("could not allocate ZIP output: {error}")))?;
-        self.bytes.extend_from_slice(bytes);
+        self.written = new_len;
         Ok(bytes.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+}
+
+struct OutputBuffer<'a> {
+    output: &'a mut Vec<u8>,
+    written: usize,
+    maximum: usize,
+}
+
+impl<'a> OutputBuffer<'a> {
+    const fn new(output: &'a mut Vec<u8>, maximum: usize) -> Self {
+        Self {
+            output,
+            written: 0,
+            maximum,
+        }
+    }
+
+    const fn written(&self) -> usize {
+        self.written
+    }
+}
+
+impl Write for OutputBuffer<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let new_len = self
+            .written
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::other("bounded ZIP output length overflows usize"))?;
+        if new_len > self.maximum {
+            return Err(io::Error::other(
+                "edited ZIP member exceeded its measured compressed size",
+            ));
+        }
+        let capacity_end = self
+            .output
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| io::Error::other("ZIP output capacity overflows usize"))?;
+        if capacity_end > self.output.capacity() {
+            return Err(io::Error::other(
+                "prepared ZIP output capacity is smaller than its measured size",
+            ));
+        }
+        self.output.extend_from_slice(bytes);
+        self.written = new_len;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Explicit ceilings for the allocation-bearing phase of one prepared ZIP
+/// reassembly.
+///
+/// [`Limits`] continues to govern source parsing, mutation validation, member
+/// compression, and the exact output-size preflight. These ceilings are
+/// intentionally separate: a caller can account the final output and offset
+/// workspace together with allocations owned by its larger transaction before
+/// allowing [`PreparedReassembly::execute`] to reserve anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReassemblyExecutionLimits {
+    /// Maximum final ZIP bytes that may be retained by execution.
+    pub max_output_bytes: usize,
+    /// Maximum number of physical-entry local-offset slots.
+    pub max_offset_count: usize,
+    /// Maximum scratch bytes, including local-offset storage.
+    pub max_scratch_bytes: usize,
+    /// Maximum bytes retained by the final candidate.
+    pub max_retained_bytes: usize,
+    /// Maximum final Vec allocation events (output plus offset workspace).
+    pub max_allocations: usize,
+}
+
+impl ReassemblyExecutionLimits {
+    /// Build explicit ceilings for the allocation-bearing execution phase.
+    #[must_use]
+    pub const fn new(
+        max_output_bytes: usize,
+        max_offset_count: usize,
+        max_scratch_bytes: usize,
+        max_retained_bytes: usize,
+        max_allocations: usize,
+    ) -> Self {
+        Self {
+            max_output_bytes,
+            max_offset_count,
+            max_scratch_bytes,
+            max_retained_bytes,
+            max_allocations,
+        }
+    }
+}
+
+/// Exact requirements reported by an output-free reassembly preflight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReassemblyExecutionRequirements {
+    output_bytes: usize,
+    offset_count: usize,
+    scratch_bytes: usize,
+    retained_bytes: usize,
+    allocations: usize,
+}
+
+impl ReassemblyExecutionRequirements {
+    /// Exact final ZIP bytes written by execution.
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    /// Exact number of physical-entry local-offset slots required.
+    #[must_use]
+    pub const fn offset_count(self) -> usize {
+        self.offset_count
+    }
+
+    /// Exact offset workspace bytes required by execution.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
+    /// Bytes retained by the final candidate output.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Final allocation events (one output Vec, plus offsets for a rebuild).
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Return inclusive ceilings that exactly admit this prepared plan.
+    #[must_use]
+    pub const fn exact_limits(self) -> ReassemblyExecutionLimits {
+        ReassemblyExecutionLimits::new(
+            self.output_bytes,
+            self.offset_count,
+            self.scratch_bytes,
+            self.retained_bytes,
+            self.allocations,
+        )
+    }
+}
+
+/// Output-free, source-authoritative ZIP reassembly plan.
+///
+/// The plan borrows the catalog source and edited payloads. Preparation parses
+/// and validates the physical ZIP, measures each replacement (including exact
+/// DEFLATE output) through a counting sink, and computes the complete output
+/// size without allocating a compressed replacement or final output buffer.
+/// Execute consumes the plan, reserves only the reported final workspaces, and
+/// compresses edited members directly into the final output.
+pub struct PreparedReassembly<'source> {
+    source: &'source [u8],
+    archive: Option<ZipArchive<'source>>,
+    shape: Option<ReassemblyShape>,
+    prepared: HashMap<usize, PreparedEdit<'source>>,
+    deleted: HashSet<usize>,
+    output_size: usize,
+    requirements: ReassemblyExecutionRequirements,
+}
+
+impl PreparedReassembly<'_> {
+    /// Return the exact output and allocation requirements for execution.
+    #[must_use]
+    pub const fn execution_requirements(&self) -> ReassemblyExecutionRequirements {
+        self.requirements
+    }
+
+    /// Return the exact output byte count computed before final allocation.
+    #[must_use]
+    pub const fn output_bytes(&self) -> usize {
+        self.output_size
+    }
+
+    /// Execute the prepared plan under explicit allocation ceilings.
+    pub fn execute(self, limits: ReassemblyExecutionLimits) -> Result<Vec<u8>> {
+        check_reassembly_execution_limits(self.requirements, limits)?;
+        let Some(archive) = self.archive else {
+            let mut output = Vec::new();
+            output
+                .try_reserve_exact(self.output_size)
+                .map_err(|_error| Error::Allocation {
+                    resource: "reassembly output",
+                    amount: self.output_size,
+                })?;
+            output.extend_from_slice(self.source);
+            if output.len() != self.output_size {
+                return Err(Error::Reassembly(
+                    "prepared no-op output size changed during execution".to_owned(),
+                ));
+            }
+            return Ok(output);
+        };
+        let shape = self.shape.ok_or_else(|| {
+            Error::Reassembly("prepared rebuild is missing its ZIP shape".to_owned())
+        })?;
+
+        let physical_count = archive.physical_entries().count();
+        let mut local_offsets = Vec::new();
+        local_offsets
+            .try_reserve_exact(physical_count)
+            .map_err(|_error| Error::Allocation {
+                resource: "reassembled ZIP local offsets",
+                amount: physical_count,
+            })?;
+
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(self.output_size)
+            .map_err(|_error| Error::Allocation {
+                resource: "reassembled ZIP output",
+                amount: self.output_size,
+            })?;
+
+        let prelude_end = archive
+            .physical_entries()
+            .next()
+            .map_or(archive.directory_offset(), |entry| {
+                entry.local_record().start
+            });
+        output.extend_from_slice(&self.source[..prelude_end]);
+
+        for (index, physical) in archive.physical_entries().enumerate() {
+            if self.deleted.contains(&index) {
+                local_offsets.push(None);
+                continue;
+            }
+            let local_offset = u64::try_from(output.len()).map_err(|_error| {
+                Error::InvalidBundle("reassembled local offset does not fit u64".to_owned())
+            })?;
+            local_offsets.push(Some(local_offset));
+            if let Some(edit) = self.prepared.get(&index) {
+                append_edited_local(&mut output, self.source, physical, edit)?;
+            } else {
+                output.extend_from_slice(&self.source[physical.local_record()]);
+            }
+        }
+
+        let new_directory_offset = u64::try_from(output.len()).map_err(|_error| {
+            Error::InvalidBundle("reassembled central directory offset does not fit u64".to_owned())
+        })?;
+        for physical_index in archive.physical_indices_in_central_order() {
+            if self.deleted.contains(&physical_index) {
+                continue;
+            }
+            let physical = archive.physical_entry(physical_index).ok_or_else(|| {
+                Error::Reassembly("central order references a missing ZIP entry".to_owned())
+            })?;
+            let local_offset = local_offsets
+                .get(physical_index)
+                .copied()
+                .flatten()
+                .ok_or_else(|| {
+                    Error::Reassembly(
+                        "retained central record has no reassembled local offset".to_owned(),
+                    )
+                })?;
+            let start = output.len();
+            output.extend_from_slice(&self.source[physical.central_record()]);
+            patch_central_record(
+                &mut output[start..],
+                local_offset,
+                self.prepared.get(&physical_index),
+                shape.base_offset,
+            )?;
+        }
+        let new_directory_size = output
+            .len()
+            .checked_sub(usize::try_from(new_directory_offset).map_err(|_error| {
+                Error::Reassembly("reassembled central offset does not fit usize".to_owned())
+            })?)
+            .ok_or_else(|| {
+                Error::Reassembly("reassembled central directory range is invalid".to_owned())
+            })?;
+        let retained_count = physical_count
+            .checked_sub(self.deleted.len())
+            .ok_or_else(|| {
+                Error::Reassembly("deleted ZIP entry count exceeds physical entry count".to_owned())
+            })?;
+        let tail_start = output.len();
+        output.extend_from_slice(&self.source[archive.eocd_offset()..]);
+        patch_end_of_central_directory(
+            &mut output[tail_start..],
+            new_directory_offset,
+            shape.base_offset,
+            new_directory_size,
+            retained_count,
+        )?;
+        if output.len() != self.output_size {
+            return Err(Error::Reassembly(format!(
+                "reassembled ZIP size changed during publication (planned {}, wrote {})",
+                self.output_size,
+                output.len()
+            )));
+        }
+        Ok(output)
+    }
+}
+
+fn reassembly_execution_requirements(
+    output_size: usize,
+    offset_count: usize,
+    noop: bool,
+) -> Result<ReassemblyExecutionRequirements> {
+    let offset_bytes = if noop {
+        0
+    } else {
+        offset_count
+            .checked_mul(size_of::<Option<u64>>())
+            .ok_or(Error::Allocation {
+                resource: "reassembled ZIP local offsets",
+                amount: offset_count,
+            })?
+    };
+    Ok(ReassemblyExecutionRequirements {
+        output_bytes: output_size,
+        offset_count,
+        scratch_bytes: offset_bytes,
+        retained_bytes: output_size,
+        allocations: if noop { 1 } else { 2 },
+    })
+}
+
+fn check_reassembly_execution_limits(
+    requirements: ReassemblyExecutionRequirements,
+    limits: ReassemblyExecutionLimits,
+) -> Result<()> {
+    if requirements.output_bytes > limits.max_output_bytes {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::OutputBytes,
+            observed: requirements.output_bytes as u64,
+            maximum: limits.max_output_bytes as u64,
+        });
+    }
+    if requirements.offset_count > limits.max_offset_count {
+        return Err(Error::Allocation {
+            resource: "reassembled ZIP local offsets",
+            amount: requirements.offset_count,
+        });
+    }
+    if requirements.scratch_bytes > limits.max_scratch_bytes {
+        return Err(Error::Allocation {
+            resource: "reassembled ZIP scratch bytes",
+            amount: requirements.scratch_bytes,
+        });
+    }
+    if requirements.retained_bytes > limits.max_retained_bytes {
+        return Err(Error::Allocation {
+            resource: "reassembled ZIP retained output",
+            amount: requirements.retained_bytes,
+        });
+    }
+    if requirements.allocations > limits.max_allocations {
+        return Err(Error::Allocation {
+            resource: "reassembled ZIP allocation events",
+            amount: requirements.allocations,
+        });
+    }
+    Ok(())
 }
 
 /// A raw ZIP entry record retained for an exact preserve-mode write.
@@ -1552,6 +1915,17 @@ impl Catalog {
         ))
     }
 
+    /// Prepare a replacement-only transaction without allocating its final
+    /// ZIP output. This is the convenience form of
+    /// [`Self::prepare_reassembly_with_deletions`].
+    pub fn prepare_reassembly<'source>(
+        &'source self,
+        edits: &'source [EntryEdit<'source>],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
+        self.prepare_reassembly_with_deletions(edits, &[], limits)
+    }
+
     /// Reassemble a flat package after replacing and deleting existing
     /// normalized members.
     ///
@@ -1583,6 +1957,30 @@ impl Catalog {
         deleted_names: &[&str],
         limits: Limits,
     ) -> Result<Vec<u8>> {
+        let prepared = self.prepare_reassembly_with_deletions(edits, deleted_names, limits)?;
+        let execution_limits = prepared.execution_requirements().exact_limits();
+        prepared.execute(execution_limits)
+    }
+
+    /// Prepare a replacement/deletion transaction without allocating the
+    /// final ZIP or any compressed replacement buffers.
+    ///
+    /// The returned plan borrows this catalog and the caller's edit payloads.
+    /// It performs the same exact selection, physical-layout, total-size, and
+    /// replacement-compression validation as the one-shot reassembler. Deflate
+    /// is measured through a counting sink, so the plan can report the exact
+    /// final ZIP size before execution reserves its output buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same validation and physical-limit errors as
+    /// [`Self::reassemble_with_deletions_to_bytes`].
+    pub fn prepare_reassembly_with_deletions<'source>(
+        &'source self,
+        edits: &'source [EntryEdit<'source>],
+        deleted_names: &'source [&'source str],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
         let checked_limits = limits.validate()?;
         let source_size = u64::try_from(self.source.len()).map_err(|_error| {
             Error::InvalidBundle("catalog source length does not fit u64".to_owned())
@@ -1592,7 +1990,15 @@ impl Catalog {
         if edits.is_empty() && deleted_names.is_empty() {
             self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
-            return self.to_bytes();
+            return Ok(PreparedReassembly {
+                source: self.source.as_ref(),
+                archive: None,
+                shape: None,
+                prepared: HashMap::new(),
+                deleted: HashSet::new(),
+                output_size: self.source.len(),
+                requirements: reassembly_execution_requirements(self.source.len(), 0, true)?,
+            });
         }
 
         if deleted_names.is_empty()
@@ -1601,7 +2007,15 @@ impl Catalog {
         {
             self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
-            return self.to_bytes();
+            return Ok(PreparedReassembly {
+                source: self.source.as_ref(),
+                archive: None,
+                shape: None,
+                prepared: HashMap::new(),
+                deleted: HashSet::new(),
+                output_size: self.source.len(),
+                requirements: reassembly_execution_requirements(self.source.len(), 0, true)?,
+            });
         }
         if !self.source_is_exact {
             let reason = if self.semantic_profile.is_some() {
@@ -1621,105 +2035,16 @@ impl Catalog {
         let output_len = usize::try_from(output_size).map_err(|_error| {
             Error::InvalidBundle("reassembled ZIP length does not fit usize".to_owned())
         })?;
-
         let physical_count = archive.physical_entries().count();
-        let mut local_offsets = Vec::new();
-        local_offsets
-            .try_reserve_exact(physical_count)
-            .map_err(|_error| Error::Allocation {
-                resource: "reassembled ZIP local offsets",
-                amount: physical_count,
-            })?;
-
-        let mut output = Vec::new();
-        output
-            .try_reserve_exact(output_len)
-            .map_err(|_error| Error::Allocation {
-                resource: "reassembled ZIP output",
-                amount: output_len,
-            })?;
-
-        let prelude_end = archive
-            .physical_entries()
-            .next()
-            .map_or(archive.directory_offset(), |entry| {
-                entry.local_record().start
-            });
-        output.extend_from_slice(&self.source[..prelude_end]);
-
-        for (index, physical) in archive.physical_entries().enumerate() {
-            if deleted.contains(&index) {
-                local_offsets.push(None);
-                continue;
-            }
-            let local_offset = u64::try_from(output.len()).map_err(|_error| {
-                Error::InvalidBundle("reassembled local offset does not fit u64".to_owned())
-            })?;
-            local_offsets.push(Some(local_offset));
-            if let Some(edit) = prepared.get(&index) {
-                append_edited_local(&mut output, self.source.as_ref(), physical, edit)?;
-            } else {
-                output.extend_from_slice(&self.source[physical.local_record()]);
-            }
-        }
-
-        let new_directory_offset = u64::try_from(output.len()).map_err(|_error| {
-            Error::InvalidBundle("reassembled central directory offset does not fit u64".to_owned())
-        })?;
-        for physical_index in archive.physical_indices_in_central_order() {
-            if deleted.contains(&physical_index) {
-                continue;
-            }
-            let physical = archive.physical_entry(physical_index).ok_or_else(|| {
-                Error::Reassembly("central order references a missing ZIP entry".to_owned())
-            })?;
-            let local_offset = local_offsets
-                .get(physical_index)
-                .copied()
-                .flatten()
-                .ok_or_else(|| {
-                    Error::Reassembly(
-                        "retained central record has no reassembled local offset".to_owned(),
-                    )
-                })?;
-            let start = output.len();
-            output.extend_from_slice(&self.source[physical.central_record()]);
-            patch_central_record(
-                &mut output[start..],
-                local_offset,
-                prepared.get(&physical_index),
-                shape.base_offset,
-            )?;
-        }
-        let new_directory_size = output
-            .len()
-            .checked_sub(usize::try_from(new_directory_offset).map_err(|_error| {
-                Error::Reassembly("reassembled central offset does not fit usize".to_owned())
-            })?)
-            .ok_or_else(|| {
-                Error::Reassembly("reassembled central directory range is invalid".to_owned())
-            })?;
-        let retained_count = physical_count.checked_sub(deleted.len()).ok_or_else(|| {
-            Error::Reassembly("deleted ZIP entry count exceeds physical entry count".to_owned())
-        })?;
-
-        let tail_start = output.len();
-        output.extend_from_slice(&self.source[archive.eocd_offset()..]);
-        patch_end_of_central_directory(
-            &mut output[tail_start..],
-            new_directory_offset,
-            shape.base_offset,
-            new_directory_size,
-            retained_count,
-        )?;
-
-        if output.len() != output_len {
-            return Err(Error::Reassembly(format!(
-                "reassembled ZIP size changed during publication (planned {output_len}, wrote {})",
-                output.len()
-            )));
-        }
-        Ok(output)
+        Ok(PreparedReassembly {
+            source: self.source.as_ref(),
+            archive: Some(archive),
+            shape: Some(shape),
+            prepared,
+            deleted,
+            output_size: output_len,
+            requirements: reassembly_execution_requirements(output_len, physical_count, false)?,
+        })
     }
 
     fn check_source_total(&self, limits: Limits) -> Result<()> {
@@ -1764,6 +2089,49 @@ impl Catalog {
         let bytes = self.reassemble_to_bytes(edits, limits)?;
         sink.write_all(&bytes)?;
         Ok(())
+    }
+}
+
+impl crate::SourceCatalog {
+    /// Reassemble this source snapshot after replacing existing members.
+    pub fn reassemble_to_bytes(&self, edits: &[EntryEdit<'_>], limits: Limits) -> Result<Vec<u8>> {
+        self.package().reassemble_to_bytes(edits, limits)
+    }
+
+    /// Reassemble this source snapshot after replacing and deleting members.
+    pub fn reassemble_with_deletions_to_bytes(
+        &self,
+        edits: &[EntryEdit<'_>],
+        deleted_names: &[&str],
+        limits: Limits,
+    ) -> Result<Vec<u8>> {
+        self.package()
+            .reassemble_with_deletions_to_bytes(edits, deleted_names, limits)
+    }
+
+    /// Prepare a replacement-only transaction against this source snapshot.
+    ///
+    /// The plan borrows the snapshot and edited payloads; use
+    /// [`PreparedReassembly::execution_requirements`] to precharge the final
+    /// ZIP allocation before calling [`PreparedReassembly::execute`].
+    pub fn prepare_reassembly<'source>(
+        &'source self,
+        edits: &'source [EntryEdit<'source>],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
+        self.package().prepare_reassembly(edits, limits)
+    }
+
+    /// Prepare a replacement/deletion transaction against this source
+    /// snapshot.
+    pub fn prepare_reassembly_with_deletions<'source>(
+        &'source self,
+        edits: &'source [EntryEdit<'source>],
+        deleted_names: &'source [&'source str],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
+        self.package()
+            .prepare_reassembly_with_deletions(edits, deleted_names, limits)
     }
 }
 
@@ -2132,12 +2500,12 @@ fn identical_edits_are_noop(
     Ok(identical)
 }
 
-fn prepare_mutations(
+fn prepare_mutations<'data>(
     archive: &ZipArchive<'_>,
-    edits: &[EntryEdit<'_>],
+    edits: &[EntryEdit<'data>],
     deleted_names: &[&str],
     limits: Limits,
-) -> Result<(HashMap<usize, PreparedEdit>, HashSet<usize>)> {
+) -> Result<(HashMap<usize, PreparedEdit<'data>>, HashSet<usize>)> {
     let mut requested_edits = HashMap::new();
     requested_edits
         .try_reserve(edits.len())
@@ -2309,12 +2677,9 @@ fn prepare_mutations(
             Error::Reassembly("matched edit references a missing ZIP entry".to_owned())
         })?;
         let data = matched_edit.edit.data();
-        let compressed =
-            encode_replacement(physical.central_header().compression_method, data, limits)?;
-        let compressed_size = u64::try_from(compressed.len()).map_err(|_error| {
-            Error::InvalidBundle("edited compressed member length does not fit u64".to_owned())
-        })?;
-        if compressed_size > u64::from(u32::MAX) {
+        let (compressed_size, crc32) =
+            measure_replacement(physical.central_header().compression_method, data, limits)?;
+        if compressed_size > u32::MAX as usize {
             return Err(Error::Reassembly(format!(
                 "edited member is too large for non-ZIP64 reassembly: {}",
                 physical.name()
@@ -2323,8 +2688,9 @@ fn prepare_mutations(
         prepared.insert(
             matched_edit.index,
             PreparedEdit {
-                compressed,
-                crc32: soapberry_zip::crc32(data),
+                data,
+                compressed_size,
+                crc32,
                 uncompressed_size: u64::try_from(data.len()).map_err(|_error| {
                     Error::InvalidBundle("edited member length does not fit u64".to_owned())
                 })?,
@@ -2371,27 +2737,19 @@ fn descriptor_start(physical: &PhysicalEntry, suffix: &[u8]) -> Result<Option<us
     Ok(Some(start))
 }
 
-fn encode_replacement(method: u16, data: &[u8], limits: Limits) -> Result<Vec<u8>> {
+fn measure_replacement(method: u16, data: &[u8], limits: Limits) -> Result<(usize, u32)> {
+    let crc32 = soapberry_zip::crc32(data);
     match method {
-        0 => {
-            let mut compressed = Vec::new();
-            compressed
-                .try_reserve_exact(data.len())
-                .map_err(|_error| Error::Allocation {
-                    resource: "edited stored member",
-                    amount: data.len(),
-                })?;
-            compressed.extend_from_slice(data);
-            Ok(compressed)
-        },
+        0 => Ok((data.len(), crc32)),
         8 => {
             let max = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
                 Error::InvalidBundle("reassembly output limit does not fit usize".to_owned())
             })?;
-            let bounded = BoundedBuffer::new(max);
+            let bounded = CountingBuffer::new(max);
             let mut encoder = DeflateEncoder::new(bounded, Compression::default());
             encoder.write_all(data)?;
-            Ok(encoder.finish()?.into_inner())
+            let bounded = encoder.finish()?;
+            Ok((bounded.written(), crc32))
         },
         other => Err(Error::Reassembly(format!(
             "compression method {other} cannot be edited"
@@ -2401,7 +2759,7 @@ fn encode_replacement(method: u16, data: &[u8], limits: Limits) -> Result<Vec<u8
 
 fn reassembled_output_size(
     archive: &ZipArchive<'_>,
-    prepared: &HashMap<usize, PreparedEdit>,
+    prepared: &HashMap<usize, PreparedEdit<'_>>,
     deleted: &HashSet<usize>,
 ) -> Result<u64> {
     let source = archive.source();
@@ -2429,7 +2787,7 @@ fn reassembled_output_size(
                 .checked_sub(physical.compressed_data_range().end)
                 .ok_or_else(|| Error::Reassembly("ZIP descriptor range is invalid".to_owned()))?;
             header_len
-                .checked_add(edit.compressed.len())
+                .checked_add(edit.compressed_size)
                 .and_then(|value| value.checked_add(suffix_len))
                 .ok_or_else(|| {
                     Error::Reassembly("reassembled local record overflows usize".to_owned())
@@ -2474,7 +2832,7 @@ fn append_edited_local(
     output: &mut Vec<u8>,
     source: &[u8],
     physical: &PhysicalEntry,
-    edit: &PreparedEdit,
+    edit: &PreparedEdit<'_>,
 ) -> Result<()> {
     let local = physical.local_record();
     let compressed = physical.compressed_data_range();
@@ -2489,7 +2847,7 @@ fn append_edited_local(
         patch_u32_at(
             output,
             header_start + 18,
-            u32::try_from(edit.compressed.len()).map_err(|_error| {
+            u32::try_from(edit.compressed_size).map_err(|_error| {
                 Error::Reassembly("edited compressed size does not fit u32".to_owned())
             })?,
             "local compressed size",
@@ -2503,7 +2861,32 @@ fn append_edited_local(
             "local uncompressed size",
         )?;
     }
-    output.extend_from_slice(&edit.compressed);
+    let compressed_start = output.len();
+    match physical.central_header().compression_method {
+        0 => output.extend_from_slice(edit.data),
+        8 => {
+            let bounded = OutputBuffer::new(output, edit.compressed_size);
+            let mut encoder = DeflateEncoder::new(bounded, Compression::default());
+            encoder.write_all(edit.data)?;
+            let bounded = encoder.finish()?;
+            if bounded.written() != edit.compressed_size {
+                return Err(Error::Reassembly(
+                    "edited member compression size changed between preflight and execution"
+                        .to_owned(),
+                ));
+            }
+        },
+        method => {
+            return Err(Error::Reassembly(format!(
+                "compression method {method} cannot be edited"
+            )));
+        },
+    }
+    if output.len() - compressed_start != edit.compressed_size {
+        return Err(Error::Reassembly(
+            "edited member output size changed during execution".to_owned(),
+        ));
+    }
     let suffix_start = output.len();
     output.extend_from_slice(&source[compressed.end..local.end]);
     if let Some(descriptor_start) = edit.descriptor_start {
@@ -2514,7 +2897,7 @@ fn append_edited_local(
         patch_u32_at(
             output,
             descriptor + 4,
-            u32::try_from(edit.compressed.len()).map_err(|_error| {
+            u32::try_from(edit.compressed_size).map_err(|_error| {
                 Error::Reassembly("edited descriptor compressed size does not fit u32".to_owned())
             })?,
             "descriptor compressed size",
@@ -2529,7 +2912,7 @@ fn append_edited_local(
         )?;
     }
     debug_assert_eq!(
-        header_len + edit.compressed.len() + (local.end - compressed.end),
+        header_len + edit.compressed_size + (local.end - compressed.end),
         output.len() - header_start
     );
     Ok(())
@@ -2538,7 +2921,7 @@ fn append_edited_local(
 fn patch_central_record(
     record: &mut [u8],
     local_offset: u64,
-    prepared_edit: Option<&PreparedEdit>,
+    prepared_edit: Option<&PreparedEdit<'_>>,
     base_offset: u64,
 ) -> Result<()> {
     let relative_offset = local_offset.checked_sub(base_offset).ok_or_else(|| {
@@ -2557,7 +2940,7 @@ fn patch_central_record(
         patch_u32_at(
             record,
             20,
-            u32::try_from(edit.compressed.len()).map_err(|_error| {
+            u32::try_from(edit.compressed_size).map_err(|_error| {
                 Error::Reassembly("central compressed size does not fit u32".to_owned())
             })?,
             "central compressed size",
@@ -5200,6 +5583,77 @@ mod tests {
             })
         ));
         assert_eq!(limited_sink, [0xde, 0xad, 0xbe, 0xef]);
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_reassembly_reports_exact_final_workspace_and_executes() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let edits = [EntryEdit::new("Untouched/a", b"replacement payload")];
+        let prepared = catalog.prepare_reassembly(&edits, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+
+        assert_eq!(requirements.output_bytes(), prepared.output_bytes());
+        assert_eq!(requirements.offset_count(), 2);
+        assert_eq!(
+            requirements.scratch_bytes(),
+            requirements.offset_count() * size_of::<Option<u64>>()
+        );
+        assert_eq!(requirements.retained_bytes(), requirements.output_bytes());
+        assert_eq!(requirements.allocations(), 2);
+
+        let output = prepared.execute(requirements.exact_limits())?;
+        assert_eq!(
+            output,
+            catalog.reassemble_to_bytes(&edits, Limits::default())?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_reassembly_rejects_allocation_ceiling_before_execution() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let edits = [EntryEdit::new("Untouched/a", b"replacement payload")];
+        let prepared = catalog.prepare_reassembly(&edits, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+
+        let mut limits = requirements.exact_limits();
+        limits.max_output_bytes = requirements.output_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::OutputBytes,
+                ..
+            })
+        ));
+
+        let prepared = catalog.prepare_reassembly(&edits, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+        let mut limits = requirements.exact_limits();
+        limits.max_offset_count = requirements.offset_count() - 1;
+        assert!(matches!(
+            prepared.execute(limits),
+            Err(Error::Allocation {
+                resource: "reassembled ZIP local offsets",
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_noop_reassembly_retains_exact_source_and_needs_no_offsets() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let prepared = catalog.prepare_reassembly(&[], Limits::default())?;
+        let requirements = prepared.execution_requirements();
+        assert_eq!(requirements.output_bytes(), bytes.len());
+        assert_eq!(requirements.offset_count(), 0);
+        assert_eq!(requirements.scratch_bytes(), 0);
+        assert_eq!(requirements.allocations(), 1);
+        assert_eq!(prepared.execute(requirements.exact_limits())?, bytes);
         Ok(())
     }
 
