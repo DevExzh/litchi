@@ -29,7 +29,7 @@ use litchi_iwa_protos::{
         RewriteOptions as MetadataRewriteOptions, SaveTokenBatch,
         inspect_package_metadata_with_visitor, rewrite_package_metadata_save_tokens,
     },
-    tst,
+    table_info_codec, tst,
 };
 use thiserror::Error as ThisError;
 
@@ -1154,6 +1154,9 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
         COMMENT_STORAGE_MESSAGE_TYPE,
         target.path,
     )?;
+    if storage_resolved.messages.len() != 1 {
+        return Err(Error::UnsupportedDependency { path: target.path });
+    }
     let storage_route = MessageRoute {
         component_index: storage_resolved.component_index,
         object_index: storage_resolved.object_index,
@@ -1920,6 +1923,9 @@ fn prepare_metadata_token_entry(
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    archive
+        .validate_canonical_object_framing(stream.as_bytes())
         .map_err(|_| Error::InvalidSource { path })?;
     archive
         .objects
@@ -3480,13 +3486,27 @@ fn census_models_and_cells(
                             options,
                         ) {
                             Ok((model, _report)) => model,
-                            Err(_fallback) if message.type_ == 6_000 => continue,
+                            Err(_fallback) if message.type_ == 6_000 => {
+                                table_info_codec::decode_table_model_reference(
+                                    message.data.as_slice(),
+                                    super::table_info_decode_options(message.data.as_slice()),
+                                )
+                                .map_err(|_| Error::InvalidSource { path })?;
+                                continue;
+                            },
                             Err(fallback) => {
                                 return Err(map_table_codec_error(fallback, path));
                             },
                         }
                     },
-                    Err(_error) if message.type_ == 6_000 => continue,
+                    Err(_error) if message.type_ == 6_000 => {
+                        table_info_codec::decode_table_model_reference(
+                            message.data.as_slice(),
+                            super::table_info_decode_options(message.data.as_slice()),
+                        )
+                        .map_err(|_| Error::InvalidSource { path })?;
+                        continue;
+                    },
                     Err(error) => return Err(map_table_codec_error(error, path)),
                 };
                 let data_options = table_cell_decode_options(

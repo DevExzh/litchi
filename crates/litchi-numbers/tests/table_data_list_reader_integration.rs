@@ -9,7 +9,7 @@
 use std::error::Error as StdError;
 use std::sync::Arc;
 
-use litchi_iwa_archive::Limits as ArchiveLimits;
+use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog, package::EntryEdit};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst, tswp};
@@ -734,6 +734,24 @@ fn synthetic_table_data_list_package_with_message_type(
     )?)
 }
 
+fn rewrite_iwa_member(
+    source: &[u8],
+    name: &str,
+    rewrite: impl FnOnce(Vec<u8>) -> TestResult<Vec<u8>>,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == name)
+        .ok_or_else(|| std::io::Error::other(format!("missing {name}")))?;
+    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
+    let rewritten = SnappyStream::compress(&rewrite(stream)?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(name, &rewritten)],
+        ArchiveLimits::default(),
+    )?)
+}
+
 fn assert_semantics(document: &Document) -> TestResult {
     document.validate()?;
     let sheet = document
@@ -1202,6 +1220,89 @@ fn metadata_backed_root_comment_clear_reopens_and_inverts_exactly() -> TestResul
     let mut restored_bytes = Vec::new();
     restored.package().write_to(&mut restored_bytes)?;
     assert_eq!(restored_bytes, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> TestResult {
+    let source = include_bytes!("fixtures/comment-edit-root.numbers").as_slice();
+    let noncanonical_metadata = rewrite_iwa_member(source, "Index/Metadata.iwa", |mut stream| {
+        let prefix_end = stream
+            .iter()
+            .position(|byte| byte & 0x80 == 0)
+            .ok_or_else(|| std::io::Error::other("metadata object prefix is unterminated"))?;
+        stream[prefix_end] |= 0x80;
+        stream.insert(prefix_end + 1, 0);
+        Ok(stream)
+    })?;
+    let extra_storage_message = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
+        let mut archive = Archive::parse(&stream)?;
+        let storage = archive
+            .objects
+            .iter_mut()
+            .find(|object| object.archive_info.identifier == Some(51))
+            .ok_or_else(|| std::io::Error::other("fixture storage object is missing"))?;
+        storage.push_message(RawMessage {
+            type_: 99_999,
+            data: vec![0x08, 0x01],
+        })?;
+        Ok(archive.to_bytes()?)
+    })?;
+    let opaque_table_candidate = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
+        let mut archive = Archive::parse(&stream)?;
+        archive.objects.push(object(99_998, 6_000, Vec::new())?);
+        Ok(archive.to_bytes()?)
+    })?;
+
+    for (candidate, expected) in [
+        (
+            noncanonical_metadata,
+            TableCellCommentError::InvalidSource {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 1,
+                    column: 1,
+                },
+            },
+        ),
+        (
+            extra_storage_message,
+            TableCellCommentError::UnsupportedDependency {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 1,
+                    column: 1,
+                },
+            },
+        ),
+        (
+            opaque_table_candidate,
+            TableCellCommentError::InvalidSource {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 1,
+                    column: 1,
+                },
+            },
+        ),
+    ] {
+        let package = Package::from_bytes(&candidate)?;
+        let sheet = &package.sheets()[0];
+        let table = sheet
+            .tables()
+            .next()
+            .ok_or_else(|| std::io::Error::other("fixture table is missing"))?;
+        let error = package
+            .clear_table_cell_comment(sheet.name(), table.name(), CellPosition::new(1, 1))
+            .expect_err("lossy clear source must fail closed");
+        assert_eq!(error, expected);
+        let mut retained = Vec::new();
+        package.write_to(&mut retained)?;
+        assert_eq!(retained, candidate);
+    }
     Ok(())
 }
 
