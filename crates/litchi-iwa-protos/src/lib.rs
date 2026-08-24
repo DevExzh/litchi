@@ -1179,6 +1179,16 @@ pub mod numbers_sheet_order_codec;
 #[doc(hidden)]
 pub mod numbers_table_header_settings_codec;
 
+/// Format-neutral strict table-header settings projection and wire rewrite.
+///
+/// `numbers_table_header_settings_codec` remains the compatibility spelling
+/// used by the Numbers package; this alias is the seam for other iWork
+/// adapters and exposes no generated Buffa types.
+#[doc(hidden)]
+pub mod table_header_settings_codec {
+    pub use super::numbers_table_header_settings_codec::*;
+}
+
 /// Internal strict Numbers table-title projection. Generated types remain
 /// private and caller-owned source bytes remain the rewrite authority.
 #[doc(hidden)]
