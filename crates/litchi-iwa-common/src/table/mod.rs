@@ -3,6 +3,8 @@
 pub mod appearance;
 pub mod axis;
 pub mod cell;
+/// Lossless, archive-free table header and footer settings.
+pub mod headers;
 pub mod lock;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
