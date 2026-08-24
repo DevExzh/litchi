@@ -12725,3 +12725,62 @@ made. Pages normalized the package bytes during save; this is bounded
 no-repair open/render/save/close/reopen evidence plus an exact pre-native
 inverse, not Rust/native byte parity, exact post-save preservation, a general
 publication gate, a performance/RSS result, or full-workspace verification.
+
+## 2026-08-24 amendment: Wave64 Keynote chart-caption verification record
+
+The focused owner, selector migration host, integration coverage, and boundary
+ratchets are commit `514b82bdf658d78ea0154f4fc075b1b85488f31c`.
+The exact scoped gates were:
+
+- `cargo test -p litchi-keynote --test slide_chart_caption --quiet`: 7/7
+  passed;
+- `cargo test -p litchi-iwa-protos keynote_chart_caption_codec --lib
+  --quiet`: 10/10 passed;
+- `cargo test -p litchi-iwa --lib
+  keynote::editor::slide_charts::tests::scratch_presentation_supports_native_chart_caption_crud
+  -- --nocapture`: 1/1 passed, with 1,568 tests filtered and existing
+  migration-host deprecation warnings;
+- the focused `slide_chart_title` and `slide_text` integration targets passed;
+- `cargo check -p litchi-keynote --all-targets` passed with the two existing
+  deprecated `Show::slide` test warnings;
+- `cargo clippy -p litchi-keynote --all-targets -- -D warnings -A deprecated`
+  passed;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 409/409 passed;
+  `py_compile`, targeted Rust formatting, and `git diff --check` passed.
+
+Repository-wide commit hooks were explicitly skipped after they reproduced
+unrelated existing formatting differences in
+`crates/litchi-iwa/src/protobuf.rs` and
+`crates/litchi-iwa-protos/src/table_info_codec.rs`, plus the existing Numbers
+two-`object_count` deprecation and `manual_contains` lint findings. The live
+`python3 tools/check_crate_boundaries.py --explain` command exits 1 for exactly
+three findings, all from the user-owned untracked Pages table-lock host source
+and its two legacy methods. It reports no Keynote chart-caption finding. These
+scoped results are not a full-workspace green claim.
+
+The bounded native record used Keynote 14.4 and disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| compatibility-host source `/private/tmp/litchi-wave64-chart-caption-native/host-source.key` | 11,977 | `f977851182891c4fb1b7cb1bbe5051bb9d40f012bdf526f4433ec26a5ef238f1` |
+| focused Rust `/private/tmp/litchi-wave64-chart-caption-native/rust-caption.key` | 11,987 | `9c6abcfe9230be705b8b2cc52111ea25f90b70cb0732d8f1ae3f91b1a16800c8` |
+| exact inverse `/private/tmp/litchi-wave64-chart-caption-native/inverse.key` | 11,977 | `f977851182891c4fb1b7cb1bbe5051bb9d40f012bdf526f4433ec26a5ef238f1` |
+| Keynote-saved `/private/tmp/litchi-wave64-chart-caption-native/keynote-saved-rust-caption.key` | 70,188 | `50485be50bcab09a23d5b22fc2aa3ffe7173b2bdb58f18cd3d81a3197887ac68` |
+
+The source contained one 2D column chart with caption `Native source
+caption`. The focused transaction replaced it with `Rust focused caption —
+北区`, reported two rewritten components and a complete reparse, and produced
+an inverse byte-identical to the source. Keynote opened the Rust candidate
+without repair, rendered the Unicode caption together with the North/South
+April/May chart data, saved a normalized copy, closed it, and reopened that
+exact saved path with the same visible caption.
+
+A separate 507,541-byte Keynote-created two-chart probe
+(`85ff87482f3be9452703595cf7098048188da1ab45e89c8b199514331ef91adb`)
+normalized one chart non-style object outside the selected slide component.
+The focused owner rejected that unsupported graph instead of weakening its
+co-location invariant. The native record is therefore bounded
+open/render/save/close/reopen acceptance for the admitted replacement graph,
+plus an exact pre-native inverse. Keynote normalized the package bytes; this
+is not Rust/native byte parity, a claim about arbitrary caption graphs, a
+performance/RSS measurement, or a full publication/workspace gate.
