@@ -22,7 +22,13 @@ use litchi_iwa_core::{
     Archive, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceVisitor, RawMessage, SnappyStream,
 };
-use litchi_iwa_protos::{comment_storage_codec, numbers_table_cell_storage_codec, tst};
+use litchi_iwa_protos::{
+    comment_storage_codec, numbers_table_cell_storage_codec,
+    package_metadata_codec::{
+        RewriteOptions as MetadataRewriteOptions, inspect_package_metadata_with_visitor,
+    },
+    tst,
+};
 use thiserror::Error as ThisError;
 
 use crate::{SheetSelector, TableSelector, table::CellPosition};
@@ -2506,6 +2512,76 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
         });
     }
     prove_archive_reference_ownership(source, selected_storage_id, selected.target.path)?;
+    prove_metadata_ownership(source, selected_storage_id, selected.target.path)?;
+    Ok(())
+}
+
+fn prove_metadata_ownership(
+    source: &Package,
+    deleted_object: u64,
+    path: Path,
+) -> Result<(), Error> {
+    let route = super::metadata::unique_message_route(source)
+        .ok_or(Error::UnsupportedDependency { path })?;
+    let message = source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .and_then(|component| component.archive().objects.get(route.object_index))
+        .and_then(|object| object.messages.get(route.message_index))
+        .filter(|message| message.type_ == super::metadata::MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource { path })?;
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    if message.data.is_empty() || message.data.len() > maximum_wire {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: message.data.len(),
+            maximum: maximum_wire,
+            path,
+        });
+    }
+    let fields = message
+        .data
+        .len()
+        .saturating_mul(8)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let work = message
+        .data
+        .len()
+        .saturating_mul(128)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    let components = source
+        .state
+        .components
+        .catalog()
+        .len()
+        .max(message.data.len())
+        .max(1);
+    let references = source.state.options.semantic().max_references().max(1);
+    let options = MetadataRewriteOptions::new(
+        maximum_wire,
+        maximum_wire,
+        fields,
+        work,
+        COMMENT_MAX_NESTING,
+        components,
+        references,
+        0,
+    );
+    let mut census = super::metadata::ObjectOwnershipVisitor::new(deleted_object);
+    inspect_package_metadata_with_visitor(message.data.as_slice(), options, &mut census)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    if census.is_owned() {
+        return Err(Error::UnsupportedDependency { path });
+    }
     Ok(())
 }
 
