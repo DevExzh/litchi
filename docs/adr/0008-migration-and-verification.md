@@ -12608,3 +12608,63 @@ semantics, plus strict Rust reread and an exact pre-native inverse. It is not
 Rust/native byte parity, exact post-save source preservation, a performance or
 RSS measurement, host-retirement evidence, or a full publication/workspace
 gate.
+
+## 2026-08-24 amendment: Wave62 Pages body-table title verification record
+
+The final implementation, host-retirement, boundary, and resource commits are
+`48f203aae56e43133fd931accfa6558661594ba0`,
+`a92f8f11a50c709877b8d1f0a158da72114dc4ab`,
+`a7088be4dd9fde9b2e843473b093839e7b7629b3`, and
+`a1c1e83a3edad808bacefa648fe0c1bdd53308f5`. Final scoped gates were:
+
+- `cargo test -p litchi-iwa-protos numbers_table_title_codec --lib --quiet`:
+  9/9 passed;
+- `cargo test -p litchi-pages --test body_table_title --quiet`: 7/7 passed;
+- `cargo test -p litchi-pages --test table_lock --quiet`: 17/17 passed;
+- `cargo test -p litchi-pages --all-targets --quiet`: 210 aggregate tests
+  passed across the library and integration targets;
+- `cargo check -p litchi-pages --all-targets --quiet`: passed;
+- `cargo clippy -p litchi-pages --all-targets --quiet -- -D warnings`:
+  passed;
+- `cargo check -p litchi-iwa --all-targets --quiet`: passed with the existing
+  deprecated-host and unused-import warnings;
+- `cargo test -p litchi-iwa --lib pages::editor::tables::tests --quiet`:
+  38/38 passed with those existing warnings;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 397/397 passed;
+  `py_compile` and `git diff --check` also passed.
+
+The live `python3 tools/check_crate_boundaries.py --explain` command exits 1
+for exactly three findings, all from the user-owned untracked
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`: the retired source and
+its two legacy methods. It reports no tracked Pages body-table-title or
+facade finding. These scoped results are not a full-workspace green claim.
+
+The bounded native record used Pages 14.4 and the following disposable
+artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| `/private/tmp/litchi-wave61-pages-native-source.pages` | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Pages-created `/private/tmp/litchi-wave62-pages-title-caption.pages` | 113,907 | `40f8d3a8c4357e584b80439d0f2e655eb9ec56c1e883980f4c4197de01dd5c43` |
+| Rust `/private/tmp/litchi-wave62-pages-title-rust.pages` before native open | 81,441 | `8842a48004c768adc6a21db28ce0bf322183056d791863d606d2f42594c5b9de` |
+| Rust `/private/tmp/litchi-wave62-pages-title-inverse.pages` | 113,907 | `40f8d3a8c4357e584b80439d0f2e655eb9ec56c1e883980f4c4197de01dd5c43` |
+| Pages-normalized Rust output after native open/reopen | 115,446 | `2dc5a4a2e55f78147be32a8b7b9dddf5837d8b2e24bb7118adc868c73febebde` |
+
+The Pages-created source contained one real 5 by 4 rooted table named
+`Table 1`, with title and caption initially disabled in the input oracle.
+Pages created and saved a source whose title was `Revenue Summary`, caption
+was `Quarterly revenue data`, and whose Title/Caption controls were enabled.
+The Rust transaction preserved those semantics while enabling the title
+outline, changed only `Index/CalculationEngine-1732611.iwa`, deleted exactly
+the three root previews, and produced an inverse byte-identical to its input.
+The native graph used model object 1733262, title style 1731500 (type 2022),
+and shape style 1731714 (type 2025).
+
+Pages opened the Rust artifact without repair and showed Title, Outline, and
+Caption enabled with `Revenue Summary`; close/reopen preserved those visible
+semantics. Pages normalized the package bytes during native interaction, as
+the final size and hash show. Package Metadata remained unchanged by the Rust
+settings-only edit because it introduced or removed no IDs or references.
+This is bounded native open/render/reopen acceptance plus an exact pre-native
+inverse—not Rust/native byte parity, exact native byte stability, a
+performance/RSS measurement, or a full publication/workspace gate.
