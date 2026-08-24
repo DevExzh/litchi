@@ -1,11 +1,12 @@
 use std::env;
 
 use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableDimensionSize,
-    PagesTableFormulaCachedValue, PagesTableFormulaCellReference, PagesTableFormulaExpression,
+    PagesCellValue, PagesDocumentBuilder, PagesEditor, PagesTableCellUpdate,
+    PagesTableDimensionSize, PagesTableFormulaCachedValue, PagesTableFormulaCellReference,
+    PagesTableFormulaExpression,
 };
-use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
+use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_pages::table::title::Settings as PagesTableTitleSettings;
 use litchi_pages::{BodyTableSelector, Package};
 
@@ -42,15 +43,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
         PagesTableFormulaCachedValue::Number(125_000.0.try_into()?),
     )?;
-    editor.set_table_header_settings(
-        table.model_object_id,
-        HeaderSettings {
+    let focused = Package::from_bytes(&editor.to_bytes()?)?;
+    let header_commit = focused
+        .edit_body_table_header_settings(BodyTableSelector::name("Revenue"))?
+        .set(HeaderSettings {
             header_rows: Some(HeaderCount::ONE),
             header_columns: Some(HeaderCount::ONE),
             footer_rows: Some(HeaderCount::ONE),
             ..Default::default()
-        },
-    )?;
+        })
+        .commit()?;
+    editor = PagesEditor::from_bytes(header_commit.package().source_bytes())?;
     for (column, width) in [120.0, 160.0, 100.0].into_iter().enumerate() {
         editor.set_table_column_width(
             table.model_object_id,

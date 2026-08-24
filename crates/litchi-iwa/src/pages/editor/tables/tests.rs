@@ -30,10 +30,42 @@ use litchi_numbers::cell::data_format::{
     FixedDecimalPlaces, Fraction, FractionAccuracy, Number, NumeralSystem, Percentage, PopUpMenu,
     Scientific, Slider, StarRating, Stepper, Text as TextFormat,
 };
-use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
+use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
+
+fn pages_table_header_settings(
+    editor: &PagesEditor,
+    selector: BodyTableSelector<'_>,
+) -> Result<HeaderSettings> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(format!("Pages header package: {error}")))?;
+    package
+        .body_table_header_settings(selector)
+        .map_err(|error| Error::InvalidFormat(format!("Pages header settings: {error}")))
+}
+
+fn set_pages_table_header_settings(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+    settings: HeaderSettings,
+) -> Result<()> {
+    let bytes = {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages header package: {error}")))?;
+        let commit = package
+            .edit_body_table_header_settings(selector)
+            .map_err(|error| Error::InvalidFormat(format!("Pages header settings: {error}")))?
+            .set(settings)
+            .commit()
+            .map_err(|error| Error::InvalidFormat(format!("Pages header settings: {error}")))?;
+        commit.package().source_bytes().to_vec()
+    };
+    *editor = PagesEditor::from_bytes(&bytes)?;
+    Ok(())
+}
 
 #[test]
 fn malformed_table_model_payload_is_reported() {
@@ -915,15 +947,15 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    editor
-        .set_table_header_settings(
-            model_id,
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    set_pages_table_header_settings(
+        &mut editor,
+        BodyTableSelector::index(0),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     editor
         .set_table_cells(
             model_id,
@@ -1269,15 +1301,15 @@ fn source_built_footer_formula_expands_and_contracts_with_body_rows() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    editor
-        .set_table_header_settings(
-            model_id,
-            HeaderSettings {
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    set_pages_table_header_settings(
+        &mut editor,
+        BodyTableSelector::index(0),
+        HeaderSettings {
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     editor
         .set_table_formula(
             model_id,
@@ -1321,17 +1353,17 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
         .build()
         .unwrap();
     let model_id = editor.tables().unwrap()[0].model_object_id;
-    editor
-        .set_table_header_settings(
-            model_id,
-            HeaderSettings {
-                header_rows: Some(HeaderCount::ONE),
-                header_columns: Some(HeaderCount::ONE),
-                footer_rows: Some(HeaderCount::ONE),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    set_pages_table_header_settings(
+        &mut editor,
+        BodyTableSelector::index(0),
+        HeaderSettings {
+            header_rows: Some(HeaderCount::ONE),
+            header_columns: Some(HeaderCount::ONE),
+            footer_rows: Some(HeaderCount::ONE),
+            ..Default::default()
+        },
+    )
+    .unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor
@@ -1343,7 +1375,7 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     editor
         .insert_table_column(model_id, ColumnInsertion::header(1))
         .unwrap();
-    let settings = editor.table_header_settings(model_id).unwrap();
+    let settings = pages_table_header_settings(&editor, BodyTableSelector::index(0)).unwrap();
     assert_eq!(settings.header_row_count(), 2);
     assert_eq!(settings.footer_row_count(), 2);
     assert_eq!(settings.header_column_count(), 2);
@@ -1379,7 +1411,7 @@ fn source_built_fixed_table_sections_roundtrip_full_axis_crud() {
     editor
         .remove_table_column(model_id, ColumnDeletion::header(0))
         .unwrap();
-    let settings = editor.table_header_settings(model_id).unwrap();
+    let settings = pages_table_header_settings(&editor, BodyTableSelector::index(0)).unwrap();
     assert_eq!(settings.header_row_count(), 0);
     assert_eq!(settings.footer_row_count(), 0);
     assert_eq!(settings.header_column_count(), 0);
@@ -1601,9 +1633,7 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         ..Default::default()
     };
 
-    editor
-        .set_table_header_settings(model_id, settings)
-        .unwrap();
+    set_pages_table_header_settings(&mut editor, BodyTableSelector::index(0), settings).unwrap();
     editor
         .set_table_column_width(model_id, 0, PagesTableDimensionSize::points(150.0).unwrap())
         .unwrap();
@@ -1612,7 +1642,10 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
         .unwrap();
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(reopened.table_header_settings(model_id).unwrap(), settings);
+    assert_eq!(
+        pages_table_header_settings(&reopened, BodyTableSelector::index(0)).unwrap(),
+        settings
+    );
     assert_eq!(
         reopened.table_column_width(model_id, 0).unwrap(),
         PagesTableDimensionSize::points(150.0).unwrap()
@@ -1652,18 +1685,20 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
             .is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before);
+    let before_header_error = reopened.to_bytes().unwrap();
     assert!(
-        reopened
-            .set_table_header_settings(
-                model_id,
-                HeaderSettings {
-                    header_rows: Some(HeaderCount::FOUR),
-                    footer_rows: Some(HeaderCount::ONE),
-                    ..Default::default()
-                },
-            )
-            .is_err()
+        set_pages_table_header_settings(
+            &mut reopened,
+            BodyTableSelector::index(0),
+            HeaderSettings {
+                header_rows: Some(HeaderCount::FOUR),
+                footer_rows: Some(HeaderCount::ONE),
+                ..Default::default()
+            },
+        )
+        .is_err()
     );
+    assert_eq!(reopened.to_bytes().unwrap(), before_header_error);
     assert_eq!(reopened.to_bytes().unwrap(), before);
 }
 

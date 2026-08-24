@@ -10,6 +10,8 @@ use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
+use litchi_pages::table::headers::{Count as PagesHeaderCount, Settings as PagesHeaderSettings};
+use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 const TABLE_ROWS: usize = 4;
 const TABLE_COLUMNS: usize = 4;
@@ -83,12 +85,12 @@ fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::
         .body_table("Section CRUD", TABLE_ROWS, TABLE_COLUMNS)
         .build()?;
     let table_id = editor.tables()?.remove(0).model_object_id;
-    editor.set_table_header_settings(
-        table_id,
-        HeaderSettings {
-            header_rows: Some(HeaderCount::ONE),
-            header_columns: Some(HeaderCount::ONE),
-            footer_rows: Some(HeaderCount::ONE),
+    set_pages_table_headers(
+        &mut editor,
+        PagesHeaderSettings {
+            header_rows: Some(PagesHeaderCount::ONE),
+            header_columns: Some(PagesHeaderCount::ONE),
+            footer_rows: Some(PagesHeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -138,6 +140,19 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
     editor.remove_slide_table_row(0, table.model_object_id, RowDeletion::footer(1))?;
     editor.remove_slide_table_column(0, table.model_object_id, ColumnDeletion::header(0))?;
     editor.save(deletions)?;
+    Ok(())
+}
+
+fn set_pages_table_headers(
+    editor: &mut litchi_iwa::pages::PagesEditor,
+    settings: PagesHeaderSettings,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_body_table_header_settings(BodyTableSelector::index(0))?
+        .set(settings)
+        .commit()?;
+    *editor = litchi_iwa::pages::PagesEditor::from_bytes(commit.package().source_bytes())?;
     Ok(())
 }
 
