@@ -654,6 +654,52 @@ fn noncanonical_object_length_prefix_is_rejected_before_changed_publish() -> Tes
 }
 
 #[test]
+fn aggregate_only_native_ownership_locks_and_inverts_exactly() -> TestResult<()> {
+    let source = rewrite_document_archive(&synthetic_package(None)?, |archive| {
+        for (identifier, message_type) in [
+            (1, ROOT_MESSAGE_TYPE),
+            (BODY_IDENTIFIER, BODY_MESSAGE_TYPE),
+            (ATTACHMENT_IDENTIFIER, ATTACHMENT_MESSAGE_TYPE),
+            (DRAWABLE_IDENTIFIER, TABLE_INFO_MESSAGE_TYPE),
+        ] {
+            let object = archive.object_mut(identifier).ok_or("missing object")?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == message_type)
+                .ok_or("missing message")?;
+            object.archive_info.message_infos[message_index]
+                .field_infos
+                .clear();
+        }
+        let drawable = archive
+            .object_mut(DRAWABLE_IDENTIFIER)
+            .ok_or("missing drawable")?;
+        let message_index = drawable
+            .messages
+            .iter()
+            .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            .ok_or("missing table-info message")?;
+        drawable.archive_info.message_infos[message_index]
+            .object_references
+            .retain(|identifier| *identifier != BODY_IDENTIFIER);
+        Ok(())
+    })?;
+
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(package.body_table_lock(0usize)?, State::Unlocked);
+    let mut edit = package.edit_body_table_lock(0usize)?;
+    edit.lock();
+    let commit = edit.commit()?;
+    assert_eq!(commit.package().body_table_lock(0usize)?, State::Locked);
+    let restored = commit
+        .package()
+        .apply_body_table_lock(&commit.patch().inverse())?;
+    assert_eq!(restored.package().source_bytes(), source.as_slice());
+    Ok(())
+}
+
+#[test]
 fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() -> TestResult<()> {
     let source = synthetic_package(None)?;
 
@@ -679,22 +725,6 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
             &[MODEL_IDENTIFIER],
         )
     })?;
-    let table_info_body_field_missing = rewrite_document_archive(&source, |archive| {
-        let drawable = archive
-            .object_mut(DRAWABLE_IDENTIFIER)
-            .ok_or("missing drawable")?;
-        let message_index = drawable
-            .messages
-            .iter()
-            .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-            .ok_or("missing table-info message")?;
-        drawable.archive_info.message_infos[message_index].field_infos = vec![field_reference(
-            vec![TABLE_INFO_MODEL_FIELD],
-            MODEL_IDENTIFIER,
-        )];
-        Ok(())
-    })?;
-
     let body_wrong = rewrite_document_archive(&source, |archive| {
         rewrite_message_references(
             archive,
@@ -767,18 +797,6 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
             .ok_or("missing root message")?;
         root.archive_info.message_infos[message_index].field_infos =
             vec![field_reference(vec![ROOT_BODY_FIELD + 1], BODY_IDENTIFIER)];
-        Ok(())
-    })?;
-    let root_field_missing = rewrite_document_archive(&source, |archive| {
-        let root = archive.object_mut(1).ok_or("missing root")?;
-        let message_index = root
-            .messages
-            .iter()
-            .position(|message| message.type_ == ROOT_MESSAGE_TYPE)
-            .ok_or("missing root message")?;
-        root.archive_info.message_infos[message_index]
-            .field_infos
-            .clear();
         Ok(())
     })?;
     let root_field_duplicate = rewrite_document_archive(&source, |archive| {
@@ -880,7 +898,6 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
         attachment_missing,
         drawable_missing,
         table_info_body_missing,
-        table_info_body_field_missing,
         body_wrong,
         attachment_wrong,
         drawable_wrong,
@@ -891,7 +908,6 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
         root_wrong,
         root_duplicate,
         root_field_wrong,
-        root_field_missing,
         root_field_duplicate,
         root_field_wrong_identifier,
         model_header_wrong,
@@ -909,24 +925,8 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
 }
 
 #[test]
-fn required_model_and_attachment_field_local_ownership_is_rejected() -> TestResult<()> {
+fn present_model_and_attachment_field_local_ownership_is_strict() -> TestResult<()> {
     let source = synthetic_package(None)?;
-
-    let model_missing = rewrite_document_archive(&source, |archive| {
-        let drawable = archive
-            .object_mut(DRAWABLE_IDENTIFIER)
-            .ok_or("missing drawable")?;
-        let message_index = drawable
-            .messages
-            .iter()
-            .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-            .ok_or("missing table-info message")?;
-        drawable.archive_info.message_infos[message_index].field_infos = vec![field_reference(
-            vec![TABLE_INFO_SUPER_FIELD, DRAWABLE_PARENT_FIELD],
-            BODY_IDENTIFIER,
-        )];
-        Ok(())
-    })?;
 
     let model_empty = rewrite_document_archive(&source, |archive| {
         let drawable = archive
@@ -986,21 +986,6 @@ fn required_model_and_attachment_field_local_ownership_is_rejected() -> TestResu
         Ok(())
     })?;
 
-    let attachment_missing = rewrite_document_archive(&source, |archive| {
-        let attachment = archive
-            .object_mut(ATTACHMENT_IDENTIFIER)
-            .ok_or("missing attachment")?;
-        let message_index = attachment
-            .messages
-            .iter()
-            .position(|message| message.type_ == ATTACHMENT_MESSAGE_TYPE)
-            .ok_or("missing attachment message")?;
-        attachment.archive_info.message_infos[message_index]
-            .field_infos
-            .clear();
-        Ok(())
-    })?;
-
     let attachment_empty = rewrite_document_archive(&source, |archive| {
         let attachment = archive
             .object_mut(ATTACHMENT_IDENTIFIER)
@@ -1046,11 +1031,9 @@ fn required_model_and_attachment_field_local_ownership_is_rejected() -> TestResu
     })?;
 
     for tampered in [
-        model_missing,
         model_empty,
         model_data_only,
         model_duplicate,
-        attachment_missing,
         attachment_empty,
         attachment_data_only,
         attachment_duplicate,
@@ -1123,19 +1106,6 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
         Ok(())
     })?;
 
-    let missing_field_declaration = rewrite_document_archive(&source, |archive| {
-        let body = archive.object_mut(BODY_IDENTIFIER).ok_or("missing body")?;
-        let message_index = body
-            .messages
-            .iter()
-            .position(|message| message.type_ == BODY_MESSAGE_TYPE)
-            .ok_or("missing body message")?;
-        body.archive_info.message_infos[message_index]
-            .field_infos
-            .clear();
-        Ok(())
-    })?;
-
     let empty_field_declaration = rewrite_document_archive(&source, |archive| {
         let body = archive.object_mut(BODY_IDENTIFIER).ok_or("missing body")?;
         let message_index = body
@@ -1179,7 +1149,6 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
         wrong_path,
         duplicate_alias,
         contradictory_field,
-        missing_field_declaration,
         empty_field_declaration,
         data_only_field_declaration,
         duplicate_empty_field_declaration,
