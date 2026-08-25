@@ -907,6 +907,7 @@ version = "0.0.1"
 dependencies = [
  "chrono",
  "fast-float2",
+ "litchi-cfb",
  "litchi-core",
  "litchi-docx",
  "litchi-drawingml",
@@ -914,11 +915,13 @@ dependencies = [
  "litchi-odp",
  "litchi-ods",
  "litchi-odt",
+ "litchi-ole-common",
  "litchi-ooxml-common",
  "litchi-opc",
  "litchi-pptx",
  "litchi-rtf",
  "litchi-sheet",
+ "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",
 ]
