@@ -671,6 +671,18 @@ impl<'a> Format<'a> {
         self.raw.hidden
     }
 
+    /// Whether the run uses small capitals.
+    #[must_use]
+    pub const fn small_caps(self) -> bool {
+        self.raw.smallcaps
+    }
+
+    /// Whether the run uses all capitals.
+    #[must_use]
+    pub const fn all_caps(self) -> bool {
+        self.raw.all_caps
+    }
+
     /// Explicit local text direction, if authored.
     #[must_use]
     pub const fn direction(self) -> Option<TextDirection> {

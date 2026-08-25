@@ -1172,6 +1172,155 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
 }
 
 #[test]
+fn small_caps_property_preserves_all_caps_and_run_boundaries() {
+    let source = Document::parse(r"{\rtf1\ansi\caps Alpha Beta}").unwrap();
+    let mut noop = source.edit();
+    noop.set_text_small_caps(TextSpan::new(0, 5).unwrap(), false)
+        .unwrap();
+    let noop_commit = noop.commit().unwrap();
+    assert!(!noop_commit.diagnostics().changed());
+    assert!(noop_commit.snapshot().same_snapshot(&source));
+
+    let mut edit = source.edit();
+    edit.set_text_small_caps(TextSpan::new(6, 10).unwrap(), true)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    assert!(
+        bytes
+            .windows(br"\scaps ".len())
+            .any(|window| window == br"\scaps ")
+    );
+    assert!(
+        bytes
+            .windows(br"\scaps0 ".len())
+            .any(|window| window == br"\scaps0 ")
+    );
+    let reopened = Document::from_bytes(&bytes).unwrap();
+    let small_caps_text = reopened
+        .body()
+        .runs()
+        .filter(|run| run.format().small_caps())
+        .map(|run| run.text())
+        .collect::<String>();
+    let ordinary_text = reopened
+        .body()
+        .runs()
+        .filter(|run| !run.format().small_caps())
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(ordinary_text.contains("Alpha"));
+    assert!(small_caps_text.contains("Beta"));
+    assert!(reopened.body().runs().all(|run| run.format().all_caps()));
+
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().small_caps()));
+    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+}
+
+#[test]
+fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state() {
+    use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
+    use serde_json::Value;
+    use std::collections::BTreeMap;
+
+    let associated = Document::parse(r"{\rtf1\ansi\ascaps Alpha}").unwrap();
+    assert!(
+        associated
+            .body()
+            .runs()
+            .all(|run| !run.format().small_caps())
+    );
+
+    let mixed = Document::parse(r"{\rtf1\ansi {\scaps Alpha} Beta}").unwrap();
+    let mut mixed_edit = mixed.edit();
+    assert!(matches!(
+        mixed_edit.set_text_small_caps(TextSpan::new(0, 10).unwrap(), false),
+        Err(Error::UnsupportedSource(
+            "the selected character span has mixed small-caps state"
+        ))
+    ));
+
+    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut paragraph_edit = paragraph.edit();
+    assert!(matches!(
+        paragraph_edit.set_text_small_caps(TextSpan::new(0, 6).unwrap(), true),
+        Err(Error::UnsupportedSource(
+            "small-caps edits require non-empty text within one paragraph"
+        ))
+    ));
+
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let mut cp1252_edit = cp1252.edit();
+    cp1252_edit
+        .set_text_small_caps(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        cp1252_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "small-caps edits refuse non-ASCII transport encodings"
+        ))
+    ));
+
+    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let limits = durable_limits(1);
+    let mut edit = source.edit();
+    edit.set_text_small_caps(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let durable = commit.patch().to_durable(limits).unwrap();
+    assert_eq!(durable.operations()[0].op, "character-small-caps.set");
+    assert_eq!(
+        durable.operations()[0].preconditions["small_caps"],
+        Value::Bool(false)
+    );
+    assert_eq!(durable.operations()[0].value, Value::Bool(true));
+    let applied = source.apply_durable(&durable).unwrap();
+    assert!(applied.body().runs().any(|run| run.format().small_caps()));
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().small_caps()));
+    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex()),
+    );
+    preconditions.insert("small_caps".to_string(), Value::Bool(true));
+    let forward = PatchOperation::new(
+        limits,
+        "character-small-caps.set",
+        "body:utf8:0-5",
+        preconditions.clone(),
+        Value::Bool(false),
+    )
+    .unwrap();
+    let inverse = PatchOperation::new(
+        limits,
+        "character-small-caps.set",
+        "body:utf8:0-5",
+        preconditions,
+        Value::Bool(true),
+    )
+    .unwrap();
+    let stale = Patch::<litchi_core::patch::Reversible>::new(
+        limits,
+        "litchi-rtf",
+        [ReversibleOperation::new(forward, inverse)],
+        BlobBundle::new(limits.blobs()),
+        BlobBundle::new(limits.blobs()),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale),
+        Err(Error::StalePrecondition(
+            "character small-caps state differs"
+        ))
+    ));
+}
+
+#[test]
 fn italic_durable_patch_rejects_stale_property_and_artifact() {
     use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
     use serde_json::Value;
