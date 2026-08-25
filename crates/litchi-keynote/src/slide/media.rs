@@ -27,6 +27,78 @@ pub struct Size {
     pub height: f32,
 }
 
+/// Validated placement and dimensions for an existing file-backed movie.
+///
+/// This value is deliberately limited to the semantic geometry that can be
+/// shared by Keynote movie readers and writers: a finite top-left position and
+/// a finite, strictly positive displayed size. Native flags, angles, archive
+/// records, and object identifiers remain in the package adapter.
+pub mod geometry {
+    use super::{Point, Size};
+
+    /// Semantic validation failures for movie geometry values.
+    pub use crate::Error;
+    /// Result type for validated movie geometry construction.
+    pub type Result<T> = crate::Result<T>;
+
+    /// A validated movie position and displayed size in document points.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct MovieGeometry {
+        position: Point,
+        size: Size,
+    }
+
+    impl MovieGeometry {
+        /// Construct validated movie geometry.
+        ///
+        /// Both position coordinates must be finite. Width and height must
+        /// be finite and strictly positive.
+        ///
+        /// # Errors
+        ///
+        /// Returns [`crate::Error::InvalidMoviePosition`] for a non-finite
+        /// coordinate or [`crate::Error::InvalidMovieSize`] for a non-finite
+        /// or non-positive dimension.
+        pub const fn new(position: Point, size: Size) -> Result<Self> {
+            if !position.x.is_finite() || !position.y.is_finite() {
+                return Err(Error::InvalidMoviePosition);
+            }
+            if !size.width.is_finite()
+                || !size.height.is_finite()
+                || size.width <= 0.0
+                || size.height <= 0.0
+            {
+                return Err(Error::InvalidMovieSize);
+            }
+            Ok(Self { position, size })
+        }
+
+        /// Return the top-left movie position in document points.
+        #[must_use]
+        pub const fn position(self) -> Point {
+            self.position
+        }
+
+        /// Return the displayed movie dimensions in document points.
+        #[must_use]
+        pub const fn size(self) -> Size {
+            self.size
+        }
+    }
+
+    /// Package transaction types for an existing movie's geometry.
+    ///
+    /// The package adapter owns selection, native graph traversal, and exact
+    /// publication. This namespace exposes only the transaction vocabulary;
+    /// native records and identifiers do not cross the semantic boundary.
+    pub mod transaction {
+        pub use crate::{
+            SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
+            SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
+        };
+    }
+}
+
 /// Archive-free playback values used by Keynote slide media summaries.
 pub mod playback {
     use std::time::Duration;
