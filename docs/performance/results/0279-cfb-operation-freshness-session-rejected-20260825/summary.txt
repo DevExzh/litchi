@@ -1,0 +1,39 @@
+Change 0279: rejected CFB operation-scoped freshness session
+Date: 2026-08-25
+Verdict: REVERT / DO NOT KEEP
+Performance claim: none
+
+Protocol
+- Control: 9adbf9ee527b4ccd2e3494c824c761973633ea14
+- Candidate: 0b0e1ed02c2fe4a262826a25a1f64b533bd0e686
+- Order: A1, B1, B2, A2
+- Cells: file-source and atomic-file x open, list, one-cell
+- Samples: 500 fresh children per cell per leg; 12,000 retained samples
+- Warmups: 20 per child
+- CPU/workers: CPU 2, one sequential worker
+- p50: floor midpoint for even samples
+- p95/p99: nearest rank
+- Corpus SHA-256: d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7
+
+Elapsed vectors are p50 / mean-floor / p95 / p99 nanoseconds.
+
+Mode/op                 A1                              B1                              A2                              B2
+file-source/open        474154/481655/550698/607837    224078/230016/267039/304880    475345/481338/522960/604624    224694/230124/269652/311099
+file-source/list        475010/483425/546402/605825    225435/230778/273677/299343    473979/482307/532283/622337    224639/229611/266638/308475
+file-source/one-cell    636723/644613/704392/794494    278168/285145/337736/372754    636367/648106/728194/844515    278023/284417/329013/375298
+atomic-file/open        279355/286870/322255/374506    219162/223862/260148/288709    280542/285260/315865/355420    218156/222999/255353/284802
+atomic-file/list        281908/287416/325809/376771    218612/227160/265175/297770    281248/288423/320632/380014    219347/224050/256134/294096
+atomic-file/one-cell    363455/370488/417074/470959    270598/278186/331567/371973    361788/367707/411959/474794    271023/279549/318840/353097
+
+Descriptive attribution
+- FileSource elapsed improved by 48.44% to 56.31% across direct p50/mean/p95/p99 comparisons.
+- Version calls changed from 1,266 to 26 for open/list and from 1,802 to 34 for one-cell.
+- Logical reads, bytes, len calls, identities, locality, source stability, and semantic outputs were exact-neutral.
+
+Failed strict gate
+- file-source/open control p95 same-side drift: +5.0369%
+- file-source/one-cell control p99 same-side drift: -6.2960%
+- atomic-file/open control p99 same-side drift: +5.0963%
+- atomic-file/one-cell candidate p99 same-side drift: +5.0746%
+- The declared same-side drift limit was unqualified <=5%, so it applies to tails.
+- Narrowing that gate after collection would be retrospective.

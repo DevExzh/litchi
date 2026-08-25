@@ -1,5 +1,10 @@
 # Performance CRUD coverage
 
+## 2026-08-25: change 0279 leaves CRUD coverage unchanged
+
+- The experimental CFB/XLS operation-scoped freshness session passed correctness and architecture gates but failed its strict performance keep gate and was reverted.
+- No CRUD surface, format coverage, facade behavior, or accepted source-backed performance claim changes.
+
 Change 0278 changes no production CRUD surface, parser, selector, or default
 case. Its opt-in runner binds a staged immutable XLS identity and records
 owned/atomic/tracked/FileSource plus standalone eager open/list/cell and facade

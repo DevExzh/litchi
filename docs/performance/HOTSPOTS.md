@@ -1,5 +1,11 @@
 # Performance hotspot inventory
 
+## 2026-08-25: XLS freshness probes remain a measured hotspot
+
+- Change 0279 confirmed that successful-read version probes dominate the selected FileSource path, but the production session candidate was rejected because four same-side p95/p99 drift checks exceeded 5%.
+- The prior per-read freshness behavior remains in production; do not cite the descriptive 48.44-56.31% direct reduction as an accepted claim.
+- A future retry must predeclare its tail-stability policy and satisfy it without retrospective narrowing.
+
 ## XLS FileSource freshness attribution (change 0278)
 
 [Change 0278](changes/0278-xls-source-attribution.md) closes the attribution

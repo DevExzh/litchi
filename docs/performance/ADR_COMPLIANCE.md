@@ -1,5 +1,10 @@
 # Performance optimization ADR-compliance matrix
 
+## 2026-08-25: change 0279 rejected without an ADR change
+
+- The experimental closure-scoped CFB session received architecture and freshness-precedence review, but its strict performance evidence failed the keep gate.
+- Reversion restores the existing per-read freshness boundary; no public low-level session API, high-level CRUD leak, ownership change, or ADR amendment remains.
+
 ## XLS source attribution boundary (change 0278)
 
 Change 0278 adds only an opt-in performance runner. CFB structure remains in

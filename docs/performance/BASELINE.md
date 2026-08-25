@@ -1,5 +1,11 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 2026-08-25: change 0279 freshness session rejected
+
+- A 12,000-sample fresh-child ABBA run failed the unqualified same-side drift limit in four p95/p99 cells, so the candidate was reverted and performance_claim:none.
+- Descriptively, version calls fell from 1266 to 26 for open/list and 1802 to 34 for one-cell; FileSource direct comparisons improved 48.44-56.31% with exact logical-read and semantic parity.
+- Evidence: changes/0279-cfb-operation-freshness-session-rejected.md and results/0279-cfb-operation-freshness-session-rejected-20260825/.
+
 ## Latest XLS FileSource attribution (change 0278)
 
 [Change 0278](changes/0278-xls-source-attribution.md) adds an isolated
