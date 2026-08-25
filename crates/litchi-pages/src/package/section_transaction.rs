@@ -50,6 +50,15 @@ pub(super) struct Usage {
     pub(super) transaction_work: usize,
     pub(super) output_allocations: usize,
     pub(super) candidate_reopens: usize,
+    pub(super) input_bytes: usize,
+    pub(super) output_bytes: usize,
+    pub(super) entries: usize,
+    pub(super) entry_bytes: usize,
+    pub(super) total_entry_bytes: usize,
+    pub(super) payload_bytes: usize,
+    pub(super) total_payload_bytes: usize,
+    pub(super) retained_bytes: usize,
+    pub(super) scratch_bytes: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +67,15 @@ pub(super) struct TransactionBudget {
     maximum_work: usize,
     maximum_references: usize,
     maximum_transaction_work: usize,
+    maximum_input_bytes: usize,
+    maximum_output_bytes: usize,
+    maximum_entries: usize,
+    maximum_entry_bytes: usize,
+    maximum_total_entry_bytes: usize,
+    maximum_payload_bytes: usize,
+    maximum_total_payload_bytes: usize,
+    maximum_retained_bytes: usize,
+    maximum_scratch_bytes: usize,
     reserved_transaction_work: usize,
     usage: Usage,
 }
@@ -69,6 +87,10 @@ impl TransactionBudget {
             .effective_archive_limits()
             .map_err(map_archive_error)?;
         let components = physical.max_entries().max(1);
+        let maximum_input_bytes = usize::try_from(physical.max_input_bytes())
+            .map_err(|_error| derived_limit_overflow(LimitKind::InputBytes))?;
+        let maximum_total_bytes = usize::try_from(physical.max_total_bytes())
+            .map_err(|_error| derived_limit_overflow(LimitKind::TotalEntryBytes))?;
         Ok(Self {
             maximum_fields: checked_derived_mul(
                 archive.max_header_fields(),
@@ -91,6 +113,19 @@ impl TransactionBudget {
                 32,
                 LimitKind::TransactionWork,
             )?,
+            maximum_input_bytes,
+            maximum_output_bytes: maximum_input_bytes,
+            maximum_entries: physical.max_entries(),
+            maximum_entry_bytes: usize::try_from(physical.max_entry_bytes())
+                .map_err(|_error| derived_limit_overflow(LimitKind::EntryBytes))?,
+            maximum_total_entry_bytes: maximum_total_bytes,
+            maximum_payload_bytes: physical.max_iwa_stream_bytes(),
+            maximum_total_payload_bytes: physical
+                .max_iwa_stream_bytes()
+                .checked_mul(components)
+                .ok_or_else(|| derived_limit_overflow(LimitKind::TotalPayloadBytes))?,
+            maximum_retained_bytes: maximum_total_bytes,
+            maximum_scratch_bytes: maximum_total_bytes,
             reserved_transaction_work: 0,
             usage: Usage::default(),
         })
@@ -102,6 +137,206 @@ impl TransactionBudget {
 
     pub(super) const fn remaining_work(self) -> usize {
         self.maximum_work.saturating_sub(self.usage.work)
+    }
+
+    pub(super) fn remaining_limit(self, kind: LimitKind) -> usize {
+        match kind {
+            LimitKind::InputBytes => self
+                .maximum_input_bytes
+                .saturating_sub(self.usage.input_bytes),
+            LimitKind::OutputBytes => self
+                .maximum_output_bytes
+                .saturating_sub(self.usage.output_bytes),
+            LimitKind::Entries => self.maximum_entries.saturating_sub(self.usage.entries),
+            LimitKind::EntryBytes => self
+                .maximum_entry_bytes
+                .saturating_sub(self.usage.entry_bytes),
+            LimitKind::TotalEntryBytes => self
+                .maximum_total_entry_bytes
+                .saturating_sub(self.usage.total_entry_bytes),
+            LimitKind::PayloadBytes => self
+                .maximum_payload_bytes
+                .saturating_sub(self.usage.payload_bytes),
+            LimitKind::TotalPayloadBytes => self
+                .maximum_total_payload_bytes
+                .saturating_sub(self.usage.total_payload_bytes),
+            LimitKind::RetainedBytes => self
+                .maximum_retained_bytes
+                .saturating_sub(self.usage.retained_bytes),
+            LimitKind::WireInputBytes | LimitKind::WireOutputBytes => self
+                .maximum_payload_bytes
+                .saturating_sub(self.usage.payload_bytes),
+            LimitKind::WireFields => self.remaining_fields(),
+            LimitKind::WireWork => self.remaining_work(),
+            LimitKind::References => self
+                .maximum_references
+                .saturating_sub(self.usage.references),
+            LimitKind::TransactionWork => self
+                .maximum_transaction_work
+                .saturating_sub(self.usage.transaction_work)
+                .saturating_sub(self.reserved_transaction_work),
+            LimitKind::PackageBytes
+            | LimitKind::PayloadObjects
+            | LimitKind::PayloadMessages
+            | LimitKind::PayloadItems
+            | LimitKind::WireNesting => self.remaining_transaction_work(),
+        }
+    }
+
+    fn remaining_transaction_work(self) -> usize {
+        self.maximum_transaction_work
+            .saturating_sub(self.usage.transaction_work)
+            .saturating_sub(self.reserved_transaction_work)
+    }
+
+    pub(super) fn charge_limit(
+        &mut self,
+        kind: LimitKind,
+        amount: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        match kind {
+            LimitKind::WireFields => self.charge_fields(amount, path),
+            LimitKind::WireWork => self.charge_work(amount, path),
+            LimitKind::References => self.charge_references(amount, path),
+            LimitKind::TransactionWork => self.charge_transaction_work(amount, path),
+            LimitKind::InputBytes => charge(
+                &mut self.usage.input_bytes,
+                amount,
+                self.maximum_input_bytes,
+                kind,
+                path,
+            ),
+            LimitKind::OutputBytes => charge(
+                &mut self.usage.output_bytes,
+                amount,
+                self.maximum_output_bytes,
+                kind,
+                path,
+            ),
+            LimitKind::Entries => charge(
+                &mut self.usage.entries,
+                amount,
+                self.maximum_entries,
+                kind,
+                path,
+            ),
+            LimitKind::EntryBytes => charge(
+                &mut self.usage.entry_bytes,
+                amount,
+                self.maximum_entry_bytes,
+                kind,
+                path,
+            ),
+            LimitKind::TotalEntryBytes => charge(
+                &mut self.usage.total_entry_bytes,
+                amount,
+                self.maximum_total_entry_bytes,
+                kind,
+                path,
+            ),
+            LimitKind::PayloadBytes | LimitKind::WireInputBytes | LimitKind::WireOutputBytes => {
+                charge(
+                    &mut self.usage.payload_bytes,
+                    amount,
+                    self.maximum_payload_bytes,
+                    kind,
+                    path,
+                )
+            },
+            LimitKind::TotalPayloadBytes => charge(
+                &mut self.usage.total_payload_bytes,
+                amount,
+                self.maximum_total_payload_bytes,
+                kind,
+                path,
+            ),
+            LimitKind::RetainedBytes => charge(
+                &mut self.usage.retained_bytes,
+                amount,
+                self.maximum_retained_bytes,
+                kind,
+                path,
+            ),
+            LimitKind::PackageBytes
+            | LimitKind::PayloadObjects
+            | LimitKind::PayloadMessages
+            | LimitKind::PayloadItems
+            | LimitKind::WireNesting => self.charge_transaction_work(amount, path),
+        }
+    }
+
+    pub(super) fn observe_limit(
+        &mut self,
+        kind: LimitKind,
+        amount: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        let current = self
+            .limit_value(kind)
+            .ok_or_else(|| derived_limit_overflow(kind))?;
+        let maximum = self.maximum_limit(kind);
+        if amount > maximum {
+            return Err(Error::LimitExceeded {
+                path,
+                kind,
+                observed: usize_to_u64(amount),
+                maximum: usize_to_u64(maximum),
+            });
+        }
+        if amount > current {
+            self.set_limit_value(kind, amount)?;
+        }
+        Ok(())
+    }
+
+    fn limit_value(&self, kind: LimitKind) -> Option<usize> {
+        Some(match kind {
+            LimitKind::InputBytes => self.usage.input_bytes,
+            LimitKind::OutputBytes => self.usage.output_bytes,
+            LimitKind::Entries => self.usage.entries,
+            LimitKind::EntryBytes => self.usage.entry_bytes,
+            LimitKind::TotalEntryBytes => self.usage.total_entry_bytes,
+            LimitKind::PayloadBytes | LimitKind::WireInputBytes | LimitKind::WireOutputBytes => {
+                self.usage.payload_bytes
+            },
+            LimitKind::TotalPayloadBytes => self.usage.total_payload_bytes,
+            LimitKind::RetainedBytes => self.usage.retained_bytes,
+            _ => return None,
+        })
+    }
+
+    fn maximum_limit(&self, kind: LimitKind) -> usize {
+        match kind {
+            LimitKind::InputBytes => self.maximum_input_bytes,
+            LimitKind::OutputBytes => self.maximum_output_bytes,
+            LimitKind::Entries => self.maximum_entries,
+            LimitKind::EntryBytes => self.maximum_entry_bytes,
+            LimitKind::TotalEntryBytes => self.maximum_total_entry_bytes,
+            LimitKind::PayloadBytes | LimitKind::WireInputBytes | LimitKind::WireOutputBytes => {
+                self.maximum_payload_bytes
+            },
+            LimitKind::TotalPayloadBytes => self.maximum_total_payload_bytes,
+            LimitKind::RetainedBytes => self.maximum_retained_bytes,
+            _ => self.maximum_transaction_work,
+        }
+    }
+
+    fn set_limit_value(&mut self, kind: LimitKind, value: usize) -> Result<(), Error> {
+        match kind {
+            LimitKind::InputBytes => self.usage.input_bytes = value,
+            LimitKind::OutputBytes => self.usage.output_bytes = value,
+            LimitKind::Entries => self.usage.entries = value,
+            LimitKind::EntryBytes => self.usage.entry_bytes = value,
+            LimitKind::TotalEntryBytes => self.usage.total_entry_bytes = value,
+            LimitKind::PayloadBytes | LimitKind::WireInputBytes | LimitKind::WireOutputBytes => {
+                self.usage.payload_bytes = value
+            },
+            LimitKind::TotalPayloadBytes => self.usage.total_payload_bytes = value,
+            LimitKind::RetainedBytes => self.usage.retained_bytes = value,
+            _ => return Err(derived_limit_overflow(kind)),
+        }
+        Ok(())
     }
 
     pub(super) fn charge_fields(&mut self, amount: usize, path: Path) -> Result<(), Error> {
@@ -130,6 +365,290 @@ impl TransactionBudget {
             amount,
             self.maximum_references,
             LimitKind::References,
+            path,
+        )
+    }
+
+    pub(super) fn charge_text_prepare(
+        &mut self,
+        report: litchi_iwa_text_wire::StorageRewritePrepareReport,
+        path: Path,
+    ) -> Result<(), Error> {
+        self.charge_limit(LimitKind::WireInputBytes, report.input_bytes(), path)?;
+        self.charge_fields(report.fields(), path)?;
+        self.charge_work(report.work_bytes(), path)?;
+        self.charge_references(report.reference_occurrences(), path)?;
+        self.charge_transaction_work(
+            report
+                .text_bytes()
+                .saturating_add(report.text_units())
+                .saturating_add(report.fragments())
+                .saturating_add(report.table_entries())
+                .saturating_add(report.max_nesting())
+                .saturating_add(usize::from(report.has_unknown_wire_fields())),
+            path,
+        )
+    }
+
+    pub(super) fn charge_text_requirements(
+        &mut self,
+        requirements: litchi_iwa_text_wire::StorageRewriteExecutionRequirements,
+        path: Path,
+    ) -> Result<(), Error> {
+        self.charge_limit(
+            LimitKind::WireOutputBytes,
+            requirements.output_bytes(),
+            path,
+        )?;
+        self.charge_work(requirements.work(), path)?;
+        self.charge_references(requirements.reference_occurrences(), path)?;
+        self.charge_limit(
+            LimitKind::RetainedBytes,
+            requirements.retained_bytes(),
+            path,
+        )?;
+        self.charge_scratch(requirements.peak_scratch_bytes(), path)?;
+        self.charge_transaction_work(requirements.allocations(), path)
+    }
+
+    pub(super) fn residual_storage_limits(
+        &self,
+        base: litchi_iwa_text_wire::RewriteLimits,
+        path: Path,
+    ) -> Result<litchi_iwa_text_wire::RewriteLimits, Error> {
+        let residual = |kind: LimitKind, required: usize| {
+            let maximum = self.remaining_limit(kind);
+            if maximum < required {
+                return Err(Error::LimitExceeded {
+                    path,
+                    kind,
+                    observed: usize_to_u64(required),
+                    maximum: usize_to_u64(maximum),
+                });
+            }
+            Ok(maximum)
+        };
+        litchi_iwa_text_wire::RewriteLimits::new(
+            residual(LimitKind::WireInputBytes, 1)?.min(base.max_message_bytes()),
+            residual(LimitKind::WireFields, 1)?.min(base.max_fields()),
+            residual(LimitKind::WireNesting, 4)?.min(base.max_nesting()),
+            residual(LimitKind::PayloadItems, 1)?.min(base.max_fragments()),
+            residual(LimitKind::PayloadBytes, 1)?.min(base.max_text_bytes()),
+            residual(LimitKind::PayloadItems, 1)?.min(base.max_table_entries()),
+            residual(LimitKind::References, 1)?.min(base.max_object_references()),
+            residual(LimitKind::WireOutputBytes, 1)?.min(base.max_output_bytes()),
+            residual(LimitKind::WireWork, 1)?.min(base.max_rewrite_work()),
+        )
+        .map_err(|error| match error {
+            litchi_iwa_text_wire::RewriteError::InvalidLimit {
+                field,
+                value,
+                maximum,
+            } => Error::LimitExceeded {
+                path,
+                kind: match field {
+                    "message bytes" => LimitKind::WireInputBytes,
+                    "output bytes" => LimitKind::WireOutputBytes,
+                    "fields" => LimitKind::WireFields,
+                    "nesting" => LimitKind::WireNesting,
+                    "rewrite work" => LimitKind::WireWork,
+                    "object references" => LimitKind::References,
+                    _ => LimitKind::PayloadItems,
+                },
+                observed: usize_to_u64(value),
+                maximum: usize_to_u64(maximum),
+            },
+            _ => Error::InvalidSource { path },
+        })
+    }
+
+    pub(super) fn preflight_archive_rewrite(
+        &mut self,
+        source: &Package,
+        target: Target,
+        original_message_bytes: usize,
+        rewritten_message_bytes: usize,
+        path: Path,
+    ) -> Result<(usize, usize), Error> {
+        let component = source
+            .state
+            .source
+            .components()
+            .iter()
+            .nth(target.component_index)
+            .ok_or(Error::InvalidSource { path })?;
+        let archive_limits = source
+            .state
+            .source
+            .limits()
+            .effective_archive_limits()
+            .map_err(map_archive_error)?;
+        let source_archive_bytes = component
+            .archive()
+            .encoded_len_with_limits(archive_limits)
+            .map_err(map_core_error)?;
+        let message_count = component
+            .archive()
+            .objects
+            .iter()
+            .try_fold(0usize, |count, object| {
+                count.checked_add(object.messages.len())
+            })
+            .ok_or(Error::InvalidSource { path })?;
+        let framing_slack = component
+            .archive()
+            .objects
+            .len()
+            .checked_add(message_count)
+            .and_then(|value| value.checked_add(2))
+            .and_then(|value| value.checked_mul(30))
+            .ok_or(Error::InvalidSource { path })?;
+        let archive_bound = source_archive_bytes
+            .checked_sub(original_message_bytes)
+            .and_then(|value| value.checked_add(rewritten_message_bytes))
+            .and_then(|value| value.checked_add(framing_slack))
+            .ok_or(Error::InvalidSource { path })?;
+        let compressed_bound =
+            SnappyStream::maximum_compressed_len(archive_bound).map_err(map_core_error)?;
+        self.charge_limit(LimitKind::WireOutputBytes, rewritten_message_bytes, path)?;
+        self.observe_limit(LimitKind::PayloadBytes, archive_bound, path)?;
+        self.charge_limit(LimitKind::EntryBytes, compressed_bound, path)?;
+        self.charge_limit(
+            LimitKind::TransactionWork,
+            source_archive_bytes
+                .saturating_add(archive_bound)
+                .saturating_add(compressed_bound),
+            path,
+        )?;
+        self.charge_limit(
+            LimitKind::RetainedBytes,
+            rewritten_message_bytes
+                .saturating_add(archive_bound)
+                .saturating_add(compressed_bound),
+            path,
+        )?;
+        self.charge_scratch(
+            source_archive_bytes
+                .saturating_add(archive_bound)
+                .saturating_add(compressed_bound),
+            path,
+        )?;
+        Ok((archive_bound, compressed_bound))
+    }
+
+    pub(super) fn preflight_package_bound(
+        &mut self,
+        source: &Package,
+        compressed_bound: usize,
+        path: Path,
+    ) -> Result<usize, Error> {
+        let (package_bound, reassembly_work) =
+            reassembly_cost(source.state.source.source_bytes().len(), compressed_bound)?;
+        // This is a conservative work/scratch envelope, not the exact ZIP
+        // result. The prepared reassembly below owns the public output and
+        // total-entry byte ceilings with its exact execution requirements.
+        // Applying this upper bound to those axes would reject a candidate
+        // whose exact size is permitted by the caller.
+        self.charge_limit(LimitKind::TransactionWork, reassembly_work, path)?;
+        Ok(package_bound)
+    }
+
+    pub(super) fn charge_reassembly(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+        path: Path,
+    ) -> Result<(), Error> {
+        self.observe_limit(LimitKind::OutputBytes, requirements.output_bytes(), path)?;
+        self.observe_limit(
+            LimitKind::TotalEntryBytes,
+            requirements.output_bytes(),
+            path,
+        )?;
+        self.charge_limit(LimitKind::Entries, requirements.offset_count(), path)?;
+        self.charge_limit(
+            LimitKind::RetainedBytes,
+            requirements.retained_bytes(),
+            path,
+        )?;
+        self.charge_scratch(requirements.scratch_bytes(), path)?;
+        self.charge_limit(LimitKind::TransactionWork, requirements.allocations(), path)
+    }
+
+    pub(super) fn precharge_candidate_reopen(
+        &mut self,
+        source: &Package,
+        candidate_bytes: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        self.observe_limit(LimitKind::OutputBytes, candidate_bytes, path)?;
+        self.observe_limit(LimitKind::RetainedBytes, candidate_bytes, path)?;
+        self.charge_scratch(candidate_bytes, path)?;
+        self.charge_limit(
+            LimitKind::TransactionWork,
+            candidate_bytes
+                .saturating_mul(2)
+                .saturating_add(source.state.source.components().len()),
+            path,
+        )?;
+        // A storage/settings rewrite preserves the package's object/message
+        // topology and reference metadata. Reserve that exact later semantic
+        // census before the final ZIP allocation so a transaction-work
+        // maximum-minus-one failure cannot occur only after publication bytes
+        // have already been materialized.
+        self.reserve_transaction_work(candidate_scan_work(source), path)?;
+        self.reserve_transaction_work(
+            128usize
+                .saturating_add(source.stats().total_objects().saturating_mul(3))
+                .saturating_add(source.state.source.components().len().saturating_mul(4)),
+            path,
+        )?;
+        self.note_candidate_reopen();
+        Ok(())
+    }
+
+    fn charge_scratch(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        charge(
+            &mut self.usage.scratch_bytes,
+            amount,
+            self.maximum_scratch_bytes,
+            LimitKind::RetainedBytes,
+            path,
+        )
+    }
+
+    pub(super) fn charge_candidate_scan(
+        &mut self,
+        candidate: &Package,
+        path: Path,
+    ) -> Result<(), Error> {
+        let components = candidate.state.source.components();
+        self.charge_limit(LimitKind::Entries, components.len(), path)?;
+        let mut objects = 0usize;
+        let mut messages = 0usize;
+        let mut references = 0usize;
+        for component in components.iter() {
+            objects = objects.saturating_add(component.archive().objects.len());
+            for object in &component.archive().objects {
+                messages = messages.saturating_add(object.messages.len());
+                for info in &object.archive_info.message_infos {
+                    references = references.saturating_add(info.object_references.len());
+                    references = references.saturating_add(info.data_references.len());
+                    for field in &info.field_infos {
+                        references = references.saturating_add(field.object_references.len());
+                        references = references.saturating_add(field.data_references.len());
+                    }
+                }
+            }
+        }
+        self.charge_limit(LimitKind::PayloadObjects, objects, path)?;
+        self.charge_limit(LimitKind::PayloadMessages, messages, path)?;
+        self.charge_references(references, path)?;
+        self.charge_limit(
+            LimitKind::TransactionWork,
+            objects
+                .saturating_add(messages)
+                .saturating_add(references)
+                .saturating_add(candidate.sections().len()),
             path,
         )
     }
@@ -206,6 +725,30 @@ impl TransactionBudget {
     fn note_candidate_reopen(&mut self) {
         self.usage.candidate_reopens = self.usage.candidate_reopens.saturating_add(1);
     }
+}
+
+fn candidate_scan_work(package: &Package) -> usize {
+    let mut objects = 0usize;
+    let mut messages = 0usize;
+    let mut references = 0usize;
+    for component in package.state.source.components().iter() {
+        objects = objects.saturating_add(component.archive().objects.len());
+        for object in &component.archive().objects {
+            messages = messages.saturating_add(object.messages.len());
+            for info in &object.archive_info.message_infos {
+                references = references.saturating_add(info.object_references.len());
+                references = references.saturating_add(info.data_references.len());
+                for field in &info.field_infos {
+                    references = references.saturating_add(field.object_references.len());
+                    references = references.saturating_add(field.data_references.len());
+                }
+            }
+        }
+    }
+    objects
+        .saturating_add(messages)
+        .saturating_add(references)
+        .saturating_add(package.sections().len())
 }
 
 fn charge(
@@ -391,10 +934,11 @@ pub(super) fn resolve_body_target(
         budget.charge_transaction_work(object.messages.len(), Path::Package)?;
         let (message_index, message) = unique_text_message(object, path)?;
         validate_selected_metadata(object, message_index, path)?;
-        budget.charge_fields(
-            message_field_count(&message.data, wire_limits(package)?)?,
-            path,
-        )?;
+        // Rooted storage payloads were already strictly decoded during
+        // package ingress. The changed commit charges the complete prepared
+        // text-wire report (including balanced unknown groups); counting via
+        // generic `WireView` here would both duplicate that scan and reject
+        // the text owner's source-preserving group policy.
         budget.charge_work(message.data.len(), path)?;
         found = Some(Target {
             position,
@@ -480,6 +1024,21 @@ pub(super) fn rewrite_package(
         .as_ref()
         .is_some_and(|location| location.component_name == component_name);
 
+    // Measure the selected archive and the complete package bound before
+    // reparsing the component or creating any rewritten archive buffers.  The
+    // text/section settings callers have already charged their strict wire
+    // plan; this physical preflight owns the archive, Snappy, ZIP, and
+    // candidate-reopen portions of the same transaction budget.
+    let original_message_bytes = selected_message(source, target)?.data.len();
+    let (_archive_bound, compressed_bound) = budget.preflight_archive_rewrite(
+        source,
+        target,
+        original_message_bytes,
+        rewritten_payload.len(),
+        path,
+    )?;
+    budget.preflight_package_bound(source, compressed_bound, Path::Package)?;
+
     let (mut archive, archive_limits) = editable_archive(source, &component_name)?;
     {
         let object = archive
@@ -555,34 +1114,37 @@ pub(super) fn rewrite_package(
         .ok_or(Error::InvalidSource {
             path: Path::Package,
         })?;
-    let (package_bound, reassembly_work) =
-        reassembly_cost(source.source_bytes().len(), compressed_len)?;
-    budget.charge_transaction_work(reassembly_work, Path::Package)?;
-    let post_output_work = package_bound
-        .saturating_mul(2)
-        .saturating_add(128)
-        .saturating_add(source.stats().total_objects().saturating_mul(2))
-        .saturating_add(source.state.source.components().len().saturating_mul(4));
-    budget.reserve_transaction_work(post_output_work, Path::Package)?;
-    let output = catalog
+    // Prepare the exact ZIP shape before allocating the final output.  The
+    // prepared plan also measures replacement compression and preserves the
+    // source ZIP's local/central records; execution is the sole output
+    // allocation for this phase.
+    let prepared = catalog
         .package()
-        .reassemble_with_deletions_to_bytes(&edits, &deletions, catalog.limits())
+        .prepare_reassembly_with_deletions(&edits, &deletions, catalog.limits())
         .map_err(map_archive_error)?;
-    budget.note_output_allocation();
-    if output.len() > package_bound {
+    let requirements = prepared.execution_requirements();
+    budget.charge_reassembly(requirements, Path::Package)?;
+    let package_bound = requirements.output_bytes();
+    if compressed_len > compressed_bound {
         return Err(Error::Verification {
             path: Path::Package,
         });
     }
-    budget.charge_transaction_work(
-        output.len().saturating_mul(2).saturating_add(128),
-        Path::Package,
-    )?;
-    budget.note_candidate_reopen();
+    budget.precharge_candidate_reopen(source, package_bound, Path::Package)?;
+    let output = prepared
+        .execute(requirements.exact_limits())
+        .map_err(map_archive_error)?;
+    budget.note_output_allocation();
+    if output.len() != package_bound {
+        return Err(Error::Verification {
+            path: Path::Package,
+        });
+    }
     let candidate_source =
         SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
             .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
+    budget.charge_candidate_scan(&candidate, Path::Package)?;
     let target_layout_state = if invalidate_layout {
         page_layout::view_state_layout_identifier(&candidate).map_err(map_page_layout_error)?
     } else {
@@ -1122,7 +1684,7 @@ mod tests {
                 small.references,
                 small.transaction_work
             ),
-            (86, 600, 4, 292_154),
+            (86, 600, 7, 3_231_148),
         );
         assert_eq!(
             (
@@ -1131,7 +1693,7 @@ mod tests {
                 large.references,
                 large.transaction_work
             ),
-            (86, 600, 4, 587_222),
+            (86, 600, 7, 6_483_224),
         );
         for (small_counter, large_counter) in [
             (small.fields, large.fields),

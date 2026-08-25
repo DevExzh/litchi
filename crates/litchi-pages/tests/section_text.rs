@@ -17,6 +17,8 @@ const BODY_IDENTIFIER: u64 = 42;
 const FIRST_SECTION_IDENTIFIER: u64 = 43;
 const SECOND_SECTION_IDENTIFIER: u64 = 44;
 const THIRD_SECTION_IDENTIFIER: u64 = 45;
+const DRAWABLES_ZORDER_IDENTIFIER: u64 = 46;
+const UNSELECTED_BODY_ALIAS_IDENTIFIER: u64 = 4_242;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const UNRELATED_STORAGE_MESSAGE_TYPE: u32 = 2_002;
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
@@ -122,6 +124,7 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
         super_: tsa::DocumentArchive::default(),
         body_storage: Some(reference(BODY_IDENTIFIER)),
         section: Some(reference(FIRST_SECTION_IDENTIFIER)),
+        drawables_zorder: Some(reference(DRAWABLES_ZORDER_IDENTIFIER)),
         ..tp::DocumentArchive::default()
     };
     let text = fragments.into_iter().map(str::to_owned).collect::<Vec<_>>();
@@ -205,6 +208,15 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
         vec![section_message("Middle", 22)?],
     )?;
     let third = ArchiveObject::new(THIRD_SECTION_IDENTIFIER, vec![section_message("Last", 33)?])?;
+    let mut zorder = object(
+        DRAWABLES_ZORDER_IDENTIFIER,
+        10_015,
+        tp::DrawablesZOrderArchive {
+            drawables: vec![reference(BODY_IDENTIFIER)],
+        }
+        .encode_to_vec(),
+    )?;
+    zorder.archive_info.message_infos[0].object_references = vec![BODY_IDENTIFIER];
     let document = component_with_unknown_header(
         vec![
             object(1, 10_000, root.encode_to_vec())?,
@@ -212,6 +224,7 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
             first,
             second,
             third,
+            zorder,
         ],
         BODY_IDENTIFIER,
     )?;
@@ -348,6 +361,149 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
         )],
         Limits::default(),
     )?)
+}
+
+fn package_with_wrong_known_table_wire() -> TestResult<Vec<u8>> {
+    let bytes = synthetic_package()?;
+    let stream = document_stream(&bytes)?;
+    let mut archive = Archive::parse(&stream)?;
+    let body = archive
+        .object_mut(BODY_IDENTIFIER)
+        .ok_or_else(|| io::Error::other("missing synthetic body"))?;
+    let message_index = body
+        .messages
+        .iter()
+        .position(|message| message.type_ == STORAGE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("missing synthetic body message"))?;
+    let mut payload = body.messages[message_index].data.clone();
+    // TSWP.StorageArchive.table_section is field 17 and must be a
+    // length-delimited message. A scalar with the same known field number
+    // must be rejected before the lazy text projection can publish.
+    litchi_iwa_common::wire::append_varint_field(&mut payload, 17, 1)?;
+    body.replace_message(
+        message_index,
+        RawMessage {
+            type_: STORAGE_MESSAGE_TYPE,
+            data: payload,
+        },
+    )?;
+    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let catalog = Catalog::from_bytes(&bytes)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?)
+}
+
+fn opaque_unknown_scalar() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    // Unknown scalar value 1 encoded with three bytes instead of its
+    // canonical one-byte representation.
+    encode_varint_into(&mut bytes, 98_u64 << 3);
+    bytes.extend_from_slice(&[0x81, 0x80, 0x00]);
+    bytes
+}
+
+fn opaque_unknown_group() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    // A balanced unknown group containing another overlong unknown scalar.
+    encode_varint_into(&mut bytes, (97_u64 << 3) | 3);
+    encode_varint_into(&mut bytes, 96_u64 << 3);
+    bytes.extend_from_slice(&[0x81, 0x00]);
+    encode_varint_into(&mut bytes, (97_u64 << 3) | 4);
+    bytes
+}
+
+fn opaque_unknown_wire() -> Vec<u8> {
+    [opaque_unknown_scalar(), opaque_unknown_group()].concat()
+}
+
+fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
+    let bytes = synthetic_package()?;
+    let stream = document_stream(&bytes)?;
+    let mut archive = Archive::parse(&stream)?;
+    let body = archive
+        .object_mut(BODY_IDENTIFIER)
+        .ok_or_else(|| io::Error::other("missing synthetic body"))?;
+    let message_index = body
+        .messages
+        .iter()
+        .position(|message| message.type_ == STORAGE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("missing synthetic body message"))?;
+    let mut payload = body.messages[message_index].data.clone();
+    payload.extend_from_slice(&opaque_unknown_wire());
+    body.replace_message(
+        message_index,
+        RawMessage {
+            type_: STORAGE_MESSAGE_TYPE,
+            data: payload,
+        },
+    )?;
+    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let catalog = Catalog::from_bytes(&bytes)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?)
+}
+
+fn package_with_unselected_body_alias() -> TestResult<Vec<u8>> {
+    let bytes = synthetic_package()?;
+    let stream = document_stream(&bytes)?;
+    let source_archive = Archive::parse(&stream)?;
+    let mut unrelated_archive = Archive::parse(&{
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let entry = catalog
+            .iter()
+            .find(|entry| entry.name() == UNRELATED_MEMBER)
+            .ok_or_else(|| io::Error::other("missing unrelated component"))?;
+        SnappyStream::decompress(entry.data())?.into_bytes()
+    })?;
+    let mut alias = source_archive
+        .object(BODY_IDENTIFIER)
+        .cloned()
+        .ok_or_else(|| io::Error::other("missing source body for alias"))?;
+    alias.archive_info.identifier = Some(UNSELECTED_BODY_ALIAS_IDENTIFIER);
+    unrelated_archive.append_objects(vec![alias])?;
+    let compressed = SnappyStream::compress(&unrelated_archive.to_bytes()?)?;
+    let catalog = Catalog::from_bytes(&bytes)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            UNRELATED_MEMBER,
+            &compressed,
+        )],
+        Limits::default(),
+    )?)
+}
+
+fn member_message_payload(
+    package: &[u8],
+    member: &str,
+    identifier: u64,
+    type_: u32,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == member)
+        .ok_or_else(|| io::Error::other("missing requested component"))?;
+    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
+    let archive = Archive::parse(&stream)?;
+    let object = archive
+        .object(identifier)
+        .ok_or_else(|| io::Error::other("missing requested object"))?;
+    let message = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == type_)
+        .ok_or_else(|| io::Error::other("missing requested message"))?;
+    Ok(message.data.clone())
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -768,6 +924,66 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
 }
 
 #[test]
+fn changed_text_preserves_unselected_body_alias_and_member_locality() -> TestResult<()> {
+    let bytes = package_with_unselected_body_alias()?;
+    let package = Package::from_bytes(&bytes)?;
+    let alias_before = member_message_payload(
+        &bytes,
+        UNRELATED_MEMBER,
+        UNSELECTED_BODY_ALIAS_IDENTIFIER,
+        STORAGE_MESSAGE_TYPE,
+    )?;
+
+    let mut edit = package.edit_section_text(SectionSelector::name("Middle"))?;
+    edit.set("alias-safe")?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    let target = exact_bytes(commit.package())?;
+    assert_eq!(
+        member_message_payload(
+            &target,
+            UNRELATED_MEMBER,
+            UNSELECTED_BODY_ALIAS_IDENTIFIER,
+            STORAGE_MESSAGE_TYPE,
+        )?,
+        alias_before
+    );
+    assert_untouched_zip_members(&bytes, &target)?;
+
+    let restored = commit
+        .package()
+        .apply_section_text(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, bytes);
+    Ok(())
+}
+
+#[test]
+fn changed_text_preserves_unknown_overlong_scalar_and_group_bytes() -> TestResult<()> {
+    let bytes = package_with_opaque_body_unknowns()?;
+    let package = Package::from_bytes(&bytes)?;
+    let source_body = message_payload(&bytes, BODY_IDENTIFIER, STORAGE_MESSAGE_TYPE)?;
+    let unknown = opaque_unknown_wire();
+    assert!(source_body.ends_with(&unknown));
+
+    let mut edit = package.edit_section_text(SectionSelector::index(1))?;
+    edit.insert(TextPosition::ZERO, "opaque")?;
+    let commit = edit.commit()?;
+    let target = exact_bytes(commit.package())?;
+    let target_body = message_payload(&target, BODY_IDENTIFIER, STORAGE_MESSAGE_TYPE)?;
+    assert!(target_body.ends_with(&unknown));
+    assert_eq!(
+        target_body[target_body.len() - unknown.len()..],
+        source_body[source_body.len() - unknown.len()..]
+    );
+
+    let restored = commit
+        .package()
+        .apply_section_text(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, bytes);
+    Ok(())
+}
+
+#[test]
 fn concurrent_section_text_commits_are_isolated_and_source_remains_immutable() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let package = Arc::new(Package::from_bytes(&bytes)?);
@@ -971,6 +1187,7 @@ fn set_clear_and_delete_preserve_neighboring_sections() -> TestResult<()> {
     );
 
     let set_package = set_commit.into_package();
+    let set_bytes = exact_bytes(&set_package)?;
     let clear_commit = set_package.clear_section_text(SectionSelector::name("First"))?;
     assert_eq!(
         clear_commit
@@ -991,6 +1208,7 @@ fn set_clear_and_delete_preserve_neighboring_sections() -> TestResult<()> {
         restored.package().section_text(SectionSelector::index(0))?,
         "First😀"
     );
+    assert_eq!(exact_bytes(restored.package())?, set_bytes);
 
     let clear_package = clear_commit.into_package();
     let mut delete_edit = clear_package.edit_section_text(SectionSelector::index(1))?;
@@ -1031,12 +1249,115 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
 }
 
 #[test]
+fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<()> {
+    let bytes = synthetic_package()?;
+    let replacement = "exact-output-limit";
+    let unrestricted = Package::from_bytes(&bytes)?;
+    let mut target_edit = unrestricted.edit_section_text(SectionSelector::index(1))?;
+    target_edit.set(replacement)?;
+    let target = target_edit.commit()?;
+    let target_bytes = exact_bytes(target.package())?;
+    assert!(target_bytes.len() > bytes.len());
+
+    let defaults = Limits::default();
+    let exact_limits = Limits::new(
+        u64::try_from(target_bytes.len())?,
+        defaults.max_entries(),
+        defaults.max_entry_bytes(),
+        defaults.max_total_bytes(),
+        defaults.max_iwa_stream_bytes(),
+    )?;
+    let exact_package = Package::from_bytes_with_limits(&bytes, exact_limits)?;
+    let exact_commit = exact_package.set_section_text(SectionSelector::index(1), replacement)?;
+    assert_eq!(exact_bytes(exact_commit.package())?, target_bytes);
+
+    let limited_limits = Limits::new(
+        u64::try_from(target_bytes.len() - 1)?,
+        defaults.max_entries(),
+        defaults.max_entry_bytes(),
+        defaults.max_total_bytes(),
+        defaults.max_iwa_stream_bytes(),
+    )?;
+    let limited_package = Package::from_bytes_with_limits(&bytes, limited_limits)?;
+    let source_before = exact_bytes(&limited_package)?;
+    let mut limited_edit = limited_package.edit_section_text(SectionSelector::index(1))?;
+    limited_edit.set(replacement)?;
+    assert!(matches!(
+        limited_edit.commit(),
+        Err(SectionTextError::LimitExceeded {
+            kind: SectionTextLimitKind::OutputBytes,
+            ..
+        })
+    ));
+    assert_eq!(exact_bytes(&limited_package)?, source_before);
+    Ok(())
+}
+
+#[test]
+fn public_physical_read_limits_fail_closed_without_mutating_source_bytes() -> TestResult<()> {
+    let bytes = synthetic_package()?;
+    let source_snapshot = bytes.clone();
+    let defaults = Limits::default();
+    let profiles = [
+        Limits::new(
+            u64::try_from(bytes.len() - 1)?,
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?,
+        Limits::new(
+            defaults.max_input_bytes(),
+            2,
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?,
+        Limits::new(
+            defaults.max_input_bytes(),
+            defaults.max_entries(),
+            1,
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?,
+        Limits::new(
+            defaults.max_input_bytes(),
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            1,
+            defaults.max_iwa_stream_bytes(),
+        )?,
+        Limits::new(
+            defaults.max_input_bytes(),
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            1,
+        )?,
+    ];
+    for limits in profiles {
+        assert!(Package::from_bytes_with_limits(&bytes, limits).is_err());
+        assert_eq!(bytes, source_snapshot);
+    }
+    Ok(())
+}
+
+#[test]
 fn malformed_known_text_tables_fail_closed_before_lazy_projection() -> TestResult<()> {
-    let bytes = package_with_duplicate_known_table()?;
-    let error = Package::from_bytes(&bytes)
-        .err()
-        .ok_or_else(|| io::Error::other("duplicate known tables must fail bounded ingress"))?;
-    assert!(matches!(&error, PackageError::InvalidFormat(_)));
-    assert!(error.to_string().contains("failed bounded validation"));
+    for (bytes, label) in [
+        (
+            package_with_duplicate_known_table()?,
+            "duplicate known tables",
+        ),
+        (
+            package_with_wrong_known_table_wire()?,
+            "wrong-wire known table",
+        ),
+    ] {
+        let error = Package::from_bytes(&bytes)
+            .err()
+            .ok_or_else(|| io::Error::other(format!("{label} must fail bounded ingress")))?;
+        assert!(matches!(&error, PackageError::InvalidFormat(_)));
+    }
     Ok(())
 }

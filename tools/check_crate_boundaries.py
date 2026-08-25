@@ -4930,6 +4930,256 @@ PAGES_HEADER_FOOTER_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tsd", "tsp", "tswp"}
 )
 
+# Section body text is now a selector-first Pages package capability.  Keep
+# the host retirement inventory separate from the older generic deprecation
+# check above: once the private owner is present, the raw-ID methods and the
+# entire focused/legacy fallback bridge must disappear, including production
+# callsites in examples and documentation.  cfg(test) items are masked one
+# item at a time so test fixtures cannot hide a later production path.
+RETIRED_IWA_PAGES_SECTION_TEXT_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "section_content.rs"
+)
+RETIRED_IWA_PAGES_SECTION_TEXT_METHODS = (
+    "section_text",
+    "replace_section_text",
+    "set_section_text",
+    "clear_section_text",
+)
+RETIRED_IWA_PAGES_SECTION_TEXT_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_SECTION_TEXT_METHODS
+)
+RETIRED_IWA_PAGES_SECTION_TEXT_HELPERS = frozenset(
+    {
+        "legacy_section_text",
+        "legacy_set_section_text",
+        "focused_section_package",
+        "focused_sections_match",
+        "publish_focused_section_commit",
+        "focused_source_fallback",
+        "semantic_read_fallback",
+        "semantic_edit_fallback",
+        "focused_pages_limits",
+        "map_section_text_error",
+        "host_section_topology_matches",
+        "section_position",
+        "section_content_range",
+        "section_content_range_at",
+        "opaque_optional_footnote_error",
+        "malformed_optional_footnote_payload_error",
+    }
+)
+RETIRED_IWA_PAGES_SECTION_TEXT_TYPES = frozenset(
+    {
+        "FocusedSectionPackage",
+        "FocusedBridgeBudget",
+        "FocusedCandidateWriter",
+    }
+)
+RETIRED_IWA_PAGES_SECTION_TEXT_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_pages_section_text.rs"
+)
+IWA_PAGES_SECTION_TEXT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_SECTION_TEXT_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?(?P<method>"
+        r"section_text|replace_section_text|set_section_text|clear_section_text)"
+        r"\b[ \t\r\n]*\(",
+    ),
+)
+IWA_PAGES_SECTION_TEXT_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?(?P<method>"
+    r"section_text|replace_section_text|set_section_text|clear_section_text)"
+    r"\b[ \t\r\n]*\(",
+)
+IWA_PAGES_SECTION_TEXT_LEGACY_MARKERS = frozenset(
+    {
+        "legacy_section_text",
+        "legacy_set_section_text",
+        "focused_section_package",
+        "focused_sections_match",
+        "publish_focused_section_commit",
+        "focused_source_fallback",
+        "semantic_read_fallback",
+        "semantic_edit_fallback",
+        "focused_pages_limits",
+        "map_section_text_error",
+        "host_section_topology_matches",
+        "section_position",
+        "section_content_range",
+        "section_content_range_at",
+        "opaque_optional_footnote_error",
+        "malformed_optional_footnote_payload_error",
+        "FOCUSED_INGRESS_FACTOR",
+        "FOCUSED_READBACK_FACTOR",
+        "legacy_fallback",
+        "LegacyFallback",
+    }
+)
+PAGES_SECTION_TEXT_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_SECTION_TEXT_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "section_text.rs"
+PAGES_SECTION_TEXT_OWNER_HELPER_ROOT = PAGES_SOURCE_ROOT / "package" / "section_text"
+PAGES_SECTION_TEXT_IMPLEMENTATION_SOURCES = (
+    PAGES_SECTION_TEXT_SEMANTIC_SOURCE,
+    PAGES_SECTION_TEXT_OWNER_SOURCE,
+)
+PAGES_SECTION_TEXT_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SECTION_TEXT_SEMANTIC_SOURCE,
+)
+PAGES_SECTION_TEXT_SELECTOR_SOURCE = PAGES_SECTION_TEXT_SEMANTIC_SOURCE
+PAGES_SECTION_TEXT_SEMANTIC_TYPES = ("SectionSelector",)
+PAGES_SECTION_TEXT_CANONICAL_TYPES = (
+    "SectionTextCommit",
+    "SectionTextDiagnostics",
+    "SectionTextEdit",
+    "SectionTextError",
+    "SectionTextLimitKind",
+    "SectionTextPatch",
+)
+PAGES_SECTION_TEXT_SHORT_NAMES = frozenset(
+    PAGES_SECTION_TEXT_CANONICAL_TYPES + PAGES_SECTION_TEXT_SEMANTIC_TYPES
+)
+PAGES_SECTION_TEXT_PUBLIC_NAMES = PAGES_SECTION_TEXT_SHORT_NAMES
+PAGES_SECTION_TEXT_ALLOWED_PUBLIC_IDENTIFIERS = frozenset(
+    {
+        "AmbiguousSelector",
+        "Allocation",
+        "BodySectionCount",
+        "DependentContent",
+        "FootnoteAnchorReplacement",
+        "InvalidSource",
+        "LimitExceeded",
+        "NameNotFound",
+        "ObjectMarkerReplacement",
+        "OperationAlreadyStaged",
+        "PatchConflict",
+        "PositionNotFound",
+        "SectionBreakReplacement",
+        "SpanOutOfBounds",
+        "SurrogateBoundary",
+        "UnsupportedSource",
+        "Verification",
+        "WireBytes",
+        "WireFields",
+        "WireNesting",
+        "WireWork",
+    }
+)
+PAGES_SECTION_TEXT_PACKAGE_METHODS = (
+    "section_text",
+    "edit_section_text",
+    "set_section_text",
+    "clear_section_text",
+    "apply_section_text",
+)
+PAGES_SECTION_TEXT_FLAT_METHODS = frozenset(
+    {
+        "text",
+        "body_text",
+        "edit_text",
+        "set_text",
+        "clear_text",
+        "replace_text",
+        "apply_text",
+    }
+)
+PAGES_SECTION_TEXT_FLAT_ALIASES = frozenset(
+    {
+        "SectionText",
+        "SectionBodyText",
+        "SectionTextValue",
+        "SectionTextRegion",
+        "SectionTextInfo",
+        "SectionTextEdit",
+        "SectionTextPatch",
+        "SectionTextCommit",
+        "SectionTextDiagnostics",
+        "SectionTextError",
+        "SectionTextLimitKind",
+        "PagesSectionText",
+        "PagesSectionTextEdit",
+        "PagesSectionTextPatch",
+        "PagesSectionTextCommit",
+        "PagesSectionTextDiagnostics",
+        "PagesSectionTextError",
+        "PagesSectionTextLimitKind",
+        "TextStorageId",
+    }
+)
+PAGES_SECTION_TEXT_ALIAS_TARGETS = frozenset(
+    PAGES_SECTION_TEXT_CANONICAL_TYPES + PAGES_SECTION_TEXT_SEMANTIC_TYPES
+)
+PAGES_SECTION_TEXT_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:section_text|section[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?text)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_SECTION_TEXT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?selector\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_SECTION_TEXT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod[ \t\r\n]+"
+    r"(?:r#)?section_text\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_PACKAGE_SECTION_TEXT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?section_text\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_SECTION_TEXT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "NativeSectionReference",
+        "RawMessage",
+        "Resolved",
+        "SectionArchive",
+        "SectionTextArchive",
+        "SectionTextSnapshot",
+        "SnappyStream",
+        "SourceCatalog",
+        "Storage",
+        "StorageArchive",
+        "StorageWireLimitsError",
+        "TextStorage",
+        "TextStorageId",
+    }
+)
+PAGES_SECTION_TEXT_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_SECTION_TEXT_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tp", "tsd", "tsp", "tswp"}
+)
+PAGES_SECTION_TEXT_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|section|storage|text|native|archive|message|component|"
+    r"entry|metadata|package|uuid)[A-Za-z_]*(?:id|identifier))"
+    r"[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
     "document_options",
     "set_document_options",
@@ -7848,6 +8098,62 @@ def _is_pages_header_footer_public_declaration(
         identifiers
         & (PAGES_HEADER_FOOTER_FLAT_ALIASES | PAGES_HEADER_FOOTER_PUBLIC_NAMES)
     ) or _pages_header_footer_owner_declaration(declaration)
+
+
+def _pages_section_text_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in section-text APIs."""
+
+    if identifier in PAGES_SECTION_TEXT_ALLOWED_PUBLIC_IDENTIFIERS:
+        return None
+    if identifier in PAGES_SECTION_TEXT_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_SECTION_TEXT_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_SECTION_TEXT_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_section_text_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_SECTION_TEXT_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_SECTION_TEXT_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_section_text_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (
+            PAGES_SECTION_TEXT_FLAT_ALIASES
+            | PAGES_SECTION_TEXT_PUBLIC_NAMES
+            | set(PAGES_SECTION_TEXT_PACKAGE_METHODS)
+            | PAGES_SECTION_TEXT_FLAT_METHODS
+        )
+    ) or _pages_section_text_owner_declaration(declaration)
 
 
 def _is_pages_table_lock_public_declaration(
@@ -13039,6 +13345,145 @@ def audit_iwa_pages_header_footer_source_topology(
                 "retired litchi-iwa Pages header/footer README info type: "
                 f"{IWA_PAGES_README}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def _pages_section_text_owner_present(root: Path) -> bool:
+    """Return whether the focused Pages section-text owner has landed."""
+
+    return (root / PAGES_SECTION_TEXT_OWNER_SOURCE).is_file()
+
+
+def audit_iwa_pages_section_text_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Pages section-text methods after owner activation.
+
+    The package owner is the activation token.  Once present, no raw section
+    identity, focused fallback bridge, or old example/documentation route may
+    remain in production.  Individual ``cfg(test)`` items are masked rather
+    than truncating a source file at its first test module.
+    """
+
+    if not _pages_section_text_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            # `editor/tests.rs` is included by an outer `#[cfg(test)] mod`
+            # declaration and therefore has no item-level attribute of its
+            # own.  It is wholly test-only, so keep it outside production
+            # retirement scanning while preserving item-level masking for
+            # mixed production modules.
+            if path == root / IWA_PAGES_EDITOR_TEST_SOURCE:
+                continue
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            code = _mask_rust_non_code(production_source)
+            for name, line_number in _rust_function_declarations(production_source):
+                if name in RETIRED_IWA_PAGES_SECTION_TEXT_METHOD_SET:
+                    violations.append(
+                        "retired litchi-iwa Pages section-text method "
+                        f"{name}: {path.relative_to(root)}:{line_number}"
+                    )
+
+            for name, line_number in _rust_function_declarations(production_source):
+                if name in RETIRED_IWA_PAGES_SECTION_TEXT_HELPERS:
+                    violations.append(
+                        "retired litchi-iwa Pages section-text legacy helper "
+                        f"{name}: {path.relative_to(root)}:{line_number}"
+                    )
+
+            for type_name in sorted(RETIRED_IWA_PAGES_SECTION_TEXT_TYPES):
+                for match in re.finditer(
+                    rf"\b(?:struct|enum|type)\s+{re.escape(type_name)}\b", code
+                ):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages section-text bridge type "
+                        f"{type_name}: {path.relative_to(root)}:{line_number}"
+                    )
+
+            for marker in sorted(IWA_PAGES_SECTION_TEXT_LEGACY_MARKERS):
+                for match in re.finditer(
+                    rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                    code,
+                ):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    # The declarations/helpers above have a more useful
+                    # diagnostic; this catches a helper imported or called
+                    # from another production module.
+                    if marker in RETIRED_IWA_PAGES_SECTION_TEXT_HELPERS:
+                        continue
+                    violations.append(
+                        "retired litchi-iwa Pages section-text legacy fallback "
+                        f"{marker}: {path.relative_to(root)}:{line_number}"
+                    )
+
+            for match in IWA_PAGES_SECTION_TEXT_CALL.finditer(code):
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                line = code[line_start:line_end]
+                # Calls on the focused package are the replacement seam.  A
+                # host receiver (including `self`) is the retired raw-ID API.
+                if (
+                    "Package::" in line
+                    or ".package." in line
+                    or match.group("receiver") in {"package", "focused_package"}
+                ):
+                    continue
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    line,
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages section-text call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_SECTION_TEXT_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            )
+            for match in IWA_PAGES_SECTION_TEXT_CALL.finditer(source):
+                if match.group("receiver") in {"package", "focused_package"}:
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages section-text example call "
+                    f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
+                )
+            for marker in sorted(IWA_PAGES_SECTION_TEXT_LEGACY_MARKERS):
+                if re.search(
+                    rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                    source,
+                ):
+                    line_number = source.count("\n", 0, source.find(marker)) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages section-text example legacy "
+                        f"fallback {marker}: {example_path.relative_to(root)}:{line_number}"
+                    )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_SECTION_TEXT_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages section-text README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
 
     return sorted(set(violations))
 
@@ -19911,6 +20356,276 @@ def audit_pages_header_footer_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_pages_section_text_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Pages section-text owner."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir() or not _pages_section_text_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / PAGES_SECTION_TEXT_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        )
+        if semantic_path.is_file()
+        else ""
+    )
+    for name in PAGES_SECTION_TEXT_SEMANTIC_TYPES:
+        if name in _rust_canonical_exports(semantic_source, frozenset({name})):
+            continue
+        violations.append(
+            "focused litchi-pages section-text public API is missing semantic "
+            f"selector type {name}: {PAGES_SECTION_TEXT_SEMANTIC_SOURCE}"
+        )
+
+    owner_path = root / PAGES_SECTION_TEXT_OWNER_SOURCE
+    owner_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        )
+        if owner_path.is_file()
+        else ""
+    )
+    owner_exports = _rust_canonical_exports(
+        owner_source, frozenset(PAGES_SECTION_TEXT_CANONICAL_TYPES)
+    )
+    for name in PAGES_SECTION_TEXT_CANONICAL_TYPES:
+        if name in owner_exports:
+            continue
+        violations.append(
+            "focused litchi-pages section-text public API is missing canonical "
+            f"package type {name}: {PAGES_SECTION_TEXT_OWNER_SOURCE}"
+        )
+
+    owner_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in PAGES_SECTION_TEXT_PACKAGE_METHODS:
+        if method not in owner_methods:
+            violations.append(
+                "focused litchi-pages section-text public API is missing Package "
+                f"method {method}: {PAGES_SECTION_TEXT_OWNER_SOURCE}"
+            )
+    for method in sorted(PAGES_SECTION_TEXT_FLAT_METHODS & owner_methods):
+        violations.append(
+            "focused litchi-pages section-text public API retains flat Package "
+            f"method {method}: {PAGES_SECTION_TEXT_OWNER_SOURCE}"
+        )
+
+    lib_path = root / PAGES_SECTION_TEXT_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        )
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_SECTION_TEXT_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages section-text public API is missing canonical "
+            f"root selector module: {PAGES_SECTION_TEXT_EXPORT_SOURCES[0]}"
+        )
+    if "SectionSelector" not in _rust_canonical_exports(
+        lib_source, frozenset({"SectionSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages section-text public API is missing root "
+            f"SectionSelector re-export: {PAGES_SECTION_TEXT_EXPORT_SOURCES[0]}"
+        )
+    for name in PAGES_SECTION_TEXT_CANONICAL_TYPES:
+        if name in _rust_canonical_exports(lib_source, frozenset({name})):
+            continue
+        violations.append(
+            "focused litchi-pages section-text public API is missing root "
+            f"re-export {name}: {PAGES_SECTION_TEXT_EXPORT_SOURCES[0]}"
+        )
+
+    package_path = root / PAGES_SECTION_TEXT_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    if PAGES_PACKAGE_SECTION_TEXT_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-pages section-text public API is missing private "
+            f"package owner module: {PAGES_SECTION_TEXT_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_PAGES_PACKAGE_SECTION_TEXT_MODULE.finditer(package_source):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-pages section-text public API exposes public "
+            f"package::section_text module: {PAGES_SECTION_TEXT_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    # Inspect the complete focused source tree after masking each cfg(test)
+    # item.  This prevents a sibling module or root glob from laundering the
+    # selector or section-text implementation into a second public route.
+    root_selector_module_seen = False
+    for path in sorted(source_root.rglob("*.rs")):
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        for declaration, line_number in _rust_public_declarations(production_source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "selector"]:
+                if path != lib_path or root_selector_module_seen:
+                    violations.append(
+                        "focused litchi-pages section-text public API exposes duplicate "
+                        f"selector module: {path.relative_to(root)}:{line_number}"
+                    )
+                if path == lib_path:
+                    root_selector_module_seen = True
+            if identifiers[:3] == ["pub", "mod", "section_text"]:
+                violations.append(
+                    "focused litchi-pages section-text public API exposes duplicate "
+                    f"section_text module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {"section_text", "selector", "package"} & set(identifiers):
+                    violations.append(
+                        "focused litchi-pages section-text public API retains root "
+                        "aliases via owner glob: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_SECTION_TEXT_ALIAS_TARGETS
+                    or "section_text" in target_identifiers
+                    or "selector" in target_identifiers
+                ) and alias and alias != target:
+                    violations.append(
+                        "focused litchi-pages section-text public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_SECTION_TEXT_ALIAS_TARGETS
+                    or "section_text" in target_identifiers
+                    or "selector" in target_identifiers
+                ) and alias != target:
+                    violations.append(
+                        "focused litchi-pages section-text public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_SECTION_TEXT_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_SECTION_TEXT_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_SECTION_TEXT_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            )
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(production_source)
+            )
+        for declaration, line_number, public_declaration, complete_scope in declarations:
+            if not _is_pages_section_text_public_declaration(
+                declaration, dedicated_source=complete_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages section-text public API retains root "
+                    f"aliases via owner glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_SECTION_TEXT_FLAT_ALIASES:
+                    # The canonical transaction names are public by design in
+                    # the focused owner; only alternate/legacy spellings are
+                    # flat aliases.
+                    if identifier not in PAGES_SECTION_TEXT_CANONICAL_TYPES:
+                        violations.append(
+                            "focused litchi-pages section-text public API retains flat "
+                            f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                        )
+                reason = _pages_section_text_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages section-text public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            if "fn" in identifiers and re.search(
+                r"\:\s*(?:&\s*)?u64\b", declaration
+            ):
+                violations.append(
+                    "focused litchi-pages section-text public API exposes raw u64: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in PAGES_SECTION_TEXT_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-pages section-text public API exposes raw identifier "
+                    f"parameter {match.group(0).strip()}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages section-text public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_settings_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Pages document-settings APIs and modules out of the host."""
 
@@ -20947,6 +21662,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_dimension_facade_source_topology()
         + audit_iwa_pages_header_footer_source_topology()
         + audit_pages_header_footer_facade_source_topology()
+        + audit_iwa_pages_section_text_source_topology()
+        + audit_pages_section_text_facade_source_topology()
         + audit_iwa_pages_chart_caption_source_topology()
         + audit_iwa_pages_drawable_order_source_topology()
         + audit_iwa_pages_document_settings_source_topology()

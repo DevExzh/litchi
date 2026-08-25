@@ -9,7 +9,7 @@
     reason = "Every retained maximum has a matching explicit accessor"
 )]
 
-use std::{mem::size_of, ops::Range};
+use std::{borrow::Cow, mem::size_of, ops::Range};
 
 #[cfg(test)]
 std::thread_local! {
@@ -399,6 +399,100 @@ pub struct StorageRewriteExecutionReport {
     pub work: usize,
 }
 
+/// Exact source-scan facts established by a prepared storage rewrite.
+///
+/// The report is output-free from the caller's perspective: it describes the
+/// strict raw pass, schema walk, and text planning that have already happened
+/// while constructing [`PreparedStorageRewrite`]. Candidate output and its
+/// retained/scratch allocation requirements remain in
+/// [`StorageRewriteExecutionRequirements`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StorageRewritePrepareReport {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work: usize,
+    max_depth: usize,
+    table_entries: usize,
+    references: usize,
+    text_bytes: usize,
+    text_units: usize,
+    fragments: usize,
+    has_unknown_wire_fields: bool,
+}
+
+impl StorageRewritePrepareReport {
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    #[must_use]
+    pub const fn work(self) -> usize {
+        self.work
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn max_nesting(self) -> usize {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn table_entries(self) -> usize {
+        self.table_entries
+    }
+
+    #[must_use]
+    pub const fn references(self) -> usize {
+        self.references
+    }
+
+    #[must_use]
+    pub const fn reference_occurrences(self) -> usize {
+        self.references
+    }
+
+    #[must_use]
+    pub const fn text_bytes(self) -> usize {
+        self.text_bytes
+    }
+
+    #[must_use]
+    pub const fn text_units(self) -> usize {
+        self.text_units
+    }
+
+    #[must_use]
+    pub const fn fragments(self) -> usize {
+        self.fragments
+    }
+
+    #[must_use]
+    pub const fn has_unknown_wire_fields(self) -> bool {
+        self.has_unknown_wire_fields
+    }
+}
+
 /// Strict output-free rewrite plan. It borrows source and replacement text;
 /// execution alone materializes candidate bytes or reference vectors.
 pub struct PreparedStorageRewrite<'source, 'replacement> {
@@ -408,6 +502,7 @@ pub struct PreparedStorageRewrite<'source, 'replacement> {
     text: TextPlan,
     root: RootPlan,
     limits: RewriteLimits,
+    prepare_report: StorageRewritePrepareReport,
     requirements: StorageRewriteExecutionRequirements,
 }
 
@@ -415,6 +510,11 @@ impl PreparedStorageRewrite<'_, '_> {
     #[must_use]
     pub const fn execution_requirements(&self) -> StorageRewriteExecutionRequirements {
         self.requirements
+    }
+
+    #[must_use]
+    pub const fn prepare_report(&self) -> StorageRewritePrepareReport {
+        self.prepare_report
     }
 
     #[must_use]
@@ -619,9 +719,23 @@ struct RawField<'source> {
     key_end: usize,
     payload_start: usize,
     end: usize,
+    key_canonical: bool,
+    length_canonical: bool,
+    group_fields: usize,
+    group_depth: usize,
 }
 
 impl<'source> RawField<'source> {
+    fn require_canonical_framing(self, label: &'static str) -> RewriteResult<()> {
+        if !self.key_canonical || !self.length_canonical {
+            return Err(invalid_owned(format!(
+                "{label} field {} has noncanonical protobuf framing",
+                self.number
+            )));
+        }
+        Ok(())
+    }
+
     fn canonical_payload(
         self,
         expected_wire: u8,
@@ -633,6 +747,7 @@ impl<'source> RawField<'source> {
                 self.number, self.wire_type
             )));
         }
+        self.require_canonical_framing(label)?;
         Ok(self.payload())
     }
 
@@ -677,6 +792,13 @@ struct RawFields<'source> {
     offset: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct GroupScan {
+    end: usize,
+    fields: usize,
+    depth: usize,
+}
+
 impl<'source> RawFields<'source> {
     const fn new(source: &'source [u8]) -> Self {
         Self { source, offset: 0 }
@@ -692,6 +814,7 @@ impl<'source> RawFields<'source> {
                 RewriteError::InvalidFormat(format!("invalid protobuf key: {error}"))
             })?;
         let key_end = checked_add(start, key_length, "protobuf key offset")?;
+        let key_canonical = key_length == varint_len(key_value);
         let number = u32::try_from(key_value >> 3)
             .map_err(|_error| invalid("protobuf field number exceeds u32"))?;
         if number == 0 || number > 0x1fff_ffff {
@@ -699,7 +822,8 @@ impl<'source> RawFields<'source> {
         }
         let wire_type = u8::try_from(key_value & 7)
             .map_err(|_error| invalid("protobuf wire type exceeds u8"))?;
-        let (payload_start, end) = match wire_type {
+        let mut length_canonical = true;
+        let (payload_start, end, group_fields, group_depth) = match wire_type {
             0 => {
                 let (_, length) =
                     decode_varint_from_bytes(&self.source[key_end..]).map_err(|error| {
@@ -708,24 +832,48 @@ impl<'source> RawFields<'source> {
                 (
                     key_end,
                     checked_add(key_end, length, "protobuf varint offset")?,
+                    0,
+                    0,
                 )
             },
-            1 => (key_end, checked_add(key_end, 8, "protobuf fixed64 offset")?),
+            1 => (
+                key_end,
+                checked_add(key_end, 8, "protobuf fixed64 offset")?,
+                0,
+                0,
+            ),
             2 => {
                 let (encoded_length, prefix_length) =
                     decode_varint_from_bytes(&self.source[key_end..]).map_err(|error| {
                         invalid_owned(format!("invalid protobuf length: {error}"))
                     })?;
                 let payload_start = checked_add(key_end, prefix_length, "protobuf length prefix")?;
+                length_canonical = prefix_length == varint_len(encoded_length);
                 let payload_length = usize::try_from(encoded_length)
                     .map_err(|_error| invalid("protobuf length exceeds usize"))?;
                 (
                     payload_start,
                     checked_add(payload_start, payload_length, "protobuf payload range")?,
+                    0,
+                    0,
                 )
             },
-            5 => (key_end, checked_add(key_end, 4, "protobuf fixed32 offset")?),
-            3 | 4 => return Err(invalid("deprecated protobuf groups are unsupported")),
+            3 => {
+                if is_known_root_field(number) {
+                    return Err(invalid_owned(format!(
+                        "known protobuf field {number} cannot use group wire type"
+                    )));
+                }
+                let group = scan_group(self.source, key_end, number, 1)?;
+                (key_end, group.end, group.fields, group.depth)
+            },
+            4 => return Err(invalid("unexpected protobuf end-group wire type")),
+            5 => (
+                key_end,
+                checked_add(key_end, 4, "protobuf fixed32 offset")?,
+                0,
+                0,
+            ),
             _ => return Err(invalid("invalid protobuf wire type")),
         };
         if end > self.source.len() {
@@ -740,7 +888,100 @@ impl<'source> RawFields<'source> {
             key_end,
             payload_start,
             end,
+            key_canonical,
+            length_canonical,
+            group_fields,
+            group_depth,
         }))
+    }
+}
+
+fn scan_group(
+    source: &[u8],
+    mut offset: usize,
+    expected_field_number: u32,
+    depth: usize,
+) -> RewriteResult<GroupScan> {
+    if depth > RewriteLimits::MAX_NESTING {
+        return Err(invalid("protobuf group nesting exceeds the hard limit"));
+    }
+    let mut fields = 0usize;
+    let mut maximum_depth = depth;
+    loop {
+        if offset >= source.len() {
+            return Err(invalid("unbalanced protobuf group"));
+        }
+        let (key_value, key_length) = decode_varint_from_bytes(&source[offset..])
+            .map_err(|error| invalid_owned(format!("invalid protobuf group key: {error}")))?;
+        let key_end = checked_add(offset, key_length, "protobuf group key offset")?;
+        let number = u32::try_from(key_value >> 3)
+            .map_err(|_error| invalid("protobuf group field number exceeds u32"))?;
+        if number == 0 || number > 0x1fff_ffff {
+            return Err(invalid(
+                "protobuf group field number is outside the valid range",
+            ));
+        }
+        let wire_type = u8::try_from(key_value & 7)
+            .map_err(|_error| invalid("protobuf group wire type exceeds u8"))?;
+        if wire_type != 4 && is_known_root_field(number) {
+            return Err(invalid_owned(format!(
+                "known protobuf field {number} cannot appear inside an unknown group"
+            )));
+        }
+        fields = checked_add(fields, 1, "protobuf group field count")?;
+        match wire_type {
+            0 => {
+                let (_, length) =
+                    decode_varint_from_bytes(&source[key_end..]).map_err(|error| {
+                        invalid_owned(format!("invalid protobuf group varint value: {error}"))
+                    })?;
+                offset = checked_add(key_end, length, "protobuf group varint offset")?;
+            },
+            1 => {
+                offset = checked_add(key_end, 8, "protobuf group fixed64 offset")?;
+            },
+            2 => {
+                let (encoded_length, prefix_length) = decode_varint_from_bytes(&source[key_end..])
+                    .map_err(|error| {
+                        invalid_owned(format!("invalid protobuf group length: {error}"))
+                    })?;
+                let payload_start =
+                    checked_add(key_end, prefix_length, "protobuf group length prefix")?;
+                let payload_length = usize::try_from(encoded_length)
+                    .map_err(|_error| invalid("protobuf group length exceeds usize"))?;
+                offset = checked_add(payload_start, payload_length, "protobuf group payload")?;
+            },
+            3 => {
+                if is_known_root_field(number) {
+                    return Err(invalid_owned(format!(
+                        "known protobuf field {number} cannot use group wire type"
+                    )));
+                }
+                let nested = scan_group(source, key_end, number, depth + 1)?;
+                fields = checked_add(fields, nested.fields, "nested protobuf group fields")?;
+                maximum_depth = maximum_depth.max(nested.depth);
+                offset = nested.end;
+            },
+            4 => {
+                if number != expected_field_number {
+                    return Err(invalid_owned(format!(
+                        "mismatched protobuf end-group field {number}; expected {expected_field_number}"
+                    )));
+                }
+                return Ok(GroupScan {
+                    end: key_end,
+                    fields,
+                    depth: maximum_depth,
+                });
+            },
+            5 => {
+                offset = checked_add(key_end, 4, "protobuf group fixed32 offset")?;
+            },
+            _ => return Err(invalid("invalid protobuf group wire type")),
+        }
+        if offset > source.len() {
+            return Err(invalid("truncated protobuf group field"));
+        }
     }
 }
 
@@ -750,6 +991,7 @@ struct TextPreflight {
     fragments: usize,
     text_bytes: usize,
     utf16_len: usize,
+    has_groups: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -823,15 +1065,23 @@ fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<Te
     let mut utf16_len = 0usize;
     let mut field_count = 0usize;
     let mut storage_kind = None;
+    let mut has_groups = false;
     let mut fields = RawFields::new(source);
     while let Some(field) = fields.next()? {
-        field_count = checked_add(field_count, 1, "root field count")?;
+        let field_increment = checked_add(field.group_fields, 1, "root field count")?;
+        field_count = checked_add(field_count, field_increment, "root field count")?;
         enforce_limit("fields", field_count, limits.max_fields())?;
+        if field.group_depth != 0 {
+            has_groups = true;
+            let depth = checked_add(1, field.group_depth, "protobuf group nesting")?;
+            enforce_limit("nesting", depth, limits.max_nesting())?;
+        }
         let number =
             usize::try_from(field.number).map_err(|_error| arithmetic("root field number"))?;
         if number <= MAX_KNOWN_ROOT_FIELD && is_known_root_field(field.number) {
             occurrences[number] =
                 checked_add(occurrences[number], 1, "known root field occurrences")?;
+            field.require_canonical_framing("TSWP storage")?;
             validate_root_field_shape(field)?;
             if field.number != ROOT_TEXT_FIELD && occurrences[number] > 1 {
                 return Err(invalid_owned(format!(
@@ -869,6 +1119,7 @@ fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<Te
         fragments,
         text_bytes,
         utf16_len,
+        has_groups,
     })
 }
 
@@ -908,6 +1159,37 @@ fn validate_root_field_shape(field: RawField<'_>) -> RewriteResult<()> {
     Ok(())
 }
 
+/// Build the smallest source accepted by the generated text projection.
+///
+/// Buffa treats legacy protobuf group wire values as nested messages while
+/// decoding unknown fields. The raw pass above is authoritative for those
+/// fields, so omit them from the private projection input; the rewrite path
+/// still copies their original bytes unchanged. Keeping the projection to
+/// root kind/text fields also prevents an opaque nested group from becoming a
+/// generated-schema concern.
+fn text_projection_source<'source>(
+    source: &'source [u8],
+    has_groups: bool,
+) -> RewriteResult<Cow<'source, [u8]>> {
+    if !has_groups {
+        return Ok(Cow::Borrowed(source));
+    }
+    let mut projection = Vec::new();
+    projection
+        .try_reserve_exact(source.len())
+        .map_err(|_allocation| RewriteError::Allocation {
+            resource: "TSWP text projection source",
+            amount: source.len(),
+        })?;
+    let mut fields = RawFields::new(source);
+    while let Some(field) = fields.next()? {
+        if matches!(field.number, 1 | ROOT_TEXT_FIELD) {
+            projection.extend_from_slice(field.raw());
+        }
+    }
+    Ok(Cow::Owned(projection))
+}
+
 fn enforce_limit(resource: &'static str, observed: usize, limit: usize) -> RewriteResult<()> {
     if observed > limit {
         return Err(RewriteError::LimitExceeded {
@@ -933,7 +1215,8 @@ fn decode_text_plan(
     )?;
     let options =
         text_storage_codec::DecodeOptions::new(limits.max_message_bytes(), 0, element_memory, 1);
-    let view = text_storage_codec::decode_storage_text(source, options)
+    let projection_source = text_projection_source(source, preflight.has_groups)?;
+    let view = text_storage_codec::decode_storage_text(projection_source.as_ref(), options)
         .map_err(|error| RewriteError::Projection(error.to_string()))?;
     if view.len() != preflight.fragments {
         return Err(invalid_owned(format!(
@@ -1173,6 +1456,7 @@ struct Counters {
     references: usize,
     tree_bytes: usize,
     unknown_fields: usize,
+    max_depth: usize,
 }
 
 impl Counters {
@@ -1183,6 +1467,7 @@ impl Counters {
         limits: RewriteLimits,
     ) -> RewriteResult<()> {
         enforce_limit("nesting", depth, limits.max_nesting())?;
+        self.max_depth = self.max_depth.max(depth);
         self.tree_bytes = checked_add(self.tree_bytes, bytes, "aggregate nested scan bytes")?;
         enforce_limit(
             "aggregate nested scan bytes",
@@ -1191,9 +1476,21 @@ impl Counters {
         )
     }
 
-    fn field(&mut self, limits: RewriteLimits) -> RewriteResult<()> {
-        self.fields = checked_add(self.fields, 1, "aggregate field count")?;
-        enforce_limit("fields", self.fields, limits.max_fields())
+    fn field(
+        &mut self,
+        field: RawField<'_>,
+        depth: usize,
+        limits: RewriteLimits,
+    ) -> RewriteResult<()> {
+        let amount = checked_add(field.group_fields, 1, "aggregate field count")?;
+        self.fields = checked_add(self.fields, amount, "aggregate field count")?;
+        enforce_limit("fields", self.fields, limits.max_fields())?;
+        if field.group_depth != 0 {
+            let nested_depth = checked_add(depth, field.group_depth, "protobuf group nesting")?;
+            enforce_limit("nesting", nested_depth, limits.max_nesting())?;
+            self.max_depth = self.max_depth.max(nested_depth);
+        }
+        Ok(())
     }
 
     fn table_entry(&mut self, limits: RewriteLimits) -> RewriteResult<()> {
@@ -1248,7 +1545,7 @@ fn validate_reference(
     let mut external = false;
     let mut fields = RawFields::new(data);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, depth, limits)?;
         match field.number {
             1 => {
                 require_absent(identifier.is_some(), "TSP.Reference identifier")?;
@@ -1306,7 +1603,7 @@ fn validate_range<'source>(
     let mut location_field = None;
     let mut fields = RawFields::new(data);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, depth, limits)?;
         match field.number {
             1 => {
                 require_absent(location.is_some(), "TSP.Range location")?;
@@ -1383,7 +1680,7 @@ fn validate_index_entry<'source>(
     let mut value_three = false;
     let mut fields = RawFields::new(data);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, depth, limits)?;
         match field.number {
             1 => {
                 require_absent(index.is_some(), "table entry character index")?;
@@ -1486,7 +1783,7 @@ fn validate_overlapping_entry<'source>(
     let mut reference = None;
     let mut fields = RawFields::new(data);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, depth, limits)?;
         match field.number {
             1 => {
                 require_absent(range.is_some(), "overlapping table range")?;
@@ -1572,6 +1869,9 @@ struct RootPlan {
     output_len: usize,
     reference_occurrences: usize,
     tree_bytes: usize,
+    fields: usize,
+    table_entries: usize,
+    max_depth: usize,
     generated_fields: usize,
     has_unknown_wire_fields: bool,
     expected_changed: bool,
@@ -1599,7 +1899,7 @@ fn validate_and_plan_root(
     };
     let mut fields = RawFields::new(source);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, 1, limits)?;
         if !is_known_root_field(field.number) {
             counters.unknown_field()?;
         }
@@ -1681,6 +1981,9 @@ fn validate_and_plan_root(
         output_len,
         reference_occurrences: counters.references,
         tree_bytes: counters.tree_bytes,
+        fields: counters.fields,
+        table_entries: counters.table_entries,
+        max_depth: counters.max_depth,
         generated_fields,
         has_unknown_wire_fields: counters.unknown_fields != 0,
         expected_changed: !text.no_op || table_changed,
@@ -1864,7 +2167,7 @@ fn validate_table_tree(
     let mut previous_index = None;
     let mut fields = RawFields::new(table);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, 2, limits)?;
         if field.number != TABLE_ENTRY_FIELD {
             counters.unknown_field()?;
             continue;
@@ -2334,14 +2637,30 @@ pub fn prepare_storage_text_rewrite_with_behavior_and_limits<'source, 'replaceme
     let text_preflight = preflight_root_text(source, limits)?;
     let text = decode_text_plan(source, &range, replacement, text_preflight, limits)?;
     let root = validate_and_plan_root(source, &range, text, replacement, behavior, limits)?;
+    let prepare_work =
+        preflight_source_work(source.len(), text_preflight, root.tree_bytes, limits)?;
     let work = preflight_rewrite_work(
         source.len(),
         text_preflight,
         text,
         replacement,
         &root,
+        prepare_work,
         limits,
     )?;
+    let prepare_report = StorageRewritePrepareReport {
+        input_bytes: source.len(),
+        output_bytes: root.output_len,
+        fields: root.fields,
+        work: prepare_work,
+        max_depth: root.max_depth,
+        table_entries: root.table_entries,
+        references: root.reference_occurrences,
+        text_bytes: text_preflight.text_bytes,
+        text_units: text_preflight.utf16_len,
+        fragments: text_preflight.fragments,
+        has_unknown_wire_fields: root.has_unknown_wire_fields,
+    };
     let requirements = storage_execution_requirements(&root, work)?;
     Ok(PreparedStorageRewrite {
         source,
@@ -2350,6 +2669,7 @@ pub fn prepare_storage_text_rewrite_with_behavior_and_limits<'source, 'replaceme
         text,
         root,
         limits,
+        prepare_report,
         requirements,
     })
 }
@@ -2364,6 +2684,7 @@ fn execute_prepared_storage_rewrite(
         text,
         root,
         limits,
+        prepare_report: _,
         requirements,
     } = prepared;
     let references_before =
@@ -2489,7 +2810,8 @@ pub fn decode_storage_with_limits(
     )?;
     let options =
         text_storage_codec::DecodeOptions::new(limits.max_message_bytes(), 0, element_memory, 1);
-    let view = text_storage_codec::decode_storage_text(source, options)
+    let projection_source = text_projection_source(source, text_preflight.has_groups)?;
+    let view = text_storage_codec::decode_storage_text(projection_source.as_ref(), options)
         .map_err(|error| RewriteError::Projection(error.to_string()))?;
     if view.len() != text_preflight.fragments {
         return Err(invalid_owned(format!(
@@ -2607,7 +2929,7 @@ fn validate_full_storage_tree(
     counters.enter_message(source.len(), 1, limits)?;
     let mut fields = RawFields::new(source);
     while let Some(field) = fields.next()? {
-        counters.field(limits)?;
+        counters.field(field, 1, limits)?;
         if !is_known_root_field(field.number) {
             counters.unknown_field()?;
         }
@@ -2635,9 +2957,23 @@ fn preflight_validation_work(
     counters: &Counters,
     limits: RewriteLimits,
 ) -> RewriteResult<usize> {
+    preflight_source_work(source_len, text, counters.tree_bytes, limits)
+}
+
+fn preflight_source_work(
+    source_len: usize,
+    text: TextPreflight,
+    tree_bytes: usize,
+    limits: RewriteLimits,
+) -> RewriteResult<usize> {
     let root_and_projection = checked_mul(source_len, 2, "validation root and Buffa work")?;
+    let projection_filter = if text.has_groups { source_len } else { 0 };
     let text_work = checked_mul(text.text_bytes, 6, "validation text work")?;
-    let structural_work = checked_add(root_and_projection, counters.tree_bytes, "validation work")?;
+    let structural_work = checked_add(
+        checked_add(root_and_projection, projection_filter, "validation work")?,
+        tree_bytes,
+        "validation work",
+    )?;
     let aggregate_work = checked_add(structural_work, text_work, "validation work")?;
     enforce_limit("rewrite work", aggregate_work, limits.max_rewrite_work())?;
     Ok(aggregate_work)
@@ -2649,9 +2985,14 @@ fn preflight_rewrite_work(
     text: TextPlan,
     replacement: &str,
     root: &RootPlan,
+    prepare_work: usize,
     limits: RewriteLimits,
 ) -> RewriteResult<usize> {
-    let root_scans = checked_mul(source_len, 2, "root preflight and Buffa work")?;
+    let root_scans = checked_mul(
+        source_len,
+        if text_preflight.has_groups { 3 } else { 2 },
+        "root preflight and Buffa work",
+    )?;
     let source_tree_scans = checked_mul(root.tree_bytes, 3, "source tree rewrite work")?;
     let output_tree_scan = checked_mul(
         root.output_len,
@@ -2668,7 +3009,8 @@ fn preflight_rewrite_work(
     work = checked_add(work, text.result_bytes, "aggregate rewrite work")?;
     work = checked_add(work, root.generated_fields, "aggregate rewrite work")?;
     enforce_limit("rewrite work", work, limits.max_rewrite_work())?;
-    Ok(work)
+    work.checked_sub(prepare_work)
+        .ok_or_else(|| arithmetic("execution work after prepare"))
 }
 
 fn storage_execution_requirements(
@@ -3442,6 +3784,31 @@ mod tests {
         bytes
     }
 
+    fn raw_overlong_scalar(number: u32, value: u8) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        encode_varint_into(&mut bytes, u64::from(number) << 3);
+        bytes.extend_from_slice(&[value | 0x80, 0]);
+        bytes
+    }
+
+    fn raw_group_with_end(number: u32, end_number: u32, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        encode_varint_into(&mut bytes, (u64::from(number) << 3) | 3);
+        bytes.extend_from_slice(payload);
+        encode_varint_into(&mut bytes, (u64::from(end_number) << 3) | 4);
+        bytes
+    }
+
+    fn raw_group(number: u32, payload: &[u8]) -> Vec<u8> {
+        raw_group_with_end(number, number, payload)
+    }
+
+    fn raw_group_end(number: u32) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        encode_varint_into(&mut bytes, (u64::from(number) << 3) | 4);
+        bytes
+    }
+
     fn root_field(source: &[u8], number: u32) -> Vec<u8> {
         let mut fields = RawFields::new(source);
         while let Some(field) = fields
@@ -3859,12 +4226,139 @@ mod tests {
 
     #[test]
     fn noncanonical_untouched_framing_is_accepted_and_preserved() {
-        let source = [0x9a, 0x80, 0x00, 0x81, 0x00, b'x'];
+        let unknown = [0x9a, 0x86, 0x00, 0x81, 0x00, b'x'];
+        let source = [raw_length_delimited(3, b"x"), unknown.to_vec()].concat();
 
         let result = rewrite(&source, 0..1, "x");
 
         assert_eq!(result.bytes(), source);
         assert!(!result.changed());
+    }
+
+    #[test]
+    fn balanced_unknown_groups_and_nested_overlong_scalars_are_raw_preserved() {
+        let nested = [
+            raw_overlong_scalar(91, 1),
+            raw_group(92, &raw_overlong_scalar(93, 2)),
+        ]
+        .concat();
+        let group = raw_group(90, &nested);
+        let source = [raw_length_delimited(3, b"abc"), group.clone()].concat();
+
+        let result = rewrite(&source, 1..2, "Z");
+
+        assert!(result.changed());
+        assert!(result.has_unknown_wire_fields());
+        assert_eq!(root_field(result.bytes(), 90), group);
+        assert_eq!(
+            root_field(result.bytes(), 3),
+            raw_length_delimited(3, b"aZc")
+        );
+        let validation = validate_storage_with_limits(&source, RewriteLimits::default())
+            .unwrap_or_else(|error| panic!("grouped storage should validate: {error}"));
+        assert!(validation.has_unknown_wire_fields());
+        let decoded = decode_storage_with_limits(&source, RewriteLimits::default())
+            .unwrap_or_else(|error| panic!("grouped storage should decode: {error}"));
+        assert_eq!(decoded.storage().text(), "abc");
+    }
+
+    #[test]
+    fn groups_reject_known_numbers_and_malformed_boundaries() {
+        let known_group = raw_group(3, &[]);
+        let known_nested_field = raw_group(90, &raw_length_delimited(3, b"x"));
+        let nested_known_group = raw_group(90, &raw_group(5, &[]));
+        let unexpected_end = raw_group_end(90);
+        let mismatched_end = raw_group_with_end(90, 91, &[]);
+        let unbalanced = {
+            let mut bytes = Vec::new();
+            encode_varint_into(&mut bytes, (90_u64 << 3) | 3);
+            bytes.extend_from_slice(&raw_overlong_scalar(91, 1));
+            bytes
+        };
+
+        for malformed in [
+            known_group,
+            known_nested_field,
+            nested_known_group,
+            unexpected_end,
+            mismatched_end,
+            unbalanced,
+        ] {
+            assert!(matches!(
+                rewrite_storage_text_with_limits(&malformed, 0..0, "", RewriteLimits::default()),
+                Err(RewriteError::InvalidFormat(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn known_fields_reject_noncanonical_keys_lengths_and_values() {
+        let overlong_key = [0x9a, 0x80, 0x00, 0x01, b'x'];
+        let overlong_length = [0x1a, 0x81, 0x00, b'x'];
+        let overlong_value = [0x08, 0x81, 0x00];
+
+        for malformed in [overlong_key.as_slice(), &overlong_length, &overlong_value] {
+            assert!(matches!(
+                rewrite_storage_text_with_limits(
+                    malformed,
+                    0..0,
+                    "",
+                    RewriteLimits::default()
+                ),
+                Err(RewriteError::InvalidFormat(message))
+                    if message.contains("noncanonical")
+            ));
+        }
+    }
+
+    #[test]
+    fn unknown_group_fields_and_depth_consume_limits() {
+        let group = raw_group(90, &raw_overlong_scalar(91, 1));
+        let source = [raw_length_delimited(3, b"x"), group].concat();
+        let fields_limited = RewriteLimits::new(1_024, 3, 4, 16, 1_024, 16, 16, 1_024, 16_384)
+            .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
+        assert!(matches!(
+            rewrite_storage_text_with_limits(&source, 0..0, "", fields_limited),
+            Err(RewriteError::LimitExceeded {
+                resource: "fields",
+                ..
+            })
+        ));
+
+        let mut nested = raw_overlong_scalar(91, 1);
+        for number in (90..94).rev() {
+            nested = raw_group(number, &nested);
+        }
+        let nested_source = [raw_length_delimited(3, b"x"), nested].concat();
+        let nesting_limited = RewriteLimits::new(1_024, 128, 4, 16, 1_024, 16, 16, 1_024, 16_384)
+            .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
+        assert!(matches!(
+            rewrite_storage_text_with_limits(&nested_source, 0..0, "", nesting_limited),
+            Err(RewriteError::LimitExceeded {
+                resource: "nesting",
+                ..
+            })
+        ));
+
+        let work_limited = RewriteLimits::new(
+            1_024,
+            128,
+            8,
+            16,
+            1_024,
+            16,
+            16,
+            1_024,
+            nested_source.len() - 1,
+        )
+        .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
+        assert!(matches!(
+            rewrite_storage_text_with_limits(&nested_source, 0..0, "", work_limited),
+            Err(RewriteError::LimitExceeded {
+                resource: "aggregate nested scan bytes",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -4138,6 +4632,14 @@ mod tests {
         assert!(requirements.peak_scratch_bytes() > 0);
         assert!(requirements.allocations() > 0);
         assert!(requirements.work() > 0);
+        let prepare_report = prepare().prepare_report();
+        assert_eq!(prepare_report.input_bytes(), source.len());
+        assert_eq!(prepare_report.output_bytes(), requirements.output_bytes());
+        assert!(prepare_report.fields() > 0);
+        assert!(prepare_report.work_bytes() > 0);
+        assert!(prepare_report.max_depth() >= 1);
+        assert!(prepare_report.table_entries() > 0);
+        assert!(prepare_report.references() > 0);
 
         for axis in 0..6 {
             STORAGE_EXECUTION_ENTRIES.with(|entries| entries.set(0));

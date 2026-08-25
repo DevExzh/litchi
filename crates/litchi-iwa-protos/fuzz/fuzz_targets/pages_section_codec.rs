@@ -4,7 +4,7 @@ use std::hint::black_box;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::pages_section_codec::{
-    DecodeError, DecodeOptions, SectionReferenceSnapshot, decode_pagination,
+    DecodeError, DecodeOptions, SectionReferenceSnapshot, decode_pagination, decode_section_name,
     decode_section_settings, decode_section_settings_with_report,
 };
 use litchi_iwa_protos::tp::SectionArchive;
@@ -135,7 +135,20 @@ fn exercise(source: &[u8]) {
                 );
             }
         },
-        Err(error) => observe_error(error),
+        Err(error) => observe_error(error.clone()),
+    }
+
+    let name = decode_section_name(source, options(MAX_INPUT_BYTES, MAX_RECURSION));
+    assert_eq!(
+        source,
+        before.as_slice(),
+        "section-name decode modified source"
+    );
+    match &name {
+        Ok(name) => {
+            black_box(*name);
+        },
+        Err(error) => observe_error(error.clone()),
     }
 
     let aggregate =
@@ -145,6 +158,10 @@ fn exercise(source: &[u8]) {
         before.as_slice(),
         "aggregate decode modified source"
     );
+
+    if let (Ok(name), Ok((snapshot, _report))) = (&name, &aggregate) {
+        assert_eq!(*name, snapshot.name());
+    }
 
     let (aggregate_ok, has_nonempty_name) = match aggregate {
         Ok((snapshot, report)) => {
@@ -204,11 +221,19 @@ fn exercise_limit_profiles(source: &[u8], aggregate_ok: bool, has_nonempty_name:
         "configured byte ceiling",
     );
     expect_limit(
+        decode_section_name(source, options(usize::MAX, 1)),
+        "configured byte ceiling",
+    );
+    expect_limit(
         decode_section_settings(source, options(usize::MAX, 1)),
         "configured byte ceiling",
     );
     expect_limit(
         decode_pagination(source, options(MAX_INPUT_BYTES, 0)),
+        "zero recursion ceiling",
+    );
+    expect_limit(
+        decode_section_name(source, options(MAX_INPUT_BYTES, 0)),
         "zero recursion ceiling",
     );
     expect_limit(
@@ -244,9 +269,18 @@ fn exercise_limit_profiles(source: &[u8], aggregate_ok: bool, has_nonempty_name:
             decode_section_settings(source, name_limited),
             "name-byte ceiling",
         );
+        let name_only_limited = options(MAX_INPUT_BYTES, MAX_RECURSION).with_max_name_bytes(0);
+        observe_optional_limit(
+            decode_section_name(source, name_only_limited),
+            "name-byte ceiling",
+        );
     }
 
     let bytes_limited = options(source.len() - 1, MAX_RECURSION);
+    expect_limit(
+        decode_section_name(source, bytes_limited),
+        "input byte ceiling",
+    );
     expect_limit(
         decode_section_settings(source, bytes_limited),
         "input byte ceiling",

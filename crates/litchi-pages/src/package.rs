@@ -22,6 +22,7 @@ mod table_lock;
 #[cfg(feature = "internal-iwork-source")]
 mod text_storage;
 
+use std::borrow::Cow;
 use std::fmt;
 use std::fs::{Metadata as FileMetadata, OpenOptions};
 use std::io::{Read, Write};
@@ -32,7 +33,7 @@ use std::sync::Arc;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
 use litchi_iwa_common::{
-    WireLimits,
+    WireLimits, decode_varint_from_bytes,
     wire::{WireFieldView, WireView},
 };
 use litchi_iwa_detect::{Format, PreparedSource};
@@ -1366,9 +1367,25 @@ fn decode_body_storage_with_wire_error(
             "Pages body object {identifier} text validation limits are invalid: {wire_error}"
         )),
     })?;
-    let preflight = preflight_body_wire(payload, identifier, max_sections, max_text_bytes, limits)?;
     let decoded = litchi_iwa_text_wire::decode_storage_with_limits(payload, wire_limits)
         .map_err(BodyStorageDecodeError::Wire)?;
+    // The strict text-wire pass above is authoritative for legacy balanced
+    // unknown groups. `WireView` intentionally rejects group wire values, so
+    // omit only those already-validated opaque root fields from its private
+    // section-boundary projection. The original payload remains the source
+    // for semantic decoding and every rewrite copies the group bytes exactly.
+    let projection = body_wire_projection_without_unknown_groups(
+        payload,
+        identifier,
+        wire_limits.max_nesting(),
+    )?;
+    let preflight = preflight_body_wire(
+        projection.as_ref(),
+        identifier,
+        max_sections,
+        max_text_bytes,
+        limits,
+    )?;
     let validation = decoded.validation();
     let storage = decoded.into_storage();
     let materialized_utf16 = storage.text().encode_utf16().count();
@@ -1385,6 +1402,186 @@ fn decode_body_storage_with_wire_error(
         ));
     }
     Ok((storage, preflight.section_references))
+}
+
+fn body_wire_projection_without_unknown_groups<'source>(
+    source: &'source [u8],
+    body_identifier: NonZeroU64,
+    max_nesting: usize,
+) -> PackageResult<Cow<'source, [u8]>> {
+    let context = format!("Pages body object {body_identifier}");
+    let mut offset = 0usize;
+    let mut projection: Option<Vec<u8>> = None;
+    while offset < source.len() {
+        let start = offset;
+        let (number, wire_type, key_end) = body_wire_key(source, offset, &context)?;
+        offset = if wire_type == 3 {
+            if is_known_body_root_field(number) {
+                return Err(PackageError::InvalidFormat(format!(
+                    "{context} known protobuf field {number} cannot use group wire type"
+                )));
+            }
+            let end = skip_body_wire_group(source, key_end, number, 1, max_nesting, &context)?;
+            if projection.is_none() {
+                let mut filtered = Vec::new();
+                filtered
+                    .try_reserve_exact(source.len())
+                    .map_err(|_allocation| PackageError::Allocation {
+                        amount: source.len(),
+                    })?;
+                filtered.extend_from_slice(&source[..start]);
+                projection = Some(filtered);
+            }
+            end
+        } else if wire_type == 4 {
+            return Err(PackageError::InvalidFormat(format!(
+                "{context} contains an unexpected protobuf end-group field {number}"
+            )));
+        } else {
+            let end = body_wire_value_end(source, key_end, wire_type, &context)?;
+            if let Some(filtered) = projection.as_mut() {
+                filtered.extend_from_slice(&source[start..end]);
+            }
+            end
+        };
+    }
+    Ok(projection.map_or(Cow::Borrowed(source), Cow::Owned))
+}
+
+fn skip_body_wire_group(
+    source: &[u8],
+    mut offset: usize,
+    expected_number: u32,
+    depth: usize,
+    max_nesting: usize,
+    context: &str,
+) -> PackageResult<usize> {
+    if depth > max_nesting {
+        return Err(PackageError::InvalidFormat(format!(
+            "{context} protobuf group nesting exceeds {max_nesting}"
+        )));
+    }
+    loop {
+        if offset >= source.len() {
+            return Err(PackageError::InvalidFormat(format!(
+                "{context} contains an unterminated protobuf group {expected_number}"
+            )));
+        }
+        let (number, wire_type, key_end) = body_wire_key(source, offset, context)?;
+        offset = match wire_type {
+            3 => {
+                if is_known_body_root_field(number) {
+                    return Err(PackageError::InvalidFormat(format!(
+                        "{context} known protobuf field {number} cannot use group wire type"
+                    )));
+                }
+                skip_body_wire_group(
+                    source,
+                    key_end,
+                    number,
+                    depth.saturating_add(1),
+                    max_nesting,
+                    context,
+                )?
+            },
+            4 => {
+                if number != expected_number {
+                    return Err(PackageError::InvalidFormat(format!(
+                        "{context} protobuf end-group field {number} does not match {expected_number}"
+                    )));
+                }
+                return Ok(key_end);
+            },
+            _ => body_wire_value_end(source, key_end, wire_type, context)?,
+        };
+    }
+}
+
+fn body_wire_key(source: &[u8], offset: usize, context: &str) -> PackageResult<(u32, u8, usize)> {
+    let (key, key_length) = decode_varint_from_bytes(source.get(offset..).ok_or_else(|| {
+        PackageError::InvalidFormat(format!("{context} protobuf key offset is invalid"))
+    })?)
+    .map_err(|error| {
+        PackageError::InvalidFormat(format!("{context} has an invalid protobuf key: {error}"))
+    })?;
+    let key_end = offset.checked_add(key_length).ok_or_else(|| {
+        PackageError::InvalidFormat(format!("{context} protobuf key offset overflows"))
+    })?;
+    let number = u32::try_from(key >> 3).map_err(|_error| {
+        PackageError::InvalidFormat(format!("{context} protobuf field number exceeds u32"))
+    })?;
+    if number == 0 || number > 0x1fff_ffff {
+        return Err(PackageError::InvalidFormat(format!(
+            "{context} protobuf field number {number} is invalid"
+        )));
+    }
+    let wire_type = u8::try_from(key & 7).map_err(|_error| {
+        PackageError::InvalidFormat(format!("{context} protobuf wire type exceeds u8"))
+    })?;
+    Ok((number, wire_type, key_end))
+}
+
+fn body_wire_value_end(
+    source: &[u8],
+    key_end: usize,
+    wire_type: u8,
+    context: &str,
+) -> PackageResult<usize> {
+    let end = match wire_type {
+        0 => {
+            let (_, width) = decode_varint_from_bytes(source.get(key_end..).ok_or_else(|| {
+                PackageError::InvalidFormat(format!("{context} protobuf value offset is invalid"))
+            })?)
+            .map_err(|error| {
+                PackageError::InvalidFormat(format!(
+                    "{context} contains an invalid protobuf varint: {error}"
+                ))
+            })?;
+            key_end.checked_add(width)
+        },
+        1 => key_end.checked_add(8),
+        2 => {
+            let (encoded_length, prefix_width) =
+                decode_varint_from_bytes(source.get(key_end..).ok_or_else(|| {
+                    PackageError::InvalidFormat(format!(
+                        "{context} protobuf length offset is invalid"
+                    ))
+                })?)
+                .map_err(|error| {
+                    PackageError::InvalidFormat(format!(
+                        "{context} contains an invalid protobuf length: {error}"
+                    ))
+                })?;
+            let payload_start = key_end.checked_add(prefix_width).ok_or_else(|| {
+                PackageError::InvalidFormat(format!("{context} protobuf length prefix overflows"))
+            })?;
+            let length = usize::try_from(encoded_length).map_err(|_error| {
+                PackageError::InvalidFormat(format!(
+                    "{context} protobuf field length exceeds usize"
+                ))
+            })?;
+            payload_start.checked_add(length)
+        },
+        5 => key_end.checked_add(4),
+        _ => {
+            return Err(PackageError::InvalidFormat(format!(
+                "{context} contains invalid protobuf wire type {wire_type}"
+            )));
+        },
+    }
+    .ok_or_else(|| {
+        PackageError::InvalidFormat(format!("{context} protobuf field range overflows"))
+    })?;
+    if end > source.len() {
+        return Err(PackageError::InvalidFormat(format!(
+            "{context} contains a truncated protobuf field"
+        )));
+    }
+    Ok(end)
+}
+
+fn is_known_body_root_field(number: u32) -> bool {
+    matches!(number, 1..=12 | 14..=28)
 }
 
 fn map_body_storage_decode_error(error: BodyStorageDecodeError) -> PackageError {
@@ -1814,10 +2011,9 @@ fn footnote_marker_identifier(
 
 fn decode_canonical_varint(field: WireFieldView<'_>, context: &str) -> PackageResult<u64> {
     let payload = field.payload();
-    let (value, length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
-            PackageError::InvalidFormat(format!("{context} protobuf varint is invalid: {error}"))
-        })?;
+    let (value, length) = decode_varint_from_bytes(payload).map_err(|error| {
+        PackageError::InvalidFormat(format!("{context} protobuf varint is invalid: {error}"))
+    })?;
     if length != payload.len() || litchi_iwa_common::varint::encoded_len(value) != length {
         return Err(PackageError::InvalidFormat(format!(
             "{context} protobuf varint is not canonical"

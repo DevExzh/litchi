@@ -2295,6 +2295,8 @@ record and retain unknown protobuf fields. Body insertion keeps the mandatory
 initial section boundary at index zero. Selector-first section-scoped text
 read, UTF-16 span replacement, whole-value update, and clear now live in
 `litchi-pages::Package`; see `litchi-pages/examples/edit_section_text.rs`.
+The umbrella `edit_pages_section_text` example delegates to that same
+selector-first package transaction; it is not a raw-ID `PagesEditor` example.
 For a rooted exact source with one unambiguous native body storage, the changed
 transaction excludes native U+0004 separators and dependent footnote or
 inline-object anchors, preserves unrelated raw records, and publishes only
@@ -2302,8 +2304,10 @@ after a retained-limit reopen and semantic readback. Global whole-body editing
 is a single-section convenience so it cannot silently orphan section graphs.
 Private Buffa lazy views validate known body-graph fields while raw records
 remain the unknown-content preservation authority.
-The legacy `PagesEditor` raw-ID methods remain a compatibility surface while
-changed nested-`Index.zip` packages still require the migration host.
+The legacy `PagesEditor` raw-ID section-text methods have been retired; use the
+focused package transaction above. Changed nested-`Index.zip` packages still
+require the migration host because their physical section-text ownership has
+not yet crossed this boundary.
 Changed no-root/fallback bodies are likewise unsupported until their physical
 ownership has an explicit preservation-safe mutation boundary.
 

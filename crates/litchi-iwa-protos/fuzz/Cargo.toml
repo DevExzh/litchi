@@ -12,6 +12,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi-iwa-protos = { path = ".." }
+litchi-iwa-text-wire = { path = "../../litchi-iwa-text-wire" }
 prost = "0.14"
 
 [[bin]]
@@ -31,6 +32,13 @@ bench = false
 [[bin]]
 name = "pages_section_codec"
 path = "fuzz_targets/pages_section_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_text_codec"
+path = "fuzz_targets/pages_section_text_codec.rs"
 test = false
 doc = false
 bench = false

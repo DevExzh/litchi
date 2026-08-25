@@ -1,5 +1,6 @@
 //! Exact-source transactions for Pages section body text.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::num::NonZeroU64;
 use std::ops::Range;
@@ -707,6 +708,19 @@ impl Package {
             return Err(SectionTextError::PatchConflict);
         }
 
+        let mut budget =
+            transaction::TransactionBudget::new(self).map_err(map_transaction_error)?;
+        budget
+            .charge_limit(
+                crate::section::settings::LimitKind::InputBytes,
+                source.source_bytes().len(),
+                Path::Package,
+            )
+            .map_err(map_transaction_error)?;
+        budget
+            .precharge_candidate_reopen(self, patch.target_bytes.len(), Path::Package)
+            .map_err(map_transaction_error)?;
+
         let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
             Arc::clone(&patch.target_bytes),
             source.limits(),
@@ -714,8 +728,25 @@ impl Package {
         .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
+        budget
+            .charge_candidate_scan(&candidate, Path::Package)
+            .map_err(map_transaction_error)?;
         candidate.validate().map_err(map_package_error)?;
         verify_candidate(self, &candidate, patch.position, patch.after())?;
+        let source_body = native_body(self)?;
+        let absolute_span = absolute_body_span(self, &source_body, patch.position, patch.span)?;
+        let replacement_units = patch_replacement_units(patch)?;
+        verify_native_topology(
+            self,
+            &candidate,
+            patch.position,
+            absolute_span,
+            replacement_units,
+        )?;
+        let target = transaction::resolve_body_target(self, patch.position, &mut budget)
+            .map_err(map_transaction_error)?;
+        validate_mutation_component(self, target.component_index)?;
+        verify_native_locality(self, &candidate, target, &mut budget)?;
         Ok(SectionTextCommit {
             package: candidate,
             patch: patch.clone(),
@@ -729,6 +760,146 @@ struct NativeBodySnapshot {
     identifier: NonZeroU64,
     references: Vec<NativeSectionReference>,
     utf16_len: usize,
+}
+
+const ROOT_COMPONENT_NAME: &str = "Index/Document.iwa";
+const ROOT_OBJECT_IDENTIFIER: u64 = 1;
+const ROOT_MESSAGE_TYPE: u32 = 10_000;
+const ROOT_BODY_FIELD: &[u32] = &[4];
+const DRAWABLES_ZORDER_MESSAGE_TYPE: u32 = 10_015;
+
+/// Prove that the body selected by the rooted `DocumentArchive` reference is
+/// not also owned by another physical record.  Pages' generic ingress keeps
+/// archive-header references as metadata rather than treating them as the
+/// semantic source of truth, so real producers may omit the aggregate or
+/// field-local declaration.  When a declaration is present, however, it must
+/// be singular and attributable to the root's `body_storage` field.  A second
+/// owner would make a text-only rewrite mutate another capability's graph.
+fn validate_rooted_body_ownership(
+    package: &Package,
+    body_identifier: NonZeroU64,
+) -> Result<(), SectionTextError> {
+    let body = body_identifier.get();
+    let mut root_seen = false;
+    let components = package.state.source.components();
+    for component in components.iter() {
+        for object in &component.archive().objects {
+            let identifier = object
+                .archive_info
+                .identifier
+                .ok_or(SectionTextError::InvalidSource)?;
+            let is_root =
+                component.name() == ROOT_COMPONENT_NAME && identifier == ROOT_OBJECT_IDENTIFIER;
+            if is_root {
+                if std::mem::replace(&mut root_seen, true) {
+                    return Err(SectionTextError::InvalidSource);
+                }
+            }
+            if object.archive_info.message_infos.len() != object.messages.len() {
+                return Err(SectionTextError::InvalidSource);
+            }
+
+            // A storage may declare a self-edge in its aggregate archive
+            // metadata. That edge does not create another owner of the
+            // selected storage and is retained byte-for-byte by the rewrite.
+            // Cross-object edges still participate in the ownership census.
+            if identifier == body {
+                continue;
+            }
+
+            for (message_index, info) in object.archive_info.message_infos.iter().enumerate() {
+                let aggregate_count = info
+                    .object_references
+                    .iter()
+                    .filter(|candidate| **candidate == body)
+                    .count();
+                let data_reference = info.data_references.contains(&body);
+                let mut field_count = 0usize;
+                for field in &info.field_infos {
+                    let occurrences = field
+                        .object_references
+                        .iter()
+                        .filter(|candidate| **candidate == body)
+                        .count();
+                    if occurrences != 0 {
+                        field_count = field_count
+                            .checked_add(occurrences)
+                            .ok_or(SectionTextError::InvalidSource)?;
+                        if !is_root
+                            || field.path.as_slice() != ROOT_BODY_FIELD
+                            || field.data_references.contains(&body)
+                        {
+                            return Err(SectionTextError::DependentContent);
+                        }
+                    }
+                    if field.data_references.contains(&body) {
+                        return Err(if is_root {
+                            SectionTextError::InvalidSource
+                        } else {
+                            SectionTextError::DependentContent
+                        });
+                    }
+                }
+
+                if aggregate_count == 0 && field_count == 0 && !data_reference {
+                    continue;
+                }
+                let message_type = object
+                    .messages
+                    .get(message_index)
+                    .map(|message| message.type_)
+                    .ok_or(SectionTextError::InvalidSource)?;
+                // Pages includes the rooted body storage in the document's
+                // drawables z-order. This exact aggregate-only edge orders the
+                // storage but does not create a second text owner, and the
+                // transaction preserves both the identifier and z-order bytes.
+                if aggregate_count == 1
+                    && field_count == 0
+                    && !data_reference
+                    && message_type == DRAWABLES_ZORDER_MESSAGE_TYPE
+                {
+                    continue;
+                }
+                if !is_root
+                    || message_index >= object.messages.len()
+                    || message_type != ROOT_MESSAGE_TYPE
+                {
+                    return Err(SectionTextError::DependentContent);
+                }
+                if data_reference || aggregate_count > 1 || field_count > 1 {
+                    return Err(SectionTextError::InvalidSource);
+                }
+                // A field-local declaration is only meaningful when the
+                // aggregate declaration also contains the same edge.  The
+                // inverse (aggregate-only) form is emitted by older Pages
+                // producers and remains source-authoritative.
+                if field_count != 0 && aggregate_count != 1 {
+                    return Err(SectionTextError::InvalidSource);
+                }
+            }
+        }
+    }
+    if !root_seen {
+        return Err(SectionTextError::InvalidSource);
+    }
+    Ok(())
+}
+
+fn validate_unique_section_targets(
+    references: &[NativeSectionReference],
+) -> Result<(), SectionTextError> {
+    let mut identifiers = HashSet::new();
+    identifiers
+        .try_reserve(references.len())
+        .map_err(|_error| SectionTextError::Allocation {
+            amount: references.len(),
+        })?;
+    for reference in references {
+        if !identifiers.insert(reference.identifier) {
+            return Err(SectionTextError::InvalidSource);
+        }
+    }
+    Ok(())
 }
 
 fn resolve_position<'selector>(
@@ -760,6 +931,7 @@ fn native_body(package: &Package) -> Result<NativeBodySnapshot, SectionTextError
     let limits = package.state.source.limits();
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
     let identifier = root.body.ok_or(SectionTextError::UnsupportedSource)?;
+    validate_rooted_body_ownership(package, identifier)?;
     let object =
         find_object(components, identifier.get()).ok_or(SectionTextError::InvalidSource)?;
     let max_text_bytes = effective_text_limit(limits);
@@ -774,6 +946,7 @@ fn native_body(package: &Package) -> Result<NativeBodySnapshot, SectionTextError
     let references =
         native_section_references(table_references, root.initial_section, MAX_SECTIONS)
             .map_err(map_package_error)?;
+    validate_unique_section_targets(&references)?;
     let utf16_len = storage.text().encode_utf16().count();
     Ok(NativeBodySnapshot {
         identifier,
@@ -830,24 +1003,9 @@ fn rewrite_package_text(
     expected: &str,
 ) -> Result<Package, SectionTextError> {
     let source_body = native_body(source)?;
-    let section_range = native_section_range(source, &source_body, position)?;
-    let absolute_start = section_range
-        .start
-        .checked_add(
-            usize::try_from(span.start().utf16_index())
-                .map_err(|_error| SectionTextError::InvalidSource)?,
-        )
-        .ok_or(SectionTextError::InvalidSource)?;
-    let absolute_end = section_range
-        .start
-        .checked_add(
-            usize::try_from(span.end().utf16_index())
-                .map_err(|_error| SectionTextError::InvalidSource)?,
-        )
-        .ok_or(SectionTextError::InvalidSource)?;
-    if absolute_end > section_range.end {
-        return Err(SectionTextError::InvalidSource);
-    }
+    let absolute_span = absolute_body_span(source, &source_body, position, span)?;
+    let absolute_start = absolute_span.start;
+    let absolute_end = absolute_span.end;
 
     let mut budget = transaction::TransactionBudget::new(source).map_err(map_transaction_error)?;
     let target = transaction::resolve_body_target(source, position, &mut budget)
@@ -855,17 +1013,58 @@ fn rewrite_package_text(
     if target.identifier != source_body.identifier {
         return Err(SectionTextError::InvalidSource);
     }
+    validate_mutation_component(source, target.component_index)?;
     let payload = transaction::selected_payload(source, target).map_err(map_transaction_error)?;
 
     let rewrite_limits = storage_rewrite_limits(source.state.source.limits())
         .map_err(map_storage_wire_limits_error)?;
-    let rewritten = litchi_iwa_text_wire::rewrite_storage_text_with_limits(
+    let path = Path::section(position);
+    budget
+        .charge_limit(
+            crate::section::settings::LimitKind::InputBytes,
+            source.state.source.source_bytes().len(),
+            Path::Package,
+        )
+        .map_err(map_transaction_error)?;
+    let residual_limits = budget
+        .residual_storage_limits(rewrite_limits, path)
+        .map_err(map_transaction_error)?;
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
         payload,
         absolute_start..absolute_end,
         replacement,
-        rewrite_limits,
+        litchi_iwa_text_wire::RewriteBehavior::PreserveOnEqualText,
+        residual_limits,
     )
     .map_err(map_text_rewrite_error)?;
+    let prepare_report = prepared.prepare_report();
+    budget
+        .charge_text_prepare(prepare_report, path)
+        .map_err(map_transaction_error)?;
+    let requirements = prepared.execution_requirements();
+    budget
+        .charge_text_requirements(requirements, path)
+        .map_err(map_transaction_error)?;
+    let rewritten = prepared
+        .execute(litchi_iwa_text_wire::StorageRewriteExecutionLimits {
+            max_output_bytes: requirements.output_bytes(),
+            max_retained_elements: requirements.retained_elements(),
+            max_retained_bytes: requirements.retained_bytes(),
+            max_peak_scratch_bytes: requirements.peak_scratch_bytes(),
+            max_allocations: requirements.allocations(),
+            max_work: requirements.work(),
+        })
+        .map_err(map_text_rewrite_error)?;
+    let report = rewritten.execution_report();
+    if rewritten.bytes().len() != requirements.output_bytes()
+        || report.retained_elements > requirements.retained_elements()
+        || report.retained_bytes > requirements.retained_bytes()
+        || report.peak_scratch_bytes > requirements.peak_scratch_bytes()
+        || report.allocations > requirements.allocations()
+        || report.work > requirements.work()
+    {
+        return Err(SectionTextError::Verification);
+    }
     let removed_units = absolute_end
         .checked_sub(absolute_start)
         .ok_or(SectionTextError::InvalidSource)?;
@@ -890,11 +1089,7 @@ fn rewrite_package_text(
     if !rewritten.changed() {
         return Err(SectionTextError::Verification);
     }
-    let rewrite_work = rewritten.execution_report().work;
     let rewritten_payload = rewritten.into_bytes();
-    budget
-        .charge_work(rewrite_work, Path::section(position))
-        .map_err(map_transaction_error)?;
     let (candidate, stats) =
         transaction::rewrite_package(source, target, rewritten_payload, false, &mut budget)
             .map_err(map_transaction_error)?;
@@ -912,10 +1107,234 @@ fn rewrite_package_text(
         &candidate,
         position,
         absolute_start..absolute_end,
-        replacement,
+        usize::try_from(utf16_len(replacement)?)
+            .map_err(|_error| SectionTextError::InvalidSource)?,
     )?;
+    verify_native_locality(source, &candidate, target, &mut budget)?;
     budget.settle_transaction_reservation();
     Ok(candidate)
+}
+
+fn absolute_body_span(
+    package: &Package,
+    body: &NativeBodySnapshot,
+    position: Position,
+    span: TextSpan,
+) -> Result<Range<usize>, SectionTextError> {
+    let section_range = native_section_range(package, body, position)?;
+    let start = section_range
+        .start
+        .checked_add(
+            usize::try_from(span.start().utf16_index())
+                .map_err(|_error| SectionTextError::InvalidSource)?,
+        )
+        .ok_or(SectionTextError::InvalidSource)?;
+    let end = section_range
+        .start
+        .checked_add(
+            usize::try_from(span.end().utf16_index())
+                .map_err(|_error| SectionTextError::InvalidSource)?,
+        )
+        .ok_or(SectionTextError::InvalidSource)?;
+    if start > end || end > section_range.end {
+        return Err(SectionTextError::InvalidSource);
+    }
+    Ok(start..end)
+}
+
+fn patch_replacement_units(patch: &SectionTextPatch) -> Result<usize, SectionTextError> {
+    let before_units = patch.before.encode_utf16().count();
+    let after_units = patch.after.encode_utf16().count();
+    let start = usize::try_from(patch.span.start().utf16_index())
+        .map_err(|_error| SectionTextError::InvalidSource)?;
+    let end = usize::try_from(patch.span.end().utf16_index())
+        .map_err(|_error| SectionTextError::InvalidSource)?;
+    if end > before_units || start > end {
+        return Err(SectionTextError::InvalidSource);
+    }
+    let removed = end - start;
+    after_units
+        .checked_sub(
+            before_units
+                .checked_sub(removed)
+                .ok_or(SectionTextError::InvalidSource)?,
+        )
+        .ok_or(SectionTextError::InvalidSource)
+}
+
+/// Changed text is only authorized for the canonical rooted body member.
+/// Read-only semantic projection may accept normalized/legacy sources, but a
+/// preserve-mode write must not rediscover a member through a ZIP alias,
+/// duplicate name, opaque entry, or mismatched local/central name metadata.
+fn validate_mutation_component(
+    package: &Package,
+    component_index: usize,
+) -> Result<(), SectionTextError> {
+    let component = package
+        .state
+        .source
+        .components()
+        .iter()
+        .nth(component_index)
+        .ok_or(SectionTextError::InvalidSource)?;
+    if component.name() != ROOT_COMPONENT_NAME {
+        return Err(SectionTextError::InvalidSource);
+    }
+    let mut matches = package
+        .state
+        .source
+        .package()
+        .iter()
+        .filter(|entry| entry.name() == ROOT_COMPONENT_NAME);
+    let entry = matches.next().ok_or(SectionTextError::InvalidSource)?;
+    if matches.next().is_some()
+        || entry.is_opaque()
+        || entry.raw_name() != ROOT_COMPONENT_NAME.as_bytes()
+        || entry.metadata().local().name() != ROOT_COMPONENT_NAME.as_bytes()
+        || entry.metadata().central().name() != ROOT_COMPONENT_NAME.as_bytes()
+        || entry.metadata().local().compression_method()
+            != entry.metadata().central().compression_method()
+    {
+        return Err(SectionTextError::InvalidSource);
+    }
+    Ok(())
+}
+
+/// Verify that a section-text rewrite changed only the selected body message.
+///
+/// Archive offsets, message lengths, and ZIP record offsets may legitimately
+/// move when the text payload changes.  All semantic/header metadata remains
+/// source-authoritative; the selected message is the sole exception for its
+/// payload and length field.  This check is deliberately performed after a
+/// complete candidate reopen so a changed package cannot pass merely because
+/// its selected text reads back correctly.
+fn verify_native_locality(
+    source: &Package,
+    candidate: &Package,
+    target: transaction::Target,
+    budget: &mut transaction::TransactionBudget,
+) -> Result<(), SectionTextError> {
+    let source_catalog = &source.state.source;
+    let candidate_catalog = &candidate.state.source;
+    budget
+        .charge_limit(
+            crate::section::settings::LimitKind::TransactionWork,
+            source_catalog
+                .source_bytes()
+                .len()
+                .saturating_add(candidate_catalog.source_bytes().len()),
+            Path::Package,
+        )
+        .map_err(map_transaction_error)?;
+    let source_entries = source_catalog.package().iter().collect::<Vec<_>>();
+    let candidate_entries = candidate_catalog.package().iter().collect::<Vec<_>>();
+    if source_entries.len() != candidate_entries.len() {
+        return Err(SectionTextError::Verification);
+    }
+    for (before, after) in source_entries.iter().zip(candidate_entries) {
+        if before.name() != after.name() {
+            return Err(SectionTextError::Verification);
+        }
+        let is_selected = before.name()
+            == source_catalog
+                .components()
+                .iter()
+                .nth(target.component_index)
+                .ok_or(SectionTextError::Verification)?
+                .name();
+        if !is_selected && (before.data() != after.data() || before.metadata() != after.metadata())
+        {
+            return Err(SectionTextError::Verification);
+        }
+    }
+
+    if source_catalog.components().len() != candidate_catalog.components().len() {
+        return Err(SectionTextError::Verification);
+    }
+    for (component_index, (before, after)) in source_catalog
+        .components()
+        .iter()
+        .zip(candidate_catalog.components().iter())
+        .enumerate()
+    {
+        if before.name() != after.name()
+            || before.archive().objects.len() != after.archive().objects.len()
+        {
+            return Err(SectionTextError::Verification);
+        }
+        for (object_index, (before_object, after_object)) in before
+            .archive()
+            .objects
+            .iter()
+            .zip(after.archive().objects.iter())
+            .enumerate()
+        {
+            if component_index != target.component_index || object_index != target.object_index {
+                if !before_object.same_content_ignoring_offsets(after_object) {
+                    return Err(SectionTextError::Verification);
+                }
+                continue;
+            }
+            let after_message = after_object
+                .messages
+                .get(target.message_index)
+                .cloned()
+                .ok_or(SectionTextError::Verification)?;
+            let retained = before_object
+                .messages
+                .iter()
+                .fold(0usize, |total, message| {
+                    total.saturating_add(message.data.len())
+                });
+            budget
+                .charge_limit(
+                    crate::section::settings::LimitKind::RetainedBytes,
+                    retained,
+                    Path::section(target.position),
+                )
+                .map_err(map_transaction_error)?;
+            let mut expected_object = before_object.clone();
+            expected_object
+                .replace_message_preserving_header_with_limits(
+                    target.message_index,
+                    after_message,
+                    source_catalog
+                        .limits()
+                        .effective_archive_limits()
+                        .map_err(map_archive_error)?,
+                )
+                .map_err(map_core_error)?;
+            let archive_limits = source_catalog
+                .limits()
+                .effective_archive_limits()
+                .map_err(map_archive_error)?;
+            let mut expected_archive = litchi_iwa_core::Archive::new();
+            expected_archive.objects.push(expected_object);
+            let expected_bytes = expected_archive
+                .to_bytes_with_limits(archive_limits)
+                .map_err(map_core_error)?;
+            budget
+                .charge_limit(
+                    crate::section::settings::LimitKind::TransactionWork,
+                    expected_bytes.len().saturating_mul(2),
+                    Path::section(target.position),
+                )
+                .map_err(map_transaction_error)?;
+            let expected_archive =
+                litchi_iwa_core::Archive::parse_with_limits(&expected_bytes, archive_limits)
+                    .map_err(map_core_error)?;
+            let expected_object = expected_archive
+                .objects
+                .first()
+                .ok_or(SectionTextError::Verification)?;
+            if expected_archive.objects.len() != 1
+                || !expected_object.same_content_ignoring_offsets(after_object)
+            {
+                return Err(SectionTextError::Verification);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn verify_candidate(
@@ -970,7 +1389,7 @@ fn verify_native_topology(
     candidate: &Package,
     position: Position,
     absolute_span: Range<usize>,
-    replacement: &str,
+    replacement_units: usize,
 ) -> Result<(), SectionTextError> {
     let source_root = root_references_with_limits(
         source.state.source.components(),
@@ -992,8 +1411,6 @@ fn verify_native_topology(
     if before.identifier != after.identifier || before.references.len() != after.references.len() {
         return Err(SectionTextError::Verification);
     }
-    let replacement_units = usize::try_from(utf16_len(replacement)?)
-        .map_err(|_error| SectionTextError::InvalidSource)?;
     for (old, new) in before.references.iter().zip(&after.references) {
         if old.identifier != new.identifier {
             return Err(SectionTextError::Verification);
