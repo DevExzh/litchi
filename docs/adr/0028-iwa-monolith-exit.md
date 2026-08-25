@@ -5082,3 +5082,36 @@ Rust reread of both normalized artifacts. Pages normalized the ZIP bytes; this
 is not Rust/native byte parity, arbitrary graph acceptance, a performance/RSS
 result, durable publication evidence, full-workspace health, or a host,
 dependency-edge, debt, or monolith-exit gate.
+
+## 2026-08-25 amendment: Wave78 Pages header/footer text bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `1596d5106ee42fe9238e8d63cc55d39c494d59c3` moves the
+existing-root Pages header/footer text slice into the selector-first package.
+`HeaderFooterSelector` selects a section, first/even/odd template, header or
+footer role, and checked zero-based slot. `Package` owns semantic reads,
+`Some -> Some` replacement, clear-to-empty, exact inverse/apply, Metadata
+root/selected-token handling, preview invalidation, strict codec/text-wire
+rewriting, candidate reopen, and locality verification. Native IDs, raw
+storage types, archive names, generated messages, wire values, Prost, and
+Buffa views remain private.
+
+This is not a header/footer graph lifecycle owner. Slot/template creation or
+removal, inheritance and page-variant settings, number attachments beyond
+the focused route, section lifecycle, media, annotations, table topology and
+appearance, body/other text graphs, and unresolved shared/resource ownership
+remain at `litchi-iwa` or their recorded owners and fail closed when they are
+not provable. The hidden `pages_header_footer_codec` and text-wire owner
+preserve supported unknown raw fields and reject malformed or conflicting
+known ownership.
+
+Debt 017, the `litchi-iwa -> litchi-pages` dependency edge, `litchi-iwa` and
+`PagesEditor`, remaining Pages host responsibilities, generated-schema,
+Buffa, and normal Prost owners, and the IWA monolith remain. No crate,
+dependency edge, debt item, manifest dependency, generated-schema owner,
+normal Prost owner, host-exit, or monolith-exit gate is retired by Wave78.
+
+The Pages 14.4 record provides bounded header/footer open/render/save/close/
+reopen evidence, exact pre-native inverse artifacts, and strict normalized
+Rust reread. Pages normalized the ZIP bytes; this is not Rust/native byte
+parity, arbitrary producer-graph acceptance, a performance/RSS result,
+durable publication evidence, or a full-workspace claim.

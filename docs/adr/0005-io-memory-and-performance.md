@@ -1354,3 +1354,33 @@ preflight for every private stage. No production manifest dependency,
 generated schema, normal Prost owner, Buffa owner, or workspace dependency
 edge changed; fuzz manifests and inventories changed only to register the new
 bounded targets.
+
+## 2026-08-25 amendment: Wave78 Pages header/footer text resource record
+
+Implementation commit `1596d5106ee42fe9238e8d63cc55d39c494d59c3` carries one
+aggregate `TransactionBudget` through physical source and catalog scans,
+root body/section/template/text/metadata selection, strict header/footer and
+text-wire scans, archive and Snappy bounds, exact output sizing, ZIP
+reassembly, private prepared metadata/text candidates, candidate catalog
+reopen, locality verification, and retained exact source/target patch
+artifacts. Distinct scans and private candidates are charged as distinct
+operation work; nesting is merged by maximum, and borrowed payloads already
+charged by an earlier phase are not charged again.
+
+The text and metadata paths perform strict source validation, exact sizing,
+semantic precharge, and candidate verification. Prepared ZIP execution
+requirements cover output, scratch, retained bytes, and fallible allocation
+before execution. Residual limits are passed between phases instead of
+resetting full limits. Staged private candidates are permitted, but
+publication remains atomic and archive, compression, ZIP, candidate-reopen,
+and locality bounds are charged before publication. Metadata root and
+selected-token work, including preservation of root field 1 and
+unknown/unselected/versioned bytes, is included in the same transaction
+budget.
+
+These are operation-local input, output, archive, codec, compression, ZIP,
+candidate, scratch, and allocation facts. They establish no package-wide
+peak-memory, RSS, latency, throughput, zero-copy, or performance result, and
+do not claim one global allocation or a universally output-free preflight.
+No production manifest dependency, generated schema, normal Prost owner,
+Buffa owner, or workspace dependency edge changed.
