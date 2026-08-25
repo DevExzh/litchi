@@ -111,6 +111,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pages_header_footer_lifecycle"
+path = "fuzz_targets/pages_header_footer_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_slide_deletion"
 path = "fuzz_targets/keynote_slide_deletion.rs"
 test = false

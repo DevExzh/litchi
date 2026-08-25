@@ -5,6 +5,8 @@ use crate::pages::PagesEditor;
 use crate::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::comment::DrawableId;
 use litchi_iwa_text::number_attachment::raw::object_id as native_object_id;
+use litchi_pages::Package as PagesPackage;
+use litchi_pages::header_footer::HeaderFooterSelector;
 
 const PREFIX: &str = "Page ";
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
@@ -85,8 +87,14 @@ fn invalid_positions_and_text_replacement_are_transactional() {
 #[test]
 fn pages_header_footer_ownership_is_enforced() {
     let mut pages = PagesEditor::create_with_text("Body").unwrap();
-    let header = pages.header_footers().unwrap()[0].storage.id;
-    pages.set_header_footer_text(header, PREFIX).unwrap();
+    let package = PagesPackage::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let header = (PagesPackage::header_footers)(&package).unwrap()[0].selector();
+    let mut edit = package.edit_header_footer_text(header).unwrap();
+    edit.set(PREFIX).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).unwrap();
+    pages = PagesEditor::from_bytes(&bytes).unwrap();
     let attachment = pages
         .insert_header_footer_number_attachment(
             header,
@@ -101,20 +109,18 @@ fn pages_header_footer_ownership_is_enforced() {
             .as_slice(),
         std::slice::from_ref(&attachment)
     );
-    let body_id = pages.body_storage().unwrap().id;
-    assert!(pages.header_footer_number_attachments(body_id).is_err());
+    let invalid = HeaderFooterSelector::index(0, header.template(), header.kind(), usize::MAX);
+    assert!(pages.header_footer_number_attachments(invalid).is_err());
     pages
         .remove_header_footer_number_attachment(header, attachment.id)
         .unwrap();
+    let package = PagesPackage::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        pages
-            .header_footers()
+        (PagesPackage::header_footers)(&package)
             .unwrap()
             .into_iter()
-            .find(|item| item.storage.id == header)
+            .find(|item| item.selector() == header)
             .unwrap()
-            .storage
-            .storage
             .text(),
         PREFIX
     );

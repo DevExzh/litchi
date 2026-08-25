@@ -68,6 +68,7 @@ pub use document::{
     MAX_BODY_STORAGES, MAX_SECTIONS, ReadError, ReadLimitKind, Result, Root, SemanticLimitKind,
     SemanticLimits, SemanticLimitsError,
 };
+pub use header_footer::{HeaderFooter, HeaderFooterSelector, Kind, Template};
 pub use litchi_core::Position;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
@@ -99,6 +100,10 @@ pub use package::{
 pub use package::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
     FootnoteTextLimitKind, FootnoteTextPatch,
+};
+pub use package::{
+    HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
+    HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
 };
 pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats, WriteError};
 pub use package::{

@@ -109,9 +109,10 @@ println!("objects: {}", stats.total_objects);
 - Legacy nested `Index.zip` bundle import with byte-preserved assets and
   explicit password-protected document rejection
 - Legacy host editors for Numbers sheets/tables/cells/formulas, Pages
-  body/header/footer/text-box text, and unmigrated Keynote slide graphs and
-  arbitrary text boxes. Selector-first Keynote title, body, and speaker-notes
-  text and presentation-settings transactions are owned by
+  body/text-box text, and unmigrated Keynote slide graphs and arbitrary text
+  boxes. Selector-first Pages header/footer text now belongs to
+  `litchi-pages::Package`; selector-first Keynote title, body, and
+  speaker-notes text and presentation-settings transactions are owned by
   `litchi-keynote::Package`.
 - `litchi-pages::Package` selector-first section-text reads and, for rooted
   exact sources with one unambiguous native body storage,
@@ -1081,6 +1082,7 @@ use litchi_iwa::numbers::{
 use litchi_iwa::pages::PagesEditor;
 use litchi_numbers::{SheetSelector, TableSelector};
 use litchi_pages::header_footer::Kind;
+use litchi_pages::Package as PagesPackage;
 use litchi_iwa::keynote::{
     KeynoteBuildSettings, KeynoteBuildStart, KeynoteEditor, KeynoteFlipDirection,
     KeynoteHorizontalBuildDirection, KeynoteKeyboardDirection, KeynoteRotationDirection,
@@ -1193,17 +1195,18 @@ if let Some(sheet) = numbers.sheets()?.first()
 }
 numbers.save("updated.numbers")?;
 
-let mut pages = PagesEditor::open("input.pages")?;
-let section_id = pages.sections()[0].object_id;
-// Selector-first section-text editing now lives in litchi-pages; see
-// litchi-pages/examples/edit_section_text.rs. The legacy raw-ID path remains
-// available here only as a compatibility surface.
-let first_header = pages
-    .header_footers()?
+let pages_package = PagesPackage::open("input.pages")?;
+let first_header = (PagesPackage::header_footers)(&pages_package)?
     .into_iter()
-    .find(|region| matches!(region.kind, Kind::Header))
+    .find(|region| region.kind() == Kind::Header)
     .expect("document header");
-pages.set_header_footer_text(first_header.storage.object_id, "Quarterly report")?;
+let mut header_edit = pages_package.edit_header_footer_text(first_header.selector())?;
+header_edit.set("Quarterly report")?;
+let header_commit = header_edit.commit()?;
+let mut updated_pages = Vec::new();
+header_commit.package().write_to(&mut updated_pages)?;
+let mut pages = PagesEditor::from_bytes(&updated_pages)?;
+let section_id = pages.sections()[0].object_id;
 // Section-name editing now lives in litchi-pages and uses SectionSelector;
 // see litchi-pages/examples/edit_section_name.rs.
 // Aggregate section settings, including header/footer inheritance and the

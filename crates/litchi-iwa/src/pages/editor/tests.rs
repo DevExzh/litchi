@@ -9,11 +9,12 @@ use crate::protobuf::tswp::{
     ObjectAttributeTable, StorageArchive, object_attribute_table::ObjectAttribute,
 };
 use crate::shapes::{DrawablePoint, DrawableSize};
+use litchi_pages::Package as PagesPackage;
 use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
     Numbering as FootnoteNumbering,
 };
-use litchi_pages::header_footer::{Kind, Template};
+use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
 use litchi_pages::page_layout::Orientation as PageOrientation;
 use litchi_pages::section::{PageNumber, PageNumbering, Start};
 
@@ -245,7 +246,7 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
         text: vec![text.to_owned()],
         ..Default::default()
     };
-    let objects = vec![
+    let mut objects = vec![
         object(1, 10000, root.encode_to_vec()),
         object(body_id, 2001, body.encode_to_vec()),
         object(section_id, SECTION_MESSAGE_TYPE, section.encode_to_vec()),
@@ -257,51 +258,115 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
         object(header_id, 2001, storage("A🚀B").encode_to_vec()),
         object(footer_id, 2001, storage("Footer").encode_to_vec()),
     ];
+    // The focused package owner consumes the archive's declared ownership
+    // graph, not only the protobuf payload references.  Keep this synthetic
+    // fixture's metadata in sync with the rooted Document graph so the host
+    // regression exercises the same strict ingress path as a native package.
+    for (owner, references) in [
+        (1, vec![body_id]),
+        (body_id, vec![section_id]),
+        (section_id, vec![template_id]),
+        (template_id, vec![header_id, footer_id]),
+    ] {
+        objects
+            .iter_mut()
+            .find(|object| object.archive_info.identifier == Some(owner))
+            .expect("header/footer fixture owner")
+            .archive_info
+            .message_infos[0]
+            .object_references = references;
+    }
     let mut package = IWorkPackage::new();
     package
         .replace_archive("Index/Document.iwa", &Archive { objects })
+        .unwrap();
+    package
+        .replace_archive(
+            PACKAGE_METADATA_ENTRY,
+            &Archive {
+                objects: vec![object(
+                    2,
+                    PACKAGE_METADATA_MESSAGE_TYPE,
+                    PackageMetadata {
+                        last_object_identifier: 1000,
+                        save_token: Some(1),
+                        components: vec![ComponentInfo {
+                            identifier: 1,
+                            preferred_locator: "Document".to_owned(),
+                            locator: Some("Document".to_owned()),
+                            save_token: Some(1),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )],
+            },
+        )
         .unwrap();
 
     let mut editor = PagesEditor::from_package(package).unwrap();
     assert_eq!(editor.sections().len(), 1);
     assert_eq!(editor.sections()[0].name.as_deref(), Some("Chapter"));
-    let regions = editor.header_footers().unwrap();
+    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let regions = (PagesPackage::header_footers)(&package).unwrap();
     assert_eq!(regions.len(), 2);
-    assert_eq!(regions[0].section_name.as_deref(), Some("Chapter"));
-    assert_eq!(regions[0].template, Template::Odd);
-    assert_eq!(regions[0].kind, Kind::Header);
-    assert_eq!(regions[0].storage.storage.text(), "A🚀B");
-    assert_eq!(regions[1].kind, Kind::Footer);
+    assert_eq!(regions[0].section_name(), Some("Chapter"));
+    assert_eq!(regions[0].template(), Template::Odd);
+    assert_eq!(regions[0].kind(), Kind::Header);
+    assert_eq!(regions[0].text(), "A🚀B");
+    assert_eq!(regions[1].kind(), Kind::Footer);
 
     let before = editor.to_bytes().unwrap();
-    assert!(
-        editor
-            .replace_header_footer_text(TextStorageId::new(header_id).unwrap(), 2..3, "x")
-            .is_err()
-    );
+    let selector = HeaderFooterSelector::index(0, Template::Odd, Kind::Header, 0);
+    let mut edit = package.edit_header_footer_text(selector).unwrap();
+    assert!(edit.replace(2..3, "x").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
-    editor
-        .replace_header_footer_text(TextStorageId::new(header_id).unwrap(), 1..3, "東京")
+    let mut edit = package.edit_header_footer_text(selector).unwrap();
+    edit.replace(1..3, "東京").unwrap();
+    let commit = edit.commit().unwrap();
+    let mut edited_bytes = Vec::new();
+    commit.package().write_to(&mut edited_bytes).unwrap();
+    editor = PagesEditor::from_bytes(&edited_bytes).unwrap();
+
+    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut edit = package
+        .edit_header_footer_text(HeaderFooterSelector::index(
+            0,
+            Template::Odd,
+            Kind::Footer,
+            0,
+        ))
         .unwrap();
-    editor
-        .clear_header_footer(TextStorageId::new(footer_id).unwrap())
-        .unwrap();
-    let regions = editor.header_footers().unwrap();
-    assert_eq!(regions[0].storage.storage.text(), "A東京B");
-    assert!(regions[1].storage.storage.is_empty());
+    edit.clear().unwrap();
+    let commit = edit.commit().unwrap();
+    let mut edited_bytes = Vec::new();
+    commit.package().write_to(&mut edited_bytes).unwrap();
+    editor = PagesEditor::from_bytes(&edited_bytes).unwrap();
+
+    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let regions = (PagesPackage::header_footers)(&package).unwrap();
+    assert_eq!(regions[0].text(), "A東京B");
+    assert!(regions[1].is_empty());
     assert!(
-        editor
-            .set_header_footer_text(TextStorageId::new(body_id).unwrap(), "no")
+        package
+            .edit_header_footer_text(HeaderFooterSelector::index(
+                0,
+                Template::Odd,
+                Kind::Header,
+                usize::MAX,
+            ))
             .is_err()
     );
     let reparsed = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    let regions = reparsed.header_footers().unwrap();
-    assert_eq!(regions[0].template, Template::Odd);
-    assert_eq!(regions[0].kind, Kind::Header);
-    assert_eq!(regions[1].template, Template::Odd);
-    assert_eq!(regions[1].kind, Kind::Footer);
-    assert_eq!(regions[0].storage.storage.text(), "A東京B");
-    assert!(regions[1].storage.storage.is_empty());
+    let package = PagesPackage::from_bytes(&reparsed.to_bytes().unwrap()).unwrap();
+    let regions = (PagesPackage::header_footers)(&package).unwrap();
+    assert_eq!(regions[0].template(), Template::Odd);
+    assert_eq!(regions[0].kind(), Kind::Header);
+    assert_eq!(regions[1].template(), Template::Odd);
+    assert_eq!(regions[1].kind(), Kind::Footer);
+    assert_eq!(regions[0].text(), "A東京B");
+    assert!(regions[1].is_empty());
 }
 
 #[test]
@@ -469,7 +534,8 @@ fn section_append_remove_is_wire_preserving_and_transactional() {
     assert_ne!(created.odd_template_id, Some(template_id));
     assert_eq!(editor.body_text().unwrap(), "Body\u{4}");
     assert_eq!(editor.sections().len(), 2);
-    assert_eq!(editor.header_footers().unwrap().len(), 4);
+    let package = PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!((PagesPackage::header_footers)(&package).unwrap().len(), 4);
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let created_section = SectionArchive::decode(
         archive.object(created.object_id).unwrap().messages[0]

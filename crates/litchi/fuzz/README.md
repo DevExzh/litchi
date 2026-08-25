@@ -111,6 +111,16 @@ The checked-in seeds under `corpus/pages_body_footnote_lifecycle/` are small
 `basic.pages` fixture, so this corpus is isolated from the low-level protobuf
 body/footnote corpora.
 
+`pages_header_footer_lifecycle` is the focused selector-first header/footer
+text target. It offers arbitrary bytes to bounded Pages ingress and reuses a
+fixed command prefix for typed section/template/role/slot selection, no-op,
+set, clear, UTF-16 replacement, alias readback, exact patch application,
+conflicts, inverse restoration, redacted selector errors, and input limits.
+The target leaves the package source immutable on every failed staging or
+commit path and never writes a package to disk. The checked-in seeds under
+`corpus/pages_header_footer_lifecycle/` are small `hex:` command recipes;
+they are not native Pages package copies.
+
 `parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
 32 MiB aggregate expanded bytes, 4,096 values of each semantic collection,

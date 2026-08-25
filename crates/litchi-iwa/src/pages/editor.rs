@@ -86,10 +86,8 @@ const DRAWABLE_ATTACHMENT_MESSAGE_TYPE: u32 = 2003;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3097;
 const BODY_DRAWABLE_DUPLICATE_OFFSET: f32 = 12.0;
 
-use litchi_pages::header_footer::{Kind, Template};
-pub use types::{
-    PagesDrawableTextInfo, PagesHeaderFooterInfo, PagesSectionInfo, RemovedPagesTextBox,
-};
+use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
+pub use types::{PagesDrawableTextInfo, PagesSectionInfo, RemovedPagesTextBox};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HeaderFooterLocation {
@@ -2640,55 +2638,6 @@ impl PagesEditor {
         Ok(removed)
     }
 
-    /// List every header/footer slot reachable from the document's sections.
-    ///
-    /// A storage can appear in more than one slot when Pages intentionally
-    /// shares content between page variants. Editing that storage updates all
-    /// aliases, matching Pages' object graph semantics.
-    pub fn header_footers(&self) -> Result<Vec<PagesHeaderFooterInfo>> {
-        self.header_footers
-            .iter()
-            .map(|location| {
-                Ok(PagesHeaderFooterInfo {
-                    section_id: location.section_id,
-                    section_name: location.section_name.clone(),
-                    section_character_index: location.section_character_index,
-                    template_id: location.template_id,
-                    template: location.template,
-                    kind: location.kind,
-                    slot: location.slot,
-                    storage: self.text.storage(location.storage_id)?,
-                })
-            })
-            .collect()
-    }
-
-    /// Replace a UTF-16 range in a reachable header/footer storage.
-    pub fn replace_header_footer_text(
-        &mut self,
-        storage_id: TextStorageId,
-        range: Range<usize>,
-        replacement: &str,
-    ) -> Result<()> {
-        self.require_header_footer(storage_id)?;
-        self.text.replace_text(storage_id, range, replacement)
-    }
-
-    /// Set the complete text of a reachable header/footer storage.
-    pub fn set_header_footer_text(
-        &mut self,
-        storage_id: TextStorageId,
-        replacement: &str,
-    ) -> Result<()> {
-        self.require_header_footer(storage_id)?;
-        self.text.set_text(storage_id, replacement)
-    }
-
-    /// Clear a reachable header/footer storage without deleting its styled slot.
-    pub fn clear_header_footer(&mut self, storage_id: TextStorageId) -> Result<()> {
-        self.set_header_footer_text(storage_id, "")
-    }
-
     pub fn package(&self) -> &IWorkPackage {
         self.text.package()
     }
@@ -2760,18 +2709,41 @@ impl PagesEditor {
         self.text.save(path)
     }
 
-    fn require_header_footer(&self, storage_id: TextStorageId) -> Result<()> {
-        if self
-            .header_footers
-            .iter()
-            .any(|location| location.storage_id == storage_id)
-        {
-            Ok(())
-        } else {
-            Err(Error::ParseError(format!(
-                "Text storage {storage_id} is not a reachable Pages header/footer"
-            )))
+    pub(super) fn require_header_footer_selector(
+        &self,
+        selector: HeaderFooterSelector<'_>,
+    ) -> Result<TextStorageId> {
+        let section_id = match selector.section() {
+            litchi_pages::SectionSelector::Position(position) => self
+                .sections
+                .get(position.get())
+                .map(|section| section.object_id),
+            litchi_pages::SectionSelector::Name(name) => {
+                let mut found = None;
+                for section in &self.sections {
+                    if section.name.as_deref() == Some(name) {
+                        if found.replace(section.object_id).is_some() {
+                            return Err(Error::ParseError(
+                                "Pages header/footer section selector is ambiguous".to_owned(),
+                            ));
+                        }
+                    }
+                }
+                found
+            },
+            _ => None,
         }
+        .ok_or_else(|| Error::ParseError("Pages header/footer section was not found".to_owned()))?;
+        self.header_footers
+            .iter()
+            .find(|location| {
+                location.section_id == section_id
+                    && location.template == selector.template()
+                    && location.kind == selector.kind()
+                    && location.slot == selector.slot_index()
+            })
+            .map(|location| location.storage_id)
+            .ok_or_else(|| Error::ParseError("Pages header/footer slot was not found".to_owned()))
     }
 
     fn reachable_drawable_ids(&self) -> Result<HashSet<u64>> {

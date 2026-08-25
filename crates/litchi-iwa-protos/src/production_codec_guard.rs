@@ -426,6 +426,10 @@ mod tests {
         ("table_info", include_str!("table_info_codec.rs")),
         ("pages_section", include_str!("pages_section_codec.rs")),
         (
+            "pages_header_footer",
+            include_str!("pages_header_footer_codec.rs"),
+        ),
+        (
             "pages_section_background",
             include_str!("pages_section_background_codec.rs"),
         ),

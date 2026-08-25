@@ -10,6 +10,7 @@ pub(crate) mod body_table_headers;
 pub(crate) mod body_table_title;
 pub(crate) mod document_settings;
 mod footnote_text;
+mod header_footer_text;
 mod page_layout;
 pub(crate) mod section_background;
 mod section_name;
@@ -68,6 +69,10 @@ pub use body_table_title::{
 pub use footnote_text::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
     FootnoteTextLimitKind, FootnoteTextPatch,
+};
+pub use header_footer_text::{
+    HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
+    HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
 };
 pub use page_layout::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
