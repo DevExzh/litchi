@@ -17,6 +17,44 @@ use super::SourceBackedSpreadsheet;
 use crate::worksheet::Row;
 use crate::worksheet::{Cell, CellChange, CellValue, Merge, Selector, Sheet, validation};
 
+/// One existing formula-cell replacement in a source-backed ODS transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FormulaChange {
+    row: usize,
+    column: usize,
+    formula: String,
+}
+
+impl FormulaChange {
+    /// Construct one formula replacement at a zero-based logical coordinate.
+    #[must_use]
+    pub fn new(row: usize, column: usize, formula: impl Into<String>) -> Self {
+        Self {
+            row,
+            column,
+            formula: formula.into(),
+        }
+    }
+
+    /// Zero-based logical row coordinate.
+    #[must_use]
+    pub const fn row(&self) -> usize {
+        self.row
+    }
+
+    /// Zero-based logical column coordinate.
+    #[must_use]
+    pub const fn column(&self) -> usize {
+        self.column
+    }
+
+    /// Replacement formula text.
+    #[must_use]
+    pub fn formula(&self) -> &str {
+        &self.formula
+    }
+}
+
 /// An immutable semantic ODS cell snapshot bound to one positional source.
 ///
 /// The snapshot shares the retained `content.xml` and worksheet projection.
@@ -256,6 +294,120 @@ impl<'source> SourceCellEdit<'source> {
             .map(|selected| selected.map(|changed| changed != 0))
     }
 
+    /// Replace one existing formula cell while retaining its cached value,
+    /// displayed text, style, and other cell metadata.
+    pub fn set_formula<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        row: usize,
+        column: usize,
+        formula: impl Into<String>,
+    ) -> Result<Option<bool>> {
+        self.set_formulas(selector, vec![FormulaChange::new(row, column, formula)])
+            .map(|selected| selected.map(|changed| changed != 0))
+    }
+
+    /// Atomically replace a bounded batch of existing formula cells.
+    ///
+    /// Missing cells, scalar cells, repeated physical rows, merged cells,
+    /// unknown values, and duplicate coordinates are refused. Repeated
+    /// physical columns may be split because the containing row remains the
+    /// same owner. Formula changes never evaluate or replace cached values.
+    pub fn set_formulas<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        mut changes: Vec<FormulaChange>,
+    ) -> Result<Option<usize>> {
+        self.before.check_source()?;
+        validate_formula_changes(&mut changes)?;
+        let Some(sheet_index) =
+            crate::worksheet::snapshot::select(&self.before.sheets, selector.into())?
+        else {
+            self.before.check_source()?;
+            return Ok(None);
+        };
+        let source_sheet = self
+            .touched
+            .get(&sheet_index)
+            .unwrap_or(&self.before.sheets[sheet_index]);
+        for change in &changes {
+            if self
+                .coordinates
+                .iter()
+                .any(|coordinate| *coordinate == (sheet_index, change.row(), change.column()))
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS source cell edit repeats coordinate ({}, {}) on sheet '{}'",
+                    change.row(),
+                    change.column(),
+                    source_sheet.name
+                )));
+            }
+        }
+        let replacements = formula_replacements(source_sheet, &changes)?;
+        let effective =
+            crate::worksheet::snapshot::effective_cell_changes(source_sheet, replacements);
+        if effective.is_empty() {
+            self.before.check_source()?;
+            return Ok(Some(0));
+        }
+        if self.structure_protected
+            || self
+                .protected_sheets
+                .iter()
+                .any(|name| name == &source_sheet.name)
+        {
+            return Err(Error::InvalidFormat(
+                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
+            ));
+        }
+        let attempted = self
+            .coordinates
+            .len()
+            .checked_add(effective.len())
+            .unwrap_or(usize::MAX);
+        if attempted > crate::worksheet::MAX_CELL_CHANGES {
+            return Err(Error::InvalidFormat(format!(
+                "ODS source cell edit exceeds the {} transaction safety limit",
+                crate::worksheet::MAX_CELL_CHANGES
+            )));
+        }
+
+        let mut candidate = source_sheet.clone();
+        candidate.set_cells_prevalidated(
+            effective
+                .iter()
+                .map(|change| (change.row(), change.column(), change.cell().clone()))
+                .collect(),
+        )?;
+        validate_candidate_rows(source_sheet, &candidate, &effective)?;
+        self.before.check_source()?;
+
+        self.coordinates
+            .try_reserve(effective.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODS source cell coordinates",
+                source,
+            })?;
+        let previous = self.touched.insert(sheet_index, candidate);
+        let old_len = self.coordinates.len();
+        self.coordinates.extend(
+            effective
+                .iter()
+                .map(|change| (sheet_index, change.row(), change.column())),
+        );
+        if let Err(error) = self.before.check_source() {
+            self.coordinates.truncate(old_len);
+            if let Some(previous) = previous {
+                self.touched.insert(sheet_index, previous);
+            } else {
+                self.touched.remove(&sheet_index);
+            }
+            return Err(error);
+        }
+        Ok(Some(effective.len()))
+    }
+
     /// Atomically replace one bounded batch of existing ordinary scalar cells.
     ///
     /// Missing cells, repeated physical rows, formulas, merged cells, unknown
@@ -271,6 +423,7 @@ impl<'source> SourceCellEdit<'source> {
         let Some(sheet_index) =
             crate::worksheet::snapshot::select(&self.before.sheets, selector.into())?
         else {
+            self.before.check_source()?;
             return Ok(None);
         };
         let source_sheet = self
@@ -595,6 +748,94 @@ fn validate_existing_changes(sheet: &Sheet, changes: &[CellChange]) -> Result<()
     })
 }
 
+fn validate_formula_changes(changes: &mut [FormulaChange]) -> Result<()> {
+    if changes.len() > crate::worksheet::MAX_CELL_CHANGES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS formula batch exceeds the {} operation safety limit",
+            crate::worksheet::MAX_CELL_CHANGES
+        )));
+    }
+    let maximum_payload = validation::MAX_TEXT_BYTES.min(validation::MAX_CONTENT_XML_BYTES);
+    let mut payload_bytes = 0u64;
+    for change in changes.iter() {
+        if change.row() >= validation::MAX_LOGICAL_ROWS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS formula batch row {} is outside the {}-row logical grid",
+                change.row(),
+                validation::MAX_LOGICAL_ROWS
+            )));
+        }
+        if change.column() >= validation::MAX_LOGICAL_COLUMNS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS formula batch column {} is outside the {}-column logical grid",
+                change.column(),
+                validation::MAX_LOGICAL_COLUMNS
+            )));
+        }
+        let formula_bytes = u64::try_from(change.formula().len()).unwrap_or(u64::MAX);
+        payload_bytes = payload_bytes
+            .checked_add(formula_bytes)
+            .ok_or_else(|| formula_payload_limit(u64::MAX, maximum_payload))?;
+        if payload_bytes > maximum_payload as u64 {
+            return Err(formula_payload_limit(payload_bytes, maximum_payload));
+        }
+    }
+    for change in changes.iter() {
+        let mut validated = Cell::empty();
+        validated.set_formula(change.formula().to_string())?;
+    }
+    changes.sort_by_key(|change| (change.row(), change.column()));
+    for repeated in changes.windows(2) {
+        if repeated[0].row() == repeated[1].row() && repeated[0].column() == repeated[1].column() {
+            return Err(Error::InvalidFormat(format!(
+                "ODS formula batch repeats logical coordinate ({}, {})",
+                repeated[0].row(),
+                repeated[0].column()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn formula_payload_limit(observed: u64, maximum: usize) -> Error {
+    Error::ResourceLimit(litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::InputBytes,
+        observed,
+        limit: maximum as u64,
+        scope: Arc::from("ODS source formula batch payload"),
+    })
+}
+
+fn formula_replacements(sheet: &Sheet, changes: &[FormulaChange]) -> Result<Vec<CellChange>> {
+    let mut replacements = Vec::with_capacity(changes.len());
+    visit_existing_formula_cells(sheet, changes, |row, existing, change| {
+        if row
+            .cells
+            .iter()
+            .any(|cell| matches!(cell.value, CellValue::Unknown { .. }))
+        {
+            return Err(Error::InvalidFormat(
+                "ODS source formula edits refuse rows containing unknown values".to_string(),
+            ));
+        }
+        if existing.formula.is_none() {
+            return Err(Error::InvalidFormat(
+                "ODS source formula edits require existing formula cells".to_string(),
+            ));
+        }
+        if existing.merge != Merge::None {
+            return Err(Error::InvalidFormat(
+                "ODS source formula edits refuse merged cells".to_string(),
+            ));
+        }
+        let mut replacement = existing.clone();
+        replacement.set_formula(change.formula().to_string())?;
+        replacements.push(CellChange::new(change.row(), change.column(), replacement));
+        Ok(())
+    })?;
+    Ok(replacements)
+}
+
 fn validate_plain_cell(cell: &Cell, role: &str) -> Result<()> {
     if cell.formula.is_some() {
         return Err(Error::InvalidFormat(format!(
@@ -689,9 +930,69 @@ fn visit_existing_cells(
     Ok(())
 }
 
+fn visit_existing_formula_cells(
+    sheet: &Sheet,
+    changes: &[FormulaChange],
+    mut visit: impl FnMut(&Row, &Cell, &FormulaChange) -> Result<()>,
+) -> Result<()> {
+    let mut row_index = 0usize;
+    let mut row_start = 0usize;
+    let mut logical_row = None;
+    let mut cell_index = 0usize;
+    let mut cell_start = 0usize;
+    for change in changes {
+        while let Some(row) = sheet.rows.get(row_index) {
+            let row_end = row_start.checked_add(row.repeat()).ok_or_else(|| {
+                Error::InvalidFormat("ODS source row range overflows".to_string())
+            })?;
+            if change.row() < row_end {
+                break;
+            }
+            row_start = row_end;
+            row_index += 1;
+        }
+        let Some(row) = sheet.rows.get(row_index) else {
+            return missing_formula_cell(change);
+        };
+        if row.repeat() != 1 {
+            return Err(Error::InvalidFormat(
+                "ODS source formula edits refuse repeated physical rows".to_string(),
+            ));
+        }
+        if logical_row != Some(change.row()) {
+            logical_row = Some(change.row());
+            cell_index = 0;
+            cell_start = 0;
+        }
+        while let Some(cell) = row.cells.get(cell_index) {
+            let cell_end = cell_start.checked_add(cell.repeat()).ok_or_else(|| {
+                Error::InvalidFormat("ODS source cell range overflows".to_string())
+            })?;
+            if change.column() < cell_end {
+                visit(row, cell, change)?;
+                break;
+            }
+            cell_start = cell_end;
+            cell_index += 1;
+        }
+        if row.cells.get(cell_index).is_none() {
+            return missing_formula_cell(change);
+        }
+    }
+    Ok(())
+}
+
 fn missing_cell(change: &CellChange) -> Result<()> {
     Err(Error::InvalidFormat(format!(
         "ODS source cell ({}, {}) does not exist",
+        change.row(),
+        change.column()
+    )))
+}
+
+fn missing_formula_cell(change: &FormulaChange) -> Result<()> {
+    Err(Error::InvalidFormat(format!(
+        "ODS source formula cell ({}, {}) does not exist",
         change.row(),
         change.column()
     )))
