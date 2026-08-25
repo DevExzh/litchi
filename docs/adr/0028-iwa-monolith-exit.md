@@ -5377,3 +5377,32 @@ repair and exposed the split control graph, while Rust matched four controls.
 There is no native mutation, candidate, inverse, normalization, byte-parity,
 performance/RSS, durable-publication, host/edge/debt-exit, or full-workspace
 claim in this owner slice.
+
+## 2026-08-26 amendment: Wave87 Keynote movie-geometry bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` moves only
+the admitted existing same-component file-backed movie position and displayed
+size transaction into the selector-first `litchi-keynote` package. The
+archive-free facade is `MovieGeometry` with
+`Package::{slide_movie_geometry, edit_slide_movie_geometry,
+apply_slide_movie_geometry}`, `SlideSelector`, and `MovieSelector`. The
+hidden geometry codec and package jointly own strict source-preserving
+projection, preview invalidation, operation-local budgets, staged-private
+publication, candidate reopen, semantic readback, exact locality, and
+patch/inverse artifacts.
+
+The slice does not own movie creation/removal, media or poster assets,
+captions, titles, playback, builds, metadata/UUID/save-token lifecycle,
+generic drawable geometry, or cross-component repair. Native angle and flags
+remain preserved compatibility state, and legacy flip/original-size-restore
+compatibility remains retained at the `litchi-iwa` host/adapter boundary.
+Malformed, non-file, aliased, cross-component, or otherwise unproven graphs
+fail closed. The native normalized artifact's strict Rust reread returned
+`InvalidSource`; it is not a native/Rust parity or publication gate.
+
+Debt 014, the `litchi-iwa -> litchi-keynote` dependency edge, debts 015 and
+017, the Pages edge, `litchi-iwa` and its remaining host responsibilities,
+generated-schema, Buffa, and normal Prost owners, migration hosts, and the
+IWA monolith remain. No crate, dependency edge, debt item, production
+manifest dependency, generated-schema owner, normal Prost owner, host-exit,
+or monolith-exit gate is retired by Wave87.
