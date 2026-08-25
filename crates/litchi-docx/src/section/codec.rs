@@ -879,8 +879,7 @@ fn decode_state(raw: &Raw) -> Result<State> {
 
 fn section_child_rank(name: &str) -> Option<usize> {
     match name {
-        "headerReference" => Some(0),
-        "footerReference" => Some(1),
+        "headerReference" | "footerReference" => Some(0),
         "footnotePr" => Some(2),
         "endnotePr" => Some(3),
         "type" => Some(4),
@@ -1416,4 +1415,48 @@ fn is_xml_declaration_or_misc(bytes: &[u8]) -> bool {
         || collected.starts_with(b"<?xml")
         || collected.starts_with(b"<!--")
         || collected.starts_with(b"<?")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, decode};
+
+    fn section_xml(children: &str) -> Vec<u8> {
+        format!(
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{children}</w:sectPr>"#
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn interleaved_header_footer_references_decode_before_page_size() {
+        let xml = section_xml(
+            r#"<w:headerReference w:type="default" r:id="rHdDefault"/><w:footerReference w:type="default" r:id="rFtDefault"/><w:headerReference w:type="first" r:id="rHdFirst"/><w:footerReference w:type="first" r:id="rFtFirst"/><w:headerReference w:type="even" r:id="rHdEven"/><w:footerReference w:type="even" r:id="rFtEven"/><w:pgSz w:w="12240" w:h="15840"/>"#,
+        );
+        let snapshot = decode(&xml).expect("interleaved references are schema-valid");
+        assert_eq!(snapshot.state.headers.len(), 3);
+        assert_eq!(snapshot.state.footers.len(), 3);
+        assert!(snapshot.state.page_size.is_some());
+    }
+
+    #[test]
+    fn reference_after_page_size_is_rejected() {
+        let xml = section_xml(
+            r#"<w:pgSz w:w="12240" w:h="15840"/><w:headerReference w:type="default" r:id="rHdDefault"/>"#,
+        );
+        assert!(matches!(
+            decode(&xml),
+            Err(Error::InvalidFormat(message)) if message.contains("out of schema order")
+        ));
+    }
+
+    #[test]
+    fn duplicate_same_header_or_footer_type_is_rejected() {
+        for children in [
+            r#"<w:headerReference w:type="default" r:id="rHdOne"/><w:headerReference w:type="default" r:id="rHdTwo"/>"#,
+            r#"<w:footerReference w:type="default" r:id="rFtOne"/><w:footerReference w:type="default" r:id="rFtTwo"/>"#,
+        ] {
+            assert!(decode(&section_xml(children)).is_err());
+        }
+    }
 }

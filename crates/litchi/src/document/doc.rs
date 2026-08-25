@@ -1118,6 +1118,50 @@ impl Document {
         }
     }
 
+    /// Return the owning local/authored section descriptors for a DOCX main
+    /// document.
+    ///
+    /// The inventory reports section ownership, logical paragraph ranges,
+    /// locally authored page properties, and inert header/footer relationship
+    /// IDs. It does not resolve relationship targets or compute effective
+    /// inherited layout.
+    #[cfg(feature = "docx")]
+    pub fn docx_section_inventory(&self) -> Result<crate::docx::section::Inventory> {
+        self.docx_section_inventory_with_limits(&crate::docx::section::Limits::default())
+    }
+
+    /// Return a bounded DOCX section inventory with explicit semantic limits.
+    ///
+    /// The returned value owns its descriptors and inert relationship IDs; it
+    /// is not an effective-layout calculation and does not retain a source
+    /// handle or relationship targets.
+    #[cfg(feature = "docx")]
+    #[allow(
+        unreachable_patterns,
+        reason = "match arms are feature-gated; fallback is unreachable when every format feature is enabled"
+    )]
+    pub fn docx_section_inventory_with_limits(
+        &self,
+        limits: &crate::docx::section::Limits,
+    ) -> Result<crate::docx::section::Inventory> {
+        match &self.inner {
+            DocumentImpl::Docx(package, _) => package
+                .document()
+                .and_then(|document| document.section_inventory_with_limits(limits))
+                .map_err(crate::map_ooxml_error),
+            DocumentImpl::DocxSource(source, _) => {
+                let result = source
+                    .section_inventory_snapshot_with_limits(limits)
+                    .map(|snapshot| snapshot.inventory().clone())
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(source, result)
+            },
+            _ => Err(Error::Unsupported(
+                "DOCX section inventory is not supported for this document format".to_owned(),
+            )),
+        }
+    }
+
     /// Get the visible text of one paragraph by zero-based position.
     ///
     /// The DOCX and ODT paths use their selected-paragraph primitives and the
@@ -1854,6 +1898,11 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "docx")]
+    fn synthetic_section_docx_xml() -> &'static [u8] {
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rHeader1"/><w:footerReference w:type="default" r:id="rFooter1"/><w:headerReference w:type="first" r:id="rHeader2"/><w:footerReference w:type="first" r:id="rFooter2"/><w:headerReference w:type="even" r:id="rHeader3"/><w:footerReference w:type="even" r:id="rFooter3"/><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></w:sectPr></w:pPr><w:r><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>second</w:t></w:r></w:p><w:sectPr><w:headerReference w:type="first" r:id="rHeader2"/><w:footerReference w:type="even" r:id="rFooter2"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>"#
+    }
+
     #[cfg(feature = "odt")]
     fn minimal_odt() -> Vec<u8> {
         let mut builder = litchi_odt::Builder::new();
@@ -2372,6 +2421,174 @@ mod tests {
                 .paragraph(usize::MAX)
                 .expect("eager out-of-range paragraph")
                 .is_none()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
+    fn docx_section_inventory_matches_eager_and_source_ownership() {
+        use crate::docx::section::Ownership;
+
+        let bytes = minimal_docx(synthetic_section_docx_xml());
+        let source = Document::from_bytes(bytes.clone()).expect("open source-backed DOCX");
+        let eager_package = crate::opc::OpcPackage::from_bytes_with_limits(
+            &bytes,
+            crate::opc::ReadLimits::default(),
+        )
+        .expect("open eager OPC oracle");
+        let eager = Document::from_detected(DetectedFormat::Docx(eager_package))
+            .expect("open eager DOCX oracle");
+        let source_inventory = source
+            .docx_section_inventory()
+            .expect("source section inventory");
+        let eager_inventory = eager
+            .docx_section_inventory()
+            .expect("eager section inventory");
+
+        assert_eq!(source_inventory.sections(), eager_inventory.sections());
+        assert_eq!(source_inventory.paragraph_count(), 2);
+        assert_eq!(source_inventory.sections().len(), 2);
+        let first = source_inventory.section(0).expect("first section");
+        assert_eq!(
+            first.ownership(),
+            Ownership::Paragraph(litchi_core::Position::new(0))
+        );
+        assert_eq!(first.paragraphs().start().get(), 0);
+        assert_eq!(first.paragraphs().end().get(), 1);
+        assert!(first.page_size().is_some());
+        assert!(first.margins().is_some());
+        assert_eq!(first.headers().len(), 3);
+        assert_eq!(first.footers().len(), 3);
+        let final_section = source_inventory.section(1).expect("body-final section");
+        assert_eq!(final_section.ownership(), Ownership::BodyFinal);
+        assert_eq!(final_section.paragraphs().start().get(), 1);
+        assert_eq!(final_section.paragraphs().end().get(), 2);
+        assert!(final_section.margins().is_some());
+        assert_eq!(final_section.headers().len(), 1);
+        assert_eq!(final_section.footers().len(), 1);
+        assert!(source_inventory.section(usize::MAX).is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
+    fn docx_header_footer_inventory_keeps_inert_relationship_ids() {
+        let path = test_data_path().join("ooxml/docx/headerFooter.docx");
+        if !path.exists() {
+            return;
+        }
+        let bytes = std::fs::read(&path).expect("read header/footer DOCX fixture");
+        let package = crate::opc::OpcPackage::from_bytes_with_limits(
+            &bytes,
+            crate::opc::ReadLimits::default(),
+        )
+        .expect("open eager header/footer OPC package");
+        let inventory = Document::from_detected(DetectedFormat::Docx(package))
+            .expect("open eager header/footer DOCX fixture")
+            .docx_section_inventory()
+            .expect("header/footer section inventory");
+        let mut relationship_ids = inventory
+            .sections()
+            .iter()
+            .flat_map(|section| {
+                section
+                    .headers()
+                    .iter()
+                    .map(|reference| reference.relationship_id.clone())
+                    .chain(
+                        section
+                            .footers()
+                            .iter()
+                            .map(|reference| reference.relationship_id.clone()),
+                    )
+            })
+            .collect::<Vec<_>>();
+        relationship_ids.sort();
+        assert_eq!(
+            relationship_ids,
+            (4..=9).map(|id| format!("rId{id}")).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
+    fn managed_docx_section_inventory_owns_result_after_facade_drop() {
+        let bytes = minimal_docx(synthetic_section_docx_xml());
+        let memory = (bytes.len() as u64).saturating_mul(4);
+        let budget = litchi_core::Budget::root(
+            "facade-managed-docx-section-inventory",
+            litchi_core::Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (_cancellation_source, cancellation) = litchi_core::CancellationSource::pair();
+        let execution_limits = litchi_core::ExecutionLimits::new(
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroU64::new(memory).expect("nonzero execution budget"),
+            0,
+        )
+        .expect("managed execution limits");
+        let context =
+            litchi_core::ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        let package = crate::docx::source_backed::Package::from_read_at_with_execution_context(
+            std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
+            crate::docx::ReadLimits::default(),
+            context,
+        )
+        .expect("open managed DOCX source");
+        let document = Document {
+            inner: DocumentImpl::DocxSource(package, Default::default()),
+        };
+        let inventory = document
+            .docx_section_inventory()
+            .expect("managed section inventory");
+        drop(document);
+        assert_eq!(inventory.sections().len(), 2);
+        assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
+    fn docx_section_inventory_maps_deferred_malformed_and_tight_limits() {
+        let malformed = Document::from_bytes(minimal_docx(b"<w:document>"))
+            .expect("malformed main XML remains deferred at source open");
+        assert!(matches!(
+            malformed.docx_section_inventory(),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let document = Document::from_bytes(minimal_docx(synthetic_section_docx_xml()))
+            .expect("open bounded source-backed DOCX");
+        let mut limits = crate::docx::section::Limits::default();
+        limits.max_input_bytes = 1;
+        assert!(matches!(
+            document.docx_section_inventory_with_limits(&limits),
+            Err(Error::InvalidFormat(message)) if message.contains("limit")
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_section_inventory_reports_source_mutation() {
+        let fixture = test_data_path().join("ooxml/docx/FancyFoot.docx");
+        let temporary = tempfile::NamedTempFile::new().expect("temporary DOCX path");
+        std::fs::copy(&fixture, temporary.path()).expect("copy DOCX fixture");
+        let document = Document::open(temporary.path()).expect("open source-backed DOCX");
+        let expected = match &document.inner {
+            DocumentImpl::DocxSource(package, _) => {
+                package.source_version().expect("capture source version")
+            },
+            _ => unreachable!("filesystem DOCX must retain source owner"),
+        };
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen DOCX source");
+        file.write_all(b"section inventory source mutation")
+            .expect("mutate DOCX source");
+        assert_source_changed(
+            document
+                .docx_section_inventory()
+                .expect_err("section inventory must reject stale source"),
+            expected,
         );
     }
 

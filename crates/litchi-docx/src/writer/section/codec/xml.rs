@@ -230,8 +230,7 @@ impl SectionProperties {
 
 fn section_child_rank(name: &str) -> Option<u8> {
     match name {
-        "headerReference" => Some(0),
-        "footerReference" => Some(1),
+        "headerReference" | "footerReference" => Some(0),
         "footnotePr" => Some(2),
         "endnotePr" => Some(3),
         "type" => Some(4),
@@ -328,6 +327,45 @@ fn direct_children(xml: &str) -> Result<Vec<(String, String)>> {
         ));
     }
     Ok(children)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SectionProperties;
+
+    fn section_xml(children: &str) -> String {
+        format!(
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">{children}</w:sectPr>"#
+        )
+    }
+
+    #[test]
+    fn section_properties_accept_interleaved_header_footer_references() {
+        let properties = SectionProperties::from_xml(&section_xml(
+            r#"<w:headerReference w:type="default" r:id="rHdDefault"/><w:footerReference w:type="default" r:id="rFtDefault"/><w:headerReference w:type="first" r:id="rHdFirst"/><w:footerReference w:type="first" r:id="rFtFirst"/><w:headerReference w:type="even" r:id="rHdEven"/><w:footerReference w:type="even" r:id="rFtEven"/><w:pgSz w:w="12240" w:h="15840"/>"#,
+        ))
+        .expect("interleaved references are schema-valid");
+        assert_eq!(properties.headers.len(), 3);
+        assert_eq!(properties.footers.len(), 3);
+    }
+
+    #[test]
+    fn section_properties_reject_reference_after_page_size() {
+        assert!(SectionProperties::from_xml(&section_xml(
+            r#"<w:pgSz w:w="12240" w:h="15840"/><w:headerReference w:type="default" r:id="rHdDefault"/>"#,
+        ))
+        .is_err());
+    }
+
+    #[test]
+    fn section_properties_reject_duplicate_same_reference_type() {
+        for children in [
+            r#"<w:headerReference w:type="default" r:id="rHdOne"/><w:headerReference w:type="default" r:id="rHdTwo"/>"#,
+            r#"<w:footerReference w:type="default" r:id="rFtOne"/><w:footerReference w:type="default" r:id="rFtTwo"/>"#,
+        ] {
+            assert!(SectionProperties::from_xml(&section_xml(children)).is_err());
+        }
+    }
 }
 
 fn attributes(xml: &str) -> Result<Vec<(String, String)>> {
