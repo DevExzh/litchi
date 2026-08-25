@@ -5337,3 +5337,43 @@ format/control graph. No Rust candidate or inverse was published, so native
 mutation acceptance is withheld. This inventory is not Rust/native byte
 parity, publication acceptance, performance/RSS, durable publication, or a
 full-workspace claim.
+
+## 2026-08-26 amendment: Wave86 Numbers unified cell-control split-read bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` extends the
+bounded Numbers unified cell-control owner only to strict reads and
+byte-exact no-ops for selected split-component format/control graphs. The
+selector-first facade remains
+`Package::{table_cell_control_format, edit_table_cell_control_format,
+apply_table_cell_control_format}` with archive-free control values.
+
+The selected split edge must have current/effective locator and external-edge
+proof; versioned, conflicting, effective-locator-disagreeing, and
+physical-alias targets fail closed. A single cached `RegistryFacts`/physical
+census serves the logical read. Selected `TableModel` sidecar refs require
+one aggregate occurrence; explicit `FieldInfo` must be unique and
+`ObjectReference` typed, while producer-omitted `FieldInfo` is accepted and
+no exact path claim is made. The root Document/TableInfo-to-
+CalculationEngine/TableModel metadata edge is not owned or proven, and
+same-component graphs do not require external-edge inspection.
+
+Opaque inbound refs are accepted for read/no-op. Every changed split-component
+route, including popup-only routes, invokes the pre-publication refusal and
+preserves source bytes. No cross-component COW, UUID/save-token transition,
+candidate/locality verification, inverse, or successful split write is owned;
+no zero-allocation-before-refusal claim follows. This is not table topology,
+general scalar formatting, Pages/Keynote control, or arbitrary native graph
+ownership.
+
+Debt 015, the `litchi-iwa -> litchi-numbers` dependency edge, debt 017, the
+`litchi-iwa -> litchi-pages` edge, `litchi-iwa`, remaining migration hosts,
+generated-schema, Buffa, and normal Prost owners, and the IWA monolith remain.
+No crate, dependency edge, debt item, production manifest dependency,
+generated-schema owner, normal Prost owner, migration host, or monolith-exit
+gate is retired by Wave86.
+
+The current Numbers 14.4 artifact is read-only provenance: it opened without
+repair and exposed the split control graph, while Rust matched four controls.
+There is no native mutation, candidate, inverse, normalization, byte-parity,
+performance/RSS, durable-publication, host/edge/debt-exit, or full-workspace
+claim in this owner slice.

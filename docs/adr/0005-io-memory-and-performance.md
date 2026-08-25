@@ -1590,3 +1590,23 @@ performance claim follows. Cross-component control graphs are outside the
 admitted resource contract. No production dependency edge or normal
 generated-schema/Prost/Buffa owner changed; fuzz manifests register only the
 bounded codec and package routes.
+
+## 2026-08-26 amendment: Wave86 Numbers unified cell-control split-read resource boundary
+
+Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` limits the
+Wave86 resource statement to package-ingress limits for strict split-component
+control reads and byte-exact no-ops. The logical read reuses one cached
+`RegistryFacts`/physical census, and selected sidecar aggregate/explicit
+`FieldInfo` checks are source-authority checks; producer-omitted `FieldInfo`
+remains admitted. Changed split-component routes, including popup-only routes,
+are refused before native/ZIP candidate publication and leave the source
+unchanged.
+
+This record makes no aggregate storage/codec read claim for fields, work,
+references, nesting, scratch, allocations, or max-minus-one limits. It makes
+no peak-memory/RSS, latency, throughput, performance, zero-copy, or
+zero-allocation-before-refusal claim. No cross-component COW, UUID/save-token
+batch, candidate/locality, inverse, or successful split-write resource route
+is owned. Package ingress limits are the only resource ceiling claimed for
+this bounded read/no-op boundary; same-component resource claims remain those
+of the preceding Wave85 slice.

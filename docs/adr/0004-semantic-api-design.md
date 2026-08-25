@@ -3170,3 +3170,33 @@ closed. This slice does not own arbitrary scalar formatting, table topology,
 Pages/Keynote control graphs, cross-component repair, or a public native graph
 API. A fresh Numbers 14.4 source demonstrated the cross-component boundary,
 so native mutation acceptance is explicitly withheld rather than inferred.
+
+## 2026-08-26 amendment: Wave86 Numbers unified cell-control split-read semantics
+
+Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` records a
+narrower Wave86 scope for the existing selector-first
+`Package::{table_cell_control_format, edit_table_cell_control_format,
+apply_table_cell_control_format}` facade. A strict read may return the
+archive-free `CellControl` for an admitted split-component graph, and an
+exact no-op produces byte-identical package bytes. No native identifier,
+component/member locator, archive, wire, generated, Prost, or Buffa value
+crosses the facade.
+
+For the selected split edge, the package checks the current/effective locator,
+rejects versioned or conflicting ownership and physical aliases, and reuses
+one cached `RegistryFacts`/physical census for the logical read. Selected
+`TableModel` sidecar references must occur exactly once in aggregate metadata.
+Any explicit `FieldInfo` occurrence must be unique and typed
+`ObjectReference`; producer-omitted `FieldInfo` is accepted, and this slice
+does not claim an exact `FieldInfo` path. The root Document/TableInfo to
+CalculationEngine/TableModel metadata edge is not owned or proven. Same-
+component graphs do not require external-edge inspection.
+
+Opaque inbound references remain admissible for read/no-op. Changed
+split-component operations, including popup-only changes, fail closed through
+`reject_cross_component_write` before native/ZIP candidate publication and
+preserve the source. This semantic slice does not own cross-component
+copy-on-write, UUID or save-token updates, candidate/locality verification,
+or inverse artifacts; no split write is successful or published. It also does
+not expand ownership to table topology, scalar data formats, or Pages and
+Keynote controls.
