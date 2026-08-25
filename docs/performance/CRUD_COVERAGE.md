@@ -1,5 +1,10 @@
 # Performance CRUD coverage
 
+## 2026-08-25: change 0280 has no CRUD effect
+
+- Replication stopped before smoke because candidate binary identity differed from the frozen protocol.
+- No production code, CRUD surface, format coverage, or accepted performance claim changes.
+
 ## 2026-08-25: change 0279 leaves CRUD coverage unchanged
 
 - The experimental CFB/XLS operation-scoped freshness session passed correctness and architecture gates but failed its strict performance keep gate and was reverted.

@@ -1,5 +1,10 @@
 # Performance program phase report
 
+## 2026-08-25: freshness-session replication aborted at identity gate
+
+- Control reproduced exactly; candidate did not match the pinned size/SHA-256, so the 24,000-sample run was never started.
+- Retained samples are zero, performance_claim:none, and the unchanged candidate remains rejected.
+
 ## 2026-08-25: rejected XLS/CFB freshness-session experiment
 
 - The candidate reduced version calls by approximately 98% and improved direct FileSource comparisons by 48.44-56.31%, with exact logical-read, identity, stability, and semantic parity.

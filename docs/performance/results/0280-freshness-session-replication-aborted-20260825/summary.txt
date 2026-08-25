@@ -1,0 +1,12 @@
+Change 0280: freshness-session replication aborted before smoke
+Date: 2026-08-25
+Verdict: aborted before smoke
+Retained samples: 0
+Performance claim: none
+
+The frozen protocol required exact reproduction of both 0279 binaries.
+The control rebuilt byte-identically.
+The completed job-limited candidate binary did not match its pinned size or SHA-256.
+The replication therefore stopped before semantic smoke, timing, or statistics.
+No 0280 latency or counter evidence exists.
+The unchanged operation-scoped freshness-session candidate remains rejected.

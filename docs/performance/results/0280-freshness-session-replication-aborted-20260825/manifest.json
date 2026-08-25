@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "verdict": "aborted_before_smoke",
+  "retained_samples": 0,
+  "performance_claim": "none",
+  "artifacts": [
+    {
+      "path": "identity.json",
+      "bytes": 1130,
+      "sha256": "9a329ce805e548464064ebdf0096e56d1c9d240e4dc14016f5e062555aefc3e1"
+    },
+    {
+      "path": "protocol.json",
+      "bytes": 2506,
+      "sha256": "02816434e4a25c770843f9606ad0344c35147a276af2c52bdcc7a02620295e18"
+    },
+    {
+      "path": "summary.txt",
+      "bytes": 551,
+      "sha256": "363eafede232f666a63632695c05baf3db8dd40367f7d7f5dce1c72d24a9922f"
+    }
+  ]
+}
