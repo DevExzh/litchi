@@ -335,6 +335,12 @@ impl DecodeError {
         }
     }
 
+    const fn allocation(requested: usize) -> Self {
+        Self {
+            kind: ErrorKind::Allocation { requested },
+        }
+    }
+
     #[must_use]
     pub const fn resource_limit(self) -> Option<DecodeLimit> {
         match self.kind {
@@ -611,16 +617,12 @@ impl<'source> PreparedTableSortOrderRewrite<'source> {
         if output.len() != self.requirements.output_bytes {
             return Err(DecodeError::projection());
         }
-        let verify_options = DecodeOptions {
-            max_input_bytes: self.options.max_input_bytes.max(output.len()),
-            max_output_bytes: self.options.max_output_bytes.max(output.len()),
-            max_fields: self.options.max_fields.max(self.requirements.fields),
-            max_work_bytes: self
-                .options
-                .max_work_bytes
-                .max(self.requirements.work_bytes),
-            ..self.options
-        };
+        // The candidate is a new ingress payload, so its input ceiling must
+        // cover the already-preflighted output.  Every semantic/wire ceiling
+        // otherwise remains exactly the caller's original option; widening
+        // fields/work/rules here would make prepare-time residual checks
+        // meaningless.
+        let verify_options = self.options.with_max_input_bytes(output.len());
         let verified = decode_table_sort_order(&output, verify_options)?;
         if verified != self.desired {
             return Err(DecodeError::projection());
@@ -658,7 +660,10 @@ pub fn decode_table_sort_order_with_report(
     validate_input(source, options)?;
     let mut budget = Budget::new(options);
     let model = parse_model(source, options, &mut budget)?;
-    let semantic = model.sort.as_ref().and_then(ParsedSort::semantic);
+    let semantic = match model.sort.as_ref() {
+        Some(sort) => sort.semantic(&mut budget)?,
+        None => None,
+    };
     if let Some(sort) = &model.sort {
         force_buffa(&sort.payload, options, sort.scope)?;
     }
@@ -707,10 +712,25 @@ pub fn prepare_table_sort_order_rewrite<'source>(
         .fields
         .checked_add(desired_field_allowance)
         .ok_or(DecodeError::projection())?;
+    let rules = desired.as_ref().map_or(0, |value| value.rules.len());
+    let max_rule_count = current
+        .sort
+        .as_ref()
+        .map_or(0, |sort| sort.rules.len())
+        .max(rules);
+    let max_depth = budget.max_depth.max(if desired.is_some() { 3 } else { 1 });
+    if max_depth > options.recursion_limit {
+        return Err(DecodeError::limit(DecodeLimit::Nesting {
+            observed: max_depth,
+            maximum: options.recursion_limit,
+        }));
+    }
+    let duplicate_rule_work = Budget::duplicate_rule_work(max_rule_count)?;
     let candidate_work = source
         .len()
         .checked_add(output_bytes)
         .and_then(|value| value.checked_mul(8))
+        .and_then(|value| value.checked_add(duplicate_rule_work))
         .ok_or(DecodeError::projection())?;
     let fields = budget
         .fields
@@ -732,20 +752,26 @@ pub fn prepare_table_sort_order_rewrite<'source>(
             maximum: options.max_work_bytes,
         }));
     }
-    let rules = desired.as_ref().map_or(0, |value| value.rules.len());
-    let max_rule_count = current
-        .sort
-        .as_ref()
-        .map_or(0, |sort| sort.rules.len())
-        .max(rules);
+    let parsed_rule_bytes = max_rule_count
+        .checked_mul(
+            size_of::<ParsedRule>()
+                .saturating_add(size_of::<FieldSpan>().saturating_mul(4))
+                .saturating_add(size_of::<SortRule>()),
+        )
+        .ok_or(DecodeError::projection())?;
+    let live_bytes = source
+        .len()
+        .checked_add(output_bytes)
+        .and_then(|value| value.checked_mul(4))
+        .ok_or(DecodeError::projection())?;
     let scratch = budget
         .scratch_bytes
-        .checked_add(source.len().saturating_add(output_bytes).saturating_mul(2))
-        .and_then(|value| value.checked_add(max_rule_count.saturating_mul(size_of::<ParsedRule>())))
+        .checked_add(live_bytes)
+        .and_then(|value| value.checked_add(parsed_rule_bytes))
         .ok_or(DecodeError::projection())?;
     let allocations = budget
         .allocations
-        .checked_add(8)
+        .checked_add(16)
         .and_then(|value| value.checked_add(max_rule_count.saturating_mul(8)))
         .ok_or(DecodeError::projection())?;
     if allocations > options.max_allocations {
@@ -759,7 +785,7 @@ pub fn prepare_table_sort_order_rewrite<'source>(
         output_bytes,
         fields,
         work_bytes,
-        max_depth: budget.max_depth,
+        max_depth,
         rules,
         allocations,
         retained_bytes: output_bytes,
@@ -769,7 +795,7 @@ pub fn prepare_table_sort_order_rewrite<'source>(
         output_bytes,
         fields,
         work_bytes,
-        max_depth: budget.max_depth,
+        max_depth,
         rules,
         allocations,
         retained_bytes: output_bytes,
@@ -854,18 +880,30 @@ struct ParsedSort {
 }
 
 impl ParsedSort {
-    fn semantic(&self) -> Option<SortOrderSnapshot> {
+    fn semantic(&self, budget: &mut Budget) -> Result<Option<SortOrderSnapshot>, DecodeError> {
         if self.rules.is_empty() {
-            None
+            Ok(None)
         } else {
-            Some(SortOrderSnapshot {
-                scope: self.scope,
-                rules: self
-                    .rules
+            let bytes = self
+                .rules
+                .len()
+                .checked_mul(size_of::<SortRule>())
+                .ok_or(DecodeError::projection())?;
+            budget.allocate()?;
+            budget.scratch(bytes)?;
+            let mut rules = Vec::new();
+            rules
+                .try_reserve_exact(self.rules.len())
+                .map_err(|_| DecodeError::allocation(bytes))?;
+            rules.extend(
+                self.rules
                     .iter()
-                    .map(|rule| SortRule::new(rule.column, rule.direction))
-                    .collect(),
-            })
+                    .map(|rule| SortRule::new(rule.column, rule.direction)),
+            );
+            Ok(Some(SortOrderSnapshot {
+                scope: self.scope,
+                rules,
+            }))
         }
     }
 }
@@ -983,15 +1021,26 @@ impl Budget {
         Ok(())
     }
 
-    fn reserve_spans(&mut self, count: usize) -> Result<(), DecodeError> {
-        let bytes = count
-            .checked_mul(size_of::<FieldSpan>())
-            .ok_or(DecodeError::projection())?;
+    fn scratch(&mut self, bytes: usize) -> Result<(), DecodeError> {
         self.scratch_bytes = self
             .scratch_bytes
             .checked_add(bytes)
             .ok_or(DecodeError::projection())?;
         Ok(())
+    }
+
+    fn duplicate_rule_work(rule_count: usize) -> Result<usize, DecodeError> {
+        rule_count
+            .checked_mul(rule_count.saturating_sub(1))
+            .and_then(|value| value.checked_div(2))
+            .ok_or(DecodeError::projection())
+    }
+
+    fn reserve_spans(&mut self, count: usize) -> Result<(), DecodeError> {
+        let bytes = count
+            .checked_mul(size_of::<FieldSpan>())
+            .ok_or(DecodeError::projection())?;
+        self.scratch(bytes)
     }
 
     fn report(
@@ -1022,6 +1071,16 @@ fn validate_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeErr
             maximum: options.max_input_bytes,
         }));
     }
+    // Decoding retains the source-sized payload as its result.  Reject an
+    // output ceiling before any field-span or nested-payload scratch is
+    // reserved, so a too-small output budget cannot be reported after a
+    // partial parse.
+    if source.len() > options.max_output_bytes {
+        return Err(DecodeError::limit(DecodeLimit::OutputBytes {
+            observed: source.len(),
+            maximum: options.max_output_bytes,
+        }));
+    }
     if options.recursion_limit > MAX_RECURSION {
         return Err(DecodeError::limit(DecodeLimit::Nesting {
             observed: options.recursion_limit,
@@ -1049,8 +1108,9 @@ fn parse_model(
         if field.wire != 2 || !field.key_canonical || !field.length_canonical {
             return Err(DecodeError::invalid("sort_order wire"));
         }
-        let payload = source[field.value_start..field.value_end].to_vec();
         budget.allocate()?;
+        let payload = copy_bytes(&source[field.value_start..field.value_end])?;
+        budget.scratch(payload.len())?;
         sort = Some(parse_sort_payload(payload, *field, options, budget)?);
     }
     Ok(ParsedModel { fields, sort })
@@ -1065,7 +1125,22 @@ fn parse_sort_payload(
     budget.work(payload.len())?;
     let fields = scan_fields(&payload, options, budget, 2)?;
     let mut scope = None;
+    let rule_count = fields
+        .iter()
+        .filter(|field| field.number == SORT_RULES_FIELD)
+        .count();
+    budget.work(Budget::duplicate_rule_work(rule_count)?)?;
     let mut rules = Vec::new();
+    if rule_count != 0 {
+        let bytes = rule_count
+            .checked_mul(size_of::<ParsedRule>())
+            .ok_or(DecodeError::projection())?;
+        budget.allocate()?;
+        budget.scratch(bytes)?;
+        rules
+            .try_reserve_exact(rule_count)
+            .map_err(|_| DecodeError::allocation(bytes))?;
+    }
     for field in &fields {
         match field.number {
             SORT_TYPE_FIELD => {
@@ -1085,8 +1160,9 @@ fn parse_sort_payload(
                     return Err(DecodeError::invalid("sort rule wire"));
                 }
                 budget.rules()?;
-                let raw = payload[field.value_start..field.value_end].to_vec();
                 budget.allocate()?;
+                let raw = copy_bytes(&payload[field.value_start..field.value_end])?;
+                budget.scratch(raw.len())?;
                 let parsed = parse_rule(raw, options, budget)?;
                 if rules
                     .iter()
@@ -1094,26 +1170,13 @@ fn parse_sort_payload(
                 {
                     return Err(DecodeError::invalid("duplicate sort column"));
                 }
-                rules
-                    .try_reserve(1)
-                    .map_err(|_| DecodeError::invalid("sort rules allocation"))?;
                 rules.push(parsed);
             },
             _ => {},
         }
     }
     let scope = scope.ok_or_else(|| DecodeError::invalid("missing sort type"))?;
-    if !rules.is_empty() {
-        validate_rules(
-            scope,
-            &rules
-                .iter()
-                .map(|rule| SortRule::new(rule.column, rule.direction))
-                .collect::<Vec<_>>(),
-            options.max_rules,
-            options.max_columns,
-        )?;
-    }
+    validate_parsed_rules(&rules, options.max_rules, options.max_columns)?;
     Ok(ParsedSort {
         payload,
         fields,
@@ -1130,6 +1193,7 @@ fn parse_rule(
 ) -> Result<ParsedRule, DecodeError> {
     budget.work(payload.len())?;
     budget.allocate()?;
+    budget.scratch(payload.len())?;
     let fields = scan_fields(&payload, options, budget, 3)?;
     let mut column = None;
     let mut direction = None;
@@ -1169,6 +1233,39 @@ fn parse_rule(
         payload,
         fields,
     })
+}
+
+fn copy_bytes(source: &[u8]) -> Result<Vec<u8>, DecodeError> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|_| DecodeError::allocation(source.len()))?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
+}
+
+fn validate_parsed_rules(
+    rules: &[ParsedRule],
+    max_rules: usize,
+    max_columns: usize,
+) -> Result<(), DecodeError> {
+    if rules.len() > max_rules {
+        return Err(DecodeError::limit(DecodeLimit::Rules {
+            observed: rules.len(),
+            maximum: max_rules,
+        }));
+    }
+    for rule in rules {
+        let column =
+            usize::try_from(rule.column).map_err(|_| DecodeError::invalid("sort column"))?;
+        if column >= max_columns {
+            return Err(DecodeError::limit(DecodeLimit::Columns {
+                observed: column.saturating_add(1),
+                maximum: max_columns,
+            }));
+        }
+    }
+    Ok(())
 }
 
 fn validate_rules(
@@ -1228,11 +1325,15 @@ fn scan_fields(
 ) -> Result<Vec<FieldSpan>, DecodeError> {
     budget.depth(depth)?;
     budget.allocate()?;
+    let capacity = source.len().min(options.max_fields);
+    let scratch = capacity
+        .checked_mul(size_of::<FieldSpan>())
+        .ok_or(DecodeError::projection())?;
     let mut fields = Vec::new();
     fields
-        .try_reserve(source.len().min(options.max_fields))
-        .map_err(|_| DecodeError::invalid("field allocation"))?;
-    budget.reserve_spans(source.len().min(options.max_fields))?;
+        .try_reserve_exact(capacity)
+        .map_err(|_| DecodeError::allocation(scratch))?;
+    budget.reserve_spans(capacity)?;
     let mut offset = 0usize;
     while offset < source.len() {
         let field = parse_field(source, &mut offset, budget, depth)?;
@@ -1605,6 +1706,10 @@ fn emit_payload_rewrite(
     desired: Option<&SortOrderSnapshot>,
 ) -> Result<Vec<u8>, DecodeError> {
     let mut output = Vec::new();
+    let capacity = measure_payload_rewrite(sort, desired)?;
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_| DecodeError::allocation(capacity))?;
     let output_scope = desired.map_or(sort.scope, |order| order.scope);
     let mut replaced_rules = false;
     for field in &sort.fields {
@@ -1657,6 +1762,10 @@ fn emit_payload_rewrite(
 
 fn emit_canonical_payload(order: &SortOrderSnapshot) -> Result<Vec<u8>, DecodeError> {
     let mut output = Vec::new();
+    let capacity = canonical_payload_len(order)?;
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_| DecodeError::allocation(capacity))?;
     output.push(8);
     encode_varint(order.scope.native_value() as u64, &mut output);
     for rule in &order.rules {
@@ -1670,6 +1779,16 @@ fn emit_canonical_payload(order: &SortOrderSnapshot) -> Result<Vec<u8>, DecodeEr
 
 fn emit_canonical_rule(rule: SortRule) -> Result<Vec<u8>, DecodeError> {
     let mut output = Vec::new();
+    let capacity = encoded_varint_len(8)
+        .checked_add(encoded_varint_len(u64::from(rule.column)))
+        .and_then(|value| value.checked_add(encoded_varint_len(16)))
+        .and_then(|value| {
+            value.checked_add(encoded_varint_len(rule.direction.native_value() as u64))
+        })
+        .ok_or(DecodeError::projection())?;
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_| DecodeError::allocation(capacity))?;
     output.push(8);
     encode_varint(u64::from(rule.column), &mut output);
     output.push(16);
@@ -1679,6 +1798,10 @@ fn emit_canonical_rule(rule: SortRule) -> Result<Vec<u8>, DecodeError> {
 
 fn emit_rule_rewrite(previous: &ParsedRule, rule: SortRule) -> Result<Vec<u8>, DecodeError> {
     let mut output = Vec::new();
+    let capacity = rewritten_rule_len(previous, rule)?;
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_| DecodeError::allocation(capacity))?;
     for field in &previous.fields {
         match field.number {
             SORT_RULE_COLUMN_FIELD => {
@@ -1693,6 +1816,28 @@ fn emit_rule_rewrite(previous: &ParsedRule, rule: SortRule) -> Result<Vec<u8>, D
         }
     }
     Ok(output)
+}
+
+fn rewritten_rule_len(previous: &ParsedRule, rule: SortRule) -> Result<usize, DecodeError> {
+    let mut length = 0usize;
+    for field in &previous.fields {
+        let field_length = match field.number {
+            SORT_RULE_COLUMN_FIELD => encoded_varint_len(8)
+                .checked_add(encoded_varint_len(u64::from(rule.column)))
+                .ok_or(DecodeError::projection())?,
+            SORT_RULE_DIRECTION_FIELD => encoded_varint_len(16)
+                .checked_add(encoded_varint_len(rule.direction.native_value() as u64))
+                .ok_or(DecodeError::projection())?,
+            _ => field
+                .end
+                .checked_sub(field.start)
+                .ok_or(DecodeError::projection())?,
+        };
+        length = length
+            .checked_add(field_length)
+            .ok_or(DecodeError::projection())?;
+    }
+    Ok(length)
 }
 
 fn check_limits(
@@ -1905,6 +2050,222 @@ mod tests {
                 .is_err()
         );
         assert!(prepared.execute(requirements.exact()).is_ok());
+    }
+
+    #[test]
+    fn prepared_requirements_replay_every_execution_axis_exactly() {
+        let source = model(&sort(0, &[(1, 0)]));
+        let desired = SortOrderSnapshot::new(
+            SortScope::SelectedRows,
+            [SortRule::new(2, SortDirection::Descending)],
+        )
+        .unwrap();
+        let prepared =
+            prepare_table_sort_order_rewrite(&source, Some(desired), options(&source)).unwrap();
+        let requirements = prepared.execution_requirements();
+        assert!(requirements.output_bytes > 0);
+        assert!(requirements.fields > 0);
+        assert!(requirements.work_bytes > 0);
+        assert!(requirements.max_depth > 0);
+        assert!(requirements.rules > 0);
+        assert!(requirements.allocations > 0);
+        assert!(requirements.retained_bytes > 0);
+        assert!(requirements.scratch_bytes > 0);
+
+        let cases = [
+            (
+                prepared.clone().execute(
+                    requirements
+                        .exact()
+                        .with_output_bytes(requirements.output_bytes - 1),
+                ),
+                DecodeLimit::OutputBytes {
+                    observed: requirements.output_bytes,
+                    maximum: requirements.output_bytes - 1,
+                },
+            ),
+            (
+                prepared
+                    .clone()
+                    .execute(requirements.exact().with_fields(requirements.fields - 1)),
+                DecodeLimit::Fields {
+                    observed: requirements.fields,
+                    maximum: requirements.fields - 1,
+                },
+            ),
+            (
+                prepared.clone().execute(
+                    requirements
+                        .exact()
+                        .with_work_bytes(requirements.work_bytes - 1),
+                ),
+                DecodeLimit::WorkBytes {
+                    observed: requirements.work_bytes,
+                    maximum: requirements.work_bytes - 1,
+                },
+            ),
+            (
+                prepared.clone().execute(
+                    requirements
+                        .exact()
+                        .with_max_depth(requirements.max_depth - 1),
+                ),
+                DecodeLimit::Nesting {
+                    observed: requirements.max_depth,
+                    maximum: requirements.max_depth - 1,
+                },
+            ),
+            (
+                prepared
+                    .clone()
+                    .execute(requirements.exact().with_rules(requirements.rules - 1)),
+                DecodeLimit::Rules {
+                    observed: requirements.rules,
+                    maximum: requirements.rules - 1,
+                },
+            ),
+            (
+                prepared.clone().execute(
+                    requirements
+                        .exact()
+                        .with_allocations(requirements.allocations - 1),
+                ),
+                DecodeLimit::Allocations {
+                    observed: requirements.allocations,
+                    maximum: requirements.allocations - 1,
+                },
+            ),
+            (
+                prepared.clone().execute(
+                    requirements
+                        .exact()
+                        .with_retained_bytes(requirements.retained_bytes - 1),
+                ),
+                DecodeLimit::RetainedBytes {
+                    observed: requirements.retained_bytes,
+                    maximum: requirements.retained_bytes - 1,
+                },
+            ),
+            (
+                prepared.clone().execute(
+                    requirements
+                        .exact()
+                        .with_scratch_bytes(requirements.scratch_bytes - 1),
+                ),
+                DecodeLimit::ScratchBytes {
+                    observed: requirements.scratch_bytes,
+                    maximum: requirements.scratch_bytes - 1,
+                },
+            ),
+        ];
+        for (result, expected) in cases {
+            assert_eq!(result.unwrap_err().resource_limit(), Some(expected));
+        }
+        let output = prepared.execute(requirements.exact()).unwrap();
+        let report = output.report();
+        assert_eq!(report.output_bytes(), requirements.output_bytes);
+        assert_eq!(report.fields(), requirements.fields);
+        assert_eq!(report.work_bytes(), requirements.work_bytes);
+        assert_eq!(report.max_depth(), requirements.max_depth);
+        assert_eq!(report.rules(), requirements.rules);
+        assert_eq!(report.allocations(), requirements.allocations);
+        assert_eq!(report.retained_bytes(), requirements.retained_bytes);
+        assert_eq!(report.scratch_bytes(), requirements.scratch_bytes);
+    }
+
+    #[test]
+    fn preparation_rejects_each_source_and_semantic_ceiling_before_scratch() {
+        let source = model(&sort(0, &[(1, 0)]));
+        let desired = SortOrderSnapshot::new(
+            SortScope::EntireTable,
+            [SortRule::new(2, SortDirection::Ascending)],
+        )
+        .unwrap();
+        let unrestricted =
+            prepare_table_sort_order_rewrite(&source, Some(desired.clone()), options(&source))
+                .unwrap();
+        let requirements = unrestricted.execution_requirements();
+
+        let input = decode_table_sort_order(
+            &source,
+            options(&source).with_max_input_bytes(source.len() - 1),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            input.resource_limit(),
+            Some(DecodeLimit::InputBytes { .. })
+        ));
+        let output = decode_table_sort_order(
+            &source,
+            options(&source).with_max_output_bytes(source.len() - 1),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            output.resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+
+        let fields = prepare_table_sort_order_rewrite(
+            &source,
+            Some(desired.clone()),
+            options(&source).with_max_fields(requirements.fields - 1),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            fields.resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+        let work = prepare_table_sort_order_rewrite(
+            &source,
+            Some(desired.clone()),
+            options(&source).with_max_work_bytes(requirements.work_bytes - 1),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            work.resource_limit(),
+            Some(DecodeLimit::WorkBytes { .. })
+        ));
+        let rules = prepare_table_sort_order_rewrite(
+            &source,
+            Some(desired.clone()),
+            options(&source).with_max_rules(0),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            rules.resource_limit(),
+            Some(DecodeLimit::Rules { .. })
+        ));
+        let columns = prepare_table_sort_order_rewrite(
+            &source,
+            Some(desired.clone()),
+            options(&source).with_max_columns(2),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            columns.resource_limit(),
+            Some(DecodeLimit::Columns { .. })
+        ));
+        let allocations = prepare_table_sort_order_rewrite(
+            &source,
+            Some(desired),
+            options(&source).with_max_allocations(requirements.allocations - 1),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            allocations.resource_limit(),
+            Some(DecodeLimit::Allocations { .. })
+        ));
+
+        let nested = prepare_table_sort_order_rewrite(
+            &source,
+            None,
+            options(&source).with_recursion_limit(2),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            nested.resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
     }
 
     #[test]

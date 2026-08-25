@@ -1053,6 +1053,91 @@ def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
     selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
 
 
+def add_pages_table_sort_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_TABLE_SORT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "pub use crate::package::body_table_sort::{"
+        "BodyTableSortCommit as Commit, BodyTableSortDiagnostics as Diagnostics, "
+        "BodyTableSortEdit as Edit, BodyTableSortError as Error, "
+        "BodyTableSortLimitKind as LimitKind, BodyTableSortPatch as Patch};\n}\n"
+        "pub use litchi_iwa_common::table::sort::{"
+        + ", ".join(boundaries.PAGES_TABLE_SORT_SEMANTIC_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        "pub fn body_table_sort_order(selector: BodyTableSelector) {}\n"
+        "pub fn edit_body_table_sort_order(selector: BodyTableSelector) {}\n"
+        "pub fn apply_body_table_sort_order(patch: &Patch) {}\n"
+        "}\n"
+        "fn table_model_sort_order_budget_candidate_reopen_locality_reassembly_atomic_inverse_source_bytes_unchanged() {}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+    package_export = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[1]
+    table_export = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+    selector = root / boundaries.PAGES_TABLE_SORT_SELECTOR_SOURCE
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod table;\n"
+        "pub use selector::BodyTableSelector;\n"
+        "pub use package::{BodyTableSortCommit, BodyTableSortDiagnostics, "
+        "BodyTableSortEdit, BodyTableSortError, BodyTableSortLimitKind, "
+        "BodyTableSortPatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod body_table_sort;\n"
+        "pub use body_table_sort::{BodyTableSortCommit, BodyTableSortDiagnostics, "
+        "BodyTableSortEdit, BodyTableSortError, BodyTableSortLimitKind, "
+        "BodyTableSortPatch};\n",
+        encoding="utf-8",
+    )
+    table_export.write_text("pub mod sort;\n", encoding="utf-8")
+    selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
+    codec = root / boundaries.PAGES_TABLE_SORT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            if name[0].isupper() and not name.startswith("decode") and not name.startswith("prepare") and not name.startswith("canonical") and not name.startswith("rewrite")
+            else f"pub fn {name}() {{}}\n"
+            for name in boundaries.PAGES_TABLE_SORT_CODEC_REQUIRED_APIS
+        )
+        + "// unknown unknown overlong report SORT_ORDER_FIELD SORT_RULES_FIELD\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.PAGES_TABLE_SORT_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod table_sort_order_codec { pub use super::numbers_table_sort_order_codec::*; }\n",
+        encoding="utf-8",
+    )
+    for target in (
+        boundaries.PAGES_TABLE_SORT_CODEC_FUZZ_SOURCE,
+        boundaries.PAGES_TABLE_SORT_FUZZ_SOURCE,
+    ):
+        path = root / target
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("fuzz_target!(|data: &[u8]| { let _ = data; });\n", encoding="utf-8")
+    for corpus in (
+        boundaries.PAGES_TABLE_SORT_CODEC_FUZZ_CORPUS,
+        boundaries.PAGES_TABLE_SORT_FUZZ_CORPUS,
+    ):
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -16088,6 +16173,289 @@ fn rewrite_movie_title_operation(
         self.assertIn(
             "+ audit_pages_table_dimension_facade_source_topology()", main_source
         )
+
+    def test_pages_table_sort_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_SORT_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/sort.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_SORT_METHODS,
+            ("table_sort_order", "set_table_sort_order", "clear_table_sort_order"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_SORT_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_table_sort.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS,
+            (
+                "body_table_sort_order",
+                "edit_body_table_sort_order",
+                "apply_body_table_sort_order",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_SORT_CODEC_SOURCE,
+            Path("crates/litchi-iwa-protos/src/numbers_table_sort_order_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_SORT_CODEC_FUZZ_SOURCE,
+            Path("crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_sort_order_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_SORT_FUZZ_SOURCE,
+            Path("crates/litchi/fuzz/fuzz_targets/pages_body_table_sort_order.rs"),
+        )
+
+    def test_focused_pages_table_sort_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}(selector: BodyTableSelector) {{}}\n"
+                            for method in boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS
+                        )
+                        + "}\n"
+                        + "fn budget_candidate_reopen_locality_reassembly_atomic_inverse() {}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_sort_facade_source_topology(root)
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}(selector: BodyTableSelector) {{}}\n"
+                            for method in boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n"
+                        + "fn budget_candidate_reopen_locality_reassembly_atomic_inverse() {}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_sort_facade_source_topology(root)
+                        )
+                    )
+
+    def test_focused_pages_table_sort_requires_semantics_selector_and_root_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text("pub mod transaction;\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_TABLE_SORT_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+            lib.write_text("pub mod other;\n", encoding="utf-8")
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            table.write_text("pub mod other;\n", encoding="utf-8")
+            violations = boundaries.audit_pages_table_sort_facade_source_topology(root)
+            for name in boundaries.PAGES_TABLE_SORT_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"missing semantic table::sort type {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations))
+            self.assertTrue(any("missing canonical root table module" in item for item in violations))
+            self.assertTrue(any("missing root BodyTableSelector re-export" in item for item in violations))
+            self.assertTrue(any("missing canonical table::sort module" in item for item in violations))
+
+    def test_focused_pages_table_sort_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_sort_order(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo, selector: BodyTableSelector) {}\n"
+                "pub fn edit_body_table_sort_order(selector: BodyTableSelector) {}\n"
+                "pub fn apply_body_table_sort_order(patch: &Patch) {}\n"
+                "}\n"
+                "pub type TableSortPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableSortArchive as TableSortPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            table.write_text("pub mod sort;\npub use sort::*;\n", encoding="utf-8")
+            violations = boundaries.audit_pages_table_sort_facade_source_topology(root)
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::sort glob",
+                "retains flat alias TableSortPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_sort_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomSortPatch = BodyTableSortPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlySortPatch = BodyTableSortPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableSortPatch as SortPatch;\n"
+                    "pub mod body_table_sort;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use sort::Order as SortOrder;\n")
+            violations = boundaries.audit_pages_table_sort_facade_source_topology(root)
+            for fragment in (
+                "alternate alias CustomSortPatch for BodyTableSortPatch",
+                "aliases via table::sort glob",
+                "alternate alias SortPatch for BodyTableSortPatch",
+                "alternate alias SortOrder for Order",
+                "exposes duplicate body_table_sort module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlySortPatch" in item for item in violations))
+
+    def test_focused_pages_table_sort_allows_canonical_private_api_and_shared_codec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_sort_order(selector: BodyTableSelector) {}\n"
+                "pub fn edit_body_table_sort_order(selector: BodyTableSelector) {}\n"
+                "pub fn apply_body_table_sort_order(patch: &Patch) {}\n"
+                "}\n"
+                "fn resolve_native(source_bytes: &[u8], wire: WireView) {}\n"
+                "fn transaction_budget_candidate_reopen_locality_reassembly_atomic_inverse_source_bytes_unchanged() {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod sort;\n"
+                "pub use sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_pages_table_sort_facade_source_topology(root), []
+            )
+
+    def test_iwa_pages_table_sort_audit_activates_and_allows_physical_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.RETIRED_IWA_PAGES_TABLE_SORT_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_numbers::table::sort::{Order, Rule};\n"
+                "pub fn table_sort_order(model_object_id: u64) {}\n"
+                "pub fn set_table_sort_order(model_object_id: u64) {}\n"
+                "pub fn clear_table_sort_order(model_object_id: u64) {}\n"
+                "pub fn apply_table_sort_order(model_object_id: u64) {}\n"
+                "pub fn apply_table_sort_order_to_rows(model_object_id: u64) {}\n"
+                "#[cfg(test)]\n"
+                "pub fn table_sort_order_for_test() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_sort_source_topology(root), []
+            )
+            add_pages_table_sort_canonical_scaffold(root)
+            violations = boundaries.audit_iwa_pages_table_sort_source_topology(root)
+            for method in boundaries.RETIRED_IWA_PAGES_TABLE_SORT_METHODS:
+                self.assertTrue(any(f"method {method}:" in item for item in violations))
+            self.assertTrue(any("table-sort import" in item for item in violations))
+            self.assertFalse(any("apply_table_sort_order" in item for item in violations))
+            self.assertFalse(any("for_test" in item for item in violations))
+
+    def test_iwa_pages_table_sort_allows_numbers_and_keynote_examples(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            examples = root / boundaries.IWA_PAGES_TABLE_SORT_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "create_numbers_sorted.rs").write_text(
+                "editor.table_sort_order(); editor.set_table_sort_order();\n",
+                encoding="utf-8",
+            )
+            (examples / "create_keynote_sorted.rs").write_text(
+                "editor.table_sort_order(); editor.clear_table_sort_order();\n",
+                encoding="utf-8",
+            )
+            (examples / "create_pages_sorted.rs").write_text(
+                "editor.table_sort_order();\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_sort_source_topology(root)
+            self.assertTrue(any("example call table_sort_order" in item for item in violations))
+            self.assertFalse(any("create_numbers_sorted" in item for item in violations))
+            self.assertFalse(any("create_keynote_sorted" in item for item in violations))
+
+    def test_focused_pages_table_sort_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn("+ audit_iwa_pages_table_sort_source_topology()", main_source)
+        self.assertIn("+ audit_pages_table_sort_facade_source_topology()", main_source)
 
     def test_pages_header_footer_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

@@ -19,10 +19,7 @@ pub use formula::{
     PagesTableFormulaAxisReference, PagesTableFormulaBinaryOperator, PagesTableFormulaCachedValue,
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
-pub use sort::{
-    PagesTableSortColumnIndex, PagesTableSortDirection, PagesTableSortOrder,
-    PagesTableSortRowRange, PagesTableSortRule, PagesTableSortScope,
-};
+pub use sort::PagesTableSortRowRange;
 use std::collections::{HashMap, HashSet};
 
 use prost::Message;

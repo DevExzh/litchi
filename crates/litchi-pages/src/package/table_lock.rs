@@ -515,7 +515,7 @@ impl Package {
         self.resolve_body_table_with_budget(selector, &mut budget)
     }
 
-    fn resolve_body_table_with_budget(
+    pub(crate) fn resolve_body_table_with_budget(
         &self,
         selector: BodyTableSelector<'_>,
         budget: &mut WireBudget,
@@ -2324,6 +2324,11 @@ impl WireBudget {
         self.maximum_payload_references
     }
 
+    pub(crate) fn remaining_payload_references(&self) -> usize {
+        self.maximum_payload_references
+            .saturating_sub(self.payload_references)
+    }
+
     pub(crate) fn charge_codec_report(
         &mut self,
         fields: usize,
@@ -2683,7 +2688,7 @@ impl WireBudget {
         self.charge_payload_work(amount)
     }
 
-    fn parse<'a>(
+    pub(crate) fn parse<'a>(
         &mut self,
         source: &'a [u8],
         depth: usize,

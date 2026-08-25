@@ -15,6 +15,8 @@ target
 !/corpus/numbers_table_cell_pop_up_menu/*
 !/corpus/numbers_table_sort_order/
 !/corpus/numbers_table_sort_order/*
+!/corpus/pages_body_table_sort_order/
+!/corpus/pages_body_table_sort_order/*
 !/corpus/keynote_movie_playback/
 !/corpus/keynote_movie_playback/*
 artifacts

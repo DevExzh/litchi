@@ -94,6 +94,10 @@ pub use package::{
     BodyTableLockLimitKind, BodyTableLockPatch,
 };
 pub use package::{
+    BodyTableSortCommit, BodyTableSortDiagnostics, BodyTableSortEdit, BodyTableSortError,
+    BodyTableSortLimitKind, BodyTableSortPatch, BodyTableSortPath,
+};
+pub use package::{
     BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
     BodyTableTitleLimitKind, BodyTableTitlePatch,
 };
