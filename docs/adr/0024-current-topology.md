@@ -2397,3 +2397,28 @@ dependency declarations, and 13 ordered migration debts. Debt 017 and the
 `litchi-iwa -> litchi-pages` edge remain open. No crate, dependency edge,
 debt item, migration host, generated-schema owner, normal Prost/Buffa owner,
 or monolith is removed by this cut.
+
+## 2026-08-25 amendment: Wave79 current-topology Pages section-text host-retirement cut
+
+Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`
+makes `litchi-pages` the current owner of existing rooted Pages section-text
+reads, checked UTF-16 set/clear/span edits, exact patch application, and
+inverse artifacts. The package owns rooted body/section selection, strict
+raw-preserving text-wire preparation/execution, section-boundary shifting,
+archive and ZIP publication, candidate reopen, topology and locality checks,
+and exact preservation of Metadata, previews, unrelated members, and
+unselected section text.
+
+The former raw-ID `PagesEditor` section-text methods and fallback writer are
+retired. The exact aggregate-only drawables-z-order reference emitted by Pages
+is retained as a non-owning ordering edge; other shared, aliased, data,
+`FieldInfo`, marker, rootless, nested, or otherwise unproven routes fail
+closed. Section lifecycle, whole-body edits across structural boundaries,
+header/footer lifecycle, annotations, tables, media, and other Pages graph
+responsibilities remain at their recorded owners.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 017 and the
+`litchi-iwa -> litchi-pages` edge remain open. No crate, dependency edge,
+debt item, migration host, generated-schema owner, normal Prost/Buffa owner,
+or monolith is removed by this cut.

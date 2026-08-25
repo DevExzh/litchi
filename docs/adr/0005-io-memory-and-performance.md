@@ -1384,3 +1384,31 @@ peak-memory, RSS, latency, throughput, zero-copy, or performance result, and
 do not claim one global allocation or a universally output-free preflight.
 No production manifest dependency, generated schema, normal Prost owner,
 Buffa owner, or workspace dependency edge changed.
+
+## 2026-08-25 amendment: Wave79 Pages section-text host-retirement resource record
+
+Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`
+carries one operation-local `TransactionBudget` through the exact source and
+catalog inventory, rooted body/section and ownership scans, strict text-wire
+prepare report, rewrite execution requirements, archive sizing, Snappy bounds,
+prepared ZIP reassembly, complete candidate reopen, semantic/topology and
+locality verification, and retained exact source/target patch artifacts.
+Distinct scans and candidates are charged as distinct work; nesting is merged
+by maximum, and already charged borrowed payloads are not charged again.
+
+The text-wire prepare phase validates fields, work, references, text bytes and
+UTF-16 units, table entries, fragments, and nesting without allocating the
+rewritten output. Its exact execution requirements bound output, retained
+elements/bytes, scratch, allocations, and work. Before final ZIP allocation,
+the package charges conservative message/archive/compression bounds, prepares
+exact reassembly requirements, and precharges the candidate catalog, object,
+message, reference, and locality walks. Typed input/output/member/archive/
+field/work/nesting/reference/allocation failures leave the immutable source
+and public package state unchanged.
+
+These are operation-local accounting and atomic-publication facts only. They
+do not establish package-wide peak memory, RSS, latency, throughput, zero-copy,
+or performance, and do not claim one global allocation or a universally
+output-free preflight. No production manifest dependency, generated schema,
+normal Prost owner, Buffa owner, or workspace dependency edge changed; fuzz
+manifest changes only register the bounded section codec and lifecycle targets.

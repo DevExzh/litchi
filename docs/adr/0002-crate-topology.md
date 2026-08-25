@@ -3536,3 +3536,33 @@ other Pages graph responsibilities remain at their recorded owners. This
 does not alter the workspace topology: debt 017, the
 `litchi-iwa -> litchi-pages` edge, the migration host, generated-schema and
 normal Prost/Buffa owners, and the monolith remain.
+
+## 2026-08-25 amendment: Wave79 Pages section-text host-retirement boundary
+
+Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`
+makes `litchi-pages` the authoritative owner of existing rooted Pages section
+text. The selector-first surface is
+`Package::{section_text, set_section_text, clear_section_text,
+edit_section_text, edit_body_text, apply_section_text}` with archive-free
+`SectionSelector`, `TextPosition`, and `TextSpan` values. The former raw-ID
+`PagesEditor::{section_text, replace_section_text, set_section_text,
+clear_section_text}` methods and their compatibility fallback are removed.
+
+The focused transaction changes only the selected existing body-storage text
+span and the section-boundary indexes that must shift with it. Exact no-ops,
+patch application, and inverse artifacts remain package operations. Rootless,
+nested, malformed, aliased, or otherwise unattributed sources and edits that
+consume section breaks, footnote anchors, inline-object markers, or hidden
+object-reference ownership fail closed. Pages' exact aggregate-only
+type-10015 drawables-z-order edge to the rooted body storage is an ordering
+consumer, not a second text owner, and is retained byte-for-byte; other
+cross-object, data, or field ownership is not inferred away.
+
+This storage-only slice allocates or culls no native object and leaves
+Metadata, save tokens, previews, unrelated members, and unselected section
+text exact. Section insertion/removal, whole-body flattening, header/footer
+and annotation graphs, tables, media, and other Pages compatibility work
+remain at their recorded owners. The 64-package, 239-internal-declaration,
+13-debt topology is unchanged: debt 017, the `litchi-iwa -> litchi-pages`
+edge, the migration host, generated-schema and normal Prost/Buffa owners, and
+the monolith remain.

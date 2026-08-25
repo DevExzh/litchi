@@ -13573,3 +13573,62 @@ evidence only. It does not establish Rust/native byte parity, arbitrary
 producer-graph acceptance, durable publication, performance/RSS, or a
 full-workspace gate. No manifest, generated-schema, or normal-Prost claim
 follows.
+
+## 2026-08-25 amendment: Wave79 Pages section-text host-retirement verification record
+
+The existing-root Pages section-text owner and host-retirement cut is
+implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`.
+Focused verification recorded:
+
+- `cargo test -p litchi-iwa-text-wire --lib --quiet` passed 43/43;
+- `cargo test -p litchi-pages --all-targets --quiet` passed 117 unit tests
+  and the positive integration groups `14, 9, 9, 7, 15, 14, 4, 12, 1, 10,
+  8, 6, 6, 7, 14, 17` (270 tests total); focused `section_text` passed 14/14;
+- `cargo clippy -p litchi-pages --all-targets -- -D warnings` passed;
+- the focused host inline-marker and section append/remove regressions each
+  passed 1/1, and `cargo check -p litchi-iwa --all-targets` passed with known
+  unrelated warnings;
+- the `pages_section_codec`, `pages_section_text_codec`, and
+  `pages_section_text` fuzz targets compiled and passed their scoped Clippy
+  checks; bounded smoke runs completed 20, 20, and 10 runs without a crash;
+- `python3 -m unittest tools.test_check_crate_boundaries` passed 479/479;
+  Python compilation, Rust formatting for the owned files, and
+  `git diff --check` passed.
+
+The live boundary checker exited 1 only for exactly the three known
+user-owned untracked Pages table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`); it reported no Wave79
+finding. Repository-wide pre-commit was not green because unrelated unstaged
+`table_info_codec.rs` and `protobuf.rs` formatting drift and the existing
+Numbers `object_count`/`manual_contains` lint findings fail its global hooks.
+The implementation commit used the verified scoped gates without modifying
+those user-owned files. No full-workspace-green claim follows.
+
+The bounded native record used Pages 14.4.1 and disposable artifacts under
+`/private/tmp/litchi-wave79-section-native-final.Aebewy`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `/private/tmp/litchi_pages_native_body_section_roundtrip.pages` | 100,392 | `89da1e1a2a07d41fca7f478819c88d11ff991342cadee4eb23904536e9a9bec9` |
+| Rust set candidate before Pages | 100,341 | `6332eccda9320a92b2632af2f40ef0cbe526a66d62a1b2533686efb1a7cc2704` |
+| exact set inverse | 100,392 | `89da1e1a2a07d41fca7f478819c88d11ff991342cadee4eb23904536e9a9bec9` |
+| Pages-normalized set candidate | 94,697 | `e68b87b3948444bd554473159d1449dad903048fbbf5c88a56356eb8c6a0245d` |
+| Rust clear candidate before Pages | 100,311 | `71b4285e880e69deceda09d43adfa7a475b77ab18823aa60661c3503a6121d0c` |
+| exact clear inverse | 100,392 | `89da1e1a2a07d41fca7f478819c88d11ff991342cadee4eb23904536e9a9bec9` |
+| Pages-normalized clear candidate | 90,677 | `4d7a38a330ef587284398eed118830985839ac00338bd882d0012e78b66b0875` |
+
+Pages opened both Rust candidates without repair, recovery, or conversion UI.
+The set branch rendered the exact first-section text `Wave79 focused section
+text — 北区`; the clear branch rendered the first section empty. In both
+branches the second section text and its native footnote remained visible.
+Cmd-S, Cmd-W, and exact-path reopen preserved those observations. Strict Rust
+reread of both Pages-normalized outputs succeeded with the same two semantic
+sections, while each pre-native inverse was byte-exact to the source.
+
+Pages normalized both ZIP artifacts. This record establishes only bounded
+open/render/save/close/reopen acceptance, exact pre-native inverse artifacts,
+and strict normalized reread. It does not establish Rust/native byte parity,
+arbitrary producer-graph acceptance, durable publication, performance/RSS,
+or a full-workspace gate. No manifest, generated-schema, normal-Prost,
+dependency-edge, debt, or monolith-exit claim follows.

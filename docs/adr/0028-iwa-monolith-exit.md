@@ -5115,3 +5115,37 @@ reopen evidence, exact pre-native inverse artifacts, and strict normalized
 Rust reread. Pages normalized the ZIP bytes; this is not Rust/native byte
 parity, arbitrary producer-graph acceptance, a performance/RSS result,
 durable publication evidence, or a full-workspace claim.
+
+## 2026-08-25 amendment: Wave79 Pages section-text host-retirement bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`
+moves existing rooted Pages section-text reads and checked edits into the
+selector-first package and retires the four raw-ID host methods plus their
+fallback writer. `Package` now owns semantic selection, strict text-wire
+splicing, section-boundary shifts, exact patch/inverse/apply behavior,
+aggregate resource accounting, candidate reopen, topology, and locality for
+this narrow storage-only slice. Native IDs, archive/member routes, wire and
+generated values, Prost, and Buffa views remain private.
+
+This is not a general Pages text or section-graph owner. Rootless/nested text,
+section insertion/removal, whole-body flattening across structural markers,
+header/footer lifecycle, footnote graphs outside their focused owner, tables,
+annotations, drawables/media, and the remaining Pages compatibility surface
+stay at their recorded owners. The known aggregate-only type-10015
+drawables-z-order consumer is retained; ambiguous, shared, aliased, data,
+`FieldInfo`, dependent-marker, and otherwise unattributed ownership fails
+closed. Metadata/save tokens and previews remain exact because this operation
+does not allocate/cull objects or invalidate layout.
+
+Debt 017, the `litchi-iwa -> litchi-pages` dependency edge, `litchi-iwa` and
+`PagesEditor`, remaining Pages host responsibilities, generated-schema,
+Buffa, and normal Prost owners, and the IWA monolith remain. No crate,
+dependency edge, debt item, manifest dependency, generated-schema owner,
+normal Prost owner, migration-host, or monolith-exit gate is retired by
+Wave79.
+
+The Pages 14.4.1 record provides bounded set/clear open/render/save/close/
+reopen evidence, exact pre-native inverses, and strict normalized Rust reread.
+Pages normalized both ZIP artifacts; this is not Rust/native byte parity,
+arbitrary producer-graph acceptance, a performance/RSS result, durable
+publication evidence, or a full-workspace claim.
