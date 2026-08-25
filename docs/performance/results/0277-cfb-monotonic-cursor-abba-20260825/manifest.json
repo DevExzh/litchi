@@ -1,0 +1,18 @@
+{
+  "artifact_root": "docs/performance/results/0277-cfb-monotonic-cursor-abba-20260825",
+  "artifacts": {
+    "a1-control.json": {"bytes": 684283, "sha256": "7063967406fac986c888461aad6d87f06beeb001cf46a232d48600bdcc54e788"},
+    "a2-control.json": {"bytes": 684283, "sha256": "b4c32f50e222c1a627b64a48cdcdd216007af3c04d7cdd6b2734c2ebb4e925ea"},
+    "b1-candidate.json": {"bytes": 684283, "sha256": "914850b7cd1d2ffed81a77137c02a706c4347e07387ad5ab7cf3058207924083"},
+    "b2-candidate.json": {"bytes": 684269, "sha256": "5f09b156908169bfefcce784a61ad04891b1ee37515b1bf1cfc5636c98e9e59a"},
+    "summary.json": {"bytes": 6595, "sha256": "3a45d2f8feb866ee212e5f3ce3c53f3f81ef2f51cfa640a283f945b4edf9442b"},
+    "summary.txt": {"bytes": 3423, "sha256": "721b09c049136f8e1a185190cf5d468ef8638664ded80466f964e7a1b63b9f31"}
+  },
+  "change": 277,
+  "date": "2026-08-25",
+  "excluded": {
+    "control-provenance-probe.json": "one-sample diagnostic only; not an A1/B1/B2/A2 input"
+  },
+  "schema_version": 1,
+  "self_hash": "excluded to avoid recursive identity"
+}

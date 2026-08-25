@@ -1,5 +1,14 @@
 # Performance CRUD coverage
 
+Change 0277 changes no XLS CRUD surface, selector, or default count. Its public
+cursor remains in low-level `litchi-cfb`; XLS consumes it privately without
+retaining mutable cursor state or exposing CFB identifiers. Per-read freshness,
+FILEPASS, limits, cancellation, malformed-tail, STRING/CONTINUE,
+duplicate-last, and selected-only behavior remain typed and tested. The strict
+run records exact-neutral logical I/O and mixed tails, so
+`performance_claim: none`; the matrix remains **398 names** and the default
+remains **36 cases / 198 records**.
+
 Change 0276 changes no CRUD surface or selector count. It preserves the
 read-only BIFF8 owner while coalescing only the already validated Workbook-
 global span, reusing one facade CFB catalog, and fencing CFB range errors after

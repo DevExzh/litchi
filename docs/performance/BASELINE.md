@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest CFB monotonic cursor XLS evidence (change 0277)
+
+[Change 0277](changes/0277-cfb-monotonic-cursor-abba.md) adds a forward-only
+FAT/MiniFAT cursor in `litchi-cfb` and uses it privately for XLS global and
+selected-sheet scans. A clean CPU-2, 20-warmup/500-sample A1/B1/B2/A2 run
+accepts all three source-path p50/mean cells and open p95, with central gains
+of 0.36%-2.03%. Logical calls, bytes, version checks, locality, and semantic
+outputs are exact-neutral. List/one-cell tails are rejected, including
+31.64% and 5.31% adverse p99 review triggers, so `performance_claim: none`;
+there is no selector-wide, tail, FileSource, physical-I/O, allocation/RSS, or
+broad XLS/CFB claim. The matrix remains **398 names** and **36 cases / 198
+default records**.
+
 ## Latest XLS source-global coalescing (change 0276)
 
 [Change 0276](changes/0276-xls-source-global-coalescing.md) retains bounded

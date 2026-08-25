@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "change": 277,
+  "date": "2026-08-25",
+  "classification": {
+    "status": "production optimization retained as a measured reusable enabler",
+    "performance_claim": "none",
+    "accepted_scope": "stable source-backed central-latency cells only",
+    "withheld": [
+      "selector-wide latency",
+      "tail latency",
+      "eager-control attribution",
+      "FileSource",
+      "physical I/O",
+      "cold cache",
+      "allocation and RSS",
+      "peak memory",
+      "broad XLS or CFB"
+    ]
+  },
+  "identity": {
+    "control_revision": "ebaaf057ad7773da7d9e061594c4c5100ff327ae",
+    "control_binary_sha256": "e046fa377f6e3e4f712a124d454e434e7da2b7c0af72ccd02aefa84673b22017",
+    "control_binary_bytes": 51051864,
+    "candidate_revision": "eac9b7518f58b1796926adeaa26a5b9627ccf873",
+    "candidate_binary_sha256": "9a9f6cd33e0c4368920f470a41765f007f22b637de716b0306613325e4affd4d",
+    "candidate_binary_bytes": 51072448,
+    "configuration_sha256": "a187ebf7988abcf5050f55498f0a6adca400d76c708012c04f89b8bbe0080109",
+    "control_worktree_clean": true,
+    "candidate_worktree_clean": true
+  },
+  "protocol": {
+    "order": ["A1", "B1", "B2", "A2"],
+    "profile": "release",
+    "rust_toolchain": "1.95.0",
+    "cpu": 2,
+    "workers": 1,
+    "warmups": 20,
+    "samples_per_selector_per_leg": 500,
+    "cache_state": "warm",
+    "process_isolation": "fresh child per sample",
+    "dispatch": "single six-selector dispatch",
+    "positive_percent_means": "candidate faster",
+    "drift_ceilings_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    }
+  },
+  "corpus": {
+    "name": "xls-comments-opaque-heavy",
+    "archive_bytes": 16995840,
+    "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+    "workbook_stream_bytes": 80946,
+    "workbook_stream_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+  },
+  "counts": {
+    "selectors": 6,
+    "statistics_per_selector": 4,
+    "comparisons": 24,
+    "directional_deltas": 48,
+    "accepted": 10,
+    "rejected": 14,
+    "adverse_both": 1
+  },
+  "source_backed_percent_faster": [
+    {
+      "case": "xls_source_backed_open",
+      "a1_b1": {"p50": 1.524199, "mean": 1.474526, "p95": 1.679633, "p99": 2.230681},
+      "a2_b2": {"p50": 1.544838, "mean": 1.461060, "p95": 0.767570, "p99": -1.246204},
+      "accepted_statistics": ["p50", "mean", "p95"]
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets",
+      "a1_b1": {"p50": 1.539576, "mean": 2.034737, "p95": 2.492821, "p99": 7.175345},
+      "a2_b2": {"p50": 0.996179, "mean": 0.362376, "p95": -4.648218, "p99": -5.309266},
+      "accepted_statistics": ["p50", "mean"]
+    },
+    {
+      "case": "xls_source_backed_open_one_cell",
+      "a1_b1": {"p50": 2.007861, "mean": 0.853052, "p95": -1.812660, "p99": -31.636120},
+      "a2_b2": {"p50": 1.633126, "mean": 1.586797, "p95": 1.253101, "p99": 0.997531},
+      "accepted_statistics": ["p50", "mean"]
+    }
+  ],
+  "eager_control_percent_faster": [
+    {
+      "case": "xls_semantic_open",
+      "a1_b1": {"p50": 2.273831, "mean": 2.334221, "p95": 3.190445, "p99": -0.991976},
+      "a2_b2": {"p50": -0.524573, "mean": -0.862775, "p95": -5.929550, "p99": -4.031664},
+      "accepted_statistics": [],
+      "adverse_both_statistics": ["p99"]
+    },
+    {
+      "case": "xls_semantic_open_list_worksheets",
+      "a1_b1": {"p50": 1.478088, "mean": 4.165415, "p95": 17.457444, "p99": 27.146401},
+      "a2_b2": {"p50": -0.797298, "mean": -1.269455, "p95": -0.623864, "p99": -6.911058},
+      "accepted_statistics": []
+    },
+    {
+      "case": "xls_semantic_open_one_cell",
+      "a1_b1": {"p50": 6.322337, "mean": 7.136895, "p95": 13.780997, "p99": 16.091685},
+      "a2_b2": {"p50": 1.774359, "mean": 1.950453, "p95": 1.854690, "p99": 0.856308},
+      "accepted_statistics": ["p50", "mean", "p95"]
+    }
+  ],
+  "review_triggers": [
+    {
+      "case": "xls_source_backed_open_one_cell",
+      "pair": "A1/B1",
+      "statistic": "p99",
+      "candidate_slower_percent": 31.636120,
+      "reproduced_in_reverse_pair": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets",
+      "pair": "A2/B2",
+      "statistic": "p99",
+      "candidate_slower_percent": 5.309266,
+      "reproduced_in_reverse_pair": false
+    }
+  ],
+  "logical_source_work": {
+    "equality": "exact across every sample of all four legs for control and candidate",
+    "cases": [
+      {
+        "case": "xls_source_backed_open",
+        "read_calls": 334,
+        "read_bytes": 138459,
+        "cfb_structural_read_calls": 265,
+        "cfb_structural_read_bytes": 136704,
+        "workbook_global_read_calls": 69,
+        "workbook_global_read_bytes": 1755,
+        "selected_worksheet_read_calls": 0,
+        "selected_worksheet_read_bytes": 0,
+        "source_version_checks": 168
+      },
+      {
+        "case": "xls_source_backed_open_list_worksheets",
+        "read_calls": 334,
+        "read_bytes": 138459,
+        "cfb_structural_read_calls": 265,
+        "cfb_structural_read_bytes": 136704,
+        "workbook_global_read_calls": 69,
+        "workbook_global_read_bytes": 1755,
+        "selected_worksheet_read_calls": 0,
+        "selected_worksheet_read_bytes": 0,
+        "source_version_checks": 162
+      },
+      {
+        "case": "xls_source_backed_open_one_cell",
+        "read_calls": 362,
+        "read_bytes": 138593,
+        "cfb_structural_read_calls": 265,
+        "cfb_structural_read_bytes": 136704,
+        "workbook_global_read_calls": 69,
+        "workbook_global_read_bytes": 1755,
+        "selected_worksheet_read_calls": 28,
+        "selected_worksheet_read_bytes": 134,
+        "source_version_checks": 224
+      }
+    ],
+    "unselected_worksheet_read_calls": 0,
+    "unselected_worksheet_read_bytes": 0,
+    "opaque_payload_read_calls": 0,
+    "opaque_payload_read_bytes": 0
+  },
+  "decision": {
+    "keep": true,
+    "reason": "Stable central source-backed cells and a coherent in-memory chain-walk/header-allocation mechanism justify retaining the cursor as reusable low-level infrastructure.",
+    "no_tail_claim": true,
+    "no_selector_wide_claim": true,
+    "tool_limitation": "tools/perf_abba_summary.py rejected this lifecycle corpus as a native XLS numeric selector mismatch; the four raw reports remain authoritative and this projection records the independently checked cells and exact paired source counters.",
+    "next": "Add owned, atomic-only, tracked, FileSource, facade, and phase-attribution modes before bounded same-stream span batching."
+  }
+}

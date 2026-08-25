@@ -1,5 +1,18 @@
 # Performance program phase report
 
+## CFB monotonic cursor and XLS evidence (change 0277)
+
+[Change 0277](changes/0277-cfb-monotonic-cursor-abba.md) adds a low-level
+forward-only FAT/MiniFAT cursor and privately integrates it into source-backed
+XLS global and selected-sheet scans. In clean CPU-2, 20-warmup/500-sample
+A1/B1/B2/A2 evidence, the source p50/mean cells improve in both directions by
+0.36%-2.03%, and open p95 also passes. Logical calls, bytes, version checks,
+and locality are exactly unchanged. List/one-cell tails are rejected; adverse
+31.64% and 5.31% p99 directions remain review triggers. The cursor is retained
+as a measured enabler, not a selector-wide win: `performance_claim: none`, no
+tail or broad XLS/CFB claim, and the matrix remains **398 names** and **36
+cases / 198 records**.
+
 ## XLS source-global coalescing (change 0276)
 
 [Change 0276](changes/0276-xls-source-global-coalescing.md) changes the
