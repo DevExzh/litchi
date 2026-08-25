@@ -1,0 +1,72 @@
+{
+  "schema": "litchi.xlsx.source-merge-abba.v1",
+  "tool": "xlsx_merge_source_abba",
+  "package_version": "0.1.0",
+  "revision_scope": "same workspace revision and same executable path for all legs; evidence requires a clean revision",
+  "directional_claim_scope": "A1->B1 and A2->B2 are claim-bearing directional comparisons within the same-revision eager-vs-source path scope; cross-revision evidence is excluded",
+  "performance_claim": "none: correctness and diagnostic timing only; no performance claim",
+  "mode": "evidence",
+  "evidence_min_samples": 20,
+  "statistical_gates_enforced": true,
+  "warmup": 20,
+  "samples": 1000,
+  "fresh_child_per_leg": true,
+  "leg_order": [
+    "A1 eager",
+    "B1 source",
+    "B2 source",
+    "A2 eager"
+  ],
+  "operations": [
+    "merge",
+    "unmerge"
+  ],
+  "sink_limit_bytes": 65536,
+  "fixture": {
+    "merge_sha256": "151fed9651e6f88a1e7e17183c8dac1f4885b6a922756214295b0d7c828a589e",
+    "merge_target_sha256": "692d1a1b71bd6af7bffc8d008d28ba75c5068dc913e0452363950fbe09d5b605",
+    "merge_bytes": 2421,
+    "unmerge_sha256": "6329afb234f9f1ea073e37baa4ca9ab6a0bb559fd40ff46a94320d416296a03f",
+    "unmerge_target_sha256": "467a33b4a4635f43d4d1a582ed8f31390a0eb6b71c94fc13059de9e5c436798e",
+    "unmerge_bytes": 2443,
+    "sheet": "Sheet1",
+    "populated_cells": [
+      "A1",
+      "C1"
+    ],
+    "merge_range": "A1:B2"
+  },
+  "identity": {
+    "executable_sha256": "6636c541a2b32fd04409a00c7f2e91ae5fe793020ada444dbeb62968c40434dd",
+    "git_revision": "30d6c74c2026b5df6527582773f8ad28837bcfa8",
+    "git_dirty": false,
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu": null,
+    "memory": "MemTotal:       32812712 kB",
+    "rustflags": null
+  },
+  "timing": {
+    "primary": "commit plus publication into a bounded retaining 64 KiB sink",
+    "preparation": "fixture-independent implementation open plus edit staging",
+    "lifecycle": "child lifecycle through semantic and source-contract diagnostics",
+    "source_counters": "logical ReadAt, len, and version calls from a local CountingSource"
+  },
+  "gates": {
+    "same_side_symmetric_delta_threshold_percent": 5.0,
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "directional_improvement_threshold_percent": 1.0,
+    "directional_improvement_threshold_ns": 50000,
+    "directional_adverse_threshold_percent": 5.0,
+    "cross_side_deltas_are_descriptive": true
+  },
+  "eager_durable_patch_available": false,
+  "durable_patch_limitation": "eager durable Patch apply/inverse is not exposed by this runner; no durable-patch claim is made",
+  "materialization_claim": false
+}

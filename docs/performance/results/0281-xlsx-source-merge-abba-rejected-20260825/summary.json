@@ -1,0 +1,740 @@
+{
+  "schema": "litchi.xlsx.source-merge-abba.v1",
+  "tool": "xlsx_merge_source_abba",
+  "package_version": "0.1.0",
+  "performance_claim": "none: correctness and diagnostic timing only; no performance claim",
+  "mode": "evidence",
+  "evidence_min_samples": 20,
+  "statistical_gates_enforced": true,
+  "cross_revision_evidence": false,
+  "warmup": 20,
+  "requested_samples": 1000,
+  "successful_rows": 8000,
+  "failure_rows": 1,
+  "operations": [
+    {
+      "operation": "merge",
+      "requested_samples": 1000,
+      "successful_samples": 1000,
+      "eager": {
+        "combined": {
+          "count": 2000,
+          "min_ns": 151909,
+          "p50_ns": 191274,
+          "mean_ns_floor": 194005,
+          "p95_ns": 227193,
+          "p99_ns": 253330,
+          "max_ns": 567002
+        },
+        "a1": {
+          "count": 1000,
+          "min_ns": 151909,
+          "p50_ns": 190838,
+          "mean_ns_floor": 193113,
+          "p95_ns": 224510,
+          "p99_ns": 248883,
+          "max_ns": 286726
+        },
+        "a2": {
+          "count": 1000,
+          "min_ns": 152359,
+          "p50_ns": 191879,
+          "mean_ns_floor": 194898,
+          "p95_ns": 228115,
+          "p99_ns": 253689,
+          "max_ns": 567002
+        }
+      },
+      "source": {
+        "combined": {
+          "count": 2000,
+          "min_ns": 96172,
+          "p50_ns": 112084,
+          "mean_ns_floor": 115059,
+          "p95_ns": 136719,
+          "p99_ns": 155524,
+          "max_ns": 329995
+        },
+        "b1": {
+          "count": 1000,
+          "min_ns": 97304,
+          "p50_ns": 112404,
+          "mean_ns_floor": 115697,
+          "p95_ns": 138131,
+          "p99_ns": 155524,
+          "max_ns": 329995
+        },
+        "b2": {
+          "count": 1000,
+          "min_ns": 96172,
+          "p50_ns": 111649,
+          "mean_ns_floor": 114420,
+          "p95_ns": 134456,
+          "p99_ns": 151969,
+          "max_ns": 242514
+        }
+      },
+      "pairwise_sample_drift_diagnostic": {
+        "basis": "diagnostic only: per-sample paired drift is not used by any gate",
+        "eager": {
+          "count": 1000,
+          "min_percent": 0.01608439314693925,
+          "p50_percent": 6.5,
+          "mean_percent": 9.871246208826525,
+          "p95_percent": 27.388104498015064,
+          "p99_percent": 45.620004513010535,
+          "max_percent": 184.31841544440266
+        },
+        "source": {
+          "count": 1000,
+          "min_percent": 0.0009034076536696419,
+          "p50_percent": 6.0,
+          "mean_percent": 9.747066488194632,
+          "p95_percent": 29.09487687733476,
+          "p99_percent": 45.63735732338209,
+          "max_percent": 191.44807729673397
+        }
+      },
+      "eager_vs_source_delta_percent": {
+        "p50_percent": -41.401340485377006,
+        "mean_percent": -40.692765650369836,
+        "p95_percent": -39.822529743433996,
+        "p99_percent": -38.60813958078396
+      },
+      "same_side_gates": {
+        "basis": "gates use symmetric deltas of per-leg aggregate p50/mean/p95/p99 values; per-leg values are reported in eager/source statistics",
+        "eager_a1_a2": [
+          {
+            "name": "eager A1/A2 p50 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 0.5454888439409342,
+            "absolute_delta_ns": 1041,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "eager A1/A2 mean symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 0.9243292787124636,
+            "absolute_delta_ns": 1785,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "eager A1/A2 p95 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 1.6057191216426885,
+            "absolute_delta_ns": 3605,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "eager A1/A2 p99 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 1.9310278323549621,
+            "absolute_delta_ns": 4806,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          }
+        ],
+        "source_b1_b2": [
+          {
+            "name": "source B1/B2 p50 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 0.6762263880554237,
+            "absolute_delta_ns": 755,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "source B1/B2 mean symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 1.1160636252403426,
+            "absolute_delta_ns": 1277,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "source B1/B2 p95 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 2.7332361516034984,
+            "absolute_delta_ns": 3675,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "source B1/B2 p99 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 2.339292882100955,
+            "absolute_delta_ns": 3555,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          }
+        ]
+      },
+      "directional_gates": {
+        "eager_a1_to_source_b1": [
+          {
+            "name": "A1 eager -> B1 source p50",
+            "threshold_percent": 1.0,
+            "observed_percent": 41.09978096605498,
+            "absolute_delta_ns": 78434,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A1 eager -> B1 source mean",
+            "threshold_percent": 1.0,
+            "observed_percent": 40.08844562510033,
+            "absolute_delta_ns": 77416,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A1 eager -> B1 source p95",
+            "threshold_percent": 5.0,
+            "observed_percent": 38.47445548082491,
+            "absolute_delta_ns": 86379,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          },
+          {
+            "name": "A1 eager -> B1 source p99",
+            "threshold_percent": 5.0,
+            "observed_percent": 37.5112000417867,
+            "absolute_delta_ns": 93359,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          }
+        ],
+        "eager_a2_to_source_b2": [
+          {
+            "name": "A2 eager -> B2 source p50",
+            "threshold_percent": 1.0,
+            "observed_percent": 41.8128091140771,
+            "absolute_delta_ns": 80230,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A2 eager -> B2 source mean",
+            "threshold_percent": 1.0,
+            "observed_percent": 41.292368315734386,
+            "absolute_delta_ns": 80478,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A2 eager -> B2 source p95",
+            "threshold_percent": 5.0,
+            "observed_percent": 41.057799793963575,
+            "absolute_delta_ns": 93659,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          },
+          {
+            "name": "A2 eager -> B2 source p99",
+            "threshold_percent": 5.0,
+            "observed_percent": 40.09633843012507,
+            "absolute_delta_ns": 101720,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          }
+        ]
+      },
+      "gates": [
+        {
+          "name": "eager A1/A2 p50 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 0.5454888439409342,
+          "absolute_delta_ns": 1041,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "eager A1/A2 mean symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 0.9243292787124636,
+          "absolute_delta_ns": 1785,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "eager A1/A2 p95 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 1.6057191216426885,
+          "absolute_delta_ns": 3605,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "eager A1/A2 p99 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 1.9310278323549621,
+          "absolute_delta_ns": 4806,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 p50 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 0.6762263880554237,
+          "absolute_delta_ns": 755,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 mean symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 1.1160636252403426,
+          "absolute_delta_ns": 1277,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 p95 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 2.7332361516034984,
+          "absolute_delta_ns": 3675,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 p99 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 2.339292882100955,
+          "absolute_delta_ns": 3555,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "A1 eager -> B1 source p50",
+          "threshold_percent": 1.0,
+          "observed_percent": 41.09978096605498,
+          "absolute_delta_ns": 78434,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A1 eager -> B1 source mean",
+          "threshold_percent": 1.0,
+          "observed_percent": 40.08844562510033,
+          "absolute_delta_ns": 77416,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A1 eager -> B1 source p95",
+          "threshold_percent": 5.0,
+          "observed_percent": 38.47445548082491,
+          "absolute_delta_ns": 86379,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        },
+        {
+          "name": "A1 eager -> B1 source p99",
+          "threshold_percent": 5.0,
+          "observed_percent": 37.5112000417867,
+          "absolute_delta_ns": 93359,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        },
+        {
+          "name": "A2 eager -> B2 source p50",
+          "threshold_percent": 1.0,
+          "observed_percent": 41.8128091140771,
+          "absolute_delta_ns": 80230,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A2 eager -> B2 source mean",
+          "threshold_percent": 1.0,
+          "observed_percent": 41.292368315734386,
+          "absolute_delta_ns": 80478,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A2 eager -> B2 source p95",
+          "threshold_percent": 5.0,
+          "observed_percent": 41.057799793963575,
+          "absolute_delta_ns": 93659,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        },
+        {
+          "name": "A2 eager -> B2 source p99",
+          "threshold_percent": 5.0,
+          "observed_percent": 40.09633843012507,
+          "absolute_delta_ns": 101720,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        }
+      ],
+      "all_required_gates_passed": true
+    },
+    {
+      "operation": "unmerge",
+      "requested_samples": 1000,
+      "successful_samples": 1000,
+      "eager": {
+        "combined": {
+          "count": 2000,
+          "min_ns": 127636,
+          "p50_ns": 165308,
+          "mean_ns_floor": 167067,
+          "p95_ns": 195820,
+          "p99_ns": 216948,
+          "max_ns": 306111
+        },
+        "a1": {
+          "count": 1000,
+          "min_ns": 128978,
+          "p50_ns": 165343,
+          "mean_ns_floor": 166520,
+          "p95_ns": 193887,
+          "p99_ns": 208117,
+          "max_ns": 306111
+        },
+        "a2": {
+          "count": 1000,
+          "min_ns": 127636,
+          "p50_ns": 165213,
+          "mean_ns_floor": 167614,
+          "p95_ns": 197362,
+          "p99_ns": 228895,
+          "max_ns": 266348
+        }
+      },
+      "source": {
+        "combined": {
+          "count": 2000,
+          "min_ns": 86349,
+          "p50_ns": 107733,
+          "mean_ns_floor": 110181,
+          "p95_ns": 134044,
+          "p99_ns": 148825,
+          "max_ns": 354530
+        },
+        "b1": {
+          "count": 1000,
+          "min_ns": 87251,
+          "p50_ns": 108234,
+          "mean_ns_floor": 110943,
+          "p95_ns": 135828,
+          "p99_ns": 152561,
+          "max_ns": 354530
+        },
+        "b2": {
+          "count": 1000,
+          "min_ns": 86349,
+          "p50_ns": 107072,
+          "mean_ns_floor": 109419,
+          "p95_ns": 132712,
+          "p99_ns": 144500,
+          "max_ns": 217810
+        }
+      },
+      "pairwise_sample_drift_diagnostic": {
+        "basis": "diagnostic only: per-sample paired drift is not used by any gate",
+        "eager": {
+          "count": 1000,
+          "min_percent": 0.03090750619695499,
+          "p50_percent": 7.5,
+          "mean_percent": 10.677426662028697,
+          "p95_percent": 29.788718498054912,
+          "p99_percent": 50.912488752509056,
+          "max_percent": 86.2221818258091
+        },
+        "source": {
+          "count": 1000,
+          "min_percent": 0.03255738238645613,
+          "p50_percent": 10.0,
+          "mean_percent": 13.050200938269803,
+          "p95_percent": 32.89704493320739,
+          "p99_percent": 57.62790904245869,
+          "max_percent": 159.59961337941536
+        }
+      },
+      "eager_vs_source_delta_percent": {
+        "p50_percent": -34.828925399859656,
+        "mean_percent": -34.04981235073353,
+        "p95_percent": -31.547339393320396,
+        "p99_percent": -31.400612128251936
+      },
+      "same_side_gates": {
+        "basis": "gates use symmetric deltas of per-leg aggregate p50/mean/p95/p99 values; per-leg values are reported in eager/source statistics",
+        "eager_a1_a2": [
+          {
+            "name": "eager A1/A2 p50 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 0.07868630192539328,
+            "absolute_delta_ns": 130,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "eager A1/A2 mean symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 0.6569781407638723,
+            "absolute_delta_ns": 1094,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "eager A1/A2 p95 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 1.7922810709330692,
+            "absolute_delta_ns": 3475,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "eager A1/A2 p99 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 9.983807185381298,
+            "absolute_delta_ns": 20778,
+            "passed": false,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          }
+        ],
+        "source_b1_b2": [
+          {
+            "name": "source B1/B2 p50 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 1.0852510460251046,
+            "absolute_delta_ns": 1162,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "source B1/B2 mean symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 1.392811120554931,
+            "absolute_delta_ns": 1524,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "source B1/B2 p95 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 2.3479414069564166,
+            "absolute_delta_ns": 3116,
+            "passed": true,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          },
+          {
+            "name": "source B1/B2 p99 symmetric delta",
+            "threshold_percent": 5.0,
+            "observed_percent": 5.578546712802768,
+            "absolute_delta_ns": 8061,
+            "passed": false,
+            "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+          }
+        ]
+      },
+      "directional_gates": {
+        "eager_a1_to_source_b1": [
+          {
+            "name": "A1 eager -> B1 source p50",
+            "threshold_percent": 1.0,
+            "observed_percent": 34.53971441185899,
+            "absolute_delta_ns": 57109,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A1 eager -> B1 source mean",
+            "threshold_percent": 1.0,
+            "observed_percent": 33.375570502041796,
+            "absolute_delta_ns": 55577,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A1 eager -> B1 source p95",
+            "threshold_percent": 5.0,
+            "observed_percent": 29.944761639511675,
+            "absolute_delta_ns": 58059,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          },
+          {
+            "name": "A1 eager -> B1 source p99",
+            "threshold_percent": 5.0,
+            "observed_percent": 26.694599672299717,
+            "absolute_delta_ns": 55556,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          }
+        ],
+        "eager_a2_to_source_b2": [
+          {
+            "name": "A2 eager -> B2 source p50",
+            "threshold_percent": 1.0,
+            "observed_percent": 35.19154061726377,
+            "absolute_delta_ns": 58141,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A2 eager -> B2 source mean",
+            "threshold_percent": 1.0,
+            "observed_percent": 34.71965348956531,
+            "absolute_delta_ns": 58195,
+            "passed": true,
+            "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+          },
+          {
+            "name": "A2 eager -> B2 source p95",
+            "threshold_percent": 5.0,
+            "observed_percent": 32.75706569653733,
+            "absolute_delta_ns": 64650,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          },
+          {
+            "name": "A2 eager -> B2 source p99",
+            "threshold_percent": 5.0,
+            "observed_percent": 36.87061753205618,
+            "absolute_delta_ns": 84395,
+            "passed": true,
+            "rationale": "source may not be more than 5% adverse for p95/p99"
+          }
+        ]
+      },
+      "gates": [
+        {
+          "name": "eager A1/A2 p50 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 0.07868630192539328,
+          "absolute_delta_ns": 130,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "eager A1/A2 mean symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 0.6569781407638723,
+          "absolute_delta_ns": 1094,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "eager A1/A2 p95 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 1.7922810709330692,
+          "absolute_delta_ns": 3475,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "eager A1/A2 p99 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 9.983807185381298,
+          "absolute_delta_ns": 20778,
+          "passed": false,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 p50 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 1.0852510460251046,
+          "absolute_delta_ns": 1162,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 mean symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 1.392811120554931,
+          "absolute_delta_ns": 1524,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 p95 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 2.3479414069564166,
+          "absolute_delta_ns": 3116,
+          "passed": true,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "source B1/B2 p99 symmetric delta",
+          "threshold_percent": 5.0,
+          "observed_percent": 5.578546712802768,
+          "absolute_delta_ns": 8061,
+          "passed": false,
+          "rationale": "symmetric delta of per-leg aggregate statistics must be <=5%; paired-sample drift is diagnostic only"
+        },
+        {
+          "name": "A1 eager -> B1 source p50",
+          "threshold_percent": 1.0,
+          "observed_percent": 34.53971441185899,
+          "absolute_delta_ns": 57109,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A1 eager -> B1 source mean",
+          "threshold_percent": 1.0,
+          "observed_percent": 33.375570502041796,
+          "absolute_delta_ns": 55577,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A1 eager -> B1 source p95",
+          "threshold_percent": 5.0,
+          "observed_percent": 29.944761639511675,
+          "absolute_delta_ns": 58059,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        },
+        {
+          "name": "A1 eager -> B1 source p99",
+          "threshold_percent": 5.0,
+          "observed_percent": 26.694599672299717,
+          "absolute_delta_ns": 55556,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        },
+        {
+          "name": "A2 eager -> B2 source p50",
+          "threshold_percent": 1.0,
+          "observed_percent": 35.19154061726377,
+          "absolute_delta_ns": 58141,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A2 eager -> B2 source mean",
+          "threshold_percent": 1.0,
+          "observed_percent": 34.71965348956531,
+          "absolute_delta_ns": 58195,
+          "passed": true,
+          "rationale": "source must improve by >=1% or >=50 us for p50/mean"
+        },
+        {
+          "name": "A2 eager -> B2 source p95",
+          "threshold_percent": 5.0,
+          "observed_percent": 32.75706569653733,
+          "absolute_delta_ns": 64650,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        },
+        {
+          "name": "A2 eager -> B2 source p99",
+          "threshold_percent": 5.0,
+          "observed_percent": 36.87061753205618,
+          "absolute_delta_ns": 84395,
+          "passed": true,
+          "rationale": "source may not be more than 5% adverse for p95/p99"
+        }
+      ],
+      "all_required_gates_passed": false
+    }
+  ]
+}
