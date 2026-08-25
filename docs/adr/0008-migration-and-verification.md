@@ -13986,3 +13986,53 @@ This is bounded strict read/no-op and source-corpus evidence only. It makes no
 Rust/native byte-parity, cross-component COW, UUID/save-token, locality,
 inverse, performance/RSS, durable-publication, host/edge/debt, monolith-exit,
 or full-workspace claim.
+
+## 2026-08-26 amendment: Wave87 Keynote movie-geometry verification record
+
+Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` was verified
+with these scoped gates:
+
+- the focused movie-geometry codec passed 4/4;
+- the focused `litchi-keynote` `slide_movie_geometry` integration passed
+  11/11;
+- the existing movie-playback regression passed 8/8;
+- the host scratch, CRUD, and wrong-target geometry regressions each passed
+  1/1;
+- `cargo check -p litchi-iwa --lib --examples` passed;
+- `litchi-keynote` library/test Clippy with `-D warnings` passed;
+- `litchi-iwa-protos` library Clippy with `-D warnings` passed;
+- both the package and codec fuzz cargo checks passed in the final shared-
+  target rerun;
+- boundary Python compilation and the boundary unittest passed 530/530, and
+  formatting/diff checks passed.
+
+The live boundary checker exited 1 with exactly the three known user-owned
+untracked Pages table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`). It reported no Wave87
+movie-geometry finding. These are scoped gates only; no full-workspace-green
+claim follows.
+
+The fresh Keynote 14.4 file-backed movie record used these artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| pristine source `.key` | 663,567 | `b3a87256391c7e600cb2658ee10fc9575c6a6cbb40e679014e7ebc3f3b8db87f` |
+| Rust geometry candidate `.key` | 663,572 | `4f730dcc282db1094a8dd56311a6a7250cfc958458b70a16cf98ada3920a4aa6` |
+| exact Rust inverse `.key` | 663,567 | `b3a87256391c7e600cb2658ee10fc9575c6a6cbb40e679014e7ebc3f3b8db87f` |
+| media `source.mov` | 178,553 | `b5098123bf93ef24e5f15cd9840e4f87d7c25041239167b116abf64500b15382` |
+| media `poster.png` | 473,831 | `7e497501a28bcf9a353ccadf6eb9216bf098ac32888fb542fb9bfe71d486761f` |
+| Keynote-normalized saved artifact `.key` | 737,449 | `7af55161e0ec9338608a8aecf10c4b8fe5a36cd73c31abc8cfd960d9a5536936` |
+
+The Rust candidate set the existing movie geometry to position `(240, 180)`
+and displayed size `640 x 360`. Computer Use opened it in Keynote 14.4
+without repair, showed the 640 x 360 movie at 12.5% left and 16.7% top with
+the exact title, caption, and media, then saved, closed, and reopened the
+exact path. Keynote normalized the saved ZIP bytes. Strict Rust reread of
+that 737,449-byte normalized artifact returned `InvalidSource`.
+
+This is bounded Rust source/candidate/inverse and native open/render/save/
+close/reopen evidence only. The strict reread failure is recorded rather
+than converted into acceptance; there is no Rust/native byte-parity,
+normalized re-ingress, durable publication, performance/RSS, arbitrary
+producer-graph, host/debt/edge, monolith, or full-workspace claim.

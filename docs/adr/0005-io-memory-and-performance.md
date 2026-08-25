@@ -1610,3 +1610,32 @@ batch, candidate/locality, inverse, or successful split-write resource route
 is owned. Package ingress limits are the only resource ceiling claimed for
 this bounded read/no-op boundary; same-component resource claims remain those
 of the preceding Wave85 slice.
+
+## 2026-08-26 amendment: Wave87 Keynote movie-geometry resource record
+
+Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` carries one
+operation-local geometry budget through source/catalog inventory, rooted
+slide/movie selection, file-movie and same-component ownership checks, strict
+geometry codec reports and execution requirements, archive and Snappy
+rewriting, root-preview deletion, prepared ZIP reassembly, candidate reopen,
+semantic reread, and object/member locality. Independent source and candidate
+walks are charged independently; nesting is merged by maximum and borrowed
+payloads are not silently charged as a second physical scan.
+
+Residual input/output, entry, total, wire-byte, field, work, nesting,
+reference, geometry-byte, component, allocation, retained-byte, and scratch
+ceilings are propagated through the admitted route. Prepared codec and ZIP
+reassembly requirements are checked with checked arithmetic, fallible
+reservations, and typed codec/archive/core mappings before their corresponding
+output stages. Any rejected limit or verification failure leaves the
+immutable source and published package unchanged.
+
+Native archive, compression, preview, and final ZIP values are staged as
+private candidates before semantic verification and publication. This is an
+operation-local accounting record only: it makes no claim of a single global
+allocation-free preflight, a single allocation, zero-copy behavior,
+package-wide peak memory or RSS, latency, throughput, or performance. The
+geometry owner does not allocate objects or mutate Metadata/UUIDs/save tokens;
+legacy angle/flags/flip/original-size-restore compatibility remains outside
+this resource slice. No production dependency edge or normal generated-
+schema/Prost/Buffa owner changes by this record.

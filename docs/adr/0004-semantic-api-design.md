@@ -3200,3 +3200,31 @@ copy-on-write, UUID or save-token updates, candidate/locality verification,
 or inverse artifacts; no split write is successful or published. It also does
 not expand ownership to table topology, scalar data formats, or Pages and
 Keynote controls.
+
+## 2026-08-26 amendment: Keynote movie-geometry semantic ownership
+
+Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` adds the
+selector-first `Package::{slide_movie_geometry, edit_slide_movie_geometry,
+apply_slide_movie_geometry}` surface. Reads return an optional validated
+archive-free `MovieGeometry`; `Edit::set` stages a finite position and
+strictly positive displayed size, and commit/apply expose conflict-checked
+`SlideMovieGeometryCommit`, exact `Patch` and inverse artifacts, redacted
+diagnostics, and typed resource failures. `SlideSelector` and
+`MovieSelector` are the only selectors; no native identity or physical
+member value crosses the facade.
+
+The admitted source is one rooted, same-component, file-backed type-3007
+movie with a unique slide-parent and movie-owner route. Existing position and
+displayed size may be replaced; changed geometry invalidates the root
+previews, while exact no-ops preserve them. Unknown and unrelated movie
+fields, including native angle, flags, media, title/caption, playback,
+build, and original-size metadata, remain source-authoritative. Legacy
+angle/flags behavior and the compatibility flip/original-size-restore helpers
+remain retained; they are not reinterpreted as ownership of the broader movie
+graph.
+
+This slice does not create or remove movies, replace media or posters, edit
+captions/titles/playback/builds, own generic drawable geometry, repair
+cross-component graphs, mutate Metadata/UUIDs, or expose a native graph API.
+Malformed, non-file, aliased, cross-component, ambiguous, or otherwise
+unproven movie graphs fail closed before publication.

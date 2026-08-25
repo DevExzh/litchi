@@ -2595,3 +2595,29 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 `litchi-iwa -> litchi-pages` edge, migration hosts, generated-schema and
 normal Prost/Buffa owners, and the IWA monolith. No crate, dependency edge,
 debt item, production manifest dependency, or monolith is removed by Wave86.
+
+## 2026-08-26 amendment: Wave87 current-topology Keynote movie-geometry cut
+
+Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` makes
+`litchi-keynote` the current selector-first owner of admitted existing
+file-backed slide-movie position and displayed-size reads, exact edits,
+patch application, and inverse artifacts. The package owns strict rooted
+slide/movie selection, same-component identity and parent proof, geometry
+codec execution, preview invalidation, operation-local resource accounting,
+prepared reassembly, candidate validation/readback, and exact object/member
+locality. The public value remains archive-free `MovieGeometry`.
+
+The physical `litchi-iwa` media graph, creation/removal, media/poster
+replacement, captions/titles, playback, builds, metadata, and broader
+drawable responsibilities remain at their recorded owners. Legacy angle and
+flags compatibility plus flip/original-size-restore compatibility remain
+retained at the host/adapter boundary; this topology cut does not claim those
+operations or fields as a separate native graph owner. Cross-component,
+non-file, aliased, malformed, or otherwise unproven movie graphs fail closed.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 014 and the
+`litchi-iwa -> litchi-keynote` edge remain open, as do debts 015 and 017,
+the Pages edge, migration hosts, generated-schema and normal Prost/Buffa
+owners, and the IWA monolith. No crate, dependency edge, debt item,
+production manifest dependency, or monolith is removed by Wave87.

@@ -3782,3 +3782,32 @@ declarations, and 13 ordered migration debts. Debt 015, the
 generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
 No crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by this cut.
+
+## 2026-08-26 amendment: Wave87 Keynote movie-geometry boundary
+
+Implementation commit `e11a4cc993cf29e5524745f2fa51dd3dd7d20b3e` moves the
+bounded existing-file-movie geometry transaction behind the selector-first
+`litchi-keynote` package facade. The archive-free semantic value is
+`slide::media::geometry::MovieGeometry`, and the package entry points are
+`Package::{slide_movie_geometry, edit_slide_movie_geometry,
+apply_slide_movie_geometry}` with `SlideSelector` and `MovieSelector`.
+Native object identifiers, component/member locators, raw bytes, archive and
+wire values, generated messages, Prost values, and Buffa views do not cross
+this boundary.
+
+The hidden `keynote_movie_geometry_codec` owns strict source-preserving
+position and displayed-size projection. The package owns rooted slide/movie
+selection, file-backed same-component ownership, strict parent/reference
+checks, preview invalidation, operation-local resource accounting, exact
+patch/inverse artifacts, prepared reassembly, candidate reopen, semantic
+readback, and object/member locality. Movie angle, flags, media, captions,
+playback, builds, metadata, and allocation/lifecycle remain opaque. Legacy
+angle/flags compatibility and flip/original-size-restore compatibility remain
+retained at the `litchi-iwa` host/adapter boundary.
+
+The workspace inventory remains 64 packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debt 014, the
+`litchi-iwa -> litchi-keynote` edge, debts 015 and 017, migration hosts,
+generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
+No crate, dependency edge, debt item, production manifest dependency, or
+monolith owner is removed by this cut.
