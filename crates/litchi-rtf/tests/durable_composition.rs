@@ -6,6 +6,7 @@
 
 use litchi_rtf::edit::{DurableComposition, DurableMergePlan, Limits, MergeResolution};
 use litchi_rtf::{Alignment, Document, UnderlineStyle, edit::TextSpan};
+use std::num::NonZeroU16;
 
 fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -747,4 +748,87 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
             .alignment(),
         Alignment::Right
     );
+}
+
+#[test]
+fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overlap() {
+    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut size_edit = source.edit();
+    size_edit
+        .set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
+        .unwrap();
+    let size = size_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(size.operations()[0].op, "character-font-size.set");
+    assert_eq!(
+        size.operations()[0].preconditions["font_size_half_points"],
+        serde_json::Value::Number(serde_json::Number::from(24_u64))
+    );
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(size.clone()).unwrap();
+    composition.join(underline.clone()).unwrap();
+    let combined = composition.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    let size_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().size().get() == 23)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(size_text.contains("First"));
+    let underlined_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().underline() == UnderlineStyle::Single)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(underlined_text.contains("Second"));
+    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened_restored.text(), source.text());
+
+    let mut overlapping_underline_edit = source.edit();
+    overlapping_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(size).unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
 }
