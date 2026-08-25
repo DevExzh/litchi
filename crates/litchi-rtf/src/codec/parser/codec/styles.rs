@@ -2,16 +2,16 @@ use super::{
     Alignment, CharacterType, ColorRef, ControlWord, Cow, DeferredText, Destination, FontRef,
     Formatting, LatentStyleExceptionBuilder, MAX_LIST_LEVELS, MAX_LIST_TABS, MAX_LIST_TEXT_BYTES,
     MAX_LISTS, MAX_PARAGRAPH_DROP_CAP_LINES, MAX_REVISION_AUTHOR_BYTES, MAX_REVISION_AUTHORS,
-    MAX_STYLE_NAME_BYTES, MAX_STYLES, MAX_TEXT_INTERMEDIATE_BYTES, NonZeroU16, Paragraph,
-    ParagraphBorderSide, ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment,
-    ParagraphWrapping, Parser, RtfError, RtfResult, SmallVec, State, TextDirection, Token,
-    UnderlineStyle, animated_text, append_transport_bytes, apply_associated_character_control,
-    associated_font_ref, character_grid, character_style_reference, character_type_selector,
-    complex_script_selector, control_symbol_text, emphasis_mark, fit_text,
-    nonnegative_author_index, paragraph_style_reference, parser_classification_error,
-    require_parameterless, required_list_spacing, required_paragraph_bool,
-    required_paragraph_indent, required_table_value, section_style_reference,
-    strict_paragraph_selector, strict_paragraph_toggle, table_style_reference,
+    MAX_STYLE_NAME_BYTES, MAX_STYLES, MAX_TEXT_INTERMEDIATE_BYTES, Paragraph, ParagraphBorderSide,
+    ParagraphDropCap, ParagraphDropCapKind, ParagraphFontAlignment, ParagraphWrapping, Parser,
+    RtfError, RtfResult, SmallVec, State, TextDirection, Token, UnderlineStyle, animated_text,
+    append_transport_bytes, apply_associated_character_control, associated_font_ref,
+    character_grid, character_style_reference, character_type_selector, complex_script_selector,
+    control_symbol_text, emphasis_mark, fit_text, font_size, nonnegative_author_index,
+    paragraph_style_reference, parser_classification_error, require_parameterless,
+    required_list_spacing, required_paragraph_bool, required_paragraph_indent,
+    required_table_value, section_style_reference, strict_paragraph_selector,
+    strict_paragraph_toggle, table_style_reference,
 };
 use std::mem::size_of;
 
@@ -3531,7 +3531,7 @@ impl<'a> Parser<'a> {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
-        reason = "raw font, color, and font-size parameters wrap to 16 bits by design"
+        reason = "raw font and color parameters are bounded by their established format ranges"
     )]
     pub(super) fn apply_style_property(
         state: &mut State,
@@ -3563,11 +3563,7 @@ impl<'a> Parser<'a> {
                 state.formatting.character_style = Some(character_style_reference(*value)?);
             },
             ControlWord::FontNumber(value) => state.formatting.font_ref = *value as FontRef,
-            ControlWord::FontSize(value) => {
-                if let Some(size) = NonZeroU16::new((*value).clamp(1, i32::from(u16::MAX)) as u16) {
-                    state.formatting.font_size = size;
-                }
-            },
+            ControlWord::FontSize(value) => state.formatting.font_size = font_size(*value)?,
             ControlWord::ColorForeground(value) => {
                 state.formatting.color_ref = *value as ColorRef;
             },

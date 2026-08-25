@@ -811,7 +811,9 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
 
         // Fonts
         "f" => ControlWord::FontNumber(param_value),
-        "fs" => ControlWord::FontSize(param_value),
+        "fs" => ControlWord::FontSize(param.ok_or_else(|| {
+            RtfError::MalformedDocument("RTF fs control requires a numeric parameter".to_string())
+        })?),
         "af" => ControlWord::AssociatedFontNumber(param),
         "afs" => ControlWord::AssociatedFontSize(param),
         "alang" => ControlWord::AssociatedLanguage(param),
