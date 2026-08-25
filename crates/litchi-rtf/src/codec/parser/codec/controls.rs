@@ -5,11 +5,11 @@
 )]
 use super::{
     Alignment, CharacterType, ColorRef, ControlWord, Destination, FontRef, Formatting, Mbcs,
-    NonZeroU16, Paragraph, ParagraphFontAlignment, ParagraphWrapping, Parser, RevisionMetadata,
-    RtfEncoding, RtfError, RtfResult, TextDirection, UnderlineStyle, animated_text,
+    Paragraph, ParagraphFontAlignment, ParagraphWrapping, Parser, RevisionMetadata, RtfEncoding,
+    RtfError, RtfResult, TextDirection, UnderlineStyle, animated_text,
     apply_associated_character_control, apply_table_distance, apply_table_distance_side,
     character_grid, character_style_reference, character_type_selector, complex_script_selector,
-    emphasis_mark, fit_text, floating_table_offset, floating_table_wrap_distance,
+    emphasis_mark, fit_text, floating_table_offset, floating_table_wrap_distance, font_size,
     nonnegative_author_index, paragraph_style_reference, parser_classification_error,
     pending_cell_revision, require_parameterless, required_list_spacing, required_paragraph_bool,
     required_paragraph_indent, resolve_preferred_width, resolve_row_geometry,
@@ -32,7 +32,7 @@ impl Parser<'_> {
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
-        reason = "match guards and adjacent range checks bound the narrowing conversions; raw color and font-size parameters wrap to 16 bits by design"
+        reason = "match guards and adjacent range checks bound the remaining raw color and font conversions"
     )]
     pub(super) fn apply_control_word(&mut self, control: &ControlWord<'_>) -> RtfResult<()> {
         if let ControlWord::Page(parameter) = control {
@@ -2077,9 +2077,7 @@ impl Parser<'_> {
                 state.formatting.emphasis_mark = emphasis_mark(*mark, *value)?;
             },
             ControlWord::FontSize(size) => {
-                if let Some(nz) = NonZeroU16::new((*size).max(0) as u16) {
-                    state.formatting.font_size = nz;
-                }
+                state.formatting.font_size = font_size(*size)?;
             },
             ControlWord::ColorForeground(c) => {
                 state.formatting.color_ref = *c as ColorRef;

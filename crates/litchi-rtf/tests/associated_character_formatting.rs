@@ -155,6 +155,76 @@ fn rejects_unbounded_or_missing_associated_values_but_keeps_field_code_inert() {
 }
 
 #[test]
+fn font_size_boundaries_are_strict_in_body_default_and_associated_paths() {
+    for size in [1, 23, 65_535] {
+        let body_source = format!(r"{{\rtf1\ansi\fs{size} X}}");
+        let body = RtfDocument::parse(&body_source).unwrap();
+        let block = body
+            .blocks()
+            .iter()
+            .find(|block| block.text == "X")
+            .unwrap();
+        assert_eq!(block.formatting.font_size.get(), size);
+
+        let default_source = format!(r"{{\rtf1\ansi{{\*\defchp\fs{size}}}X}}");
+        assert!(
+            RtfDocument::parse(&default_source).is_ok(),
+            "rejected valid defchp fs value {size}"
+        );
+
+        let stylesheet_source = format!(r"{{\rtf1{{\stylesheet{{\s0\fs{size} Style;}}}}X}}");
+        assert!(
+            RtfDocument::parse(&stylesheet_source).is_ok(),
+            "rejected valid stylesheet fs value {size}"
+        );
+
+        let associated_source = format!(r"{{\rtf1\ansi\afs{size} X}}");
+        let associated = RtfDocument::parse(&associated_source).unwrap();
+        assert_eq!(
+            associated_for(&associated, "X").font_size.unwrap().get(),
+            size
+        );
+    }
+
+    for value in [0, -1, 65_536, i32::MAX] {
+        let body_source = format!(r"{{\rtf1\ansi\fs{value} X}}");
+        assert!(
+            RtfDocument::parse(&body_source).is_err(),
+            "accepted invalid body fs value {value}"
+        );
+
+        let default_source = format!(r"{{\rtf1\ansi{{\*\defchp\fs{value}}}X}}");
+        assert!(
+            RtfDocument::parse(&default_source).is_err(),
+            "accepted invalid defchp fs value {value}"
+        );
+
+        let stylesheet_source = format!(r"{{\rtf1{{\stylesheet{{\s0\fs{value} Style;}}}}X}}");
+        assert!(
+            RtfDocument::parse(&stylesheet_source).is_err(),
+            "accepted invalid stylesheet fs value {value}"
+        );
+
+        let associated_source = format!(r"{{\rtf1\ansi\afs{value} X}}");
+        assert!(
+            RtfDocument::parse(&associated_source).is_err(),
+            "accepted invalid afs value {value}"
+        );
+    }
+
+    for source in [
+        r"{\rtf1\ansi\fs X}",
+        r"{\rtf1\ansi{\*\defchp\fs}X}",
+        r"{\rtf1{\stylesheet{\s0\fs Style;}}X}",
+    ] {
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "accepted bare fs: {source}"
+        );
+    }
+}
+
+#[test]
 fn associated_mutation_validates_and_clears_exact_state() {
     let mut associated = AssociatedCharacterFormatting::default();
     assert!(

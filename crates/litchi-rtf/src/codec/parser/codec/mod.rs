@@ -1146,6 +1146,14 @@ fn associated_font_size(raw_value: Option<i32>) -> RtfResult<NonZeroU16> {
     })
 }
 
+fn font_size(raw_value: i32) -> RtfResult<NonZeroU16> {
+    let size = u16::try_from(raw_value).map_err(|_err| {
+        RtfError::MalformedDocument("RTF fs value must be in 1..=65535".to_string())
+    })?;
+    NonZeroU16::new(size)
+        .ok_or_else(|| RtfError::MalformedDocument("RTF fs value must be in 1..=65535".to_string()))
+}
+
 fn associated_language(raw_value: Option<i32>) -> RtfResult<crate::LanguageId> {
     let value = raw_value.ok_or_else(|| {
         RtfError::MalformedDocument("RTF alang control requires a numeric parameter".to_string())
