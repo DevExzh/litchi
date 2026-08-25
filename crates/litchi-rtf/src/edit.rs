@@ -927,6 +927,11 @@ enum Operation {
         before: bool,
         after: bool,
     },
+    AllCaps {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -1033,7 +1038,8 @@ impl Operation {
             | Self::Underline { .. }
             | Self::Strike { .. }
             | Self::Hidden { .. }
-            | Self::SmallCaps { .. } => 0,
+            | Self::SmallCaps { .. }
+            | Self::AllCaps { .. } => 0,
         }
     }
 
@@ -1073,6 +1079,12 @@ impl Operation {
                     span.start, span.end
                 )]
             },
+            Self::AllCaps { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:all-caps",
+                    span.start, span.end
+                )]
+            },
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
@@ -1101,6 +1113,7 @@ impl Operation {
             | Self::Strike { span, .. }
             | Self::Hidden { span, .. }
             | Self::SmallCaps { span, .. }
+            | Self::AllCaps { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
@@ -1129,6 +1142,7 @@ impl Operation {
                 | Self::Strike { .. }
                 | Self::Hidden { .. }
                 | Self::SmallCaps { .. }
+                | Self::AllCaps { .. }
         )
     }
 
@@ -1818,6 +1832,72 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stages one exact all-caps state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw all-caps state. This
+    /// operates only on ordinary body runs and does not interpret associated
+    /// or paragraph-numbering caps controls as body formatting.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_all_caps(
+        &mut self,
+        span: TextSpan,
+        all_caps: bool,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "all-caps edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = all_caps_for_span(&self.source, span)?;
+        self.operations.push(Operation::AllCaps {
+            span,
+            before,
+            after: all_caps,
+        });
+        Ok(self)
+    }
+
     /// Inserts one ordinary paragraph immediately after a checked paragraph.
     ///
     /// This is the transaction's explicit structural class. The inserted text
@@ -2320,6 +2400,7 @@ impl Edit {
                     | Operation::Strike { .. }
                     | Operation::Hidden { .. }
                     | Operation::SmallCaps { .. }
+                    | Operation::AllCaps { .. }
                     | Operation::InsertParagraph { .. }
             )
         }) {
@@ -2739,6 +2820,7 @@ impl Edit {
                     | Operation::Strike { .. }
                     | Operation::Hidden { .. }
                     | Operation::SmallCaps { .. }
+                    | Operation::AllCaps { .. }
             )
         });
         let mut alignments = if property_operation {
@@ -2776,6 +2858,11 @@ impl Edit {
         } else {
             false
         };
+        let base_all_caps = if property_operation && !layout_operation {
+            base_all_caps_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
         let mut baseline = self
             .source
             .body()
@@ -2788,12 +2875,14 @@ impl Edit {
         baseline.strike = base_strike;
         baseline.hidden = base_hidden;
         baseline.smallcaps = base_small_caps;
+        baseline.all_caps = base_all_caps;
         let mut projected_bold_ranges = Vec::new();
         let mut projected_italic_ranges = Vec::new();
         let mut projected_underline_ranges = Vec::new();
         let mut projected_strike_ranges = Vec::new();
         let mut projected_hidden_ranges = Vec::new();
         let mut projected_small_caps_ranges = Vec::new();
+        let mut projected_all_caps_ranges = Vec::new();
         let mut paragraph_properties = if layout_operation {
             source_paragraph_properties(&self.source)?
         } else {
@@ -2862,6 +2951,10 @@ impl Edit {
                     projected_small_caps_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::AllCaps { span, after, .. } => {
+                    projected_all_caps_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Text { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
@@ -2902,6 +2995,9 @@ impl Edit {
         let has_small_caps_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::SmallCaps { before, after, .. } if before != after)
         });
+        let has_all_caps_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::AllCaps { before, after, .. } if before != after)
+        });
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
@@ -2913,7 +3009,8 @@ impl Edit {
             || has_underline_delta
             || has_strike_delta
             || has_hidden_delta
-            || has_small_caps_delta;
+            || has_small_caps_delta
+            || has_all_caps_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
             return Ok(Commit::new(
@@ -2959,6 +3056,10 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::SmallCaps { .. }));
+        let has_all_caps_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::AllCaps { .. }));
         if has_italic_operation && !source_bytes.is_ascii() {
             return Err(Error::UnsupportedSource(
                 "italic edits refuse non-ASCII transport encodings",
@@ -2984,6 +3085,11 @@ impl Edit {
                 "small-caps edits refuse non-ASCII transport encodings",
             ));
         }
+        if has_all_caps_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "all-caps edits refuse non-ASCII transport encodings",
+            ));
+        }
         if layout_operation {
             self.source
                 .model()
@@ -2995,6 +3101,7 @@ impl Edit {
             || has_strike_operation
             || has_hidden_operation
             || has_small_caps_operation
+            || has_all_caps_operation
         {
             if has_bold_operation
                 && !has_italic_operation
@@ -3002,6 +3109,7 @@ impl Edit {
                 && !has_strike_operation
                 && !has_hidden_operation
                 && !has_small_caps_operation
+                && !has_all_caps_operation
             {
                 self.source
                     .model()
@@ -3016,6 +3124,7 @@ impl Edit {
                     has_strike_operation,
                     has_hidden_operation,
                     has_small_caps_operation,
+                    has_all_caps_operation,
                 )
                 .map_err(Error::UnsupportedSource)?;
             }
@@ -3034,6 +3143,7 @@ impl Edit {
                 || has_strike_operation
                 || has_hidden_operation
                 || has_small_caps_operation
+                || has_all_caps_operation
             {
                 return Err(Error::ParagraphLayoutTextConflict);
             }
@@ -3061,6 +3171,8 @@ impl Edit {
                     hidden_changes: &projected_hidden_ranges,
                     base_small_caps,
                     small_caps_changes: &projected_small_caps_ranges,
+                    base_all_caps,
+                    all_caps_changes: &projected_all_caps_ranges,
                 },
                 self.source.limits(),
             )?
@@ -3131,6 +3243,13 @@ impl Edit {
             if small_caps_for_span(&snapshot, small_caps_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate small-caps property did not survive RTF validation",
+                ));
+            }
+        }
+        for (all_caps_span, expected) in projected_all_caps_ranges {
+            if all_caps_for_span(&snapshot, all_caps_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate all-caps property did not survive RTF validation",
                 ));
             }
         }
@@ -3439,6 +3558,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -3518,6 +3638,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4172,6 +4293,7 @@ fn project_text(
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -4315,6 +4437,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::Strike { .. }
         | Operation::Hidden { .. }
         | Operation::SmallCaps { .. }
+        | Operation::AllCaps { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
@@ -4466,6 +4589,7 @@ fn plain_body_character_editability(
     allow_mixed_strike: bool,
     allow_mixed_hidden: bool,
     allow_mixed_small_caps: bool,
+    allow_mixed_all_caps: bool,
 ) -> Result<(), &'static str> {
     source.model().local_paragraph_property_editability()?;
     let mut paragraph_format = None;
@@ -4495,6 +4619,9 @@ fn plain_body_character_editability(
             }
             if allow_mixed_small_caps {
                 raw_character.smallcaps = false;
+            }
+            if allow_mixed_all_caps {
+                raw_character.all_caps = false;
             }
             if character_format.is_some_and(|existing| existing != raw_character) {
                 return Err("the body has mixed run or paragraph formatting");
@@ -4527,6 +4654,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4581,6 +4709,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Strike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4625,6 +4754,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4679,6 +4809,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Strike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4726,6 +4857,7 @@ fn base_underline_for_edit(
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4780,6 +4912,7 @@ fn base_underline_for_edit(
                 | Operation::Strike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4824,6 +4957,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Underline { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4878,6 +5012,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Underline { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4922,6 +5057,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Underline { .. }
             | Operation::Strike { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4976,6 +5112,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
                 | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5020,6 +5157,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
             | Operation::Underline { .. }
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
+            | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5074,6 +5212,107 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
                 | Operation::Hidden { .. }
+                | Operation::AllCaps { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_all_caps(source: &Snapshot) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let all_caps = run.format().raw().all_caps;
+        if value.is_some_and(|existing| existing != all_caps) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(all_caps);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
+    let all_caps_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::AllCaps { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if all_caps_spans.is_empty() {
+        return uniform_body_all_caps(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &all_caps_spans) {
+                let value = run.format().raw().all_caps;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed all-caps state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::AllCaps { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5313,6 +5552,43 @@ fn small_caps_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error>
     ))
 }
 
+fn all_caps_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let all_caps = run.format().raw().all_caps;
+                if value.is_some_and(|existing| existing != all_caps) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed all-caps state",
+                    ));
+                }
+                value = Some(all_caps);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
 fn formatting_for_span(
     source: &Snapshot,
     span: TextSpan,
@@ -5376,6 +5652,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -5574,6 +5851,7 @@ enum CharacterPropertyChange {
     Strike(bool),
     Hidden(bool),
     SmallCaps(bool),
+    AllCaps(bool),
 }
 
 struct CharacterPropertyOverlays<'a> {
@@ -5589,6 +5867,8 @@ struct CharacterPropertyOverlays<'a> {
     hidden_changes: &'a [(TextSpan, bool)],
     base_small_caps: bool,
     small_caps_changes: &'a [(TextSpan, bool)],
+    base_all_caps: bool,
+    all_caps_changes: &'a [(TextSpan, bool)],
 }
 
 fn encoded_body_with_properties(
@@ -5607,6 +5887,7 @@ fn encoded_body_with_properties(
         .and_then(|bytes| bytes.checked_add(overlays.strike_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(overlays.hidden_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(overlays.small_caps_changes.len().saturating_mul(8)))
+        .and_then(|bytes| bytes.checked_add(overlays.all_caps_changes.len().saturating_mul(6)))
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: limits.max_source_bytes(),
@@ -5689,6 +5970,14 @@ fn encoded_body_with_properties(
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::SmallCaps(value))),
             )
+            .chain(
+                overlays
+                    .all_caps_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::AllCaps(value))),
+            )
             .collect::<Vec<_>>();
         paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
         for (span, change) in paragraph_changes {
@@ -5749,6 +6038,16 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold);
                     write_small_caps(&mut output, overlays.base_small_caps);
+                },
+                CharacterPropertyChange::AllCaps(value) => {
+                    // All-caps controls are local character state. Reassert
+                    // bold around the fragment to force a stable run boundary
+                    // without changing small-caps or any other facet.
+                    write_bold(&mut output, overlays.base_bold);
+                    write_all_caps(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold);
+                    write_all_caps(&mut output, overlays.base_all_caps);
                 },
             }
             cursor = span.end;
@@ -6024,6 +6323,14 @@ fn write_small_caps(output: &mut Vec<u8>, small_caps: bool) {
     }
 }
 
+fn write_all_caps(output: &mut Vec<u8>, all_caps: bool) {
+    if all_caps {
+        output.extend_from_slice(br"\caps ");
+    } else {
+        output.extend_from_slice(br"\caps0 ");
+    }
+}
+
 /// Result of an atomically validated RTF edit.
 pub struct Commit {
     snapshot: Snapshot,
@@ -6128,6 +6435,12 @@ enum Change {
         after: bool,
     },
     SmallCaps {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    AllCaps {
         span: TextSpan,
         after_span: TextSpan,
         before: bool,
@@ -6299,6 +6612,17 @@ impl Change {
                 before,
                 after,
             } => Self::SmallCaps {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::AllCaps {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::AllCaps {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -6543,6 +6867,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::AllCaps {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::AllCaps {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::InsertParagraph {
                 position,
                 span,
@@ -6683,6 +7017,7 @@ fn semantic_changes(
             | Operation::Strike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
@@ -6935,6 +7270,21 @@ fn durable_operation(
             litchi_core::patch::PatchOperation::new(
                 limits,
                 "character-small-caps.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::AllCaps {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("all_caps".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-all-caps.set",
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Bool(*after),
@@ -7433,6 +7783,23 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("small-caps value must be Boolean".to_string())
                 })?;
                 edit.set_text_small_caps(span, replacement)?;
+            },
+            "character-all-caps.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("all_caps")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing all-caps precondition".to_string())
+                    })?;
+                if all_caps_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character all-caps state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("all-caps value must be Boolean".to_string())
+                })?;
+                edit.set_text_all_caps(span, replacement)?;
             },
             "paragraph.insert-after" => {
                 let position = parse_paragraph_target(&operation.target)?;
