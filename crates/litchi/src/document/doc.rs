@@ -1118,6 +1118,91 @@ impl Document {
         }
     }
 
+    /// Get the visible text of one paragraph by zero-based position.
+    ///
+    /// The DOCX and ODT paths use their selected-paragraph primitives and the
+    /// source-backed variants preserve source-freshness errors. Legacy DOC and
+    /// RTF do not expose selected-paragraph owner APIs, so those variants use
+    /// the same full paragraph projection as [`Self::paragraphs`].
+    pub fn paragraph_text(&self, index: usize) -> Result<Option<String>> {
+        match &self.inner {
+            #[cfg(feature = "doc")]
+            DocumentImpl::Doc(doc, _) => {
+                let paragraphs = doc.paragraphs().map_err(Error::from)?;
+                paragraphs
+                    .into_iter()
+                    .nth(index)
+                    .map(|paragraph| {
+                        paragraph
+                            .text()
+                            .map(|text| text.to_string())
+                            .map_err(Error::from)
+                    })
+                    .transpose()
+            },
+            #[cfg(feature = "docx")]
+            DocumentImpl::Docx(package, _) => {
+                let paragraph = package
+                    .document()
+                    .and_then(|document| document.paragraph(index))
+                    .map_err(crate::map_ooxml_error)?;
+                paragraph
+                    .map(|paragraph| {
+                        paragraph
+                            .text()
+                            .map(|text| text.to_string())
+                            .map_err(crate::map_ooxml_error)
+                    })
+                    .transpose()
+            },
+            #[cfg(feature = "docx")]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = package
+                    .document()
+                    .and_then(|document| document.paragraph_text(index))
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(package, result)
+            },
+            #[cfg(feature = "pages")]
+            DocumentImpl::Pages(doc) => {
+                Ok(pages_paragraph_texts(doc).nth(index).map(str::to_owned))
+            },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(doc) => Ok(doc
+                .paragraphs_with_content()
+                .into_iter()
+                .nth(index)
+                .map(|paragraph| paragraph.text())),
+            #[cfg(feature = "odt")]
+            DocumentImpl::Odt(doc) => {
+                let paragraph = doc.paragraph(index).map_err(|error| {
+                    Error::ParseError(format!("Failed to get paragraph: {error}"))
+                })?;
+                paragraph
+                    .map(|paragraph| {
+                        paragraph.text().map_err(|error| {
+                            Error::ParseError(format!("Failed to get paragraph text: {error}"))
+                        })
+                    })
+                    .transpose()
+            },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = (|| {
+                    let paragraph = doc.paragraph(index)?;
+                    paragraph
+                        .map(|paragraph| {
+                            paragraph.text().map_err(|error| {
+                                Error::ParseError(format!("Failed to get paragraph text: {error}"))
+                            })
+                        })
+                        .transpose()
+                })();
+                Self::finish_source_odt_result(doc, result)
+            },
+        }
+    }
+
     /// Get an iterator over paragraphs in the document.
     ///
     /// For Pages, this follows semantic section order and projects headings,
@@ -1798,6 +1883,38 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "doc")]
+    fn paragraph_text_matches_doc_projection_and_bounds() {
+        let document = Document::open(test_data_path().join("ole/doc/FancyFoot.doc"))
+            .expect("open DOC fixture");
+        let paragraphs = document.paragraphs().expect("project DOC paragraphs");
+        assert!(!paragraphs.is_empty());
+        for index in [0, paragraphs.len() - 1] {
+            assert_eq!(
+                document.paragraph_text(index).expect("selected DOC text"),
+                Some(paragraphs[index].text().expect("projected DOC text"))
+            );
+        }
+        assert_eq!(document.paragraph_text(paragraphs.len()).unwrap(), None);
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn paragraph_text_matches_rtf_projection_and_bounds() {
+        let document =
+            Document::open(test_data_path().join("rtf/testUnicode.rtf")).expect("open RTF fixture");
+        let paragraphs = document.paragraphs().expect("project RTF paragraphs");
+        assert!(!paragraphs.is_empty());
+        for index in [0, paragraphs.len() - 1] {
+            assert_eq!(
+                document.paragraph_text(index).expect("selected RTF text"),
+                Some(paragraphs[index].text().expect("projected RTF text"))
+            );
+        }
+        assert_eq!(document.paragraph_text(paragraphs.len()).unwrap(), None);
+    }
+
+    #[test]
     #[cfg(feature = "docx")]
     fn owned_docx_bytes_use_source_owner_and_match_independent_eager_oracle() {
         let path = test_data_path().join("ooxml/docx/FancyFoot.docx");
@@ -1928,6 +2045,11 @@ mod tests {
             .expect("ODT opening must use the ODT policy");
         assert!(matches!(&document.inner, DocumentImpl::Odt(_)));
         assert_eq!(document.text().unwrap(), "Source-backed ODT");
+        assert_eq!(
+            document.paragraph_text(0).unwrap().as_deref(),
+            Some("Source-backed ODT")
+        );
+        assert_eq!(document.paragraph_text(1).unwrap(), None);
     }
 
     #[test]
@@ -2024,6 +2146,99 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "docx")]
+    fn paragraph_text_matches_eager_and_source_and_returns_none_out_of_range() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>second</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let source = Document::from_bytes(bytes.clone()).expect("open source-backed DOCX");
+        let eager_package = crate::opc::OpcPackage::from_bytes_with_limits(
+            &bytes,
+            crate::opc::ReadLimits::default(),
+        )
+        .expect("open eager OPC oracle");
+        let eager = Document::from_detected(DetectedFormat::Docx(eager_package))
+            .expect("open eager DOCX oracle");
+        assert_eq!(
+            match &source.inner {
+                DocumentImpl::DocxSource(package, _) => package.cache_diagnostics().cold_loads,
+                _ => unreachable!("owned DOCX bytes must retain source owner"),
+            },
+            0
+        );
+
+        for index in 0..2 {
+            assert_eq!(
+                source.paragraph_text(index).expect("source paragraph text"),
+                eager.paragraph_text(index).expect("eager paragraph text")
+            );
+        }
+        assert_eq!(
+            match &source.inner {
+                DocumentImpl::DocxSource(package, _) => package.cache_diagnostics().cold_loads,
+                _ => unreachable!("owned DOCX bytes must retain source owner"),
+            },
+            1
+        );
+        assert_eq!(
+            source
+                .paragraph_text(usize::MAX)
+                .expect("source out-of-range paragraph text"),
+            None
+        );
+        assert_eq!(
+            eager
+                .paragraph_text(usize::MAX)
+                .expect("eager out-of-range paragraph text"),
+            None
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
+    fn managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>managed</w:t></w:r></w:p><w:p><w:r><w:t>selected</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let memory = bytes.len() as u64;
+        let budget = litchi_core::Budget::root(
+            "facade-managed-docx-paragraph-text",
+            litchi_core::Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (_cancellation_source, cancellation) = litchi_core::CancellationSource::pair();
+        let execution_limits = litchi_core::ExecutionLimits::new(
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroUsize::MIN,
+            std::num::NonZeroU64::new(memory).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context =
+            litchi_core::ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        let package = crate::docx::source_backed::Package::from_read_at_with_execution_context(
+            std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
+            crate::docx::ReadLimits::default(),
+            context,
+        )
+        .expect("open managed DOCX source");
+        let document = Document {
+            inner: DocumentImpl::DocxSource(package, Default::default()),
+        };
+
+        assert_eq!(
+            document.paragraph_text(1).unwrap().as_deref(),
+            Some("selected")
+        );
+        assert!(budget.used(litchi_core::Resource::Memory) > 0);
+        assert!(matches!(
+            document.paragraphs(),
+            Err(Error::InvalidFormat(message)) if message.contains("document paragraphs")
+        ));
+        drop(document);
+        assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
+    }
+
+    #[test]
     #[cfg(all(feature = "docx", any(unix, windows)))]
     fn filesystem_docx_reports_source_mutation_on_deferred_queries() {
         let fixture = test_data_path().join("ooxml/docx/FancyFoot.docx");
@@ -2054,6 +2269,12 @@ mod tests {
             document
                 .metadata()
                 .expect_err("metadata must reject stale source"),
+            expected,
+        );
+        assert_source_changed(
+            document
+                .paragraph_text(0)
+                .expect_err("paragraph text must reject stale source"),
             expected,
         );
     }
@@ -2456,6 +2677,11 @@ mod tests {
             _ => unreachable!("filesystem ODT must retain source owner"),
         };
         assert!(media.iter().any(|path| path == "Pictures/deferred.bin"));
+        assert_eq!(
+            document.paragraph_text(0).unwrap().as_deref(),
+            Some("Source-backed ODT")
+        );
+        assert_eq!(document.paragraph_text(1).unwrap(), None);
         assert_eq!(document.text().unwrap(), "Source-backed ODT");
     }
 
@@ -2548,6 +2774,12 @@ mod tests {
             document
                 .metadata()
                 .expect_err("metadata must reject stale source"),
+            expected,
+        );
+        assert_source_changed(
+            document
+                .paragraph_text(0)
+                .expect_err("paragraph text must reject stale source"),
             expected,
         );
     }
