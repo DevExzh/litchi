@@ -3592,3 +3592,35 @@ hosts, remaining Numbers/Pages graph responsibilities, generated-schema and
 normal Prost/Buffa owners, and the IWA monolith remain. This cut removes no
 crate, dependency edge, debt item, production manifest dependency, or
 monolith owner.
+
+## 2026-08-25 amendment: Wave81 Numbers table-cell Pop-Up Menu boundary
+
+Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
+makes `litchi-numbers` the authoritative owner of the admitted rooted Numbers
+table-cell Pop-Up Menu lifecycle. The archive-free facade is
+`Package::{table_cell_pop_up_menu_format,
+edit_table_cell_pop_up_menu_format,
+apply_table_cell_pop_up_menu_format}` with `SheetSelector`, `TableSelector`,
+`CellPosition`, `PopUpMenu`, `Item`, `InitialSelection`, and nested transaction
+values. Native object IDs, component locators, archive/member names, raw bytes,
+wire values, generated messages, Prost values, and Buffa views do not cross
+that boundary.
+
+The hidden strict Pop-Up Menu codec owns the type-6206 model and nested cell
+specification projection; the Numbers storage-wire owner retains table-list,
+BNC-cell, key, and refcount mechanics. The package owns rooted selection,
+same-component copy-on-write/reuse/reset/final-cull decisions, exhaustive BNC
+refcount and inbound-reference census, UUID/watermark/save-token transitions,
+exact patch/inverse artifacts, candidate reopen, and locality. Cross-component
+aliases or dependencies, malformed ownership, and unsupported producer graphs
+fail closed.
+
+The dedicated Numbers editor Pop-Up Menu declarations are retired. The generic
+Numbers data-format compatibility surface delegates its Pop-Up Menu branch to
+the focused package, while the shared private adapter and the Pages/Keynote
+table-control hosts remain. The workspace inventory remains 64 packages, 239
+internal dependency declarations, and 13 ordered migration debts. Debt 015,
+the `litchi-iwa -> litchi-numbers` edge, debt 017 and the Pages edge, migration
+hosts, generated-schema and normal Prost/Buffa owners, and the IWA monolith
+remain. No crate, dependency edge, debt item, production manifest dependency,
+or monolith owner is removed by this cut.

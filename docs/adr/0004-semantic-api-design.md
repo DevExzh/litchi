@@ -3021,3 +3021,37 @@ registry, and all remaining ownership facts prove the route exactly.
 This is appearance replacement, not table/style/preset/network creation or
 culling, reset semantics, table topology or content editing, arbitrary
 producer-graph repair, or a public native graph API.
+
+## 2026-08-25 amendment: Numbers table-cell Pop-Up Menu semantic ownership
+
+Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
+adds selector-first `Package::{table_cell_pop_up_menu_format,
+edit_table_cell_pop_up_menu_format,
+apply_table_cell_pop_up_menu_format}` ownership. Reads return an optional
+archive-free `PopUpMenu`; an `Edit` can set, clear, or reset the value and
+produces a conflict-checked `Commit`, exact `Patch`, inverse, redacted
+`Diagnostics`, typed `Path`, and typed resource errors. `PopUpMenu`, `Item`,
+and `InitialSelection` remain semantic values; no native identifier or physical
+IWA representation crosses the facade.
+
+The package resolves the selected sheet, rooted table, exact BNC cell, data
+store, tile, format list, control list, cell specification, and type-6206
+model. A changed transaction validates exact aggregate and per-key
+`FieldInfo` ownership, censuses every selected-archive BNC format/control key,
+and proves refcounts before and after the edit. It may reuse a rooted matching
+model, copy on write when a sibling retains the old model, create a new model,
+or reset and cull the final unreferenced model. Every mutated existing object
+and reused model has exact current UUID ownership; new identifiers are reserved
+against physical and current/versioned metadata registries, and root watermark
+plus every touched current-component save token advance exactly once.
+
+Known fields, references, NIL/string menu values, table-list entries, and
+metadata ownership are strict. Supported unknown fields, overlong unknown
+scalars, balanced unknown groups, unselected objects and members, and
+versioned metadata remain byte-authoritative. Exact cross-component aliases,
+opaque or unknown inbound ownership, segmented lists, malformed or dangling
+format/control routes, refcount disagreement, missing metadata, and
+locked/dependent graphs fail closed. This owner is limited to rooted
+same-component Pop-Up Menu graphs; it is not a general Numbers data-format,
+table topology, other control, cross-component graph-repair, or public native
+graph API.

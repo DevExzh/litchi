@@ -13689,3 +13689,53 @@ open/render/save/close/reopen acceptance, exact pre-native inverse bytes, and
 strict normalized reread. It does not establish Rust/native byte parity,
 arbitrary producer-graph acceptance, performance/RSS, durable publication, or
 a full-workspace gate.
+
+## 2026-08-25 amendment: Wave81 Numbers table-cell Pop-Up Menu verification record
+
+Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
+passed the following bounded gates:
+
+- strict Pop-Up Menu codec tests passed 11/11, storage codec tests passed
+  53/53, and `litchi-numbers-wire` library tests passed 30/30;
+- the focused `litchi-numbers` Pop-Up Menu integration passed 19/19, and the
+  library suite passed 400 tests with 0 failures and 4 ignored;
+- all-target checking passed for `litchi-iwa-protos`, `litchi-numbers`, and
+  `litchi-iwa`; strict library Clippy passed for the protos and wire crates,
+  while Numbers library and integration-target Clippy passed with allowances
+  only for the recorded pre-existing `object_count`, `manual_contains`,
+  `clone_on_copy`, and test `needless_question_mark` findings;
+- both the strict codec and package-lifecycle fuzz targets compiled;
+- boundary tests passed 492/492, Python compilation passed, and the live
+  checker reported no Wave81 finding;
+- exact-file Rust formatting and staged/working-tree diff checks passed.
+
+The live checker exited 1 only for the three known user-owned untracked Pages
+table-lock findings (`body_table_lock_state`, `set_body_table_lock_state`, and
+the returned `crates/litchi-iwa/src/pages/editor/tables/lock.rs`). A global
+pre-commit attempt was not a Wave81 gate: it encountered unrelated unstaged
+formatting drift and then exhausted disk while compiling the full workspace.
+The hook's temporary patch was restored, reproducible build artifacts were
+cleaned, and the implementation commit used the completed scoped gates without
+modifying those user-owned files. No full-workspace-green claim follows.
+
+The fresh native source record used Numbers 14.4 and this disposable artifact:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `/private/tmp/litchi-wave81-popup-native.fX9qBn/blank-native-popup-source.numbers` | 135,226 | `b830e8981cd9cd0ede3f125506b6b7076e33b7cc79110a8a59696270d005afc9` |
+
+Numbers created the source from the Basic/Blank template, applied a Pop-Up
+Menu to B2 with `Item 1`, `Item 2`, and `Item 3`, selected “Start with First
+Item”, saved it, closed it, and reopened the exact path without repair,
+recovery, or conversion UI. After reopen, B2 rendered `Item 1` and the
+formatter showed the three menu entries and first-item initial selection.
+
+Strict Rust package read refused that native source with
+`UnsupportedDependency`: Numbers placed the format/control-list graph across
+components, while this Wave81 owner intentionally admits same-component
+graphs only. No Rust candidate or inverse was produced, and native mutation
+acceptance is therefore withheld rather than inferred. The source record
+proves only the native graph's Numbers open/render/save/close/reopen behavior;
+it does not establish Rust/native mutation interoperability, byte parity,
+arbitrary producer-graph acceptance, durable publication, performance/RSS, or
+a full-workspace gate.

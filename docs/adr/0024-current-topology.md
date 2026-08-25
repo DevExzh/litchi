@@ -2446,3 +2446,28 @@ dependency declarations, and 13 ordered migration debts. Debt 017 and the
 `litchi-iwa -> litchi-pages` edge remain open. No crate, dependency edge,
 debt item, migration host, generated-schema owner, normal Prost/Buffa owner,
 or monolith is removed by this cut.
+
+## 2026-08-25 amendment: Wave81 current-topology Numbers table-cell Pop-Up Menu cut
+
+Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
+makes `litchi-numbers` the current owner of selector-first reads, set/clear/
+reset lifecycle, copy-on-write or rooted reuse, final unreferenced-model cull,
+exact patch application, and inverse artifacts for admitted same-component
+Numbers Pop-Up Menu graphs. The package owns rooted cell/table-list/model
+selection, BNC refcount census, strict codec/storage validation, metadata
+UUID/watermark/save-token transitions, aggregate resource accounting,
+candidate reopen, and object/member locality.
+
+The dedicated Numbers editor Pop-Up Menu methods are retired. The generic
+Numbers data-format compatibility surface delegates its Pop-Up Menu branch to
+the focused package; shared private adapters and Pages/Keynote table-control
+hosts remain. Cross-component format/control graphs, other control formats,
+general data-format and table topology, and unsupported alias/resource graphs
+remain at their recorded owners and fail closed at this boundary.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debt 017, the Pages
+edge, migration hosts, generated-schema and normal Prost/Buffa owners, and the
+IWA monolith. No crate, dependency edge, debt item, production manifest
+dependency, or monolith is removed by this cut.
