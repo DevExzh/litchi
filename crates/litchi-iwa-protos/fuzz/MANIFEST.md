@@ -10,6 +10,7 @@ generated libFuzzer output part of the repository.
 | `numbers_formula_archive` | `fuzz_targets/numbers_formula_archive.rs` | `corpus/numbers_formula_archive/` |
 | `pages_section_codec` | `fuzz_targets/pages_section_codec.rs` | `corpus/pages_section_codec/` |
 | `pages_body_footnote_codec` | `fuzz_targets/pages_body_footnote_codec.rs` | `corpus/pages_body_footnote_codec/` |
+| `pages_footnote_graph_codec` | `fuzz_targets/pages_footnote_graph_codec.rs` | `corpus/pages_footnote_graph_codec/` |
 | `pages_footnote_codec` | `fuzz_targets/pages_footnote_codec.rs` | `corpus/pages_footnote_codec/` |
 | `pages_movie_caption_codec` | `fuzz_targets/pages_movie_caption_codec.rs` | `corpus/pages_movie_caption_codec/` |
 | `numbers_table_data_list` | `fuzz_targets/numbers_table_data_list.rs` | `corpus/numbers_table_data_list/` |

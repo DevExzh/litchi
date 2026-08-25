@@ -104,6 +104,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pages_body_footnote_lifecycle"
+path = "fuzz_targets/pages_body_footnote_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_slide_deletion"
 path = "fuzz_targets/keynote_slide_deletion.rs"
 test = false

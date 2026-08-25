@@ -355,6 +355,25 @@ cargo +nightly fuzz list
 cargo +nightly fuzz check pages_body_footnote_codec
 ```
 
+## Pages body-footnote graph codec
+
+`pages_footnote_graph_codec` drives the hidden generated-free graph seam used
+by the Pages body-footnote owner. It creates bounded canonical reference,
+storage, marker, and body-entry payloads from each input, checks exact output
+and resource reports, exercises one-under output/field/work budgets, then
+decodes and rewrites the body table while retaining unknown scalar and group
+spans. It also checks source immutability and candidate semantic readback.
+
+The target accepts at most 64 KiB and uses 256 KiB output/work, 8,192 fields,
+1,024 entries, and recursion depth 64. Corpus entries under
+`corpus/pages_footnote_graph_codec/` are hand-authored `hex:` command seeds;
+they are not native package bytes and are isolated from the existing body and
+footnote codec corpora.
+
+```sh
+cargo +nightly fuzz check pages_footnote_graph_codec
+```
+
 ## Pages footnote reference and marker codecs
 
 `pages_footnote_codec` drives both strict, caller-owned Pages footnote

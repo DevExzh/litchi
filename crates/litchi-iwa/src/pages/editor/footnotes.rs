@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::str;
+use std::sync::Arc;
 
 use litchi_iwa_common::{
     LimitKind, WireLimits,
@@ -12,26 +13,25 @@ use litchi_iwa_common::{
 use litchi_iwa_protos::pages_body_codec;
 use litchi_iwa_protos::pages_footnote_codec;
 use litchi_iwa_protos::pages_footnote_marker_codec;
-use prost::Message;
 
-use super::text_box_create::body_text_storage;
 use super::{
     DOCUMENT_OBJECT_ID, PagesEditor, STORAGE_MESSAGE_TYPES, find_object_archive,
     package_references_object,
 };
-use crate::archive::{ArchiveObject, RawMessage};
+use crate::archive::ArchiveObject;
+#[cfg(test)]
+use crate::archive::RawMessage;
 use crate::package_metadata::{
-    add_component_object_uuids, component_identifier_for_object_uuid, next_object_identifier,
-    release_package_identifier_suffix, remove_component_external_references_to_object,
-    remove_component_object_uuids, set_package_last_object_identifier,
+    component_identifier_for_object_uuid, release_package_identifier_suffix,
+    remove_component_external_references_to_object, remove_component_object_uuids,
 };
-use crate::protobuf::{tsp, tswp};
-use crate::text::IWorkTextEditor;
-use crate::text::editor::storage_object_references;
+use crate::protobuf::tswp;
 #[cfg(test)]
 use crate::wire::repeated_length_delimited_payloads;
+#[cfg(test)]
 use crate::wire::{patch_length_delimited_field, rewrite_repeated_length_delimited_fields};
 use crate::{Error, IWorkPackage, Result};
+use litchi_pages::Package as PagesPackage;
 use litchi_pages::footnote::body::{Footnote, Position, Selector};
 
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
@@ -40,15 +40,10 @@ const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;
 const FOOTNOTE_SUPER_FIELD: u32 = 1;
 const FOOTNOTE_TABLE_FIELD: u32 = 16;
 const TABLE_ENTRIES_FIELD: u32 = 1;
-const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
-const FOOTNOTE_ANCHOR: char = '\u{000e}';
-const FOOTNOTE_ANCHOR_TEXT: &str = "\u{000e}";
 const FOOTNOTE_ANCHOR_UNIT: u16 = 0x000e;
-const FOOTNOTE_MARK: char = '\u{fffc}';
 const FOOTNOTE_CONTENT_PREFIX: &str = "\u{fffc} ";
 const FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT: u32 = 64;
 const MAX_BODY_FOOTNOTES: usize = 4096;
-const MAX_FOOTNOTE_TABLE_BYTES: usize = WireLimits::MAX_INPUT_BYTES;
 
 /// Native Pages footnote data plus the private objects it owns.
 #[derive(Debug, Clone)]
@@ -63,135 +58,146 @@ pub(super) struct BodyFootnoteGraph {
 struct FootnoteTableEntry {
     index: u32,
     reference_id: u64,
-    raw: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct FootnoteObjectIds {
-    reference: u64,
-    storage: u64,
-    marker: u64,
-}
-
-impl FootnoteObjectIds {
-    fn allocate(first: u64) -> Result<Self> {
-        let identifier = |offset| {
-            first.checked_add(offset).ok_or_else(|| {
-                Error::ParseError("Pages footnote object identifier overflow".to_owned())
-            })
-        };
-        Ok(Self {
-            reference: identifier(0)?,
-            storage: identifier(1)?,
-            marker: identifier(2)?,
-        })
-    }
-
-    const fn last(self) -> u64 {
-        self.marker
-    }
 }
 
 impl PagesEditor {
     /// Read every native footnote attached to the main Pages body.
     pub fn body_footnotes(&self) -> Result<Vec<Footnote>> {
-        let graphs = body_footnote_graphs(self.package(), self.body_storage_id.get())?;
-        let mut footnotes = Vec::new();
-        footnotes.try_reserve_exact(graphs.len()).map_err(|_| {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "Pages body footnotes",
-                amount: graphs.len(),
+        focused_body_footnote_package(self)?
+            .body_footnotes()
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Pages body footnote read failed: {error}"))
             })
-        })?;
-        footnotes.extend(graphs.into_iter().map(|graph| graph.footnote));
-        Ok(footnotes)
     }
 
-    /// Insert a native Pages footnote at a UTF-16 body position.
+    /// Insert a native Pages footnote through the focused package owner.
     ///
     /// The inserted body character is Pages' private U+000E footnote anchor;
     /// use [`Self::body_footnotes`] instead of treating that character as text.
-    pub fn insert_body_footnote(
+    fn insert_body_footnote(
         &mut self,
         position: Position,
         text: impl AsRef<str>,
     ) -> Result<Footnote> {
         let text = text.as_ref();
-        validate_footnote_text(text)?;
-        let position_u32 = position.utf16_index();
-        let position_index = usize::try_from(position_u32).map_err(|_| {
-            Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
-        })?;
-        body_footnote_graphs(self.package(), self.body_storage_id.get())?;
-
-        let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
-        text_editor.replace_text(
-            self.body_storage_id,
-            position_index..position_index,
-            FOOTNOTE_ANCHOR_TEXT,
+        let package = focused_body_footnote_package(self)?;
+        let commit = PagesPackage::insert_body_footnote(&package, position, text, None).map_err(
+            |error| Error::InvalidFormat(format!("Pages body footnote insertion failed: {error}")),
         )?;
-        let mut staged = text_editor.into_package();
-        let ids = FootnoteObjectIds::allocate(next_object_identifier(&staged)?)?;
-        let body = storage_at(&staged, self.body_storage_id.get(), "Pages body")?.1;
-        let archive_name = find_object_archive(&staged, self.body_storage_id.get())?;
-        let objects = new_footnote_objects(ids, text, &body)?;
-
-        insert_footnote_reference(
-            &mut staged,
-            &archive_name,
-            self.body_storage_id.get(),
-            position_u32,
-            ids.reference,
-        )?;
-        staged.update_archive(&archive_name, |archive| {
-            for object in objects {
-                archive.insert_object(object)?;
-            }
-            Ok(())
+        let notes = commit.package().body_footnotes().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Pages body footnote insertion readback failed: {error}"
+            ))
         })?;
-        add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &[ids.storage])?;
-        set_package_last_object_identifier(&mut staged, ids.last())?;
-
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        let created = body_footnote_by_selector(&verified, Selector::At(position))?.footnote;
-        if created.position.utf16_index() != position_u32
-            || created.text.as_ref() != text
-            || created.custom_mark.is_some()
-        {
-            return Err(Error::InvalidFormat(
-                "Pages footnote insertion failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
+        let created = notes
+            .iter()
+            .find(|footnote| footnote.position == position)
+            .cloned()
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Pages body footnote insertion did not produce its requested position"
+                        .to_owned(),
+                )
+            })?;
+        publish_focused_body_footnote_commit(self, &commit, &notes)?;
         Ok(created)
     }
 
-    /// Delete one native body footnote, its body anchor, and its owned objects.
-    pub fn remove_body_footnote(&mut self, selector: Selector) -> Result<Footnote> {
-        let removed = body_footnote_by_selector(self, selector)?;
-        let start = usize::try_from(removed.footnote.position.utf16_index()).map_err(|_| {
-            Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
+    /// Delete one native body footnote through the focused package owner.
+    fn remove_body_footnote(&mut self, selector: Selector) -> Result<Footnote> {
+        let package = focused_body_footnote_package(self)?;
+        let mut edit = package.edit_body_footnote(selector).map_err(|error| {
+            Error::InvalidFormat(format!("Pages body footnote selection failed: {error}"))
         })?;
-        let end = start
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("Pages footnote anchor range overflow".to_owned()))?;
-        // Keep the legacy graph edit and its cleanup off the live editor until
-        // the removed native reference is absent. Position-only validation is
-        // incorrect when a following footnote shifts into the deleted anchor.
-        let mut staged = self.clone();
-        staged.replace_body_text(start..end, "")?;
-        if body_footnote_graphs(staged.package(), staged.body_storage_id.get())?
-            .iter()
-            .any(|graph| graph.reference_id == removed.reference_id)
-        {
-            return Err(Error::InvalidFormat(
-                "Pages footnote deletion failed validation".to_owned(),
-            ));
-        }
-        let result = removed.footnote;
-        *self = staged;
-        Ok(result)
+        let removed = edit.before().clone();
+        edit.clear();
+        let commit = edit.commit().map_err(|error| {
+            Error::InvalidFormat(format!("Pages body footnote removal failed: {error}"))
+        })?;
+        let notes = commit.package().body_footnotes().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Pages body footnote removal readback failed: {error}"
+            ))
+        })?;
+        publish_focused_body_footnote_commit(self, &commit, &notes)?;
+        Ok(removed)
     }
+}
+
+fn focused_body_footnote_package(editor: &PagesEditor) -> Result<PagesPackage> {
+    let source = match editor.package().exact_source_bytes() {
+        Some(source) => source.to_vec(),
+        None => editor.to_bytes()?,
+    };
+    let limits = focused_body_footnote_limits(editor.package().limits())?;
+    PagesPackage::from_bytes_with_limits(&source, limits).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages focused body footnote ingress failed: {error}"
+        ))
+    })
+}
+
+fn focused_body_footnote_limits(
+    source: crate::package::PackageLimits,
+) -> Result<litchi_pages::Limits> {
+    let limits = litchi_pages::Limits::new(
+        source.max_input_bytes(),
+        source.max_entries(),
+        source.max_entry_bytes(),
+        source.max_total_bytes(),
+        source.max_iwa_stream_bytes(),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Pages focused limits are invalid: {error}")))?;
+    limits
+        .with_archive_limits(source.archive_limits())
+        .map_err(|error| Error::InvalidFormat(format!("Pages focused limits are invalid: {error}")))
+}
+
+fn publish_focused_body_footnote_commit(
+    editor: &mut PagesEditor,
+    commit: &litchi_pages::BodyFootnoteCommit,
+    expected: &[Footnote],
+) -> Result<()> {
+    let focused_limits = focused_body_footnote_limits(editor.package().limits())?;
+    let source_limits = editor.package().limits();
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    let candidate =
+        PagesPackage::from_bytes_with_limits(&bytes, focused_limits).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Pages focused body footnote candidate failed: {error}"
+            ))
+        })?;
+    let actual = candidate.body_footnotes().map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages focused body footnote candidate readback failed: {error}"
+        ))
+    })?;
+    if actual != expected {
+        return Err(Error::InvalidFormat(
+            "Pages focused body footnote candidate semantic readback disagreed".to_owned(),
+        ));
+    }
+    let target: Arc<[u8]> = bytes.into();
+    let package = IWorkPackage::from_shared_bytes_with_limits(Arc::clone(&target), source_limits)?;
+    let reopened = PagesEditor::from_package(package)?;
+    let reopened_notes = focused_body_footnote_package(&reopened)?
+        .body_footnotes()
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Pages focused body footnote reopen readback failed: {error}"
+            ))
+        })?;
+    if reopened_notes != expected {
+        return Err(Error::InvalidFormat(
+            "Pages focused body footnote reopen semantic readback disagreed".to_owned(),
+        ));
+    }
+    *editor = reopened;
+    Ok(())
 }
 
 pub(super) fn body_footnote_graphs(
@@ -303,38 +309,6 @@ fn footnote_cleanup_identifier_count(removed_count: usize) -> Result<usize> {
     removed_count.checked_mul(3).ok_or_else(|| {
         Error::InvalidFormat("Pages removed footnote identifier count overflows usize".to_owned())
     })
-}
-
-fn body_footnote_by_selector(
-    editor: &PagesEditor,
-    selector: Selector,
-) -> Result<BodyFootnoteGraph> {
-    let footnotes = body_footnote_graphs(editor.package(), editor.body_storage_id.get())?;
-    match selector {
-        Selector::Index(index) => footnotes.into_iter().nth(index).ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages body has no footnote at source index {index}"
-            ))
-        }),
-        Selector::At(position) => {
-            let mut matches = footnotes
-                .into_iter()
-                .filter(|graph| graph.footnote.position == position);
-            let Some(graph) = matches.next() else {
-                return Err(Error::InvalidFormat(format!(
-                    "Pages body has no footnote at UTF-16 position {}",
-                    position.utf16_index()
-                )));
-            };
-            if matches.next().is_some() {
-                return Err(Error::InvalidFormat(format!(
-                    "Pages body has more than one footnote at UTF-16 position {}",
-                    position.utf16_index()
-                )));
-            }
-            Ok(graph)
-        },
-    }
 }
 
 /// Aggregate wire accounting for one rooted body-footnote graph read.
@@ -1122,210 +1096,6 @@ fn storage_text(
     Ok(text)
 }
 
-fn new_footnote_objects(
-    ids: FootnoteObjectIds,
-    text: &str,
-    body: &tswp::StorageArchive,
-) -> Result<[ArchiveObject; 3]> {
-    let mut content = String::with_capacity(FOOTNOTE_CONTENT_PREFIX.len() + text.len());
-    content.push_str(FOOTNOTE_CONTENT_PREFIX);
-    content.push_str(text);
-    let mut storage = body_text_storage(&content, body);
-    storage.kind = Some(tswp::storage_archive::KindType::Footnote as i32);
-    storage.table_attachment = Some(tswp::ObjectAttributeTable {
-        entries: vec![tswp::object_attribute_table::ObjectAttribute {
-            character_index: 0,
-            object: Some(reference(ids.marker)),
-        }],
-    });
-    let marker = tswp::TextualAttachmentArchive {
-        string_equivalent: None,
-        kind: Some(tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32),
-    };
-    let attachment = tswp::FootnoteReferenceAttachmentArchive {
-        super_: None,
-        contained_storage: Some(reference(ids.storage)),
-        custom_mark_string: None,
-    };
-    let storage_references = storage_object_references(&storage);
-    Ok([
-        pages_object(
-            ids.reference,
-            FOOTNOTE_REFERENCE_MESSAGE_TYPE,
-            attachment,
-            &[ids.storage],
-        )?,
-        pages_object(
-            ids.storage,
-            STORAGE_MESSAGE_TYPES[0],
-            storage,
-            &storage_references,
-        )?,
-        pages_object(ids.marker, TEXTUAL_ATTACHMENT_MESSAGE_TYPE, marker, &[])?,
-    ])
-}
-
-fn pages_object(
-    identifier: u64,
-    message_type: u32,
-    message: impl Message,
-    references: &[u64],
-) -> Result<ArchiveObject> {
-    let mut object = ArchiveObject::new(
-        identifier,
-        vec![RawMessage {
-            type_: message_type,
-            data: message.encode_to_vec(),
-        }],
-    )?;
-    let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
-    info.object_references = references.to_vec();
-    Ok(object)
-}
-
-fn insert_footnote_reference(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    storage_id: u64,
-    position: u32,
-    reference_id: u64,
-) -> Result<()> {
-    let mut wire_budget = FootnoteGraphBudget::default();
-    package.update_archive(archive_name, |archive| {
-        let object = archive.object_mut(storage_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages body storage {storage_id} is missing"))
-        })?;
-        let message_index = unique_storage_message_index(object, storage_id)?;
-        let original = &object.messages[message_index];
-        let storage = decode_storage_for_mutation(
-            original.data.as_slice(),
-            storage_id,
-            "Pages body storage",
-            &mut wire_budget,
-        )?;
-        let table = footnote_table_payload(
-            storage_id,
-            original.data.as_slice(),
-            &mut wire_budget,
-        )?;
-        let mut entries = footnote_table_entries_from_table(
-            storage_id,
-            table,
-            &storage,
-            &mut wire_budget,
-        )?;
-        if entries.iter().any(|entry| entry.index == position) {
-            return Err(Error::InvalidFormat(format!(
-                "Pages body storage {storage_id} already has a footnote at UTF-16 index {position}"
-            )));
-        }
-        require_text_boundary(storage_id, position, &storage.text)?;
-        if utf16_unit_at(&storage.text, position) != Some(FOOTNOTE_ANCHOR_UNIT) {
-            return Err(Error::InvalidFormat(format!(
-                "Pages body storage {storage_id} has no U+000E footnote anchor at UTF-16 index {position}"
-            )));
-        }
-        let new_entry = tswp::object_attribute_table::ObjectAttribute {
-            character_index: position,
-            object: Some(reference(reference_id)),
-        };
-        reserve_footnote_entries(&mut entries, 1, "Pages body footnote table entries")?;
-        let existing_raw_bytes = entries.iter().try_fold(0usize, |total, entry| {
-            total.checked_add(entry.raw.len()).ok_or_else(|| {
-                Error::InvalidFormat("Pages body footnote table raw size overflows usize".to_owned())
-            })
-        })?;
-        let new_raw = new_entry.encode_to_vec();
-        let raw_bytes = existing_raw_bytes
-            .checked_add(new_raw.len())
-            .ok_or_else(|| {
-                Error::InvalidFormat("Pages body footnote table raw size overflows usize".to_owned())
-            })?;
-        if raw_bytes > MAX_FOOTNOTE_TABLE_BYTES {
-            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-                kind: LimitKind::InputBytes,
-                observed: raw_bytes,
-                limit: MAX_FOOTNOTE_TABLE_BYTES,
-            }));
-        }
-        entries.push(FootnoteTableEntry {
-            index: position,
-            reference_id,
-            raw: new_raw,
-        });
-        entries.sort_by_key(|entry| entry.index);
-        let mut encoded_entries = Vec::new();
-        reserve_footnote_entries(
-            &mut encoded_entries,
-            entries.len(),
-            "Pages body footnote table encoded entries",
-        )?;
-        encoded_entries.extend(entries.into_iter().map(|entry| entry.raw));
-        let has_table = table.is_some();
-        let table = match table {
-            Some(table) => rewrite_repeated_length_delimited_fields(
-                table,
-                TABLE_ENTRIES_FIELD,
-                &encoded_entries,
-            )?,
-            None => rewrite_repeated_length_delimited_fields(
-                &[],
-                TABLE_ENTRIES_FIELD,
-                &encoded_entries,
-            )?,
-        };
-        let data = patch_length_delimited_field(
-            original.data.as_slice(),
-            FOOTNOTE_TABLE_FIELD,
-            has_table,
-            Some(&table),
-        )?;
-        let verified = decode_storage_for_mutation(
-            data.as_slice(),
-            storage_id,
-            "Pages body storage patch",
-            &mut wire_budget,
-        )?;
-        if footnote_table_entries(storage_id, &data, &verified, &mut wire_budget)?
-            .iter()
-            .all(|entry| entry.reference_id != reference_id)
-        {
-            return Err(Error::InvalidFormat(
-                "Pages body footnote table patch failed validation".to_owned(),
-            ));
-        }
-        object.replace_message(
-            message_index,
-            RawMessage {
-                type_: original.type_,
-                data,
-            },
-        )?;
-        let references = &mut object.archive_info.message_infos[message_index].object_references;
-        if references.contains(&reference_id) {
-            return Err(Error::InvalidFormat(format!(
-                "Pages body metadata already references footnote object {reference_id}"
-            )));
-        }
-        references.push(reference_id);
-        Ok(())
-    })
-}
-
-/// Mutation-only compatibility route. The caller already owns a temporary
-/// generated storage template; read/validation callers use the borrowed
-/// [`FootnoteStorageProjection`] route below.
-fn footnote_table_entries(
-    storage_id: u64,
-    data: &[u8],
-    storage: &tswp::StorageArchive,
-    wire_budget: &mut FootnoteGraphBudget,
-) -> Result<Vec<FootnoteTableEntry>> {
-    let table = footnote_table_payload(storage_id, data, wire_budget)?;
-    footnote_table_entries_from_table(storage_id, table, storage, wire_budget)
-}
-
 fn footnote_table_entries_from_projection(
     storage_id: u64,
     storage: &FootnoteStorageProjection<'_>,
@@ -1335,62 +1105,6 @@ fn footnote_table_entries_from_projection(
         return Ok(Vec::new());
     };
     parse_footnote_table_entries(storage_id, table, storage.text(), wire_budget)
-}
-
-fn footnote_table_payload<'a>(
-    storage_id: u64,
-    data: &'a [u8],
-    wire_budget: &mut FootnoteGraphBudget,
-) -> Result<Option<&'a [u8]>> {
-    let (view, _) = wire_budget.scan(data, no_footnote_descent)?;
-    for field in view.fields() {
-        field.validate_canonical_framing()?;
-    }
-    let mut count = 0usize;
-    let mut table = None;
-    for field in view
-        .fields()
-        .filter(|field| field.number() == FOOTNOTE_TABLE_FIELD)
-    {
-        if field.wire_type() != 2 {
-            return Err(Error::InvalidFormat(format!(
-                "Pages body storage {storage_id} footnote table is not length-delimited"
-            )));
-        }
-        count = count.checked_add(1).ok_or_else(|| {
-            Error::InvalidFormat("Pages footnote table count overflows usize".to_owned())
-        })?;
-        table = Some(field.canonical_payload()?);
-    }
-    if count > 1 {
-        return Err(Error::InvalidFormat(format!(
-            "Pages body storage {storage_id} contains {count} footnote tables"
-        )));
-    }
-    Ok(table)
-}
-
-fn footnote_table_entries_from_table(
-    storage_id: u64,
-    table: Option<&[u8]>,
-    storage: &tswp::StorageArchive,
-    wire_budget: &mut FootnoteGraphBudget,
-) -> Result<Vec<FootnoteTableEntry>> {
-    let Some(table) = table else {
-        return if storage.table_footnote.is_none() {
-            Ok(Vec::new())
-        } else {
-            Err(Error::InvalidFormat(format!(
-                "Pages body storage {storage_id} footnote table wire state is inconsistent"
-            )))
-        };
-    };
-    if storage.table_footnote.is_none() {
-        return Err(Error::InvalidFormat(format!(
-            "Pages body storage {storage_id} footnote table wire state is inconsistent"
-        )));
-    }
-    parse_footnote_table_entries(storage_id, table, &storage.text, wire_budget)
 }
 
 fn parse_footnote_table_entries<F: AsRef<str>>(
@@ -1447,18 +1161,9 @@ fn parse_footnote_table_entries<F: AsRef<str>>(
         })?;
         wire_budget.charge_codec(report)?;
         wire_budget.charge_work(raw.len())?;
-        let mut raw_copy = Vec::new();
-        raw_copy.try_reserve_exact(raw.len()).map_err(|_| {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "Pages body footnote table raw payload",
-                amount: raw.len(),
-            })
-        })?;
-        raw_copy.extend_from_slice(raw);
         entries.push(FootnoteTableEntry {
             index: entry.character_index(),
             reference_id: entry.section().map_or(0, |value| value.identifier().get()),
-            raw: raw_copy,
         });
     }
     validate_footnote_table_entries(storage_id, &entries, text)?;
@@ -1550,25 +1255,6 @@ fn remove_unreferenced_footnote_object(
     })
 }
 
-fn storage_at(
-    package: &IWorkPackage,
-    storage_id: u64,
-    label: &str,
-) -> Result<(String, tswp::StorageArchive)> {
-    // Mutation/template callers intentionally retain the generated Prost
-    // value while the source-preserving wire rewrite is staged separately.
-    let archive_name = find_object_archive(package, storage_id)?;
-    let archive = package.archive(&archive_name)?;
-    let object = archive
-        .object(storage_id)
-        .ok_or_else(|| Error::InvalidFormat(format!("{label} storage {storage_id} is missing")))?;
-    let message_index = unique_storage_message_index(object, storage_id)?;
-    let source = object.messages[message_index].data.as_slice();
-    let mut wire_budget = FootnoteGraphBudget::default();
-    let storage = decode_storage_for_mutation(source, storage_id, label, &mut wire_budget)?;
-    Ok((archive_name, storage))
-}
-
 fn with_storage_projection<T, F>(
     package: &IWorkPackage,
     storage_id: u64,
@@ -1593,39 +1279,6 @@ where
     // The archive is an owned cache clone, so its borrowed projection cannot
     // escape this function. Keep all projection consumers inside this scope.
     read(&storage, wire_budget)
-}
-
-/// Admit a legacy storage payload for the mutation/template compatibility path.
-///
-/// This is deliberately separate from [`FootnoteStorageProjection`]: callers
-/// retain the original payload as the mutation authority, while Prost supplies
-/// only the temporary template value needed by existing constructors/rewrites.
-fn decode_storage_for_mutation(
-    source: &[u8],
-    storage_id: u64,
-    label: &str,
-    wire_budget: &mut FootnoteGraphBudget,
-) -> Result<tswp::StorageArchive> {
-    let validation = litchi_iwa_text_wire::validate_storage_with_limits(
-        source,
-        litchi_iwa_text_wire::RewriteLimits::default(),
-    )
-    .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
-
-    // The preflight does not allocate semantic text or generated fields. All
-    // aggregate charges therefore happen before Prost can grow its repeated
-    // text/table vectors. The extra source-byte charge covers the generated
-    // compatibility projection's bounded parse/allocation pass.
-    wire_budget.charge_input(source.len())?;
-    wire_budget.charge_fields(validation.fields())?;
-    wire_budget.charge_work(validation.validation_work())?;
-    wire_budget.charge_work(source.len())?;
-
-    tswp::StorageArchive::decode(source).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Pages {label} storage {storage_id} failed bounded compatibility decode: {error}"
-        ))
-    })
 }
 
 fn map_storage_wire_error(
@@ -1729,24 +1382,6 @@ fn object_message_data_of_types<'a>(
     Ok(message.data.as_slice())
 }
 
-fn reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
-        deprecated_type: None,
-        deprecated_is_external: None,
-    }
-}
-
-fn validate_footnote_text(text: &str) -> Result<()> {
-    if text.contains(FOOTNOTE_ANCHOR) || text.contains(FOOTNOTE_MARK) {
-        return Err(Error::ParseError(
-            "Pages footnote text cannot contain native footnote-anchor or attachment markers"
-                .to_owned(),
-        ));
-    }
-    Ok(())
-}
-
 fn require_text_boundary<F: AsRef<str>>(storage_id: u64, position: u32, text: &[F]) -> Result<()> {
     let mut current = 0u32;
     if position == current {
@@ -1814,7 +1449,7 @@ mod tests {
         let package = PagesPackage::from_bytes(&editor.to_bytes()?)
             .map_err(|error| Error::InvalidFormat(format!("Pages footnote package: {error}")))?;
         let mut edit = package
-            .edit_body_footnote_text(selector)
+            .edit_body_footnote(selector)
             .map_err(|error| Error::InvalidFormat(format!("Pages footnote edit: {error}")))?;
         edit.set(text)
             .map_err(|error| Error::InvalidFormat(format!("Pages footnote edit: {error}")))?;
@@ -1826,7 +1461,17 @@ mod tests {
             Error::InvalidFormat(format!("Pages footnote package write failed: {error}"))
         })?;
         let reopened = PagesEditor::from_bytes(&bytes)?;
-        let updated = body_footnote_by_selector(&reopened, selector)?.footnote;
+        let updated_footnotes = commit
+            .package()
+            .body_footnotes()
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote readback: {error}")))?;
+        let updated = match selector {
+            Selector::Index(index) => updated_footnotes.get(index).cloned(),
+            Selector::At(position) => updated_footnotes
+                .into_iter()
+                .find(|footnote| footnote.position == position),
+        }
+        .ok_or_else(|| Error::InvalidFormat("Pages footnote readback missing".to_owned()))?;
         *editor = reopened;
         Ok(updated)
     }
@@ -1860,7 +1505,7 @@ mod tests {
     }
 
     #[test]
-    fn body_footnote_crud_round_trips_and_restores_a_source_document() {
+    fn body_footnote_crud_round_trips_and_retains_the_native_high_watermark() {
         let mut editor = PagesEditor::create_with_text("A😀B").unwrap();
         let baseline = editor.to_bytes().unwrap();
         let note = editor
@@ -1887,7 +1532,11 @@ mod tests {
         assert_eq!(removed, updated);
         assert_eq!(editor.body_text().unwrap(), "A😀B");
         assert!(editor.body_footnotes().unwrap().is_empty());
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        let target = editor.to_bytes().unwrap();
+        assert_ne!(target, baseline);
+        let reopened = PagesEditor::from_bytes(&target).unwrap();
+        assert_eq!(reopened.body_text().unwrap(), "A😀B");
+        assert!(reopened.body_footnotes().unwrap().is_empty());
     }
 
     #[test]
@@ -1917,31 +1566,24 @@ mod tests {
     }
 
     #[test]
-    fn ordinary_body_replacement_reclaims_deleted_footnote_graphs() {
+    fn ordinary_body_replacement_refuses_unattributed_footnote_graph_cleanup() {
         let mut editor = PagesEditor::create_with_text("AB").unwrap();
         editor
             .insert_body_footnote(Position::from_utf16_index(1).unwrap(), "First")
             .unwrap();
-        let first_reference_id =
-            body_footnote_graphs(editor.package(), editor.body_storage_id.get()).unwrap()[0]
-                .reference_id;
-        let second = editor
+        editor
             .insert_body_footnote(Position::from_utf16_index(3).unwrap(), "Second")
             .unwrap();
         assert_eq!(editor.body_text().unwrap(), "A\u{e}B\u{e}");
 
-        editor.replace_body_text(1..2, "").unwrap();
-        assert_eq!(editor.body_text().unwrap(), "AB\u{e}");
-        assert_eq!(
-            editor.body_footnotes().unwrap(),
-            vec![Footnote {
-                position: Position::from_utf16_index(2).unwrap(),
-                text: "Second".into(),
-                custom_mark: None,
-            }]
+        let baseline = editor.to_bytes().unwrap();
+        let error = editor.replace_body_text(1..2, "").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("remains referenced after body-anchor deletion")
         );
-        assert!(find_object_archive(editor.package(), first_reference_id).is_err());
-        assert_eq!(second.position, Position::from_utf16_index(3).unwrap());
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
     }
 
     #[test]
@@ -1962,9 +1604,9 @@ mod tests {
     }
 
     #[test]
-    fn native_footnote_reference_without_a_super_payload_is_supported() {
+    fn required_footnote_reference_payload_cannot_be_removed_by_host_mutation() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        let footnote = editor
+        editor
             .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
             .unwrap();
         let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
@@ -1972,7 +1614,8 @@ mod tests {
             .reference_id;
         let mut package = editor.package().clone();
         let archive_name = find_object_archive(&package, reference_id).unwrap();
-        package
+        let baseline = package.to_bytes().unwrap();
+        let error = package
             .update_archive(&archive_name, |archive| {
                 let object = archive.object_mut(reference_id).unwrap();
                 let message = &object.messages[0];
@@ -1991,10 +1634,13 @@ mod tests {
                 )?;
                 Ok(())
             })
-            .unwrap();
-
-        let parsed = PagesEditor::from_package(package).unwrap();
-        assert_eq!(parsed.body_footnotes().unwrap(), vec![footnote]);
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("singular protobuf field 1 changed")
+        );
+        assert_eq!(package.to_bytes().unwrap(), baseline);
     }
 
     #[test]

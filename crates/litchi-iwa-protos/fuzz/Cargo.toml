@@ -43,6 +43,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pages_footnote_graph_codec"
+path = "fuzz_targets/pages_footnote_graph_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "pages_footnote_codec"
 path = "fuzz_targets/pages_footnote_codec.rs"
 test = false

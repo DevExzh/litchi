@@ -527,12 +527,12 @@ impl Package {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct NativeFootnote {
-    body_identifier: NonZeroU64,
-    position: Position,
-    reference_identifier: NonZeroU64,
-    storage_identifier: NonZeroU64,
-    marker_identifier: NonZeroU64,
+pub(super) struct NativeFootnote {
+    pub(super) body_identifier: NonZeroU64,
+    pub(super) position: Position,
+    pub(super) reference_identifier: NonZeroU64,
+    pub(super) storage_identifier: NonZeroU64,
+    pub(super) marker_identifier: NonZeroU64,
 }
 
 /// Borrowed object locations for one immutable source snapshot.
@@ -599,7 +599,7 @@ impl<'source> FootnoteObjectLocations<'source> {
 /// this coordinator across those two graph passes prevents two individually
 /// valid walks from silently doubling the work and source allowance.
 #[derive(Debug, Clone, Copy)]
-struct FootnoteGraphBudget {
+pub(super) struct FootnoteGraphBudget {
     maximum_source_bytes: usize,
     maximum_references: usize,
     maximum_work: usize,
@@ -609,7 +609,7 @@ struct FootnoteGraphBudget {
 }
 
 impl FootnoteGraphBudget {
-    fn new(limits: super::Limits) -> Result<Self, FootnoteTextError> {
+    pub(super) fn new(limits: super::Limits) -> Result<Self, FootnoteTextError> {
         let archive = limits
             .effective_archive_limits()
             .map_err(map_archive_error)?;
@@ -635,7 +635,7 @@ impl FootnoteGraphBudget {
         })
     }
 
-    fn charge_source(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+    pub(super) fn charge_source(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
         charge_graph_counter(
             &mut self.source_bytes,
             amount,
@@ -644,7 +644,7 @@ impl FootnoteGraphBudget {
         )
     }
 
-    fn charge_references(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+    pub(super) fn charge_references(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
         charge_graph_counter(
             &mut self.references,
             amount,
@@ -653,7 +653,7 @@ impl FootnoteGraphBudget {
         )
     }
 
-    fn charge_work(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+    pub(super) fn charge_work(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
         charge_graph_counter(
             &mut self.work,
             amount,
@@ -717,12 +717,14 @@ fn resolve_footnote(
     Ok((graph.position, clone_footnote(footnote)?, *graph))
 }
 
-fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
+pub(super) fn native_footnotes(
+    package: &Package,
+) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
     let mut budget = FootnoteGraphBudget::new(package.state.source.limits())?;
     native_footnotes_with_budget(package, &mut budget)
 }
 
-fn native_footnotes_with_budget(
+pub(super) fn native_footnotes_with_budget(
     package: &Package,
     budget: &mut FootnoteGraphBudget,
 ) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
@@ -1088,7 +1090,7 @@ fn is_canonical_component_name(name: &str) -> bool {
 /// metadata, whereas native Pages writes commonly retain it.  Any alias from
 /// another owner is rejected before `rewrite_component` gets a mutable
 /// archive, so a successful edit cannot silently change an unrelated graph.
-fn prove_footnote_ownership(
+pub(super) fn prove_footnote_ownership(
     package: &Package,
     native_footnote: NativeFootnote,
     budget: &mut FootnoteGraphBudget,

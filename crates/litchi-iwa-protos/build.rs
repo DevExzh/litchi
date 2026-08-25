@@ -83,6 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_footnote_graph_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_background_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
@@ -1247,6 +1248,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
     const RAW_CODECS: &[&str] = &[
         "src/hyperlink_codec.rs",
         "src/keynote_chart_caption_graph_codec.rs",
+        "src/pages_footnote_graph_codec.rs",
     ];
 
     let mut expected_paths = CODECS
