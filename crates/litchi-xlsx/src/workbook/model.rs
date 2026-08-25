@@ -1140,6 +1140,11 @@ impl Worksheet {
         Arc::ptr_eq(&self.owner, &other.owner)
     }
 
+    /// Parse this worksheet's typed inert hyperlinks.
+    pub fn hyperlinks(&self) -> Result<Vec<crate::hyperlinks::Hyperlink>> {
+        worksheet::hyperlinks(self)
+    }
+
     /// Borrow this worksheet's Office Add-in range bindings.
     ///
     /// Bindings are decoded and validated on first access, then retained by
