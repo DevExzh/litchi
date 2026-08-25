@@ -1560,3 +1560,33 @@ of a single allocation, zero-allocation preflight, zero-copy behavior,
 package-wide peak memory or RSS, latency, throughput, or performance. The
 owner does not mutate Metadata, UUIDs, save tokens, or previews. No production
 dependency edge or normal generated-schema/Prost/Buffa owner changed.
+
+## 2026-08-26 amendment: Wave85 Numbers unified cell-control resource record
+
+Implementation commit `8f804fdc65f5d99a61d8b73503353901edf87488` carries one
+operation-local transaction budget through source/catalog inventory, rooted
+table/model/tile selection, BNC cell and mixed format/control-list scans,
+strict control and storage codec reports, exact refcount/ownership census,
+metadata UUID/save-token transitions, native archive and Snappy bounds,
+prepared ZIP reassembly, candidate reopen, semantic readback, exact patch
+artifacts, and object/member locality. Distinct source and candidate scans are
+charged independently, while nesting is merged by maximum.
+
+Residual input/output, package-entry, payload, object, message, item,
+reference, field, work, nesting, component, allocation, retained-byte, and
+scratch ceilings are propagated across the admitted route. Prepared
+CellSpec/display-format/list rewrites validate their reports against execution
+requirements. Archive, compression, metadata, package-output, and reassembly
+bounds use checked arithmetic, fallible reservations, and typed codec/archive/
+core mappings. Failures leave the immutable source and published package
+unchanged.
+
+Codec payloads, list/archive rewrites, metadata, compression output, and the
+final ZIP are staged as private candidates before semantic verification and
+publication. The popup metadata stage depends on the native stage's selected
+result, so this is not one global allocation-free preflight. No single-
+allocation, zero-copy, package-wide peak-memory/RSS, latency, throughput, or
+performance claim follows. Cross-component control graphs are outside the
+admitted resource contract. No production dependency edge or normal
+generated-schema/Prost/Buffa owner changed; fuzz manifests register only the
+bounded codec and package routes.

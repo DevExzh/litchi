@@ -3716,3 +3716,38 @@ dependency declarations, and 13 ordered migration debts. Debt 017 and the
 generated-schema and normal Prost/Buffa owners, and the IWA monolith. No
 crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by this cut.
+
+## 2026-08-26 amendment: Wave85 Numbers unified cell-control boundary
+
+Implementation commit `8f804fdc65f5d99a61d8b73503353901edf87488` makes
+`litchi-numbers` the selector-first transaction owner for Checkbox, Star
+Rating, Slider, Stepper, and compatibility Pop-Up Menu controls on admitted
+same-component rooted table graphs. The archive-free facade is
+`Package::{table_cell_control_format, edit_table_cell_control_format,
+apply_table_cell_control_format}` with `SheetSelector`, `TableSelector`,
+`CellPosition`, and `cell::data_format::control::CellControl`. Native IDs,
+member locators, package bytes, archive/wire values, generated messages,
+Prost values, and Buffa views do not cross that boundary.
+
+The hidden neutral control codec owns strict `CellSpecArchive` and numeric
+display-format projection, fixed64 range validation, mixed-list dispatch, and
+prepared canonical rewrites. The package owns rooted cell/model/tile/list
+selection, exact BNC and list refcount census, control copy-on-write/cull,
+metadata UUID/watermark/save-token transitions, operation-local budgeting,
+exact patch/inverse artifacts, prepared ZIP publication, candidate reopen,
+semantic readback, and object/member locality. The existing focused Pop-Up
+Menu graph engine remains the single popup lifecycle route beneath this
+unified facade.
+
+The four dedicated Numbers editor read/set/reset method families are retired;
+the generic Numbers data-format bridge delegates file-backed control work to
+the focused package. Private source-built compatibility readers/resets and the
+shared Pages/Keynote control adapters remain in `litchi-iwa`. Cross-component
+format/control graphs remain unsupported and fail closed.
+
+The workspace inventory remains 64 packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debt 015, the
+`litchi-iwa -> litchi-numbers` edge, debts 014 and 017, migration hosts,
+generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
+No crate, dependency edge, debt item, production manifest dependency, or
+monolith owner is removed by this cut.

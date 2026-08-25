@@ -5305,3 +5305,35 @@ host, or monolith-exit gate is retired by Wave84. The native record is bounded
 open/render/save/close/reopen evidence only, with normalized ZIP bytes; it is
 not Rust/native byte parity, physical-sort acceptance, performance/RSS,
 durable publication, or a full-workspace claim.
+
+## 2026-08-26 amendment: Wave85 Numbers unified cell-control bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `8f804fdc65f5d99a61d8b73503353901edf87488` moves
+admitted same-component Numbers Checkbox, Star Rating, Slider, Stepper, and
+compatibility Pop-Up Menu control transactions into the selector-first
+package. The archive-free facade contains no native ID or physical IWA value.
+The strict hidden codec and package jointly own mixed control projection,
+BNC/list refcount authority, copy-on-write/cull, metadata transitions,
+operation-local budgeting, staged-private atomic publication, candidate
+readback/locality, and exact patch/inverse artifacts for this bounded slice.
+
+This is not arbitrary scalar data-format, table topology, Pages/Keynote
+control, or cross-component format/control ownership. The dedicated Numbers
+editor method families are retired, while the generic focused bridge, private
+source-built compatibility readers/resets, shared Pages/Keynote adapters, and
+remaining table graph responsibilities stay in `litchi-iwa`. Malformed,
+segmented, aliased, cross-component, locked, ownership-ambiguous, or otherwise
+unproven graphs fail closed.
+
+Debt 015, the `litchi-iwa -> litchi-numbers` dependency edge, debts 014 and
+017, `litchi-iwa`, remaining migration hosts, generated-schema, Buffa, and
+normal Prost owners, and the IWA monolith remain. No crate, dependency edge,
+debt item, production manifest dependency, generated-schema owner, normal
+Prost owner, migration host, or monolith-exit gate is retired by Wave85.
+
+Numbers 14.4 opened, saved, closed, and reopened the fresh UI-authored source
+without repair, but the focused owner correctly refused its cross-component
+format/control graph. No Rust candidate or inverse was published, so native
+mutation acceptance is withheld. This inventory is not Rust/native byte
+parity, publication acceptance, performance/RSS, durable publication, or a
+full-workspace claim.
