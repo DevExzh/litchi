@@ -318,7 +318,11 @@ and metadata; see `create_*_flipped_movie` for scratch-file examples.
 
 Movies with native original-size metadata can also restore just their displayed
 dimensions through `restore_body_movie_original_size`,
-`restore_sheet_movie_original_size`, or `restore_slide_movie_original_size`.
+or `restore_sheet_movie_original_size`. Keynote slide movie position and
+displayed-size edits, including original-size restoration, use the
+selector-first `litchi_keynote::Package::{slide_movie_geometry,
+edit_slide_movie_geometry,apply_slide_movie_geometry}` API; native angle and
+reflection flags remain in the compatibility Arrange operation.
 Those operations retain the current position and transform while returning an
 error for media that has no original dimensions; see
 `create_*_original_size_movie` for scratch-file examples.

@@ -86,6 +86,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/movie_playback_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_movie_geometry_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_graph_codec.rs");
@@ -120,6 +121,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_keynote_movie_caption_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_movie_geometry_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -358,6 +363,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .reflect_mode(buffa_build::ReflectMode::Off)
         .idiomatic_field_names(true)
         .compile()?;
+
+    // Keynote movie geometry keeps only the drawable/geometry envelope in the
+    // generated lazy view. Point and Size remain opaque bytes so the strict
+    // codec can preserve framing, unknown fields, and future extensions.
+    let buffa_keynote_movie_geometry_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-movie-geometry");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNMovieGeometryArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_movie_geometry_out_directory)
+        .include_file("iwa_keynote_movie_geometry_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_movie_geometry_projection_budget(&buffa_keynote_movie_geometry_out_directory)?;
 
     // Keynote chart-title reads need only the two scalar fields from the
     // generated ChartNonStyleArchive extension. Keep the outer non-style
@@ -923,6 +948,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "9cd1e92b3a0c41a3d3431c26ece99496dd2fac4e1d8eca460758adc3a437b646",
         ),
         (
+            "KNMovieGeometryArchive.proto",
+            428,
+            "4233567f983e0cd8221a77bda82e59c409e1d546db9f50a79b0deefab2bc8a45",
+        ),
+        (
             "KNPlaceholderTextOwnerArchive.proto",
             1108,
             "2f076952a2f963ab9fa410f2625f3eac7f5ee1f26f5b1c49f833266016f13d8c",
@@ -1195,6 +1225,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/movie_playback_codec.rs",
             "crate::buffa_movie_playback_generated::",
             "mod buffa_movie_playback_generated {",
+        ),
+        (
+            "src/keynote_movie_geometry_codec.rs",
+            "crate::buffa_keynote_movie_geometry_generated::",
+            "mod buffa_keynote_movie_geometry_generated {",
         ),
         (
             "src/keynote_chart_title_codec.rs",
@@ -2327,6 +2362,88 @@ required .LitchiIwaProjection.DrawableArchive super = 1;\n\
     {
         return Err(
             "derived Keynote movie-caption projection/router drifted from canonical TSD MovieArchive title/caption fields, exposed repeated storage, or introduced generated/production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_movie_geometry_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaKeynoteMovieGeometryProjection;\n\
+message PointSizeArchive {\n\
+required bytes position = 1;\n\
+required bytes size = 2;\n\
+optional uint32 flags = 3;\n\
+optional float angle = 4;\n\
+}\n\
+message DrawableArchive {\n\
+required PointSizeArchive geometry = 1;\n\
+}\n\
+message MovieArchive {\n\
+required DrawableArchive super = 1;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 8] = [
+        "const MOVIE_SUPER_FIELD: u32 = 1;",
+        "const DRAWABLE_GEOMETRY_FIELD: u32 = 1;",
+        "const GEOMETRY_POSITION_FIELD: u32 = 1;",
+        "const GEOMETRY_SIZE_FIELD: u32 = 2;",
+        "pub fn decode_movie_geometry(",
+        "pub fn prepare_movie_geometry_rewrite",
+        "pub fn rewrite_movie_geometry(",
+        "fn parse_field(",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_movie_geometry_generated {",
+        "\"/buffa-keynote-movie-geometry/iwa_keynote_movie_geometry_buffa_protos.rs\"",
+    ];
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("KNMovieGeometryArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let codec = fs::read_to_string("src/keynote_movie_geometry_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let movie = tsd
+        .split_once("message MovieArchive {")
+        .map(|(_, suffix)| suffix)
+        .unwrap_or_default();
+    if tsd.matches("message MovieArchive {").count() != 1
+        || !movie.contains("required .TSD.DrawableArchive super = 1;")
+        || tsd.matches("message DrawableArchive {").count() != 1
+        || tsd
+            .matches("optional .TSD.GeometryArchive geometry = 1;")
+            .count()
+            < 1
+        || tsd.matches("message GeometryArchive {").count() != 1
+        || tsd.matches("optional .TSP.Point position = 1;").count() != 1
+        || tsd.matches("optional .TSP.Size size = 2;").count() != 1
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote movie-geometry projection/router drifted from canonical TSD MovieArchive geometry fields or introduced generated/production encoding"
                 .into(),
         );
     }
@@ -5925,6 +6042,44 @@ fn enforce_keynote_movie_caption_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Keynote movie-caption projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_movie_geometry_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote movie-geometry projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

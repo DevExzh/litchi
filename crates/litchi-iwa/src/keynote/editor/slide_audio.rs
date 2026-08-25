@@ -401,6 +401,7 @@ mod tests {
     use crate::keynote::KeynoteDocumentBuilder;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+    use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
     const REPLACEMENT_AUDIO: &[u8] = b"FORM\0\0\0\x10AIFFreplacement-audio";
@@ -706,8 +707,9 @@ mod tests {
             .unwrap();
         let before = editor.to_bytes().unwrap();
         assert!(
-            editor
-                .set_slide_movie_geometry(0, audio.drawable_object_id, DrawableGeometry::default(),)
+            KeynotePackage::from_bytes(&before)
+                .unwrap()
+                .edit_slide_movie_geometry(SlideSelector::index(0), MovieSelector::index(0))
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);

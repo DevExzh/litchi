@@ -259,6 +259,23 @@ input. The tracked `basic.key` seed is embedded only as a valid package
 fallback; a file-backed movie-bearing seed can be supplied by a future native
 campaign without changing the public harness boundary.
 
+`keynote_slide_movie_geometry` is the focused selector-first geometry target
+for an existing file-backed movie. It offers arbitrary bytes to bounded
+Keynote ingress and reuses the same bytes as typed `SlideSelector` and
+`MovieSelector` commands against the checked-in Keynote seed. When a source
+contains an admitted movie geometry, it covers position/size reads, no-op and
+replacement commits, exact patch application and conflicts, inverse
+restoration, candidate readback, selector failures, and source-byte
+atomicity. Native flags, angles, movie graph records, and identifiers remain
+opaque; movie creation/removal, media replacement, and cross-component writes
+are outside this target.
+
+The target uses the finite Keynote physical and semantic profile used by the
+other focused Keynote targets; keep `-max_len` at 1 KiB so malformed ingress
+and the fixed native transaction both receive every input. Recipes under
+`corpus/keynote_slide_movie_geometry/` are command bytes, not native Keynote
+packages.
+
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
