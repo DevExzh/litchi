@@ -2914,3 +2914,41 @@ generated schema type, Prost message, or Buffa view crosses the public facade.
 This owner does not authorize ordinary-body replacement to infer or reclaim an
 unattributed footnote graph, and it does not move unrelated Pages text,
 annotation, section, table, or media responsibilities.
+
+## 2026-08-25 amendment: Pages header/footer text semantic ownership
+
+Implementation commit `1596d5106ee42fe9238e8d63cc55d39c494d59c3` establishes
+the selector-first existing-root Pages header/footer text owner. The public
+surface is `Package::{header_footers, edit_header_footer_text,
+apply_header_footer_text}` and the archive-free
+`HeaderFooterSelector`/`HeaderFooter` vocabulary.
+`HeaderFooterSelector` contains a `SectionSelector`, `Template` (`First`,
+`Even`, or `Odd`), `Kind` (`Header` or `Footer`), and typed zero-based slot
+`Position`; no section, template, storage, component, or archive identifier
+is exposed.
+
+The semantic operation reads reachable existing slots, replaces text in one
+selected storage, or clears it to an explicitly empty value. Absence and an
+empty storage remain distinct. `Some -> Some` and clear-to-empty are the only
+changed states admitted by this slice. UTF-16 boundaries and reserved native
+markers are validated before staging; exact no-ops retain the source
+artifact. Exact patches retain private source/target authorization artifacts,
+support conflict-checked application and inverse restoration, and expose
+only semantic values and redacted diagnostics.
+
+The package owns rooted `Document -> body -> section -> template -> storage`
+selection, exact alias handling, aggregate and `FieldInfo` ownership proof,
+Metadata root plus selected current-component save-token updates, preview
+invalidation, candidate reopen, and locality verification. Weak `ViewState`
+references are preserved. Strong or unspecified external/data references,
+ambiguous ownership, and conflicting root data-map ownership fail closed.
+The hidden strict `pages_header_footer_codec` validates canonical known
+framing and preserves unknown fields and balanced unknown groups; the
+text-wire rewrite preserves all unrelated storage bytes. The package does
+not create/remove slots or templates, allocate/cull native graph objects,
+change inheritance or first/even/odd settings, edit number attachments,
+modify margins or section topology, or mutate body, annotation, media, or
+text-box graphs.
+
+No native ID, raw storage type, archive/member name, wire field, generated
+schema type, Prost message, or Buffa view crosses the semantic facade.

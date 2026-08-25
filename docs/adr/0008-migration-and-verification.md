@@ -13518,3 +13518,58 @@ open/render/save/close/reopen acceptance, exact pre-native inverse artifacts,
 and strict normalized reread. It does not establish Rust/native byte parity,
 arbitrary producer-graph acceptance, durable publication, performance/RSS, or
 a full-workspace gate.
+
+## 2026-08-25 amendment: Wave78 Pages header/footer text verification record
+
+The existing-root Pages header/footer text owner is implementation commit
+`1596d5106ee42fe9238e8d63cc55d39c494d59c3`. Focused verification recorded:
+
+- `cargo test -p litchi-pages --quiet` passed 117 unit tests; all listed
+  integration targets passed with counts `14, 9, 9, 7, 15, 14, 4, 12, 1,
+  10, 8, 6, 6, 7, 10, 17, 2`;
+- focused `header_footer_text` integration passed 12/12;
+- `cargo test -p litchi-iwa-protos --lib` passed 466/466 and the focused
+  header/footer codec passed 6/6;
+- the text-wire library passed 39/39;
+- the focused host header/footer CRUD test passed 1/1 and host number-
+  attachment tests passed 4/4;
+- all-target checks for `litchi-pages` and `litchi-iwa-protos` passed;
+  Pages all-target Clippy and protos library Clippy passed with `-D
+  warnings`; `cargo check -p litchi-iwa --lib --examples` passed with known
+  unrelated warnings;
+- strict codec fuzzing completed 1,000 runs without a crash (`cov 485`,
+  `ft 824`), and lifecycle fuzzing completed 500 runs without a crash
+  (`cov 1195`, `ft 1200`);
+- `python3 -m unittest tools.test_check_crate_boundaries` passed 471/471,
+  Python compilation, `cargo fmt --all -- --check`, and `git diff --check`
+  passed.
+
+The live boundary checker exited 1 only for exactly the three known
+user-owned untracked Pages table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`); it reported no Wave78
+finding. These are scoped owner gates and do not imply a full-workspace-green
+result.
+
+The bounded native record used Pages 14.4 and disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `/private/tmp/litchi-wave77-native.hS3X8u/wave78-pages-header-footer-source.pages` | 116,410 | `385086b36c20e52058957df9fdc505ba21af17dba21e24c8c7fc7421d7db9ef0` |
+| Rust candidate before Pages `/private/tmp/litchi-wave78-header-footer-native.s8waIF/rust-pre-pages.pages` | 72,643 | `a5b9ee8d0a255663239435c25e0b6ab179770294bcdcf3314811bc26164ce712` |
+| exact inverse `/private/tmp/litchi-wave78-header-footer-native.s8waIF/inverse.pages` | 116,410 | `385086b36c20e52058957df9fdc505ba21af17dba21e24c8c7fc7421d7db9ef0` |
+| Pages-normalized saved candidate `/private/tmp/litchi-wave78-header-footer-native.s8waIF/rust-header.pages` | 117,311 | `923331bf440e1a04f9bfc984ae9ce0e3b50a73c887f5ff1403298893f0dcee8d` |
+
+Pages opened the candidate without repair, recovery, or conversion UI. The
+three-page facing-pages body remained visible; pages 1 and 3 retained the
+left header `Wave78 focused header — 北区`, while the page-2 even header/footer
+and the other odd-page labels remained intact. Cmd-S, close, and exact-path
+reopen succeeded without repair. Strict Rust reread of the normalized
+artifact emitted `/private/tmp/litchi-wave78-header-footer-native.s8waIF/reread-pages-saved.pages`, identical at 117,311 bytes and the same SHA-256.
+
+Pages normalized the ZIP artifact. This establishes bounded open/render,
+save/close/reopen, exact pre-native inverse, and strict normalized reread
+evidence only. It does not establish Rust/native byte parity, arbitrary
+producer-graph acceptance, durable publication, performance/RSS, or a
+full-workspace gate. No manifest, generated-schema, or normal-Prost claim
+follows.

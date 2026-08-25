@@ -2373,3 +2373,27 @@ dependency declarations, and 13 ordered migration debts. Debt 017 and the
 editing, compatibility examples/tests, and host responsibilities remain. No
 crate, dependency edge, debt item, generated-schema owner, normal Prost/Buffa
 owner, migration host, or monolith is removed by this cut.
+
+## 2026-08-25 amendment: Wave78 current-topology Pages header/footer text cut
+
+Implementation commit `1596d5106ee42fe9238e8d63cc55d39c494d59c3` makes
+`litchi-pages` the current owner of existing-root header/footer text reads,
+`Some -> Some` replacement, and clear-to-empty edits through the
+selector-first `HeaderFooterSelector` surface. The package resolves the
+rooted body/section/template/storage chain, proves exact aliases and
+aggregate/`FieldInfo` ownership, applies the selected metadata token
+transition, preserves root field 1 and raw unselected/versioned data, and
+publishes only after exact patch, preview, candidate-reopen, and locality
+verification.
+
+The raw header/footer APIs and public raw `TextStorageId`/
+`PagesHeaderFooterInfo` route are retired. Header/footer number attachments
+now route through `Package`; template/slot creation and removal, inheritance
+and first/even/odd settings, section lifecycle, media, annotations, table
+and remaining text graphs remain at their recorded compatibility owners.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 017 and the
+`litchi-iwa -> litchi-pages` edge remain open. No crate, dependency edge,
+debt item, migration host, generated-schema owner, normal Prost/Buffa owner,
+or monolith is removed by this cut.

@@ -3502,3 +3502,37 @@ This boundary change does not alter the workspace topology. The authoritative
 remain in force. In particular, debt 017, the `litchi-iwa -> litchi-pages`
 edge, remaining Pages compatibility responsibilities, generated-schema and
 normal Prost/Buffa owners, and the migration host remain.
+
+## 2026-08-25 amendment: Wave78 Pages header/footer text boundary
+
+Implementation commit `1596d5106ee42fe9238e8d63cc55d39c494d59c3` moves the
+existing-root Pages header/footer text boundary into `litchi-pages`. The
+selector-first surface is `Package::{header_footers,
+edit_header_footer_text, apply_header_footer_text}`, with archive-free
+`HeaderFooterSelector` and `HeaderFooter` values. A selector combines a
+`SectionSelector`, one of
+`Template::{First, Even, Odd}`, one of `Kind::{Header, Footer}`, and a checked
+zero-based `Position` slot. The focused owner admits existing storage
+`Some -> Some` replacement and clear-to-empty edits only; it does not create
+or remove a template, slot, or native storage graph.
+
+The hidden strict `pages_header_footer_codec` owns the
+`TP.SectionTemplateArchive` header/footer repeated `TSP.Reference`
+projection. The text-wire owner validates `StorageArchive` kind `HEADER = 1`
+and performs the raw-preserving text splice. The package resolves
+`Document -> body -> unique section -> strict template -> unique storage`,
+proves exact aliases and aggregate/`FieldInfo` ownership, applies the
+Metadata root and selected current-component save-token transition while
+leaving root field 1 unchanged, and preserves weak `ViewState` references.
+Strong or unspecified external/data ownership, ambiguous ownership, and
+conflicting root data-map references fail closed. Unknown, unselected, and
+versioned metadata bytes remain source-authoritative.
+
+The raw header/footer host APIs and public raw `TextStorageId`/
+`PagesHeaderFooterInfo` route are retired by this boundary. Header/footer
+number attachments now use the focused package route. Section/template
+lifecycle, inheritance and page-variant settings, media, annotation, and
+other Pages graph responsibilities remain at their recorded owners. This
+does not alter the workspace topology: debt 017, the
+`litchi-iwa -> litchi-pages` edge, the migration host, generated-schema and
+normal Prost/Buffa owners, and the monolith remain.
