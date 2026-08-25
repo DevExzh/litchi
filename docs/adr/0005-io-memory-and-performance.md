@@ -1324,3 +1324,33 @@ package-wide peak-memory, RSS, latency, throughput, zero-copy, or performance
 result, and make no claim that every transaction has one allocation or one
 output-free preflight. No manifest dependency, generated schema, Buffa owner,
 normal Prost owner, or workspace dependency changed.
+
+## 2026-08-25 amendment: Wave77 Pages body-footnote insertion/removal resource record
+
+Implementation commit `5dc2ab5337cb61b72f83e369d818829c355d7141`
+carries one aggregate body-footnote transaction budget across the source
+catalog, rooted body and graph census, strict graph codec, Metadata inspection
+and prepared rewrite, archive parsing and exact sizing, Snappy compression,
+ZIP reassembly, preview deletion, complete candidate reopen, locality checks,
+and retained exact source/target patch artifacts. Distinct scans and private
+candidates are summed, maximum nesting is merged by maximum, and already
+charged borrowed payloads are not charged a second time.
+
+The graph codec and PackageMetadata insertion/removal-plus-save-token routes
+perform strict source validation, exact output sizing, semantic precharge, and
+candidate verification. Prepared metadata execution requirements cover
+output, fields, work, components, references, allocations, retained bytes, and
+scratch before their candidate allocation. The package derives residual
+limits from the transaction rather than resetting full limits for each phase;
+identifier collision work, native graph output, compression bounds, prepared
+ZIP execution, and candidate reread are charged before publication. Fallible
+reservations and typed input/output/field/work/depth/reference/component/
+addition/allocation failures leave the immutable source artifact unchanged.
+
+These are operation-local accounting and atomic-publication facts. They do not
+establish package-wide peak memory, RSS, latency, throughput, zero-copy, or
+performance, and they do not claim a single allocation or one output-free
+preflight for every private stage. No production manifest dependency,
+generated schema, normal Prost owner, Buffa owner, or workspace dependency
+edge changed; fuzz manifests and inventories changed only to register the new
+bounded targets.

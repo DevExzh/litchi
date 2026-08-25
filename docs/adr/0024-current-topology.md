@@ -2349,3 +2349,27 @@ dependency declarations, and 13 ordered migration debts. The
 `litchi-iwa -> litchi-pages` edge remains, as do generated schemas, normal
 Prost/Buffa owners, the migration host, and the monolith. Wave71 retires no
 crate, edge, debt, or host-exit gate.
+
+## 2026-08-25 amendment: Wave77 current-topology Pages body-footnote lifecycle cut
+
+Implementation commit `5dc2ab5337cb61b72f83e369d818829c355d7141` makes
+`litchi-pages` the current owner of bounded body-footnote insertion, selected
+edit/removal, exact patch application, and ordered semantic reads. The focused
+package coordinates the body anchor, table/reference/marker/storage graph,
+strict raw-preserving codec, collision-free identifiers, Metadata UUID and
+external ownership, root watermark, selected save tokens, previews, ZIP
+locality, candidate reopen, and exact inverse artifacts.
+
+The compatibility examples and host route now delegate through the focused
+selector-first transaction rather than retaining a second raw graph writer.
+Wave71 existing-root footnote-text replacement remains available. Ordinary
+body-text cleanup that cannot prove the complete footnote graph and metadata
+ownership remains fail closed, as do malformed, shared, aliased, ambiguous,
+resource-owned, and otherwise unproven lifecycle graphs.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 017 and the
+`litchi-iwa -> litchi-pages` edge remain open because other Pages package
+editing, compatibility examples/tests, and host responsibilities remain. No
+crate, dependency edge, debt item, generated-schema owner, normal Prost/Buffa
+owner, migration host, or monolith is removed by this cut.

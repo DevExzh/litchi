@@ -13453,3 +13453,68 @@ This is bounded application open/render/save/close/reopen acceptance plus exact
 pre-native inverses and strict normalized reread. Pages normalized the package
 bytes; no Rust/native byte parity, performance/RSS result, durable publication,
 or full-workspace claim follows.
+
+## 2026-08-25 amendment: Wave77 Pages body-footnote insertion/removal verification record
+
+The body-footnote lifecycle implementation under verification is commit
+`5dc2ab5337cb61b72f83e369d818829c355d7141`. The focused gates recorded before
+publication were:
+
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib` passed
+  37/37;
+- `cargo test -p litchi-iwa-protos pages_footnote_graph_codec --lib` passed
+  4/4;
+- `cargo test -p litchi-pages --test body_footnote` passed 14/14;
+- the complete `litchi-pages` library passed 113/113;
+- the complete `litchi-iwa-protos` library passed 460/460;
+- `cargo clippy -p litchi-pages --lib -- -D warnings` and the focused
+  body-footnote test-target Clippy gate passed;
+- all-target checks for `litchi-iwa-protos` and `litchi-pages` passed;
+- `cargo check -p litchi-iwa --examples` passed with existing warnings, and
+  the focused host footnote suite passed 13/13 with existing deprecation
+  warnings;
+- the nightly `pages_footnote_graph_codec` and
+  `pages_body_footnote_lifecycle` fuzz-target checks passed;
+- `python3 -m unittest tools.test_check_crate_boundaries` passed 461/461;
+  Python compilation and `git diff --check` passed.
+
+The live boundary checker exited 1 only for exactly the three known
+user-owned untracked Pages table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`); it reported no
+body-footnote finding. Repository-wide pre-commit was not green: unrelated
+unstaged `table_info_codec.rs` and `protobuf.rs` formatting drift, the existing
+Numbers `object_count` and `manual_contains` lint findings, a separate full
+workspace test failure, and disk exhaustion during a doc-test hook prevented
+that aggregate gate. The implementation commit therefore used the verified
+focused gates after the exact unstaged user patch was restored byte-for-byte;
+no full-workspace-green claim follows.
+
+The bounded native record used Pages 14.4 and disposable artifacts under
+`/private/tmp/litchi-wave77-native.hS3X8u`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| insertion source `/private/tmp/litchi_pages_native_body_roundtrip.pages` | 98,657 | `0bf48b09307574b0123d8b9445b44926b774ef0d23dd44cb627857335291e39d` |
+| Rust insertion before Pages | 72,631 | `14877f3e70d4c42ac59454b59984e40f97d1a1a485210723b99dd81881136a85` |
+| exact insertion inverse | 98,657 | `0bf48b09307574b0123d8b9445b44926b774ef0d23dd44cb627857335291e39d` |
+| Pages-normalized insertion | 103,546 | `d539a9255e79fd728c478b057fb3f6201de314a07eec77c76c311cbe4ffb491f` |
+| removal source `/private/tmp/litchi_native_pages_footnote_wave34_original.pages` | 106,395 | `f1875eebaec9343adc7dd9c45ce647d782934875aedc85040e26724b1a4f345d` |
+| Rust removal before Pages | 72,414 | `e4ff1cd817fd4404b13a8d0055ecd2f315205ff00ff0f259dbbaa2dead08bde5` |
+| exact removal inverse | 106,395 | `f1875eebaec9343adc7dd9c45ce647d782934875aedc85040e26724b1a4f345d` |
+| Pages-normalized removal | 101,180 | `37c027fe6573e7bc73ad530d5ccdec32d0a796d1bfa3649c2eb8988f18bd20c5` |
+
+Pages opened the insertion candidate without repair, recovery, or conversion
+UI. It rendered the existing body and the exact footnote text `Wave77 Rust
+inserted footnote — 北区`; Cmd-S, Cmd-W, and exact-path reopen preserved those
+observations. Pages opened the removal candidate without repair and rendered
+the retained three-paragraph body with no Footnote element; save, close, and
+exact-path reopen preserved that absence. Strict Rust reread of both
+Pages-normalized outputs succeeded, and applying each stored inverse to its
+normalized source restored that normalized source exactly.
+
+Pages normalized both ZIP artifacts. This record establishes only bounded
+open/render/save/close/reopen acceptance, exact pre-native inverse artifacts,
+and strict normalized reread. It does not establish Rust/native byte parity,
+arbitrary producer-graph acceptance, durable publication, performance/RSS, or
+a full-workspace gate.

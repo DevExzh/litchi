@@ -5051,3 +5051,34 @@ where documented; this is not Rust/native byte parity, a performance/RSS
 result, durable publication evidence, or a full-workspace gate. The live
 boundary checker retains the three user-owned untracked Pages table-lock
 findings, which are unrelated to this owner.
+
+## 2026-08-25 amendment: Wave77 Pages body-footnote lifecycle bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `5dc2ab5337cb61b72f83e369d818829c355d7141` moves the
+bounded body-footnote lifecycle into the selector-first Pages package: ordered
+read, checked insertion, selected text/custom-mark edit, complete selected
+removal, Metadata UUID/external/watermark/save-token transitions, preview and
+locality verification, candidate reopen, patch conflict detection, and exact
+inverse artifacts. The hidden graph codec remains raw-preserving and strict;
+native identities and generated or wire representations remain private.
+
+The compatibility examples and host lifecycle path now route through that
+owner. This is not a general body-text graph-reclamation authority: ordinary
+body replacement still refuses cleanup when the exact aggregate,
+`FieldInfo`, and Metadata ownership cannot be attributed. Section lifecycle,
+header/footer and other text graphs, table topology and appearance, comments,
+bookmarks, media/drawables, and the remaining Pages compatibility surface stay
+at their recorded owners.
+
+Debt 017, the `litchi-iwa -> litchi-pages` dependency edge, `litchi-iwa` and
+`PagesEditor`, remaining host responsibilities, generated schema/Buffa/Prost
+owners, and the IWA monolith remain. No crate, dependency edge, debt item,
+production manifest dependency, generated-schema owner, normal Prost owner,
+or monolith-exit gate is retired by Wave77.
+
+The Pages 14.4 insertion/removal record provides bounded
+open/render/save/close/reopen acceptance, exact pre-native inverses, and strict
+Rust reread of both normalized artifacts. Pages normalized the ZIP bytes; this
+is not Rust/native byte parity, arbitrary graph acceptance, a performance/RSS
+result, durable publication evidence, full-workspace health, or a host,
+dependency-edge, debt, or monolith-exit gate.
