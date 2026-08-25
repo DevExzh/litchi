@@ -26,7 +26,7 @@ use zeroize::Zeroizing;
 const MAX_MANIFEST_TEXT_BYTES: usize = 1024;
 const MANIFEST_PATH: &str = "META-INF/manifest.xml";
 const LOEXT_NAMESPACE: &[u8] =
-    b"urn:org:documentfoundation:names:experimental:office:xmlns:manifest:1.0";
+    b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 
 fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
     if source.has_zip_encrypted_entries() {
@@ -429,6 +429,14 @@ use crate::package::validate_manifest_path;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 
+fn normalized_manifest_path(path: &str) -> &str {
+    if path == "/" {
+        "/"
+    } else {
+        path.strip_prefix('/').unwrap_or(path)
+    }
+}
+
 fn invalid_odf_datetime(value: &str, field: &str) -> Error {
     Error::InvalidFormat(format!("invalid ODF {field} date-time '{value}'"))
 }
@@ -566,6 +574,7 @@ pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
     manifest_metadata_bytes: u64,
     archive_entry_count: usize,
     manifest_version: String,
+    preserved_manifest: Option<PreservedManifest>,
     wrote_any_entry: bool,
     wrote_mimetype: bool,
     wrote_payload_entry: bool,
@@ -592,6 +601,11 @@ struct ManifestEntry {
     media_type: String,
     size: Option<u64>,
     encryption: Option<ManifestEncryption>,
+}
+
+struct PreservedManifest {
+    bytes: Vec<u8>,
+    entries: std::collections::HashMap<String, ManifestEntry>,
 }
 
 /// Helper to create standard ODF directory structure.
@@ -665,6 +679,7 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
             manifest_metadata_bytes: 0,
             archive_entry_count: 0,
             manifest_version: "1.3".to_string(),
+            preserved_manifest: None,
             wrote_any_entry: false,
             wrote_mimetype: false,
             wrote_payload_entry: false,
@@ -711,6 +726,7 @@ impl<W: Write> PackageWriter<W> {
             manifest_metadata_bytes: 0,
             archive_entry_count: 0,
             manifest_version: "1.3".to_string(),
+            preserved_manifest: None,
             wrote_any_entry: false,
             wrote_mimetype: false,
             wrote_payload_entry: false,
@@ -884,17 +900,19 @@ impl<W: Write> PackageWriter<W> {
         }
         if !value.is_ascii()
             || value
-                .chars()
-                .any(|character| character.is_control() || character.is_whitespace())
+                .bytes()
+                .any(|byte| (byte < 0x20 && byte != b'\t') || byte == 0x7f)
         {
             return Err(Error::InvalidFormat(format!(
-                "ODF {field} must be ASCII and contain no whitespace or control characters"
+                "ODF {field} must be ASCII and contain no unsafe control characters"
             )));
         }
 
-        let mut parts = value.split('/');
+        let mut segments = value.split(';');
+        let essence = segments.next().unwrap_or_default().trim();
+        let mut parts = essence.split('/');
         let top_level = parts.next().unwrap_or_default();
-        let subtype = parts.next().unwrap_or_default();
+        let subtype = parts.next();
         let valid_token = |token: &str| {
             !token.is_empty()
                 && token.bytes().all(|byte| {
@@ -918,9 +936,13 @@ impl<W: Write> PackageWriter<W> {
                         )
                 })
         };
-        if !valid_token(top_level) || !valid_token(subtype) || parts.next().is_some() {
+        if !valid_token(top_level)
+            || !subtype.is_some_and(valid_token)
+            || parts.next().is_some()
+            || segments.any(|parameter| parameter.trim().is_empty())
+        {
             return Err(Error::InvalidFormat(format!(
-                "ODF {field} must contain exactly one valid type/subtype pair"
+                "ODF {field} must contain a valid type/subtype and non-empty parameters"
             )));
         }
         Ok(())
@@ -1582,6 +1604,86 @@ impl<W: Write> PackageWriter<W> {
         Ok(())
     }
 
+    /// Request exact publication of a validated source manifest when the
+    /// final staged inventory remains equivalent to that source inventory.
+    ///
+    /// This is an opt-in preservation slot rather than an immediate write:
+    /// later member additions or removals are compared at finalization. The
+    /// request is deliberately ignored for legacy-only manifest locations,
+    /// signed sources, encrypted metadata, and raw metadata larger than the
+    /// writer's bounded metadata ceiling. Those cases continue through
+    /// canonical manifest generation. Source rebuilds that copy auxiliary
+    /// members retain the copy path's explicit refusal for unsupported
+    /// unencrypted `manifest:size` metadata.
+    pub fn preserve_source_manifest(&mut self, source: &OwnedPackage) -> Result<()> {
+        self.preserved_manifest = None;
+
+        let has_canonical_manifest = source.has_file(MANIFEST_PATH)?;
+        let has_legacy_manifest = source.has_file("manifest.xml")?;
+        if has_canonical_manifest && has_legacy_manifest {
+            return Err(Error::Unsupported(
+                "ODF source contains both canonical and legacy manifest members".to_string(),
+            ));
+        }
+        if !has_canonical_manifest {
+            return Ok(());
+        }
+        let source_files = source.files()?;
+        if source_files.iter().any(|path| path.ends_with('/'))
+            || source_files
+                .iter()
+                .any(|path| is_signature_owner_path(path))
+        {
+            return Ok(());
+        }
+
+        ensure_source_manifest_rewritable(source)?;
+        let package = source.package()?;
+        let source_manifest = package.manifest();
+        if source_manifest.has_encrypted_entries()
+            || source_manifest
+                .entries
+                .values()
+                .any(|entry| entry.size.is_some())
+        {
+            return Ok(());
+        }
+
+        let bytes = source.get_file(MANIFEST_PATH)?;
+        let byte_count = u64::try_from(bytes.len()).map_err(|error| {
+            Error::InvalidFormat(format!("ODF source manifest is too large: {error}"))
+        })?;
+        if byte_count > self.limits.max_metadata_bytes {
+            return Ok(());
+        }
+
+        let mut entries = std::collections::HashMap::new();
+        entries
+            .try_reserve(source_manifest.entries.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODF preserved manifest entries",
+                source,
+            })?;
+        for (path, entry) in &source_manifest.entries {
+            let normalized_path = normalized_manifest_path(path).to_string();
+            if entries.contains_key(&normalized_path) {
+                return Ok(());
+            }
+            entries.insert(
+                normalized_path,
+                ManifestEntry {
+                    full_path: path.clone(),
+                    media_type: entry.media_type.clone(),
+                    size: entry.size,
+                    encryption: entry.encryption.clone(),
+                },
+            );
+        }
+
+        self.preserved_manifest = Some(PreservedManifest { bytes, entries });
+        Ok(())
+    }
+
     fn inherit_manifest_version(&mut self, source: &OwnedPackage) -> Result<()> {
         let bytes = source
             .get_file("META-INF/manifest.xml")
@@ -1591,6 +1693,32 @@ impl<W: Write> PackageWriter<W> {
             self.manifest_version = version;
         }
         Ok(())
+    }
+
+    fn preserved_manifest_if_equivalent(&self) -> Option<&[u8]> {
+        let preserved = self.preserved_manifest.as_ref()?;
+        if self.document_signer.is_some() || preserved.entries.len() != self.manifest_entries.len()
+        {
+            return None;
+        }
+        for entry in &self.manifest_entries {
+            let normalized_path = normalized_manifest_path(&entry.full_path);
+            let source_entry = preserved.entries.get(normalized_path)?;
+            if source_entry.media_type != entry.media_type
+                || source_entry.size != entry.size
+                || source_entry.encryption != entry.encryption
+            {
+                return None;
+            }
+        }
+        Some(preserved.bytes.as_slice())
+    }
+
+    fn final_manifest_bytes(&self) -> Result<Vec<u8>> {
+        if let Some(bytes) = self.preserved_manifest_if_equivalent() {
+            return Ok(bytes.to_vec());
+        }
+        Ok(self.generate_manifest()?.into_bytes())
     }
 
     /// Generate the manifest.xml content
@@ -1747,16 +1875,24 @@ impl<W: Write> PackageWriter<W> {
                 "MIME type not set".to_string(),
             )));
         }
-        let fixed_bytes = self
-            .manifest_fixed_metadata_bytes()
-            .map_err(PackageWriterError::Core)?;
-        let manifest_bytes = fixed_bytes
-            .checked_add(self.manifest_metadata_bytes)
-            .ok_or_else(|| {
-                PackageWriterError::Core(Error::InvalidFormat(
-                    "ODF manifest metadata size overflow".to_string(),
-                ))
-            })?;
+        let manifest_bytes = if let Some(raw_manifest) = self.preserved_manifest_if_equivalent() {
+            u64::try_from(raw_manifest.len()).map_err(|error| {
+                PackageWriterError::Core(Error::InvalidFormat(format!(
+                    "ODF preserved manifest metadata is too large: {error}"
+                )))
+            })?
+        } else {
+            let fixed_bytes = self
+                .manifest_fixed_metadata_bytes()
+                .map_err(PackageWriterError::Core)?;
+            fixed_bytes
+                .checked_add(self.manifest_metadata_bytes)
+                .ok_or_else(|| {
+                    PackageWriterError::Core(Error::InvalidFormat(
+                        "ODF manifest metadata size overflow".to_string(),
+                    ))
+                })?
+        };
         if manifest_bytes > self.limits.max_metadata_bytes {
             return Err(self.manifest_limit_error(
                 PackageWriterLimitResource::MetadataBytes,
@@ -1784,8 +1920,11 @@ impl<W: Write> PackageWriter<W> {
     ) -> PackageWriterResult<(W, Option<crate::signature::DocumentSigner>)> {
         self.validate_finish_publication()?;
 
-        // Generate and write manifest.
-        let manifest_content = match self.generate_manifest() {
+        // Select and write the manifest only after every staged entry has been
+        // accounted for. A retained source payload is already validated by
+        // `OwnedPackage`; generated content still goes through the authored
+        // XML publication audit.
+        let manifest_content = match self.final_manifest_bytes() {
             Ok(content) => content,
             Err(error) => {
                 return Err(Self::map_stream_error(
@@ -1795,11 +1934,10 @@ impl<W: Write> PackageWriter<W> {
                 ));
             },
         };
-        if let Err(error) = Self::validate_authored_xml(
-            "META-INF/manifest.xml",
-            manifest_content.as_bytes(),
-            "text/xml",
-        ) {
+        if self.preserved_manifest_if_equivalent().is_none()
+            && let Err(error) =
+                Self::validate_authored_xml("META-INF/manifest.xml", &manifest_content, "text/xml")
+        {
             return Err(Self::map_stream_error(
                 error,
                 self.zip_writer.output_bytes(),
@@ -1808,7 +1946,7 @@ impl<W: Write> PackageWriter<W> {
         }
         if let Err(error) = self
             .zip_writer
-            .write_deflated_sized("META-INF/manifest.xml", manifest_content.as_bytes())
+            .write_deflated_sized("META-INF/manifest.xml", &manifest_content)
         {
             return Err(self.map_archive_error(error));
         }
@@ -2393,6 +2531,15 @@ mod tests {
             .unwrap();
         let error = writer.copy_auxiliary_files_from(&source).unwrap_err();
         assert!(error.to_string().contains("encrypted entries"));
+    }
+
+    #[test]
+    fn source_manifest_accepts_loext_key_derivation_attributes() {
+        let accepted = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"><m:key-derivation loext:argon2-iterations="1"/></m:manifest>"#;
+        assert!(ensure_supported_manifest_metadata(accepted).is_ok());
+
+        let rejected = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:manifest:1.0"><m:key-derivation loext:argon2-iterations="1"/></m:manifest>"#;
+        assert!(ensure_supported_manifest_metadata(rejected).is_err());
     }
 
     #[test]

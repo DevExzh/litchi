@@ -1644,22 +1644,43 @@ impl MutablePresentation {
     /// ```
     pub(super) fn to_bytes_bounded(&self, limit: usize) -> Result<Vec<u8>> {
         let mut writer = PackageWriter::new_bounded(limit);
+        let source_manifest = self
+            .source_package
+            .as_ref()
+            .map(|package| package.package())
+            .transpose()?;
 
         // Set MIME type
         writer.set_mimetype(&self.mimetype)?;
 
         // Add content.xml (regenerated from mutable state)
         let content_xml = self.generate_content_xml()?;
-        writer.add_file("content.xml", content_xml.as_bytes())?;
+        let content_media_type = source_manifest
+            .as_ref()
+            .and_then(|package| package.manifest().get_media_type("content.xml"))
+            .unwrap_or("text/xml");
+        writer.add_file_with_media_type(
+            "content.xml",
+            content_xml.as_bytes(),
+            content_media_type,
+        )?;
 
         // Add styles.xml (preserved or default)
         let default_styles = Structure::default_styles_xml();
         let styles_xml = self.styles_xml.as_deref().unwrap_or(&default_styles);
-        writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        let styles_media_type = source_manifest
+            .as_ref()
+            .and_then(|package| package.manifest().get_media_type("styles.xml"))
+            .unwrap_or("text/xml");
+        writer.add_file_with_media_type("styles.xml", styles_xml.as_bytes(), styles_media_type)?;
 
         // Add meta.xml (patched from the source or regenerated with current metadata)
         let meta_xml = self.generate_meta_xml()?;
-        writer.add_file("meta.xml", meta_xml.as_bytes())?;
+        let meta_media_type = source_manifest
+            .as_ref()
+            .and_then(|package| package.manifest().get_media_type("meta.xml"))
+            .unwrap_or("text/xml");
+        writer.add_file_with_media_type("meta.xml", meta_xml.as_bytes(), meta_media_type)?;
 
         for (path, media) in &self.media_files {
             writer.add_file_with_media_type(path, &media.bytes, &media.media_type)?;
@@ -1669,6 +1690,10 @@ impl MutablePresentation {
             let mut excluded = self.media_files.keys().cloned().collect::<Vec<_>>();
             excluded.extend(self.removed_media_paths.iter().cloned());
             writer.copy_auxiliary_files_from_except(package, &excluded, &[])?;
+            // Opt in only after every regenerated and copied member has been
+            // staged. PackageWriter decides at finalization whether the
+            // source manifest inventory still matches exactly.
+            writer.preserve_source_manifest(package)?;
         }
 
         writer.finish_to_bounded_bytes()
