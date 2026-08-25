@@ -13739,3 +13739,57 @@ proves only the native graph's Numbers open/render/save/close/reopen behavior;
 it does not establish Rust/native mutation interoperability, byte parity,
 arbitrary producer-graph acceptance, durable publication, performance/RSS, or
 a full-workspace gate.
+
+## 2026-08-25 amendment: Wave82 Keynote movie-playback verification record
+
+Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
+was verified with these focused gates:
+
+- strict movie-playback codec tests passed 7/7;
+- the focused `litchi-keynote` slide-movie-playback integration passed 8/8,
+  including exact no-op, replacement, optional-field clearing, conflict,
+  inverse/apply, malformed input, unknown framing, file-movie refusal,
+  metadata independence, preview preservation, and ingress limits;
+- `litchi-iwa-protos` and `litchi-keynote` all-target checks passed, and strict
+  library Clippy passed for both crates; strict Clippy also passed for the
+  focused Keynote integration target;
+- the migrated `litchi-iwa` scratch movie CRUD regression passed 1/1 and the
+  host library check passed with its recorded deprecation/dead-code warnings;
+- the strict codec and package-lifecycle fuzz targets compiled;
+- boundary Python compilation and all 497 boundary tests passed, and the live
+  checker reported no Wave82 finding;
+- exact-file Rust formatting and working/index diff checks passed.
+
+The live checker exited 1 only for the three known user-owned untracked Pages
+table-lock findings (`body_table_lock_state`, `set_body_table_lock_state`, and
+the returned `crates/litchi-iwa/src/pages/editor/tables/lock.rs`). A global
+pre-commit attempt was not a Wave82 gate: its whole-worktree formatter found
+two excluded user-owned files, and its workspace Clippy found the recorded
+Numbers `object_count`/`manual_contains` baseline. The hook's temporary patch
+was restored exactly, and the implementation commit used the completed scoped
+gates without modifying or staging those files. No full-workspace-green claim
+follows.
+
+The fresh Keynote 14.4 native record used these disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `/private/tmp/litchi-wave82-movie-playback.eoLVlc/source.key` | 663,567 | `b3a87256391c7e600cb2658ee10fc9575c6a6cbb40e679014e7ebc3f3b8db87f` |
+| Rust candidate `/private/tmp/litchi-wave82-movie-playback.eoLVlc/rust-candidate.key` | 663,567 | `75a57ba35df605c4447ba48569a014ab8cf96bcfd9af5a20fd51dba4ade80f4a` |
+| exact Rust inverse `/private/tmp/litchi-wave82-movie-playback.eoLVlc/rust-inverse.key` | 663,567 | `b3a87256391c7e600cb2658ee10fc9575c6a6cbb40e679014e7ebc3f3b8db87f` |
+| Keynote-saved artifact `/private/tmp/litchi-wave82-movie-playback.eoLVlc/keynote-saved.key` | 738,126 | `3dfe26f1b6337c4e10cc5f08e5a468e7d2a9912a66c5ce435853e319a5eb8fe5` |
+
+Rust changed the existing file-backed movie from Repeat/75% volume to Loop
+Back and Forth/25% while preserving its 0-second start/poster and 3-second end;
+the inverse restored the source bytes exactly. Keynote opened the Rust
+candidate without repair, recovery, or conversion UI, rendered the embedded
+`source.mov` at the existing 640-by-360-point geometry with its title/caption,
+and exposed Volume `0.25` and `Loop Back and Forth`. After Save, Close, and
+exact-path Reopen, the same media and playback controls persisted. Strict Rust
+reread of the Keynote-normalized artifact returned the same semantic playback
+values.
+
+Keynote normalized the saved ZIP bytes. This is bounded open/render/control/
+save/close/reopen and strict semantic-reread evidence only; it is not
+Rust/native byte parity, arbitrary graph acceptance, performance/RSS,
+publication durability, or a full-workspace claim.

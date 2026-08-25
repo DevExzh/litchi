@@ -5216,3 +5216,33 @@ inverse, normalized reread, or native mutation acceptance is claimed. This is
 not Rust/native byte parity, arbitrary producer-graph acceptance, a
 performance/RSS result, durable publication evidence, or a full-workspace
 claim.
+
+## 2026-08-25 amendment: Wave82 Keynote movie-playback bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
+moves admitted existing file-backed Keynote slide-movie playback reads and
+scalar replacement into the selector-first package. The archive-free facade
+contains no native ID or physical IWA type. The strict hidden codec and package
+jointly own raw-preserving playback projection, unique rooted same-component
+selection, operation-local budgeting, staged-private atomic publication,
+candidate validation/readback, exact patch/inverse, and locality for this
+narrow slice. Metadata and previews remain byte-exact.
+
+This is not movie graph, media/poster, geometry, title/caption, build, audio,
+or cross-component ownership. Duplicate, aliased, non-file, parent/owner-
+ambiguous, malformed, or unsupported producer graphs fail closed. The former
+raw-ID Keynote playback methods are retired, while the shared media adapter and
+remaining Keynote, Pages, and Numbers compatibility responsibilities retain
+their recorded owners.
+
+Debt 014, the `litchi-iwa -> litchi-keynote` dependency edge, debts 015 and
+017, `litchi-iwa`, remaining migration hosts, generated-schema, Buffa, and
+normal Prost owners, and the IWA monolith remain. No crate, dependency edge,
+debt item, production manifest dependency, generated-schema owner, normal
+Prost owner, migration host, or monolith-exit gate is retired by Wave82.
+
+The Keynote 14.4 record proves bounded native open/render/control/save/close/
+reopen of the Rust candidate, an exact pre-native inverse, and strict semantic
+reread of the Keynote-normalized artifact. Keynote normalized the ZIP bytes;
+this is not Rust/native byte parity, arbitrary producer-graph acceptance,
+performance/RSS, durable publication evidence, or a full-workspace claim.

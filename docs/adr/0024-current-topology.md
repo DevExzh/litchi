@@ -2471,3 +2471,28 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 edge, migration hosts, generated-schema and normal Prost/Buffa owners, and the
 IWA monolith. No crate, dependency edge, debt item, production manifest
 dependency, or monolith is removed by this cut.
+
+## 2026-08-25 amendment: Wave82 current-topology Keynote movie-playback cut
+
+Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
+makes `litchi-keynote` the current owner of selector-first playback reads,
+replacement, exact patch application, and inverse artifacts for admitted
+existing rooted file-backed slide movies. The package owns strict slide/movie
+selection, same-component identity and owner proof, playback-codec execution,
+aggregate resource accounting, prepared reassembly, candidate validation and
+semantic readback, and exact object/member locality. Metadata and previews are
+preserved rather than rewritten.
+
+The former raw-ID `KeynoteEditor::{slide_movie_playback_settings,
+set_slide_movie_playback_settings}` methods are retired. The tracked Keynote
+movie example and compatibility-host regression use the focused package. The
+shared private media-playback implementation, movie graph/media creation and
+removal, geometry, title/caption, builds, and Pages/Numbers media hosts retain
+their recorded owners.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 014 and the
+`litchi-iwa -> litchi-keynote` edge remain open, as do debts 015 and 017,
+migration hosts, generated-schema and normal Prost/Buffa owners, and the IWA
+monolith. No crate, dependency edge, debt item, production manifest
+dependency, or monolith is removed by this cut.

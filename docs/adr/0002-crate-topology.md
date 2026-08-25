@@ -3624,3 +3624,35 @@ the `litchi-iwa -> litchi-numbers` edge, debt 017 and the Pages edge, migration
 hosts, generated-schema and normal Prost/Buffa owners, and the IWA monolith
 remain. No crate, dependency edge, debt item, production manifest dependency,
 or monolith owner is removed by this cut.
+
+## 2026-08-25 amendment: Wave82 Keynote movie-playback boundary
+
+Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
+makes `litchi-keynote` the authoritative owner of playback-scalar reads and
+replacement for admitted existing rooted file-backed slide movies. The
+archive-free facade is `Package::{slide_movie_playback_settings,
+edit_slide_movie_playback_settings, apply_slide_movie_playback_settings}`
+with `SlideSelector`, `MovieSelector`, and `MediaPlaybackSettings`. Native
+object IDs, component/member locators, raw bytes, generated archives, Prost
+values, and Buffa views do not cross that boundary.
+
+The hidden neutral movie-playback codec owns the strict source-preserving
+projection of the selected `TSD.MovieArchive` playback fields and its private
+Buffa lazy sidecar. The package owns rooted selector resolution, file-movie
+and same-component ownership proof, strict reference validation, aggregate
+resource accounting, exact patch/inverse artifacts, prepared ZIP publication,
+candidate validation/readback, and member/object locality. Metadata and
+preview members are not mutated by this scalar owner.
+
+The raw-ID `KeynoteEditor::{slide_movie_playback_settings,
+set_slide_movie_playback_settings}` methods are retired, and the tracked
+Keynote movie example and compatibility-host regression use the focused
+package. The shared private `litchi-iwa` media-playback implementation remains
+for Pages, Numbers, and unmigrated graph responsibilities.
+
+The workspace inventory remains 64 packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debt 014, the
+`litchi-iwa -> litchi-keynote` edge, debt 015 and 017, migration hosts,
+generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
+No crate, dependency edge, debt item, production manifest dependency, or
+monolith owner is removed by this cut.
