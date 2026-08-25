@@ -6,6 +6,7 @@ publish = false
 
 [features]
 allocator-metrics = []
+xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
 
 [[bin]]
@@ -17,6 +18,11 @@ required-features = ["allocator-metrics"]
 name = "xlsb_crud"
 path = "src/bin/xlsb_crud.rs"
 required-features = ["xlsb-crud"]
+
+[[bin]]
+name = "xls_source_attribution"
+path = "src/bin/xls_source_attribution.rs"
+required-features = ["xls-source-attribution"]
 
 [dependencies]
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
