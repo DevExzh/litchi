@@ -3478,3 +3478,27 @@ This is an API-boundary and one-operation ownership step. It does not remove a
 crate or manifest edge, change generated-schema or normal Prost/Buffa owners,
 or complete the migration host. The 64-package/239-declaration topology and
 13-entry ordered debt ledger remain in force.
+
+## 2026-08-25 amendment: Wave77 Pages body-footnote insertion/removal boundary
+
+Implementation commit `5dc2ab5337cb61b72f83e369d818829c355d7141` moves the
+bounded body-footnote lifecycle boundary into `litchi-pages`. The focused
+surface now owns ordered semantic reads, checked UTF-16 insertion, existing
+footnote edit/removal, exact patch application and inverse artifacts through
+`Package::{body_footnotes, insert_body_footnote, edit_body_footnote,
+apply_body_footnote}` and the archive-free `footnote::body::{Footnote,
+Position, Selector}` vocabulary. Native identifiers, component routes, ZIP or
+IWA values, generated messages, Prost values, and Buffa views remain private.
+
+The compatibility examples and host footnote lifecycle route now use the
+focused package transaction. The former host graph mutator is not retained as
+a competing public raw-ID owner. Existing-root footnote-text replacement from
+Wave71 remains a compatible narrow transaction; arbitrary ordinary-body text
+cleanup that would need to infer and cull an unattributed footnote graph still
+fails closed.
+
+This boundary change does not alter the workspace topology. The authoritative
+64-package, 239-internal-declaration inventory and 13 ordered migration debts
+remain in force. In particular, debt 017, the `litchi-iwa -> litchi-pages`
+edge, remaining Pages compatibility responsibilities, generated-schema and
+normal Prost/Buffa owners, and the migration host remain.

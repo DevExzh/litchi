@@ -2874,3 +2874,43 @@ message, Buffa view, or Prost type crosses the semantic facade. The six raw-ID
 Pages dimension methods and their tracked layout owner are retired by the
 compatibility cut; other Pages table and document responsibilities remain at
 their recorded owners.
+
+## 2026-08-25 amendment: Pages body-footnote insertion/removal semantic ownership
+
+Implementation commit `5dc2ab5337cb61b72f83e369d818829c355d7141`
+establishes the selector-first Pages body-footnote lifecycle owner. The public
+surface is `Package::{body_footnotes, insert_body_footnote,
+edit_body_footnote, apply_body_footnote}`, the archive-free
+`footnote::body::{Footnote, Position, Selector}` values, and the typed
+`BodyFootnote{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` transaction
+types. Insertion accepts one checked UTF-16 body position, text, and an
+optional custom mark. An existing edit may replace text or the custom mark, or
+clear the complete selected graph. Exact no-ops preserve the source artifact.
+
+The hidden strict `pages_footnote_graph_codec` owns raw-preserving body anchor,
+footnote-table, reference-attachment, marker, and storage graph projections
+and rewrites. The package owns rooted body/storage selection, ordered semantic
+projection, collision-free identifier allocation, global aggregate and
+`FieldInfo` ownership census, Metadata UUID/external-reference/watermark and
+save-token transitions, preview invalidation, exact package locality,
+candidate reopen, patch conflict detection, and exact inverse artifacts.
+Malformed known wire, duplicate or missing required values, shared or aliased
+owners, ambiguous metadata, resource ownership, cross-component divergence,
+and otherwise unproven graphs fail closed. Unknown fields and supported opaque
+framing remain source-authoritative.
+
+Insertion registers the new storage object's UUID while the reference and
+marker remain archive-owned. When the current `ViewState` component is
+present, the transaction adds the exact weak ViewState-to-Document/storage
+external edge and advances both selected current component tokens; without
+that component, only the exact Document selector is updated. Removal deletes
+the selected graph, its storage UUID, and the authorized current external
+tuple, advances the selected tokens once, and deliberately retains the root
+last-object-identifier watermark. All metadata changes and the native graph
+rewrite publish atomically.
+
+No native identifier, archive/member name, component selector, wire value,
+generated schema type, Prost message, or Buffa view crosses the public facade.
+This owner does not authorize ordinary-body replacement to infer or reclaim an
+unattributed footnote graph, and it does not move unrelated Pages text,
+annotation, section, table, or media responsibilities.
