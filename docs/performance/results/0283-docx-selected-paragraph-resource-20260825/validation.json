@@ -1,0 +1,131 @@
+{
+  "schema": "litchi.docx.source-selected-paragraph.validation.v1",
+  "run_mode": "authoritative",
+  "result": "pass",
+  "independent_tester": {
+    "checks_passed": 314,
+    "checks_total": 314,
+    "failures": 0,
+    "failure_records": []
+  },
+  "corpus": {
+    "generator": "litchi-docx-source-selected-paragraph-media-v2",
+    "archive_bytes": 16786572,
+    "archive_sha256": "a4384c2c249ef87bac6150f92b1a839d4555872f5c9b6ffe6b3d849f47bb7fef",
+    "member_count": 15,
+    "media_member_count": 8,
+    "media_payload_bytes": 2097152,
+    "direct_body_paragraph_count": 201,
+    "target_index": 100,
+    "expected_text": "source-selected-paragraph-0100"
+  },
+  "provenance": {
+    "implementation_commit": "01936e4f1",
+    "resource_and_lock_fix_commit": "3044d83d8",
+    "runner_revision": "cc5062a77",
+    "authoritative_revision": "df2cb38f6ddbb34ae1a83a942755d4baeb8c1179",
+    "cargo_lock_sha256": "723fc29f56056ef8f155f60aa6b4d011d4d648bd3bc4d2e0b03341f65f0d3c71",
+    "rustc": "rustc 1.95.0 (59807616 2026-04-14)",
+    "rustc_normalization": "trim trailing whitespace",
+    "rustc_vv_sha256": "0f1e5974425d9a3f3697d68725b2196a47e04096fb98160ce78b3b706d7c5054",
+    "profile": "release",
+    "executable": {
+      "name": "docx_source_selected_paragraph",
+      "bytes": 8555792,
+      "sha256": "6b65e7c2f50ab28fce1263ffc0d3c04bd60d956ce50fcc6017591648ba43d9fc"
+    }
+  },
+  "retained_files": [
+    {
+      "path": "evidence.json",
+      "bytes": 27994,
+      "sha256": "d129b46d5975207589de3cfa3f649344f2128f534e6b15d9b8ad201d3009e585"
+    },
+    {
+      "path": "evidence.json.sha256.json",
+      "bytes": 91,
+      "sha256": "a46485d8b5a4d22038a2e6de525f4a40513a7eb73ea91355c5f4d6d13061d492"
+    },
+    {
+      "path": "build-manifest.json",
+      "bytes": 846,
+      "sha256": "62f19742deb259c71066cf2be595951f337fbb712228ffb4ddeb73be34a1b640"
+    }
+  ],
+  "phase_counters": {
+    "open_without_semantic_payload": {
+      "read_calls": 18,
+      "requested_bytes": 2096,
+      "returned_bytes": 2096,
+      "len_calls": 1,
+      "version_calls": 6,
+      "zip_structural_requested_bytes": 1300,
+      "catalog_relationship_requested_bytes": 796,
+      "unclassified_requested_bytes": 0
+    },
+    "document_materialization_main_document_only": {
+      "read_calls": 5,
+      "requested_bytes": 709,
+      "returned_bytes": 709,
+      "version_calls": 7,
+      "main_document_requested_bytes": 663,
+      "zip_structural_requested_bytes": 46,
+      "unclassified_requested_bytes": 0
+    },
+    "paragraph_query": {
+      "read_calls": 0,
+      "requested_bytes": 0,
+      "returned_bytes": 0,
+      "cache_cold_loads": 0
+    },
+    "out_of_bounds_query": {
+      "read_calls": 0,
+      "requested_bytes": 0,
+      "returned_bytes": 0,
+      "cache_cold_loads": 0
+    },
+    "stale_refusal": {
+      "snapshot_query_source_reads": 0,
+      "package_reentry_typed_source_changed": true
+    }
+  },
+  "cache_and_budget": {
+    "cold_loads": 1,
+    "successful_loads": 1,
+    "retained_entries": 1,
+    "retained_bytes": 12776,
+    "managed_budget_memory_before_open": 0,
+    "managed_budget_memory_after_document": 12776,
+    "managed_budget_memory_after_drop": 0,
+    "managed_budget_released_after_drop": true
+  },
+  "critical_gate_assertions": {
+    "corpus_identity": true,
+    "executable_identity": true,
+    "lock_identity": true,
+    "compiler_identity": true,
+    "eager_selected_text": true,
+    "facade_selected_text": true,
+    "eager_out_of_bounds_none": true,
+    "facade_out_of_bounds_none": true,
+    "facade_stale_source_changed": true,
+    "source_version_unchanged_before_stale": true,
+    "main_document_is_the_only_semantic_payload_materialized": true,
+    "paragraph_query_does_no_source_work": true,
+    "out_of_bounds_query_does_no_source_work": true,
+    "cache_reused_after_materialization": true,
+    "managed_budget_released_after_drop": true,
+    "no_failed_artifact_retained": true,
+    "performance_claim": false
+  },
+  "review": {
+    "p0_findings": 0,
+    "p1_findings": 0,
+    "p2_findings": 0
+  },
+  "claim": {
+    "authorized": true,
+    "scope": "selected paragraph access after one main-document materialization; logical ReadAt/cache/managed-budget evidence only",
+    "performance_claim": "none"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "litchi.docx.source-selected-paragraph.artifact-manifest.v1",
+  "self_excluded": true,
+  "authoritative_revision": "df2cb38f6ddbb34ae1a83a942755d4baeb8c1179",
+  "runner_revision": "cc5062a77",
+  "cargo_lock_sha256": "723fc29f56056ef8f155f60aa6b4d011d4d648bd3bc4d2e0b03341f65f0d3c71",
+  "rustc_vv_sha256": "0f1e5974425d9a3f3697d68725b2196a47e04096fb98160ce78b3b706d7c5054",
+  "files": [
+    {
+      "path": "evidence.json",
+      "bytes": 27994,
+      "sha256": "d129b46d5975207589de3cfa3f649344f2128f534e6b15d9b8ad201d3009e585"
+    },
+    {
+      "path": "evidence.json.sha256.json",
+      "bytes": 91,
+      "sha256": "a46485d8b5a4d22038a2e6de525f4a40513a7eb73ea91355c5f4d6d13061d492"
+    },
+    {
+      "path": "build-manifest.json",
+      "bytes": 846,
+      "sha256": "62f19742deb259c71066cf2be595951f337fbb712228ffb4ddeb73be34a1b640"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 4250,
+      "sha256": "7177ec669717e8a3ab7e48d5338e8a4fd384c435e397dcb9cd955de0feb81359"
+    },
+    {
+      "path": "sha256.txt",
+      "bytes": 340,
+      "sha256": "74f798be522f0c85b43b62feff4d8bed0fa24a7793cb4f8f1b83c51113e6e872"
+    }
+  ],
+  "external_executable": {
+    "path": "docx_source_selected_paragraph",
+    "bytes": 8555792,
+    "sha256": "6b65e7c2f50ab28fce1263ffc0d3c04bd60d956ce50fcc6017591648ba43d9fc",
+    "revision": "df2cb38f6ddbb34ae1a83a942755d4baeb8c1179"
+  }
+}
