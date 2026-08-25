@@ -13,6 +13,7 @@ use litchi_iwa_archive::package::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
+    numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_pop_up_menu_codec as popup_codec,
     numbers_table_cell_storage_codec as storage_codec,
     package_metadata_codec::{
@@ -28,8 +29,24 @@ use super::{
     table_cell_pop_up_menu_native as popup_native,
 };
 use crate::{
-    SheetSelector, TableSelector, cell::data_format::pop_up_menu::PopUpMenu, table::CellPosition,
+    SheetSelector, TableSelector,
+    cell::data_format::control::{DisplayFormat, Range},
+    cell::data_format::number::{
+        CurrencyCode, DecimalPlaces, FixedDecimalPlaces, FractionAccuracy,
+        NegativeStyle as NumberNegativeStyle, ThousandsSeparator,
+    },
+    cell::data_format::numeral_system::{
+        Base, FixedPlaces, NegativeStyle as NumeralNegativeStyle, Places,
+    },
+    cell::data_format::{
+        CellControl, Checkbox, Currency, CurrencyStyle, Fraction, Number, NumeralSystem,
+        Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper,
+    },
+    table::CellPosition,
 };
+
+const LIST_FORMAT: i32 = 2;
+const LIST_CONTROL_CELL_SPEC: i32 = 12;
 
 /// A content-free location associated with a Pop-Up Menu operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -460,15 +477,16 @@ impl Package {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct CellTarget {
-    sheet_position: usize,
-    table_position: usize,
-    position: CellPosition,
-    model_identifier: u64,
-    component_index: usize,
-    object_index: usize,
-    message_index: usize,
-    message_type: u32,
+pub(super) struct CellTarget {
+    pub(super) sheet_position: usize,
+    pub(super) table_position: usize,
+    pub(super) position: CellPosition,
+    pub(super) model_identifier: u64,
+    pub(super) component_index: usize,
+    pub(super) object_index: usize,
+    pub(super) message_index: usize,
+    pub(super) message_type: u32,
+    pub(super) locked: bool,
 }
 
 /// One operation-local ledger shared by the rooted catalog, native graph,
@@ -576,6 +594,25 @@ impl TransactionBudget {
             remaining_transaction_work: max_transaction_work,
             remaining_allocations: max_allocations,
         }
+    }
+
+    /// Construct the aggregate ledger used by the unified scalar-control
+    /// route. That route scans the model, data store, tiles, both co-located
+    /// lists, every mixed CellSpec, and Metadata under one transaction. The
+    /// archive's IWA-stream ceiling is a per-message bound, so summing all of
+    /// those distinct reports against it would incorrectly reject valid
+    /// packages. The transaction-work ceiling remains the outer aggregate
+    /// bound for those scans.
+    pub(super) fn for_cell_control(source: &Package) -> Self {
+        let mut budget = Self::new(source);
+        let aggregate = budget.max_transaction_work;
+        budget.max_wire_bytes = aggregate;
+        budget.max_wire_fields = aggregate;
+        budget.max_wire_work = aggregate;
+        budget.remaining_wire_bytes = aggregate;
+        budget.remaining_wire_fields = aggregate;
+        budget.remaining_wire_work = aggregate;
+        budget
     }
 
     fn charge(
@@ -837,6 +874,27 @@ impl TransactionBudget {
             self.remaining_payload_references.max(1),
         )
     }
+
+    /// Residual storage policy for a prepared list rewrite whose candidate
+    /// may be larger than its source message. The strict storage API uses one
+    /// byte ceiling for both ingress and candidate verification, so the
+    /// ordinary source-sized decode policy is insufficient for an append.
+    pub(super) fn residual_storage_rewrite_options(
+        &self,
+        source: &[u8],
+    ) -> storage_codec::DecodeOptions {
+        let bytes = source.len().max(1).saturating_mul(8);
+        storage_codec::DecodeOptions::new(
+            self.remaining_wire_bytes
+                .min(bytes)
+                .max(source.len().max(1)),
+            self.remaining_wire_work.max(1),
+            self.remaining_wire_fields.max(1),
+            64,
+            self.remaining_payload_references.max(1),
+            self.remaining_payload_references.max(1),
+        )
+    }
 }
 
 fn no_op_commit(
@@ -885,6 +943,9 @@ fn rewrite_transaction(
         TableSelector::index(table),
         position,
     )?;
+    if target.locked {
+        return Err(Error::TableLocked { path });
+    }
     let mut budget = TransactionBudget::new(source);
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::UnsupportedSource)?;
@@ -1544,7 +1605,7 @@ fn map_popup_metadata_error(error: popup_metadata::MetadataError, path: Path) ->
     }
 }
 
-fn resolve_cell<'sheet, 'table>(
+pub(super) fn resolve_cell<'sheet, 'table>(
     source: &Package,
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
@@ -1605,11 +1666,552 @@ fn resolve_cell<'sheet, 'table>(
         object_index: native.object_index,
         message_index: native.message_index,
         message_type: native.message_type,
+        locked: native.locked == crate::table::lock::State::Locked,
     })
 }
 
-fn read_popup(source: &Package, target: CellTarget) -> Result<Option<PopUpMenu>, Error> {
+pub(super) fn read_popup(source: &Package, target: CellTarget) -> Result<Option<PopUpMenu>, Error> {
     read_popup_with_policy(source, target, false)
+}
+
+/// Read the complete archive-free control sum for one rooted cell.
+///
+/// Pop-Up Menu remains on the audited popup path; the other four controls use
+/// the neutral control codec for their `CellSpecArchive`/format payloads.  The
+/// row projection deliberately resolves packed offsets, so a control in any
+/// column of a multi-cell row is treated exactly like column zero.
+pub(super) fn read_cell_control(
+    source: &Package,
+    target: CellTarget,
+) -> Result<Option<CellControl>, Error> {
+    let scalar = read_non_popup_control(source, target)?;
+    if let Some(control) = scalar {
+        return Ok(Some(control));
+    }
+    read_popup(source, target).map(|menu| menu.map(CellControl::PopUpMenu))
+}
+
+fn read_non_popup_control(
+    source: &Package,
+    target: CellTarget,
+) -> Result<Option<CellControl>, Error> {
+    let path = Path::Cell {
+        sheet: target.sheet_position,
+        table: target.table_position,
+        position: target.position,
+    };
+    let model = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .and_then(|component| component.archive().objects.get(target.object_index))
+        .and_then(|object| object.messages.get(target.message_index))
+        .ok_or(Error::InvalidSource { path })?;
+    if model.type_ != target.message_type || model.type_ != 6_001 {
+        return Err(Error::InvalidSource { path });
+    }
+    let options = storage_options(&model.data);
+    let (model_snapshot, _) = storage_codec::decode_table_model_with_report(&model.data, options)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let (store, _) = storage_codec::decode_data_store_with_report(
+        model_snapshot.base_data_store(),
+        storage_options(model_snapshot.base_data_store()),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let mut tiles = TileCollector::default();
+    let (tile_storage, _) = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        storage_options(store.tiles()),
+        &mut tiles,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let tile_size = tile_storage
+        .tile_size()
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_id = target_row_tile(tile_size, target.position.row());
+    let tile_ref = tiles
+        .tiles
+        .iter()
+        .find(|tile| tile.0 == tile_id)
+        .map(|tile| tile.1)
+        .ok_or(Error::CellNotFound)?;
+    let tile_message =
+        resolve_typed_message(source, tile_ref, target.component_index, 6_002, path)?;
+    let mut rows = RowCollector::default();
+    storage_codec::decode_tile_with_visitor(
+        &tile_message.data,
+        storage_options(&tile_message.data),
+        &mut rows,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let row = rows
+        .rows
+        .iter()
+        .find(|row| row.index == target.position.row())
+        .ok_or(Error::CellNotFound)?;
+    let cell_bytes = row
+        .cell(target.position.column())
+        .ok_or(Error::InvalidSource { path })?;
+    let cell = BncCell::parse(cell_bytes).map_err(|_| Error::InvalidSource { path })?;
+    let format_identifier = cell.format_identifier();
+    let control_identifier = cell.control_cell_spec_identifier();
+    if format_identifier.is_none() && control_identifier.is_none() {
+        return Ok(None);
+    }
+    if format_identifier.is_none() {
+        return Err(Error::InvalidSource { path });
+    }
+    if cell.cell_format_kind() == Some(5) {
+        return Ok(None);
+    }
+    if !matches!(cell.cell_format_kind(), Some(1 | 2 | 6)) {
+        return Err(Error::InvalidSource { path });
+    }
+    let format_identifier = format_identifier.ok_or(Error::InvalidSource { path })?;
+    let format_table_identifier = store
+        .format_table()
+        .ok_or(Error::InvalidSource { path })?
+        .identifier();
+    let format_resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, format_table_identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    if format_resolved.component_index != target.component_index {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let mut format_payload = None;
+    for message in format_resolved
+        .messages
+        .iter()
+        .filter(|message| message.type_ == 6_005)
+    {
+        let mut entries = ListCollector::default();
+        let (list, _) = storage_codec::decode_table_data_list_with_visitor(
+            &message.data,
+            storage_options(&message.data),
+            &mut entries,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+        if list.list_type() != LIST_FORMAT {
+            continue;
+        }
+        if entries.segments != 0
+            || duplicate_list_keys(&entries.entries)
+            || format_payload.is_some()
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        let entry = entries
+            .entries
+            .iter()
+            .find(|entry| entry.key == format_identifier)
+            .ok_or(Error::InvalidSource { path })?;
+        if entry.ref_count == 0 {
+            return Err(Error::InvalidSource { path });
+        }
+        format_payload = entry.format.clone();
+    }
+    let format_payload = format_payload.ok_or(Error::InvalidSource { path })?;
+    let (format, _) = control_codec::decode_control_format_with_report(
+        &format_payload,
+        control_codec::DecodeOptions::for_source(&format_payload),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let Some(control_identifier) = control_identifier else {
+        if matches!(format.format_type(), 263 | 267) {
+            return Err(Error::InvalidSource { path });
+        }
+        return Ok(None);
+    };
+
+    let control_table_identifier = store
+        .control_cell_spec_table()
+        .ok_or(Error::InvalidSource { path })?
+        .identifier();
+    let control_resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, control_table_identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    if control_resolved.component_index != target.component_index {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let mut selected = None;
+    for (message_index, message) in control_resolved
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == 6_005)
+    {
+        let mut entries = ListCollector::default();
+        let (list, _) = storage_codec::decode_table_data_list_with_visitor(
+            &message.data,
+            storage_options(&message.data),
+            &mut entries,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+        if list.list_type() != LIST_CONTROL_CELL_SPEC {
+            continue;
+        }
+        if entries.segments != 0 || duplicate_list_keys(&entries.entries) || selected.is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+        let object = source
+            .state
+            .components
+            .catalog()
+            .get_index(control_resolved.component_index)
+            .and_then(|component| {
+                component
+                    .archive()
+                    .objects
+                    .get(control_resolved.object_index)
+            })
+            .ok_or(Error::InvalidSource { path })?;
+        validate_control_list_metadata(object, message_index, &entries.entries, false, path)?;
+        for entry in &entries.entries {
+            let spec = entry
+                .cell_spec
+                .as_deref()
+                .ok_or(Error::InvalidSource { path })?;
+            let (spec, _) = control_codec::decode_any_cell_spec_with_report(
+                spec,
+                control_codec::DecodeOptions::for_source(spec),
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            let control_codec::CellSpecSnapshot::Popup(spec) = spec else {
+                continue;
+            };
+            let popup = resolve_typed_message(
+                source,
+                spec.popup_model().identifier(),
+                target.component_index,
+                6_206,
+                path,
+            )?;
+            popup_codec::decode_popup_menu_model_with_report(
+                &popup.data,
+                popup_codec::DecodeOptions::for_source(&popup.data),
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+        }
+        let entry = entries
+            .entries
+            .iter()
+            .find(|entry| entry.key == control_identifier)
+            .ok_or(Error::InvalidSource { path })?;
+        if entry.ref_count == 0 {
+            return Err(Error::InvalidSource { path });
+        }
+        let spec = entry
+            .cell_spec
+            .as_deref()
+            .ok_or(Error::InvalidSource { path })?;
+        selected = Some(spec.to_owned());
+    }
+    let spec = selected.ok_or(Error::InvalidSource { path })?;
+    let (spec, _) = control_codec::decode_control_cell_spec_with_report(
+        &spec,
+        control_codec::DecodeOptions::for_source(&spec),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    control_semantic_value(source, target.component_index, spec, format, path)
+}
+
+fn control_semantic_value(
+    source: &Package,
+    component_index: usize,
+    spec: control_codec::ControlCellSpecSnapshot<'_>,
+    format: control_codec::ControlFormatSnapshot<'_>,
+    path: Path,
+) -> Result<Option<CellControl>, Error> {
+    let interaction = spec.interaction_type();
+    match interaction {
+        control_codec::CHECKBOX_INTERACTION_TYPE => {
+            if format.format_type() != 263 {
+                return Err(Error::InvalidSource { path });
+            }
+            Ok(Some(CellControl::Checkbox(Checkbox)))
+        },
+        control_codec::STAR_RATING_INTERACTION_TYPE => {
+            if format.format_type() != 267
+                || spec.range_control_min() != Some(0.0)
+                || spec.range_control_max() != Some(5.0)
+                || spec.range_control_inc() != Some(1.0)
+            {
+                return Err(Error::InvalidSource { path });
+            }
+            Ok(Some(CellControl::StarRating(StarRating)))
+        },
+        control_codec::SLIDER_INTERACTION_TYPE | control_codec::STEPPER_INTERACTION_TYPE => {
+            let range = Range::new(
+                spec.range_control_min()
+                    .ok_or(Error::InvalidSource { path })?,
+                spec.range_control_max()
+                    .ok_or(Error::InvalidSource { path })?,
+                spec.range_control_inc()
+                    .ok_or(Error::InvalidSource { path })?,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            let display = control_display_format(format, path)?;
+            if interaction == control_codec::SLIDER_INTERACTION_TYPE {
+                Ok(Some(CellControl::Slider(Slider::new(range, display))))
+            } else {
+                Ok(Some(CellControl::Stepper(Stepper::new(range, display))))
+            }
+        },
+        7 => {
+            // Use the strict popup route for the one graph-bearing variant;
+            // resolving it from the current cell avoids accepting a stale
+            // control spec that merely resembles a popup.
+            let _ = (source, component_index);
+            Err(Error::InvalidSource { path })
+        },
+        _ => Err(Error::InvalidSource { path }),
+    }
+}
+
+fn control_display_format(
+    format: control_codec::ControlFormatSnapshot<'_>,
+    path: Path,
+) -> Result<DisplayFormat, Error> {
+    let format_type = format.format_type();
+    match format_type {
+        256 | 258 => {
+            ensure_decimal_format_fields(format, false, path)?;
+            let decimal_places = decimal_places_from_native(format.decimal_places(), path)?;
+            let negative_style = negative_style_from_native(format.negative_style(), path)?;
+            let thousands_separator =
+                thousands_separator_from_native(format.show_thousands_separator(), path)?;
+            if format_type == 256 {
+                Ok(DisplayFormat::Number(Number::new(
+                    decimal_places,
+                    negative_style,
+                    thousands_separator,
+                )))
+            } else {
+                Ok(DisplayFormat::Percentage(Percentage::new(
+                    decimal_places,
+                    negative_style,
+                    thousands_separator,
+                )))
+            }
+        },
+        257 => {
+            ensure_decimal_format_fields(format, true, path)?;
+            let decimal_places = decimal_places_from_native(format.decimal_places(), path)?;
+            let negative_style = negative_style_from_native(format.negative_style(), path)?;
+            let thousands_separator =
+                thousands_separator_from_native(format.show_thousands_separator(), path)?;
+            let code = match format.currency_code() {
+                Some(value) => {
+                    CurrencyCode::new(value).map_err(|_| Error::InvalidSource { path })?
+                },
+                None => CurrencyCode::USD,
+            };
+            let style = match format.use_accounting_style() {
+                Some(false) => CurrencyStyle::Standard,
+                Some(true) => CurrencyStyle::Accounting,
+                None => CurrencyStyle::Standard,
+            };
+            Ok(DisplayFormat::Currency(Currency::new(
+                code,
+                decimal_places,
+                negative_style,
+                thousands_separator,
+                style,
+            )))
+        },
+        259 => {
+            ensure_decimal_format_fields(format, false, path)?;
+            if format.negative_style().is_some_and(|value| value != 0)
+                || format.show_thousands_separator().is_some_and(|value| value)
+            {
+                return Err(Error::InvalidSource { path });
+            }
+            let decimal_places = match format.decimal_places() {
+                None => FixedDecimalPlaces::TWO,
+                Some(value) => {
+                    let DecimalPlaces::Fixed(value) =
+                        decimal_places_from_native(Some(value), path)?
+                    else {
+                        return Err(Error::InvalidSource { path });
+                    };
+                    value
+                },
+            };
+            Ok(DisplayFormat::Scientific(Scientific::new(decimal_places)))
+        },
+        262 => {
+            ensure_fraction_format_fields(format, path)?;
+            let accuracy = match format.fraction_accuracy().unwrap_or(u32::MAX - 2) as i32 {
+                -1 => FractionAccuracy::UpToOneDigit,
+                -2 => FractionAccuracy::UpToTwoDigits,
+                -3 => FractionAccuracy::UpToThreeDigits,
+                2 => FractionAccuracy::Halves,
+                4 => FractionAccuracy::Quarters,
+                8 => FractionAccuracy::Eighths,
+                16 => FractionAccuracy::Sixteenths,
+                10 => FractionAccuracy::Tenths,
+                100 => FractionAccuracy::Hundredths,
+                _ => return Err(Error::InvalidSource { path }),
+            };
+            Ok(DisplayFormat::Fraction(Fraction::new(accuracy)))
+        },
+        269 => {
+            ensure_numeral_format_fields(format, path)?;
+            let base = Base::new(
+                u8::try_from(format.base().unwrap_or(10))
+                    .map_err(|_| Error::InvalidSource { path })?,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            let places = match format.base_places().unwrap_or(0) {
+                0 => Places::Minimum,
+                value => Places::Fixed(
+                    FixedPlaces::new(
+                        u8::try_from(value).map_err(|_| Error::InvalidSource { path })?,
+                    )
+                    .map_err(|_| Error::InvalidSource { path })?,
+                ),
+            };
+            let negative_style = match format.base_use_minus_sign().unwrap_or(true) {
+                true => NumeralNegativeStyle::MinusSign,
+                false => NumeralNegativeStyle::TwosComplement,
+            };
+            let value = NumeralSystem::new(base, places, negative_style)
+                .map_err(|_| Error::InvalidSource { path })?;
+            Ok(DisplayFormat::NumeralSystem(value))
+        },
+        _ => Err(Error::InvalidSource { path }),
+    }
+}
+
+fn decimal_places_from_native(value: Option<u32>, path: Path) -> Result<DecimalPlaces, Error> {
+    match value.unwrap_or(253) {
+        253 => Ok(DecimalPlaces::Automatic),
+        value => Ok(DecimalPlaces::Fixed(
+            FixedDecimalPlaces::new(
+                u8::try_from(value).map_err(|_| Error::InvalidSource { path })?,
+            )
+            .map_err(|_| Error::InvalidSource { path })?,
+        )),
+    }
+}
+
+fn negative_style_from_native(
+    value: Option<u32>,
+    path: Path,
+) -> Result<NumberNegativeStyle, Error> {
+    match value {
+        None | Some(0) => Ok(NumberNegativeStyle::MinusSign),
+        Some(1) => Ok(NumberNegativeStyle::Red),
+        Some(2) => Ok(NumberNegativeStyle::Parentheses),
+        Some(3) => Ok(NumberNegativeStyle::RedParentheses),
+        _ => Err(Error::InvalidSource { path }),
+    }
+}
+
+fn thousands_separator_from_native(
+    value: Option<bool>,
+    _path: Path,
+) -> Result<ThousandsSeparator, Error> {
+    match value {
+        Some(false) => Ok(ThousandsSeparator::Hidden),
+        Some(true) => Ok(ThousandsSeparator::Shown),
+        None => Ok(ThousandsSeparator::Hidden),
+    }
+}
+
+fn ensure_decimal_format_fields(
+    format: control_codec::ControlFormatSnapshot<'_>,
+    currency: bool,
+    path: Path,
+) -> Result<(), Error> {
+    if (!currency && (format.currency_code().is_some() || format.use_accounting_style().is_some()))
+        || (currency
+            && (format.currency_code().is_some() != format.use_accounting_style().is_some()))
+        || format.duration_style().is_some()
+        || format.base().is_some()
+        || format.base_places().is_some()
+        || format.base_use_minus_sign().is_some()
+        || format.fraction_accuracy().is_some()
+        || format.suppress_date_format().is_some()
+        || format.suppress_time_format().is_some()
+        || format.date_time_format().is_some()
+        || format.duration_unit_largest().is_some()
+        || format.duration_unit_smallest().is_some()
+        || format.control_minimum().is_some()
+        || format.control_maximum().is_some()
+        || format.control_increment().is_some()
+        || format.control_format_type().is_some()
+        || format.slider_orientation().is_some()
+        || format.slider_position().is_some()
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
+}
+
+fn ensure_fraction_format_fields(
+    format: control_codec::ControlFormatSnapshot<'_>,
+    path: Path,
+) -> Result<(), Error> {
+    if format.decimal_places().is_some()
+        || format.currency_code().is_some()
+        || format.negative_style().is_some()
+        || format.show_thousands_separator().is_some()
+        || format.use_accounting_style().is_some()
+        || format.duration_style().is_some()
+        || format.base().is_some()
+        || format.base_places().is_some()
+        || format.base_use_minus_sign().is_some()
+        || format.suppress_date_format().is_some()
+        || format.suppress_time_format().is_some()
+        || format.date_time_format().is_some()
+        || format.duration_unit_largest().is_some()
+        || format.duration_unit_smallest().is_some()
+        || format.control_minimum().is_some()
+        || format.control_maximum().is_some()
+        || format.control_increment().is_some()
+        || format.control_format_type().is_some()
+        || format.slider_orientation().is_some()
+        || format.slider_position().is_some()
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
+}
+
+fn ensure_numeral_format_fields(
+    format: control_codec::ControlFormatSnapshot<'_>,
+    path: Path,
+) -> Result<(), Error> {
+    if format.decimal_places().is_some()
+        || format.currency_code().is_some()
+        || format.negative_style().is_some()
+        || format.show_thousands_separator().is_some()
+        || format.use_accounting_style().is_some()
+        || format.duration_style().is_some()
+        || format.fraction_accuracy().is_some()
+        || format.suppress_date_format().is_some()
+        || format.suppress_time_format().is_some()
+        || format.date_time_format().is_some()
+        || format.duration_unit_largest().is_some()
+        || format.duration_unit_smallest().is_some()
+        || format.control_minimum().is_some()
+        || format.control_maximum().is_some()
+        || format.control_increment().is_some()
+        || format.control_format_type().is_some()
+        || format.slider_orientation().is_some()
+        || format.slider_position().is_some()
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
 }
 
 fn read_popup_with_policy(
@@ -1636,13 +2238,18 @@ fn read_popup_with_policy(
     let options = storage_options(model.data.as_slice());
     let (model_snapshot, _) = storage_codec::decode_table_model_with_report(&model.data, options)
         .map_err(|_| Error::InvalidSource { path })?;
-    let (store, _) =
-        storage_codec::decode_data_store_with_report(model_snapshot.base_data_store(), options)
-            .map_err(|_| Error::InvalidSource { path })?;
+    let (store, _) = storage_codec::decode_data_store_with_report(
+        model_snapshot.base_data_store(),
+        storage_options(model_snapshot.base_data_store()),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let mut tiles = TileCollector::default();
-    let (tile_storage, _) =
-        storage_codec::decode_tile_storage_with_visitor(store.tiles(), options, &mut tiles)
-            .map_err(|_| Error::InvalidSource { path })?;
+    let (tile_storage, _) = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        storage_options(store.tiles()),
+        &mut tiles,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let tile_size = tile_storage
         .tile_size()
         .ok_or(Error::InvalidSource { path })?;
@@ -1656,21 +2263,31 @@ fn read_popup_with_policy(
     let tile_message =
         resolve_typed_message(source, tile_ref, target.component_index, 6_002, path)?;
     let mut rows = RowCollector::default();
-    let (_, _) = storage_codec::decode_tile_with_visitor(&tile_message.data, options, &mut rows)
-        .map_err(|_| Error::InvalidSource { path })?;
+    let (_, _) = storage_codec::decode_tile_with_visitor(
+        &tile_message.data,
+        storage_options(&tile_message.data),
+        &mut rows,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let row = rows
         .rows
         .iter()
         .find(|row| row.index == target.position.row())
         .ok_or(Error::CellNotFound)?;
-    let cell = BncCell::parse(&row.buffer).map_err(|_| Error::InvalidSource { path })?;
+    let cell_buffer = row
+        .cell(target.position.column())
+        .ok_or(Error::InvalidSource { path })?;
+    let cell = BncCell::parse(cell_buffer).map_err(|_| Error::InvalidSource { path })?;
     let format_id = cell.format_identifier();
     let control_id = cell.control_cell_spec_identifier();
     if format_id.is_none() && control_id.is_none() {
         return Ok(None);
     }
-    if cell.cell_format_kind() != Some(5) || format_id.is_none() || control_id.is_none() {
+    if cell.cell_format_kind() != Some(5) || control_id.is_none() {
         return Ok(None);
+    }
+    if format_id.is_none() {
+        return Err(Error::InvalidSource { path });
     }
     let format_id = format_id.ok_or(Error::InvalidSource { path })?;
     let control_key = control_id.ok_or(Error::InvalidSource { path })?;
@@ -1696,14 +2313,14 @@ fn read_popup_with_policy(
         let mut candidate_entries = ListCollector::default();
         let (list, _) = storage_codec::decode_table_data_list_with_visitor(
             &message.data,
-            options,
+            storage_options(&message.data),
             &mut candidate_entries,
         )
         .map_err(|_| Error::InvalidSource { path })?;
         if list.list_type() != 2 {
             continue;
         }
-        if candidate_entries.segments != 0 {
+        if candidate_entries.segments != 0 || duplicate_list_keys(&candidate_entries.entries) {
             return Err(Error::UnsupportedDependency { path });
         }
         if format_entries.replace(candidate_entries).is_some() {
@@ -1740,7 +2357,7 @@ fn read_popup_with_policy(
         let mut candidate_entries = ListCollector::default();
         let (list, _) = storage_codec::decode_table_data_list_with_visitor(
             &message.data,
-            options,
+            storage_options(&message.data),
             &mut candidate_entries,
         )
         .map_err(|_| Error::InvalidSource { path })?;
@@ -1829,6 +2446,9 @@ fn validate_control_list_metadata(
     allow_missing_field_infos: bool,
     path: Path,
 ) -> Result<(), Error> {
+    if duplicate_list_keys(entries) {
+        return Err(Error::InvalidSource { path });
+    }
     let info = object
         .archive_info
         .message_infos
@@ -1847,6 +2467,12 @@ fn validate_control_list_metadata(
         }
         return Ok(());
     }
+    // A control list can legitimately mix the four scalar controls with
+    // Pop-Up Menu entries.  Only the popup interaction owns a 6206 model;
+    // scalar CellSpecs therefore contribute neither aggregate references nor
+    // [3,key] FieldInfo edges.  Decode every entry through the neutral
+    // control projection so scalar records are still validated strictly
+    // rather than being treated as opaque bytes.
     let mut expected = Vec::with_capacity(entries.len());
     for entry in entries {
         if entry.ref_count == 0 {
@@ -1856,16 +2482,34 @@ fn validate_control_list_metadata(
             .cell_spec
             .as_deref()
             .ok_or(Error::InvalidSource { path })?;
-        let (spec, _) = popup_codec::decode_cell_spec_with_report(payload, popup_options(payload))
-            .map_err(|_| Error::InvalidSource { path })?;
-        if spec.interaction_type() != 7
-            || spec.popup_model().identifier() == 0
-            || spec.popup_model().deprecated_type().is_some()
-            || spec.popup_model().deprecated_is_external().unwrap_or(false)
-        {
-            return Err(Error::InvalidSource { path });
+        let (spec, _) = control_codec::decode_cell_spec_with_report(
+            payload,
+            control_codec::DecodeOptions::for_source(payload),
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+        match spec {
+            control_codec::CellSpecSnapshot::Control(spec) => {
+                if !matches!(
+                    spec.interaction_type(),
+                    control_codec::CHECKBOX_INTERACTION_TYPE
+                        | control_codec::STAR_RATING_INTERACTION_TYPE
+                        | control_codec::SLIDER_INTERACTION_TYPE
+                        | control_codec::STEPPER_INTERACTION_TYPE
+                ) {
+                    return Err(Error::InvalidSource { path });
+                }
+            },
+            control_codec::CellSpecSnapshot::Popup(spec) => {
+                if spec.interaction_type() != 7
+                    || spec.popup_model().identifier() == 0
+                    || spec.popup_model().deprecated_type().is_some()
+                    || spec.popup_model().deprecated_is_external().unwrap_or(false)
+                {
+                    return Err(Error::InvalidSource { path });
+                }
+                expected.push((entry.key, spec.popup_model().identifier()));
+            },
         }
-        expected.push((entry.key, spec.popup_model().identifier()));
     }
     let mut expected_aggregate = expected.iter().map(|(_, id)| *id).collect::<Vec<_>>();
     expected_aggregate.sort_unstable();
@@ -2034,7 +2678,55 @@ struct RowCollector {
 
 struct RowFact {
     index: u32,
-    buffer: Vec<u8>,
+    cell_count: u32,
+    storage: Vec<u8>,
+    offsets: Vec<u8>,
+    wide_offsets: bool,
+}
+
+impl RowFact {
+    fn cell(&self, column: u32) -> Option<&[u8]> {
+        let column = usize::try_from(column).ok()?;
+        let count = usize::try_from(self.cell_count).ok()?;
+        if count == 1 && self.offsets.is_empty() {
+            return (column == 0).then_some(self.storage.as_slice());
+        }
+        if !self.offsets.len().is_multiple_of(2) {
+            return None;
+        }
+        let slot_count = self.offsets.len() / 2;
+        if column >= slot_count || slot_count < count {
+            return None;
+        }
+        let unit = if self.wide_offsets { 4usize } else { 1usize };
+        let mut starts = Vec::with_capacity(slot_count);
+        let mut previous = None;
+        for encoded in self.offsets.chunks_exact(2) {
+            let raw = u16::from_le_bytes([encoded[0], encoded[1]]);
+            if raw == u16::MAX {
+                starts.push(None);
+                continue;
+            }
+            let start = usize::from(raw).checked_mul(unit)?;
+            if previous.is_some_and(|prior| prior >= start) {
+                return None;
+            }
+            starts.push(Some(start));
+            previous = Some(start);
+        }
+        if starts.iter().flatten().count() != count {
+            return None;
+        }
+        let start = starts.get(column).copied().flatten()?;
+        let end = starts
+            .iter()
+            .skip(column + 1)
+            .flatten()
+            .next()
+            .copied()
+            .unwrap_or(self.storage.len());
+        (start < end && end <= self.storage.len()).then_some(&self.storage[start..end])
+    }
 }
 
 impl storage_codec::StorageVisitor for RowCollector {
@@ -2042,13 +2734,20 @@ impl storage_codec::StorageVisitor for RowCollector {
         &mut self,
         row: storage_codec::TileRowInfoSnapshot<'_>,
     ) -> Result<(), storage_codec::DecodeError> {
-        let buffer = row
+        let storage = row
             .cell_storage_buffer()
             .unwrap_or_else(|| row.cell_storage_buffer_pre_bnc())
             .to_vec();
+        let offsets = row
+            .cell_offsets()
+            .unwrap_or_else(|| row.cell_offsets_pre_bnc())
+            .to_vec();
         self.rows.push(RowFact {
             index: row.tile_row_index(),
-            buffer,
+            cell_count: row.cell_count(),
+            storage,
+            offsets,
+            wide_offsets: row.has_wide_offsets().unwrap_or(false),
         });
         Ok(())
     }
@@ -2066,6 +2765,14 @@ struct ListEntry {
     ref_count: u32,
     cell_spec: Option<Vec<u8>>,
     format: Option<Vec<u8>>,
+}
+
+fn duplicate_list_keys(entries: &[ListEntry]) -> bool {
+    entries.iter().enumerate().any(|(index, entry)| {
+        entries[..index]
+            .iter()
+            .any(|previous| previous.key == entry.key)
+    })
 }
 
 impl storage_codec::StorageVisitor for ListCollector {

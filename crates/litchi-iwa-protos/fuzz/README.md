@@ -330,6 +330,57 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
 
+## Numbers unified cell-control codec
+
+`numbers_table_cell_control_codec` drives the neutral hidden
+`numbers_table_cell_control_codec` facade for interactive `CellSpecArchive`
+and `FormatStructArchive` payloads. It covers native interaction types 4--8,
+including strict fixed64 slider/stepper/star ranges and canonical checkbox
+formats, alongside popup references and the rejection path for unsupported
+or deprecated fields. Scalar and report decoders must agree and leave the
+caller-owned bytes unchanged. Prepared CellSpec and format writes are
+executed with exact requirements, decoded again, and replayed with each
+output/field/work/depth/reference/allocation/retained/scratch ceiling one
+below the requirement to prove fail-closed execution.
+
+The target also feeds duplicate/wrong-wire/non-canonical known fields,
+non-finite or reversed ranges, truncated references, unknown overlong
+scalars, balanced unknown groups, and deeply nested groups. The recipes under
+`corpus/numbers_table_cell_control_codec/` are hand-authored protobuf wire
+inputs and never native package copies.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_control_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-numbers-control-codec-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_control_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_control_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root.
+
 `numbers_tile_storage` sends one bounded, caller-owned byte source through both
 tile entry points:
 

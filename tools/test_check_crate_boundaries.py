@@ -543,6 +543,101 @@ def add_numbers_table_cell_pop_up_menu_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
+    """Create the smallest complete Wave85 owner for boundary unit tests."""
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction;\n"
+        + "\n".join(
+            f"pub struct {name};"
+            for name in boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_TYPES
+        )
+        + "\npub enum CellControl { Checkbox(Checkbox), StarRating(StarRating), "
+        "Slider(Slider), Stepper(Stepper), PopUpMenu(PopUpMenu) }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "\n".join(
+            f"pub struct {name};"
+            for name in boundaries.NUMBERS_TABLE_CELL_CONTROL_TRANSACTION_TYPES
+        )
+        + "\n"
+        "fn control_cell_graph() {}\n"
+        "fn table_data_list_graph() {}\n"
+        "fn refcount_graph() {}\n"
+        "fn copy_on_write_shared_cull() {}\n"
+        "fn metadata_save_token_object_uuid_external_reference_watermark() {}\n"
+        "fn transaction_budget_preflight_residual() {}\n"
+        "fn resource_allocation_retained_max_minus_one() {}\n"
+        "fn prepared_execution_requirements() {}\n"
+        "fn verify_locality_candidate_reopen_atomic_inverse() {}\n"
+        "impl Package {\n"
+        "pub fn table_cell_control_format<'sheet, 'table, 'cell>(&self, "
+        "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
+        "position: CellPosition<'cell>) -> Result<Option<CellControl>, Error> {}\n"
+        "pub fn edit_table_cell_control_format<'sheet, 'table, 'cell>(&self, "
+        "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
+        "position: CellPosition<'cell>) -> Result<Edit, Error> {}\n"
+        "pub fn apply_table_cell_control_format(&self, patch: &Patch) "
+        "-> Result<Commit, Error> {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, data_format_export = (
+        root / path
+        for path in boundaries.NUMBERS_TABLE_CELL_CONTROL_EXPORT_SOURCES[:3]
+    )
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text("pub mod cell;\n", encoding="utf-8")
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "pub(crate) mod table_cell_control;\n", encoding="utf-8"
+    )
+    data_format_export.parent.mkdir(parents=True, exist_ok=True)
+    data_format_export.write_text("pub mod control;\n", encoding="utf-8")
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct PreparedCellSpecWrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_cell_spec_with_report() {}\n"
+        "pub fn prepare_cell_spec_write() {}\n"
+        "pub fn canonical_cell_spec() {}\n"
+        "pub fn rewrite_cell_spec() {}\n"
+        "fn canonical_unknown_report_prepared_fixed64_interaction_refcount() {}\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in (
+        boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_CORPUS,
+    ):
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -22206,6 +22301,284 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_numbers_comment_clear_metadata_prerequisite_source_topology()",
+            main_source,
+        )
+
+    def test_numbers_table_cell_control_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_METHODS,
+            (
+                "table_cell_checkbox_format",
+                "set_table_cell_checkbox_format",
+                "reset_table_cell_checkbox_format",
+                "table_cell_star_rating_format",
+                "set_table_cell_star_rating_format",
+                "reset_table_cell_star_rating_format",
+                "table_cell_slider_format",
+                "set_table_cell_slider_format",
+                "reset_table_cell_slider_format",
+                "table_cell_stepper_format",
+                "set_table_cell_stepper_format",
+                "reset_table_cell_stepper_format",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_TYPES,
+            (
+                "CellControl",
+                "Checkbox",
+                "StarRating",
+                "Slider",
+                "Stepper",
+                "PopUpMenu",
+                "Range",
+                "DisplayFormat",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_VARIANTS,
+            ("Checkbox", "StarRating", "Slider", "Stepper", "PopUpMenu"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_PACKAGE_METHODS,
+            (
+                "table_cell_control_format",
+                "edit_table_cell_control_format",
+                "apply_table_cell_control_format",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_MODULE,
+            "numbers_table_cell_control_codec",
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cell_control.rs"),
+        )
+
+    def test_focused_numbers_table_cell_control_is_dormant_until_complete_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_control_source_topology(root),
+                [],
+            )
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_cell_control_requires_each_contract_part(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub mod transaction;\n"
+                + "\n".join(
+                    f"pub struct {name};"
+                    for name in boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_TYPES
+                    if name != "CellControl"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical cell::data_format::control type CellControl" in item
+                    for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "CellPosition<'cell>", "MissingPosition<'cell>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first CellPosition" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_SOURCE
+            codec.write_text("", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("hidden codec is missing strict API" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE).unlink()
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+            marker_lines = {
+                "control-cell": "fn control_cell_graph() {}\n",
+                "table-data-list": "fn table_data_list_graph() {}\n",
+                "refcount": "fn refcount_graph() {}\n",
+                "copy-on-write": "fn copy_on_write_shared_cull() {}\n",
+                "metadata": "fn metadata_save_token_object_uuid_external_reference_watermark() {}\n",
+                "budget": "fn transaction_budget_preflight_residual() {}\n",
+                "resource": "fn resource_allocation_retained_max_minus_one() {}\n",
+                "prepared": "fn prepared_execution_requirements() {}\n",
+                "locality": "fn verify_locality_candidate_reopen_atomic_inverse() {}\n",
+            }
+            for label, marker_line in marker_lines.items():
+                with self.subTest(marker=label):
+                    add_numbers_table_cell_control_canonical_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+                    owner_source = owner.read_text(encoding="utf-8").replace(
+                        marker_line, ""
+                    )
+                    if label == "control-cell":
+                        owner_source = owner_source.replace("CellControl", "MissingControl")
+                    owner.write_text(owner_source, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_cell_control_rejects_aliases_leaks_and_duplicate_popup(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type CellControlEdit = Edit;\n"
+                + "fn rewrite_native_popup_menu() {}\n"
+                + "pub fn raw_control(table_id: u64, row: usize, column: usize, "
+                "source_bytes: &[u8], wire: WireView, archive: Archive, "
+                "generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::table_cell_control::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias CellControlEdit",
+                "duplicate popup lifecycle implementation rewrite_native_popup_menu",
+                "exposes raw identifier parameter table_id: u64",
+                "exposes raw identifier parameter row: usize",
+                "exposes raw identifier parameter column: usize",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cell_control_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn test_only_raw_control(table_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
+                [],
+            )
+
+    def test_numbers_table_cell_control_host_retirement_is_owner_gated_and_scoped(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/semantic/table.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn focused_control_format() { source.table_cell_slider_format(); }\n"
+                "pub fn table_cell_slider_format() {}\n"
+                "pub fn set_table_cell_slider_format() {}\n"
+                "pub fn reset_table_cell_slider_format() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_control_source_topology(root),
+                [],
+            )
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_cell_control_source_topology(root)
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_METHODS:
+                if method.endswith("slider_format"):
+                    self.assertTrue(any(f"method {method}" in item for item in violations), violations)
+            self.assertFalse(any("focused_control_format" in item for item in violations))
+
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create_pages() { editor.set_table_cell_slider_format(); }\n"
+                "fn create_keynote() { editor.set_slide_table_cell_slider_format(); }\n"
+                "fn create_numbers() { editor.set_table_cell_slider_format(); }\n",
+                encoding="utf-8",
+            )
+            example_violations = boundaries.audit_iwa_numbers_table_cell_control_source_topology(
+                root
+            )
+            self.assertTrue(any("example call" in item for item in example_violations))
+
+            shared = root / "crates/litchi-iwa/src/numbers/editor/cell_data_format/control.rs"
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "pub(crate) fn table_cell_slider_format() {}\n", encoding="utf-8"
+            )
+            self.assertFalse(
+                any(
+                    "cell_data_format/control.rs" in item
+                    for item in boundaries.audit_iwa_numbers_table_cell_control_source_topology(root)
+                )
+            )
+
+    def test_focused_numbers_table_cell_control_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_table_cell_control_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_numbers_table_cell_control_facade_source_topology()",
             main_source,
         )
 

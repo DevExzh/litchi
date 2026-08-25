@@ -1563,11 +1563,13 @@ fn checkbox_predicates_round_trip_and_require_native_checkbox_format() {
     }
     for column in [1, 2] {
         editor
-            .set_table_cell_checkbox_format(
+            .set_table_cell_data_format(
                 table_id,
                 1,
                 column,
-                litchi_numbers::cell::data_format::Checkbox,
+                litchi_numbers::cell::data_format::DataFormat::Checkbox(
+                    litchi_numbers::cell::data_format::Checkbox,
+                ),
             )
             .unwrap();
     }

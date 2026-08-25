@@ -13,7 +13,7 @@ pub mod number;
 pub mod numeral_system;
 pub mod pop_up_menu;
 
-pub use control::{Slider, Stepper};
+pub use control::{CellControl, NotCellControl, Slider, Stepper};
 pub use custom::Custom;
 pub use date_time::DateTime;
 pub use duration::Duration;

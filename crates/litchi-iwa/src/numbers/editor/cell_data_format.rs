@@ -607,6 +607,9 @@ pub(super) fn reset_cell_duration_format(
     }
 }
 
+// Shared private compatibility readers/resets for the Pages and Keynote
+// table hosts. Numbers' public control surface routes through the focused
+// selector-first litchi-numbers owner.
 pub(super) fn cell_checkbox_format(
     package: &IWorkPackage,
     table_id: u64,
@@ -1630,7 +1633,7 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_reuses_and_resets_checkbox_formats() {
+    fn source_built_table_roundtrips_reuses_and_resets_cell_control_checkbox() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Checkboxes")
             .table_dimensions(3, 3)
@@ -1645,12 +1648,22 @@ mod tests {
             CellValue::Boolean(true),
         )
         .unwrap();
-        editor
-            .set_table_cell_checkbox_format(table_id, 1, 1, Checkbox)
-            .unwrap();
-        editor
-            .set_table_cell_checkbox_format(table_id, 1, 2, Checkbox)
-            .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            1,
+            &DataFormat::Checkbox(Checkbox),
+        )
+        .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            2,
+            &DataFormat::Checkbox(Checkbox),
+        )
+        .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
         let formats = resolve_format_table(editor.package(), &location).unwrap();
@@ -1676,7 +1689,7 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_checkbox_format(table_id, 1, 1).unwrap(),
+            cell_checkbox_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(Checkbox)
         );
         let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
@@ -1684,20 +1697,12 @@ mod tests {
             document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::Boolean(false))
         );
-        assert!(
-            reopened
-                .reset_table_cell_checkbox_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reset_cell_checkbox_format(&mut reopened.package, table_id, 1, 1).unwrap();
         assert_eq!(
-            reopened.table_cell_checkbox_format(table_id, 1, 2).unwrap(),
+            cell_checkbox_format(&reopened.package, table_id, 1, 2).unwrap(),
             Some(Checkbox)
         );
-        assert!(
-            reopened
-                .reset_table_cell_checkbox_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reset_cell_checkbox_format(&mut reopened.package, table_id, 1, 2).unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let controls = storage::resolve_table_data_list(
             reopened.package(),
@@ -1710,7 +1715,7 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_reuses_and_resets_star_rating_formats() {
+    fn source_built_table_roundtrips_reuses_and_resets_cell_control_star_rating() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Ratings")
             .table_dimensions(3, 3)
@@ -1725,12 +1730,22 @@ mod tests {
             CellValue::number(3.0).expect("finite test number"),
         )
         .unwrap();
-        editor
-            .set_table_cell_star_rating_format(table_id, 1, 1, StarRating)
-            .unwrap();
-        editor
-            .set_table_cell_star_rating_format(table_id, 1, 2, StarRating)
-            .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            1,
+            &DataFormat::StarRating(StarRating),
+        )
+        .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            2,
+            &DataFormat::StarRating(StarRating),
+        )
+        .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
         let formats = resolve_format_table(editor.package(), &location).unwrap();
@@ -1766,9 +1781,7 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened
-                .table_cell_star_rating_format(table_id, 1, 1)
-                .unwrap(),
+            cell_star_rating_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(StarRating)
         );
         let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
@@ -1776,22 +1789,12 @@ mod tests {
             document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::number(0.0).expect("finite test number"))
         );
-        assert!(
-            reopened
-                .reset_table_cell_star_rating_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reset_cell_star_rating_format(&mut reopened.package, table_id, 1, 1).unwrap();
         assert_eq!(
-            reopened
-                .table_cell_star_rating_format(table_id, 1, 2)
-                .unwrap(),
+            cell_star_rating_format(&reopened.package, table_id, 1, 2).unwrap(),
             Some(StarRating)
         );
-        assert!(
-            reopened
-                .reset_table_cell_star_rating_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reset_cell_star_rating_format(&mut reopened.package, table_id, 1, 2).unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let controls = storage::resolve_table_data_list(
             reopened.package(),
@@ -1804,7 +1807,7 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_reuses_and_resets_slider_formats() {
+    fn source_built_table_roundtrips_reuses_and_resets_cell_control_slider() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Sliders")
             .table_dimensions(3, 3)
@@ -1826,12 +1829,22 @@ mod tests {
             CellValue::number(25.0).expect("finite test number"),
         )
         .unwrap();
-        editor
-            .set_table_cell_slider_format(table_id, 1, 1, number_slider.clone())
-            .unwrap();
-        editor
-            .set_table_cell_slider_format(table_id, 1, 2, number_slider.clone())
-            .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            1,
+            &DataFormat::Slider(number_slider.clone()),
+        )
+        .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            2,
+            &DataFormat::Slider(number_slider.clone()),
+        )
+        .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
         let formats = resolve_format_table(editor.package(), &location).unwrap();
@@ -1867,7 +1880,7 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_slider_format(table_id, 1, 1).unwrap(),
+            cell_slider_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(number_slider.clone())
         );
         let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
@@ -1877,27 +1890,24 @@ mod tests {
         );
 
         let currency_slider = Slider::new(range, Currency::default().into());
-        reopened
-            .set_table_cell_slider_format(table_id, 1, 1, currency_slider.clone())
-            .unwrap();
+        set_cell_data_format(
+            &mut reopened.package,
+            table_id,
+            1,
+            1,
+            &DataFormat::Slider(currency_slider.clone()),
+        )
+        .unwrap();
         assert_eq!(
-            reopened.table_cell_slider_format(table_id, 1, 1).unwrap(),
+            cell_slider_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(currency_slider)
         );
-        assert!(
-            reopened
-                .reset_table_cell_slider_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reset_cell_slider_format(&mut reopened.package, table_id, 1, 1).unwrap();
         assert_eq!(
-            reopened.table_cell_slider_format(table_id, 1, 2).unwrap(),
+            cell_slider_format(&reopened.package, table_id, 1, 2).unwrap(),
             Some(number_slider)
         );
-        assert!(
-            reopened
-                .reset_table_cell_slider_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reset_cell_slider_format(&mut reopened.package, table_id, 1, 2).unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let controls = storage::resolve_table_data_list(
             reopened.package(),
@@ -1910,7 +1920,7 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_reuses_and_resets_stepper_formats() {
+    fn source_built_table_roundtrips_reuses_and_resets_cell_control_stepper() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Steppers")
             .table_dimensions(3, 3)
@@ -1932,12 +1942,22 @@ mod tests {
             CellValue::number(25.0).expect("finite test number"),
         )
         .unwrap();
-        editor
-            .set_table_cell_stepper_format(table_id, 1, 1, number_stepper.clone())
-            .unwrap();
-        editor
-            .set_table_cell_stepper_format(table_id, 1, 2, number_stepper.clone())
-            .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            1,
+            &DataFormat::Stepper(number_stepper.clone()),
+        )
+        .unwrap();
+        set_cell_data_format(
+            &mut editor.package,
+            table_id,
+            1,
+            2,
+            &DataFormat::Stepper(number_stepper.clone()),
+        )
+        .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
         let formats = resolve_format_table(editor.package(), &location).unwrap();
@@ -1973,7 +1993,7 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_stepper_format(table_id, 1, 1).unwrap(),
+            cell_stepper_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(number_stepper.clone())
         );
         let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
@@ -1983,27 +2003,24 @@ mod tests {
         );
 
         let currency_stepper = Stepper::new(range, Currency::default().into());
-        reopened
-            .set_table_cell_stepper_format(table_id, 1, 1, currency_stepper.clone())
-            .unwrap();
+        set_cell_data_format(
+            &mut reopened.package,
+            table_id,
+            1,
+            1,
+            &DataFormat::Stepper(currency_stepper.clone()),
+        )
+        .unwrap();
         assert_eq!(
-            reopened.table_cell_stepper_format(table_id, 1, 1).unwrap(),
+            cell_stepper_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(currency_stepper)
         );
-        assert!(
-            reopened
-                .reset_table_cell_stepper_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reset_cell_stepper_format(&mut reopened.package, table_id, 1, 1).unwrap();
         assert_eq!(
-            reopened.table_cell_stepper_format(table_id, 1, 2).unwrap(),
+            cell_stepper_format(&reopened.package, table_id, 1, 2).unwrap(),
             Some(number_stepper)
         );
-        assert!(
-            reopened
-                .reset_table_cell_stepper_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reset_cell_stepper_format(&mut reopened.package, table_id, 1, 2).unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let controls = storage::resolve_table_data_list(
             reopened.package(),

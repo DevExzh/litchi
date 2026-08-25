@@ -1098,6 +1098,9 @@ pub(crate) fn reset_table_cell_duration_format_in_package(
     cell_data_format::reset_cell_duration_format(package, table_id, row, column)
 }
 
+// Shared private adapters retained for the Pages and Keynote table-cell
+// compatibility hosts. Numbers' public control methods route through the
+// focused selector-first owner and do not call these raw-ID helpers.
 pub(crate) fn table_cell_checkbox_format_in_package(
     package: &IWorkPackage,
     table_id: u64,

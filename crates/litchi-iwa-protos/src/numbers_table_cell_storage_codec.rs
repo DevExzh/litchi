@@ -3636,7 +3636,10 @@ pub fn prepare_table_data_list_entry_rewrite<'source>(
     let expected_list_type = match mutation {
         TableDataListEntryMutation::Append(value) => match value.payload {
             TableDataListEntryPayload::String(_) => 1,
-            TableDataListEntryPayload::Format(_) => 7,
+            // TST.TableDataList.ListType.Format is the canonical enum value
+            // 2.  Legacy archives may contain unrelated list type 7, but an
+            // append must never rewrite that discriminator implicitly.
+            TableDataListEntryPayload::Format(_) => 2,
             TableDataListEntryPayload::ControlCellSpec(_) => 12,
         },
         TableDataListEntryMutation::RefCount(_) | TableDataListEntryMutation::Remove(_) => {
@@ -4019,11 +4022,11 @@ fn validate_new_entry_payload(
             Ok(budget.report())
         },
         TableDataListEntryPayload::ControlCellSpec(value) => {
-            // The popup codec is a leaf dependency of this storage seam; it
+            // The control codec is a leaf dependency of this storage seam; it
             // does not import storage, so validating a CellSpecArchive here
-            // does not create a module cycle.  Keep the payload strict rather
-            // than treating a selected ControlCellSpec as opaque bytes.
-            let popup_options = crate::numbers_table_cell_pop_up_menu_codec::DecodeOptions::new(
+            // does not create a module cycle. Keep every supported control
+            // strict rather than treating selected CellSpec bytes as opaque.
+            let control_options = crate::numbers_table_cell_control_codec::DecodeOptions::new(
                 options.max_message_bytes,
                 options.max_message_bytes,
                 options.max_fields,
@@ -4034,9 +4037,9 @@ fn validate_new_entry_payload(
                 options.max_text_bytes,
             );
             let (_, report) =
-                crate::numbers_table_cell_pop_up_menu_codec::decode_cell_spec_with_report(
+                crate::numbers_table_cell_control_codec::decode_any_cell_spec_with_report(
                     value,
-                    popup_options,
+                    control_options,
                 )
                 .map_err(|_| DecodeError::invalid())?;
             Ok(DecodeReport {
@@ -8990,6 +8993,146 @@ mod tests {
     }
 
     #[test]
+    fn prepared_format_list_append_uses_canonical_type_two_and_replays_report() {
+        let mut source = list_minimal();
+        source[1] = 2;
+        let payload = [0x08, 0x80, 0x02]; // FormatStructArchive.format_type = 256.
+        let append = TableDataListEntryAppend::format(11, 1, &payload);
+        let plan = prepare_table_data_list_entry_rewrite(
+            &source,
+            TableDataListEntryMutation::Append(append),
+            list_mutation_options(&source),
+        )
+        .expect("format list append plan");
+        let requirements = plan.requirements();
+        let (candidate, report) = plan
+            .execute(requirements.exact_limits())
+            .expect("format list append execute");
+        let (snapshot, decoded_report) =
+            decode_table_data_list_with_report(&candidate, list_mutation_options(&candidate))
+                .expect("format list candidate");
+        assert_eq!(snapshot.list_type(), 2);
+        assert_eq!(report.output_bytes(), candidate.len());
+        assert_eq!(report.fields(), requirements.fields());
+        assert_eq!(report.work_bytes(), requirements.work_bytes());
+        assert!(decoded_report.work_bytes() >= candidate.len());
+        assert!(
+            candidate
+                .windows(payload.len())
+                .any(|window| window == payload)
+        );
+    }
+
+    #[test]
+    fn mixed_control_list_dispatches_popup_and_neutral_cell_specs() {
+        let mut source = list_minimal();
+        source[1] = 12;
+        let control_options =
+            crate::numbers_table_cell_control_codec::DecodeOptions::for_source(&[0; 128]);
+        let cases = [
+            (
+                crate::numbers_table_cell_control_codec::STEPPER_INTERACTION_TYPE,
+                Some(0.0),
+                Some(10.0),
+                Some(1.0),
+            ),
+            (
+                crate::numbers_table_cell_control_codec::SLIDER_INTERACTION_TYPE,
+                Some(-1.0),
+                Some(1.0),
+                Some(0.25),
+            ),
+            (
+                crate::numbers_table_cell_control_codec::STAR_RATING_INTERACTION_TYPE,
+                Some(0.0),
+                Some(5.0),
+                Some(1.0),
+            ),
+            (
+                crate::numbers_table_cell_control_codec::CHECKBOX_INTERACTION_TYPE,
+                None,
+                None,
+                None,
+            ),
+        ];
+        let mut expected_interactions = Vec::new();
+        for (offset, (interaction, minimum, maximum, increment)) in cases.into_iter().enumerate() {
+            let payload = crate::numbers_table_cell_control_codec::canonical_control_cell_spec(
+                interaction,
+                minimum,
+                maximum,
+                increment,
+                control_options,
+            )
+            .expect("canonical control cell spec")
+            .into_bytes();
+            let append = TableDataListEntryAppend::control_cell_spec(
+                u32::try_from(offset + 1).expect("small test key"),
+                1,
+                &payload,
+            );
+            let plan = prepare_table_data_list_entry_rewrite(
+                &source,
+                TableDataListEntryMutation::Append(append),
+                list_mutation_options(&source),
+            )
+            .expect("mixed control append plan");
+            let requirements = plan.requirements();
+            let (candidate, report) = plan
+                .execute(requirements.exact_limits())
+                .expect("mixed control append execute");
+            assert_eq!(report.output_bytes(), candidate.len());
+            source = candidate;
+            expected_interactions.push(interaction);
+        }
+
+        let popup_payload = crate::numbers_table_cell_pop_up_menu_codec::canonical_cell_spec(
+            41,
+            false,
+            crate::numbers_table_cell_pop_up_menu_codec::DecodeOptions::for_source(&[0; 128]),
+        )
+        .expect("canonical popup cell spec")
+        .into_bytes();
+        let append = TableDataListEntryAppend::control_cell_spec(5, 1, &popup_payload);
+        let plan = prepare_table_data_list_entry_rewrite(
+            &source,
+            TableDataListEntryMutation::Append(append),
+            list_mutation_options(&source),
+        )
+        .expect("popup append in mixed control list");
+        let requirements = plan.requirements();
+        let (candidate, report) = plan
+            .execute(requirements.exact_limits())
+            .expect("popup append execute");
+        assert_eq!(report.output_bytes(), candidate.len());
+        source = candidate;
+
+        let mut visitor = ListCollector::for_source(&source);
+        let (snapshot, _) = decode_table_data_list_with_visitor(
+            &source,
+            list_mutation_options(&source),
+            &mut visitor,
+        )
+        .expect("decode mixed control list");
+        assert_eq!(snapshot.list_type(), 12);
+        assert_eq!(visitor.entries.len(), expected_interactions.len() + 1);
+        for (entry, interaction) in visitor
+            .entries
+            .iter()
+            .zip(expected_interactions.into_iter().chain(std::iter::once(7)))
+        {
+            let payload = entry.cell_spec.as_deref().expect("cell-spec payload");
+            let (decoded, _) =
+                crate::numbers_table_cell_control_codec::decode_any_cell_spec_with_report(
+                    payload,
+                    crate::numbers_table_cell_control_codec::DecodeOptions::for_source(payload),
+                )
+                .expect("neutral mixed-cell-spec dispatch");
+            assert_eq!(decoded.interaction_type(), interaction);
+        }
+    }
+
+    #[test]
     fn prepared_popup_list_limits_refuse_before_candidate_allocation() {
         let mut source = list_minimal();
         source[1] = 12;
@@ -9020,7 +9163,7 @@ mod tests {
 
         let mut format_source = list_minimal();
         // The list type is the format list for this second operation.
-        format_source[1] = 7;
+        format_source[1] = 2;
         let format_payload = [8, 1];
         let append = TableDataListEntryAppend::format(11, 1, &format_payload);
         let plan = prepare_table_data_list_entry_rewrite(

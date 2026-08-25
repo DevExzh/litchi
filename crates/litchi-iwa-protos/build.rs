@@ -47,6 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_sort_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_pop_up_menu_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_control_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -170,6 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_numbers_table_cell_control_codec_provenance(proto_directory)?;
     enforce_package_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_native_message_provenance(proto_directory)?;
@@ -1360,6 +1362,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/keynote_chart_caption_graph_codec.rs",
         "src/pages_footnote_graph_codec.rs",
         "src/table_appearance_codec.rs",
+        "src/numbers_table_cell_control_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -3312,6 +3315,91 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_budget(
             "Numbers table-cell popup projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated views"
         )
         .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_control_codec_provenance(
+    proto_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CODEC_MARKERS: [&str; 19] = [
+        "pub const STEPPER_INTERACTION_TYPE: u32 = 4;",
+        "pub const SLIDER_INTERACTION_TYPE: u32 = 5;",
+        "pub const STAR_RATING_INTERACTION_TYPE: u32 = 6;",
+        "pub const CHECKBOX_INTERACTION_TYPE: u32 = 8;",
+        "pub struct ControlCellSpecSnapshot<'source>",
+        "pub struct ControlFormatSnapshot<'source>",
+        "pub struct ControlFormatWrite<'source>",
+        "pub fn decode_control_cell_spec_with_report(",
+        "pub fn decode_control_format_with_report(",
+        "pub fn prepare_control_cell_spec_write(",
+        "pub struct PreparedControlCellSpecWrite",
+        "pub fn prepare_control_format_write(",
+        "pub fn prepare_control_format_write_fields<'source>(",
+        "pub struct PreparedControlFormatWrite",
+        "pub fn canonical_control_format_fields(",
+        "fn validate_control_cell_spec_values(",
+        "fn emit_fixed64_field(",
+        "pub struct RewriteExecutionRequirements",
+        "pub struct RewriteExecutionLimits",
+    ];
+    const NEUTRAL_MARKERS: [&str; 10] = [
+        "pub use crate::numbers_table_cell_pop_up_menu_codec::{\n    CHECKBOX_INTERACTION_TYPE",
+        "PreparedControlCellSpecWrite as PreparedCellSpecWrite",
+        "PreparedControlFormatWrite as PreparedFormatWrite",
+        "ControlFormatSnapshot, ControlFormatWrite,",
+        "decode_control_cell_spec, decode_control_cell_spec_with_report, decode_control_format",
+        "decode_control_format_with_report",
+        "prepare_control_cell_spec_write as prepare_cell_spec_write",
+        "prepare_control_format_write_fields as prepare_format_write_fields",
+        "canonical_control_format_fields as canonical_format_fields",
+        "rewrite_control_format_fields as rewrite_format_fields",
+    ];
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
+    let neutral = fs::read_to_string("src/numbers_table_cell_control_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production_codec = production_codec_source(&codec);
+    const CELL_SPEC_FIELDS: [&str; 3] = [
+        "optional double range_control_min = 3;",
+        "optional double range_control_max = 4;",
+        "optional double range_control_inc = 5;",
+    ];
+    const FORMAT_FIELDS: [&str; 6] = [
+        "optional double control_minimum = 21;",
+        "optional double control_maximum = 22;",
+        "optional double control_increment = 23;",
+        "optional uint32 control_format_type = 24;",
+        "optional uint32 slider_orientation = 25;",
+        "optional uint32 slider_position = 26;",
+    ];
+    if !CODEC_MARKERS
+        .iter()
+        .all(|marker| codec.matches(marker).count() == 1)
+        || !NEUTRAL_MARKERS
+            .iter()
+            .all(|marker| neutral.matches(marker).count() == 1)
+        || !CELL_SPEC_FIELDS
+            .iter()
+            .all(|field| tst.matches(field).count() == 1)
+        || !FORMAT_FIELDS
+            .iter()
+            .all(|field| tsk.matches(field).count() == 1)
+        || lib
+            .matches("pub mod numbers_table_cell_control_codec;")
+            .count()
+            != 1
+        || lib.matches("pub mod table_cell_control_codec {").count() != 1
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "Numbers control-cell codec drifted from the strict CellSpec/FormatStruct route or introduced generated/encoding ownership".into(),
+        );
     }
     Ok(())
 }

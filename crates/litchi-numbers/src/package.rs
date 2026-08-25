@@ -37,6 +37,8 @@ pub(crate) mod sheet_order;
 )]
 mod table;
 pub(crate) mod table_appearance;
+pub(crate) mod table_cell_control;
+pub(crate) mod table_cell_control_native;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_pop_up_menu;
 pub(crate) mod table_cell_pop_up_menu_metadata;

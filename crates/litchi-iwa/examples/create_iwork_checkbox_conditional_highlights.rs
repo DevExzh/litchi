@@ -8,7 +8,7 @@ use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
 use litchi_iwa_common::table::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::cell::Value as CellValue;
-use litchi_numbers::cell::data_format::Checkbox;
+use litchi_numbers::cell::data_format::{CellControl, Checkbox};
 
 const CHECKBOX_ROW: usize = 1;
 const CHECKED_COLUMN: usize = 1;
@@ -58,7 +58,12 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
     for column in [CHECKED_COLUMN, UNCHECKED_COLUMN] {
-        editor.set_table_cell_checkbox_format(table_id, CHECKBOX_ROW, column, Checkbox)?;
+        set_numbers_cell_control(
+            &mut editor,
+            CHECKBOX_ROW,
+            column,
+            CellControl::from(Checkbox),
+        )?;
     }
     let rules = checkbox_rules()?;
     for (column, rule) in [CHECKED_COLUMN, UNCHECKED_COLUMN].into_iter().zip(&rules) {
@@ -78,6 +83,28 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             Some(vec![rule.clone()])
         );
     }
+    Ok(())
+}
+
+fn set_numbers_cell_control(
+    editor: &mut NumbersEditor,
+    row: usize,
+    column: usize,
+    control: CellControl,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let source = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
+    let position = litchi_numbers::CellPosition::try_from_usize(row, column)?;
+    let commit = source
+        .edit_table_cell_control_format(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+            position,
+        )?
+        .set(control)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
     Ok(())
 }
 

@@ -1,9 +1,24 @@
 //! Shared numeric-control values for Slider and Stepper cells.
 
+use super::DataFormat;
 use super::number::{Currency, Fraction, Number, Percentage, Scientific};
 use super::numeral_system::NumeralSystem;
+pub use super::pop_up_menu::PopUpMenu;
+pub use super::{Checkbox, StarRating};
 use std::fmt;
 use std::hash::{Hash, Hasher};
+
+/// Exact-source selector-first transactions for one table cell's control.
+///
+/// The package adapter owns the rooted table/control graph, native wire
+/// preservation, and publication. This semantic namespace exposes only the
+/// archive-free transaction handles; native identifiers, generated messages,
+/// and package bytes never cross the boundary.
+pub mod transaction {
+    pub use crate::package::table_cell_control::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+    };
+}
 
 macro_rules! display_format_from {
     ($type:ty, $variant:ident) => {
@@ -166,6 +181,167 @@ display_format_from!(Fraction, Fraction);
 display_format_from!(Scientific, Scientific);
 display_format_from!(NumeralSystem, NumeralSystem);
 
+/// One archive-free interactive control attached to a Numbers table cell.
+///
+/// The marker controls reuse the existing [`Checkbox`] and [`StarRating`]
+/// values; numeric controls reuse their validated [`Range`] and
+/// [`DisplayFormat`] values; and Pop-Up Menu reuses the bounded
+/// [`PopUpMenu`] value. Keeping those values as payloads preserves the
+/// established `DataFormat` representation without creating duplicate
+/// semantic models for the unified control owner.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CellControl {
+    /// A Boolean checkbox control.
+    Checkbox(Checkbox),
+    /// A fixed five-star rating control.
+    StarRating(StarRating),
+    /// A bounded numeric slider control.
+    Slider(Slider),
+    /// A bounded numeric stepper control.
+    Stepper(Stepper),
+    /// A compatibility Pop-Up Menu control.
+    PopUpMenu(PopUpMenu),
+}
+
+impl CellControl {
+    /// Borrow the checkbox marker when this is a checkbox control.
+    #[must_use]
+    pub const fn as_checkbox(&self) -> Option<&Checkbox> {
+        match self {
+            Self::Checkbox(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Borrow the star-rating marker when this is a star-rating control.
+    #[must_use]
+    pub const fn as_star_rating(&self) -> Option<&StarRating> {
+        match self {
+            Self::StarRating(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Borrow the slider settings when this is a slider control.
+    #[must_use]
+    pub const fn as_slider(&self) -> Option<&Slider> {
+        match self {
+            Self::Slider(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Borrow the stepper settings when this is a stepper control.
+    #[must_use]
+    pub const fn as_stepper(&self) -> Option<&Stepper> {
+        match self {
+            Self::Stepper(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Borrow the Pop-Up Menu value when this is a menu control.
+    #[must_use]
+    pub const fn as_pop_up_menu(&self) -> Option<&PopUpMenu> {
+        match self {
+            Self::PopUpMenu(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Convert this control to the established complete cell-data-format sum.
+    #[must_use]
+    pub fn into_data_format(self) -> DataFormat {
+        self.into()
+    }
+
+    /// Borrow this control as the established complete cell-data-format sum.
+    #[must_use]
+    pub fn to_data_format(&self) -> DataFormat {
+        self.clone().into_data_format()
+    }
+}
+
+impl From<Checkbox> for CellControl {
+    fn from(value: Checkbox) -> Self {
+        Self::Checkbox(value)
+    }
+}
+
+impl From<StarRating> for CellControl {
+    fn from(value: StarRating) -> Self {
+        Self::StarRating(value)
+    }
+}
+
+impl From<Slider> for CellControl {
+    fn from(value: Slider) -> Self {
+        Self::Slider(value)
+    }
+}
+
+impl From<Stepper> for CellControl {
+    fn from(value: Stepper) -> Self {
+        Self::Stepper(value)
+    }
+}
+
+impl From<PopUpMenu> for CellControl {
+    fn from(value: PopUpMenu) -> Self {
+        Self::PopUpMenu(value)
+    }
+}
+
+impl From<CellControl> for DataFormat {
+    fn from(value: CellControl) -> Self {
+        match value {
+            CellControl::Checkbox(value) => Self::Checkbox(value),
+            CellControl::StarRating(value) => Self::StarRating(value),
+            CellControl::Slider(value) => Self::Slider(value),
+            CellControl::Stepper(value) => Self::Stepper(value),
+            CellControl::PopUpMenu(value) => Self::PopUpMenu(value),
+        }
+    }
+}
+
+/// Error returned when a complete cell data format is not an interactive
+/// control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotCellControl;
+
+impl fmt::Display for NotCellControl {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("cell data format is not an interactive control")
+    }
+}
+
+impl std::error::Error for NotCellControl {}
+
+impl TryFrom<DataFormat> for CellControl {
+    type Error = NotCellControl;
+
+    fn try_from(value: DataFormat) -> std::result::Result<Self, Self::Error> {
+        match value {
+            DataFormat::Checkbox(value) => Ok(Self::Checkbox(value)),
+            DataFormat::StarRating(value) => Ok(Self::StarRating(value)),
+            DataFormat::Slider(value) => Ok(Self::Slider(value)),
+            DataFormat::Stepper(value) => Ok(Self::Stepper(value)),
+            DataFormat::PopUpMenu(value) => Ok(Self::PopUpMenu(value)),
+            DataFormat::Automatic
+            | DataFormat::Number(_)
+            | DataFormat::Text(_)
+            | DataFormat::Currency(_)
+            | DataFormat::Percentage(_)
+            | DataFormat::Scientific(_)
+            | DataFormat::Fraction(_)
+            | DataFormat::NumeralSystem(_)
+            | DataFormat::DateTime(_)
+            | DataFormat::Duration(_)
+            | DataFormat::Custom(_) => Err(NotCellControl),
+        }
+    }
+}
+
 /// Numeric slider control format.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Slider {
@@ -307,5 +483,28 @@ mod tests {
             stepper.display_format(),
             DisplayFormat::Fraction(_)
         ));
+    }
+
+    #[test]
+    fn unified_controls_reuse_existing_data_format_values() {
+        let Ok(range) = Range::new(0.0, 10.0, 1.0) else {
+            panic!("finite increasing range should construct");
+        };
+        let controls = [
+            CellControl::from(Checkbox),
+            CellControl::from(StarRating),
+            CellControl::from(Slider::new(range, DisplayFormat::default())),
+            CellControl::from(Stepper::new(range, DisplayFormat::default())),
+            CellControl::from(PopUpMenu::default()),
+        ];
+
+        for control in controls {
+            let format = control.clone().into_data_format();
+            assert_eq!(CellControl::try_from(format), Ok(control));
+        }
+        assert_eq!(
+            CellControl::try_from(DataFormat::Automatic),
+            Err(NotCellControl)
+        );
     }
 }

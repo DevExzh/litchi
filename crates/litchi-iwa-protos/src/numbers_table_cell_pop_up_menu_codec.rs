@@ -38,10 +38,39 @@ const CELL_SPEC_MODEL_FIELD: u32 = 6;
 const CELL_SPEC_FIRST_FIELD: u32 = 7;
 const CELL_SPEC_FORMULA_FIELD: u32 = 2;
 const CELL_SPEC_DEPRECATED_LABEL_FIELD: u32 = 8;
+const FORMAT_DECIMAL_PLACES_FIELD: u32 = 2;
+const FORMAT_CURRENCY_CODE_FIELD: u32 = 3;
+const FORMAT_NEGATIVE_STYLE_FIELD: u32 = 4;
+const FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD: u32 = 5;
+const FORMAT_USE_ACCOUNTING_STYLE_FIELD: u32 = 6;
+const FORMAT_DURATION_STYLE_FIELD: u32 = 7;
+const FORMAT_BASE_FIELD: u32 = 8;
+const FORMAT_BASE_PLACES_FIELD: u32 = 9;
+const FORMAT_BASE_USE_MINUS_SIGN_FIELD: u32 = 10;
+const FORMAT_FRACTION_ACCURACY_FIELD: u32 = 11;
+const FORMAT_SUPPRESS_DATE_FORMAT_FIELD: u32 = 12;
+const FORMAT_SUPPRESS_TIME_FORMAT_FIELD: u32 = 13;
+const FORMAT_DATE_TIME_FORMAT_FIELD: u32 = 14;
+const FORMAT_DURATION_UNIT_LARGEST_FIELD: u32 = 15;
+const FORMAT_DURATION_UNIT_SMALLEST_FIELD: u32 = 16;
+const FORMAT_CONTROL_MINIMUM_FIELD: u32 = 21;
+const FORMAT_CONTROL_MAXIMUM_FIELD: u32 = 22;
+const FORMAT_CONTROL_INCREMENT_FIELD: u32 = 23;
+const FORMAT_CONTROL_FORMAT_TYPE_FIELD: u32 = 24;
+const FORMAT_SLIDER_ORIENTATION_FIELD: u32 = 25;
+const FORMAT_SLIDER_POSITION_FIELD: u32 = 26;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const REFERENCE_TYPE_FIELD: u32 = 2;
 const REFERENCE_EXTERNAL_FIELD: u32 = 3;
 const POPUP_INTERACTION_TYPE: u32 = 7;
+/// Native interaction type for a stepper control.
+pub const STEPPER_INTERACTION_TYPE: u32 = 4;
+/// Native interaction type for a slider control.
+pub const SLIDER_INTERACTION_TYPE: u32 = 5;
+/// Native interaction type for a star-rating control.
+pub const STAR_RATING_INTERACTION_TYPE: u32 = 6;
+/// Native interaction type for a checkbox control.
+pub const CHECKBOX_INTERACTION_TYPE: u32 = 8;
 const FORMAT_TYPE_TEXT: u64 = 260;
 const STRING_TYPE: u64 = 5;
 const NIL_TYPE: u64 = 1;
@@ -382,6 +411,183 @@ pub struct CellSpecSnapshot<'source> {
     starts_with_first: bool,
 }
 
+/// Borrowed facts for one non-popup interactive `CellSpecArchive`.
+///
+/// The range fields are present only for slider and stepper controls.  The
+/// source bytes remain authoritative, so unknown fields and groups are never
+/// normalized by this projection.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ControlCellSpecSnapshot<'source> {
+    source: &'source [u8],
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+}
+
+impl<'source> ControlCellSpecSnapshot<'source> {
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn interaction_type(self) -> u32 {
+        self.interaction_type
+    }
+
+    #[must_use]
+    pub const fn range_control_min(self) -> Option<f64> {
+        self.range_control_min
+    }
+
+    #[must_use]
+    pub const fn range_control_max(self) -> Option<f64> {
+        self.range_control_max
+    }
+
+    #[must_use]
+    pub const fn range_control_inc(self) -> Option<f64> {
+        self.range_control_inc
+    }
+
+    /// Whether this snapshot describes a slider or stepper range control.
+    #[must_use]
+    pub const fn is_range_control(self) -> bool {
+        matches!(
+            self.interaction_type,
+            SLIDER_INTERACTION_TYPE | STEPPER_INTERACTION_TYPE
+        )
+    }
+}
+
+/// Borrowed facts for a strict control-cell `FormatStructArchive` payload.
+///
+/// The control codec intentionally exposes only the fields that identify and
+/// parameterize a native control.  Other fields are retained as raw source
+/// bytes and are not silently re-encoded.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ControlFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+    decimal_places: Option<u32>,
+    currency_code: Option<&'source str>,
+    negative_style: Option<u32>,
+    show_thousands_separator: Option<bool>,
+    use_accounting_style: Option<bool>,
+    duration_style: Option<u32>,
+    base: Option<u32>,
+    base_places: Option<u32>,
+    base_use_minus_sign: Option<bool>,
+    fraction_accuracy: Option<u32>,
+    suppress_date_format: Option<bool>,
+    suppress_time_format: Option<bool>,
+    date_time_format: Option<&'source str>,
+    duration_unit_largest: Option<u32>,
+    duration_unit_smallest: Option<u32>,
+    control_minimum: Option<f64>,
+    control_maximum: Option<f64>,
+    control_increment: Option<f64>,
+    control_format_type: Option<u32>,
+    slider_orientation: Option<u32>,
+    slider_position: Option<u32>,
+}
+
+impl<'source> ControlFormatSnapshot<'source> {
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+    #[must_use]
+    pub const fn format_type(self) -> u32 {
+        self.format_type
+    }
+    #[must_use]
+    pub const fn decimal_places(self) -> Option<u32> {
+        self.decimal_places
+    }
+    #[must_use]
+    pub const fn currency_code(self) -> Option<&'source str> {
+        self.currency_code
+    }
+    #[must_use]
+    pub const fn negative_style(self) -> Option<u32> {
+        self.negative_style
+    }
+    #[must_use]
+    pub const fn show_thousands_separator(self) -> Option<bool> {
+        self.show_thousands_separator
+    }
+    #[must_use]
+    pub const fn use_accounting_style(self) -> Option<bool> {
+        self.use_accounting_style
+    }
+    #[must_use]
+    pub const fn duration_style(self) -> Option<u32> {
+        self.duration_style
+    }
+    #[must_use]
+    pub const fn base(self) -> Option<u32> {
+        self.base
+    }
+    #[must_use]
+    pub const fn base_places(self) -> Option<u32> {
+        self.base_places
+    }
+    #[must_use]
+    pub const fn base_use_minus_sign(self) -> Option<bool> {
+        self.base_use_minus_sign
+    }
+    #[must_use]
+    pub const fn fraction_accuracy(self) -> Option<u32> {
+        self.fraction_accuracy
+    }
+    #[must_use]
+    pub const fn suppress_date_format(self) -> Option<bool> {
+        self.suppress_date_format
+    }
+    #[must_use]
+    pub const fn suppress_time_format(self) -> Option<bool> {
+        self.suppress_time_format
+    }
+    #[must_use]
+    pub const fn date_time_format(self) -> Option<&'source str> {
+        self.date_time_format
+    }
+    #[must_use]
+    pub const fn duration_unit_largest(self) -> Option<u32> {
+        self.duration_unit_largest
+    }
+    #[must_use]
+    pub const fn duration_unit_smallest(self) -> Option<u32> {
+        self.duration_unit_smallest
+    }
+    #[must_use]
+    pub const fn control_minimum(self) -> Option<f64> {
+        self.control_minimum
+    }
+    #[must_use]
+    pub const fn control_maximum(self) -> Option<f64> {
+        self.control_maximum
+    }
+    #[must_use]
+    pub const fn control_increment(self) -> Option<f64> {
+        self.control_increment
+    }
+    #[must_use]
+    pub const fn control_format_type(self) -> Option<u32> {
+        self.control_format_type
+    }
+    #[must_use]
+    pub const fn slider_orientation(self) -> Option<u32> {
+        self.slider_orientation
+    }
+    #[must_use]
+    pub const fn slider_position(self) -> Option<u32> {
+        self.slider_position
+    }
+}
+
 impl<'source> CellSpecSnapshot<'source> {
     #[must_use]
     pub const fn raw(self) -> &'source [u8] {
@@ -457,6 +663,45 @@ pub fn decode_cell_spec_with_report(
     Ok((snapshot, budget.finish(0)))
 }
 
+/// Decode a strict checkbox, star-rating, slider, or stepper cell spec.
+pub fn decode_control_cell_spec(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<ControlCellSpecSnapshot<'_>, DecodeError> {
+    Ok(decode_control_cell_spec_with_report(source, options)?.0)
+}
+
+/// Decode a strict control cell spec and return its aggregate resource report.
+pub fn decode_control_cell_spec_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(ControlCellSpecSnapshot<'_>, DecodeReport), DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let snapshot = parse_control_cell_spec(source, &mut budget)?;
+    if !budget.unknown_fields {
+        buffa_cell_spec_parity(source, &mut budget)?;
+    }
+    Ok((snapshot, budget.finish(0)))
+}
+
+/// Decode a strict `FormatStructArchive` used by an interactive cell.
+pub fn decode_control_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<ControlFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_control_format_with_report(source, options)?.0)
+}
+
+/// Decode a strict control format and return its aggregate resource report.
+pub fn decode_control_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(ControlFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let snapshot = parse_control_format(source, &mut budget)?;
+    Ok((snapshot, budget.finish(0)))
+}
+
 fn buffa_cell_spec_parity(source: &[u8], budget: &mut Budget) -> Result<(), DecodeError> {
     let options = budget.options;
     let _: projection::CellSpecArchiveLazyView<'_> = BuffaDecodeOptions::new()
@@ -516,6 +761,20 @@ impl Field<'_> {
             return Err(DecodeError::invalid());
         }
         self.varint.ok_or_else(DecodeError::invalid)
+    }
+
+    fn fixed64(self) -> Result<u64, DecodeError> {
+        if self.wire != 1 || self.raw.len() < 8 {
+            return Err(DecodeError::invalid());
+        }
+        let start = self
+            .raw
+            .len()
+            .checked_sub(8)
+            .ok_or_else(DecodeError::invalid)?;
+        let bytes = self.raw.get(start..).ok_or_else(DecodeError::invalid)?;
+        let bytes: [u8; 8] = bytes.try_into().map_err(|_| DecodeError::invalid())?;
+        Ok(u64::from_le_bytes(bytes))
     }
 }
 
@@ -657,6 +916,22 @@ impl Budget {
                 maximum: self.options.max_items,
             }));
         }
+        if self.text_bytes > self.options.max_text_bytes {
+            return Err(DecodeError::limited(DecodeLimit::Text {
+                observed: self.text_bytes,
+                maximum: self.options.max_text_bytes,
+            }));
+        }
+        Ok(())
+    }
+
+    fn text(&mut self, amount: usize) -> Result<(), DecodeError> {
+        self.text_bytes = self.text_bytes.checked_add(amount).ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Text {
+                observed: usize::MAX,
+                maximum: self.options.max_text_bytes,
+            })
+        })?;
         if self.text_bytes > self.options.max_text_bytes {
             return Err(DecodeError::limited(DecodeLimit::Text {
                 observed: self.text_bytes,
@@ -990,6 +1265,293 @@ fn parse_cell_spec<'source>(
         interaction_type: interaction.ok_or_else(DecodeError::invalid)?,
         popup_model: model.ok_or_else(DecodeError::invalid)?,
         starts_with_first: starts.ok_or_else(DecodeError::invalid)?,
+    })
+}
+
+fn parse_control_cell_spec<'source>(
+    source: &'source [u8],
+    budget: &mut Budget,
+) -> Result<ControlCellSpecSnapshot<'source>, DecodeError> {
+    let mut offset = 0usize;
+    let mut interaction = None;
+    let mut minimum = None;
+    let mut maximum = None;
+    let mut increment = None;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, budget.options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        offset = field.end;
+        match field.number {
+            CELL_SPEC_INTERACTION_FIELD => {
+                if field.wire != 0 || interaction.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                let value = field.known_varint()?;
+                if !matches!(value, 4 | 5 | 6 | 8) {
+                    return Err(DecodeError::invalid());
+                }
+                interaction = Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?);
+            },
+            3..=5 => {
+                if field.wire != 1 {
+                    return Err(DecodeError::invalid());
+                }
+                let value = field.fixed64()?.to_le_bytes();
+                let value = f64::from_le_bytes(value);
+                if !value.is_finite() {
+                    return Err(DecodeError::invalid());
+                }
+                let target = match field.number {
+                    3 => &mut minimum,
+                    4 => &mut maximum,
+                    5 => &mut increment,
+                    _ => unreachable!("matched control range field"),
+                };
+                if target.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                *target = Some(value);
+            },
+            // Formula, popup model, selection, and deprecated label fields
+            // are all outside the four strict control projections.
+            CELL_SPEC_FORMULA_FIELD
+            | CELL_SPEC_MODEL_FIELD
+            | CELL_SPEC_FIRST_FIELD
+            | CELL_SPEC_DEPRECATED_LABEL_FIELD => return Err(DecodeError::invalid()),
+            _ => budget.mark_unknown(),
+        }
+    }
+    let interaction = interaction.ok_or_else(DecodeError::invalid)?;
+    let is_range = matches!(
+        interaction,
+        SLIDER_INTERACTION_TYPE | STEPPER_INTERACTION_TYPE | STAR_RATING_INTERACTION_TYPE
+    );
+    if is_range {
+        let min = minimum.ok_or_else(DecodeError::invalid)?;
+        let max = maximum.ok_or_else(DecodeError::invalid)?;
+        let inc = increment.ok_or_else(DecodeError::invalid)?;
+        if min >= max || inc <= 0.0 || !((max - min) / inc).is_finite() {
+            return Err(DecodeError::invalid());
+        }
+        if interaction == STAR_RATING_INTERACTION_TYPE && (min != 0.0 || max != 5.0 || inc != 1.0) {
+            return Err(DecodeError::invalid());
+        }
+    } else if minimum.is_some() || maximum.is_some() || increment.is_some() {
+        return Err(DecodeError::invalid());
+    }
+    Ok(ControlCellSpecSnapshot {
+        source,
+        interaction_type: interaction,
+        range_control_min: minimum,
+        range_control_max: maximum,
+        range_control_inc: increment,
+    })
+}
+
+fn parse_control_format<'source>(
+    source: &'source [u8],
+    budget: &mut Budget,
+) -> Result<ControlFormatSnapshot<'source>, DecodeError> {
+    let mut offset = 0usize;
+    let mut format_type = None;
+    let mut decimal_places = None;
+    let mut currency_code = None;
+    let mut negative_style = None;
+    let mut show_thousands_separator = None;
+    let mut use_accounting_style = None;
+    let mut duration_style = None;
+    let mut base = None;
+    let mut base_places = None;
+    let mut base_use_minus_sign = None;
+    let mut fraction_accuracy = None;
+    let mut suppress_date_format = None;
+    let mut suppress_time_format = None;
+    let mut date_time_format = None;
+    let mut duration_unit_largest = None;
+    let mut duration_unit_smallest = None;
+    let mut control_minimum = None;
+    let mut control_maximum = None;
+    let mut control_increment = None;
+    let mut control_format_type = None;
+    let mut slider_orientation = None;
+    let mut slider_position = None;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, budget.options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        offset = field.end;
+        match field.number {
+            1 => {
+                if field.wire != 0 || format_type.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                let value = field.known_varint()?;
+                let value = u32::try_from(value).map_err(|_| DecodeError::invalid())?;
+                if !matches!(value, 256..=263 | 267..=269) {
+                    return Err(DecodeError::invalid());
+                }
+                format_type = Some(value);
+            },
+            2 | 4 | 7 | 8 | 9 | 11 | 15 | 16 => {
+                if field.wire != 0 || !field.varint_canonical {
+                    return Err(DecodeError::invalid());
+                }
+                let value =
+                    u32::try_from(field.known_varint()?).map_err(|_| DecodeError::invalid())?;
+                let target = match field.number {
+                    FORMAT_DECIMAL_PLACES_FIELD => &mut decimal_places,
+                    FORMAT_NEGATIVE_STYLE_FIELD => &mut negative_style,
+                    FORMAT_DURATION_STYLE_FIELD => &mut duration_style,
+                    FORMAT_BASE_FIELD => &mut base,
+                    FORMAT_BASE_PLACES_FIELD => &mut base_places,
+                    FORMAT_FRACTION_ACCURACY_FIELD => &mut fraction_accuracy,
+                    FORMAT_DURATION_UNIT_LARGEST_FIELD => &mut duration_unit_largest,
+                    FORMAT_DURATION_UNIT_SMALLEST_FIELD => &mut duration_unit_smallest,
+                    _ => unreachable!("matched display-format integer field"),
+                };
+                if target.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                *target = Some(value);
+            },
+            3 | 14 => {
+                if field.wire != 2 {
+                    return Err(DecodeError::invalid());
+                }
+                let bytes = field.payload.ok_or_else(DecodeError::invalid)?;
+                let text = str::from_utf8(bytes).map_err(|_| DecodeError::invalid())?;
+                if text.chars().any(char::is_control) {
+                    return Err(DecodeError::invalid());
+                }
+                budget.text(bytes.len())?;
+                let target = match field.number {
+                    FORMAT_CURRENCY_CODE_FIELD => &mut currency_code,
+                    FORMAT_DATE_TIME_FORMAT_FIELD => &mut date_time_format,
+                    _ => unreachable!("matched display-format string field"),
+                };
+                if target.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                *target = Some(text);
+            },
+            5 | 6 | 10 | 12 | 13 => {
+                let target = match field.number {
+                    FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD => &mut show_thousands_separator,
+                    FORMAT_USE_ACCOUNTING_STYLE_FIELD => &mut use_accounting_style,
+                    FORMAT_BASE_USE_MINUS_SIGN_FIELD => &mut base_use_minus_sign,
+                    FORMAT_SUPPRESS_DATE_FORMAT_FIELD => &mut suppress_date_format,
+                    FORMAT_SUPPRESS_TIME_FORMAT_FIELD => &mut suppress_time_format,
+                    _ => unreachable!("matched display-format bool field"),
+                };
+                set_bool(target, field, false)?;
+            },
+            FORMAT_CONTROL_MINIMUM_FIELD..=FORMAT_CONTROL_INCREMENT_FIELD => {
+                if field.wire != 1 {
+                    return Err(DecodeError::invalid());
+                }
+                let value = f64::from_le_bytes(field.fixed64()?.to_le_bytes());
+                if !value.is_finite() {
+                    return Err(DecodeError::invalid());
+                }
+                let target = match field.number {
+                    FORMAT_CONTROL_MINIMUM_FIELD => &mut control_minimum,
+                    FORMAT_CONTROL_MAXIMUM_FIELD => &mut control_maximum,
+                    FORMAT_CONTROL_INCREMENT_FIELD => &mut control_increment,
+                    _ => unreachable!("matched control format field"),
+                };
+                if target.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                *target = Some(value);
+            },
+            FORMAT_CONTROL_FORMAT_TYPE_FIELD..=FORMAT_SLIDER_POSITION_FIELD => {
+                if field.wire != 0 || !field.varint_canonical {
+                    return Err(DecodeError::invalid());
+                }
+                let target = match field.number {
+                    FORMAT_CONTROL_FORMAT_TYPE_FIELD => &mut control_format_type,
+                    FORMAT_SLIDER_ORIENTATION_FIELD => &mut slider_orientation,
+                    FORMAT_SLIDER_POSITION_FIELD => &mut slider_position,
+                    _ => unreachable!("matched control format field"),
+                };
+                if target.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                *target =
+                    Some(u32::try_from(field.known_varint()?).map_err(|_| DecodeError::invalid())?);
+            },
+            _ => budget.mark_unknown(),
+        }
+    }
+    let format_type = format_type.ok_or_else(DecodeError::invalid)?;
+    if matches!(format_type, 263 | 267)
+        && (decimal_places.is_some()
+            || currency_code.is_some()
+            || negative_style.is_some()
+            || show_thousands_separator.is_some()
+            || use_accounting_style.is_some()
+            || duration_style.is_some()
+            || base.is_some()
+            || base_places.is_some()
+            || base_use_minus_sign.is_some()
+            || fraction_accuracy.is_some()
+            || suppress_date_format.is_some()
+            || suppress_time_format.is_some()
+            || date_time_format.is_some()
+            || duration_unit_largest.is_some()
+            || duration_unit_smallest.is_some()
+            || control_minimum.is_some()
+            || control_maximum.is_some()
+            || control_increment.is_some()
+            || control_format_type.is_some()
+            || slider_orientation.is_some()
+            || slider_position.is_some())
+    {
+        return Err(DecodeError::invalid());
+    }
+    if control_minimum.is_some() != control_maximum.is_some()
+        || control_minimum.is_some() != control_increment.is_some()
+    {
+        return Err(DecodeError::invalid());
+    }
+    if let (Some(min), Some(max), Some(inc)) = (control_minimum, control_maximum, control_increment)
+        && (min >= max || inc <= 0.0 || !((max - min) / inc).is_finite())
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(ControlFormatSnapshot {
+        source,
+        format_type,
+        decimal_places,
+        currency_code,
+        negative_style,
+        show_thousands_separator,
+        use_accounting_style,
+        duration_style,
+        base,
+        base_places,
+        base_use_minus_sign,
+        fraction_accuracy,
+        suppress_date_format,
+        suppress_time_format,
+        date_time_format,
+        duration_unit_largest,
+        duration_unit_smallest,
+        control_minimum,
+        control_maximum,
+        control_increment,
+        control_format_type,
+        slider_orientation,
+        slider_position,
     })
 }
 
@@ -1560,6 +2122,222 @@ pub struct PreparedCellSpecWrite {
     verify_options: DecodeOptions,
 }
 
+/// Prepared canonical write for one checkbox, star-rating, slider, or
+/// stepper `CellSpecArchive`.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedControlCellSpecWrite {
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedControlCellSpecWrite {
+    #[must_use]
+    pub fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_control_cell_spec(
+            &mut bytes,
+            self.interaction_type,
+            self.range_control_min,
+            self.range_control_max,
+            self.range_control_inc,
+        )?;
+        verify_control_cell_spec_candidate(&bytes, self.verify_options, self.requirements)?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Archive-free control-format values for a canonical `FormatStructArchive`.
+///
+/// The fields mirror the native display-format scalar surface (TSK fields
+/// 1--16).  Control range metadata lives in `CellSpecArchive` and is not part
+/// of this write bundle.  Unknown source fields are intentionally not copied
+/// by the creation-only canonical writer; source-preserving package rewrites
+/// must retain the original payload and patch only selected fields.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ControlFormatWrite<'source> {
+    format_type: u32,
+    decimal_places: Option<u32>,
+    currency_code: Option<&'source str>,
+    negative_style: Option<u32>,
+    show_thousands_separator: Option<bool>,
+    use_accounting_style: Option<bool>,
+    duration_style: Option<u32>,
+    base: Option<u32>,
+    base_places: Option<u32>,
+    base_use_minus_sign: Option<bool>,
+    fraction_accuracy: Option<u32>,
+    suppress_date_format: Option<bool>,
+    suppress_time_format: Option<bool>,
+    date_time_format: Option<&'source str>,
+    duration_unit_largest: Option<u32>,
+    duration_unit_smallest: Option<u32>,
+}
+
+impl<'source> ControlFormatWrite<'source> {
+    #[must_use]
+    pub const fn new(format_type: u32) -> Self {
+        Self {
+            format_type,
+            decimal_places: None,
+            currency_code: None,
+            negative_style: None,
+            show_thousands_separator: None,
+            use_accounting_style: None,
+            duration_style: None,
+            base: None,
+            base_places: None,
+            base_use_minus_sign: None,
+            fraction_accuracy: None,
+            suppress_date_format: None,
+            suppress_time_format: None,
+            date_time_format: None,
+            duration_unit_largest: None,
+            duration_unit_smallest: None,
+        }
+    }
+    #[must_use]
+    pub const fn format_type(self) -> u32 {
+        self.format_type
+    }
+    #[must_use]
+    pub const fn with_decimal_places(mut self, value: u32) -> Self {
+        self.decimal_places = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_currency_code(mut self, value: &'source str) -> Self {
+        self.currency_code = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_negative_style(mut self, value: u32) -> Self {
+        self.negative_style = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_show_thousands_separator(mut self, value: bool) -> Self {
+        self.show_thousands_separator = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_use_accounting_style(mut self, value: bool) -> Self {
+        self.use_accounting_style = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_duration_style(mut self, value: u32) -> Self {
+        self.duration_style = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_base(mut self, value: u32) -> Self {
+        self.base = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_base_places(mut self, value: u32) -> Self {
+        self.base_places = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_base_use_minus_sign(mut self, value: bool) -> Self {
+        self.base_use_minus_sign = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_fraction_accuracy(mut self, value: u32) -> Self {
+        self.fraction_accuracy = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_suppress_date_format(mut self, value: bool) -> Self {
+        self.suppress_date_format = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_suppress_time_format(mut self, value: bool) -> Self {
+        self.suppress_time_format = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_date_time_format(mut self, value: &'source str) -> Self {
+        self.date_time_format = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_duration_unit_largest(mut self, value: u32) -> Self {
+        self.duration_unit_largest = Some(value);
+        self
+    }
+    #[must_use]
+    pub const fn with_duration_unit_smallest(mut self, value: u32) -> Self {
+        self.duration_unit_smallest = Some(value);
+        self
+    }
+}
+
+/// Prepared canonical write for one control-oriented `FormatStructArchive`.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedControlFormatWrite<'source> {
+    write: ControlFormatWrite<'source>,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl<'source> PreparedControlFormatWrite<'source> {
+    #[must_use]
+    pub fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_control_format(&mut bytes, self.write)?;
+        verify_control_format_candidate(&bytes, self.verify_options, self.requirements)?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
 impl PreparedCellSpecWrite {
     #[must_use]
     pub fn prepare_report(self) -> DecodeReport {
@@ -1723,6 +2501,180 @@ pub fn rewrite_cell_spec(
     canonical_cell_spec(model_identifier, starts_with_first, options)
 }
 
+/// Prepare a canonical control-cell spec payload.
+pub fn prepare_control_cell_spec_write(
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+    options: DecodeOptions,
+) -> Result<PreparedControlCellSpecWrite, DecodeError> {
+    validate_control_cell_spec_values(
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+    )?;
+    let range_count = if matches!(
+        interaction_type,
+        SLIDER_INTERACTION_TYPE | STEPPER_INTERACTION_TYPE | STAR_RATING_INTERACTION_TYPE
+    ) {
+        3
+    } else {
+        0
+    };
+    let output_bytes = control_cell_spec_output_len(
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+    )?;
+    let fields = 1usize
+        .checked_add(range_count)
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields,
+        work_bytes: output_bytes
+            .checked_add(output_bytes)
+            .and_then(|work| work.checked_add(output_bytes))
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedControlCellSpecWrite {
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// One-shot canonical control-cell spec encoding wrapper.
+pub fn canonical_control_cell_spec(
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_control_cell_spec_write(
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+        options,
+    )?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Compatibility spelling for a canonical control-cell spec constructor.
+pub fn rewrite_control_cell_spec(
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    canonical_control_cell_spec(
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+        options,
+    )
+}
+
+/// Prepare a canonical control-oriented format payload with only field 1.
+/// This is the compact constructor used by checkbox and star-rating formats.
+pub fn prepare_control_format_write(
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<PreparedControlFormatWrite<'static>, DecodeError> {
+    prepare_control_format_write_fields(ControlFormatWrite::new(format_type), options)
+}
+
+/// Prepare a canonical display-format payload carrying the supported TSK
+/// fields 1--16.  The caller-owned strings are borrowed until execution.
+pub fn prepare_control_format_write_fields<'source>(
+    write: ControlFormatWrite<'source>,
+    options: DecodeOptions,
+) -> Result<PreparedControlFormatWrite<'source>, DecodeError> {
+    validate_control_format_write(write, options.max_text_bytes)?;
+    let output_bytes = control_format_output_len(write)?;
+    let fields = control_format_field_count(write);
+    let text_bytes = control_format_text_bytes(write)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields,
+        work_bytes: output_bytes
+            .checked_add(output_bytes)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedControlFormatWrite {
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// One-shot canonical control-oriented format encoding wrapper.
+pub fn canonical_control_format(
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_control_format_write(format_type, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// One-shot canonical display-format writer carrying fields 1--16.
+pub fn canonical_control_format_fields(
+    write: ControlFormatWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_control_format_write_fields(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Compatibility spelling for a canonical control-oriented format
+/// constructor.
+pub fn rewrite_control_format(
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    canonical_control_format(format_type, options)
+}
+
+/// Compatibility spelling for the full display-format constructor.
+pub fn rewrite_control_format_fields(
+    write: ControlFormatWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    canonical_control_format_fields(write, options)
+}
+
 fn report_from_requirements(requirements: RewriteExecutionRequirements) -> DecodeReport {
     DecodeReport {
         input_bytes: 0,
@@ -1776,6 +2728,48 @@ fn verify_cell_spec_candidate(
         || report.work_bytes != candidate_work
         || report.max_depth != requirements.max_depth
         || report.references != requirements.references
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn verify_control_cell_spec_candidate(
+    source: &[u8],
+    mut options: DecodeOptions,
+    requirements: RewriteExecutionRequirements,
+) -> Result<(), DecodeError> {
+    options.max_message_bytes = options.max_message_bytes.max(source.len());
+    let (_, report) = decode_control_cell_spec_with_report(source, options)?;
+    let candidate_work = requirements
+        .work_bytes
+        .checked_sub(requirements.output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    if report.fields != requirements.fields
+        || report.work_bytes != candidate_work
+        || report.max_depth != requirements.max_depth
+        || report.references != requirements.references
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn verify_control_format_candidate(
+    source: &[u8],
+    mut options: DecodeOptions,
+    requirements: RewriteExecutionRequirements,
+) -> Result<(), DecodeError> {
+    options.max_message_bytes = options.max_message_bytes.max(source.len());
+    let (_, report) = decode_control_format_with_report(source, options)?;
+    let candidate_work = requirements
+        .work_bytes
+        .checked_sub(requirements.output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    if report.fields != requirements.fields
+        || report.work_bytes != candidate_work
+        || report.max_depth != requirements.max_depth
+        || report.text_bytes != requirements.text_bytes
     {
         return Err(DecodeError::invalid());
     }
@@ -1875,6 +2869,258 @@ fn validate_text(text: &str, maximum: usize) -> Result<(), DecodeError> {
         }));
     }
     Ok(())
+}
+
+fn validate_control_format_write(
+    write: ControlFormatWrite<'_>,
+    max_text_bytes: usize,
+) -> Result<(), DecodeError> {
+    if !matches!(write.format_type, 256..=263 | 267..=269) {
+        return Err(DecodeError::invalid());
+    }
+    if let Some(value) = write.currency_code {
+        validate_text(value, max_text_bytes)?;
+    }
+    if let Some(value) = write.date_time_format {
+        validate_text(value, max_text_bytes)?;
+    }
+    if matches!(write.format_type, 263 | 267)
+        && (write.decimal_places.is_some()
+            || write.currency_code.is_some()
+            || write.negative_style.is_some()
+            || write.show_thousands_separator.is_some()
+            || write.use_accounting_style.is_some()
+            || write.duration_style.is_some()
+            || write.base.is_some()
+            || write.base_places.is_some()
+            || write.base_use_minus_sign.is_some()
+            || write.fraction_accuracy.is_some()
+            || write.suppress_date_format.is_some()
+            || write.suppress_time_format.is_some()
+            || write.date_time_format.is_some()
+            || write.duration_unit_largest.is_some()
+            || write.duration_unit_smallest.is_some())
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn control_format_field_count(write: ControlFormatWrite<'_>) -> usize {
+    1usize
+        + usize::from(write.decimal_places.is_some())
+        + usize::from(write.currency_code.is_some())
+        + usize::from(write.negative_style.is_some())
+        + usize::from(write.show_thousands_separator.is_some())
+        + usize::from(write.use_accounting_style.is_some())
+        + usize::from(write.duration_style.is_some())
+        + usize::from(write.base.is_some())
+        + usize::from(write.base_places.is_some())
+        + usize::from(write.base_use_minus_sign.is_some())
+        + usize::from(write.fraction_accuracy.is_some())
+        + usize::from(write.suppress_date_format.is_some())
+        + usize::from(write.suppress_time_format.is_some())
+        + usize::from(write.date_time_format.is_some())
+        + usize::from(write.duration_unit_largest.is_some())
+        + usize::from(write.duration_unit_smallest.is_some())
+}
+
+fn control_format_text_bytes(write: ControlFormatWrite<'_>) -> Result<usize, DecodeError> {
+    let mut total = 0usize;
+    if let Some(value) = write.currency_code {
+        total = total
+            .checked_add(value.len())
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    if let Some(value) = write.date_time_format {
+        total = total
+            .checked_add(value.len())
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    Ok(total)
+}
+
+fn control_format_output_len(write: ControlFormatWrite<'_>) -> Result<usize, DecodeError> {
+    let mut length = 0usize;
+    add_control_format_varint_len(&mut length, FORMAT_TYPE_FIELD, u64::from(write.format_type))?;
+    if let Some(value) = write.decimal_places {
+        add_control_format_varint_len(&mut length, FORMAT_DECIMAL_PLACES_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.currency_code {
+        add_control_format_string_len(&mut length, FORMAT_CURRENCY_CODE_FIELD, value)?;
+    }
+    if let Some(value) = write.negative_style {
+        add_control_format_varint_len(&mut length, FORMAT_NEGATIVE_STYLE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.show_thousands_separator {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.use_accounting_style {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_USE_ACCOUNTING_STYLE_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.duration_style {
+        add_control_format_varint_len(&mut length, FORMAT_DURATION_STYLE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.base {
+        add_control_format_varint_len(&mut length, FORMAT_BASE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.base_places {
+        add_control_format_varint_len(&mut length, FORMAT_BASE_PLACES_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.base_use_minus_sign {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_BASE_USE_MINUS_SIGN_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.fraction_accuracy {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_FRACTION_ACCURACY_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.suppress_date_format {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_SUPPRESS_DATE_FORMAT_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.suppress_time_format {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_SUPPRESS_TIME_FORMAT_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.date_time_format {
+        add_control_format_string_len(&mut length, FORMAT_DATE_TIME_FORMAT_FIELD, value)?;
+    }
+    if let Some(value) = write.duration_unit_largest {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_DURATION_UNIT_LARGEST_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.duration_unit_smallest {
+        add_control_format_varint_len(
+            &mut length,
+            FORMAT_DURATION_UNIT_SMALLEST_FIELD,
+            u64::from(value),
+        )?;
+    }
+    Ok(length)
+}
+
+fn add_control_format_varint_len(
+    length: &mut usize,
+    field: u32,
+    value: u64,
+) -> Result<(), DecodeError> {
+    *length = length
+        .checked_add(encoded_varint_len(u64::from(field) << 3))
+        .and_then(|length| length.checked_add(encoded_varint_len(value)))
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(())
+}
+
+fn add_control_format_string_len(
+    length: &mut usize,
+    field: u32,
+    value: &str,
+) -> Result<(), DecodeError> {
+    *length = length
+        .checked_add(length_field_len(field, value.len())?)
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(())
+}
+
+fn validate_control_cell_spec_values(
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+) -> Result<(), DecodeError> {
+    if !matches!(
+        interaction_type,
+        STEPPER_INTERACTION_TYPE
+            | SLIDER_INTERACTION_TYPE
+            | STAR_RATING_INTERACTION_TYPE
+            | CHECKBOX_INTERACTION_TYPE
+    ) {
+        return Err(DecodeError::invalid());
+    }
+    let requires_range = matches!(
+        interaction_type,
+        STEPPER_INTERACTION_TYPE | SLIDER_INTERACTION_TYPE | STAR_RATING_INTERACTION_TYPE
+    );
+    if requires_range {
+        let (Some(min), Some(max), Some(inc)) =
+            (range_control_min, range_control_max, range_control_inc)
+        else {
+            return Err(DecodeError::invalid());
+        };
+        if !min.is_finite()
+            || !max.is_finite()
+            || !inc.is_finite()
+            || min >= max
+            || inc <= 0.0
+            || !((max - min) / inc).is_finite()
+        {
+            return Err(DecodeError::invalid());
+        }
+        if interaction_type == STAR_RATING_INTERACTION_TYPE
+            && (min != 0.0 || max != 5.0 || inc != 1.0)
+        {
+            return Err(DecodeError::invalid());
+        }
+    } else if range_control_min.is_some()
+        || range_control_max.is_some()
+        || range_control_inc.is_some()
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn control_cell_spec_output_len(
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+) -> Result<usize, DecodeError> {
+    validate_control_cell_spec_values(
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+    )?;
+    let mut length = 1usize
+        .checked_add(encoded_varint_len(u64::from(interaction_type)))
+        .ok_or_else(DecodeError::invalid)?;
+    if matches!(
+        interaction_type,
+        STEPPER_INTERACTION_TYPE | SLIDER_INTERACTION_TYPE | STAR_RATING_INTERACTION_TYPE
+    ) {
+        for field in 3u32..=5 {
+            length = length
+                .checked_add(encoded_varint_len((u64::from(field) << 3) | 1))
+                .and_then(|value| value.checked_add(8))
+                .ok_or_else(DecodeError::invalid)?;
+        }
+    }
+    Ok(length)
 }
 
 fn popup_model_output_len(items: &[&str]) -> Result<usize, DecodeError> {
@@ -1996,9 +3242,121 @@ fn emit_cell_spec(
     Ok(())
 }
 
+fn emit_control_cell_spec(
+    output: &mut Vec<u8>,
+    interaction_type: u32,
+    range_control_min: Option<f64>,
+    range_control_max: Option<f64>,
+    range_control_inc: Option<f64>,
+) -> Result<(), DecodeError> {
+    validate_control_cell_spec_values(
+        interaction_type,
+        range_control_min,
+        range_control_max,
+        range_control_inc,
+    )?;
+    emit_varint_field(
+        output,
+        CELL_SPEC_INTERACTION_FIELD,
+        u64::from(interaction_type),
+    )?;
+    if matches!(
+        interaction_type,
+        STEPPER_INTERACTION_TYPE | SLIDER_INTERACTION_TYPE | STAR_RATING_INTERACTION_TYPE
+    ) {
+        emit_fixed64_field(
+            output,
+            3,
+            range_control_min.ok_or_else(DecodeError::invalid)?,
+        )?;
+        emit_fixed64_field(
+            output,
+            4,
+            range_control_max.ok_or_else(DecodeError::invalid)?,
+        )?;
+        emit_fixed64_field(
+            output,
+            5,
+            range_control_inc.ok_or_else(DecodeError::invalid)?,
+        )?;
+    }
+    Ok(())
+}
+
+fn emit_control_format(
+    output: &mut Vec<u8>,
+    write: ControlFormatWrite<'_>,
+) -> Result<(), DecodeError> {
+    validate_control_format_write(write, usize::MAX)?;
+    emit_varint_field(output, FORMAT_TYPE_FIELD, u64::from(write.format_type))?;
+    if let Some(value) = write.decimal_places {
+        emit_varint_field(output, FORMAT_DECIMAL_PLACES_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.currency_code {
+        emit_len_field(output, FORMAT_CURRENCY_CODE_FIELD, value.as_bytes())?;
+    }
+    if let Some(value) = write.negative_style {
+        emit_varint_field(output, FORMAT_NEGATIVE_STYLE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.show_thousands_separator {
+        emit_varint_field(
+            output,
+            FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+            u64::from(value),
+        )?;
+    }
+    if let Some(value) = write.use_accounting_style {
+        emit_varint_field(output, FORMAT_USE_ACCOUNTING_STYLE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.duration_style {
+        emit_varint_field(output, FORMAT_DURATION_STYLE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.base {
+        emit_varint_field(output, FORMAT_BASE_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.base_places {
+        emit_varint_field(output, FORMAT_BASE_PLACES_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.base_use_minus_sign {
+        emit_varint_field(output, FORMAT_BASE_USE_MINUS_SIGN_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.fraction_accuracy {
+        emit_varint_field(output, FORMAT_FRACTION_ACCURACY_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.suppress_date_format {
+        emit_varint_field(output, FORMAT_SUPPRESS_DATE_FORMAT_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.suppress_time_format {
+        emit_varint_field(output, FORMAT_SUPPRESS_TIME_FORMAT_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.date_time_format {
+        emit_len_field(output, FORMAT_DATE_TIME_FORMAT_FIELD, value.as_bytes())?;
+    }
+    if let Some(value) = write.duration_unit_largest {
+        emit_varint_field(output, FORMAT_DURATION_UNIT_LARGEST_FIELD, u64::from(value))?;
+    }
+    if let Some(value) = write.duration_unit_smallest {
+        emit_varint_field(
+            output,
+            FORMAT_DURATION_UNIT_SMALLEST_FIELD,
+            u64::from(value),
+        )?;
+    }
+    Ok(())
+}
+
 fn emit_varint_field(output: &mut Vec<u8>, number: u32, value: u64) -> Result<(), DecodeError> {
     write_varint(output, u64::from(number) << 3)?;
     write_varint(output, value)
+}
+
+fn emit_fixed64_field(output: &mut Vec<u8>, number: u32, value: f64) -> Result<(), DecodeError> {
+    if !value.is_finite() {
+        return Err(DecodeError::invalid());
+    }
+    write_varint(output, (u64::from(number) << 3) | 1)?;
+    output.extend_from_slice(&value.to_le_bytes());
+    Ok(())
 }
 
 fn emit_len_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> Result<(), DecodeError> {
@@ -2351,5 +3709,177 @@ mod tests {
                 .resource_limit()
                 .is_some_and(|limit| matches!(limit, DecodeLimit::References { .. }))
         );
+    }
+
+    #[test]
+    fn strict_control_cell_specs_cover_checkbox_star_slider_and_stepper() {
+        let cases = [
+            (CHECKBOX_INTERACTION_TYPE, None, None, None),
+            (
+                STAR_RATING_INTERACTION_TYPE,
+                Some(0.0),
+                Some(5.0),
+                Some(1.0),
+            ),
+            (SLIDER_INTERACTION_TYPE, Some(-1.0), Some(1.0), Some(0.25)),
+            (STEPPER_INTERACTION_TYPE, Some(0.0), Some(10.0), Some(1.0)),
+        ];
+        for (interaction, minimum, maximum, increment) in cases {
+            let output =
+                canonical_control_cell_spec(interaction, minimum, maximum, increment, options())
+                    .expect("canonical control cell spec");
+            let (snapshot, report) =
+                decode_control_cell_spec_with_report(output.bytes(), options())
+                    .expect("decode control cell spec");
+            assert_eq!(snapshot.interaction_type(), interaction);
+            assert_eq!(snapshot.range_control_min(), minimum);
+            assert_eq!(snapshot.range_control_max(), maximum);
+            assert_eq!(snapshot.range_control_inc(), increment);
+            assert_eq!(report.input_bytes(), output.bytes().len());
+            assert_eq!(report.fields(), 1 + usize::from(minimum.is_some()) * 3);
+        }
+    }
+
+    #[test]
+    fn control_cell_spec_unknown_group_is_raw_preserved_and_ranges_are_strict() {
+        let output = canonical_control_cell_spec(
+            SLIDER_INTERACTION_TYPE,
+            Some(0.0),
+            Some(10.0),
+            Some(1.0),
+            options(),
+        )
+        .expect("canonical slider");
+        let mut source = output.bytes().to_vec();
+        source.extend_from_slice(&[
+            0xa3, 0x06, 0x08, 0x81, 0x00, 0xa4, 0x06, // balanced unknown group
+        ]);
+        let snapshot = decode_control_cell_spec(&source, options()).expect("unknown group");
+        assert_eq!(snapshot.raw(), source.as_slice());
+
+        let missing_range = canonical_control_cell_spec(
+            SLIDER_INTERACTION_TYPE,
+            Some(0.0),
+            Some(10.0),
+            Some(1.0),
+            options(),
+        )
+        .expect("canonical slider")
+        .bytes()
+        .get(..18)
+        .expect("range prefix")
+        .to_vec();
+        assert!(decode_control_cell_spec(&missing_range, options()).is_err());
+
+        let mut checkbox_with_range =
+            canonical_control_cell_spec(CHECKBOX_INTERACTION_TYPE, None, None, None, options())
+                .expect("canonical checkbox")
+                .bytes()
+                .to_vec();
+        checkbox_with_range.extend_from_slice(&[0x19, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert!(decode_control_cell_spec(&checkbox_with_range, options()).is_err());
+    }
+
+    #[test]
+    fn prepared_control_cell_spec_replays_exactly_and_honors_typed_limits() {
+        let prepared = prepare_control_cell_spec_write(
+            STAR_RATING_INTERACTION_TYPE,
+            Some(0.0),
+            Some(5.0),
+            Some(1.0),
+            options(),
+        )
+        .expect("prepare star");
+        let requirements = prepared.execution_requirements();
+        let output = prepared
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("exact star execute");
+        assert_eq!(output.bytes().len(), requirements.output_bytes());
+        assert_eq!(output.report().fields(), requirements.fields());
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_output_bytes(requirements.output_bytes() - 1)
+                )
+                .expect_err("output ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_fields(requirements.fields() - 1)
+                )
+                .expect_err("field ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_work_bytes(requirements.work_bytes() - 1)
+                )
+                .expect_err("work ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(RewriteExecutionLimits::exact(requirements).with_allocations(0))
+                .expect_err("allocation ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::Allocation { .. })
+        ));
+    }
+
+    #[test]
+    fn control_format_preserves_full_display_fields_and_rejects_checkbox_extras() {
+        let write = ControlFormatWrite::new(256)
+            .with_decimal_places(3)
+            .with_currency_code("USD")
+            .with_negative_style(2)
+            .with_show_thousands_separator(true)
+            .with_use_accounting_style(false)
+            .with_duration_style(4)
+            .with_base(16)
+            .with_base_places(2)
+            .with_base_use_minus_sign(true)
+            .with_fraction_accuracy(5)
+            .with_suppress_date_format(false)
+            .with_suppress_time_format(true)
+            .with_date_time_format("yyyy-MM-dd")
+            .with_duration_unit_largest(1)
+            .with_duration_unit_smallest(2);
+        let output = canonical_control_format_fields(write, options()).expect("format write");
+        let (snapshot, report) =
+            decode_control_format_with_report(output.bytes(), options()).expect("format read");
+        assert_eq!(snapshot.format_type(), 256);
+        assert_eq!(snapshot.decimal_places(), Some(3));
+        assert_eq!(snapshot.currency_code(), Some("USD"));
+        assert_eq!(snapshot.negative_style(), Some(2));
+        assert_eq!(snapshot.show_thousands_separator(), Some(true));
+        assert_eq!(snapshot.use_accounting_style(), Some(false));
+        assert_eq!(snapshot.duration_style(), Some(4));
+        assert_eq!(snapshot.base(), Some(16));
+        assert_eq!(snapshot.base_places(), Some(2));
+        assert_eq!(snapshot.base_use_minus_sign(), Some(true));
+        assert_eq!(snapshot.fraction_accuracy(), Some(5));
+        assert_eq!(snapshot.suppress_date_format(), Some(false));
+        assert_eq!(snapshot.suppress_time_format(), Some(true));
+        assert_eq!(snapshot.date_time_format(), Some("yyyy-MM-dd"));
+        assert_eq!(snapshot.duration_unit_largest(), Some(1));
+        assert_eq!(snapshot.duration_unit_smallest(), Some(2));
+        assert_eq!(report.fields(), 16);
+        assert_eq!(report.text_bytes(), 13);
+
+        let mut invalid_checkbox = canonical_control_format(263, options())
+            .expect("checkbox format")
+            .bytes()
+            .to_vec();
+        invalid_checkbox.extend_from_slice(&[0x10, 0x01]);
+        assert!(decode_control_format(&invalid_checkbox, options()).is_err());
     }
 }

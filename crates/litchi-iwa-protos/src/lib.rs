@@ -1397,6 +1397,19 @@ pub mod numbers_table_cell_storage_codec;
 #[doc(hidden)]
 pub mod numbers_table_cell_pop_up_menu_codec;
 
+/// Neutral strict Numbers checkbox/star-rating/slider/stepper CellSpec and
+/// FormatStruct projection.  The implementation aliases the audited popup
+/// parser/writer so control packages cannot accidentally create a second wire
+/// policy or bypass prepared resource limits.
+#[doc(hidden)]
+pub mod numbers_table_cell_control_codec;
+
+/// Format-neutral spelling for the Numbers interactive-cell control seam.
+#[doc(hidden)]
+pub mod table_cell_control_codec {
+    pub use super::numbers_table_cell_control_codec::*;
+}
+
 /// Format-neutral strict table-dimension/header-bucket seam.
 ///
 /// The implementation remains in [`numbers_table_cell_storage_codec`] so

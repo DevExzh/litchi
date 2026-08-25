@@ -12,9 +12,9 @@ use litchi_numbers::cell::data_format::numeral_system::{
     Base, FixedPlaces, NegativeStyle as NumeralNegativeStyle, Places,
 };
 use litchi_numbers::cell::data_format::{
-    self as numbers, Checkbox, Currency, CurrencyCode, CurrencyStyle, DateTime, DecimalPlaces,
-    Duration, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number, NumeralSystem,
-    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper,
+    self as numbers, CellControl, Checkbox, Currency, CurrencyCode, CurrencyStyle, DateTime,
+    DecimalPlaces, Duration, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
+    NumeralSystem, Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper,
 };
 
 const ROW: usize = 1;
@@ -286,14 +286,29 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         DURATION_COLUMN,
         numbers_duration_format(),
     )?;
-    editor.set_table_cell_checkbox_format(table_id, ROW, CHECKBOX_COLUMN, Checkbox)?;
-    editor.set_table_cell_star_rating_format(table_id, ROW, STAR_RATING_COLUMN, StarRating)?;
-    editor.set_table_cell_slider_format(table_id, ROW, SLIDER_COLUMN, numbers_slider_format()?)?;
-    editor.set_table_cell_stepper_format(
-        table_id,
+    set_numbers_cell_control(
+        &mut editor,
+        ROW,
+        CHECKBOX_COLUMN,
+        CellControl::from(Checkbox),
+    )?;
+    set_numbers_cell_control(
+        &mut editor,
+        ROW,
+        STAR_RATING_COLUMN,
+        CellControl::from(StarRating),
+    )?;
+    set_numbers_cell_control(
+        &mut editor,
+        ROW,
+        SLIDER_COLUMN,
+        CellControl::from(numbers_slider_format()?),
+    )?;
+    set_numbers_cell_control(
+        &mut editor,
         ROW,
         STEPPER_COLUMN,
-        numbers_stepper_format()?,
+        CellControl::from(numbers_stepper_format()?),
     )?;
     editor.set_table_cell_data_format(
         table_id,
@@ -321,6 +336,28 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         numbers_custom_text_format()?,
     )?;
     editor.save(output)?;
+    Ok(())
+}
+
+fn set_numbers_cell_control(
+    editor: &mut NumbersEditor,
+    row: usize,
+    column: usize,
+    control: CellControl,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let source = litchi_numbers::Package::from_bytes(&editor.to_bytes()?)?;
+    let position = litchi_numbers::CellPosition::try_from_usize(row, column)?;
+    let commit = source
+        .edit_table_cell_control_format(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+            position,
+        )?
+        .set(control)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
     Ok(())
 }
 
