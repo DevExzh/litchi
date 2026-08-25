@@ -16,7 +16,7 @@ use litchi_odf_common::{
     package::raw_identical_members,
 };
 use litchi_ods::{
-    Cell, CellValue, CellView, SourceBackedSpreadsheet, Spreadsheet,
+    Cell, CellValue, CellView, FormulaChange, SourceBackedSpreadsheet, Spreadsheet,
     worksheet::{CellChange, MAX_CELL_CHANGES},
 };
 
@@ -37,6 +37,13 @@ fn ordinary_content() -> String {
             r#"<table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell><table:table-cell office:value-type="string" table:number-columns-repeated="3"><text:p>same</text:p></table:table-cell></table:table-row>"#,
             r#"<table:table-row><table:table-cell office:value-type="float" office:value="7"><text:p>7</text:p></table:table-cell></table:table-row>"#,
         ),
+    )
+}
+
+fn formula_content() -> String {
+    content(
+        "",
+        r#"<table:table-row><table:table-cell office:value-type="float" office:value="2" table:formula="of:=1+1" table:style-name="formula-style"><text:p>cached-result</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="4" table:formula="of:=2+2" table:number-columns-repeated="2"><text:p>repeated-result</text:p></table:table-cell></table:table-row>"#,
     )
 }
 
@@ -336,6 +343,185 @@ fn source_cell_edit_is_failure_atomic_and_refuses_unsafe_owners() {
         Some(true)
     );
     assert!(edit.commit().is_err());
+}
+
+#[test]
+fn source_formula_edit_preserves_cached_cell_state_and_inverse() {
+    let source = package(&formula_content(), false).unwrap();
+    let owner =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    let before = owner.cell_snapshot().unwrap();
+    let mut edit = before.edit().unwrap();
+    assert_eq!(
+        edit.set_formula("Data", 0, 0, "of:=7*6").unwrap(),
+        Some(true)
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(commit.changed_cells(), 1);
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.content_xml(), before.content_xml());
+
+    let mut output = Vec::new();
+    commit.write_to(&mut output).unwrap();
+    let reopened = Spreadsheet::from_bytes(output.clone()).unwrap();
+    let Some(CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
+        panic!("formula fixture cell");
+    };
+    assert_eq!(cell.formula.as_deref(), Some("of:=7*6"));
+    assert_eq!(cell.text, "cached-result");
+    assert_eq!(cell.style_name.as_deref(), Some("formula-style"));
+    assert!(matches!(cell.value, CellValue::Number(value) if value == 2.0));
+    let identical = raw_identical_members(&source, &output).unwrap();
+    assert!(identical.contains("mimetype"));
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Pictures/opaque.bin"));
+    assert!(!identical.contains("content.xml"));
+}
+
+#[test]
+fn source_formula_batch_handles_repeated_columns_and_atomic_conflicts() {
+    let source = package(&formula_content(), false).unwrap();
+    let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let mut edit = owner.edit_cells().unwrap();
+    assert_eq!(
+        edit.set_formulas(
+            "Data",
+            vec![
+                FormulaChange::new(0, 0, "of:=3"),
+                FormulaChange::new(0, 2, "of:=5"),
+            ],
+        )
+        .unwrap(),
+        Some(2)
+    );
+    assert!(
+        edit.set_cell("Data", 0, 0, text("scalar-conflict"))
+            .is_err()
+    );
+    assert_eq!(edit.changed_cells(), 2);
+    assert!(edit.set_formula("Data", 0, 0, "of:=3").is_err());
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    commit.write_to(&mut output).unwrap();
+    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let Some(CellView::Stored(first)) = reopened.cell("Data", 0, 0) else {
+        panic!("first formula fixture cell");
+    };
+    assert_eq!(first.formula.as_deref(), Some("of:=3"));
+    let Some(CellView::Stored(repeated)) = reopened.cell("Data", 0, 1) else {
+        panic!("repeated formula fixture cell");
+    };
+    assert_eq!(repeated.formula.as_deref(), Some("of:=2+2"));
+    let Some(CellView::Stored(last)) = reopened.cell("Data", 0, 2) else {
+        panic!("edited repeated formula fixture cell");
+    };
+    assert_eq!(last.formula.as_deref(), Some("of:=5"));
+}
+
+#[test]
+fn source_formula_edit_requires_existing_formula_and_allows_exact_protected_no_op() {
+    let source = package(&formula_content(), false).unwrap();
+    let owner =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    let mut missing = owner.edit_cells().unwrap();
+    assert!(missing.set_formula("Data", 9, 9, "of:=1").is_err());
+    assert!(missing.set_formula("Data", 0, 0, "").is_err());
+    assert!(missing.set_formula("Data", 0, 0, "of:=1").is_ok());
+
+    let protected_source = package(
+        &content(" table:protected=\"true\"", &formula_content_rows()),
+        false,
+    )
+    .unwrap();
+    let protected =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(protected_source.clone())))
+            .unwrap();
+    let mut no_op = protected.edit_cells().unwrap();
+    assert_eq!(
+        no_op.set_formula("Data", 0, 0, "of:=1+1").unwrap(),
+        Some(false)
+    );
+    let mut exact = Vec::new();
+    assert!(
+        no_op
+            .commit()
+            .unwrap()
+            .write_to(&mut exact)
+            .unwrap()
+            .is_no_op()
+    );
+    assert_eq!(exact, protected_source);
+}
+
+fn formula_content_rows() -> String {
+    formula_content()
+        .split_once("<table:table table:name=\"Data\">")
+        .and_then(|(_, tail)| tail.split_once("</table:table>").map(|(rows, _)| rows))
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn source_formula_batch_rejects_aggregate_payload_atomically() {
+    let source = package(&formula_content(), false).unwrap();
+    let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let large_formula = format!("of:={}", "x".repeat(8 * 1024 * 1024));
+    let mut edit = owner.edit_cells().unwrap();
+    let error = edit
+        .set_formulas(
+            "Data",
+            vec![
+                FormulaChange::new(0, 0, large_formula.clone()),
+                FormulaChange::new(0, 1, large_formula),
+            ],
+        )
+        .unwrap_err();
+    assert!(matches!(error, litchi_core::Error::ResourceLimit(_)));
+    assert_eq!(edit.changed_cells(), 0);
+    assert!(edit.is_no_op());
+}
+
+#[test]
+fn source_formula_batch_validates_later_changes_before_mutation() {
+    let source = package(&formula_content(), false).unwrap();
+    let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let mut edit = owner.edit_cells().unwrap();
+    let error = edit
+        .set_formulas(
+            "Data",
+            vec![
+                FormulaChange::new(0, 0, "of:=valid"),
+                FormulaChange::new(0, 1, ""),
+            ],
+        )
+        .unwrap_err();
+    assert!(matches!(error, litchi_core::Error::InvalidFormat(_)));
+    assert_eq!(edit.changed_cells(), 0);
+    assert!(edit.is_no_op());
+}
+
+#[test]
+fn source_formula_and_scalar_selector_misses_recheck_stale_source() {
+    let source = Arc::new(MutableSource::new(
+        package(&formula_content(), false).unwrap(),
+    ));
+    let owner = SourceBackedSpreadsheet::from_read_at(source.clone()).unwrap();
+    let mut formula_edit = owner.edit_cells().unwrap();
+    let mut scalar_edit = owner.edit_cells().unwrap();
+    source.bump();
+    assert!(
+        formula_edit
+            .set_formulas("Missing", vec![FormulaChange::new(0, 0, "of:=1")],)
+            .is_err()
+    );
+    assert_eq!(formula_edit.changed_cells(), 0);
+    assert!(
+        scalar_edit
+            .set_cells("Missing", vec![CellChange::new(0, 0, text("changed"))])
+            .is_err()
+    );
+    assert_eq!(scalar_edit.changed_cells(), 0);
 }
 
 #[test]

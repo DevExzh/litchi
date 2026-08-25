@@ -20,7 +20,7 @@ pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceReadMetrics};
 pub use source::{ReadLimits, SourceBackedSpreadsheet};
 pub use source_edit::{
-    SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
+    FormulaChange, SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
     SourceCellSnapshot,
 };
 

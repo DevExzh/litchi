@@ -78,10 +78,10 @@ pub use charts::Chart;
 pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};
 pub use facade::{
-    Builder, CellSelector, MAX_CELL_SELECTORS, MutableSpreadsheet, ReadLimits, SheetCatalogEntry,
-    SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, SourceCellCommit, SourceCellEdit,
-    SourceCellPatch, SourceCellPublicationReport, SourceCellSnapshot, SourceReadMetrics,
-    Spreadsheet,
+    Builder, CellSelector, FormulaChange, MAX_CELL_SELECTORS, MutableSpreadsheet, ReadLimits,
+    SheetCatalogEntry, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, SourceCellCommit,
+    SourceCellEdit, SourceCellPatch, SourceCellPublicationReport, SourceCellSnapshot,
+    SourceReadMetrics, Spreadsheet,
 };
 pub use flat::{
     FlatCommit, FlatEdit, FlatSpreadsheet, Limits as FlatLimits, Patch as FlatPatch,
