@@ -5,10 +5,11 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
-use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa_common::shape::geometry::{Point, Size};
+use litchi_keynote::slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
+use litchi_keynote::{MovieSelector, Package, SlideSelector};
 
 const SLIDE_WIDTH_POINTS: f32 = 1_920.0;
 const SLIDE_HEIGHT_POINTS: f32 = 1_080.0;
@@ -55,16 +56,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.slide_movie_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded movie: {movie_filename}"));
     editor.set_slide_movie_properties(0, created.drawable_object_id, properties)?;
-    let playback = created
+    let initial_playback = created
         .playback
         .ok_or("created Keynote movie has no playback settings")?;
-    editor.set_slide_movie_playback_settings(
-        0,
-        created.drawable_object_id,
-        playback
-            .with_loop_mode(Some(MediaLoopMode::Repeat))
-            .with_volume(Some(MediaVolume::new(0.75)?)),
-    )?;
+    let playback = MediaPlaybackSettings::new(initial_playback.end_time)
+        .with_start_time(initial_playback.start_time)
+        .with_poster_time(initial_playback.poster_time)
+        .with_loop_mode(Some(MediaLoopMode::Repeat))
+        .with_volume(Some(MediaVolume::new(0.75)?));
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_movie_playback_settings(
+            SlideSelector::position(litchi_core::Position::new(0)),
+            MovieSelector::index(0),
+        )?
+        .set(playback)?
+        .commit()?;
+    let mut playback_bytes = Vec::new();
+    commit.package().write_to(&mut playback_bytes)?;
+    editor = KeynoteEditor::from_bytes(&playback_bytes)?;
     editor.set_slide_movie_title_by_selector(
         litchi_core::Position::new(0),
         litchi_keynote::MovieSelector::index(0),

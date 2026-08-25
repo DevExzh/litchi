@@ -13,5 +13,7 @@ target
 !/corpus/pages_section_text/*
 !/corpus/numbers_table_cell_pop_up_menu/
 !/corpus/numbers_table_cell_pop_up_menu/*
+!/corpus/keynote_movie_playback/
+!/corpus/keynote_movie_playback/*
 artifacts
 coverage

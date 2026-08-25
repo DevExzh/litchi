@@ -83,6 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_media_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
+    println!("cargo:rerun-if-changed=src/movie_playback_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_footnote_graph_codec.rs");
@@ -331,6 +332,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_movie_caption_projection_budget(&buffa_keynote_movie_caption_out_directory)?;
+
+    // Keynote movie playback uses only the required drawable envelope and the
+    // six scalar playback fields. Keep the complete MovieArchive graph out of
+    // generated code; the strict raw codec owns validation and preservation.
+    let buffa_movie_playback_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-movie-playback");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDMoviePlaybackArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_movie_playback_out_directory)
+        .include_file("iwa_movie_playback_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
 
     // Keynote chart-title reads need only the two scalar fields from the
     // generated ChartNonStyleArchive extension. Keep the outer non-style
@@ -975,6 +995,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "e4306fa9440c13f2f77587f2edfb25c81eab639087d217bf88f5738ce416c2a9",
         ),
         (
+            "TSDMoviePlaybackArchive.proto",
+            598,
+            "b42ebea4039c7bee3d049de00b2b7a997b6c8e5d18851aa8c6a916eb9a7986f5",
+        ),
+        (
             "TSPPackageMetadataArchive.proto",
             927,
             "cbfdc5b57d0b09153a7fa083f2557bff305aa7463375173cf4fd1eb75f52fced",
@@ -1132,6 +1157,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_movie_caption_codec.rs",
             "crate::buffa_keynote_movie_caption_generated::",
             "mod buffa_keynote_movie_caption_generated {",
+        ),
+        (
+            "src/movie_playback_codec.rs",
+            "crate::buffa_movie_playback_generated::",
+            "mod buffa_movie_playback_generated {",
         ),
         (
             "src/keynote_chart_title_codec.rs",

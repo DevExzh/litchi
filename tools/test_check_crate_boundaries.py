@@ -445,6 +445,94 @@ def add_numbers_table_cell_pop_up_menu_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod playback {\n"
+        "pub mod transaction;\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_TYPES
+        )
+        + "}\n"
+        "pub use playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume, TimeField};\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES
+        )
+        + "struct TransactionBudget;\n"
+        + "fn transaction_budget_preflight() { budget; }\n"
+        + "fn preflight_candidate_reopen_locality() { ExactArtifacts; inverse; }\n"
+        + "fn charge_codec_report_fields_work() { codec_report; wire; fields; work; }\n"
+        + "fn charge_archive_snappy_zip_output() { archive; Snappy; ZIP; output; }\n"
+        + "fn movie_playback_codec_route() { movie_playback_codec; }\n"
+        + "impl Package {\n"
+        + "pub fn slide_movie_playback_settings<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MediaPlaybackSettings, Error> { let _ = (slide, movie); todo!() }\n"
+        + "pub fn edit_slide_movie_playback_settings<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MediaPlaybackSettings) -> Result<SlideMoviePlaybackEdit, Error> { let _ = (slide, movie, value); todo!() }\n"
+        + "pub fn apply_slide_movie_playback_settings(&self, patch: &SlideMoviePlaybackPatch) -> Result<SlideMoviePlaybackCommit, Error> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideMoviePlaybackEdit { pub fn set(self, value: MediaPlaybackSettings) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideMoviePlaybackCommit, Error> { todo!() } }\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_movie_playback;\n"
+        "pub use slide_movie_playback::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod slide;\n"
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::movie::MovieSelector;\n"
+        "pub use slide::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume, TimeField};\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_TYPES
+        )
+        + "pub fn decode_movie_playback_with_report() {}\n"
+        + "pub fn prepare_movie_playback_rewrite() {}\n"
+        + "pub fn rewrite_movie_playback() {}\n"
+        + "// private Buffa lazy sidecar ingress; unknown balanced raw fields; max_input max_output max_fields max_work max_depth max_references try_reserve\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in boundaries.KEYNOTE_MOVIE_PLAYBACK_FUZZ_SOURCES:
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in boundaries.KEYNOTE_MOVIE_PLAYBACK_FUZZ_CORPORA:
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -11322,6 +11410,117 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_movie_title_facade_source_topology()",
             "+ audit_keynote_movie_title_codec_source_topology()",
             "+ audit_keynote_movie_title_lifecycle_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_movie_playback_facade_is_dormant_until_owner_and_then_strict(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            # The current compatibility host is intentionally not audited
+            # until the owner/codec/package activation seam exists.
+            self.assertEqual(
+                boundaries.audit_keynote_movie_playback_facade_source_topology(root), []
+            )
+            add_keynote_movie_playback_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_playback_facade_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_playback(bytes: &[u8], movie_id: u64) -> MoviePlaybackSnapshot { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+    def test_keynote_movie_playback_facade_masks_cfg_test_decoys_and_rejects_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_playback_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\npub fn decoy(movie_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::SlideMoviePlaybackEdit as PlaybackEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_movie_playback_codec_resource_and_fuzz_ratchets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_playback_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_playback_resource_source_topology(root),
+                [],
+            )
+            codec = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            for markers in boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_MARKER_GROUPS.values():
+                for marker in markers:
+                    codec_source = codec_source.replace(marker, "")
+            codec.write_text(codec_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("resource/preflight" in item for item in violations), violations)
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "fn resource() { max_work; try_reserve; }\n",
+                encoding="utf-8",
+            )
+            fuzz = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+    def test_keynote_movie_playback_host_retires_surface_and_keeps_shared_helpers_outside_scope(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_playback_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_MOVIE_PLAYBACK_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn slide_movie_playback_settings(&self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn set_slide_movie_playback_settings(&mut self, slide_index: usize, movie_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_playback_source_topology(root)
+            self.assertTrue(any("public method" in item for item in violations), violations)
+
+            host.write_text("pub fn unrelated_media_playback_helper() {}\n", encoding="utf-8")
+            example = root / boundaries.IWA_KEYNOTE_MOVIE_PLAYBACK_EXAMPLES[0]
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create() { editor.set_slide_movie_playback_settings(0, 7, settings); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_playback_source_topology(root)
+            self.assertTrue(any("example call" in item for item in violations), violations)
+            example.write_text(
+                "fn create() { package.slide_movie_playback_settings(slide, movie); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_movie_playback_source_topology(root), []
+            )
+
+    def test_keynote_movie_playback_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_movie_playback_source_topology()",
+            "+ audit_keynote_movie_playback_facade_source_topology()",
+            "+ audit_keynote_movie_playback_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 
