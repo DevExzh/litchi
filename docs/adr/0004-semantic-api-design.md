@@ -2983,3 +2983,41 @@ neither allocates nor removes an object and does not invalidate layout,
 Metadata identifiers/save tokens and previews do not change. Section graph
 lifecycle, whole-body replacement across structural boundaries, and other
 text, table, annotation, or media graphs are outside this owner.
+
+## 2026-08-25 amendment: Numbers table-appearance semantic ownership
+
+Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
+adds selector-first `Package::{table_appearance, edit_table_appearance,
+apply_table_appearance}` ownership. `Appearance`, `Banding`, `RowSizing`,
+`GridlineVisibility`, and `Gridlines` are archive-free semantic values;
+`Edit`, `Commit`, `Patch`, `Diagnostics`, `Path`, and typed errors describe an
+atomic package transaction without exposing native identifiers or physical
+IWA details.
+
+The hidden strict table-appearance codec validates the selected
+`TableModelArchive` direct-style edge, bounded `TableStyleArchive`
+inheritance, and current plus versioned `StylesheetArchive` registries. It
+preserves unknown fields, balanced unknown groups, overlong unknown scalar
+values, unselected and versioned registry bytes, and all unrelated object
+metadata. Known fields, references, registry entries, inheritance, and
+resource limits are canonical and fail closed. A changed edit creates one
+copy-on-write style variation, replaces only the selected model edge, appends
+the exact stylesheet registry relationship, updates UUID/watermark and root
+plus selected current-component save tokens, invalidates canonical previews,
+reopens the candidate, verifies locality, and retains an exact inverse.
+
+This owner accepts an existing rooted direct field-3 style route. A nonzero
+field-48 preset is opaque and byte-preserved while the direct edge remains
+authoritative; preset-only and preset/network lifecycle are unsupported.
+The selected style and stylesheet must have one proven current owner and be
+co-located; cross-component stylesheet graphs, aliases, shared ownership,
+missing or conflicting metadata, locked/dependent tables, malformed
+MessageInfo/FieldInfo edges, and ambiguous/versioned/data/root-map ownership
+fail closed. Native producer cases where a component-root stylesheet is not
+repeated in its UUID map, or where current field-local metadata is absent, are
+accepted only when the component identity, aggregate references, strict
+registry, and all remaining ownership facts prove the route exactly.
+
+This is appearance replacement, not table/style/preset/network creation or
+culling, reset semantics, table topology or content editing, arbitrary
+producer-graph repair, or a public native graph API.

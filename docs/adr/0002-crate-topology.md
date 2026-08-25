@@ -3566,3 +3566,29 @@ remain at their recorded owners. The 64-package, 239-internal-declaration,
 13-debt topology is unchanged: debt 017, the `litchi-iwa -> litchi-pages`
 edge, the migration host, generated-schema and normal Prost/Buffa owners, and
 the monolith remain.
+
+## 2026-08-25 amendment: Wave80 Numbers table-appearance boundary
+
+Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
+makes `litchi-numbers` the authoritative owner of existing rooted Numbers
+table-appearance reads and copy-on-write replacement. The archive-free facade
+is `Package::{table_appearance, edit_table_appearance,
+apply_table_appearance}` with `table::appearance::{Appearance, Banding,
+RowSizing, GridlineVisibility, Gridlines}` and transaction values. Native
+object IDs, component routes, archive names, wire values, generated messages,
+Prost values, and Buffa views do not cross that boundary.
+
+The former mutating `NumbersEditor::{table_appearance,
+set_table_appearance}` wrapper and its private editor module are retired.
+`NumbersEditor::tables()` retains a read-only compatibility fallback for
+older/source-built producer graphs, and the shared root
+`litchi_iwa::table_appearance` implementation remains for Pages and Keynote.
+The package cut therefore does not close debt 015 or remove the
+`litchi-iwa -> litchi-numbers` edge.
+
+The workspace inventory remains 64 packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debts 015 and 017, the migration
+hosts, remaining Numbers/Pages graph responsibilities, generated-schema and
+normal Prost/Buffa owners, and the IWA monolith remain. This cut removes no
+crate, dependency edge, debt item, production manifest dependency, or
+monolith owner.

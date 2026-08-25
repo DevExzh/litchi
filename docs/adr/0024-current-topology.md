@@ -2398,6 +2398,30 @@ dependency declarations, and 13 ordered migration debts. Debt 017 and the
 debt item, migration host, generated-schema owner, normal Prost/Buffa owner,
 or monolith is removed by this cut.
 
+## 2026-08-25 amendment: Wave80 current-topology Numbers table-appearance cut
+
+Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
+makes `litchi-numbers` the current owner of selector-first, existing-root
+table-appearance reads, copy-on-write replacement, exact patch application,
+and inverse artifacts. The package owns strict model/style/stylesheet and
+metadata validation, bounded style inheritance, new variation and registry
+publication, UUID/watermark/save-token updates, aggregate resource accounting,
+candidate reopen, preview invalidation, and locality verification.
+
+The mutating Numbers editor wrapper is retired. A read-only compatibility
+fallback remains in `NumbersEditor::tables()` for older/source-built graphs,
+and the shared root appearance implementation remains for Pages and Keynote.
+Preset/network lifecycle, cross-component stylesheet graphs, table topology
+and content, appearance reset/cull, and remaining Numbers graph operations
+stay at their recorded owners.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debt 017, the Pages
+edge, the migration hosts, generated-schema and normal Prost/Buffa owners,
+and the IWA monolith. No crate, dependency edge, debt item, production
+manifest dependency, or monolith is removed by this cut.
+
 ## 2026-08-25 amendment: Wave79 current-topology Pages section-text host-retirement cut
 
 Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`

@@ -1412,3 +1412,35 @@ or performance, and do not claim one global allocation or a universally
 output-free preflight. No production manifest dependency, generated schema,
 normal Prost owner, Buffa owner, or workspace dependency edge changed; fuzz
 manifest changes only register the bounded section codec and lifecycle targets.
+
+## 2026-08-25 amendment: Wave80 Numbers table-appearance resource record
+
+Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
+carries one operation-local transaction budget through source catalog and
+rooted selector resolution, model/style/stylesheet and metadata ownership
+scans, strict codec preparation and execution, UUID/external-reference and
+save-token preparation, archive and Snappy sizing, prepared ZIP reassembly,
+candidate reopen, semantic readback, locality verification, and retained
+source/target patch artifacts. Residual input, output, fields, work, nesting,
+components, references, additions, allocations, retained bytes, and scratch
+limits are passed between distinct phases instead of resetting full limits.
+
+Native and metadata codec plans expose checked execution requirements and use
+fallible scratch/output reservations. Conservative component archive,
+compression, candidate, and package-output bounds are charged before their
+respective private candidates; exact prepared reassembly requirements are
+checked before the final ZIP allocation. Typed archive/core/codec limit and
+allocation failures leave the immutable source and published package state
+unchanged. Independent source and candidate scans are charged independently,
+while already-accounted borrowed bytes are not charged twice and nesting is
+merged by maximum.
+
+The native rewrite and metadata rewrite are staged private candidates because
+the metadata UUID transition consumes the newly generated style identifier.
+Publication is atomic after all verification, but this record does not claim
+one global output-free preflight or one allocation. These are operation-local
+accounting facts only: they establish no package-wide peak memory, RSS,
+latency, throughput, zero-copy, or performance result. No production manifest
+dependency, generated schema, normal Prost owner, Buffa owner, or workspace
+dependency edge changed; fuzz manifests only register the bounded codec and
+package targets.

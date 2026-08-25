@@ -5149,3 +5149,36 @@ reopen evidence, exact pre-native inverses, and strict normalized Rust reread.
 Pages normalized both ZIP artifacts; this is not Rust/native byte parity,
 arbitrary producer-graph acceptance, a performance/RSS result, durable
 publication evidence, or a full-workspace claim.
+
+## 2026-08-25 amendment: Wave80 Numbers table-appearance bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
+moves existing rooted Numbers table-appearance reads and copy-on-write
+replacement into the selector-first package. The semantic facade contains no
+native IDs or physical IWA types. The strict hidden codec and package jointly
+own direct model-style selection, bounded inheritance, source-preserving
+stylesheet registry append, UUID/watermark and selected-token transition,
+staged-private atomic publication, candidate reopen, exact patch/inverse, and
+locality for this narrow slice.
+
+This is not general style or table graph ownership. Direct field 3 remains
+authoritative while any nonzero field-48 preset is opaque and byte-preserved;
+preset-only graphs, preset/network/style lifecycle, reset/cull, aliases,
+cross-component stylesheet ownership, table topology/content, and unsupported
+shared or malformed resources fail closed or remain at their recorded owners.
+The mutating Numbers editor wrapper is retired, but its table inventory keeps
+a read-only compatibility fallback, and the shared appearance host remains for
+Pages and Keynote.
+
+Debt 015, the `litchi-iwa -> litchi-numbers` dependency edge, debt 017 and the
+Pages edge, `litchi-iwa`, remaining migration-host responsibilities,
+generated-schema, Buffa, and normal Prost owners, and the IWA monolith remain.
+No crate, dependency edge, debt item, production manifest dependency,
+generated-schema owner, normal Prost owner, migration host, or monolith-exit
+gate is retired by Wave80.
+
+The Numbers 14.4 record provides bounded appearance open/render/save/close/
+reopen evidence, a byte-exact pre-native inverse, and strict normalized Rust
+reread. Numbers normalized the ZIP bytes; this is not Rust/native byte parity,
+arbitrary producer-graph acceptance, a performance/RSS result, durable
+publication evidence, or a full-workspace claim.
