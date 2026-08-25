@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.xlsx.cell-values-abba.v1",
+  "self_excluded": true,
+  "files": [
+    {
+      "path": "protocol.json",
+      "bytes": 7133,
+      "sha256": "ec62eae51e31433e03c654abd7fd1fc86b3194f29211b3e8f6d3d40283238a75"
+    },
+    {
+      "path": "samples.jsonl",
+      "bytes": 18076365,
+      "sha256": "cca3aae4abbded80b2e0189c4df25f7b45dabcddd97001296d18ca82542d1d81"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 44955,
+      "sha256": "3cdeeeea10ffe2e6814245e881c0cb0db4c9ccdc3b88ec3508de36e603844865"
+    },
+    {
+      "path": "failures.jsonl",
+      "bytes": 158,
+      "sha256": "cb5d19ae88aa46cb968e4489ef57d6aa8d4995bc0d1f02d6b34fca123b4b6685"
+    },
+    {
+      "path": "sha256.txt",
+      "bytes": 186,
+      "sha256": "ddac5b85b787130c47ebf45aea80988dbf61c00da02a6122288a0d6c1f00d4c8"
+    },
+    {
+      "path": "process-time.txt",
+      "bytes": 69,
+      "sha256": "94a2de16199a981539a4e9f90a412fd695366b1a181d7b13e1efd044195f1d3b"
+    }
+  ]
+}
