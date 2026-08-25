@@ -1170,22 +1170,43 @@ pub(crate) fn reset_table_cell_stepper_format_in_package(
     cell_data_format::reset_cell_stepper_format(package, table_id, row, column)
 }
 
+/// Shared private adapter retained for the Pages and Keynote table-cell
+/// control hosts. Numbers' public popup methods route through the focused
+/// selector-first owner in `semantic::table`.
 pub(crate) fn table_cell_pop_up_menu_format_in_package(
     package: &IWorkPackage,
     table_id: u64,
     row: usize,
     column: usize,
 ) -> Result<Option<PopUpMenu>> {
-    cell_data_format::cell_pop_up_menu_format(package, table_id, row, column)
+    cell_data_format::cell_data_format(package, table_id, row, column).and_then(|format| {
+        match format {
+            DataFormat::Automatic => Ok(None),
+            DataFormat::PopUpMenu(format) => Ok(Some(format)),
+            _ => Err(Error::InvalidFormat(
+                "Table cell does not use the Pop-Up Menu data format".to_owned(),
+            )),
+        }
+    })
 }
 
+/// Shared private adapter retained for the Pages and Keynote table-cell
+/// control hosts. Numbers' public reset method is retired.
 pub(crate) fn reset_table_cell_pop_up_menu_format_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
     row: usize,
     column: usize,
 ) -> Result<bool> {
-    cell_data_format::reset_cell_pop_up_menu_format(package, table_id, row, column)
+    match cell_data_format::cell_data_format(package, table_id, row, column)? {
+        DataFormat::Automatic => Ok(false),
+        DataFormat::PopUpMenu(_) => {
+            cell_data_format::reset_cell_data_format(package, table_id, row, column)
+        },
+        _ => Err(Error::InvalidFormat(
+            "Cannot reset Pop-Up Menu format from a non-Pop-Up-Menu cell".to_owned(),
+        )),
+    }
 }
 
 pub(crate) fn set_table_cell_layout_in_package(

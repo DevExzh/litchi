@@ -8,6 +8,9 @@
 
 #![forbid(unsafe_code)]
 
+/// Source-preserving Pop-Up Menu BNC transition planner and executor.
+pub mod popup_menu;
+
 use std::collections::BTreeMap;
 
 use std::fmt;

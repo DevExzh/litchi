@@ -45,6 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_pop_up_menu_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -159,6 +160,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_table_title_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_cell_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_table_data_list_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_numbers_table_cell_pop_up_menu_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_package_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_native_message_provenance(proto_directory)?;
@@ -481,6 +486,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_cell_storage_projection_budget(&buffa_table_cell_storage_out_directory)?;
+
+    // Popup-menu model and cell-spec decoding only needs singular wrappers.
+    // The repeated model values and control-cell list entries remain on the
+    // handwritten source-preserving route, so this sidecar cannot materialize
+    // input-width generated vectors.
+    let buffa_numbers_table_cell_pop_up_menu_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-pop-up-menu");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableCellPopUpMenuArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_table_cell_pop_up_menu_out_directory)
+        .include_file("iwa_numbers_table_cell_pop_up_menu_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_table_cell_pop_up_menu_projection_budget(
+        &buffa_numbers_table_cell_pop_up_menu_out_directory,
+    )?;
 
     let buffa_table_cell_dependency_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-dependency");
@@ -962,6 +990,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "17d1cd1afd6f59c46d29f2c481744ead27568ffe937a2b9d9633ce376cb754c9",
         ),
         (
+            "TSTTableCellPopUpMenuArchive.proto",
+            1052,
+            "343dba7ba59458e2b06c34d5da2b71cf868c349bb738e05c1e85cdee7c87bea0",
+        ),
+        (
             "TSTTableHeaderSettingsArchive.proto",
             930,
             "1236d9a9d0116885c7140683e5de2d33b6a083435bf3d3cfbebf91172c856d24",
@@ -1179,6 +1212,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/numbers_table_cell_storage_codec.rs",
             "crate::buffa_numbers_table_cell_storage_generated::",
             "mod buffa_numbers_table_cell_storage_generated {",
+        ),
+        (
+            "src/numbers_table_cell_pop_up_menu_codec.rs",
+            "crate::buffa_numbers_table_cell_pop_up_menu_generated::",
+            "mod buffa_numbers_table_cell_pop_up_menu_generated {",
         ),
         (
             "src/numbers_table_cell_dependency_codec.rs",
@@ -3027,6 +3065,127 @@ fn enforce_table_cell_projection_provenance(
         || production.contains(".encode(")
     {
         return Err("Numbers table-cell projections/codecs drifted from canonical TST/TSCE envelopes, exceeded source budgets, exposed repeated generated storage, or introduced production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_pop_up_menu_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const ROUTER_MARKERS: [&str; 12] = [
+        "pub struct PopUpMenuModelSnapshot<'source>",
+        "pub struct CellSpecSnapshot<'source>",
+        "pub fn decode_popup_menu_model(",
+        "pub fn decode_popup_menu_model_with_report(",
+        "pub fn decode_cell_spec(",
+        "pub fn prepare_popup_menu_model_write<'items>(",
+        "pub fn prepare_cell_spec_write(",
+        "pub struct RewriteExecutionRequirements",
+        "pub struct RewriteExecutionLimits",
+        "pub struct PreparedPopUpMenuModelWrite",
+        "pub struct PreparedCellSpecWrite",
+        "const POPUP_INTERACTION_TYPE: u32 = 7;",
+    ];
+    const PRIVATE_MODULE_MARKERS: [&str; 2] = [
+        "mod buffa_numbers_table_cell_pop_up_menu_generated {",
+        "/buffa-numbers-table-cell-pop-up-menu/iwa_numbers_table_cell_pop_up_menu_buffa_protos.rs",
+    ];
+    const PROJECTION_MARKERS: [&str; 12] = [
+        "message CellValueArchive {",
+        "required int32 cell_value_type = 1;",
+        "optional bytes string_value = 5;",
+        "message StringCellValueArchive {",
+        "required string value = 1;",
+        "required bytes format = 2;",
+        "message CellSpecArchive {",
+        "required uint32 interaction_type = 1;",
+        "optional bytes chooser_control_popup_model = 6;",
+        "optional bool chooser_control_start_w_first = 7;",
+        "optional bool category_summary_should_display_label = 8;",
+        "syntax = \"proto2\";",
+    ];
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let tsce = fs::read_to_string(proto_directory.join("TSCEArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableCellPopUpMenuArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let canonical = [
+        "message PopUpMenuModel {",
+        "repeated .TST.PopUpMenuModel.CellValue item = 1 [deprecated = true];",
+        "repeated .TSCE.CellValueArchive tsce_item = 2;",
+        "message CellSpecArchive {",
+        "optional .TSP.Reference chooser_control_popup_model = 6;",
+        "optional bool chooser_control_start_w_first = 7;",
+        "message StringCellValueArchive {",
+        "required string value = 1;",
+    ];
+    let tsce_string = proto_message_block(&tsce, "StringCellValueArchive").unwrap_or("");
+    if !canonical
+        .iter()
+        .all(|marker| tst.matches(marker).count() + tsce.matches(marker).count() == 1)
+        || tsce_string
+            .matches("required .TSK.FormatStructArchive format = 2;")
+            .count()
+            != 1
+        || !PROJECTION_MARKERS
+            .iter()
+            .all(|marker| projection.matches(marker).count() == 1)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || !ROUTER_MARKERS
+            .iter()
+            .all(|marker| codec.matches(marker).count() == 1)
+        || !PRIVATE_MODULE_MARKERS
+            .iter()
+            .all(|marker| lib.matches(marker).count() == 1)
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "Numbers table-cell popup projection/codec drifted from the strict TST/TSCE route, exposed repeated generated storage, or introduced production encoding".into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_pop_up_menu_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut files = 0usize;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("popup generated file overflow")?;
+        let generated = fs::read(entry.path())?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("popup generated byte overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("popup repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("popup lazy-repeated-view count overflow")?;
+    }
+    if files != 5 || bytes > 180 * 1024 || repeated_views != 0 || lazy_repeated_views != 0 {
+        return Err(format!(
+            "Numbers table-cell popup projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated views"
+        )
+        .into());
     }
     Ok(())
 }

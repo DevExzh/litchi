@@ -2659,6 +2659,229 @@ NUMBERS_TABLE_APPEARANCE_OWNER_REQUIRED_MARKERS = {
         r"same_content)(?![A-Za-z0-9])"
     ),
 }
+
+# Numbers cell pop-up-menu formatting remains in the IWA host until a complete
+# selector-first package transaction owns the control-cell/spec/model graph.
+# Keep this ratchet dormant until the private owner, strict codec, and fuzz
+# targets appear together; a semantic-only extraction must not retire the host
+# route or debt 015.
+RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_METHODS = (
+    "table_cell_pop_up_menu_format",
+    "set_table_cell_pop_up_menu_format",
+    "reset_table_cell_pop_up_menu_format",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_TESTS = (
+    "source_built_table_roundtrips_reuses_and_cleans_up_pop_up_menus",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_TEST_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_TESTS
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/create_iwork_table_number_formats.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "package.rs",
+)
+IWA_NUMBERS_README_TABLE_CELL_POP_UP_MENU_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor|editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_cell_pop_up_menu_format|"
+        r"set_table_cell_pop_up_menu_format|reset_table_cell_pop_up_menu_format)\b"
+        r"[ \t\r\n]*\(",
+    ),
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/data_format/pop_up_menu.rs"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cell_pop_up_menu.rs"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_HELPER_ROOT = Path(
+    "crates/litchi-numbers/src/package/table_cell_pop_up_menu"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_pop_up_menu_codec.rs"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_MODULE = (
+    "numbers_table_cell_pop_up_menu_codec"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_REQUIRED_APIS = (
+    "decode_popup_menu_model_with_report",
+    "decode_cell_spec_with_report",
+    "prepare_popup_menu_model_write",
+    "prepare_cell_spec_write",
+    "PreparedPopUpMenuModelWrite",
+    "PreparedCellSpecWrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "canonical_popup_menu_model",
+    "canonical_cell_spec",
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE,
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+    Path("crates/litchi-numbers/src/cell/data_format.rs"),
+    NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE,
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES = (
+    "Item",
+    "InitialSelection",
+    "PopUpMenu",
+    "Error",
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_PACKAGE_METHODS = (
+    "table_cell_pop_up_menu_format",
+    "edit_table_cell_pop_up_menu_format",
+    "apply_table_cell_pop_up_menu_format",
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_SHORT_NAMES = frozenset(
+    NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES
+    + NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_FLAT_ALIAS_PREFIXES = (
+    "PopUpMenu",
+    "TableCellPopUpMenu",
+    "CellPopUpMenu",
+    "PopUpMenuFormat",
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_CELL_POP_UP_MENU_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_cell_pop_up_menu|cell[ \t\r\n]*::"
+    r"[ \t\r\n]*data_format[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?pop_up_menu)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_CELL_POP_UP_MENU_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+"
+    r"(?:r#)?table_cell_pop_up_menu\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_TABLE_CELL_POP_UP_MENU_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod[ \t\r\n]+"
+    r"(?:r#)?table_cell_pop_up_menu\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_CELL_POP_UP_MENU_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?pop_up_menu\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "BncCell",
+        "CellValueArchive",
+        "ComponentCatalog",
+        "ControlCellSpec",
+        "ExactArtifacts",
+        "FormatStructArchive",
+        "IWorkPackage",
+        "PhysicalSource",
+        "PopUpMenuModel",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableDataList",
+    }
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tsce", "tst", "tswp"}
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_REQUIRED_MARKERS = (
+    "canonical",
+    "unknown",
+    "report",
+    "nil",
+    "deprecated",
+    "refcount",
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_REQUIRED_MARKERS = {
+    "control-cell": re.compile(
+        r"(?<![A-Za-z0-9])(?:control[_-]?cell|ControlCellSpec)(?![A-Za-z0-9])"
+    ),
+    "table-data-list": re.compile(
+        r"(?<![A-Za-z0-9])(?:table[_-]?data[_-]?list|TableDataList|data[_-]?list)(?![A-Za-z0-9])"
+    ),
+    "refcount": re.compile(
+        r"(?<![A-Za-z0-9])(?:refcount|ref_count|reference_count)(?![A-Za-z0-9])"
+    ),
+    "copy-on-write": re.compile(
+        r"(?<![A-Za-z0-9])(?:copy_on_write|copy-on-write|shared|cull|cow)(?![A-Za-z0-9])"
+    ),
+    "metadata": re.compile(
+        r"(?<![A-Za-z0-9])(?:metadata|save_token|object_uuid|external_reference|watermark)(?![A-Za-z0-9])"
+    ),
+    "budget": re.compile(
+        r"(?<![A-Za-z0-9])(?:budget|WireBudget|TransactionBudget|charge_|preflight)(?![A-Za-z0-9])"
+    ),
+    "locality": re.compile(
+        r"(?<![A-Za-z0-9])(?:locality|verify_locality|candidate|reopen|same_content)(?![A-Za-z0-9])"
+    ),
+    "string-table": re.compile(
+        r"(?<![A-Za-z0-9])(?:string[_-]?table|StringTable|InitialSelection)(?![A-Za-z0-9])"
+    ),
+}
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_FUZZ_SOURCE = Path(
+    "crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_cell_pop_up_menu_codec.rs"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_FUZZ_CORPUS = Path(
+    "crates/litchi-iwa-protos/fuzz/corpus/numbers_table_cell_pop_up_menu_codec"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_SOURCE = Path(
+    "crates/litchi/fuzz/fuzz_targets/numbers_table_cell_pop_up_menu.rs"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_CORPUS = Path(
+    "crates/litchi/fuzz/corpus/numbers_table_cell_pop_up_menu"
+)
+NUMBERS_TABLE_CELL_POP_UP_MENU_RAW_PARAMETER = re.compile(
+    r"\b(?:table_id|row|column|object_id|native_id|model_id|"
+    r"control_spec_id|popup_model_id|source_bytes|bytes)\b[ \t\r\n]*:\s*"
+    r"(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])\b"
+)
 RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS = (
     "table_dimension_size",
     "set_table_dimension_size",
@@ -7829,6 +8052,48 @@ def _is_numbers_table_appearance_public_declaration(
     ) or _numbers_table_appearance_owner_declaration(declaration)
 
 
+def _numbers_table_cell_pop_up_menu_public_leak(identifier: str) -> str | None:
+    """Classify native/control-cell vocabulary forbidden in popup APIs."""
+
+    if identifier in NUMBERS_TABLE_CELL_POP_UP_MENU_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_TABLE_CELL_POP_UP_MENU_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_CELL_POP_UP_MENU_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_table_cell_pop_up_menu_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_PATH.search(declaration) is not None or any(
+        identifier in NUMBERS_TABLE_CELL_POP_UP_MENU_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_numbers_table_cell_pop_up_menu_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers & NUMBERS_TABLE_CELL_POP_UP_MENU_FLAT_ALIASES
+    ) or _numbers_table_cell_pop_up_menu_owner_declaration(declaration)
+
+
 def _numbers_table_title_settings_owner_declaration(declaration: str) -> bool:
     identifiers = [
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -12028,6 +12293,425 @@ def audit_numbers_table_appearance_facade_source_topology(
                 violations.append(
                     "focused litchi-numbers table-appearance public API exposes raw "
                     f"byte slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def _numbers_table_cell_pop_up_menu_owner_present(root: Path) -> bool:
+    owner_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+    codec_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+    package_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and codec_path.is_file()
+        and NUMBERS_PACKAGE_TABLE_CELL_POP_UP_MENU_MODULE.search(package_source)
+        is not None
+    )
+
+
+def audit_iwa_numbers_table_cell_pop_up_menu_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire only the Numbers popup host after the package owner is complete.
+
+    The Pages table popup adapter and the shared private cell-data-format
+    implementation are intentionally outside this ratchet.  They may remain
+    while Numbers migrates, but public NumbersEditor/raw-ID entry points and
+    example calls must not bypass the selector-first package owner.
+    """
+
+    if not _numbers_table_cell_pop_up_menu_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            code = _mask_rust_non_code(
+                _rust_mask_named_function_bodies(
+                    production_source,
+                    frozenset(
+                        {"focused_popup_format", "commit_focused_popup_format"}
+                    ),
+                )
+            )
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            ):
+                identifiers = {
+                    match.group(1)
+                    for match in RUST_IDENTIFIER.finditer(declaration)
+                }
+                for method in sorted(
+                    identifiers
+                    & RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_METHOD_SET
+                ):
+                    violations.append(
+                        "retired litchi-iwa Numbers popup-menu method "
+                        f"{method}: {path.relative_to(root)}:{line_number}"
+                    )
+
+            # The private cell_data_format module is a shared implementation
+            # seam; its internal calls are not a public Numbers host surface.
+            if "cell_data_format" not in path.parts:
+                for match in re.finditer(
+                    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>"
+                    r"table_cell_pop_up_menu_format|set_table_cell_pop_up_menu_format|"
+                    r"reset_table_cell_pop_up_menu_format)\b[ \t\r\n]*\(",
+                    code,
+                ):
+                    line_start = code.rfind("\n", 0, match.start()) + 1
+                    line_end = code.find("\n", match.end())
+                    if line_end < 0:
+                        line_end = len(code)
+                    if re.search(
+                        rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                        code[line_start:line_end],
+                    ):
+                        continue
+                    line_number = code.count("\n", 0, match.start("method")) + 1
+                    violations.append(
+                        "retired litchi-iwa Numbers popup-menu call "
+                        f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        production_source = _mask_rust_cfg_test_items(
+            tests_path.read_text(encoding="utf-8")
+        )
+        for name, line_number in _rust_function_declarations(production_source):
+            if name in RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_TEST_SET:
+                violations.append(
+                    "retired litchi-iwa Numbers popup-menu test "
+                    f"{name}: {IWA_NUMBERS_EDITOR_TEST_SOURCE}:{line_number}"
+                )
+
+    example = root / RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_EXAMPLE
+    if example.is_file():
+        source = _mask_rust_non_code(
+            _rust_mask_named_function_bodies(
+                _mask_rust_cfg_test_items(example.read_text(encoding="utf-8")),
+                frozenset({"create_pages", "create_keynote"}),
+            )
+        )
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_cell_pop_up_menu_format|"
+            r"set_table_cell_pop_up_menu_format|reset_table_cell_pop_up_menu_format)"
+            r"\b[ \t\r\n]*\(",
+            source,
+        ):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers popup-menu example call "
+                f"{match.group(0).split('(')[0].strip()}: "
+                f"{RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_EXAMPLE}:{line_number}"
+            )
+
+    readme_path = root / IWA_NUMBERS_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_NUMBERS_README_TABLE_CELL_POP_UP_MENU_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers popup-menu README call "
+                    f"{match.group('method')}: {IWA_NUMBERS_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Numbers popup-menu owner."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir() or not _numbers_table_cell_pop_up_menu_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES)
+    )
+    for name in NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-numbers popup-menu public API is missing "
+                f"canonical cell::data_format::pop_up_menu type {name}: "
+                f"{NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE}"
+            )
+    semantic_code = _mask_rust_non_code(semantic_source)
+    if PUBLIC_NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_MODULE.search(
+        semantic_code
+    ) is None:
+        violations.append(
+            "focused litchi-numbers popup-menu public API is missing canonical "
+            "cell::data_format::pop_up_menu::transaction module: "
+            f"{NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE}"
+        )
+
+    data_format_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[2]
+    data_format_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(data_format_path.read_text(encoding="utf-8"))
+        )
+        if data_format_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_CELL_POP_UP_MENU_MODULE.search(data_format_source) is None:
+        violations.append(
+            "focused litchi-numbers popup-menu public API is missing canonical "
+            "cell::data_format::pop_up_menu module: "
+            f"{NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[2]}"
+        )
+
+    package_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    if NUMBERS_PACKAGE_TABLE_CELL_POP_UP_MENU_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-numbers popup-menu public API is missing private "
+            "package owner module: "
+            f"{NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_NUMBERS_PACKAGE_TABLE_CELL_POP_UP_MENU_MODULE.finditer(
+        package_source
+    ):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-numbers popup-menu public API exposes public "
+            "package::table_cell_pop_up_menu module: "
+            f"{NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    owner_code = _mask_rust_non_code(owner_source)
+    owner_exports = _rust_canonical_exports(
+        owner_source, frozenset(NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_TYPES)
+    )
+    for name in NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_TYPES:
+        if name not in owner_exports:
+            violations.append(
+                "focused litchi-numbers popup-menu public API is missing "
+                f"canonical package type {name}: {NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}"
+            )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in NUMBERS_TABLE_CELL_POP_UP_MENU_PACKAGE_METHODS:
+        declaration = owner_methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-numbers popup-menu public API is missing "
+                f"Package method {method}: {NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_table_cell_pop_up_menu_format":
+            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-numbers popup-menu Package method "
+                        f"{method} must accept selector-first {selector}: "
+                        f"{NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}"
+                    )
+
+    for label, marker in NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-numbers popup-menu owner is missing "
+                f"{label} transaction marker: {NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}"
+            )
+
+    codec_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+    codec_source = (
+        _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        if codec_path.is_file()
+        else ""
+    )
+    codec_code = _mask_rust_non_code(codec_source)
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-numbers popup-menu public API is missing strict hidden "
+            f"codec source: {NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE}"
+        )
+    else:
+        for api in NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct)\s+{re.escape(api)}\b",
+                codec_code,
+            ) is None:
+                violations.append(
+                    "focused litchi-numbers popup-menu hidden codec is missing "
+                    f"strict API {api}: {NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE}"
+                )
+        for marker in NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_REQUIRED_MARKERS:
+            if re.search(re.escape(marker), codec_source) is None:
+                violations.append(
+                    "focused litchi-numbers popup-menu hidden codec is missing "
+                    f"strict {marker} marker: {NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE}"
+                )
+
+    codec_lib_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_PUBLIC_SOURCE
+    codec_lib_source = (
+        _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+        if codec_lib_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_MODULE)}\b",
+        codec_lib_source,
+    ) is None:
+        violations.append(
+            "focused litchi-numbers popup-menu public API is missing hidden codec "
+            f"module {NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_MODULE}: "
+            f"{NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_PUBLIC_SOURCE}"
+        )
+
+    lib_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        )
+        if lib_path.is_file()
+        else ""
+    )
+    if re.search(r"\bpub\s+mod\s+cell\b", lib_source) is None:
+        violations.append(
+            "focused litchi-numbers popup-menu public API is missing root cell module: "
+            f"{NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[0]}"
+        )
+
+    fuzz_targets = (
+        NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_FUZZ_SOURCE,
+        NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_SOURCE,
+    )
+    fuzz_corpora = (
+        NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_FUZZ_CORPUS,
+        NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_CORPUS,
+    )
+    for fuzz_path in fuzz_targets:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-numbers popup-menu boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-numbers popup-menu fuzz target is missing "
+                f"fuzz_target! harness: {fuzz_path}"
+            )
+    for corpus in fuzz_corpora:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-numbers popup-menu boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_CELL_POP_UP_MENU_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    owner_helper_root = root / NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        for declaration, line_number in _rust_public_declarations(production_source):
+            if not _is_numbers_table_cell_pop_up_menu_public_declaration(
+                declaration, dedicated_source=dedicated_source
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+            if (
+                public_use_or_type
+                and "*" in declaration
+                and (
+                    "table_cell_pop_up_menu" in identifiers
+                    or "pop_up_menu" in identifiers
+                )
+            ):
+                violations.append(
+                    "focused litchi-numbers popup-menu public API retains root "
+                    f"aliases via glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if identifier in NUMBERS_TABLE_CELL_POP_UP_MENU_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-numbers popup-menu public API retains "
+                        f"flat alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_cell_pop_up_menu_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-numbers popup-menu public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            raw_parameters = NUMBERS_TABLE_CELL_POP_UP_MENU_RAW_PARAMETER.finditer(
+                declaration
+            )
+            for raw_parameter in raw_parameters:
+                violations.append(
+                    "focused litchi-numbers popup-menu public API exposes raw "
+                    f"identifier parameter {raw_parameter.group(0).strip()}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers popup-menu public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
                 )
 
     return sorted(set(violations))
@@ -22248,6 +22932,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_title_settings_facade_source_topology()
         + audit_iwa_numbers_table_appearance_source_topology()
         + audit_numbers_table_appearance_facade_source_topology()
+        + audit_iwa_numbers_table_cell_pop_up_menu_source_topology()
+        + audit_numbers_table_cell_pop_up_menu_facade_source_topology()
         + audit_iwa_numbers_table_dimension_source_topology()
         + audit_numbers_table_dimension_facade_source_topology()
         + audit_numbers_formula_facade_source_topology()

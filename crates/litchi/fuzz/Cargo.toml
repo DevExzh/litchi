@@ -81,6 +81,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "numbers_table_cell_pop_up_menu"
+path = "fuzz_targets/numbers_table_cell_pop_up_menu.rs"
+test = false
+doc = false
+bench = false
+
 
 [[bin]]
 name = "pages_page_layout"

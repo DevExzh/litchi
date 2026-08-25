@@ -82,6 +82,19 @@ forward apply, patch conflicts, inverse restoration, candidate readback, and
 content-redacted selector/ingress failures. It never exposes native style
 objects, identifiers, protobuf payloads, or archive names.
 
+`numbers_table_cell_pop_up_menu` is the focused selector-first Pop-Up Menu
+cell-format lifecycle target. It offers arbitrary bytes to bounded Numbers
+ingress and reuses the native `basic.numbers` seed for checked cell-position
+commands. When the source admits the control-cell graph, the harness covers
+automatic/no-op reads, creation, Some-to-Some replacement, model reuse across
+two cells, reset and final model cull, exact-source patch application and
+conflicts, inverse restoration, candidate readback, and redacted selector or
+ingress errors. Commands use only `SheetSelector`, `TableSelector`, and
+`CellPosition`; native IDs, BNC bytes, archive names, and generated types do
+not cross the fuzz target boundary. The checked-in seeds under
+`corpus/numbers_table_cell_pop_up_menu/` are command recipes, not native
+package bytes.
+
 
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
@@ -186,6 +199,11 @@ every input.
 profile. The command prefix is at most eight bytes; keep `-max_len` at 512 bytes
 so arbitrary ingress remains bounded while every input also reaches the native
 appearance transaction.
+
+`numbers_table_cell_pop_up_menu` uses the same finite Numbers physical and
+semantic profile. Popup commands consume a fixed prefix and construct at most
+three validated menu items of 4 KiB each; keep `-max_len` at 1 KiB so malformed
+ingress and native create/reuse/reset transactions both receive every input.
 
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
@@ -312,6 +330,14 @@ seeds:
 cargo +nightly fuzz run numbers_table_appearance \
   corpus/numbers_table_appearance -- \
   -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers Pop-Up Menu lifecycle target with its command seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_pop_up_menu \
+  corpus/numbers_table_cell_pop_up_menu -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
 

@@ -10,7 +10,7 @@
     reason = "Wire helpers stay beside the generated-free snapshots they construct."
 )]
 
-use core::{fmt, str};
+use core::{fmt, mem::size_of, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
@@ -136,6 +136,8 @@ pub enum DecodeLimit {
     Nesting { observed: u32, maximum: u32 },
     /// A fallible transaction-staging allocation was refused.
     Allocation { requested: usize },
+    /// Retained candidate bytes exceeded the execution ceiling.
+    Retained { observed: usize, maximum: usize },
 }
 
 /// Strict table-cell storage decode failure.
@@ -323,6 +325,14 @@ pub trait StorageVisitor {
         _entry: TableDataListEntrySnapshot<'_>,
     ) -> Result<(), DecodeError> {
         Ok(())
+    }
+    /// Visit a validated list entry with its exact source payload. Older
+    /// visitors continue to receive `visit_list_entry` through this default.
+    fn visit_list_entry_record(
+        &mut self,
+        record: TableDataListEntryRecord<'_>,
+    ) -> Result<(), DecodeError> {
+        self.visit_list_entry(record.snapshot())
     }
     fn visit_list_segment(&mut self, _reference: ReferenceRecord<'_>) -> Result<(), DecodeError> {
         Ok(())
@@ -718,6 +728,31 @@ pub struct TableDataListEntrySnapshot<'source> {
     cell_spec: Option<&'source [u8]>,
 }
 
+/// A validated list entry together with its exact source payload.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListEntryRecord<'source> {
+    raw: &'source [u8],
+    snapshot: TableDataListEntrySnapshot<'source>,
+}
+
+impl<'source> TableDataListEntryRecord<'source> {
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.raw
+    }
+
+    #[must_use]
+    pub const fn snapshot(self) -> TableDataListEntrySnapshot<'source> {
+        self.snapshot
+    }
+}
+
+impl fmt::Debug for TableDataListEntryRecord<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("TableDataListEntryRecord { payload: <redacted> }")
+    }
+}
+
 /// Exact semantic precondition for removing one root comment-storage entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableDataListEntryRemoval {
@@ -772,6 +807,399 @@ impl TableDataListEntryRemovalReport {
     #[must_use]
     pub const fn rewrite_work_bytes(self) -> usize {
         self.rewrite_work_bytes
+    }
+}
+
+/// The source-owned payload kind for a new `TableDataList.ListEntry`.
+///
+/// The three variants are deliberately narrower than the generated entry
+/// message.  Popup-menu lifecycle code may add only a string-table entry, a
+/// format-table entry, or a control-cell-spec entry; all other entry fields
+/// remain source-owned and are therefore not accidentally synthesized.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TableDataListEntryPayload<'source> {
+    String(&'source str),
+    Format(&'source [u8]),
+    ControlCellSpec(&'source [u8]),
+}
+
+impl fmt::Debug for TableDataListEntryPayload<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::String(_) => formatter.write_str("String(<redacted>)"),
+            Self::Format(_) => formatter.write_str("Format(<redacted>)"),
+            Self::ControlCellSpec(_) => formatter.write_str("ControlCellSpec(<redacted>)"),
+        }
+    }
+}
+
+/// A canonical entry to append to a root `TableDataList`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListEntryAppend<'source> {
+    key: u32,
+    ref_count: u32,
+    payload: TableDataListEntryPayload<'source>,
+}
+
+impl fmt::Debug for TableDataListEntryAppend<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TableDataListEntryAppend")
+            .field("key", &"<redacted>")
+            .field("ref_count", &self.ref_count)
+            .field("payload", &self.payload)
+            .finish()
+    }
+}
+
+impl<'source> TableDataListEntryAppend<'source> {
+    #[must_use]
+    pub const fn string(key: u32, ref_count: u32, value: &'source str) -> Self {
+        Self {
+            key,
+            ref_count,
+            payload: TableDataListEntryPayload::String(value),
+        }
+    }
+
+    #[must_use]
+    pub const fn format(key: u32, ref_count: u32, value: &'source [u8]) -> Self {
+        Self {
+            key,
+            ref_count,
+            payload: TableDataListEntryPayload::Format(value),
+        }
+    }
+
+    #[must_use]
+    pub const fn control_cell_spec(key: u32, ref_count: u32, value: &'source [u8]) -> Self {
+        Self {
+            key,
+            ref_count,
+            payload: TableDataListEntryPayload::ControlCellSpec(value),
+        }
+    }
+
+    #[must_use]
+    pub const fn key(self) -> u32 {
+        self.key
+    }
+
+    #[must_use]
+    pub const fn ref_count(self) -> u32 {
+        self.ref_count
+    }
+
+    #[must_use]
+    pub const fn payload(self) -> TableDataListEntryPayload<'source> {
+        self.payload
+    }
+}
+
+/// A refcount-only update to one source-ordered list entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListEntryRefCountEdit {
+    key: u32,
+    expected_ref_count: u32,
+    replacement_ref_count: u32,
+}
+
+impl TableDataListEntryRefCountEdit {
+    #[must_use]
+    pub const fn new(key: u32, expected_ref_count: u32, replacement_ref_count: u32) -> Self {
+        Self {
+            key,
+            expected_ref_count,
+            replacement_ref_count,
+        }
+    }
+
+    #[must_use]
+    pub const fn key(self) -> u32 {
+        self.key
+    }
+
+    #[must_use]
+    pub const fn expected_ref_count(self) -> u32 {
+        self.expected_ref_count
+    }
+
+    #[must_use]
+    pub const fn replacement_ref_count(self) -> u32 {
+        self.replacement_ref_count
+    }
+}
+
+/// An exact payload precondition for removing a list entry.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListEntryRemovalSpec<'source> {
+    key: u32,
+    expected_ref_count: u32,
+    payload: TableDataListEntryPayload<'source>,
+}
+
+impl fmt::Debug for TableDataListEntryRemovalSpec<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TableDataListEntryRemovalSpec")
+            .field("key", &"<redacted>")
+            .field("expected_ref_count", &self.expected_ref_count)
+            .field("payload", &self.payload)
+            .finish()
+    }
+}
+
+impl<'source> TableDataListEntryRemovalSpec<'source> {
+    #[must_use]
+    pub const fn string(key: u32, expected_ref_count: u32, value: &'source str) -> Self {
+        Self {
+            key,
+            expected_ref_count,
+            payload: TableDataListEntryPayload::String(value),
+        }
+    }
+
+    #[must_use]
+    pub const fn format(key: u32, expected_ref_count: u32, value: &'source [u8]) -> Self {
+        Self {
+            key,
+            expected_ref_count,
+            payload: TableDataListEntryPayload::Format(value),
+        }
+    }
+
+    #[must_use]
+    pub const fn control_cell_spec(
+        key: u32,
+        expected_ref_count: u32,
+        value: &'source [u8],
+    ) -> Self {
+        Self {
+            key,
+            expected_ref_count,
+            payload: TableDataListEntryPayload::ControlCellSpec(value),
+        }
+    }
+
+    #[must_use]
+    pub const fn key(self) -> u32 {
+        self.key
+    }
+
+    #[must_use]
+    pub const fn expected_ref_count(self) -> u32 {
+        self.expected_ref_count
+    }
+
+    #[must_use]
+    pub const fn payload(self) -> TableDataListEntryPayload<'source> {
+        self.payload
+    }
+}
+
+/// One prepared source-preserving list mutation.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TableDataListEntryMutation<'source> {
+    Append(TableDataListEntryAppend<'source>),
+    RefCount(TableDataListEntryRefCountEdit),
+    Remove(TableDataListEntryRemovalSpec<'source>),
+}
+
+impl fmt::Debug for TableDataListEntryMutation<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Append(value) => formatter.debug_tuple("Append").field(value).finish(),
+            Self::RefCount(value) => formatter.debug_tuple("RefCount").field(value).finish(),
+            Self::Remove(value) => formatter.debug_tuple("Remove").field(value).finish(),
+        }
+    }
+}
+
+impl<'source> From<TableDataListEntryAppend<'source>> for TableDataListEntryMutation<'source> {
+    fn from(value: TableDataListEntryAppend<'source>) -> Self {
+        Self::Append(value)
+    }
+}
+
+impl From<TableDataListEntryRefCountEdit> for TableDataListEntryMutation<'_> {
+    fn from(value: TableDataListEntryRefCountEdit) -> Self {
+        Self::RefCount(value)
+    }
+}
+
+/// Resource ceilings for executing a prepared list mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListRewriteExecutionLimits {
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    references: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+    retained_bytes: usize,
+}
+
+impl TableDataListRewriteExecutionLimits {
+    #[must_use]
+    pub const fn new(
+        output_bytes: usize,
+        fields: usize,
+        work_bytes: usize,
+        max_depth: u32,
+        references: usize,
+        scratch_bytes: usize,
+        allocations: usize,
+    ) -> Self {
+        Self {
+            output_bytes,
+            fields,
+            work_bytes,
+            max_depth,
+            references,
+            scratch_bytes,
+            allocations,
+            retained_bytes: usize::MAX,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_retained_bytes(mut self, retained_bytes: usize) -> Self {
+        self.retained_bytes = retained_bytes;
+        self
+    }
+}
+
+/// Exact preflight requirements for a list mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListRewriteRequirements {
+    source: DecodeReport,
+    result: DecodeResourceUpperBound,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    references: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+    retained_bytes: usize,
+}
+
+impl TableDataListRewriteRequirements {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+    #[must_use]
+    pub const fn result(self) -> DecodeResourceUpperBound {
+        self.result
+    }
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+    #[must_use]
+    pub const fn references(self) -> usize {
+        self.references
+    }
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    #[must_use]
+    pub const fn exact_limits(self) -> TableDataListRewriteExecutionLimits {
+        TableDataListRewriteExecutionLimits::new(
+            self.output_bytes,
+            self.fields,
+            self.work_bytes,
+            self.max_depth,
+            self.references,
+            self.scratch_bytes,
+            self.allocations,
+        )
+        .with_retained_bytes(self.retained_bytes)
+    }
+}
+
+/// Exact reports for source, candidate, and verification passes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListRewriteReport {
+    source: DecodeReport,
+    result: DecodeReport,
+    verification: DecodeReport,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    references: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+    retained_bytes: usize,
+}
+
+impl TableDataListRewriteReport {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+    #[must_use]
+    pub const fn result(self) -> DecodeReport {
+        self.result
+    }
+    #[must_use]
+    pub const fn verification(self) -> DecodeReport {
+        self.verification
+    }
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn references(self) -> usize {
+        self.references
+    }
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
     }
 }
 impl<'source> TableDataListEntrySnapshot<'source> {
@@ -3138,11 +3566,12 @@ fn decode_table_data_list_in(
         match field.number {
             1 => set_once(&mut list_type, canonical_int32(field.varint()?)?)?,
             2 => set_once(&mut next_list_id, canonical_u32(field.varint()?)?)?,
-            3 => visitor.visit_list_entry(decode_table_data_list_entry_in(
-                field.bytes()?,
-                budget,
-                child_depth,
-            )?)?,
+            3 => {
+                // 3 => visitor.visit_list_entry(decode_table_data_list_entry_in(
+                let raw = field.bytes()?;
+                let snapshot = decode_table_data_list_entry_in(raw, budget, child_depth)?;
+                visitor.visit_list_entry_record(TableDataListEntryRecord { raw, snapshot })?;
+            },
             4 => {
                 let raw = field.bytes()?;
                 let reference = decode_reference(raw, budget, child_depth)?;
@@ -3186,6 +3615,1524 @@ pub fn decode_table_data_list_entry_with_report(
     let mut budget = Budget::new(source, options)?;
     let snapshot = decode_table_data_list_entry_in(source, &mut budget, 1)?;
     Ok((snapshot, budget.report()))
+}
+
+/// Prepare one append/refcount/removal mutation for a root `TableDataList`.
+///
+/// Preparation performs all source and payload validation, computes a
+/// conservative candidate ledger, and stages only borrowed source spans.  It
+/// does not reserve the candidate output buffer.  The root list's existing
+/// fields, unknown groups, segment references, and entry order are copied
+/// verbatim by execution; a new entry is inserted immediately before the
+/// first segment field so repeated entry/segment ordering remains canonical.
+pub fn prepare_table_data_list_entry_rewrite<'source>(
+    source: &'source [u8],
+    mutation: TableDataListEntryMutation<'source>,
+    options: DecodeOptions,
+) -> Result<PreparedTableDataListEntryRewrite<'source>, DecodeError> {
+    let mut stage = ListEntryRewriteStage::new(source, options);
+    let (snapshot, source_report) =
+        decode_table_data_list_with_visitor(source, options, &mut stage)?;
+    let expected_list_type = match mutation {
+        TableDataListEntryMutation::Append(value) => match value.payload {
+            TableDataListEntryPayload::String(_) => 1,
+            TableDataListEntryPayload::Format(_) => 7,
+            TableDataListEntryPayload::ControlCellSpec(_) => 12,
+        },
+        TableDataListEntryMutation::RefCount(_) | TableDataListEntryMutation::Remove(_) => {
+            snapshot.list_type
+        },
+    };
+    if snapshot.list_type != expected_list_type {
+        return Err(DecodeError::invalid());
+    }
+    if stage.entries.iter().any(|pair| {
+        stage
+            .entries
+            .iter()
+            .filter(|other| other.snapshot.key() == pair.snapshot.key())
+            .count()
+            != 1
+    }) {
+        return Err(DecodeError::invalid());
+    }
+
+    let payload_report = match mutation {
+        TableDataListEntryMutation::Append(value) => {
+            if value.ref_count == 0 || stage.has_key(value.key) {
+                return Err(DecodeError::invalid());
+            }
+            validate_new_entry_payload(value.payload, options)?
+        },
+        TableDataListEntryMutation::RefCount(value) => {
+            let entry = stage
+                .unique_key(value.key)?
+                .ok_or_else(DecodeError::invalid)?;
+            if entry.snapshot.ref_count() != value.expected_ref_count
+                || value.replacement_ref_count == 0
+            {
+                return Err(DecodeError::invalid());
+            }
+            DecodeReport {
+                source_bytes: 0,
+                fields: 0,
+                work_bytes: 0,
+                max_depth: 0,
+                references: 0,
+                reference_bytes: 0,
+                text_bytes: 0,
+            }
+        },
+        TableDataListEntryMutation::Remove(value) => {
+            let entry = stage
+                .unique_key(value.key)?
+                .ok_or_else(DecodeError::invalid)?;
+            if entry.snapshot.ref_count() != value.expected_ref_count
+                || !entry_matches_payload(entry.snapshot, value.payload)
+            {
+                return Err(DecodeError::invalid());
+            }
+            DecodeReport {
+                source_bytes: 0,
+                fields: 0,
+                work_bytes: 0,
+                max_depth: 0,
+                references: 0,
+                reference_bytes: 0,
+                text_bytes: 0,
+            }
+        },
+    };
+    let output_bytes = match mutation {
+        TableDataListEntryMutation::Append(value) => source
+            .len()
+            .checked_add(encoded_list_entry_length(value)?)
+            .ok_or_else(DecodeError::invalid)?,
+        TableDataListEntryMutation::RefCount(value) => {
+            let entry = stage
+                .unique_key(value.key)?
+                .ok_or_else(DecodeError::invalid)?;
+            source
+                .len()
+                .checked_sub(entry.end - entry.start)
+                .and_then(|length| {
+                    let patched =
+                        patched_entry_length(entry.raw, value.replacement_ref_count).ok()?;
+                    let prefix = protobuf_length_delimited_prefix_len(patched).ok()?;
+                    length.checked_add(prefix)?.checked_add(patched)
+                })
+                .ok_or_else(DecodeError::invalid)?
+        },
+        TableDataListEntryMutation::Remove(value) => {
+            let entry = stage
+                .unique_key(value.key)?
+                .ok_or_else(DecodeError::invalid)?;
+            source
+                .len()
+                .checked_sub(entry.end - entry.start)
+                .ok_or_else(DecodeError::invalid)?
+        },
+    };
+    let result_fields = source_report
+        .fields
+        .checked_add(payload_report.fields)
+        .and_then(|fields| match mutation {
+            TableDataListEntryMutation::Append(_) => fields.checked_add(3),
+            TableDataListEntryMutation::RefCount(_) => Some(fields),
+            TableDataListEntryMutation::Remove(_) => Some(fields),
+        })
+        .ok_or_else(DecodeError::invalid)?;
+    let result_work = source_report
+        .work_bytes
+        .checked_add(payload_report.work_bytes)
+        .and_then(|work| work.checked_add(source.len()))
+        .and_then(|work| work.checked_add(output_bytes.checked_mul(4)?))
+        .ok_or_else(DecodeError::invalid)?;
+    let result_upper_bound = DecodeResourceUpperBound {
+        source_bytes: output_bytes,
+        fields: result_fields,
+        work_bytes: result_work,
+        max_depth: source_report
+            .max_depth
+            .max(payload_report.max_depth.saturating_add(2)),
+        references: source_report
+            .references
+            .checked_add(payload_report.references)
+            .ok_or_else(DecodeError::invalid)?,
+        reference_bytes: source_report
+            .reference_bytes
+            .checked_add(payload_report.reference_bytes)
+            .ok_or_else(DecodeError::invalid)?,
+        text_bytes: source_report
+            .text_bytes
+            .checked_add(payload_report.text_bytes)
+            .ok_or_else(DecodeError::invalid)?,
+    };
+    validate_result_ceiling(result_upper_bound, options)?;
+    let staging_scratch_bytes = stage
+        .entries
+        .capacity()
+        .checked_mul(size_of::<ListEntryRewriteSpan<'static>>())
+        .ok_or_else(DecodeError::invalid)?;
+    let fields = source_report
+        .fields
+        .checked_add(payload_report.fields)
+        .and_then(|fields| fields.checked_add(result_upper_bound.fields))
+        .and_then(|fields| fields.checked_add(result_upper_bound.fields))
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source_report
+        .work_bytes
+        .checked_add(payload_report.work_bytes)
+        .and_then(|work| work.checked_add(result_upper_bound.work_bytes))
+        .and_then(|work| work.checked_add(result_upper_bound.work_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    let references = source_report
+        .references
+        .checked_add(payload_report.references)
+        .and_then(|references| references.checked_add(result_upper_bound.references))
+        .and_then(|references| references.checked_add(result_upper_bound.references))
+        .ok_or_else(DecodeError::invalid)?;
+    let scratch_bytes = staging_scratch_bytes;
+    let allocations = stage
+        .allocation_count
+        .checked_add(1)
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = TableDataListRewriteRequirements {
+        source: source_report,
+        result: result_upper_bound,
+        output_bytes,
+        fields,
+        work_bytes,
+        max_depth: result_upper_bound.max_depth,
+        references,
+        scratch_bytes,
+        allocations,
+        retained_bytes: output_bytes,
+    };
+    let insertion_at = list_entry_insertion_offset(source, options)?;
+    Ok(PreparedTableDataListEntryRewrite {
+        source,
+        options,
+        mutation,
+        entries: stage.entries,
+        insertion_at,
+        requirements,
+    })
+}
+
+/// Prepared source-preserving list mutation.  The source remains borrowed
+/// until execution, so preparation itself cannot publish or mutate it.
+pub struct PreparedTableDataListEntryRewrite<'source> {
+    source: &'source [u8],
+    options: DecodeOptions,
+    mutation: TableDataListEntryMutation<'source>,
+    entries: Vec<ListEntryRewriteSpan<'source>>,
+    insertion_at: usize,
+    requirements: TableDataListRewriteRequirements,
+}
+
+impl fmt::Debug for PreparedTableDataListEntryRewrite<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedTableDataListEntryRewrite")
+            .field("requirements", &self.requirements)
+            .field("mutation", &self.mutation)
+            .field("entries", &self.entries.len())
+            .finish()
+    }
+}
+
+impl PreparedTableDataListEntryRewrite<'_> {
+    #[must_use]
+    pub const fn requirements(&self) -> TableDataListRewriteRequirements {
+        self.requirements
+    }
+
+    #[must_use]
+    pub const fn prepare_report(&self) -> DecodeReport {
+        self.requirements.source
+    }
+
+    /// Execute with exact caller-provided ceilings.  The candidate output is
+    /// reserved only after every requirement has been checked, then decoded
+    /// and verified before being returned to the owner.
+    pub fn execute(
+        self,
+        limits: TableDataListRewriteExecutionLimits,
+    ) -> Result<(Vec<u8>, TableDataListRewriteReport), DecodeError> {
+        let requirements = self.requirements;
+        enforce_table_data_list_execution_limits(requirements, limits)?;
+        let mut output = Vec::new();
+        reserve_exact(&mut output, requirements.output_bytes)?;
+        assemble_table_data_list_entry_rewrite(
+            &mut output,
+            self.source,
+            &self.entries,
+            self.insertion_at,
+            self.mutation,
+        )?;
+        if output.len() != requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let options = self.options;
+        let (_snapshot, result) = decode_table_data_list_with_report(&output, options)?;
+        let mut verifier = ListMutationVerifier {
+            mutation: self.mutation,
+            matched: matches!(self.mutation, TableDataListEntryMutation::Remove(_)),
+        };
+        let (_snapshot, verification) =
+            decode_table_data_list_with_visitor(&output, options, &mut verifier)?;
+        if !verifier.matched {
+            return Err(DecodeError::invalid());
+        }
+        Ok((
+            output,
+            TableDataListRewriteReport {
+                source: requirements.source,
+                result,
+                verification,
+                output_bytes: requirements.output_bytes,
+                fields: requirements.fields,
+                work_bytes: requirements.work_bytes,
+                references: requirements.references,
+                scratch_bytes: requirements.scratch_bytes,
+                allocations: requirements.allocations,
+                retained_bytes: requirements.retained_bytes,
+            },
+        ))
+    }
+}
+
+/// One-shot convenience wrapper around the prepared list rewrite.
+pub fn rewrite_table_data_list_entry(
+    source: &[u8],
+    mutation: TableDataListEntryMutation<'_>,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, TableDataListRewriteReport), DecodeError> {
+    let plan = prepare_table_data_list_entry_rewrite(source, mutation, options)?;
+    let limits = plan.requirements().exact_limits();
+    plan.execute(limits)
+}
+
+struct ListEntryRewriteSpan<'source> {
+    start: usize,
+    end: usize,
+    raw: &'source [u8],
+    snapshot: TableDataListEntrySnapshot<'source>,
+}
+
+struct ListEntryRewriteStage<'source> {
+    source: &'source [u8],
+    options: DecodeOptions,
+    source_start: *const u8,
+    source_len: usize,
+    entries: Vec<ListEntryRewriteSpan<'source>>,
+    allocation_count: usize,
+}
+
+impl<'source> ListEntryRewriteStage<'source> {
+    fn new(source: &'source [u8], options: DecodeOptions) -> Self {
+        Self {
+            source,
+            options,
+            source_start: source.as_ptr(),
+            source_len: source.len(),
+            entries: Vec::new(),
+            allocation_count: 0,
+        }
+    }
+
+    fn has_key(&self, key: u32) -> bool {
+        self.entries.iter().any(|entry| entry.snapshot.key() == key)
+    }
+
+    fn unique_key(&self, key: u32) -> Result<Option<&ListEntryRewriteSpan<'_>>, DecodeError> {
+        let mut selected = None;
+        for entry in &self.entries {
+            if entry.snapshot.key() == key {
+                if selected.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                selected = Some(entry);
+            }
+        }
+        Ok(selected)
+    }
+}
+
+impl<'source> StorageVisitor for ListEntryRewriteStage<'source> {
+    fn visit_list_entry_record(
+        &mut self,
+        record: TableDataListEntryRecord<'_>,
+    ) -> Result<(), DecodeError> {
+        let payload_start = (record.raw().as_ptr() as usize)
+            .checked_sub(self.source_start as usize)
+            .ok_or_else(DecodeError::invalid)?;
+        let raw_len = record.raw().len();
+        if raw_len == 0 {
+            return Err(DecodeError::invalid());
+        }
+        let prefix = protobuf_length_delimited_prefix_len(raw_len)?;
+        let start = payload_start
+            .checked_sub(prefix)
+            .ok_or_else(DecodeError::invalid)?;
+        let end = payload_start
+            .checked_add(raw_len)
+            .filter(|end| *end <= self.source_len)
+            .ok_or_else(DecodeError::invalid)?;
+        let raw = &self.source[payload_start..end];
+        let mut budget = Budget::new(raw, self.options)?;
+        let snapshot = decode_table_data_list_entry_in(raw, &mut budget, 2)?;
+        let capacity = self.entries.capacity();
+        self.entries
+            .try_reserve(1)
+            .map_err(|_| DecodeError::allocation(1))?;
+        if self.entries.capacity() != capacity {
+            self.allocation_count = self
+                .allocation_count
+                .checked_add(1)
+                .ok_or_else(DecodeError::invalid)?;
+        }
+        self.entries.push(ListEntryRewriteSpan {
+            start,
+            end,
+            raw,
+            snapshot,
+        });
+        Ok(())
+    }
+}
+
+fn validate_new_entry_payload(
+    payload: TableDataListEntryPayload<'_>,
+    options: DecodeOptions,
+) -> Result<DecodeReport, DecodeError> {
+    match payload {
+        TableDataListEntryPayload::String(value) => {
+            let mut budget = Budget::new(value.as_bytes(), options)?;
+            strict_utf8(value.as_bytes(), &mut budget)?;
+            Ok(budget.report())
+        },
+        TableDataListEntryPayload::Format(value) => {
+            let mut budget = Budget::new(value, options)?;
+            scan_opaque_message(value, &mut budget, 2)?;
+            Ok(budget.report())
+        },
+        TableDataListEntryPayload::ControlCellSpec(value) => {
+            // The popup codec is a leaf dependency of this storage seam; it
+            // does not import storage, so validating a CellSpecArchive here
+            // does not create a module cycle.  Keep the payload strict rather
+            // than treating a selected ControlCellSpec as opaque bytes.
+            let popup_options = crate::numbers_table_cell_pop_up_menu_codec::DecodeOptions::new(
+                options.max_message_bytes,
+                options.max_message_bytes,
+                options.max_fields,
+                options.max_work_bytes,
+                options.recursion_limit,
+                options.max_references,
+                options.max_references.max(1),
+                options.max_text_bytes,
+            );
+            let (_, report) =
+                crate::numbers_table_cell_pop_up_menu_codec::decode_cell_spec_with_report(
+                    value,
+                    popup_options,
+                )
+                .map_err(|_| DecodeError::invalid())?;
+            Ok(DecodeReport {
+                source_bytes: report.input_bytes(),
+                fields: report.fields(),
+                work_bytes: report.work_bytes(),
+                max_depth: report.max_depth(),
+                references: report.references(),
+                reference_bytes: 0,
+                text_bytes: report.text_bytes(),
+            })
+        },
+    }
+}
+
+fn entry_matches_payload(
+    entry: TableDataListEntrySnapshot<'_>,
+    payload: TableDataListEntryPayload<'_>,
+) -> bool {
+    match payload {
+        TableDataListEntryPayload::String(value) => {
+            entry.string_value() == Some(value)
+                && entry.reference().is_none()
+                && entry.formula().is_none()
+                && entry.format().is_none()
+                && entry.custom_format().is_none()
+                && entry.rich_text_payload().is_none()
+                && entry.comment_storage().is_none()
+                && entry.import_warning_set().is_none()
+                && entry.cell_spec().is_none()
+        },
+        TableDataListEntryPayload::Format(value) => {
+            entry.format() == Some(value)
+                && entry.string_value().is_none()
+                && entry.reference().is_none()
+                && entry.formula().is_none()
+                && entry.custom_format().is_none()
+                && entry.rich_text_payload().is_none()
+                && entry.comment_storage().is_none()
+                && entry.import_warning_set().is_none()
+                && entry.cell_spec().is_none()
+        },
+        TableDataListEntryPayload::ControlCellSpec(value) => {
+            entry.cell_spec() == Some(value)
+                && entry.string_value().is_none()
+                && entry.reference().is_none()
+                && entry.formula().is_none()
+                && entry.format().is_none()
+                && entry.custom_format().is_none()
+                && entry.rich_text_payload().is_none()
+                && entry.comment_storage().is_none()
+                && entry.import_warning_set().is_none()
+        },
+    }
+}
+
+fn append_length_delimited_field_length(
+    field: u32,
+    payload_len: usize,
+) -> Result<usize, DecodeError> {
+    let field_len = encoded_varint_len((u64::from(field) << 3) | 2);
+    field_len
+        .checked_add(encoded_varint_len(
+            u64::try_from(payload_len).map_err(|_| DecodeError::invalid())?,
+        ))
+        .and_then(|length| length.checked_add(payload_len))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn encoded_list_entry_length(append: TableDataListEntryAppend<'_>) -> Result<usize, DecodeError> {
+    let inner_length = encoded_list_entry_inner_length(append)?;
+    append_length_delimited_field_length(3, inner_length)
+}
+
+fn encoded_list_entry_inner_length(
+    append: TableDataListEntryAppend<'_>,
+) -> Result<usize, DecodeError> {
+    let mut length = encoded_varint_len(8)
+        .checked_add(encoded_varint_len(u64::from(append.key)))
+        .and_then(|length| {
+            length
+                .checked_add(encoded_varint_len(16))
+                .and_then(|length| {
+                    length.checked_add(encoded_varint_len(u64::from(append.ref_count)))
+                })
+        })
+        .ok_or_else(DecodeError::invalid)?;
+    let (field, payload_len) = match append.payload {
+        TableDataListEntryPayload::String(value) => (3, value.len()),
+        TableDataListEntryPayload::Format(value) => (6, value.len()),
+        TableDataListEntryPayload::ControlCellSpec(value) => (12, value.len()),
+    };
+    length = length
+        .checked_add(append_length_delimited_field_length(field, payload_len)?)
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(length)
+}
+
+fn patched_entry_length(raw: &[u8], replacement: u32) -> Result<usize, DecodeError> {
+    let (start, end) = wire_field_span(raw, 2)?.ok_or_else(DecodeError::invalid)?;
+    let replacement_len = encoded_varint_len(16)
+        .checked_add(encoded_varint_len(u64::from(replacement)))
+        .ok_or_else(DecodeError::invalid)?;
+    raw.len()
+        .checked_sub(end - start)
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn wire_field_span(source: &[u8], wanted: u32) -> Result<Option<(usize, usize)>, DecodeError> {
+    let mut budget = Budget::new(
+        source,
+        DecodeOptions::new(
+            source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            MAX_RECURSION,
+            usize::MAX,
+            usize::MAX,
+        ),
+    )?;
+    let mut remaining = source;
+    let mut selected = None;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
+        let end = source.len() - remaining.len();
+        if field.number == wanted {
+            if selected.is_some() {
+                return Err(DecodeError::invalid());
+            }
+            selected = Some((start, end));
+        }
+    }
+    Ok(selected)
+}
+
+fn list_entry_insertion_offset(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<usize, DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let mut remaining = source;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
+        if field.number == 4 {
+            return Ok(start);
+        }
+    }
+    Ok(source.len())
+}
+
+fn append_table_data_list_entry(
+    output: &mut Vec<u8>,
+    append: TableDataListEntryAppend<'_>,
+) -> Result<(), DecodeError> {
+    let (field, payload) = match append.payload {
+        TableDataListEntryPayload::String(value) => (3, value.as_bytes()),
+        TableDataListEntryPayload::Format(value) => (6, value),
+        TableDataListEntryPayload::ControlCellSpec(value) => (12, value),
+    };
+    let inner_length = encoded_list_entry_inner_length(append)?;
+    encode_key(output, 3, 2);
+    encode_varint(
+        output,
+        u64::try_from(inner_length).map_err(|_| DecodeError::invalid())?,
+    );
+    encode_key(output, 1, 0);
+    encode_varint(output, u64::from(append.key));
+    encode_key(output, 2, 0);
+    encode_varint(output, u64::from(append.ref_count));
+    encode_key(output, field, 2);
+    encode_varint(
+        output,
+        u64::try_from(payload.len()).map_err(|_| DecodeError::invalid())?,
+    );
+    output.extend_from_slice(payload);
+    Ok(())
+}
+
+fn patch_table_data_list_entry_refcount(
+    output: &mut Vec<u8>,
+    raw: &[u8],
+    replacement: u32,
+) -> Result<(), DecodeError> {
+    let (start, end) = wire_field_span(raw, 2)?.ok_or_else(DecodeError::invalid)?;
+    output.extend_from_slice(&raw[..start]);
+    encode_key(output, 2, 0);
+    encode_varint(output, u64::from(replacement));
+    output.extend_from_slice(&raw[end..]);
+    Ok(())
+}
+
+fn assemble_table_data_list_entry_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    entries: &[ListEntryRewriteSpan<'_>],
+    insertion_at: usize,
+    mutation: TableDataListEntryMutation<'_>,
+) -> Result<(), DecodeError> {
+    let mut cursor = 0usize;
+    if let TableDataListEntryMutation::Append(append) = mutation {
+        output.extend_from_slice(&source[..insertion_at]);
+        append_table_data_list_entry(output, append)?;
+        cursor = insertion_at;
+    }
+    for entry in entries {
+        if entry.start < cursor {
+            continue;
+        }
+        output.extend_from_slice(&source[cursor..entry.start]);
+        let selected = match mutation {
+            TableDataListEntryMutation::RefCount(edit) => entry.snapshot.key() == edit.key,
+            TableDataListEntryMutation::Remove(edit) => entry.snapshot.key() == edit.key,
+            TableDataListEntryMutation::Append(_) => false,
+        };
+        match mutation {
+            TableDataListEntryMutation::Remove(_) if selected => {},
+            TableDataListEntryMutation::RefCount(edit) if selected => {
+                encode_key(output, 3, 2);
+                let patched_len = patched_entry_length(entry.raw, edit.replacement_ref_count)?;
+                encode_varint(
+                    output,
+                    u64::try_from(patched_len).map_err(|_| DecodeError::invalid())?,
+                );
+                patch_table_data_list_entry_refcount(
+                    output,
+                    entry.raw,
+                    edit.replacement_ref_count,
+                )?;
+            },
+            _ => output.extend_from_slice(&source[entry.start..entry.end]),
+        }
+        cursor = entry.end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    Ok(())
+}
+
+fn enforce_table_data_list_execution_limits(
+    requirements: TableDataListRewriteRequirements,
+    limits: TableDataListRewriteExecutionLimits,
+) -> Result<(), DecodeError> {
+    if requirements.output_bytes > limits.output_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: requirements.output_bytes,
+            maximum: limits.output_bytes,
+        }));
+    }
+    if requirements.fields > limits.fields {
+        return Err(DecodeError::limited(DecodeLimit::Fields {
+            observed: requirements.fields,
+            maximum: limits.fields,
+        }));
+    }
+    if requirements.work_bytes > limits.work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: requirements.work_bytes,
+            maximum: limits.work_bytes,
+        }));
+    }
+    if requirements.max_depth > limits.max_depth {
+        return Err(DecodeError::limited(DecodeLimit::Nesting {
+            observed: requirements.max_depth,
+            maximum: limits.max_depth,
+        }));
+    }
+    if requirements.references > limits.references {
+        return Err(DecodeError::limited(DecodeLimit::References {
+            observed: requirements.references,
+            maximum: limits.references,
+        }));
+    }
+    if requirements.scratch_bytes > limits.scratch_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Allocation {
+            requested: requirements.scratch_bytes,
+        }));
+    }
+    if requirements.allocations > limits.allocations {
+        return Err(DecodeError::limited(DecodeLimit::Allocation {
+            requested: requirements.allocations,
+        }));
+    }
+    if requirements.retained_bytes > limits.retained_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Retained {
+            observed: requirements.retained_bytes,
+            maximum: limits.retained_bytes,
+        }));
+    }
+    Ok(())
+}
+
+struct ListMutationVerifier<'source> {
+    mutation: TableDataListEntryMutation<'source>,
+    matched: bool,
+}
+
+impl StorageVisitor for ListMutationVerifier<'_> {
+    fn visit_list_entry(
+        &mut self,
+        entry: TableDataListEntrySnapshot<'_>,
+    ) -> Result<(), DecodeError> {
+        match self.mutation {
+            TableDataListEntryMutation::Append(append) if entry.key() == append.key => {
+                if self.matched
+                    || entry.ref_count() != append.ref_count
+                    || !entry_matches_payload(entry, append.payload)
+                {
+                    return Err(DecodeError::invalid());
+                }
+                self.matched = true;
+            },
+            TableDataListEntryMutation::RefCount(edit) if entry.key() == edit.key => {
+                if self.matched || entry.ref_count() != edit.replacement_ref_count {
+                    return Err(DecodeError::invalid());
+                }
+                self.matched = true;
+            },
+            TableDataListEntryMutation::Remove(remove) if entry.key() == remove.key => {
+                self.matched = false;
+                return Err(DecodeError::invalid());
+            },
+            _ => {},
+        }
+        Ok(())
+    }
+}
+
+/// Exact precondition for inserting or replacing DataStore field 21
+/// (`control_cell_spec_table`). `None` means that the field must be absent;
+/// `Some(id)` means that one existing canonical Reference must identify `id`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ControlCellSpecTableReferenceEdit {
+    expected_identifier: Option<u64>,
+    replacement_identifier: u64,
+}
+
+impl ControlCellSpecTableReferenceEdit {
+    #[must_use]
+    pub const fn insert(identifier: u64) -> Self {
+        Self {
+            expected_identifier: None,
+            replacement_identifier: identifier,
+        }
+    }
+
+    #[must_use]
+    pub const fn replace(expected_identifier: u64, replacement_identifier: u64) -> Self {
+        Self {
+            expected_identifier: Some(expected_identifier),
+            replacement_identifier,
+        }
+    }
+
+    #[must_use]
+    pub const fn expected_identifier(self) -> Option<u64> {
+        self.expected_identifier
+    }
+
+    #[must_use]
+    pub const fn replacement_identifier(self) -> u64 {
+        self.replacement_identifier
+    }
+}
+
+/// Resource ceilings for a prepared DataStore/TableModel Reference rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageReferenceRewriteExecutionLimits {
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    references: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+}
+
+impl StorageReferenceRewriteExecutionLimits {
+    #[must_use]
+    pub const fn new(
+        output_bytes: usize,
+        fields: usize,
+        work_bytes: usize,
+        max_depth: u32,
+        references: usize,
+        scratch_bytes: usize,
+        allocations: usize,
+    ) -> Self {
+        Self {
+            output_bytes,
+            fields,
+            work_bytes,
+            max_depth,
+            references,
+            scratch_bytes,
+            allocations,
+        }
+    }
+}
+
+/// Exact preflight ledger for a DataStore/TableModel Reference rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageReferenceRewriteRequirements {
+    source: DecodeReport,
+    result: DecodeResourceUpperBound,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    max_depth: u32,
+    references: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+}
+
+impl StorageReferenceRewriteRequirements {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn result(self) -> DecodeResourceUpperBound {
+        self.result
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn references(self) -> usize {
+        self.references
+    }
+
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn exact_limits(self) -> StorageReferenceRewriteExecutionLimits {
+        StorageReferenceRewriteExecutionLimits::new(
+            self.output_bytes,
+            self.fields,
+            self.work_bytes,
+            self.max_depth,
+            self.references,
+            self.scratch_bytes,
+            self.allocations,
+        )
+    }
+}
+
+/// Source, candidate, and verification accounting for a Reference rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StorageReferenceRewriteReport {
+    source: DecodeReport,
+    result: DecodeReport,
+    verification: DecodeReport,
+    output_bytes: usize,
+    work_bytes: usize,
+    allocations: usize,
+}
+
+impl StorageReferenceRewriteReport {
+    #[must_use]
+    pub const fn source(self) -> DecodeReport {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn result(self) -> DecodeReport {
+        self.result
+    }
+
+    #[must_use]
+    pub const fn verification(self) -> DecodeReport {
+        self.verification
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+}
+
+/// Prepared field-21 rewrite for a DataStore envelope.
+pub struct PreparedDataStoreControlCellSpecTableRewrite<'source> {
+    source: &'source [u8],
+    options: DecodeOptions,
+    edit: ControlCellSpecTableReferenceEdit,
+    field: Option<(usize, usize, &'source [u8])>,
+    requirements: StorageReferenceRewriteRequirements,
+}
+
+impl fmt::Debug for PreparedDataStoreControlCellSpecTableRewrite<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedDataStoreControlCellSpecTableRewrite")
+            .field("requirements", &self.requirements)
+            .field("edit", &self.edit)
+            .finish()
+    }
+}
+
+impl PreparedDataStoreControlCellSpecTableRewrite<'_> {
+    #[must_use]
+    pub const fn requirements(&self) -> StorageReferenceRewriteRequirements {
+        self.requirements
+    }
+
+    #[must_use]
+    pub const fn prepare_report(&self) -> DecodeReport {
+        self.requirements.source
+    }
+
+    pub fn execute(
+        self,
+        limits: StorageReferenceRewriteExecutionLimits,
+    ) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+        enforce_storage_reference_limits(self.requirements, limits)?;
+        let mut output = Vec::new();
+        reserve_exact(&mut output, self.requirements.output_bytes)?;
+        assemble_reference_field_rewrite(
+            &mut output,
+            self.source,
+            self.field.map(|(start, end, _raw)| (start, end)),
+            21,
+            self.edit.replacement_identifier,
+        )?;
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let (snapshot, result) = decode_data_store_with_report(&output, self.options)?;
+        if snapshot
+            .control_cell_spec_table()
+            .map(ReferenceSnapshot::identifier)
+            != Some(self.edit.replacement_identifier)
+        {
+            return Err(DecodeError::invalid());
+        }
+        let verification = result;
+        Ok((
+            output,
+            StorageReferenceRewriteReport {
+                source: self.requirements.source,
+                result,
+                verification,
+                output_bytes: self.requirements.output_bytes,
+                work_bytes: self.requirements.work_bytes,
+                allocations: self.requirements.allocations,
+            },
+        ))
+    }
+}
+
+/// Prepare DataStore field 21 insertion/replacement without allocating a
+/// candidate output buffer.
+pub fn prepare_data_store_control_cell_spec_table_rewrite<'source>(
+    source: &'source [u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<PreparedDataStoreControlCellSpecTableRewrite<'source>, DecodeError> {
+    validate_reference_edit(edit)?;
+    let (_snapshot, source_report) = decode_data_store_with_report(source, options)?;
+    let field = unique_reference_field(source, 21, options)?;
+    match (edit.expected_identifier, field) {
+        (None, Some((_start, _end, raw))) => {
+            let mut budget = Budget::new(raw, options)?;
+            let reference = decode_canonical_reference(raw, &mut budget, 2)?;
+            let _ = reference;
+            return Err(DecodeError::invalid());
+        },
+        (Some(_), None) => return Err(DecodeError::invalid()),
+        _ => {},
+    }
+    if let (Some(expected), Some((_start, _end, raw))) = (edit.expected_identifier, field) {
+        let mut budget = Budget::new(raw, options)?;
+        let reference = decode_canonical_reference(raw, &mut budget, 2)?;
+        if reference.identifier() != expected {
+            return Err(DecodeError::invalid());
+        }
+    }
+    let output_bytes = match field {
+        Some((start, end, raw)) => {
+            let replacement_len =
+                patched_reference_payload_length(raw, edit.replacement_identifier)?;
+            source
+                .len()
+                .checked_sub(end - start)
+                .and_then(|length| {
+                    append_length_delimited_field_length(21, replacement_len)
+                        .ok()
+                        .and_then(|field_len| length.checked_add(field_len))
+                })
+                .ok_or_else(DecodeError::invalid)?
+        },
+        None => source
+            .len()
+            .checked_add(append_length_delimited_field_length(
+                21,
+                canonical_reference_payload_length(edit.replacement_identifier)?,
+            )?)
+            .ok_or_else(DecodeError::invalid)?,
+    };
+    let result = reference_rewrite_upper_bound(source_report, output_bytes)?;
+    validate_result_ceiling(result, options)?;
+    let fields = source_report
+        .fields
+        .checked_add(result.fields)
+        .ok_or_else(DecodeError::invalid)?;
+    let references = source_report
+        .references
+        .checked_add(result.references)
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source_report
+        .work_bytes
+        .checked_add(result.work_bytes)
+        .and_then(|work| work.checked_add(source.len()))
+        .ok_or_else(DecodeError::invalid)?;
+    if work_bytes > options.max_work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    Ok(PreparedDataStoreControlCellSpecTableRewrite {
+        source,
+        options,
+        edit,
+        field,
+        requirements: StorageReferenceRewriteRequirements {
+            source: source_report,
+            result,
+            output_bytes,
+            fields,
+            work_bytes,
+            max_depth: result.max_depth,
+            references,
+            scratch_bytes: 0,
+            allocations: 1,
+        },
+    })
+}
+
+/// One-shot DataStore field-21 rewrite.
+pub fn rewrite_data_store_control_cell_spec_table(
+    source: &[u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+    let plan = prepare_data_store_control_cell_spec_table_rewrite(source, edit, options)?;
+    let limits = plan.requirements().exact_limits();
+    plan.execute(limits)
+}
+
+/// Explicit `Reference`-suffix aliases used by package owners that prefer
+/// naming the wire transition rather than the semantic table route.
+pub type PreparedDataStoreControlCellSpecTableReferenceRewrite<'source> =
+    PreparedDataStoreControlCellSpecTableRewrite<'source>;
+
+pub fn prepare_data_store_control_cell_spec_table_reference_rewrite<'source>(
+    source: &'source [u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<PreparedDataStoreControlCellSpecTableReferenceRewrite<'source>, DecodeError> {
+    prepare_data_store_control_cell_spec_table_rewrite(source, edit, options)
+}
+
+pub fn rewrite_data_store_control_cell_spec_table_reference(
+    source: &[u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+    rewrite_data_store_control_cell_spec_table(source, edit, options)
+}
+
+/// Prepared TableModel field-4/DataStore field-21 rewrite.
+pub struct PreparedTableModelControlCellSpecTableRewrite<'source> {
+    source: &'source [u8],
+    options: DecodeOptions,
+    data_store: PreparedDataStoreControlCellSpecTableRewrite<'source>,
+    data_store_field: (usize, usize),
+    requirements: StorageReferenceRewriteRequirements,
+}
+
+impl fmt::Debug for PreparedTableModelControlCellSpecTableRewrite<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedTableModelControlCellSpecTableRewrite")
+            .field("requirements", &self.requirements)
+            .finish()
+    }
+}
+
+impl PreparedTableModelControlCellSpecTableRewrite<'_> {
+    #[must_use]
+    pub const fn requirements(&self) -> StorageReferenceRewriteRequirements {
+        self.requirements
+    }
+
+    #[must_use]
+    pub const fn prepare_report(&self) -> DecodeReport {
+        self.requirements.source
+    }
+
+    pub fn execute(
+        self,
+        limits: StorageReferenceRewriteExecutionLimits,
+    ) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+        enforce_storage_reference_limits(self.requirements, limits)?;
+        let expected_identifier = self.data_store.edit.replacement_identifier;
+        let nested_limits = StorageReferenceRewriteExecutionLimits::new(
+            self.data_store.requirements().output_bytes,
+            self.data_store.requirements().fields,
+            self.data_store.requirements().work_bytes,
+            self.data_store.requirements().max_depth,
+            self.data_store.requirements().references,
+            self.data_store.requirements().scratch_bytes,
+            self.data_store.requirements().allocations,
+        );
+        let (nested, _nested_report) = self.data_store.execute(nested_limits)?;
+        let mut output = Vec::new();
+        reserve_exact(&mut output, self.requirements.output_bytes)?;
+        let (field_start, field_end) = self.data_store_field;
+        output.extend_from_slice(&self.source[..field_start]);
+        encode_key(&mut output, 4, 2);
+        encode_varint(
+            &mut output,
+            u64::try_from(nested.len()).map_err(|_| DecodeError::invalid())?,
+        );
+        output.extend_from_slice(&nested);
+        output.extend_from_slice(&self.source[field_end..]);
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let (snapshot, result) = decode_table_model_with_report(&output, self.options)?;
+        let (store, verification) =
+            decode_data_store_with_report(snapshot.base_data_store(), self.options)?;
+        if store
+            .control_cell_spec_table()
+            .map(ReferenceSnapshot::identifier)
+            != Some(expected_identifier)
+        {
+            return Err(DecodeError::invalid());
+        }
+        Ok((
+            output,
+            StorageReferenceRewriteReport {
+                source: self.requirements.source,
+                result,
+                verification,
+                output_bytes: self.requirements.output_bytes,
+                work_bytes: self.requirements.work_bytes,
+                allocations: self.requirements.allocations,
+            },
+        ))
+    }
+}
+
+/// Prepare a model's nested DataStore field-21 transition.
+pub fn prepare_table_model_control_cell_spec_table_rewrite<'source>(
+    source: &'source [u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<PreparedTableModelControlCellSpecTableRewrite<'source>, DecodeError> {
+    validate_reference_edit(edit)?;
+    let (_model, source_report) = decode_table_model_with_report(source, options)?;
+    let model_field =
+        unique_length_delimited_field(source, 4, options)?.ok_or_else(DecodeError::invalid)?;
+    let nested_source = model_field.2;
+    let data_store =
+        prepare_data_store_control_cell_spec_table_rewrite(nested_source, edit, options)?;
+    let data_store_requirements = data_store.requirements();
+    let output_bytes = source
+        .len()
+        .checked_sub(model_field.1 - model_field.0)
+        .and_then(|length| {
+            append_length_delimited_field_length(4, data_store_requirements.output_bytes)
+                .ok()
+                .and_then(|field_len| length.checked_add(field_len))
+        })
+        .ok_or_else(DecodeError::invalid)?;
+    let result = reference_rewrite_upper_bound(source_report, output_bytes)?;
+    validate_result_ceiling(result, options)?;
+    let fields = source_report
+        .fields
+        .checked_add(data_store_requirements.fields)
+        .and_then(|fields| fields.checked_add(result.fields))
+        .and_then(|fields| fields.checked_add(data_store_requirements.fields))
+        .ok_or_else(DecodeError::invalid)?;
+    let references = source_report
+        .references
+        .checked_add(data_store_requirements.references)
+        .and_then(|references| references.checked_add(result.references))
+        .and_then(|references| references.checked_add(data_store_requirements.references))
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source_report
+        .work_bytes
+        .checked_add(data_store_requirements.work_bytes)
+        .and_then(|work| work.checked_add(result.work_bytes))
+        .and_then(|work| work.checked_add(data_store_requirements.work_bytes))
+        .and_then(|work| work.checked_add(source.len()))
+        .ok_or_else(DecodeError::invalid)?;
+    if work_bytes > options.max_work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    Ok(PreparedTableModelControlCellSpecTableRewrite {
+        source,
+        options,
+        data_store,
+        data_store_field: (model_field.0, model_field.1),
+        requirements: StorageReferenceRewriteRequirements {
+            source: source_report,
+            result,
+            output_bytes,
+            fields,
+            work_bytes,
+            max_depth: result.max_depth,
+            references,
+            scratch_bytes: data_store_requirements
+                .scratch_bytes
+                .checked_add(data_store_requirements.output_bytes)
+                .ok_or_else(DecodeError::invalid)?,
+            allocations: data_store_requirements
+                .allocations
+                .checked_add(1)
+                .ok_or_else(DecodeError::invalid)?,
+        },
+    })
+}
+
+/// One-shot TableModel field-21 transition.
+pub fn rewrite_table_model_control_cell_spec_table(
+    source: &[u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+    let plan = prepare_table_model_control_cell_spec_table_rewrite(source, edit, options)?;
+    let limits = plan.requirements().exact_limits();
+    plan.execute(limits)
+}
+
+pub type PreparedTableModelControlCellSpecTableReferenceRewrite<'source> =
+    PreparedTableModelControlCellSpecTableRewrite<'source>;
+
+pub fn prepare_table_model_control_cell_spec_table_reference_rewrite<'source>(
+    source: &'source [u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<PreparedTableModelControlCellSpecTableReferenceRewrite<'source>, DecodeError> {
+    prepare_table_model_control_cell_spec_table_rewrite(source, edit, options)
+}
+
+pub fn rewrite_table_model_control_cell_spec_table_reference(
+    source: &[u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+    rewrite_table_model_control_cell_spec_table(source, edit, options)
+}
+
+fn validate_reference_edit(edit: ControlCellSpecTableReferenceEdit) -> Result<(), DecodeError> {
+    if edit.replacement_identifier == 0 {
+        return Err(DecodeError::invalid());
+    }
+    if edit.expected_identifier == Some(0) {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn canonical_reference_payload_length(identifier: u64) -> Result<usize, DecodeError> {
+    if identifier == 0 {
+        return Err(DecodeError::invalid());
+    }
+    encoded_varint_len(8)
+        .checked_add(encoded_varint_len(identifier))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn patched_reference_payload_length(raw: &[u8], replacement: u64) -> Result<usize, DecodeError> {
+    let (start, end) = wire_field_span(raw, 1)?.ok_or_else(DecodeError::invalid)?;
+    let replacement_len = encoded_varint_len(8)
+        .checked_add(encoded_varint_len(replacement))
+        .ok_or_else(DecodeError::invalid)?;
+    raw.len()
+        .checked_sub(end - start)
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn patch_reference_identifier(
+    output: &mut Vec<u8>,
+    raw: &[u8],
+    replacement: u64,
+) -> Result<(), DecodeError> {
+    let (start, end) = wire_field_span(raw, 1)?.ok_or_else(DecodeError::invalid)?;
+    output.extend_from_slice(&raw[..start]);
+    encode_key(output, 1, 0);
+    encode_varint(output, replacement);
+    output.extend_from_slice(&raw[end..]);
+    Ok(())
+}
+
+fn field_payload_from_span(source: &[u8], start: usize, end: usize) -> Result<&[u8], DecodeError> {
+    let mut budget = Budget::new(
+        &source[start..end],
+        DecodeOptions::new(
+            end - start,
+            usize::MAX,
+            usize::MAX,
+            MAX_RECURSION,
+            usize::MAX,
+            usize::MAX,
+        ),
+    )?;
+    let mut remaining = &source[start..end];
+    let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
+    if !remaining.is_empty() {
+        return Err(DecodeError::invalid());
+    }
+    field.bytes()
+}
+
+fn unique_length_delimited_field(
+    source: &[u8],
+    number: u32,
+    options: DecodeOptions,
+) -> Result<Option<(usize, usize, &[u8])>, DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let mut remaining = source;
+    let mut selected = None;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
+        let end = source.len() - remaining.len();
+        if field.number != number {
+            continue;
+        }
+        if selected.is_some() {
+            return Err(DecodeError::invalid());
+        }
+        let raw = field.bytes()?;
+        let mut nested_budget = Budget::new(raw, options)?;
+        // Enforce the selected field's length-delimited framing and finite
+        // nested extent before allowing it into a prepared plan.
+        nested_budget.message(raw, 2)?;
+        selected = Some((start, end, raw));
+    }
+    Ok(selected)
+}
+
+fn unique_reference_field(
+    source: &[u8],
+    number: u32,
+    options: DecodeOptions,
+) -> Result<Option<(usize, usize, &[u8])>, DecodeError> {
+    let selected = unique_length_delimited_field(source, number, options)?;
+    if let Some((_start, _end, raw)) = selected {
+        let mut budget = Budget::new(raw, options)?;
+        let _ = decode_canonical_reference(raw, &mut budget, 2)?;
+    }
+    Ok(selected)
+}
+
+fn reference_rewrite_upper_bound(
+    source: DecodeReport,
+    output_bytes: usize,
+) -> Result<DecodeResourceUpperBound, DecodeError> {
+    Ok(DecodeResourceUpperBound {
+        source_bytes: output_bytes,
+        fields: source.fields,
+        work_bytes: source
+            .work_bytes
+            .checked_add(
+                output_bytes
+                    .checked_mul(2)
+                    .ok_or_else(DecodeError::invalid)?,
+            )
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: source.max_depth,
+        references: source.references,
+        reference_bytes: source.reference_bytes,
+        text_bytes: source.text_bytes,
+    })
+}
+
+fn assemble_reference_field_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    field: Option<(usize, usize)>,
+    number: u32,
+    replacement: u64,
+) -> Result<(), DecodeError> {
+    if let Some((start, end)) = field {
+        let raw = field_payload_from_span(source, start, end)?;
+        output.extend_from_slice(&source[..start]);
+        encode_key(output, number, 2);
+        let payload_len = patched_reference_payload_length(raw, replacement)?;
+        encode_varint(
+            output,
+            u64::try_from(payload_len).map_err(|_| DecodeError::invalid())?,
+        );
+        patch_reference_identifier(output, raw, replacement)?;
+        output.extend_from_slice(&source[end..]);
+    } else {
+        output.extend_from_slice(source);
+        let payload_len = canonical_reference_payload_length(replacement)?;
+        encode_key(output, number, 2);
+        encode_varint(
+            output,
+            u64::try_from(payload_len).map_err(|_| DecodeError::invalid())?,
+        );
+        encode_key(output, 1, 0);
+        encode_varint(output, replacement);
+    }
+    Ok(())
+}
+
+fn enforce_storage_reference_limits(
+    requirements: StorageReferenceRewriteRequirements,
+    limits: StorageReferenceRewriteExecutionLimits,
+) -> Result<(), DecodeError> {
+    if requirements.output_bytes > limits.output_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: requirements.output_bytes,
+            maximum: limits.output_bytes,
+        }));
+    }
+    if requirements.fields > limits.fields {
+        return Err(DecodeError::limited(DecodeLimit::Fields {
+            observed: requirements.fields,
+            maximum: limits.fields,
+        }));
+    }
+    if requirements.work_bytes > limits.work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: requirements.work_bytes,
+            maximum: limits.work_bytes,
+        }));
+    }
+    if requirements.max_depth > limits.max_depth {
+        return Err(DecodeError::limited(DecodeLimit::Nesting {
+            observed: requirements.max_depth,
+            maximum: limits.max_depth,
+        }));
+    }
+    if requirements.references > limits.references {
+        return Err(DecodeError::limited(DecodeLimit::References {
+            observed: requirements.references,
+            maximum: limits.references,
+        }));
+    }
+    if requirements.scratch_bytes > limits.scratch_bytes {
+        return Err(DecodeError::allocation(requirements.scratch_bytes));
+    }
+    if requirements.allocations > limits.allocations {
+        return Err(DecodeError::allocation(requirements.allocations));
+    }
+    Ok(())
 }
 
 fn decode_table_data_list_entry_in<'source>(
@@ -3368,11 +5315,11 @@ fn decode_table_data_list_segment_in<'source>(
                 key_range_location = Some(location);
                 key_range_length = Some(length);
             },
-            3 => visitor.visit_list_entry(decode_table_data_list_entry_in(
-                field.bytes()?,
-                budget,
-                child_depth,
-            )?)?,
+            3 => {
+                let raw = field.bytes()?;
+                let snapshot = decode_table_data_list_entry_in(raw, budget, child_depth)?;
+                visitor.visit_list_entry_record(TableDataListEntryRecord { raw, snapshot })?;
+            },
             _ => {},
         }
     }
@@ -3806,6 +5753,22 @@ pub(crate) fn decode_reference(
         || view.deprecated_type != snapshot.deprecated_type
         || view.deprecated_is_external != snapshot.deprecated_is_external
     {
+        return Err(DecodeError::invalid());
+    }
+    Ok(snapshot)
+}
+
+/// Decode a storage reference whose selected mutation path requires the
+/// canonical one-field form. Legacy reference fields are retained by the
+/// general projection for compatibility, but they are not accepted when a
+/// prepared owner is about to rewrite the selected reference.
+fn decode_canonical_reference(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<ReferenceSnapshot, DecodeError> {
+    let snapshot = decode_reference(source, budget, depth)?;
+    if snapshot.deprecated_type().is_some() || snapshot.deprecated_is_external().is_some() {
         return Err(DecodeError::invalid());
     }
     Ok(snapshot)
@@ -5784,6 +7747,25 @@ mod tests {
         source
     }
 
+    fn list_mutation_options(source: &[u8]) -> DecodeOptions {
+        DecodeOptions::new(
+            source.len().saturating_add(1024),
+            1_000_000,
+            source.len().saturating_mul(40).saturating_add(1024),
+            64,
+            20_000,
+            1_000_000,
+        )
+    }
+
+    fn valid_control_cell_spec() -> Vec<u8> {
+        let options =
+            crate::numbers_table_cell_pop_up_menu_codec::DecodeOptions::for_source(&[0; 128]);
+        crate::numbers_table_cell_pop_up_menu_codec::canonical_cell_spec(41, false, options)
+            .unwrap()
+            .into_bytes()
+    }
+
     fn entry_minimal() -> Vec<u8> {
         let mut source = Vec::new();
         v(&mut source, 1, 1);
@@ -6956,5 +8938,233 @@ mod tests {
             let error = decode_table_data_list_with_visitor(&source, options, &mut ()).unwrap_err();
             assert_eq!(error.resource_limit(), Some(expected));
         }
+    }
+
+    #[test]
+    fn prepared_popup_list_append_refcount_remove_preserves_segments_and_unknowns() {
+        let mut source = list_minimal();
+        unknown_fields(&mut source, 91);
+        let segment = reference(700);
+        b(&mut source, 4, &segment);
+        let append = TableDataListEntryAppend::string(9, 1, "Low");
+        let plan = prepare_table_data_list_entry_rewrite(
+            &source,
+            TableDataListEntryMutation::Append(append),
+            list_mutation_options(&source),
+        )
+        .unwrap();
+        let requirements = plan.requirements();
+        let (with_entry, report) = plan.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(report.output_bytes(), with_entry.len());
+        assert_eq!(report.fields(), requirements.fields());
+        assert_eq!(report.work_bytes(), requirements.work_bytes());
+        assert_eq!(report.references(), requirements.references());
+        assert_eq!(report.retained_bytes(), requirements.retained_bytes());
+        assert_eq!(with_entry[..2], source[..2]);
+        assert!(
+            with_entry
+                .windows(segment.len())
+                .any(|window| window == segment)
+        );
+
+        let update = TableDataListEntryRefCountEdit::new(9, 1, 2);
+        let (updated, update_report) = rewrite_table_data_list_entry(
+            &with_entry,
+            TableDataListEntryMutation::RefCount(update),
+            list_mutation_options(&with_entry),
+        )
+        .unwrap();
+        assert_eq!(update_report.output_bytes(), updated.len());
+
+        let remove = TableDataListEntryRemovalSpec::string(9, 2, "Low");
+        let plan = prepare_table_data_list_entry_rewrite(
+            &updated,
+            TableDataListEntryMutation::Remove(remove),
+            list_mutation_options(&updated),
+        )
+        .unwrap();
+        let limits = plan.requirements().exact_limits();
+        let (restored, removal_report) = plan.execute(limits).unwrap();
+        assert_eq!(restored, source);
+        assert_eq!(removal_report.output_bytes(), restored.len());
+    }
+
+    #[test]
+    fn prepared_popup_list_limits_refuse_before_candidate_allocation() {
+        let mut source = list_minimal();
+        source[1] = 12;
+        let payload = valid_control_cell_spec();
+        let append = TableDataListEntryAppend::control_cell_spec(12, 1, &payload);
+        let plan = prepare_table_data_list_entry_rewrite(
+            &source,
+            TableDataListEntryMutation::Append(append),
+            list_mutation_options(&source),
+        )
+        .unwrap();
+        let requirements = plan.requirements();
+        let limits = TableDataListRewriteExecutionLimits::new(
+            requirements.output_bytes() - 1,
+            requirements.fields(),
+            requirements.work_bytes(),
+            requirements.max_depth(),
+            requirements.references(),
+            requirements.scratch_bytes(),
+            requirements.allocations(),
+        );
+        let error = plan.execute(limits).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Bytes { .. })
+        ));
+        assert!(!source.is_empty());
+
+        let mut format_source = list_minimal();
+        // The list type is the format list for this second operation.
+        format_source[1] = 7;
+        let format_payload = [8, 1];
+        let append = TableDataListEntryAppend::format(11, 1, &format_payload);
+        let plan = prepare_table_data_list_entry_rewrite(
+            &format_source,
+            TableDataListEntryMutation::Append(append),
+            list_mutation_options(&format_source),
+        )
+        .unwrap();
+        let requirements = plan.requirements();
+        let limits = TableDataListRewriteExecutionLimits::new(
+            requirements.output_bytes(),
+            requirements.fields(),
+            requirements.work_bytes() - 1,
+            requirements.max_depth(),
+            requirements.references(),
+            requirements.scratch_bytes(),
+            requirements.allocations(),
+        );
+        let error = plan.execute(limits).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+    }
+
+    #[test]
+    fn prepared_popup_list_limits_cover_fields_references_scratch_and_allocations() {
+        let mut source = list_minimal();
+        source[1] = 12;
+        let payload = valid_control_cell_spec();
+        let mut existing = Vec::new();
+        v(&mut existing, 1, 1);
+        v(&mut existing, 2, 1);
+        b(&mut existing, 12, &payload);
+        b(&mut source, 3, &existing);
+        let segment = reference(700);
+        b(&mut source, 4, &segment);
+        let append = TableDataListEntryAppend::control_cell_spec(12, 1, &payload);
+        let make_plan = || {
+            prepare_table_data_list_entry_rewrite(
+                &source,
+                TableDataListEntryMutation::Append(append),
+                list_mutation_options(&source),
+            )
+            .unwrap()
+        };
+        let requirements = make_plan().requirements();
+
+        let error = make_plan()
+            .execute(TableDataListRewriteExecutionLimits::new(
+                requirements.output_bytes(),
+                requirements.fields() - 1,
+                requirements.work_bytes(),
+                requirements.max_depth(),
+                requirements.references(),
+                requirements.scratch_bytes(),
+                requirements.allocations(),
+            ))
+            .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+
+        let error = make_plan()
+            .execute(TableDataListRewriteExecutionLimits::new(
+                requirements.output_bytes(),
+                requirements.fields(),
+                requirements.work_bytes(),
+                requirements.max_depth(),
+                requirements.references() - 1,
+                requirements.scratch_bytes(),
+                requirements.allocations(),
+            ))
+            .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::References { .. })
+        ));
+
+        let error = make_plan()
+            .execute(TableDataListRewriteExecutionLimits::new(
+                requirements.output_bytes(),
+                requirements.fields(),
+                requirements.work_bytes(),
+                requirements.max_depth(),
+                requirements.references(),
+                requirements.scratch_bytes() - 1,
+                requirements.allocations(),
+            ))
+            .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Allocation { .. })
+        ));
+
+        let error = make_plan()
+            .execute(TableDataListRewriteExecutionLimits::new(
+                requirements.output_bytes(),
+                requirements.fields(),
+                requirements.work_bytes(),
+                requirements.max_depth(),
+                requirements.references(),
+                requirements.scratch_bytes(),
+                requirements.allocations() - 1,
+            ))
+            .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Allocation { .. })
+        ));
+
+        let error = make_plan()
+            .execute(
+                TableDataListRewriteExecutionLimits::new(
+                    requirements.output_bytes(),
+                    requirements.fields(),
+                    requirements.work_bytes(),
+                    requirements.max_depth(),
+                    requirements.references(),
+                    requirements.scratch_bytes(),
+                    requirements.allocations(),
+                )
+                .with_retained_bytes(requirements.retained_bytes() - 1),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Retained { .. })
+        ));
+    }
+
+    #[test]
+    fn prepared_control_cell_spec_reference_rejects_deprecated_fields() {
+        let mut source = minimal_store();
+        let mut deprecated = reference(7);
+        v(&mut deprecated, 2, 1);
+        b(&mut source, 21, &deprecated);
+        let error = prepare_data_store_control_cell_spec_table_rewrite(
+            &source,
+            ControlCellSpecTableReferenceEdit::replace(7, 8),
+            options(&source),
+        )
+        .unwrap_err();
+        assert_eq!(error.resource_limit(), None);
     }
 }

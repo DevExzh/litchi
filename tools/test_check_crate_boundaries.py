@@ -355,6 +355,96 @@ def add_numbers_table_appearance_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_numbers_table_cell_pop_up_menu_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction;\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES
+        )
+        + "pub enum InitialSelection { FirstItem, Blank }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_TRANSACTION_TYPES
+        )
+        + "fn control_cell_data_list_refcount() {}\n"
+        + "fn copy_on_write_shared_model_cull() {}\n"
+        + "fn metadata_save_token_object_uuid_external_reference_watermark() {}\n"
+        + "fn transaction_budget_preflight_charge() {}\n"
+        + "fn verify_locality_candidate_reopen_string_table() {}\n"
+        + "impl Package {\n"
+        + "pub fn table_cell_pop_up_menu_format<'sheet, 'table, 'cell>(&self, "
+        "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
+        "position: CellPosition<'cell>) -> Result<PopUpMenu, Error> {}\n"
+        + "pub fn edit_table_cell_pop_up_menu_format<'sheet, 'table, 'cell>(&self, "
+        "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
+        "position: CellPosition<'cell>, value: PopUpMenu) -> Result<Edit, Error> {}\n"
+        + "pub fn apply_table_cell_pop_up_menu_format(&self, patch: &Patch) "
+        "-> Result<Commit, Error> {}\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, data_format_export = (
+        root / path
+        for path in boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[:3]
+    )
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text("pub mod cell;\n", encoding="utf-8")
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "pub(crate) mod table_cell_pop_up_menu;\n", encoding="utf-8"
+    )
+    data_format_export.parent.mkdir(parents=True, exist_ok=True)
+    data_format_export.write_text("pub mod pop_up_menu;\n", encoding="utf-8")
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct PreparedPopUpMenuModelWrite;\n"
+        "pub struct PreparedCellSpecWrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_popup_menu_model_with_report() {}\n"
+        "pub fn decode_cell_spec_with_report() {}\n"
+        "pub fn prepare_popup_menu_model_write() {}\n"
+        "pub fn prepare_cell_spec_write() {}\n"
+        "pub fn canonical_popup_menu_model() {}\n"
+        "pub fn canonical_cell_spec() {}\n"
+        "fn canonical_unknown_report_nil_deprecated_refcount() {}\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in (
+        boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_CORPUS,
+    ):
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -17652,6 +17742,300 @@ fn rewrite_movie_title_operation(
                     for item in boundaries.audit_iwa_numbers_table_appearance_source_topology(root)
                 )
             )
+
+    def test_numbers_table_cell_pop_up_menu_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_METHODS,
+            (
+                "table_cell_pop_up_menu_format",
+                "set_table_cell_pop_up_menu_format",
+                "reset_table_cell_pop_up_menu_format",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/cell/data_format/pop_up_menu.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cell_pop_up_menu.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE,
+            Path(
+                "crates/litchi-iwa-protos/src/"
+                "numbers_table_cell_pop_up_menu_codec.rs"
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_PACKAGE_METHODS,
+            (
+                "table_cell_pop_up_menu_format",
+                "edit_table_cell_pop_up_menu_format",
+                "apply_table_cell_pop_up_menu_format",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_REQUIRED_APIS,
+            (
+                "decode_popup_menu_model_with_report",
+                "decode_cell_spec_with_report",
+                "prepare_popup_menu_model_write",
+                "prepare_cell_spec_write",
+                "PreparedPopUpMenuModelWrite",
+                "PreparedCellSpecWrite",
+                "RewriteExecutionRequirements",
+                "RewriteExecutionLimits",
+                "canonical_popup_menu_model",
+                "canonical_cell_spec",
+            ),
+        )
+        self.assertIn(
+            "numbers_table_cell_pop_up_menu_codec",
+            boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_MODULE,
+        )
+    def test_focused_numbers_table_cell_pop_up_menu_is_dormant_until_owner_codec_and_fuzz(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_pop_up_menu_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_table_cell_pop_up_menu_requires_each_contract_part(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub mod transaction;\n"
+                + "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES
+                    if name != "Item"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical cell::data_format::pop_up_menu type Item" in item
+                    for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "CellPosition<'cell>", "MissingPosition<'cell>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first CellPosition" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+            codec.write_text("", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("hidden codec is missing strict API" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_SOURCE).unlink()
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+            marker_lines = {
+                "control-cell": "fn control_cell_data_list_refcount() {}\n",
+                "table-data-list": "fn control_cell_data_list_refcount() {}\n",
+                "refcount": "fn control_cell_data_list_refcount() {}\n",
+                "copy-on-write": "fn copy_on_write_shared_model_cull() {}\n",
+                "metadata": "fn metadata_save_token_object_uuid_external_reference_watermark() {}\n",
+                "budget": "fn transaction_budget_preflight_charge() {}\n",
+                "locality": "fn verify_locality_candidate_reopen_string_table() {}\n",
+                "string-table": "fn verify_locality_candidate_reopen_string_table() {}\n",
+            }
+            for label, marker_line in marker_lines.items():
+                with self.subTest(marker=label):
+                    add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(marker_line, ""),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_cell_pop_up_menu_rejects_aliases_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type PopUpMenuEdit = Edit;\n"
+                + "pub fn raw_popup(table_id: u64, row: usize, column: usize, "
+                "source_bytes: &[u8], wire: WireView, archive: Archive, "
+                "model: PopUpMenuModel, value: CellValueArchive, "
+                "generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::table_cell_pop_up_menu::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias PopUpMenuEdit",
+                "exposes raw identifier parameter table_id: u64",
+                "exposes raw identifier parameter row: usize",
+                "exposes raw identifier parameter column: usize",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes archive/IWA type PopUpMenuModel",
+                "exposes archive/IWA type CellValueArchive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cell_pop_up_menu_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn test_only_raw_popup(table_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_pop_up_menu_host_retirement_is_owner_gated_and_scoped(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/semantic/table.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn focused_popup_format() { source.table_cell_pop_up_menu_format(); }\n"
+                "pub fn table_cell_pop_up_menu_format() {}\n"
+                "pub fn set_table_cell_pop_up_menu_format() {}\n"
+                "pub fn reset_table_cell_pop_up_menu_format() {}\n"
+                "#[cfg(test)]\n"
+                "pub fn source_built_table_roundtrips_reuses_and_cleans_up_pop_up_menus() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_pop_up_menu_source_topology(root),
+                [],
+            )
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_cell_pop_up_menu_source_topology(root)
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_METHODS:
+                self.assertTrue(any(f"method {method}" in item for item in violations), violations)
+            self.assertFalse(any("source_built_table_roundtrips" in item for item in violations))
+
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_POP_UP_MENU_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create_pages() { editor.set_table_cell_pop_up_menu_format(); }\n"
+                "fn create_keynote() { editor.set_slide_table_cell_pop_up_menu_format(); }\n"
+                "fn create_numbers() { editor.set_table_cell_data_format(); }\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                any(
+                    "example call" in item
+                    for item in boundaries.audit_iwa_numbers_table_cell_pop_up_menu_source_topology(
+                        root
+                    )
+                )
+            )
+
+            shared = root / "crates/litchi-iwa/src/numbers/editor/cell_data_format/pop_up_menu.rs"
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "pub(crate) fn table_cell_pop_up_menu_format() {}\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                any(
+                    "cell_data_format/pop_up_menu.rs" in item
+                    for item in boundaries.audit_iwa_numbers_table_cell_pop_up_menu_source_topology(root)
+                )
+            )
+
+    def test_focused_numbers_table_cell_pop_up_menu_audits_are_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_table_cell_pop_up_menu_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_numbers_table_cell_pop_up_menu_facade_source_topology()",
+            main_source,
+        )
 
     def test_numbers_table_dimension_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

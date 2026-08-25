@@ -215,6 +215,59 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
 
+## Numbers Pop-Up Menu codec
+
+`numbers_table_cell_pop_up_menu_codec` drives the hidden
+`numbers_table_cell_pop_up_menu_codec` projection for one bounded
+`TST.PopUpMenuModel` payload. Successful inputs are decoded through the scalar
+and reported paths, then passed through the prepared rewrite/execute route
+with exact requirements and candidate readback. The harness checks that the
+caller-owned source is unchanged, that prepared output/field/work/nesting and
+allocation ceilings are honored, and that an output or work limit one below
+the exact requirement fails before a candidate can be published.
+
+The fixed recipes under
+`corpus/numbers_table_cell_pop_up_menu_codec/` cover the required NIL sentinel,
+string choices, deprecated `item`, missing/duplicate sentinel, wrong value
+type, typed string options, duplicate known fields, unknown overlong scalars,
+and balanced unknown groups. They are hand-authored protobuf wire recipes,
+not copied from a native Numbers package. Unknown bytes are retained only
+where the strict codec policy permits them; malformed known fields remain
+fail-closed.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_pop_up_menu_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-numbers-popup-codec-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_pop_up_menu_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_pop_up_menu_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root; set
+`KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
+
 `numbers_tile_storage` sends one bounded, caller-owned byte source through both
 tile entry points:
 
