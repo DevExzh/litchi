@@ -7,6 +7,7 @@
 mod body_footnote;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
+pub(crate) mod body_table_sort;
 pub(crate) mod body_table_title;
 pub(crate) mod document_settings;
 mod footnote_text;
@@ -62,6 +63,10 @@ pub use body_table_headers::{
     BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit,
     BodyTableHeaderSettingsError, BodyTableHeaderSettingsInvalidReason,
     BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch,
+};
+pub use body_table_sort::{
+    BodyTableSortCommit, BodyTableSortDiagnostics, BodyTableSortEdit, BodyTableSortError,
+    BodyTableSortLimitKind, BodyTableSortPatch, BodyTableSortPath,
 };
 pub use body_table_title::{
     BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,

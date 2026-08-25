@@ -5625,6 +5625,255 @@ PAGES_TABLE_DIMENSION_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tst", "tsp", "tswp"}
 )
 
+# Pages body-table sort configuration is a persisted table-model edge, not
+# the physical "Sort Now" executor.  Keep the package facade selector-first
+# and archive-free, while allowing the compatibility host to retain the
+# physical apply/apply-to-rows methods that reorder native rows.  This
+# inventory is intentionally activated only when the private package owner
+# and strict neutral codec have landed together.
+RETIRED_IWA_PAGES_TABLE_SORT_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "sort.rs"
+)
+RETIRED_IWA_PAGES_TABLE_SORT_METHODS = (
+    "table_sort_order",
+    "set_table_sort_order",
+    "clear_table_sort_order",
+)
+RETIRED_IWA_PAGES_TABLE_SORT_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_SORT_METHODS
+)
+IWA_PAGES_TABLE_SORT_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"(?:litchi_numbers|numbers)[^;\n]*"
+        r"(?:table[ \t]*::[ \t]*sort|SortOrder|SortRule|table_sort_order)"
+    ),
+)
+RETIRED_IWA_PAGES_TABLE_SORT_EXAMPLES = (
+    Path("crates/litchi-iwa/examples/apply_pages_sort.rs"),
+    Path("crates/litchi-iwa/examples/create_pages_sorted.rs"),
+    Path("crates/litchi-iwa/examples/create_pages_selected_row_sort.rs"),
+)
+IWA_PAGES_TABLE_SORT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_TABLE_SORT_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_sort_order|set_table_sort_order|clear_table_sort_order)"
+        r"\b[ \t\r\n]*\(",
+    ),
+)
+PAGES_TABLE_SORT_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "sort.rs"
+PAGES_TABLE_SORT_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "body_table_sort.rs"
+PAGES_TABLE_SORT_OWNER_HELPER_ROOT = PAGES_SOURCE_ROOT / "package" / "body_table_sort"
+PAGES_TABLE_SORT_IMPLEMENTATION_SOURCES = (
+    PAGES_TABLE_SORT_SEMANTIC_SOURCE,
+    PAGES_TABLE_SORT_OWNER_SOURCE,
+)
+PAGES_TABLE_SORT_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_SORT_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_TABLE_SORT_SEMANTIC_TYPES = (
+    "ColumnIndex",
+    "Direction",
+    "Order",
+    "RowRange",
+    "Rule",
+    "Scope",
+)
+PAGES_TABLE_SORT_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+PAGES_TABLE_SORT_CANONICAL_TYPES = (
+    "BodyTableSortEdit",
+    "BodyTableSortPatch",
+    "BodyTableSortCommit",
+    "BodyTableSortDiagnostics",
+    "BodyTableSortError",
+    "BodyTableSortLimitKind",
+)
+PAGES_TABLE_SORT_SHORT_NAMES = frozenset(
+    PAGES_TABLE_SORT_SEMANTIC_TYPES + PAGES_TABLE_SORT_TRANSACTION_TYPES
+)
+PAGES_TABLE_SORT_PUBLIC_NAMES = frozenset(
+    PAGES_TABLE_SORT_SEMANTIC_TYPES + PAGES_TABLE_SORT_CANONICAL_TYPES
+)
+PAGES_TABLE_SORT_PACKAGE_METHODS = (
+    "body_table_sort_order",
+    "edit_body_table_sort_order",
+    "apply_body_table_sort_order",
+)
+PAGES_TABLE_SORT_FLAT_METHODS = frozenset(
+    {"table_sort_order", "edit_table_sort_order", "apply_table_sort_order"}
+)
+PAGES_TABLE_SORT_FLAT_ALIASES = frozenset(
+    {
+        "SortEdit",
+        "SortPatch",
+        "SortCommit",
+        "SortDiagnostics",
+        "SortError",
+        "SortLimitKind",
+        "SortPath",
+        "TableSortEdit",
+        "TableSortPatch",
+        "TableSortCommit",
+        "TableSortDiagnostics",
+        "TableSortError",
+        "TableSortLimitKind",
+        "TableSortPath",
+        "TableSortOrder",
+        "TableSortOrderEdit",
+        "TableSortOrderPatch",
+        "TableSortOrderCommit",
+        "TableSortOrderDiagnostics",
+        "TableSortOrderError",
+        "TableSortOrderLimitKind",
+        "TableSortOrderPath",
+    }
+)
+PAGES_TABLE_SORT_ALIAS_TARGETS = frozenset(
+    PAGES_TABLE_SORT_CANONICAL_TYPES + PAGES_TABLE_SORT_SEMANTIC_TYPES
+)
+PAGES_TABLE_SORT_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_sort|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?sort)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_PACKAGE_TABLE_SORT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body_table_sort\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_TABLE_SORT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_table_sort\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_SORT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?sort\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_SORT_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+# The format-neutral public spelling is an inline alias in lib.rs; the strict
+# implementation remains the already-fuzzed Numbers source so Pages cannot
+# fork the field-44 wire policy.
+PAGES_TABLE_SORT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_sort_order_codec.rs"
+)
+PAGES_TABLE_SORT_CODEC_PUBLIC_SOURCE = Path("crates/litchi-iwa-protos/src/lib.rs")
+PAGES_TABLE_SORT_CODEC_MODULE = "table_sort_order_codec"
+PAGES_TABLE_SORT_CODEC_REQUIRED_APIS = (
+    "SortOrderSnapshot",
+    "decode_table_sort_order",
+    "decode_table_sort_order_with_report",
+    "prepare_table_sort_order_rewrite",
+    "PreparedTableSortOrderRewrite",
+    "canonical_table_sort_order",
+    "rewrite_table_sort_order",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+)
+PAGES_TABLE_SORT_CODEC_REQUIRED_MARKERS = (
+    "unknown",
+    "unknown overlong",
+    "report",
+    "SORT_ORDER_FIELD",
+    "SORT_RULES_FIELD",
+)
+PAGES_TABLE_SORT_CODEC_FUZZ_SOURCE = Path(
+    "crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_sort_order_codec.rs"
+)
+PAGES_TABLE_SORT_CODEC_FUZZ_CORPUS = Path(
+    "crates/litchi-iwa-protos/fuzz/corpus/numbers_table_sort_order_codec"
+)
+PAGES_TABLE_SORT_FUZZ_SOURCE = Path(
+    "crates/litchi/fuzz/fuzz_targets/pages_body_table_sort_order.rs"
+)
+PAGES_TABLE_SORT_FUZZ_CORPUS = Path(
+    "crates/litchi/fuzz/corpus/pages_body_table_sort_order"
+)
+PAGES_TABLE_SORT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "SortRuleArchive",
+        "SortRuleReferenceTrackerArchive",
+        "TableModelArchive",
+        "TableSortOrderArchive",
+        "TableSortOrderSnapshot",
+    }
+)
+PAGES_TABLE_SORT_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_TABLE_SORT_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tst", "tswp"}
+)
+PAGES_TABLE_SORT_OWNER_REQUIRED_MARKERS = {
+    "table-model": re.compile(
+        r"(?<![A-Za-z0-9])(?:table[_-]?model|TableModel|sort[_-]?order)(?![A-Za-z0-9])"
+    ),
+    "field44/field45": re.compile(
+        r"(?<![A-Za-z0-9])(?:field44|field45|sort_order|sort_rule_reference_tracker)"
+        r"(?![A-Za-z0-9])"
+    ),
+    "budget": re.compile(
+        r"(?<![A-Za-z0-9])(?:budget|WireBudget|TransactionBudget|charge_|preflight)"
+        r"(?![A-Za-z0-9])"
+    ),
+    "locality": re.compile(
+        r"(?<![A-Za-z0-9])(?:locality|verify_locality|candidate|reopen|same_content)"
+        r"(?![A-Za-z0-9])"
+    ),
+    "reassembly": re.compile(
+        r"(?<![A-Za-z0-9])(?:reassembl\w*|zip|snappy|compress)(?![A-Za-z0-9])"
+    ),
+    "atomic/inverse": re.compile(
+        r"(?<![A-Za-z0-9])(?:atomic|inverse|conflict|source_bytes|unchanged)"
+        r"(?![A-Za-z0-9])"
+    ),
+}
+PAGES_TABLE_SORT_RAW_PARAMETER = re.compile(
+    r"\b(?:table_id|object_id|model_id|native_id|source_bytes|bytes|row|column)"
+    r"\b[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])\b"
+)
+
 # Header/footer text is the next Pages text-storage edge.  Keep its
 # migration inventory dormant until a complete selector-first owner lands:
 # the current host still resolves native TextStorageId values and owns the
@@ -8961,6 +9210,56 @@ def _pages_table_dimension_public_leak(identifier: str) -> str | None:
     ):
         return "physical package name"
     return None
+
+
+def _pages_table_sort_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in Pages sort APIs."""
+
+    if identifier in PAGES_TABLE_SORT_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_TABLE_SORT_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_TABLE_SORT_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_table_sort_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_TABLE_SORT_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_TABLE_SORT_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_table_sort_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers & (PAGES_TABLE_SORT_FLAT_ALIASES | PAGES_TABLE_SORT_PUBLIC_NAMES)
+    ) or _pages_table_sort_owner_declaration(declaration)
 
 
 def _pages_footnote_lifecycle_public_leak(identifier: str) -> str | None:
@@ -15354,6 +15653,444 @@ def audit_iwa_pages_table_dimension_source_topology(root: Path = ROOT) -> list[s
                 violations.append(
                     "retired litchi-iwa Pages table-dimension README call "
                     f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def _pages_table_sort_owner_present(root: Path) -> bool:
+    owner_path = root / PAGES_TABLE_SORT_OWNER_SOURCE
+    package_path = root / PAGES_TABLE_SORT_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and (
+        PAGES_PACKAGE_TABLE_SORT_MODULE.search(package_source) is not None
+    )
+
+
+def audit_iwa_pages_table_sort_source_topology(root: Path = ROOT) -> list[str]:
+    """Retire only the persisted Pages table-sort configuration surface.
+
+    The host's ``apply_table_sort_order`` and
+    ``apply_table_sort_order_to_rows`` methods remain physical executors: they
+    reorder body rows and therefore stay in ``litchi-iwa``.  Read/set/clear
+    configuration belongs to the selector-first Pages package owner.  The
+    audit is gated on that owner so the existing host remains a migration
+    baseline until the package transaction is actually present.
+    """
+
+    if not _pages_table_sort_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    call_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_sort_order|"
+        r"set_table_sort_order|clear_table_sort_order)\b[ \t\r\n]*\(",
+    )
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            code = _mask_rust_non_code(source)
+            for name, line_number in _rust_function_declarations(source):
+                if name in RETIRED_IWA_PAGES_TABLE_SORT_METHOD_SET:
+                    violations.append(
+                        "retired litchi-iwa Pages table-sort method "
+                        f"{name}: {path.relative_to(root)}:{line_number}"
+                    )
+            for pattern in IWA_PAGES_TABLE_SORT_IMPORTS:
+                for match in pattern.finditer(code):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-sort import: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            for match in call_pattern.finditer(code):
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                line = code[line_start:line_end]
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    line,
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-sort call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_TABLE_SORT_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            # The shared examples intentionally retain Numbers and Keynote
+            # adapters.  Only Pages examples are in this host retirement.
+            stem = example_path.stem.lower()
+            if ("numbers" in stem or "keynote" in stem) and "pages" not in stem:
+                continue
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            )
+            for match in call_pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-sort example call "
+                    f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_TABLE_SORT_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-sort README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Enforce the selector-first, archive-free Pages table-sort owner."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir() or not _pages_table_sort_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / PAGES_TABLE_SORT_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(PAGES_TABLE_SORT_SEMANTIC_TYPES)
+    )
+    for name in PAGES_TABLE_SORT_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-pages table-sort public API is missing "
+                f"semantic table::sort type {name}: {PAGES_TABLE_SORT_SEMANTIC_SOURCE}"
+            )
+    if PUBLIC_PAGES_TABLE_SORT_TRANSACTION_MODULE.search(
+        _mask_rust_non_code(semantic_source)
+    ) is None:
+        violations.append(
+            "focused litchi-pages table-sort public API is missing canonical "
+            f"table::sort::transaction module: {PAGES_TABLE_SORT_SEMANTIC_SOURCE}"
+        )
+
+    selector_path = root / PAGES_TABLE_SORT_SELECTOR_SOURCE
+    selector_source = (
+        _mask_rust_non_code(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        selector_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-sort public API is missing canonical "
+            f"BodyTableSelector: {PAGES_TABLE_SORT_SELECTOR_SOURCE}"
+        )
+
+    owner_path = root / PAGES_TABLE_SORT_OWNER_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    owner_exports = _rust_canonical_exports(
+        owner_source, frozenset(PAGES_TABLE_SORT_CANONICAL_TYPES)
+    )
+    for name in PAGES_TABLE_SORT_CANONICAL_TYPES:
+        if name not in owner_exports:
+            violations.append(
+                "focused litchi-pages table-sort public API is missing "
+                f"canonical package type {name}: {PAGES_TABLE_SORT_OWNER_SOURCE}"
+            )
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in PAGES_TABLE_SORT_PACKAGE_METHODS:
+        declaration = owner_methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-pages table-sort public API is missing "
+                f"Package method {method}: {PAGES_TABLE_SORT_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_body_table_sort_order":
+            if "BodyTableSelector" not in declaration:
+                violations.append(
+                    "focused litchi-pages table-sort Package method "
+                    f"{method} must accept selector-first BodyTableSelector: "
+                    f"{PAGES_TABLE_SORT_OWNER_SOURCE}"
+                )
+    for method in sorted(PAGES_TABLE_SORT_FLAT_METHODS & owner_methods.keys()):
+        violations.append(
+            "focused litchi-pages table-sort public API retains flat Package method "
+            f"{method}: {PAGES_TABLE_SORT_OWNER_SOURCE}"
+        )
+    owner_code = _mask_rust_non_code(owner_source)
+    for label, marker in PAGES_TABLE_SORT_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-pages table-sort owner is missing "
+                f"{label} transaction marker: {PAGES_TABLE_SORT_OWNER_SOURCE}"
+            )
+
+    lib_path = root / PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages table-sort public API is missing canonical root "
+            f"table module: {PAGES_TABLE_SORT_EXPORT_SOURCES[0]}"
+        )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        lib_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-sort public API is missing root "
+            f"BodyTableSelector re-export: {PAGES_TABLE_SORT_EXPORT_SOURCES[0]}"
+        )
+    table_path = root / PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_SORT_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-pages table-sort public API is missing canonical "
+            f"table::sort module: {PAGES_TABLE_SORT_EXPORT_SOURCES[2]}"
+        )
+    package_path = root / PAGES_TABLE_SORT_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    if PAGES_PACKAGE_TABLE_SORT_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-pages table-sort public API is missing private package "
+            f"owner module: {PAGES_TABLE_SORT_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_PAGES_PACKAGE_TABLE_SORT_MODULE.finditer(package_source):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-pages table-sort public API exposes duplicate "
+            f"package::body_table_sort module: {PAGES_TABLE_SORT_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    codec_path = root / PAGES_TABLE_SORT_CODEC_SOURCE
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-pages table-sort public API is missing strict hidden "
+            f"codec source: {PAGES_TABLE_SORT_CODEC_SOURCE}"
+        )
+    else:
+        codec_source = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        codec_code = _mask_rust_non_code(codec_source)
+        for api in PAGES_TABLE_SORT_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct|type)\s+{re.escape(api)}\b",
+                codec_code,
+            ) is None:
+                violations.append(
+                    "focused litchi-pages table-sort hidden codec is missing "
+                    f"strict API {api}: {codec_path.relative_to(root)}"
+                )
+        for marker in PAGES_TABLE_SORT_CODEC_REQUIRED_MARKERS:
+            if re.search(re.escape(marker), codec_source) is None:
+                violations.append(
+                    "focused litchi-pages table-sort hidden codec is missing "
+                    f"strict {marker} marker: {codec_path.relative_to(root)}"
+                )
+        codec_lib_path = root / PAGES_TABLE_SORT_CODEC_PUBLIC_SOURCE
+        codec_lib_source = (
+            _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+            if codec_lib_path.is_file()
+            else ""
+        )
+        if re.search(
+            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+            rf"pub\s+mod\s+{re.escape(PAGES_TABLE_SORT_CODEC_MODULE)}\b",
+            codec_lib_source,
+        ) is None:
+            violations.append(
+                "focused litchi-pages table-sort public API is missing hidden codec "
+                f"module {PAGES_TABLE_SORT_CODEC_MODULE}: {PAGES_TABLE_SORT_CODEC_PUBLIC_SOURCE}"
+            )
+
+    for target in (
+        PAGES_TABLE_SORT_CODEC_FUZZ_SOURCE,
+        PAGES_TABLE_SORT_FUZZ_SOURCE,
+    ):
+        absolute = root / target
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-pages table-sort boundary is missing fuzz target: "
+                f"{target}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-pages table-sort fuzz target is missing "
+                f"fuzz_target! harness: {target}"
+            )
+    for corpus in (PAGES_TABLE_SORT_CODEC_FUZZ_CORPUS, PAGES_TABLE_SORT_FUZZ_CORPUS):
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-pages table-sort boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_TABLE_SORT_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_TABLE_SORT_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_TABLE_SORT_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+
+    # Scan the whole facade tree.  In particular, cfg(test) is masked item by
+    # item so a production sibling cannot launder a raw-ID or glob route.
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "body_table_sort"]:
+                violations.append(
+                    "focused litchi-pages table-sort public API exposes duplicate "
+                    f"body_table_sort module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {"body_table_sort", "sort", "package"} & set(identifiers):
+                    violations.append(
+                        "focused litchi-pages table-sort public API retains root "
+                        f"aliases via table::sort glob: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_SORT_ALIAS_TARGETS
+                    or "body_table_sort" in target_identifiers
+                    or "sort" in target_identifiers
+                ) and alias and alias != target:
+                    if path == semantic_path and alias in PAGES_TABLE_SORT_TRANSACTION_TYPES:
+                        continue
+                    if alias in PAGES_TABLE_SORT_PUBLIC_NAMES:
+                        continue
+                    violations.append(
+                        "focused litchi-pages table-sort public API retains "
+                        f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_SORT_ALIAS_TARGETS
+                    or "body_table_sort" in target_identifiers
+                    or "sort" in target_identifiers
+                ) and alias != target and alias not in PAGES_TABLE_SORT_PUBLIC_NAMES:
+                    violations.append(
+                        "focused litchi-pages table-sort public API retains "
+                        f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, public_declaration, complete_scope in declarations:
+            if not _is_pages_table_sort_public_declaration(
+                declaration, dedicated_source=complete_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages table-sort public API retains root aliases "
+                    f"via table::sort glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_TABLE_SORT_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages table-sort public API retains flat alias "
+                        f"{identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_table_sort_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages table-sort public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages table-sort public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+            if public_declaration and PAGES_TABLE_SORT_RAW_PARAMETER.search(declaration):
+                match = PAGES_TABLE_SORT_RAW_PARAMETER.search(declaration)
+                assert match is not None
+                violations.append(
+                    "focused litchi-pages table-sort public API exposes raw identifier/bytes "
+                    f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
                 )
 
     return sorted(set(violations))
@@ -24205,6 +24942,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_headers_facade_source_topology()
         + audit_iwa_pages_table_dimension_source_topology()
         + audit_pages_table_dimension_facade_source_topology()
+        + audit_iwa_pages_table_sort_source_topology()
+        + audit_pages_table_sort_facade_source_topology()
         + audit_iwa_pages_header_footer_source_topology()
         + audit_pages_header_footer_facade_source_topology()
         + audit_iwa_pages_section_text_source_topology()

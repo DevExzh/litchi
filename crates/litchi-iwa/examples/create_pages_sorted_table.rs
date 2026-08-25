@@ -1,11 +1,9 @@
 //! Create and physically sort a plain-text Pages table without an input document.
 use std::env;
 
-use litchi_iwa::pages::{
-    PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate, PagesTableSortColumnIndex,
-    PagesTableSortDirection, PagesTableSortOrder, PagesTableSortRule,
-};
+use litchi_iwa::pages::{PagesCellValue, PagesDocumentBuilder, PagesTableCellUpdate};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_pages::table::sort::{ColumnIndex, Direction, Order, Rule};
 use litchi_pages::{BodyTableSelector, Package};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,13 +44,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_table_cell_comment(table_id, 1, 1, "Zebra comment follows its sorted row")?;
     let reply_id =
         editor.add_table_cell_comment_reply(table_id, 1, 1, "Pages keeps this thread intact")?;
-    editor.set_table_sort_order(
-        table_id,
-        PagesTableSortOrder::new([PagesTableSortRule::new(
-            PagesTableSortColumnIndex::new(0)?,
-            PagesTableSortDirection::Ascending,
-        )])?,
-    )?;
+    let sort_commit = Package::from_bytes(&editor.to_bytes()?)?
+        .edit_body_table_sort_order(BodyTableSelector::index(0))?
+        .set(Order::new([Rule::new(
+            ColumnIndex::new(0)?,
+            Direction::Ascending,
+        )])?)
+        .commit()?;
+    let mut sort_bytes = Vec::new();
+    sort_commit.package().write_to(&mut sort_bytes)?;
+    editor = litchi_iwa::pages::PagesEditor::from_bytes(&sort_bytes)?;
     if !editor.apply_table_sort_order(table_id)? {
         return Err("expected the source table to be reordered".into());
     }

@@ -220,6 +220,16 @@ profile. Its command prefix is bounded and only changes persisted field 44;
 keep `-max_len` at 1 KiB so malformed ingress and native set/clear commands
 both receive every input. Physical row execution remains outside this target.
 
+`pages_body_table_sort_order` is the focused selector-first persisted sort
+configuration target for a Pages body table. It offers arbitrary bytes to
+bounded Pages ingress and reuses the same input as bounded
+`BodyTableSelector` commands against the repository's Pages seed. It covers
+read, set/clear/reset, exact-source publication and conflicts, inverse replay,
+candidate readback, and source-atomic limit failures. It deliberately does
+not execute physical row sorting. The checked-in recipes under
+`corpus/pages_body_table_sort_order/` are command inputs, not native Pages
+package copies.
+
 `keynote_movie_playback` is the focused selector-first movie-playback target.
 It offers arbitrary bytes to bounded Keynote ingress and reuses the same
 input as bounded `SlideSelector`/`MovieSelector` commands. When the source

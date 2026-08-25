@@ -33,6 +33,7 @@ use litchi_numbers::cell::data_format::{
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use litchi_pages::table::dimension::{Dimension, Size};
 use litchi_pages::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
+use litchi_pages::table::sort::{ColumnIndex, Direction, Order, RowRange, Rule as SortRule};
 use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 const SOURCE_BUILT_TABLE_INFO_OBJECT_ID: u64 = 9;
@@ -100,6 +101,66 @@ fn set_pages_table_dimension_size(
             .set(size)
             .commit()
             .map_err(|error| Error::InvalidFormat(format!("Pages table dimension: {error}")))?;
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        bytes
+    };
+    *editor = PagesEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn pages_table_sort_order(
+    editor: &PagesEditor,
+    selector: BodyTableSelector<'_>,
+) -> Result<Option<Order>> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(format!("Pages sort package: {error}")))?;
+    package
+        .body_table_sort_order(selector)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))
+}
+
+fn set_pages_table_sort_order(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+    order: Order,
+) -> Result<()> {
+    let bytes = {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages sort package: {error}")))?;
+        let commit = package
+            .edit_body_table_sort_order(selector)
+            .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))?
+            .set(order)
+            .commit()
+            .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))?;
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        bytes
+    };
+    *editor = PagesEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn clear_pages_table_sort_order(
+    editor: &mut PagesEditor,
+    selector: BodyTableSelector<'_>,
+) -> Result<()> {
+    let bytes = {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages sort package: {error}")))?;
+        let commit = package
+            .edit_body_table_sort_order(selector)
+            .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))?
+            .clear()
+            .commit()
+            .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))?;
         let mut bytes = Vec::new();
         commit
             .package()
@@ -1064,18 +1125,19 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         .storage_id;
     let hidden = HiddenAxes::new([AxisIndex::row(2)]).unwrap();
     editor.set_table_hidden_axes(model_id, &hidden).unwrap();
-    let order = PagesTableSortOrder::new([PagesTableSortRule::new(
-        PagesTableSortColumnIndex::new(0).unwrap(),
-        PagesTableSortDirection::Ascending,
+    let order = Order::new([SortRule::new(
+        ColumnIndex::new(0).unwrap(),
+        Direction::Ascending,
     )])
     .unwrap();
 
-    assert_eq!(editor.table_sort_order(model_id).unwrap(), None);
-    editor
-        .set_table_sort_order(model_id, order.clone())
-        .unwrap();
     assert_eq!(
-        editor.table_sort_order(model_id).unwrap(),
+        pages_table_sort_order(&editor, BodyTableSelector::index(0)).unwrap(),
+        None
+    );
+    set_pages_table_sort_order(&mut editor, BodyTableSelector::index(0), order.clone()).unwrap();
+    assert_eq!(
+        pages_table_sort_order(&editor, BodyTableSelector::index(0)).unwrap(),
         Some(order.clone())
     );
     assert!(editor.apply_table_sort_order(model_id).unwrap());
@@ -1124,7 +1186,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
 
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reopened.table_sort_order(model_id).unwrap(),
+        pages_table_sort_order(&reopened, BodyTableSelector::index(0)).unwrap(),
         Some(order.clone())
     );
     assert_eq!(
@@ -1143,28 +1205,33 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     );
     assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
     let unchanged = reopened.to_bytes().unwrap();
-    reopened.set_table_sort_order(model_id, order).unwrap();
+    set_pages_table_sort_order(&mut reopened, BodyTableSelector::index(0), order).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let invalid = PagesTableSortOrder::new([PagesTableSortRule::new(
-        PagesTableSortColumnIndex::new(2).unwrap(),
-        PagesTableSortDirection::Ascending,
+    let invalid = Order::new([SortRule::new(
+        ColumnIndex::new(2).unwrap(),
+        Direction::Ascending,
     )])
     .unwrap();
     let before_invalid = reopened.to_bytes().unwrap();
-    assert!(reopened.set_table_sort_order(model_id, invalid).is_err());
+    assert!(
+        set_pages_table_sort_order(&mut reopened, BodyTableSelector::index(0), invalid).is_err()
+    );
     assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
 
-    let selected_order = PagesTableSortOrder::selected_rows([PagesTableSortRule::new(
-        PagesTableSortColumnIndex::new(0).unwrap(),
-        PagesTableSortDirection::Descending,
+    let selected_order = Order::selected_rows([SortRule::new(
+        ColumnIndex::new(0).unwrap(),
+        Direction::Descending,
     )])
     .unwrap();
-    reopened
-        .set_table_sort_order(model_id, selected_order.clone())
-        .unwrap();
+    set_pages_table_sort_order(
+        &mut reopened,
+        BodyTableSelector::index(0),
+        selected_order.clone(),
+    )
+    .unwrap();
     assert_eq!(
-        reopened.table_sort_order(model_id).unwrap(),
+        pages_table_sort_order(&reopened, BodyTableSelector::index(0)).unwrap(),
         Some(selected_order)
     );
     let before_wrong_executor = reopened.to_bytes().unwrap();
@@ -1172,7 +1239,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     assert_eq!(reopened.to_bytes().unwrap(), before_wrong_executor);
     assert!(
         reopened
-            .apply_table_sort_order_to_rows(model_id, PagesTableSortRowRange::new(1, 4).unwrap(),)
+            .apply_table_sort_order_to_rows(model_id, RowRange::new(1, 4).unwrap(),)
             .unwrap()
     );
     let table = reopened.table(model_id).unwrap();
@@ -1214,10 +1281,13 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     );
     assert_eq!(reopened.table_hidden_axes(model_id).unwrap(), hidden);
 
-    reopened.clear_table_sort_order(model_id).unwrap();
-    assert_eq!(reopened.table_sort_order(model_id).unwrap(), None);
+    clear_pages_table_sort_order(&mut reopened, BodyTableSelector::index(0)).unwrap();
+    assert_eq!(
+        pages_table_sort_order(&reopened, BodyTableSelector::index(0)).unwrap(),
+        None
+    );
     let unchanged = reopened.to_bytes().unwrap();
-    reopened.clear_table_sort_order(model_id).unwrap();
+    clear_pages_table_sort_order(&mut reopened, BodyTableSelector::index(0)).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
     assert!(reopened.apply_table_sort_order(model_id).is_err());
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
