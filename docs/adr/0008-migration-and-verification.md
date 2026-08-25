@@ -13793,3 +13793,54 @@ Keynote normalized the saved ZIP bytes. This is bounded open/render/control/
 save/close/reopen and strict semantic-reread evidence only; it is not
 Rust/native byte parity, arbitrary graph acceptance, performance/RSS,
 publication durability, or a full-workspace claim.
+
+## 2026-08-25 amendment: Wave83 Numbers table-sort verification record
+
+Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
+was verified with these focused gates:
+
+- strict table-sort codec tests passed 5/5;
+- the focused `litchi-numbers` table-sort integration passed 12/12, and the
+  selected-model table-header ownership regressions passed 2/2;
+- `litchi-numbers` library check and strict library Clippy passed (with only
+  the recorded unrelated `object_count` deprecation/manual-contains
+  allowances), and the public example compiled;
+- the migrated `litchi-iwa` focused persisted-sort bridge, source-created
+  physical executor, and stable row-UID-remapping regressions each passed
+  1/1;
+- the strict codec and package-lifecycle fuzz targets compiled;
+- boundary Python compilation and all 506 boundary tests passed; the live
+  checker reported no Wave83 finding;
+- Rust formatting and index/working-tree diff checks passed.
+
+The live checker exited 1 only for the three known user-owned untracked Pages
+table-lock findings (`body_table_lock_state`, `set_body_table_lock_state`, and
+the returned `crates/litchi-iwa/src/pages/editor/tables/lock.rs`). The
+implementation commit used the completed scoped gates with `--no-verify`
+without modifying or staging those files. No full-workspace-green claim
+follows.
+
+The fresh Numbers 14.4 native record used these disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| tracked source `test-data/iwork/numbers/basic.numbers` | 136,357 | `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693` |
+| Rust candidate `/private/tmp/litchi-wave83-sort-native.r8AnxY/candidate.numbers` before Numbers save | 136,364 | `5af5a4c3715c794ea0bad15b2e953e1875e53ffcf6669519386769ae4999ec58` |
+| exact Rust inverse `/private/tmp/litchi-wave83-sort-native.r8AnxY/inverse.numbers` | 136,357 | `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693` |
+| Numbers-saved candidate at the same candidate path | 136,222 | `4a40be4bba791cbf3f9cb5ec4217c19c609b67e3ed447fb2772bedb1df9f8d17` |
+
+Rust set the existing rooted Table 1 to sort the entire table by Column B
+ascending and then Column C descending; its inverse restored the tracked
+source bytes exactly. Numbers opened the Rust candidate without repair,
+recovery, or conversion UI, rendered the unchanged 22-by-7 table (including
+`Litchi native Numbers fixture` and `42` in their original rows), and exposed
+exactly those two rules in Organize → Sort. “Sort Now” was not invoked. After
+Save, Close, and exact-path Reopen, the row content and both rules persisted.
+Strict Rust reread of the Numbers-normalized artifact returned the same order;
+setting it again was an exact no-op with zero touched components.
+
+Numbers normalized the saved ZIP bytes. This is bounded open/render/control/
+save/close/reopen and strict semantic-reread evidence only; it is not
+Rust/native byte parity, physical-sort acceptance, arbitrary producer-graph
+acceptance, performance/RSS, publication durability, or a full-workspace
+claim.

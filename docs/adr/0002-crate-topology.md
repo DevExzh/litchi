@@ -3656,3 +3656,34 @@ declarations, and 13 ordered migration debts. Debt 014, the
 generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
 No crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by this cut.
+
+## 2026-08-25 amendment: Wave83 Numbers table-sort boundary
+
+Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
+makes `litchi-numbers` the authoritative owner of persisted sort-order reads,
+set/clear edits, patch application, and inverse artifacts for admitted rooted
+Numbers tables. The archive-free facade is
+`Package::{table_sort_order, edit_table_sort_order,
+apply_table_sort_order}` with `SheetSelector`, `TableSelector`, and
+`table::sort::{Order, Rule, Scope, ColumnIndex, Direction}` plus nested
+transaction values. Native object IDs, member names, raw bytes, archive and
+wire types, generated messages, Prost values, and Buffa views do not cross
+that boundary.
+
+The hidden neutral sort-order codec owns strict source-preserving projection
+of `TST.TableModelArchive.sort_order` field 44 and its private Buffa lazy
+sidecar. The package owns rooted selection, lock policy, operation-local
+resource accounting, exact patch/inverse artifacts, candidate reopen,
+semantic readback, preview/member/object locality, and atomic publication.
+Field 45 remains opaque and exact; the owner changes persisted configuration
+only and never invokes physical row sorting.
+
+The persisted `NumbersEditor` read/set/clear methods are retired. The physical
+`NumbersEditor::apply_table_sort_order*` executors remain in the compatibility
+host and consume the focused owner; Pages and Keynote sort adapters remain at
+their recorded hosts. The workspace inventory remains 64 packages, 239
+internal dependency declarations, and 13 ordered migration debts. Debt 015,
+the `litchi-iwa -> litchi-numbers` edge, debts 014 and 017, migration hosts,
+generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
+No crate, dependency edge, debt item, production manifest dependency, or
+monolith owner is removed by this cut.

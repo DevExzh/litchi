@@ -2496,3 +2496,26 @@ dependency declarations, and 13 ordered migration debts. Debt 014 and the
 migration hosts, generated-schema and normal Prost/Buffa owners, and the IWA
 monolith. No crate, dependency edge, debt item, production manifest
 dependency, or monolith is removed by this cut.
+
+## 2026-08-25 amendment: Wave83 current-topology Numbers table-sort cut
+
+Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
+makes `litchi-numbers` the current owner of selector-first persisted sort-order
+reads, set/clear transactions, exact patch application, and inverse artifacts
+for admitted rooted Numbers tables. The package owns exact table/model
+selection, strict field-44 codec execution, operation-local resource
+accounting, candidate reopen, semantic readback, and exact model/member/
+preview locality. Field 45 and Metadata remain opaque and exact.
+
+The persisted `NumbersEditor` read/set/clear methods are retired. The physical
+row-sort executors remain in `litchi-iwa`, consume the focused configuration,
+and retain table-storage, UID, formula, comment, border, and other physical
+movement responsibilities. Pages and Keynote adapters also remain at their
+recorded hosts.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debts 014 and 017,
+migration hosts, generated-schema and normal Prost/Buffa owners, and the IWA
+monolith. No crate, dependency edge, debt item, production manifest
+dependency, or monolith is removed by this cut.
