@@ -13632,3 +13632,60 @@ and strict normalized reread. It does not establish Rust/native byte parity,
 arbitrary producer-graph acceptance, durable publication, performance/RSS,
 or a full-workspace gate. No manifest, generated-schema, normal-Prost,
 dependency-edge, debt, or monolith-exit claim follows.
+
+## 2026-08-25 amendment: Wave80 Numbers table-appearance verification record
+
+Implementation commit `bf01576c090cb508ac0596a5faac01951ef502d0`
+passed the following bounded gates:
+
+- `table_appearance_codec` unit tests passed 11/11, and the shared exact
+  object-reference transition tests passed 5/5;
+- `litchi-numbers` table-appearance integration passed 9/9;
+- `litchi-numbers` all-target checking passed with only the two existing
+  `object_count` deprecation warnings; scoped library and integration-target
+  Clippy passed with the recorded unrelated lint allowances;
+- `litchi-iwa-protos` and `litchi-iwa-core` library Clippy passed with
+  `-D warnings`; both table-appearance fuzz targets compiled;
+- the `litchi-iwa` selector suite passed 3/3, its library and
+  `create_iwork_table_appearance` example checked successfully with existing
+  migration-host deprecation/dead-code warnings;
+- boundary tests passed 485/485, Python compilation passed, the live checker
+  reported no Wave80 finding, and exact-file Rust formatting plus
+  `git diff --check` passed.
+
+The live checker exited 1 only for the three known user-owned untracked Pages
+table-lock findings (`body_table_lock_state`, `set_body_table_lock_state`, and
+the returned `crates/litchi-iwa/src/pages/editor/tables/lock.rs`). The global
+pre-commit hook was not used as a Wave80 gate because it formats unrelated
+unstaged `table_info_codec.rs` and `protobuf.rs` changes and runs broader
+workspace checks with existing warnings. The implementation commit used the
+verified scoped gates without modifying those files. No full-workspace-green
+claim follows.
+
+The fresh bounded native record used Numbers 14.4 and artifacts under
+`/private/tmp/litchi-wave80-appearance-native.qqoTnv`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `test-data/iwork/numbers/basic.numbers` | 136,357 | `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693` |
+| Rust candidate before Numbers | 79,484 | `97504c4bee842d537a693195e9b87d1d3c0d13920d7199f9fefc346922e9f1ed` |
+| exact inverse | 136,357 | `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693` |
+| Numbers-normalized saved candidate | 119,179 | `8666f53f9b9a6d976d7f0e01c4d550cdc9645fca1227d55e7303f1ae0eb5ec22` |
+
+Before the edit, strict Rust read banding disabled, fit-cell-content row
+sizing, and all five gridline groups visible. The Rust candidate enabled
+banding and retained fit-cell-content sizing while setting body-horizontal,
+body-vertical, and footer-row gridlines hidden and header-column/header-row
+gridlines visible. Numbers opened it without repair, recovery, or conversion
+UI; Table 1 remained 22 rows by 7 columns and retained the visible fixture
+content, including `Litchi native Numbers fixture` and `42`. The formatter
+showed alternating row color enabled and the mixed gridline controls. Cmd-S,
+Cmd-W, and exact-path reopen preserved the table and controls without a repair
+alert. Strict Rust reread of the normalized output succeeded with the same
+semantic appearance, and the pre-native inverse was byte-exact to the source.
+
+Numbers normalized the ZIP artifact. This establishes only bounded
+open/render/save/close/reopen acceptance, exact pre-native inverse bytes, and
+strict normalized reread. It does not establish Rust/native byte parity,
+arbitrary producer-graph acceptance, performance/RSS, durable publication, or
+a full-workspace gate.
