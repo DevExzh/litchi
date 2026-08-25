@@ -3324,6 +3324,21 @@ RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_TEST_SET = frozenset(
 RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_EXAMPLE = Path(
     "crates/litchi-iwa/examples/create_iwork_table_number_formats.rs"
 )
+# The generic NumbersEditor data-format bridge is a compatibility surface, but
+# its interactive-control branch must remain selector-first internally.  Keep
+# this audit separate from the retired method scan: Pages/Keynote adapters and
+# the private cell_data_format implementation are intentionally out of scope.
+IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
+)
+IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:cell_data_format[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:cell|reset_cell)_(?:checkbox|star_rating|slider|stepper|"
+    r"pop_up_menu)_format|"
+    r"(?:table_cell_checkbox|table_cell_star_rating|table_cell_slider|"
+    r"table_cell_stepper|table_cell_pop_up_menu)_format_in_package)"
+    r"\b[ \t\r\n]*\("
+)
 RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "package.rs",
@@ -8603,6 +8618,37 @@ def _rust_named_function_body(source: str, name: str) -> tuple[str, int] | None:
     """Return one top-level Rust function body and its source offset."""
 
     return _rust_top_level_function_bodies(source).get(name)
+
+
+def _rust_any_function_body(source: str, name: str) -> str | None:
+    """Return one Rust function body, including methods inside ``impl`` blocks.
+
+    The older named-body helper deliberately limits itself to module-level
+    functions.  A few compatibility ratchets need to inspect an inherent
+    method's routing body as well, so use the masked source only for finding
+    braces and return the corresponding original source slice.
+    """
+
+    code = _mask_rust_non_code(source)
+    declaration = re.search(
+        rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(name)}\b", code
+    )
+    if declaration is None:
+        return None
+    opening = code.find("{", declaration.end())
+    if opening < 0:
+        return None
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(code) and depth:
+        if code[cursor] == "{":
+            depth += 1
+        elif code[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    if depth:
+        return None
+    return source[opening + 1 : cursor - 1]
 
 
 def _rust_mask_named_function_bodies(
@@ -14476,6 +14522,133 @@ def _numbers_table_cell_control_owner_present(root: Path) -> bool:
         and NUMBERS_PACKAGE_TABLE_CELL_CONTROL_MODULE.search(package_source)
         is not None
     )
+
+
+def audit_iwa_numbers_table_cell_control_bridge_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Verify the generic Numbers bridge delegates controls by selectors.
+
+    The compatibility ``NumbersEditor`` still exposes the historical generic
+    data-format entry point.  Interactive controls must nevertheless enter
+    ``litchi-numbers::Package`` through ``SheetSelector``/
+    ``TableSelector``/``CellPosition`` and the unified control transaction;
+    this prevents a future split-control change from quietly reintroducing a
+    raw-ID per-kind writer.  This audit deliberately reads only the Numbers
+    bridge.  Shared cell-data-format code and Pages/Keynote adapters remain
+    valid compatibility implementations.
+    """
+
+    if not _numbers_table_cell_control_owner_present(root):
+        return []
+
+    path = root / IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE
+    if not path.is_file():
+        return [
+            "Numbers cell-control selector bridge source is missing: "
+            f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+        ]
+
+    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    violations: list[str] = []
+
+    location = _rust_any_function_body(source, "focused_control_location")
+    if location is None:
+        violations.append(
+            "Numbers cell-control selector bridge is missing focused_control_location: "
+            f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+        )
+    else:
+        for marker in (
+            "focused_table_location",
+            "try_from_usize",
+        ):
+            if marker not in location:
+                violations.append(
+                    "Numbers cell-control selector bridge focused_control_location "
+                    f"must retain {marker}: {IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+                )
+
+    read_helper = _rust_any_function_body(source, "focused_control_format")
+    if read_helper is None:
+        violations.append(
+            "Numbers cell-control selector bridge is missing focused_control_format: "
+            f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+        )
+    else:
+        for marker in ("focused_control_location", "table_cell_control_format"):
+            if marker not in read_helper:
+                violations.append(
+                    "Numbers cell-control read bridge must call focused Package "
+                    f"{marker}: {IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+                )
+
+    write_helper = _rust_any_function_body(
+        source, "commit_focused_control_format"
+    )
+    if write_helper is None:
+        violations.append(
+            "Numbers cell-control selector bridge is missing "
+            "commit_focused_control_format: "
+            f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+        )
+    else:
+        for marker in (
+            "focused_control_location",
+            "edit_table_cell_control_format",
+            ".set(",
+            ".clear(",
+            ".commit(",
+        ):
+            if marker not in write_helper:
+                violations.append(
+                    "Numbers cell-control write bridge must retain focused "
+                    f"transaction marker {marker}: "
+                    f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+                )
+
+
+    for marker in ("SheetSelector", "TableSelector", "CellPosition"):
+        if marker not in source:
+            violations.append(
+                "Numbers cell-control selector bridge must expose typed "
+                f"{marker} selector construction: "
+                f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+            )
+
+    for method, marker in (
+        ("table_cell_data_format", "focused_control_format"),
+        ("set_table_cell_data_format", "commit_focused_control_format"),
+    ):
+        body = _rust_any_function_body(source, method)
+        if body is None:
+            violations.append(
+                "Numbers cell-control generic bridge is missing "
+                f"{method}: {IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+            )
+        elif marker not in body:
+            violations.append(
+                "Numbers cell-control generic bridge "
+                f"{method} must route interactive controls through {marker}: "
+                f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+            )
+
+    for marker in ("FocusedNumbersPackage", "CellControl::try_from"):
+        if marker not in source:
+            violations.append(
+                "Numbers cell-control selector bridge is missing focused owner "
+                f"marker {marker}: {IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}"
+            )
+
+    for match in IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_LEGACY_CALL.finditer(source):
+        line_number = source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "Numbers cell-control selector bridge calls a legacy per-kind/raw-ID "
+            f"adapter {match.group(0).split('(')[0].strip()}: "
+            f"{IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
 
 
 def audit_iwa_numbers_table_cell_control_source_topology(
@@ -26339,6 +26512,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_title_settings_facade_source_topology()
         + audit_iwa_numbers_table_appearance_source_topology()
         + audit_numbers_table_appearance_facade_source_topology()
+        + audit_iwa_numbers_table_cell_control_bridge_source_topology()
         + audit_iwa_numbers_table_cell_control_source_topology()
         + audit_numbers_table_cell_control_facade_source_topology()
         + audit_iwa_numbers_table_cell_pop_up_menu_source_topology()
