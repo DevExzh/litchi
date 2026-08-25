@@ -85,6 +85,49 @@ pub struct SharedOleStreamCursor<'a> {
     state: SharedOleStreamCursorState,
 }
 
+/// Closure outcome for [`SharedOleFile::with_stream_session_at`].
+///
+/// `Complete` publishes an owned result only after the session's final source
+/// version fence. `Abort` is for cancellation or another path that publishes
+/// no session-derived value; it skips the final fence only when no successful
+/// `read_exact` operation occurred. After a successful `read_exact`, `Abort` performs
+/// the same final fence as `Complete(Err(_))`. This is intentionally a
+/// low-level CFB operation primitive, not a general workbook transaction
+/// abstraction.
+pub enum SharedOleStreamSessionOutcome<T, E> {
+    /// Finish the operation and perform its final source-version fence.
+    Complete(Result<T, E>),
+    /// Abort without publishing a session-derived value.
+    ///
+    /// No final fence is performed when the session has completed no
+    /// successful `read_exact` operation. A session that has read payload bytes is
+    /// final-fenced before this error is returned.
+    Abort(E),
+}
+
+/// A closure-scoped, forward-only session over one validated CFB stream.
+///
+/// Sessions have no standalone constructor. [`SharedOleFile::with_stream_session_at`]
+/// resolves the stream, performs one start source-version fence, and then
+/// lends a session to the closure. Successful `read_exact` calls do not fence
+/// individually; a complete closure fences once before publishing its owned
+/// result. Raw read, chain, and bounds failures perform an immediate
+/// source-version check so `SourceChanged` takes precedence over the original
+/// failure. Skips do no source I/O and no source-version checks.
+pub struct SharedOleStreamSession<'a> {
+    cursor: SharedOleStreamCursor<'a>,
+    read_succeeded: bool,
+}
+
+impl std::fmt::Debug for SharedOleStreamSession<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SharedOleStreamSession")
+            .field("cursor", &self.cursor)
+            .finish()
+    }
+}
+
 impl std::fmt::Debug for SharedOleStreamCursor<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -618,6 +661,65 @@ impl SharedOleFile {
             position: offset,
             state,
         })
+    }
+
+    /// Runs a closure-scoped stream session after one start source-version
+    /// fence.
+    ///
+    /// The cursor is constructed before the start fence and the closure is
+    /// not called when construction or that fence fails. The closure may
+    /// perform many reads: successful reads do not perform per-read version
+    /// checks, while a read/chain/bounds error immediately checks the source
+    /// and lets [`OleError::SourceChanged`] replace the original error when a
+    /// mutation was observed. `Complete(Ok(value))` performs one final fence
+    /// before publishing `value`; `Complete(Err(error))` performs the same
+    /// fence, preserving `error` unless it observes `SourceChanged`.
+    /// `Abort(error)` skips that final fence only if no successful `read_exact`
+    /// operation occurred; after a successful read it final-fences and lets
+    /// `SourceChanged` override `error`. `T` and `E` must be owned
+    /// independently of the borrowed session.
+    ///
+    /// This is a low-level CFB operation primitive. It deliberately does not
+    /// provide a transaction or a workbook-level consistency boundary.
+    pub fn with_stream_session_at<'file, T, E, F>(
+        &'file self,
+        path: &[&str],
+        offset: u64,
+        operation: F,
+    ) -> Result<T, E>
+    where
+        T: 'static,
+        E: From<OleError> + 'static,
+        F: FnOnce(&mut SharedOleStreamSession<'file>) -> SharedOleStreamSessionOutcome<T, E>,
+    {
+        let cursor = self.stream_cursor_at(path, offset).map_err(E::from)?;
+        self.check_source_version().map_err(E::from)?;
+        let mut session = SharedOleStreamSession {
+            cursor,
+            read_succeeded: false,
+        };
+        match operation(&mut session) {
+            SharedOleStreamSessionOutcome::Abort(error) if session.read_succeeded => {
+                self.finish_session_error(error)
+            },
+            SharedOleStreamSessionOutcome::Abort(error) => Err(error),
+            SharedOleStreamSessionOutcome::Complete(Ok(value)) => {
+                self.check_source_version().map(|()| value).map_err(E::from)
+            },
+            SharedOleStreamSessionOutcome::Complete(Err(original)) => {
+                self.finish_session_error(original)
+            },
+        }
+    }
+
+    fn finish_session_error<T, E>(&self, original: E) -> Result<T, E>
+    where
+        E: From<OleError>,
+    {
+        match self.check_source_version() {
+            Err(error @ OleError::SourceChanged { .. }) => Err(E::from(error)),
+            Ok(()) | Err(_) => Err(original),
+        }
     }
 
     /// Returns whether an entry is present at `path`.
@@ -2482,9 +2584,24 @@ impl SharedOleStreamCursor<'_> {
     /// fails, or a source I/O/source-version error.
     pub fn read_exact(&mut self, output: &mut [u8]) -> Result<(), OleError> {
         self.file.check_source_version()?;
+        let result = self.read_exact_pending(output);
+        match self.file.finish_cursor_operation(result) {
+            Ok((state, position)) => {
+                self.state = state;
+                self.position = position;
+                Ok(())
+            },
+            Err(error) => Err(error),
+        }
+    }
+
+    fn read_exact_pending(
+        &self,
+        output: &mut [u8],
+    ) -> Result<(SharedOleStreamCursorState, u64), OleError> {
         let state = self.state;
         let position = self.position;
-        let result = (|| {
+        (|| {
             let requested = output.len() as u64;
             let end = position.checked_add(requested).ok_or_else(|| {
                 OleError::InvalidData("stream cursor read end overflow".to_string())
@@ -2502,15 +2619,7 @@ impl SharedOleStreamCursor<'_> {
                 state
             };
             Ok((state, end))
-        })();
-        match self.file.finish_cursor_operation(result) {
-            Ok((state, position)) => {
-                self.state = state;
-                self.position = position;
-                Ok(())
-            },
-            Err(error) => Err(error),
-        }
+        })()
     }
 
     fn move_forward(&mut self, bytes: u64) -> Result<(), OleError> {
@@ -2751,6 +2860,56 @@ impl SharedOleStreamCursor<'_> {
     }
 }
 
+impl SharedOleStreamSession<'_> {
+    /// Declared logical stream length.
+    #[must_use]
+    pub const fn len(&self) -> u64 {
+        self.cursor.len()
+    }
+
+    /// Whether the selected stream is logically empty.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.cursor.is_empty()
+    }
+
+    /// Current logical stream position.
+    #[must_use]
+    pub const fn position(&self) -> u64 {
+        self.cursor.position()
+    }
+
+    /// Advances without payload I/O or a source-version fence.
+    pub fn skip_forward(&mut self, bytes: u64) -> Result<(), OleError> {
+        self.cursor.skip_forward(bytes)
+    }
+
+    /// Moves to a later logical position without payload I/O or a
+    /// source-version fence.
+    pub fn skip_to(&mut self, position: u64) -> Result<(), OleError> {
+        self.cursor.skip_to(position)
+    }
+
+    /// Reads exactly `output.len()` bytes at the current logical position.
+    ///
+    /// Successful reads intentionally perform no version probe. If a source,
+    /// chain, or bounds error occurs, one immediate post-error source check
+    /// lets `SourceChanged` replace the original error when appropriate. The
+    /// caller must discard a partially written destination after any error;
+    /// the enclosing `Complete` outcome performs the final publication fence.
+    pub fn read_exact(&mut self, output: &mut [u8]) -> Result<(), OleError> {
+        match self.cursor.read_exact_pending(output) {
+            Ok((state, position)) => {
+                self.cursor.state = state;
+                self.cursor.position = position;
+                self.read_succeeded = true;
+                Ok(())
+            },
+            Err(original) => self.cursor.file.finish_stream_range(Err(original)),
+        }
+    }
+}
+
 fn cursor_chain_sector(
     table: &[u32],
     start_sector: u32,
@@ -2903,6 +3062,7 @@ mod tests {
     struct TestSource {
         bytes: Vec<u8>,
         revision: AtomicU64,
+        version_calls: AtomicUsize,
         reads: AtomicUsize,
         read_ranges: Mutex<Vec<(u64, usize)>>,
         active_reads: AtomicUsize,
@@ -2926,6 +3086,7 @@ mod tests {
             Self {
                 bytes,
                 revision: AtomicU64::new(0),
+                version_calls: AtomicUsize::new(0),
                 reads: AtomicUsize::new(0),
                 read_ranges: Mutex::new(Vec::new()),
                 active_reads: AtomicUsize::new(0),
@@ -2948,6 +3109,10 @@ mod tests {
         fn reset_read_count(&self) {
             self.reads.store(0, AtomicOrdering::SeqCst);
             self.read_ranges.lock().unwrap().clear();
+        }
+
+        fn reset_version_count(&self) {
+            self.version_calls.store(0, AtomicOrdering::SeqCst);
         }
 
         fn read_ranges(&self) -> Vec<(u64, usize)> {
@@ -3062,6 +3227,7 @@ mod tests {
         }
 
         fn version(&self) -> io::Result<SourceVersion> {
+            self.version_calls.fetch_add(1, AtomicOrdering::SeqCst);
             Ok(SourceVersion::new(
                 7,
                 self.revision.load(AtomicOrdering::SeqCst),
@@ -5514,6 +5680,10 @@ mod tests {
             cursor.read_exact(&mut output),
             Err(OleError::SourceChanged { .. })
         ));
+        assert_eq!(cursor.position(), 0);
+        source.revision.store(0, AtomicOrdering::SeqCst);
+        cursor.read_exact(&mut output).unwrap();
+        assert_eq!(cursor.position(), output.len() as u64);
 
         let source = Arc::new(TestSource::new(sample_bytes()));
         let file = shared(source.clone());
@@ -5535,6 +5705,202 @@ mod tests {
             cursor.read_exact(&mut output),
             Err(OleError::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn stream_session_success_fences_once_at_start_and_once_at_completion() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.reset_read_count();
+        source.reset_version_count();
+
+        let result: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |session| {
+            let result: Result<(), OleError> = (|| {
+                let mut first = [0u8; 4];
+                session.read_exact(&mut first)?;
+                assert_eq!(first, [0xA5; 4]);
+                session.skip_forward(512)?;
+                let mut second = [0u8; 4];
+                session.read_exact(&mut second)?;
+                assert_eq!(second, [0xA5; 4]);
+                Ok(())
+            })();
+            SharedOleStreamSessionOutcome::Complete(result)
+        });
+
+        assert!(result.is_ok());
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 2);
+        assert_eq!(source.version_calls.load(AtomicOrdering::SeqCst), 2);
+    }
+
+    #[test]
+    fn stream_session_supports_fat_and_minifat_payloads() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source);
+
+        let large = {
+            let result: Result<[u8; 8], OleError> =
+                file.with_stream_session_at(&["Large"], 0, |session| {
+                    let mut output = [0u8; 8];
+                    let result = session.read_exact(&mut output).map(|()| output);
+                    SharedOleStreamSessionOutcome::Complete(result)
+                });
+            result.unwrap()
+        };
+        assert_eq!(large, [0xA5; 8]);
+
+        let small = {
+            let result: Result<[u8; 4], OleError> =
+                file.with_stream_session_at(&["Small"], 0, |session| {
+                    let mut output = [0u8; 4];
+                    let result = session.read_exact(&mut output).map(|()| output);
+                    SharedOleStreamSessionOutcome::Complete(result)
+                });
+            result.unwrap()
+        };
+        assert_eq!(&small, b"mini");
+        assert!(!file.mini_stream_is_materialized());
+    }
+
+    #[test]
+    fn stream_session_stale_start_does_not_call_closure() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.revision.store(1, AtomicOrdering::SeqCst);
+        source.reset_version_count();
+        let called = AtomicBool::new(false);
+
+        let result: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |_session| {
+            called.store(true, AtomicOrdering::SeqCst);
+            SharedOleStreamSessionOutcome::Abort(OleError::InvalidData(
+                "closure must not run".to_string(),
+            ))
+        });
+
+        assert!(matches!(result, Err(OleError::SourceChanged { .. })));
+        assert!(!called.load(AtomicOrdering::SeqCst));
+        assert_eq!(source.version_calls.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[test]
+    fn stream_session_final_fence_discards_success_after_mutation() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        let result: Result<Vec<u8>, OleError> =
+            file.with_stream_session_at(&["Large"], 0, |session| {
+                let mut output = [0u8; 4];
+                let result = session.read_exact(&mut output).map(|()| output.to_vec());
+                SharedOleStreamSessionOutcome::Complete(result)
+            });
+        // The source mutates while the successful payload read is in flight;
+        // the session's final fence rejects publication.
+        assert!(matches!(result, Err(OleError::SourceChanged { .. })));
+    }
+
+    #[test]
+    fn stream_session_raw_read_error_prefers_source_change_and_preserves_stable_error() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        let changed: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |session| {
+            let mut output = [0u8; 4];
+            let error = session.read_exact(&mut output).unwrap_err();
+            assert_eq!(session.position(), 0);
+            SharedOleStreamSessionOutcome::Abort(error)
+        });
+        assert!(matches!(changed, Err(OleError::SourceChanged { .. })));
+
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        let stable: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |session| {
+            let mut output = [0u8; 4];
+            let error = session.read_exact(&mut output).unwrap_err();
+            SharedOleStreamSessionOutcome::Abort(error)
+        });
+        assert!(matches!(stable, Err(OleError::Io(_))));
+    }
+
+    #[test]
+    fn stream_session_complete_error_fence_prefers_change_and_preserves_stable_error() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let changed: Result<(), OleError> =
+            file.with_stream_session_at(&["Large"], 0, |_session| {
+                source.revision.store(1, AtomicOrdering::SeqCst);
+                SharedOleStreamSessionOutcome::Complete(Err(OleError::InvalidData(
+                    "semantic failure".to_string(),
+                )))
+            });
+        assert!(matches!(changed, Err(OleError::SourceChanged { .. })));
+
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source);
+        let stable: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |_session| {
+            SharedOleStreamSessionOutcome::Complete(Err(OleError::InvalidData(
+                "semantic failure".to_string(),
+            )))
+        });
+        assert!(matches!(
+            stable,
+            Err(OleError::InvalidData(message)) if message == "semantic failure"
+        ));
+    }
+
+    #[test]
+    fn stream_session_abort_skips_final_fence_and_skips_do_no_io() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.reset_read_count();
+        source.reset_version_count();
+
+        let result: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |session| {
+            session.skip_to(512).unwrap();
+            source.revision.store(1, AtomicOrdering::SeqCst);
+            SharedOleStreamSessionOutcome::Abort(OleError::InvalidData("cancelled".to_string()))
+        });
+
+        assert!(matches!(
+            result,
+            Err(OleError::InvalidData(message)) if message == "cancelled"
+        ));
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 0);
+        assert_eq!(source.version_calls.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[test]
+    fn stream_session_read_then_abort_final_fences_and_preserves_or_overrides_error() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.reset_version_count();
+        let stable: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |session| {
+            let mut output = [0u8; 4];
+            session.read_exact(&mut output).unwrap();
+            SharedOleStreamSessionOutcome::Abort(OleError::InvalidData(
+                "cancelled after read".to_string(),
+            ))
+        });
+        assert!(matches!(
+            stable,
+            Err(OleError::InvalidData(message)) if message == "cancelled after read"
+        ));
+        assert_eq!(source.version_calls.load(AtomicOrdering::SeqCst), 2);
+
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        source.reset_version_count();
+        let changed: Result<(), OleError> = file.with_stream_session_at(&["Large"], 0, |session| {
+            let mut output = [0u8; 4];
+            session.read_exact(&mut output).unwrap();
+            SharedOleStreamSessionOutcome::Abort(OleError::InvalidData(
+                "cancelled after read".to_string(),
+            ))
+        });
+        assert!(matches!(changed, Err(OleError::SourceChanged { .. })));
+        assert_eq!(source.version_calls.load(AtomicOrdering::SeqCst), 2);
     }
 
     #[test]
