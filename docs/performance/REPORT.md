@@ -1,5 +1,11 @@
 # Performance program phase report
 
+## 2026-08-25: rejected XLS/CFB freshness-session experiment
+
+- The candidate reduced version calls by approximately 98% and improved direct FileSource comparisons by 48.44-56.31%, with exact logical-read, identity, stability, and semantic parity.
+- Four same-side p95/p99 drift cells exceeded the unqualified 5% limit. The candidate was reverted in e198d6048; the evidence is descriptive and performance_claim:none.
+- Full evidence is retained under results/0279-cfb-operation-freshness-session-rejected-20260825/.
+
 ## XLS source and FileSource attribution (change 0278)
 
 [Change 0278](changes/0278-xls-source-attribution.md) adds a clean, isolated

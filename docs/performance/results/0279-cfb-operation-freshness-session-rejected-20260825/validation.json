@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "verdict": "rejected",
+  "performance_claim": "none",
+  "sample_count": 12000,
+  "checks": {
+    "complete_coordinate_matrix": true,
+    "binary_and_corpus_identity": true,
+    "source_version_stable": true,
+    "semantic_outputs_identical": true,
+    "logical_reads_bytes_and_len_calls_identical": true,
+    "predeclared_version_call_counts": true,
+    "file_source_central_improvement_both_directions": true,
+    "file_source_candidate_tail_regression_limit": true,
+    "atomic_file_guard_regression_limit": true,
+    "same_side_drift_limit": false
+  },
+  "same_side_drift_failures": [
+    {"mode":"file-source","operation":"open","side":"control","statistic":"p95","drift_percent":5.036880468060534},
+    {"mode":"file-source","operation":"one-cell","side":"control","statistic":"p99","drift_percent":-6.29595692352617},
+    {"mode":"atomic-file","operation":"open","side":"control","statistic":"p99","drift_percent":5.096313543708245},
+    {"mode":"atomic-file","operation":"one-cell","side":"candidate","statistic":"p99","drift_percent":5.07456186336105}
+  ]
+}

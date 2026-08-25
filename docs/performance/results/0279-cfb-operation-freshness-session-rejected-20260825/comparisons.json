@@ -1,0 +1,1469 @@
+{
+  "schema_version": 1,
+  "comparisons": [
+    {
+      "kind": "candidate",
+      "left_leg": "A1",
+      "right_leg": "B1",
+      "mode": "file-source",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 474154,
+          "right": 224078,
+          "delta_ns": 250076,
+          "improvement_percent": 52.74151436031331
+        },
+        "mean": {
+          "left": 481655.322,
+          "right": 230016.684,
+          "delta_ns": 251638.63799999998,
+          "improvement_percent": 52.24454636047808
+        },
+        "p95": {
+          "left": 550698,
+          "right": 267039,
+          "delta_ns": 283659,
+          "improvement_percent": 51.50899404029069
+        },
+        "p99": {
+          "left": 607837,
+          "right": 304880,
+          "delta_ns": 302957,
+          "improvement_percent": 49.841816144788815
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 218771,
+          "right": 4574,
+          "delta_ns": 214197,
+          "improvement_percent": 97.90922928541718
+        },
+        "mean": {
+          "left": 222072.15,
+          "right": 4783.27,
+          "delta_ns": 217288.88,
+          "improvement_percent": 97.84607389985642
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A2",
+      "right_leg": "B2",
+      "mode": "file-source",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 475345,
+          "right": 224694,
+          "delta_ns": 250651,
+          "improvement_percent": 52.73033270571901
+        },
+        "mean": {
+          "left": 481338.508,
+          "right": 230124.22,
+          "delta_ns": 251214.28799999997,
+          "improvement_percent": 52.19077298506938
+        },
+        "p95": {
+          "left": 522960,
+          "right": 269652,
+          "delta_ns": 253308,
+          "improvement_percent": 48.43735658558972
+        },
+        "p99": {
+          "left": 604624,
+          "right": 311099,
+          "delta_ns": 293525,
+          "improvement_percent": 48.546700097912094
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 219464,
+          "right": 4576,
+          "delta_ns": 214888,
+          "improvement_percent": 97.91491998687711
+        },
+        "mean": {
+          "left": 222504.12,
+          "right": 4808.992,
+          "delta_ns": 217695.128,
+          "improvement_percent": 97.83869530146228
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "A1",
+      "right_leg": "A2",
+      "mode": "file-source",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 474154,
+          "right": 475345,
+          "delta_ns": -1191,
+          "improvement_percent": -0.2511842144113516
+        },
+        "mean": {
+          "left": 481655.322,
+          "right": 481338.508,
+          "delta_ns": 316.81400000001304,
+          "improvement_percent": 0.06577608209216736
+        },
+        "p95": {
+          "left": 550698,
+          "right": 522960,
+          "delta_ns": 27738,
+          "improvement_percent": 5.036880468060534
+        },
+        "p99": {
+          "left": 607837,
+          "right": 604624,
+          "delta_ns": 3213,
+          "improvement_percent": 0.5285956596916608
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 218771,
+          "right": 219464,
+          "delta_ns": -693,
+          "improvement_percent": -0.3167695901193486
+        },
+        "mean": {
+          "left": 222072.15,
+          "right": 222504.12,
+          "delta_ns": -431.97000000000116,
+          "improvement_percent": -0.19451786277567953
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "B1",
+      "right_leg": "B2",
+      "mode": "file-source",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 224078,
+          "right": 224694,
+          "delta_ns": -616,
+          "improvement_percent": -0.2749042744044485
+        },
+        "mean": {
+          "left": 230016.684,
+          "right": 230124.22,
+          "delta_ns": -107.53599999999278,
+          "improvement_percent": -0.04675139130342074
+        },
+        "p95": {
+          "left": 267039,
+          "right": 269652,
+          "delta_ns": -2613,
+          "improvement_percent": -0.9785087571478323
+        },
+        "p99": {
+          "left": 304880,
+          "right": 311099,
+          "delta_ns": -6219,
+          "improvement_percent": -2.039818945158751
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 4574,
+          "right": 4576,
+          "delta_ns": -2,
+          "improvement_percent": -0.043725404459991256
+        },
+        "mean": {
+          "left": 4783.27,
+          "right": 4808.992,
+          "delta_ns": -25.721999999999753,
+          "improvement_percent": -0.5377492803040546
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A1",
+      "right_leg": "B1",
+      "mode": "file-source",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 475010,
+          "right": 225435,
+          "delta_ns": 249575,
+          "improvement_percent": 52.54099913686028
+        },
+        "mean": {
+          "left": 483425.632,
+          "right": 230778.244,
+          "delta_ns": 252647.38799999998,
+          "improvement_percent": 52.26189330399427
+        },
+        "p95": {
+          "left": 546402,
+          "right": 273677,
+          "delta_ns": 272725,
+          "improvement_percent": 49.91288465269161
+        },
+        "p99": {
+          "left": 605825,
+          "right": 299343,
+          "delta_ns": 306482,
+          "improvement_percent": 50.589196550158874
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 219734,
+          "right": 4595,
+          "delta_ns": 215139,
+          "improvement_percent": 97.90883522804846
+        },
+        "mean": {
+          "left": 223509.874,
+          "right": 4803.118,
+          "delta_ns": 218706.75600000002,
+          "improvement_percent": 97.85104885343902
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A2",
+      "right_leg": "B2",
+      "mode": "file-source",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 473979,
+          "right": 224639,
+          "delta_ns": 249340,
+          "improvement_percent": 52.60570615997755
+        },
+        "mean": {
+          "left": 482307.72,
+          "right": 229611.98,
+          "delta_ns": 252695.73999999996,
+          "improvement_percent": 52.39305313213729
+        },
+        "p95": {
+          "left": 532283,
+          "right": 266638,
+          "delta_ns": 265645,
+          "improvement_percent": 49.9067225517253
+        },
+        "p99": {
+          "left": 622337,
+          "right": 308475,
+          "delta_ns": 313862,
+          "improvement_percent": 50.4328040916738
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 219713,
+          "right": 4578,
+          "delta_ns": 215135,
+          "improvement_percent": 97.91637272259722
+        },
+        "mean": {
+          "left": 222787.148,
+          "right": 4814.266,
+          "delta_ns": 217972.88199999998,
+          "improvement_percent": 97.83907373328375
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "A1",
+      "right_leg": "A2",
+      "mode": "file-source",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 475010,
+          "right": 473979,
+          "delta_ns": 1031,
+          "improvement_percent": 0.21704806214606007
+        },
+        "mean": {
+          "left": 483425.632,
+          "right": 482307.72,
+          "delta_ns": 1117.9120000000112,
+          "improvement_percent": 0.23124797817919823
+        },
+        "p95": {
+          "left": 546402,
+          "right": 532283,
+          "delta_ns": 14119,
+          "improvement_percent": 2.5839949341327446
+        },
+        "p99": {
+          "left": 605825,
+          "right": 622337,
+          "delta_ns": -16512,
+          "improvement_percent": -2.7255395535014237
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 219734,
+          "right": 219713,
+          "delta_ns": 21,
+          "improvement_percent": 0.009557009839169177
+        },
+        "mean": {
+          "left": 223509.874,
+          "right": 222787.148,
+          "delta_ns": 722.7260000000242,
+          "improvement_percent": 0.323353052402519
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "B1",
+      "right_leg": "B2",
+      "mode": "file-source",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 225435,
+          "right": 224639,
+          "delta_ns": 796,
+          "improvement_percent": 0.3530951271985273
+        },
+        "mean": {
+          "left": 230778.244,
+          "right": 229611.98,
+          "delta_ns": 1166.2639999999956,
+          "improvement_percent": 0.5053613286007997
+        },
+        "p95": {
+          "left": 273677,
+          "right": 266638,
+          "delta_ns": 7039,
+          "improvement_percent": 2.5720100702653124
+        },
+        "p99": {
+          "left": 299343,
+          "right": 308475,
+          "delta_ns": -9132,
+          "improvement_percent": -3.050680991371103
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 4595,
+          "right": 4578,
+          "delta_ns": 17,
+          "improvement_percent": 0.36996735582154516
+        },
+        "mean": {
+          "left": 4803.118,
+          "right": 4814.266,
+          "delta_ns": -11.147999999999229,
+          "improvement_percent": -0.23209923220706274
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A1",
+      "right_leg": "B1",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 636723,
+          "right": 278168,
+          "delta_ns": 358555,
+          "improvement_percent": 56.31255663765876
+        },
+        "mean": {
+          "left": 644613.602,
+          "right": 285145.106,
+          "delta_ns": 359468.4959999999,
+          "improvement_percent": 55.764956694165434
+        },
+        "p95": {
+          "left": 704392,
+          "right": 337736,
+          "delta_ns": 366656,
+          "improvement_percent": 52.05283421731082
+        },
+        "p99": {
+          "left": 794494,
+          "right": 372754,
+          "delta_ns": 421740,
+          "improvement_percent": 53.08284266463939
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 312587,
+          "right": 5950,
+          "delta_ns": 306637,
+          "improvement_percent": 98.09652992606858
+        },
+        "mean": {
+          "left": 316009.784,
+          "right": 6213.618,
+          "delta_ns": 309796.16599999997,
+          "improvement_percent": 98.03372606969663
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A2",
+      "right_leg": "B2",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 636367,
+          "right": 278023,
+          "delta_ns": 358344,
+          "improvement_percent": 56.31090235665898
+        },
+        "mean": {
+          "left": 648106.904,
+          "right": 284417.448,
+          "delta_ns": 363689.456,
+          "improvement_percent": 56.11565835132656
+        },
+        "p95": {
+          "left": 728194,
+          "right": 329013,
+          "delta_ns": 399181,
+          "improvement_percent": 54.81794686580774
+        },
+        "p99": {
+          "left": 844515,
+          "right": 375298,
+          "delta_ns": 469217,
+          "improvement_percent": 55.5605288242364
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 312239,
+          "right": 5950,
+          "delta_ns": 306289,
+          "improvement_percent": 98.09440844993739
+        },
+        "mean": {
+          "left": 316852.574,
+          "right": 6125.988,
+          "delta_ns": 310726.586,
+          "improvement_percent": 98.06661251866618
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "A1",
+      "right_leg": "A2",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 636723,
+          "right": 636367,
+          "delta_ns": 356,
+          "improvement_percent": 0.0559112832424775
+        },
+        "mean": {
+          "left": 644613.602,
+          "right": 648106.904,
+          "delta_ns": -3493.302000000025,
+          "improvement_percent": -0.5419218566225702
+        },
+        "p95": {
+          "left": 704392,
+          "right": 728194,
+          "delta_ns": -23802,
+          "improvement_percent": -3.379084373473861
+        },
+        "p99": {
+          "left": 794494,
+          "right": 844515,
+          "delta_ns": -50021,
+          "improvement_percent": -6.29595692352617
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 312587,
+          "right": 312239,
+          "delta_ns": 348,
+          "improvement_percent": 0.11132900600472828
+        },
+        "mean": {
+          "left": 316009.784,
+          "right": 316852.574,
+          "delta_ns": -842.7900000000373,
+          "improvement_percent": -0.2666974387096943
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "B1",
+      "right_leg": "B2",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 278168,
+          "right": 278023,
+          "delta_ns": 145,
+          "improvement_percent": 0.05212677231025855
+        },
+        "mean": {
+          "left": 285145.106,
+          "right": 284417.448,
+          "delta_ns": 727.658000000054,
+          "improvement_percent": 0.2551886687475022
+        },
+        "p95": {
+          "left": 337736,
+          "right": 329013,
+          "delta_ns": 8723,
+          "improvement_percent": 2.5827865551791933
+        },
+        "p99": {
+          "left": 372754,
+          "right": 375298,
+          "delta_ns": -2544,
+          "improvement_percent": -0.6824876460078229
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 5950,
+          "right": 5950,
+          "delta_ns": 0,
+          "improvement_percent": 0
+        },
+        "mean": {
+          "left": 6213.618,
+          "right": 6125.988,
+          "delta_ns": 87.63000000000011,
+          "improvement_percent": 1.4102894642058799
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A1",
+      "right_leg": "B1",
+      "mode": "atomic-file",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 279355,
+          "right": 219162,
+          "delta_ns": 60193,
+          "improvement_percent": 21.547135365395288
+        },
+        "mean": {
+          "left": 286870.776,
+          "right": 223862.874,
+          "delta_ns": 63007.902,
+          "improvement_percent": 21.96386222345632
+        },
+        "p95": {
+          "left": 322255,
+          "right": 260148,
+          "delta_ns": 62107,
+          "improvement_percent": 19.27262571565996
+        },
+        "p99": {
+          "left": 374506,
+          "right": 288709,
+          "delta_ns": 85797,
+          "improvement_percent": 22.909379288983352
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 32156,
+          "right": 654,
+          "delta_ns": 31502,
+          "improvement_percent": 97.96616494588879
+        },
+        "mean": {
+          "left": 32772.456,
+          "right": 655.676,
+          "delta_ns": 32116.78,
+          "improvement_percent": 97.9993077113293
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A2",
+      "right_leg": "B2",
+      "mode": "atomic-file",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 280542,
+          "right": 218156,
+          "delta_ns": 62386,
+          "improvement_percent": 22.237668513092515
+        },
+        "mean": {
+          "left": 285260.216,
+          "right": 222999.824,
+          "delta_ns": 62260.39200000002,
+          "improvement_percent": 21.825823759454778
+        },
+        "p95": {
+          "left": 315865,
+          "right": 255353,
+          "delta_ns": 60512,
+          "improvement_percent": 19.157551485603026
+        },
+        "p99": {
+          "left": 355420,
+          "right": 284802,
+          "delta_ns": 70618,
+          "improvement_percent": 19.86888751336447
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 32154,
+          "right": 652,
+          "delta_ns": 31502,
+          "improvement_percent": 97.97225850594018
+        },
+        "mean": {
+          "left": 32865.478,
+          "right": 656.184,
+          "delta_ns": 32209.294,
+          "improvement_percent": 98.00342474860703
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "A1",
+      "right_leg": "A2",
+      "mode": "atomic-file",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 279355,
+          "right": 280542,
+          "delta_ns": -1187,
+          "improvement_percent": -0.4249073759195289
+        },
+        "mean": {
+          "left": 286870.776,
+          "right": 285260.216,
+          "delta_ns": 1610.5599999999977,
+          "improvement_percent": 0.5614235170472707
+        },
+        "p95": {
+          "left": 322255,
+          "right": 315865,
+          "delta_ns": 6390,
+          "improvement_percent": 1.9829017393058292
+        },
+        "p99": {
+          "left": 374506,
+          "right": 355420,
+          "delta_ns": 19086,
+          "improvement_percent": 5.096313543708245
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 32156,
+          "right": 32154,
+          "delta_ns": 2,
+          "improvement_percent": 0.006219679064560268
+        },
+        "mean": {
+          "left": 32772.456,
+          "right": 32865.478,
+          "delta_ns": -93.02200000000448,
+          "improvement_percent": -0.28384201660078356
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "B1",
+      "right_leg": "B2",
+      "mode": "atomic-file",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": {
+          "left": 219162,
+          "right": 218156,
+          "delta_ns": 1006,
+          "improvement_percent": 0.45902118067913233
+        },
+        "mean": {
+          "left": 223862.874,
+          "right": 222999.824,
+          "delta_ns": 863.0500000000175,
+          "improvement_percent": 0.3855261859990315
+        },
+        "p95": {
+          "left": 260148,
+          "right": 255353,
+          "delta_ns": 4795,
+          "improvement_percent": 1.8431815735658164
+        },
+        "p99": {
+          "left": 288709,
+          "right": 284802,
+          "delta_ns": 3907,
+          "improvement_percent": 1.3532657450928096
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 654,
+          "right": 652,
+          "delta_ns": 2,
+          "improvement_percent": 0.3058103975535168
+        },
+        "mean": {
+          "left": 655.676,
+          "right": 656.184,
+          "delta_ns": -0.5079999999999245,
+          "improvement_percent": -0.07747729061303517
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A1",
+      "right_leg": "B1",
+      "mode": "atomic-file",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 281908,
+          "right": 218612,
+          "delta_ns": 63296,
+          "improvement_percent": 22.452715070164732
+        },
+        "mean": {
+          "left": 287416.238,
+          "right": 227160.298,
+          "delta_ns": 60255.94,
+          "improvement_percent": 20.964695808174902
+        },
+        "p95": {
+          "left": 325809,
+          "right": 265175,
+          "delta_ns": 60634,
+          "improvement_percent": 18.610290077929093
+        },
+        "p99": {
+          "left": 376771,
+          "right": 297770,
+          "delta_ns": 79001,
+          "improvement_percent": 20.96790888895377
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 32122,
+          "right": 652,
+          "delta_ns": 31470,
+          "improvement_percent": 97.97023846584895
+        },
+        "mean": {
+          "left": 32533.152,
+          "right": 655.734,
+          "delta_ns": 31877.417999999998,
+          "improvement_percent": 97.98441294590822
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A2",
+      "right_leg": "B2",
+      "mode": "atomic-file",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 281248,
+          "right": 219347,
+          "delta_ns": 61901,
+          "improvement_percent": 22.00940095574013
+        },
+        "mean": {
+          "left": 288423.168,
+          "right": 224050.668,
+          "delta_ns": 64372.5,
+          "improvement_percent": 22.318768789059277
+        },
+        "p95": {
+          "left": 320632,
+          "right": 256134,
+          "delta_ns": 64498,
+          "improvement_percent": 20.115896105192245
+        },
+        "p99": {
+          "left": 380014,
+          "right": 294096,
+          "delta_ns": 85918,
+          "improvement_percent": 22.609167030688344
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 32161,
+          "right": 652,
+          "delta_ns": 31509,
+          "improvement_percent": 97.97269985386026
+        },
+        "mean": {
+          "left": 33448.154,
+          "right": 655.456,
+          "delta_ns": 32792.698000000004,
+          "improvement_percent": 98.0403821388768
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "A1",
+      "right_leg": "A2",
+      "mode": "atomic-file",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 281908,
+          "right": 281248,
+          "delta_ns": 660,
+          "improvement_percent": 0.23411893241766815
+        },
+        "mean": {
+          "left": 287416.238,
+          "right": 288423.168,
+          "delta_ns": -1006.929999999993,
+          "improvement_percent": -0.3503385915168763
+        },
+        "p95": {
+          "left": 325809,
+          "right": 320632,
+          "delta_ns": 5177,
+          "improvement_percent": 1.5889677694600213
+        },
+        "p99": {
+          "left": 376771,
+          "right": 380014,
+          "delta_ns": -3243,
+          "improvement_percent": -0.8607350353397688
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 32122,
+          "right": 32161,
+          "delta_ns": -39,
+          "improvement_percent": -0.12141211630658116
+        },
+        "mean": {
+          "left": 32533.152,
+          "right": 33448.154,
+          "delta_ns": -915.002000000004,
+          "improvement_percent": -2.8125218238921454
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 1266
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "B1",
+      "right_leg": "B2",
+      "mode": "atomic-file",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": {
+          "left": 218612,
+          "right": 219347,
+          "delta_ns": -735,
+          "improvement_percent": -0.3362121018059393
+        },
+        "mean": {
+          "left": 227160.298,
+          "right": 224050.668,
+          "delta_ns": 3109.6300000000047,
+          "improvement_percent": 1.3689143866152194
+        },
+        "p95": {
+          "left": 265175,
+          "right": 256134,
+          "delta_ns": 9041,
+          "improvement_percent": 3.4094465918732912
+        },
+        "p99": {
+          "left": 297770,
+          "right": 294096,
+          "delta_ns": 3674,
+          "improvement_percent": 1.2338381972663464
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 652,
+          "right": 652,
+          "delta_ns": 0,
+          "improvement_percent": 0
+        },
+        "mean": {
+          "left": 655.734,
+          "right": 655.456,
+          "delta_ns": 0.27800000000002,
+          "improvement_percent": 0.042395239533106414
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        },
+        "right": {
+          "read_calls": 655,
+          "read_bytes": 567685,
+          "len_calls": 1,
+          "version_calls": 26
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A1",
+      "right_leg": "B1",
+      "mode": "atomic-file",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 363455,
+          "right": 270598,
+          "delta_ns": 92857,
+          "improvement_percent": 25.548417273114964
+        },
+        "mean": {
+          "left": 370488.014,
+          "right": 278186.69,
+          "delta_ns": 92301.32400000002,
+          "improvement_percent": 24.913444028448385
+        },
+        "p95": {
+          "left": 417074,
+          "right": 331567,
+          "delta_ns": 85507,
+          "improvement_percent": 20.501637599083136
+        },
+        "p99": {
+          "left": 470959,
+          "right": 371973,
+          "delta_ns": 98986,
+          "improvement_percent": 21.017965470454968
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 45797,
+          "right": 859,
+          "delta_ns": 44938,
+          "improvement_percent": 98.12433128807564
+        },
+        "mean": {
+          "left": 46732.348,
+          "right": 858.056,
+          "delta_ns": 45874.292,
+          "improvement_percent": 98.16389281360313
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        }
+      }
+    },
+    {
+      "kind": "candidate",
+      "left_leg": "A2",
+      "right_leg": "B2",
+      "mode": "atomic-file",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 361788,
+          "right": 271023,
+          "delta_ns": 90765,
+          "improvement_percent": 25.087896779329334
+        },
+        "mean": {
+          "left": 367707.334,
+          "right": 279549.998,
+          "delta_ns": 88157.33599999995,
+          "improvement_percent": 23.974864749366123
+        },
+        "p95": {
+          "left": 411959,
+          "right": 318840,
+          "delta_ns": 93119,
+          "improvement_percent": 22.603948451180823
+        },
+        "p99": {
+          "left": 474794,
+          "right": 353097,
+          "delta_ns": 121697,
+          "improvement_percent": 25.631537045539748
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 45757,
+          "right": 851,
+          "delta_ns": 44906,
+          "improvement_percent": 98.14017527372862
+        },
+        "mean": {
+          "left": 46408.26,
+          "right": 855.138,
+          "delta_ns": 45553.122,
+          "improvement_percent": 98.15735819442487
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "A1",
+      "right_leg": "A2",
+      "mode": "atomic-file",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 363455,
+          "right": 361788,
+          "delta_ns": 1667,
+          "improvement_percent": 0.4586537535595878
+        },
+        "mean": {
+          "left": 370488.014,
+          "right": 367707.334,
+          "delta_ns": 2780.680000000051,
+          "improvement_percent": 0.7505451984743697
+        },
+        "p95": {
+          "left": 417074,
+          "right": 411959,
+          "delta_ns": 5115,
+          "improvement_percent": 1.2264010703136614
+        },
+        "p99": {
+          "left": 470959,
+          "right": 474794,
+          "delta_ns": -3835,
+          "improvement_percent": -0.8142959365889599
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 45797,
+          "right": 45757,
+          "delta_ns": 40,
+          "improvement_percent": 0.08734196563093652
+        },
+        "mean": {
+          "left": 46732.348,
+          "right": 46408.26,
+          "delta_ns": 324.0879999999961,
+          "improvement_percent": 0.6934982166956304
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 1802
+        }
+      }
+    },
+    {
+      "kind": "same_side",
+      "left_leg": "B1",
+      "right_leg": "B2",
+      "mode": "atomic-file",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": {
+          "left": 270598,
+          "right": 271023,
+          "delta_ns": -425,
+          "improvement_percent": -0.15705954959016696
+        },
+        "mean": {
+          "left": 278186.69,
+          "right": 279549.998,
+          "delta_ns": -1363.308000000019,
+          "improvement_percent": -0.49006945659406603
+        },
+        "p95": {
+          "left": 331567,
+          "right": 318840,
+          "delta_ns": 12727,
+          "improvement_percent": 3.8384398929929695
+        },
+        "p99": {
+          "left": 371973,
+          "right": 353097,
+          "delta_ns": 18876,
+          "improvement_percent": 5.07456186336105
+        }
+      },
+      "version_ns": {
+        "p50": {
+          "left": 859,
+          "right": 851,
+          "delta_ns": 8,
+          "improvement_percent": 0.9313154831199069
+        },
+        "mean": {
+          "left": 858.056,
+          "right": 855.138,
+          "delta_ns": 2.9180000000000064,
+          "improvement_percent": 0.34007104431412477
+        }
+      },
+      "counters": {
+        "left": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        },
+        "right": {
+          "read_calls": 920,
+          "read_bytes": 569391,
+          "len_calls": 1,
+          "version_calls": 34
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "created_before_candidate_smoke": true,
+  "control": {
+    "revision": "9adbf9ee527b4ccd2e3494c824c761973633ea14",
+    "binary_bytes": 8416176,
+    "binary_sha256": "394d2e56184bea77dc3b0682f25712739b819c1b8e02aa301d2ab2a291c9bf82"
+  },
+  "candidate": {
+    "revision": "0b0e1ed02c2fe4a262826a25a1f64b533bd0e686",
+    "binary_bytes": 8412832,
+    "binary_sha256": "a4edd3969c3114d15b6f773b2e9493e80bf0d4d117e627f269e1d37a23c4b562"
+  },
+  "corpus": {
+    "bytes": 1402368,
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "worksheet_index": 1,
+    "row": 1,
+    "column": 0
+  },
+  "selector_order": [
+    "file-source/open", "file-source/list", "file-source/one-cell",
+    "atomic-file/open", "atomic-file/list", "atomic-file/one-cell"
+  ],
+  "expected": {
+    "control": {
+      "open": {"read_calls": 655, "read_bytes": 567685, "version_calls": 1266, "len_calls": 1},
+      "list": {"read_calls": 655, "read_bytes": 567685, "version_calls": 1266, "len_calls": 1},
+      "one-cell": {"read_calls": 920, "read_bytes": 569391, "version_calls": 1802, "len_calls": 1}
+    },
+    "candidate": {
+      "open": {"read_calls": 655, "read_bytes": 567685, "version_calls": 26, "len_calls": 1},
+      "list": {"read_calls": 655, "read_bytes": 567685, "version_calls": 26, "len_calls": 1},
+      "one-cell": {"read_calls": 920, "read_bytes": 569391, "version_calls": 34, "len_calls": 1}
+    }
+  },
+  "collection": {
+    "order": ["A1", "B1", "B2", "A2"],
+    "cpu": 2,
+    "workers": 1,
+    "warmups_per_child": 20,
+    "retained_samples_per_cell_per_leg": 500,
+    "fresh_child_per_sample": true
+  }
+}
