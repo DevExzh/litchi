@@ -397,6 +397,81 @@ fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overl
 }
 
 #[test]
+fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap() {
+    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut all_caps_edit = source.edit();
+    all_caps_edit
+        .set_text_all_caps(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let all_caps = all_caps_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(all_caps.operations()[0].op, "character-all-caps.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(all_caps.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    let all_caps_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().all_caps())
+        .map(|run| run.text())
+        .collect::<String>();
+    let underlined_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().underline() == UnderlineStyle::Single)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(all_caps_text.contains("First"));
+    assert!(!all_caps_text.contains("Second"));
+    assert!(underlined_text.contains("Second"));
+    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| !run.format().all_caps()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(all_caps).unwrap();
+    let mut overlapping_underline_edit = source.edit();
+    overlapping_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
 fn durable_join_preflights_combined_reversible_payload_before_mutation() {
     let left_text = "a".repeat(100_000);
     let right_text = "b".repeat(100_000);

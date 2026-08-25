@@ -369,7 +369,8 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Underline { .. }
         | Operation::Strike { .. }
         | Operation::Hidden { .. }
-        | Operation::SmallCaps { .. } => PublicationDomain::Ordinary,
+        | Operation::SmallCaps { .. }
+        | Operation::AllCaps { .. } => PublicationDomain::Ordinary,
         Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
         | Operation::AnnotationText { .. }
@@ -471,6 +472,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::Strike { span, .. }
         | Operation::Hidden { span, .. }
         | Operation::SmallCaps { span, .. }
+        | Operation::AllCaps { span, .. }
         | Operation::InsertParagraph { span, .. } => Some(*span),
         _ => None,
     }
@@ -1183,7 +1185,8 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
             | "character-underline.set"
             | "character-strike.set"
             | "character-hidden.set"
-            | "character-small-caps.set" => DurableDomain::Ordinary,
+            | "character-small-caps.set"
+            | "character-all-caps.set" => DurableDomain::Ordinary,
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -1570,7 +1573,8 @@ fn durable_inverse_targets_equal(
         | "character-underline.set"
         | "character-strike.set"
         | "character-hidden.set"
-        | "character-small-caps.set" => None,
+        | "character-small-caps.set"
+        | "character-all-caps.set" => None,
         _ => return durable_targets_equal(forward, inverse),
     };
     let Some(source_span) = super::parse_text_target(&forward.target).ok() else {
@@ -1624,6 +1628,7 @@ fn durable_inverse_values_match(forward: &DurableOperation, inverse: &DurableOpe
         "character-strike.set" => "strike",
         "character-hidden.set" => "hidden",
         "character-small-caps.set" => "small_caps",
+        "character-all-caps.set" => "all_caps",
         _ => return false,
     };
     inverse.preconditions.get(key) == Some(&forward.value)
@@ -1638,7 +1643,8 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
         | ("character-underline.set", "character-underline.set")
         | ("character-strike.set", "character-strike.set")
         | ("character-hidden.set", "character-hidden.set")
-        | ("character-small-caps.set", "character-small-caps.set") => {
+        | ("character-small-caps.set", "character-small-caps.set")
+        | ("character-all-caps.set", "character-all-caps.set") => {
             super::parse_text_target(&left.target).ok()
                 == super::parse_text_target(&right.target).ok()
         },
@@ -1816,6 +1822,26 @@ fn verify_durable_inverse_semantics(
                     ));
                 }
             },
+            "character-all-caps.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("all_caps")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing all-caps state".to_string(),
+                        )
+                    })?;
+                if super::all_caps_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore all-caps state".to_string(),
+                    ));
+                }
+            },
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -1951,6 +1977,7 @@ fn validate_durable_operation_shape(
         | "character-strike.set"
         | "character-hidden.set"
         | "character-small-caps.set"
+        | "character-all-caps.set"
         | "table-cell-text.replace"
         | "header-footer-text.replace"
         | "annotation-text.replace"
@@ -1987,7 +2014,8 @@ fn validate_durable_operation_shape(
         | "character-underline.set"
         | "character-strike.set"
         | "character-hidden.set"
-        | "character-small-caps.set" => {
+        | "character-small-caps.set"
+        | "character-all-caps.set" => {
             let span =
                 super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
             super::validate_span(source.text(), span).map_err(CompositionError::Edit)?;
@@ -2043,7 +2071,8 @@ fn durable_operation_domain(operation: &DurableOperation) -> Option<DurableDomai
         | "character-underline.set"
         | "character-strike.set"
         | "character-hidden.set"
-        | "character-small-caps.set" => Some(DurableDomain::Ordinary),
+        | "character-small-caps.set"
+        | "character-all-caps.set" => Some(DurableDomain::Ordinary),
         "table-cell-text.replace"
         | "header-footer-text.replace"
         | "annotation-text.replace"
@@ -2081,7 +2110,8 @@ fn durable_text_span(operation: &DurableOperation) -> Option<super::TextSpan> {
         | "character-underline.set"
         | "character-strike.set"
         | "character-hidden.set"
-        | "character-small-caps.set" => super::parse_text_target(&operation.target).ok(),
+        | "character-small-caps.set"
+        | "character-all-caps.set" => super::parse_text_target(&operation.target).ok(),
         _ => None,
     }
 }
@@ -2238,6 +2268,15 @@ fn commit_durable_operations(
                     CompositionError::Durable("invalid small-caps value".to_string())
                 })?;
                 edit.set_text_small_caps(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-all-caps.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation.value.as_bool().ok_or_else(|| {
+                    CompositionError::Durable("invalid all-caps value".to_string())
+                })?;
+                edit.set_text_all_caps(span, value)
                     .map_err(CompositionError::Edit)?;
             },
             "table-cell-text.replace" => {
