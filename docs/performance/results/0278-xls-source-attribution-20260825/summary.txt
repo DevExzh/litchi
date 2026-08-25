@@ -1,0 +1,19 @@
+Change 0278 XLS source attribution
+
+Classification: diagnostic attribution retained; performance_claim: none.
+Revision: b2c2260efa36421e446b52e0983f9bca8fd12ac3.
+Binary: 8,417,112 bytes; SHA-256 9ce0514e5106f7d019b58d54d888ae39656f68eef04487f531b2f3f0783b72b3.
+Protocol: Rust 1.95 release, CPU 2, one worker, 17 separate mode/operation children, 20 warmups and 100 retained warm-cache samples in each child.
+Corpus: ConditionalFormattingSamples.xls, 1,402,368 bytes, SHA-256 d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7.
+Workbook stream: 1,314,225 bytes, SHA-256 99305abd97f40bfc2fa4c052701bbebc971c1feb12278e8b76ecfbaca777676f.
+
+Within the source-backed timing family, atomic-file -> FileSource:
+- open p50 277,687 -> 459,173 ns (+181,486 ns, 65.36%); mean 281,190 -> 462,449 ns (+181,259 ns, 64.46%). Extra measured version time: 185,463 ns; FileSource version share: 47.08% of mean.
+- list p50 278,709 -> 458,813 ns (+180,104 ns, 64.62%); mean 280,625 -> 461,588 ns (+180,963 ns, 64.49%). Extra measured version time: 183,808 ns; FileSource version share: 46.83% of mean.
+- one-cell p50 358,024 -> 624,941 ns (+266,917 ns, 74.55%); mean 361,455 -> 627,670 ns (+266,215 ns, 73.65%). Extra measured version time: 265,068 ns; FileSource version share: 49.68% of mean.
+
+Logical work is exact across owned, atomic, tracked, and FileSource modes: open/list each record 655 reads, 567,685 bytes, 1,266 version calls, and one len call; one-cell records 920 reads, 569,391 bytes, 1,802 version calls, and one len call. The tracked wrapper is a diagnostic confounder: its range-union accounting consumes 74.44%-77.86% of mean elapsed time.
+
+Standalone controls are not cross-family comparisons. Eager p50 is 718,966 ns open, 709,929 ns list, and 730,863 ns one-cell; facade p50 is 380,299 ns open and 358,294 ns list. Source/facade expose 16 sheets, eager exposes 13, and Products1!A2 projects as string:4:Date in both source and eager implementations. These are implementation-local compatibility projections, not an independent parser oracle.
+
+Decision: select an operation-scoped CFB/XLS freshness session as the next bounded production candidate. This diagnostic package is not A/B evidence; a clean A1/B1/B2/A2 run with exact freshness, logical-I/O, locality, semantic, cancellation/error-precedence, and tail gates is required before retaining or claiming that optimization.

@@ -1,0 +1,86 @@
+{
+  "artifact_root": "docs/performance/results/0278-xls-source-attribution-20260825",
+  "artifacts": {
+    "atomic-file-list.json": {
+      "bytes": 100264,
+      "sha256": "c70f61b009a47069b7916fb8cf97dc94b79ffa70a558b0baa8b12c0f7d04f036"
+    },
+    "atomic-file-one-cell.json": {
+      "bytes": 62987,
+      "sha256": "07dff4a0f948203fb094ccaaad44b1bc78a1f5c0beab48021f6b4241de10a93a"
+    },
+    "atomic-file-open.json": {
+      "bytes": 61166,
+      "sha256": "19d09b7d081ea4bb589ab1208b21c818062a8646904d6300682f2be5eae5cfbe"
+    },
+    "eager-file-list.json": {
+      "bytes": 124753,
+      "sha256": "23892f7f9a911d68cfed55d52c9a9af72c0cf1017eb4ad07194d70fa19bd09d6"
+    },
+    "eager-file-one-cell.json": {
+      "bytes": 95103,
+      "sha256": "2f58465572afb73db6a19167af0c582f29533a9489729873d0bba8ead2602fba"
+    },
+    "eager-file-open.json": {
+      "bytes": 93353,
+      "sha256": "1a3f5969c545b65305ce1b472cc8a799f073107aed6a1a447395d05082078880"
+    },
+    "facade-file-list.json": {
+      "bytes": 98326,
+      "sha256": "101fe5d376ff9eb5354bb16a4b00489225252bfee8c74971b632b50280419917"
+    },
+    "facade-file-open.json": {
+      "bytes": 59228,
+      "sha256": "df1e8325f8817e36e814b554b090ec7a56060345c95d60b38e571bd580745939"
+    },
+    "file-source-list.json": {
+      "bytes": 100452,
+      "sha256": "4203f21036b9c942ee263fb00e07605086339da7469b00550d3cac1937ef96d1"
+    },
+    "file-source-one-cell.json": {
+      "bytes": 63177,
+      "sha256": "34bdb3b23ba29c3966c1af8b37615395b19587bf40c583b78564aacb15a91016"
+    },
+    "file-source-open.json": {
+      "bytes": 61351,
+      "sha256": "6ad230d4aec1610100694218ed0d974d269066c902d1e5fff8d8a927667a046a"
+    },
+    "owned-readat-list.json": {
+      "bytes": 100075,
+      "sha256": "1e0224f55651a6f55e3a49c17e09b0fe1031f4bf1267ccb5b74207a1a564bddb"
+    },
+    "owned-readat-one-cell.json": {
+      "bytes": 62702,
+      "sha256": "8a65322bb2cd6fcdfdfee286e4ebd34fb0a85e2c673be683ca28a38eccee3724"
+    },
+    "owned-readat-open.json": {
+      "bytes": 60975,
+      "sha256": "3ef79a9b611b7ad989cacc38e1d6efec4778d4527503902caa8fac7b41c6620b"
+    },
+    "summary.json": {
+      "bytes": 23029,
+      "sha256": "9df4a806be6db3635baed420353b3969502c568b55cb826f7a5e262329b3d82f"
+    },
+    "tracked-file-list.json": {
+      "bytes": 102020,
+      "sha256": "ddce1eeca5b6c6cd341b2bc1fe00e66bd8f7ddc7b76d246a8f65cb11259cd340"
+    },
+    "tracked-file-one-cell.json": {
+      "bytes": 64731,
+      "sha256": "6fe9e47fca56ffe13954cc466a2a6667b57a9646631728b63bd839f7cd2a1a84"
+    },
+    "tracked-file-open.json": {
+      "bytes": 62934,
+      "sha256": "4eb8f7398c57b9bc96626d799aeaeaab66bf200cccf984e8e2ba063350044167"
+    },
+    "summary.txt": {
+      "bytes": 2394,
+      "sha256": "bfc7990b0fe8d8ad630b4e0070825a9cf8df12e6429bea8c46f731e6adb554b5"
+    }
+  },
+  "change": 278,
+  "date": "2026-08-25",
+  "excluded": {},
+  "schema_version": 1,
+  "self_hash": "excluded to avoid recursive identity"
+}

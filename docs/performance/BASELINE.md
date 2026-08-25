@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLS FileSource attribution (change 0278)
+
+[Change 0278](changes/0278-xls-source-attribution.md) adds an isolated
+owned/atomic/tracked/FileSource/eager/facade attribution runner. On a clean
+CPU-2 release build, 17 reports with 20 warmups and 100 retained warm samples
+show FileSource p50/mean gaps of 180-267 microseconds over the matched atomic
+file source; extra measured `version()` time closely explains those gaps and
+uses 46.83%-49.68% of FileSource mean elapsed time. This selects a private
+freshness-session candidate for a separate A/B batch. The single-revision,
+shared-child, warm-cache package has `performance_claim: none`; no cross-family,
+tail, physical-I/O, cold-cache, allocation/RSS, or broad XLS/CFB claim follows.
+The matrix remains **398 names** and **36 cases / 198 default records**.
+
 ## Latest CFB monotonic cursor XLS evidence (change 0277)
 
 [Change 0277](changes/0277-cfb-monotonic-cursor-abba.md) adds a forward-only

@@ -1,0 +1,3579 @@
+{
+  "schema_version": 2,
+  "revision": "b2c2260efa36421e446b52e0983f9bca8fd12ac3",
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "revision": "b2c2260efa36421e446b52e0983f9bca8fd12ac3"
+  },
+  "binary": {
+    "path": "/dev/shm/litchi-xls-attribution-release/release/xls_source_attribution",
+    "bytes": 8417112,
+    "sha256": "9ce0514e5106f7d019b58d54d888ae39656f68eef04487f531b2f3f0783b72b3"
+  },
+  "input": {
+    "path": "/dev/shm/litchi-xls-attribution-wt/test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "bytes": 1402368,
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "mode": "eager-file",
+  "operation": "open",
+  "counter_scope": "counting Read/Seek wrapper around the eager raw CFB/XLS owner; logical reads only; warm page-cache and no physical-I/O counter",
+  "limitation": "eager compatibility control; source construction and timing scope are not paired with positional modes; the staged fixture is immutable and warm-cache",
+  "timing_scope": "eager-file family: staged file open, CFB open, XLS owner construction, and query are inside elapsed_ns; compare elapsed_ns only within eager-file, never against source-backed or facade-file",
+  "process_scope": "samples share one benchmark process; invoke once per retained sample for fresh-child evidence",
+  "input_scope": "the original input is copied once outside timing into a private read-only staged file; all path-backed samples reopen that snapshot; full-file staging and post-run SHA-256 verification are outside elapsed_ns, warm the page cache, and do not measure cold or physical I/O",
+  "warmups": 20,
+  "samples": 100,
+  "worksheet_index": 1,
+  "row": 1,
+  "column": 0,
+  "semantic_oracle": {
+    "source_implementation_projection": {
+      "worksheet_count": 16,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "Quarters",
+        "Bike rating",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Compare to totals",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "eager_implementation_projection": {
+      "worksheet_count": 13,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "scope": "implementation-local compatibility projections only; no independent source-parser oracle and no source/eager equivalence assertion"
+  },
+  "elapsed_samples_ns": [
+    728655,
+    713454,
+    721725,
+    724148,
+    718602,
+    734603,
+    733301,
+    718952,
+    737787,
+    744967,
+    712323,
+    704121,
+    701819,
+    733923,
+    705713,
+    705563,
+    705062,
+    742143,
+    730908,
+    717600,
+    713353,
+    708757,
+    720053,
+    723287,
+    724680,
+    738018,
+    708597,
+    757384,
+    748442,
+    729906,
+    721805,
+    716368,
+    729126,
+    722957,
+    726091,
+    703300,
+    705162,
+    734604,
+    728134,
+    718981,
+    715476,
+    729646,
+    703310,
+    703310,
+    721084,
+    719071,
+    712453,
+    710089,
+    700187,
+    754971,
+    735745,
+    733323,
+    718250,
+    705894,
+    724760,
+    707946,
+    713474,
+    736405,
+    730758,
+    771955,
+    725721,
+    727423,
+    710841,
+    711081,
+    731870,
+    716668,
+    718611,
+    712523,
+    720844,
+    772395,
+    788748,
+    739670,
+    711411,
+    717499,
+    730338,
+    711332,
+    703701,
+    711361,
+    708077,
+    718752,
+    705383,
+    739289,
+    714886,
+    727002,
+    712212,
+    710029,
+    722176,
+    716219,
+    706765,
+    706875,
+    716248,
+    708307,
+    710390,
+    710200,
+    701408,
+    731579,
+    778765,
+    796949,
+    755562,
+    748323
+  ],
+  "records": [
+    {
+      "elapsed_ns": 728655,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43883,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27768,
+        "xls_owner_ns": 700756,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 713454,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42664,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28769,
+        "xls_owner_ns": 684524,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 721725,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42398,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28449,
+        "xls_owner_ns": 693156,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 724148,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44552,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29460,
+        "xls_owner_ns": 694558,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718602,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 47840,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28189,
+        "xls_owner_ns": 690282,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 734603,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 49348,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28118,
+        "xls_owner_ns": 706355,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 733301,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 48243,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29020,
+        "xls_owner_ns": 704151,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718952,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44963,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29371,
+        "xls_owner_ns": 689451,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 737787,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43198,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28188,
+        "xls_owner_ns": 709459,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 744967,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43961,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 34527,
+        "xls_owner_ns": 710299,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712323,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43298,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28239,
+        "xls_owner_ns": 683934,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 704121,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42146,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27558,
+        "xls_owner_ns": 676433,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701819,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41480,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27308,
+        "xls_owner_ns": 674401,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 733923,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41215,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27758,
+        "xls_owner_ns": 706034,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705713,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43357,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28008,
+        "xls_owner_ns": 677575,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705563,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41426,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28118,
+        "xls_owner_ns": 677304,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705062,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41047,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27798,
+        "xls_owner_ns": 677134,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 742143,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44842,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 33306,
+        "xls_owner_ns": 708707,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 730908,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40797,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28990,
+        "xls_owner_ns": 701788,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 717600,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42192,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27699,
+        "xls_owner_ns": 689772,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 713353,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40837,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27778,
+        "xls_owner_ns": 685455,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 708757,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41156,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27828,
+        "xls_owner_ns": 680779,
+        "selected_query_ns": 41,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 720053,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39646,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27267,
+        "xls_owner_ns": 692655,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 723287,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40150,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 30672,
+        "xls_owner_ns": 692486,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 724680,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43410,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27959,
+        "xls_owner_ns": 696600,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 738018,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44619,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28540,
+        "xls_owner_ns": 709338,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 708597,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42822,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28008,
+        "xls_owner_ns": 680468,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 757384,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42780,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27738,
+        "xls_owner_ns": 729496,
+        "selected_query_ns": 51,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 748442,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42635,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28639,
+        "xls_owner_ns": 719672,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 729906,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42759,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28569,
+        "xls_owner_ns": 701208,
+        "selected_query_ns": 29,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 721805,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41270,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27779,
+        "xls_owner_ns": 693886,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716368,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41126,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27798,
+        "xls_owner_ns": 688450,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 729126,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41724,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28259,
+        "xls_owner_ns": 700736,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 722957,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41206,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28389,
+        "xls_owner_ns": 694427,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 726091,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43042,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28019,
+        "xls_owner_ns": 697942,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703300,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42416,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28080,
+        "xls_owner_ns": 675081,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705162,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40413,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27487,
+        "xls_owner_ns": 677535,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 734604,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42085,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27398,
+        "xls_owner_ns": 707056,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 728134,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41230,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28990,
+        "xls_owner_ns": 699014,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718981,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44677,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28439,
+        "xls_owner_ns": 690412,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 715476,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 49604,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27527,
+        "xls_owner_ns": 687808,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 729646,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39831,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28218,
+        "xls_owner_ns": 701298,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703310,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40906,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28680,
+        "xls_owner_ns": 674489,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703310,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40711,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28238,
+        "xls_owner_ns": 674951,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 721084,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 51085,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 39515,
+        "xls_owner_ns": 681439,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 719071,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41206,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28018,
+        "xls_owner_ns": 690933,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712453,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40624,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28029,
+        "xls_owner_ns": 684293,
+        "selected_query_ns": 29,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710089,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39593,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27768,
+        "xls_owner_ns": 682212,
+        "selected_query_ns": 29,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 700187,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39117,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27488,
+        "xls_owner_ns": 672557,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 754971,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39147,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27227,
+        "xls_owner_ns": 727583,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 735745,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39912,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28290,
+        "xls_owner_ns": 707326,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 733323,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40714,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28391,
+        "xls_owner_ns": 704803,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718250,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42107,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28639,
+        "xls_owner_ns": 689480,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705894,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39870,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28049,
+        "xls_owner_ns": 677715,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 724760,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40174,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27678,
+        "xls_owner_ns": 696952,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 707946,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39082,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28269,
+        "xls_owner_ns": 679547,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 713474,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39004,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28329,
+        "xls_owner_ns": 685015,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 736405,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39086,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28679,
+        "xls_owner_ns": 707546,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 730758,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 46222,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28259,
+        "xls_owner_ns": 702348,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 771955,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 54445,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 31423,
+        "xls_owner_ns": 740371,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 725721,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39350,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29180,
+        "xls_owner_ns": 696410,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 727423,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44347,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28169,
+        "xls_owner_ns": 699124,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710841,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44890,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28130,
+        "xls_owner_ns": 682581,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 711081,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42800,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27838,
+        "xls_owner_ns": 683123,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 731870,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40746,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27769,
+        "xls_owner_ns": 703961,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716668,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40375,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28209,
+        "xls_owner_ns": 688320,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718611,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39440,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28249,
+        "xls_owner_ns": 690223,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712523,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39343,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 33546,
+        "xls_owner_ns": 678847,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 720844,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39107,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27608,
+        "xls_owner_ns": 693096,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 772395,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39198,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27458,
+        "xls_owner_ns": 744748,
+        "selected_query_ns": 49,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 788748,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 45713,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29751,
+        "xls_owner_ns": 758737,
+        "selected_query_ns": 29,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 739670,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 47347,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 39425,
+        "xls_owner_ns": 700076,
+        "selected_query_ns": 40,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 711411,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40568,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28809,
+        "xls_owner_ns": 682471,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 717499,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39578,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27798,
+        "xls_owner_ns": 689561,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 730338,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40067,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27729,
+        "xls_owner_ns": 702459,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 711332,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39683,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28330,
+        "xls_owner_ns": 682873,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703701,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38983,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27859,
+        "xls_owner_ns": 675722,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 711361,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38818,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28179,
+        "xls_owner_ns": 683062,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 708077,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39419,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27799,
+        "xls_owner_ns": 680147,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718752,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39011,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28168,
+        "xls_owner_ns": 690463,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705383,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39803,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28069,
+        "xls_owner_ns": 677182,
+        "selected_query_ns": 29,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 739289,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39212,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27578,
+        "xls_owner_ns": 711582,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 714886,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41017,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28209,
+        "xls_owner_ns": 686547,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 727002,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39565,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28028,
+        "xls_owner_ns": 698844,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712212,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40076,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28218,
+        "xls_owner_ns": 683853,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710029,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39115,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28299,
+        "xls_owner_ns": 681599,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 722176,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39656,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27257,
+        "xls_owner_ns": 694789,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716219,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40147,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27509,
+        "xls_owner_ns": 688590,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706765,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39188,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27908,
+        "xls_owner_ns": 678736,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706875,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39064,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27497,
+        "xls_owner_ns": 679246,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716248,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38769,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27758,
+        "xls_owner_ns": 688379,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 708307,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40263,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27558,
+        "xls_owner_ns": 680629,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710390,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39889,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27748,
+        "xls_owner_ns": 682522,
+        "selected_query_ns": 30,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710200,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39304,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28059,
+        "xls_owner_ns": 682011,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701408,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38779,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27779,
+        "xls_owner_ns": 673500,
+        "selected_query_ns": 31,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 731579,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39485,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 39754,
+        "xls_owner_ns": 691684,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 778765,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40602,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28569,
+        "xls_owner_ns": 750006,
+        "selected_query_ns": 50,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 796949,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 48646,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 33867,
+        "xls_owner_ns": 762912,
+        "selected_query_ns": 49,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 755562,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40764,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 30683,
+        "xls_owner_ns": 724690,
+        "selected_query_ns": 60,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 748323,
+      "observation": {
+        "kind": "open",
+        "worksheet_count": 13,
+        "worksheet_names": null,
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39275,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29350,
+        "xls_owner_ns": 718832,
+        "selected_query_ns": 20,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    }
+  ]
+}

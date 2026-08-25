@@ -1,5 +1,18 @@
 # Performance program phase report
 
+## XLS source and FileSource attribution (change 0278)
+
+[Change 0278](changes/0278-xls-source-attribution.md) adds a clean, isolated
+six-mode runner and retains 17 CPU-2 release reports. Matched atomic-file and
+FileSource samples have exact logical reads/bytes/version counts, while
+FileSource p50/mean is 180-267 microseconds higher and measured `version()`
+time explains approximately all of that central gap. The tracked control is
+74.44%-77.86% range-union accounting, so it is excluded from production ROI
+reasoning. The evidence selects an operation-scoped freshness session for the
+next production batch, but is single-revision, warm-cache attribution only:
+`performance_claim: none`, with the matrix unchanged at **398 names** and
+**36 cases / 198 records**.
+
 ## CFB monotonic cursor and XLS evidence (change 0277)
 
 [Change 0277](changes/0277-cfb-monotonic-cursor-abba.md) adds a low-level

@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## XLS source attribution boundary (change 0278)
+
+Change 0278 adds only an opt-in performance runner. CFB structure remains in
+`litchi-cfb`, BIFF semantics remain in `litchi-xls`, and facade path routing
+remains in `litchi`; no raw record, CFB ID, runtime handle, or mutable cursor
+enters an ordinary CRUD signature. The runner stages and re-verifies an
+immutable input, keeps oracles outside timing, and explicitly withholds
+source/eager equivalence and physical-I/O claims. Its FileSource result selects
+freshness sessions for separate design and correctness review but changes no
+freshness contract itself. `performance_claim: none`; the matrix remains
+**398 names** and **36 cases / 198 default records**.
+
 ## CFB monotonic cursor and XLS integration (change 0277)
 
 Change 0277 keeps stream topology and cursor state in low-level `litchi-cfb`
