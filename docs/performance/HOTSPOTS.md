@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## XLS FileSource freshness attribution (change 0278)
+
+[Change 0278](changes/0278-xls-source-attribution.md) closes the attribution
+gap left by change 0277. Exact-equal atomic/FileSource logical work shows
+FileSource central gaps of 180-267 microseconds across open/list/one-cell; its
+measured version probes consume 46.83%-49.68% of mean elapsed time and closely
+explain the gap. The tracked wrapper is separately dominated 74.44%-77.86% by
+range-union bookkeeping and is not a production proxy. The next bounded
+hotspot is therefore a private operation-scoped freshness session, followed by
+clean A1/B1/B2/A2 keep/revert evidence before any span batching. This remains
+single-revision diagnostic evidence with `performance_claim: none`; the matrix
+stays **398 names** and **36 cases / 198 default records**.
+
 ## CFB monotonic cursor result and next XLS hotspot (change 0277)
 
 [Change 0277](changes/0277-cfb-monotonic-cursor-abba.md) removes repeated

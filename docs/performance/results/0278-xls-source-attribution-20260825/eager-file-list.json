@@ -1,0 +1,4979 @@
+{
+  "schema_version": 2,
+  "revision": "b2c2260efa36421e446b52e0983f9bca8fd12ac3",
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "revision": "b2c2260efa36421e446b52e0983f9bca8fd12ac3"
+  },
+  "binary": {
+    "path": "/dev/shm/litchi-xls-attribution-release/release/xls_source_attribution",
+    "bytes": 8417112,
+    "sha256": "9ce0514e5106f7d019b58d54d888ae39656f68eef04487f531b2f3f0783b72b3"
+  },
+  "input": {
+    "path": "/dev/shm/litchi-xls-attribution-wt/test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "bytes": 1402368,
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7"
+  },
+  "mode": "eager-file",
+  "operation": "list",
+  "counter_scope": "counting Read/Seek wrapper around the eager raw CFB/XLS owner; logical reads only; warm page-cache and no physical-I/O counter",
+  "limitation": "eager compatibility control; source construction and timing scope are not paired with positional modes; the staged fixture is immutable and warm-cache",
+  "timing_scope": "eager-file family: staged file open, CFB open, XLS owner construction, and query are inside elapsed_ns; compare elapsed_ns only within eager-file, never against source-backed or facade-file",
+  "process_scope": "samples share one benchmark process; invoke once per retained sample for fresh-child evidence",
+  "input_scope": "the original input is copied once outside timing into a private read-only staged file; all path-backed samples reopen that snapshot; full-file staging and post-run SHA-256 verification are outside elapsed_ns, warm the page cache, and do not measure cold or physical I/O",
+  "warmups": 20,
+  "samples": 100,
+  "worksheet_index": 1,
+  "row": 1,
+  "column": 0,
+  "semantic_oracle": {
+    "source_implementation_projection": {
+      "worksheet_count": 16,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "Quarters",
+        "Bike rating",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Compare to totals",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "eager_implementation_projection": {
+      "worksheet_count": 13,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "scope": "implementation-local compatibility projections only; no independent source-parser oracle and no source/eager equivalence assertion"
+  },
+  "elapsed_samples_ns": [
+    728895,
+    706604,
+    736546,
+    766727,
+    728395,
+    720874,
+    697583,
+    698754,
+    710259,
+    722357,
+    701808,
+    709759,
+    719932,
+    726382,
+    697161,
+    695720,
+    738478,
+    705463,
+    702829,
+    705373,
+    703711,
+    740421,
+    715997,
+    706724,
+    748633,
+    706995,
+    716178,
+    696691,
+    696531,
+    725091,
+    707836,
+    703631,
+    713294,
+    705914,
+    702169,
+    703270,
+    699555,
+    710020,
+    715618,
+    716037,
+    696561,
+    702168,
+    707946,
+    747721,
+    701338,
+    703830,
+    729186,
+    720894,
+    703961,
+    694648,
+    719612,
+    709839,
+    718351,
+    694707,
+    701307,
+    699064,
+    700437,
+    713934,
+    734574,
+    713644,
+    698073,
+    692645,
+    693466,
+    714155,
+    714065,
+    701548,
+    707085,
+    704471,
+    741773,
+    743966,
+    700186,
+    716439,
+    706374,
+    718631,
+    696331,
+    712583,
+    714155,
+    699114,
+    697122,
+    697402,
+    709349,
+    712172,
+    710961,
+    728835,
+    724149,
+    712263,
+    701507,
+    691904,
+    706604,
+    729857,
+    710941,
+    712192,
+    707165,
+    722237,
+    724550,
+    711882,
+    715867,
+    801425,
+    717209,
+    720094
+  ],
+  "records": [
+    {
+      "elapsed_ns": 728895,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38016,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28268,
+        "xls_owner_ns": 700215,
+        "selected_query_ns": 271,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706604,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39052,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29040,
+        "xls_owner_ns": 677194,
+        "selected_query_ns": 281,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 736546,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 49864,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28358,
+        "xls_owner_ns": 707846,
+        "selected_query_ns": 250,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 766727,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41139,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 31113,
+        "xls_owner_ns": 735134,
+        "selected_query_ns": 361,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 728395,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40335,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 31964,
+        "xls_owner_ns": 696060,
+        "selected_query_ns": 240,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 720874,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38601,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29200,
+        "xls_owner_ns": 691253,
+        "selected_query_ns": 311,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 697583,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39969,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29901,
+        "xls_owner_ns": 667340,
+        "selected_query_ns": 240,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 698754,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40633,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28709,
+        "xls_owner_ns": 669624,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710259,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39387,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28639,
+        "xls_owner_ns": 681170,
+        "selected_query_ns": 340,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 722357,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39646,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28970,
+        "xls_owner_ns": 692976,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701808,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39067,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29170,
+        "xls_owner_ns": 672218,
+        "selected_query_ns": 340,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 709759,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38837,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28570,
+        "xls_owner_ns": 680790,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 719932,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43219,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28709,
+        "xls_owner_ns": 690813,
+        "selected_query_ns": 301,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 726382,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42964,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29020,
+        "xls_owner_ns": 696861,
+        "selected_query_ns": 280,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 697161,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41250,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29350,
+        "xls_owner_ns": 667421,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 695720,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39816,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28699,
+        "xls_owner_ns": 666579,
+        "selected_query_ns": 341,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 738478,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38849,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29470,
+        "xls_owner_ns": 708518,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705463,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40020,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29351,
+        "xls_owner_ns": 675702,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 702829,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38797,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28770,
+        "xls_owner_ns": 673629,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705373,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38853,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28709,
+        "xls_owner_ns": 676253,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703711,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41839,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28780,
+        "xls_owner_ns": 674540,
+        "selected_query_ns": 301,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 740421,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44293,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29241,
+        "xls_owner_ns": 710770,
+        "selected_query_ns": 301,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 715997,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39716,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29932,
+        "xls_owner_ns": 685644,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706724,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39515,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28849,
+        "xls_owner_ns": 677375,
+        "selected_query_ns": 410,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 748633,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 47648,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28570,
+        "xls_owner_ns": 719603,
+        "selected_query_ns": 250,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706995,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40254,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29090,
+        "xls_owner_ns": 677495,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716178,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39505,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28379,
+        "xls_owner_ns": 687378,
+        "selected_query_ns": 311,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 696691,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39382,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28209,
+        "xls_owner_ns": 668072,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 696531,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39301,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28719,
+        "xls_owner_ns": 667430,
+        "selected_query_ns": 281,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 725091,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39250,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27888,
+        "xls_owner_ns": 696811,
+        "selected_query_ns": 270,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 707836,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39377,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28849,
+        "xls_owner_ns": 678486,
+        "selected_query_ns": 311,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703631,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39045,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28739,
+        "xls_owner_ns": 674420,
+        "selected_query_ns": 330,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 713294,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39175,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28709,
+        "xls_owner_ns": 684143,
+        "selected_query_ns": 330,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 705914,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38911,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28429,
+        "xls_owner_ns": 677134,
+        "selected_query_ns": 250,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 702169,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38731,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28499,
+        "xls_owner_ns": 673319,
+        "selected_query_ns": 240,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703270,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39172,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28429,
+        "xls_owner_ns": 674441,
+        "selected_query_ns": 301,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 699555,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38552,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28510,
+        "xls_owner_ns": 670684,
+        "selected_query_ns": 250,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710020,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39031,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28429,
+        "xls_owner_ns": 681150,
+        "selected_query_ns": 320,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 715618,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39676,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29291,
+        "xls_owner_ns": 685906,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716037,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38977,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28609,
+        "xls_owner_ns": 687018,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 696561,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39146,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29521,
+        "xls_owner_ns": 666659,
+        "selected_query_ns": 280,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 702168,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 45237,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28129,
+        "xls_owner_ns": 673629,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 707946,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39260,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28379,
+        "xls_owner_ns": 679157,
+        "selected_query_ns": 301,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 747721,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38777,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 44011,
+        "xls_owner_ns": 703330,
+        "selected_query_ns": 280,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701338,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39026,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28870,
+        "xls_owner_ns": 672128,
+        "selected_query_ns": 240,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703830,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38892,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28730,
+        "xls_owner_ns": 674610,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 729186,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39284,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28390,
+        "xls_owner_ns": 700426,
+        "selected_query_ns": 270,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 720894,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40397,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28579,
+        "xls_owner_ns": 691875,
+        "selected_query_ns": 320,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 703961,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39025,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28599,
+        "xls_owner_ns": 674922,
+        "selected_query_ns": 331,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 694648,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39414,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28789,
+        "xls_owner_ns": 665478,
+        "selected_query_ns": 280,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 719612,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38801,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28228,
+        "xls_owner_ns": 691004,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 709839,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39691,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29210,
+        "xls_owner_ns": 680198,
+        "selected_query_ns": 331,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718351,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39150,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28479,
+        "xls_owner_ns": 689431,
+        "selected_query_ns": 341,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 694707,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38470,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29140,
+        "xls_owner_ns": 665167,
+        "selected_query_ns": 281,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701307,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 44738,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28499,
+        "xls_owner_ns": 672388,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 699064,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38246,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28449,
+        "xls_owner_ns": 670224,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 700437,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39100,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28280,
+        "xls_owner_ns": 671755,
+        "selected_query_ns": 291,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 713934,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39221,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28148,
+        "xls_owner_ns": 685366,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 734574,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 48398,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 35129,
+        "xls_owner_ns": 699034,
+        "selected_query_ns": 301,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 713644,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40716,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28358,
+        "xls_owner_ns": 684875,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 698073,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38996,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28449,
+        "xls_owner_ns": 669223,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 692645,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38697,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28129,
+        "xls_owner_ns": 664086,
+        "selected_query_ns": 320,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 693466,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38875,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28140,
+        "xls_owner_ns": 664926,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 714155,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38756,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28439,
+        "xls_owner_ns": 685225,
+        "selected_query_ns": 370,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 714065,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38853,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28430,
+        "xls_owner_ns": 685194,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701548,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38947,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28439,
+        "xls_owner_ns": 672718,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 707085,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39553,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28339,
+        "xls_owner_ns": 678366,
+        "selected_query_ns": 270,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 704471,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40176,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 30341,
+        "xls_owner_ns": 673739,
+        "selected_query_ns": 280,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 741773,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39416,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28599,
+        "xls_owner_ns": 712734,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 743966,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42521,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 36731,
+        "xls_owner_ns": 706775,
+        "selected_query_ns": 330,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 700186,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39119,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28719,
+        "xls_owner_ns": 671066,
+        "selected_query_ns": 280,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 716439,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38494,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 38003,
+        "xls_owner_ns": 678015,
+        "selected_query_ns": 320,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706374,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38782,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27847,
+        "xls_owner_ns": 678075,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 718631,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39010,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28470,
+        "xls_owner_ns": 689791,
+        "selected_query_ns": 261,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 696331,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39869,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28579,
+        "xls_owner_ns": 667330,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712583,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39441,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28069,
+        "xls_owner_ns": 684063,
+        "selected_query_ns": 350,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 714155,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41479,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28128,
+        "xls_owner_ns": 685626,
+        "selected_query_ns": 291,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 699114,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39444,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27938,
+        "xls_owner_ns": 670816,
+        "selected_query_ns": 270,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 697122,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39278,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27839,
+        "xls_owner_ns": 668852,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 697402,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38920,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28631,
+        "xls_owner_ns": 668411,
+        "selected_query_ns": 260,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 709349,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38509,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27558,
+        "xls_owner_ns": 681390,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712172,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40497,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 31944,
+        "xls_owner_ns": 679828,
+        "selected_query_ns": 290,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710961,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39335,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28249,
+        "xls_owner_ns": 682351,
+        "selected_query_ns": 260,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 728835,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38875,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 27919,
+        "xls_owner_ns": 700546,
+        "selected_query_ns": 240,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 724149,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 50021,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 30101,
+        "xls_owner_ns": 693657,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712263,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40550,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 34568,
+        "xls_owner_ns": 677294,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 701507,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38631,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28329,
+        "xls_owner_ns": 672788,
+        "selected_query_ns": 260,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 691904,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38778,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28189,
+        "xls_owner_ns": 663315,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 706604,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38517,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28319,
+        "xls_owner_ns": 677875,
+        "selected_query_ns": 300,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 729857,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38684,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28469,
+        "xls_owner_ns": 700977,
+        "selected_query_ns": 311,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 710941,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38131,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28990,
+        "xls_owner_ns": 681580,
+        "selected_query_ns": 270,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 712192,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40939,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28669,
+        "xls_owner_ns": 683162,
+        "selected_query_ns": 260,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 707165,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 38629,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28529,
+        "xls_owner_ns": 678206,
+        "selected_query_ns": 331,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 722237,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43499,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28249,
+        "xls_owner_ns": 693607,
+        "selected_query_ns": 271,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 724550,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 40925,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29360,
+        "xls_owner_ns": 694759,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 711882,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 42554,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28780,
+        "xls_owner_ns": 682721,
+        "selected_query_ns": 270,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 715867,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 43887,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 28389,
+        "xls_owner_ns": 687058,
+        "selected_query_ns": 310,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 801425,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41894,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 43540,
+        "xls_owner_ns": 757415,
+        "selected_query_ns": 360,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 717209,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 41962,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 30301,
+        "xls_owner_ns": 686517,
+        "selected_query_ns": 291,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    },
+    {
+      "elapsed_ns": 720094,
+      "observation": {
+        "kind": "list",
+        "worksheet_count": null,
+        "worksheet_names": [
+          "Home",
+          "Products1",
+          "Products2",
+          "Book tour",
+          "Grades",
+          "Customers1",
+          "FY months",
+          "Regional sales",
+          "Mountains",
+          "Category sales",
+          "Banded rows",
+          "Products3",
+          "Customers2"
+        ],
+        "cell": null
+      },
+      "metrics": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "len_calls": 0,
+        "read_ns": 39587,
+        "version_ns": 0,
+        "len_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      },
+      "source_version_stable": null,
+      "eager_phases": {
+        "cfb_open_ns": 29201,
+        "xls_owner_ns": 690462,
+        "selected_query_ns": 321,
+        "cfb_open_read_calls": 25,
+        "cfb_open_read_bytes": 13824,
+        "xls_owner_read_calls": 21,
+        "xls_owner_read_bytes": 1314225,
+        "selected_query_read_calls": 0,
+        "selected_query_read_bytes": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,596 @@
+{
+  "schema_version": 1,
+  "change": 278,
+  "date": "2026-08-25",
+  "classification": {
+    "status": "diagnostic attribution retained; freshness-session candidate selected for a separate production batch",
+    "performance_claim": "none",
+    "accepted_scope": "warm-cache logical-I/O and within-family source-wrapper attribution",
+    "withheld": [
+      "control/candidate latency",
+      "selector-wide latency",
+      "tail latency",
+      "cross-family elapsed comparisons",
+      "cold-cache or physical I/O",
+      "allocation, RSS, or peak memory",
+      "independent source-parser semantic oracle",
+      "broad XLS or CFB"
+    ]
+  },
+  "identity": {
+    "revision": "b2c2260efa36421e446b52e0983f9bca8fd12ac3",
+    "binary_sha256": "9ce0514e5106f7d019b58d54d888ae39656f68eef04487f531b2f3f0783b72b3",
+    "binary_bytes": 8417112,
+    "clean_detached_worktree": true
+  },
+  "protocol": {
+    "profile": "release",
+    "rust_toolchain": "1.95.0",
+    "cpu": 2,
+    "workers": 1,
+    "warmups_per_report": 20,
+    "retained_samples_per_report": 100,
+    "reports": 17,
+    "cache_state": "warm",
+    "process_isolation": "one child per mode/operation; warmups and samples share that child",
+    "input_staging": "the original input is copied once outside timing into a private read-only staged file; all path-backed samples reopen that snapshot; full-file staging and post-run SHA-256 verification are outside elapsed_ns, warm the page cache, and do not measure cold or physical I/O",
+    "semantic_scope": "implementation-local compatibility projections only; no independent source-parser oracle and no source/eager equivalence assertion"
+  },
+  "corpus": {
+    "repository_path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "archive_bytes": 1402368,
+    "archive_sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "workbook_stream_bytes": 1314225,
+    "workbook_stream_sha256": "99305abd97f40bfc2fa4c052701bbebc971c1feb12278e8b76ecfbaca777676f"
+  },
+  "semantics": {
+    "source_projection": {
+      "worksheet_count": 16,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "Quarters",
+        "Bike rating",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Compare to totals",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "eager_projection": {
+      "worksheet_count": 13,
+      "worksheet_names": [
+        "Home",
+        "Products1",
+        "Products2",
+        "Book tour",
+        "Grades",
+        "Customers1",
+        "FY months",
+        "Regional sales",
+        "Mountains",
+        "Category sales",
+        "Banded rows",
+        "Products3",
+        "Customers2"
+      ],
+      "selected_cell": null
+    },
+    "selected_cell_source_and_eager": "string:4:Date",
+    "facade_parity": "open/list exact with source projection; selected-cell API unavailable"
+  },
+  "reports": [
+    {
+      "mode": "atomic-file",
+      "operation": "list",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom positional FileExt ReadAt over a staged immutable file; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "synthetic fixed SourceVersion::new(1, 0) over an immutable staged fixture; freshness/version behavior is not representative",
+      "timing": {
+        "p50_ns": 278709,
+        "mean_ns": 280625,
+        "p95_ns": 293485,
+        "p99_ns": 301305
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 32369,
+        "len_calls": 1,
+        "len_ns": 24,
+        "read_ns": 87951,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "atomic-file",
+      "operation": "one-cell",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom positional FileExt ReadAt over a staged immutable file; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "synthetic fixed SourceVersion::new(1, 0) over an immutable staged fixture; freshness/version behavior is not representative",
+      "timing": {
+        "p50_ns": 358024,
+        "mean_ns": 361455,
+        "p95_ns": 382528,
+        "p99_ns": 401704
+      },
+      "metrics_mean": {
+        "read_calls": 920,
+        "read_bytes": 569391,
+        "version_calls": 1802,
+        "version_ns": 46745,
+        "len_calls": 1,
+        "len_ns": 24,
+        "read_ns": 119114,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "atomic-file",
+      "operation": "open",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom positional FileExt ReadAt over a staged immutable file; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "synthetic fixed SourceVersion::new(1, 0) over an immutable staged fixture; freshness/version behavior is not representative",
+      "timing": {
+        "p50_ns": 277687,
+        "mean_ns": 281190,
+        "p95_ns": 300514,
+        "p99_ns": 321273
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 32255,
+        "len_calls": 1,
+        "len_ns": 24,
+        "read_ns": 89571,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "eager-file",
+      "operation": "list",
+      "timing_scope": "eager-file family: staged file open, CFB open, XLS owner construction, and query are inside elapsed_ns; compare elapsed_ns only within eager-file, never against source-backed or facade-file",
+      "counter_scope": "counting Read/Seek wrapper around the eager raw CFB/XLS owner; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "eager compatibility control; source construction and timing scope are not paired with positional modes; the staged fixture is immutable and warm-cache",
+      "timing": {
+        "p50_ns": 709929,
+        "mean_ns": 713087,
+        "p95_ns": 741773,
+        "p99_ns": 766727
+      },
+      "metrics_mean": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "version_ns": 0,
+        "len_calls": 0,
+        "len_ns": 0,
+        "read_ns": 40177,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      }
+    },
+    {
+      "mode": "eager-file",
+      "operation": "one-cell",
+      "timing_scope": "eager-file family: staged file open, CFB open, XLS owner construction, and query are inside elapsed_ns; compare elapsed_ns only within eager-file, never against source-backed or facade-file",
+      "counter_scope": "counting Read/Seek wrapper around the eager raw CFB/XLS owner; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "eager compatibility control; source construction and timing scope are not paired with positional modes; the staged fixture is immutable and warm-cache",
+      "timing": {
+        "p50_ns": 730864,
+        "mean_ns": 744508,
+        "p95_ns": 876990,
+        "p99_ns": 943251
+      },
+      "metrics_mean": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "version_ns": 0,
+        "len_calls": 0,
+        "len_ns": 0,
+        "read_ns": 42411,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      }
+    },
+    {
+      "mode": "eager-file",
+      "operation": "open",
+      "timing_scope": "eager-file family: staged file open, CFB open, XLS owner construction, and query are inside elapsed_ns; compare elapsed_ns only within eager-file, never against source-backed or facade-file",
+      "counter_scope": "counting Read/Seek wrapper around the eager raw CFB/XLS owner; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "eager compatibility control; source construction and timing scope are not paired with positional modes; the staged fixture is immutable and warm-cache",
+      "timing": {
+        "p50_ns": 718966,
+        "mean_ns": 723699,
+        "p95_ns": 757384,
+        "p99_ns": 788748
+      },
+      "metrics_mean": {
+        "read_calls": 46,
+        "read_bytes": 1328049,
+        "version_calls": 0,
+        "version_ns": 0,
+        "len_calls": 0,
+        "len_ns": 0,
+        "read_ns": 41767,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 47
+      }
+    },
+    {
+      "mode": "facade-file",
+      "operation": "list",
+      "timing_scope": "facade-file family: public facade open/detection and query are inside elapsed_ns; compare elapsed_ns only within facade-file, never against source-backed or eager-file",
+      "counter_scope": "facade file API; filesystem counters are not exposed; staged warm page-cache and no physical-I/O counter",
+      "limitation": "facade-file uses the unified public Workbook API; filesystem counters are not exposed; the staged fixture is immutable and warm-cache, so physical I/O is not measured",
+      "timing": {
+        "p50_ns": 358294,
+        "mean_ns": 360714,
+        "p95_ns": 376179,
+        "p99_ns": 391190
+      },
+      "metrics_mean": {
+        "read_calls": 0,
+        "read_bytes": 0,
+        "version_calls": 0,
+        "version_ns": 0,
+        "len_calls": 0,
+        "len_ns": 0,
+        "read_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "facade-file",
+      "operation": "open",
+      "timing_scope": "facade-file family: public facade open/detection and query are inside elapsed_ns; compare elapsed_ns only within facade-file, never against source-backed or eager-file",
+      "counter_scope": "facade file API; filesystem counters are not exposed; staged warm page-cache and no physical-I/O counter",
+      "limitation": "facade-file uses the unified public Workbook API; filesystem counters are not exposed; the staged fixture is immutable and warm-cache, so physical I/O is not measured",
+      "timing": {
+        "p50_ns": 380299,
+        "mean_ns": 401556,
+        "p95_ns": 470369,
+        "p99_ns": 636749
+      },
+      "metrics_mean": {
+        "read_calls": 0,
+        "read_bytes": 0,
+        "version_calls": 0,
+        "version_ns": 0,
+        "len_calls": 0,
+        "len_ns": 0,
+        "read_ns": 0,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "file-source",
+      "operation": "list",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "FileSource ReadAt wrapper over a staged immutable file; len/version/read calls are counted; warm page-cache and no physical-I/O counter",
+      "limitation": "the staged fixture is immutable and warm-cache; this measures logical FileSource calls, not physical I/O",
+      "timing": {
+        "p50_ns": 458813,
+        "mean_ns": 461588,
+        "p95_ns": 477119,
+        "p99_ns": 496715
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 216177,
+        "len_calls": 1,
+        "len_ns": 154,
+        "read_ns": 88052,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "file-source",
+      "operation": "one-cell",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "FileSource ReadAt wrapper over a staged immutable file; len/version/read calls are counted; warm page-cache and no physical-I/O counter",
+      "limitation": "the staged fixture is immutable and warm-cache; this measures logical FileSource calls, not physical I/O",
+      "timing": {
+        "p50_ns": 624941,
+        "mean_ns": 627670,
+        "p95_ns": 642025,
+        "p99_ns": 669283
+      },
+      "metrics_mean": {
+        "read_calls": 920,
+        "read_bytes": 569391,
+        "version_calls": 1802,
+        "version_ns": 311813,
+        "len_calls": 1,
+        "len_ns": 158,
+        "read_ns": 120506,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "file-source",
+      "operation": "open",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "FileSource ReadAt wrapper over a staged immutable file; len/version/read calls are counted; warm page-cache and no physical-I/O counter",
+      "limitation": "the staged fixture is immutable and warm-cache; this measures logical FileSource calls, not physical I/O",
+      "timing": {
+        "p50_ns": 459173,
+        "mean_ns": 462449,
+        "p95_ns": 478650,
+        "p99_ns": 500421
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 217718,
+        "len_calls": 1,
+        "len_ns": 158,
+        "read_ns": 87896,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "list",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom immutable ReadAt over staged bytes; no filesystem I/O",
+      "limitation": null,
+      "timing": {
+        "p50_ns": 218997,
+        "mean_ns": 222767,
+        "p95_ns": 253669,
+        "p99_ns": 284492
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 33439,
+        "len_calls": 1,
+        "len_ns": 25,
+        "read_ns": 24046,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom immutable ReadAt over staged bytes; no filesystem I/O",
+      "limitation": null,
+      "timing": {
+        "p50_ns": 285950,
+        "mean_ns": 291378,
+        "p95_ns": 327422,
+        "p99_ns": 373776
+      },
+      "metrics_mean": {
+        "read_calls": 920,
+        "read_bytes": 569391,
+        "version_calls": 1802,
+        "version_ns": 47083,
+        "len_calls": 1,
+        "len_ns": 24,
+        "read_ns": 34518,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "open",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom immutable ReadAt over staged bytes; no filesystem I/O",
+      "limitation": null,
+      "timing": {
+        "p50_ns": 218176,
+        "mean_ns": 225507,
+        "p95_ns": 252258,
+        "p99_ns": 375017
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 33602,
+        "len_calls": 1,
+        "len_ns": 25,
+        "read_ns": 23648,
+        "mutex_ns": 0,
+        "range_union_ns": 0,
+        "range_union_bytes": 0,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "tracked-file",
+      "operation": "list",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom positional ReadAt over a staged immutable file with mutex-protected File and range-union counters; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "synthetic fixed SourceVersion::new(1, 0) over an immutable staged fixture; freshness/version behavior is not representative",
+      "timing": {
+        "p50_ns": 1591230,
+        "mean_ns": 1601736,
+        "p95_ns": 1669163,
+        "p99_ns": 1735923
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 32746,
+        "len_calls": 1,
+        "len_ns": 24,
+        "read_ns": 98071,
+        "mutex_ns": 17197,
+        "range_union_ns": 1247149,
+        "range_union_bytes": 565201,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "tracked-file",
+      "operation": "one-cell",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom positional ReadAt over a staged immutable file with mutex-protected File and range-union counters; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "synthetic fixed SourceVersion::new(1, 0) over an immutable staged fixture; freshness/version behavior is not representative",
+      "timing": {
+        "p50_ns": 1851158,
+        "mean_ns": 1853657,
+        "p95_ns": 1891729,
+        "p99_ns": 1906460
+      },
+      "metrics_mean": {
+        "read_calls": 920,
+        "read_bytes": 569391,
+        "version_calls": 1802,
+        "version_ns": 47437,
+        "len_calls": 1,
+        "len_ns": 25,
+        "read_ns": 133652,
+        "mutex_ns": 24670,
+        "range_union_ns": 1379881,
+        "range_union_bytes": 566907,
+        "seek_calls": 0
+      }
+    },
+    {
+      "mode": "tracked-file",
+      "operation": "open",
+      "timing_scope": "source-backed family: staged source construction is outside elapsed_ns; production CFB/XLS open/query and internal source probes are timed; compare elapsed_ns only within this family, never against eager-file or facade-file",
+      "counter_scope": "custom positional ReadAt over a staged immutable file with mutex-protected File and range-union counters; logical reads only; warm page-cache and no physical-I/O counter",
+      "limitation": "synthetic fixed SourceVersion::new(1, 0) over an immutable staged fixture; freshness/version behavior is not representative",
+      "timing": {
+        "p50_ns": 1610331,
+        "mean_ns": 1615730,
+        "p95_ns": 1659518,
+        "p99_ns": 1748292
+      },
+      "metrics_mean": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": 32512,
+        "len_calls": 1,
+        "len_ns": 24,
+        "read_ns": 99184,
+        "mutex_ns": 17408,
+        "range_union_ns": 1254549,
+        "range_union_bytes": 565201,
+        "seek_calls": 0
+      }
+    }
+  ],
+  "atomic_vs_file_source": [
+    {
+      "operation": "open",
+      "p50_gap_ns": 181486,
+      "p50_file_source_slower_percent": 65.36,
+      "mean_gap_ns": 181259,
+      "mean_file_source_slower_percent": 64.46,
+      "version_mean_gap_ns": 185463,
+      "file_source_version_share_of_mean_percent": 47.08,
+      "exact_logical_work_equal": true
+    },
+    {
+      "operation": "list",
+      "p50_gap_ns": 180104,
+      "p50_file_source_slower_percent": 64.62,
+      "mean_gap_ns": 180963,
+      "mean_file_source_slower_percent": 64.49,
+      "version_mean_gap_ns": 183808,
+      "file_source_version_share_of_mean_percent": 46.83,
+      "exact_logical_work_equal": true
+    },
+    {
+      "operation": "one-cell",
+      "p50_gap_ns": 266917,
+      "p50_file_source_slower_percent": 74.55,
+      "mean_gap_ns": 266215,
+      "mean_file_source_slower_percent": 73.65,
+      "version_mean_gap_ns": 265068,
+      "file_source_version_share_of_mean_percent": 49.68,
+      "exact_logical_work_equal": true
+    }
+  ],
+  "tracked_accounting": [
+    {
+      "operation": "open",
+      "range_union_mean_ns": 1254549,
+      "range_union_share_of_mean_percent": 77.65,
+      "mutex_mean_ns": 17408,
+      "unique_range_bytes": 565201
+    },
+    {
+      "operation": "list",
+      "range_union_mean_ns": 1247149,
+      "range_union_share_of_mean_percent": 77.86,
+      "mutex_mean_ns": 17197,
+      "unique_range_bytes": 565201
+    },
+    {
+      "operation": "one-cell",
+      "range_union_mean_ns": 1379881,
+      "range_union_share_of_mean_percent": 74.44,
+      "mutex_mean_ns": 24670,
+      "unique_range_bytes": 566907
+    }
+  ],
+  "decision": {
+    "next_candidate": "operation-scoped CFB/XLS freshness session",
+    "threshold": "investigate only when central gap is at least 1% or approximately 50000 ns",
+    "reason": "atomic-file versus FileSource p50/mean gaps are positive for all three operations and are closely explained by extra measured version() time",
+    "required_next_evidence": "separate clean A1/B1/B2/A2 production comparison with exact freshness, logical-I/O, locality, semantic, error-precedence, cancellation, and tail gates"
+  }
+}

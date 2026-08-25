@@ -1,5 +1,15 @@
 # Performance CRUD coverage
 
+Change 0278 changes no production CRUD surface, parser, selector, or default
+case. Its opt-in runner binds a staged immutable XLS identity and records
+owned/atomic/tracked/FileSource plus standalone eager open/list/cell and facade
+open/list projections. Source/facade expose 16 sheets, eager exposes 13, and
+the selected cell is retained as an implementation-local compatibility
+projection rather than an equivalence claim. FileSource freshness work is selected for a future
+production batch, but this single-revision diagnostic package has
+`performance_claim: none`; the matrix remains **398 names** and the default
+remains **36 cases / 198 records**.
+
 Change 0277 changes no XLS CRUD surface, selector, or default count. Its public
 cursor remains in low-level `litchi-cfb`; XLS consumes it privately without
 retaining mutable cursor state or exposing CFB identifiers. Per-read freshness,
