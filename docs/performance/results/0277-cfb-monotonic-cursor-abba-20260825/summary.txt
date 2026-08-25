@@ -1,0 +1,65 @@
+Change 0277: CFB monotonic stream cursor / XLS strict A1-B1-B2-A2
+
+Classification
+- Retained as a measured reusable low-level enabler.
+- performance_claim: none.
+- Source p50/mean central cells pass both paired directions; open p95 also passes.
+- List and one-cell tails are rejected. No selector-wide or tail claim.
+- Eager controls are environment guards and are not attributable cursor results.
+
+Identity and protocol
+- Control: ebaaf057ad7773da7d9e061594c4c5100ff327ae
+  binary e046fa377f6e3e4f712a124d454e434e7da2b7c0af72ccd02aefa84673b22017
+  51,051,864 bytes
+- Candidate: eac9b7518f58b1796926adeaa26a5b9627ccf873
+  binary 9a9f6cd33e0c4368920f470a41765f007f22b637de716b0306613325e4affd4d
+  51,072,448 bytes
+- Configuration: a187ebf7988abcf5050f55498f0a6adca400d76c708012c04f89b8bbe0080109
+- Clean release worktrees, Rust 1.95.0, CPU 2, one worker.
+- A1/B1/B2/A2; fresh warm child per sample; 20 warmups; 500 retained samples.
+- One combined dispatch containing three eager and three source-backed selectors.
+- Positive percentages mean candidate faster.
+- Drift ceilings: p50/mean 5%, p95 10%, p99 15%.
+
+Corpus
+- Archive: 16,995,840 bytes
+  6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53
+- Workbook stream: 80,946 bytes
+  c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041
+
+Source-backed percent faster
+selector                 A1/B1 p50 mean p95 p99          A2/B2 p50 mean p95 p99
+open                     1.524 1.475 1.680 2.231         1.545 1.461 0.768 -1.246
+open+list                1.540 2.035 2.493 7.175         0.996 0.362 -4.648 -5.309
+open+one-cell            2.008 0.853 -1.813 -31.636     1.633 1.587 1.253 0.998
+
+Eager-control percent faster
+selector                 A1/B1 p50 mean p95 p99          A2/B2 p50 mean p95 p99
+open                     2.274 2.334 3.190 -0.992        -0.525 -0.863 -5.930 -4.032
+open+list                1.478 4.165 17.457 27.146       -0.797 -1.269 -0.624 -6.911
+open+one-cell            6.322 7.137 13.781 16.092      1.774 1.950 1.855 0.856
+
+Policy counts
+- 24 selector/statistic comparisons and 48 directional deltas.
+- 10 accepted, 14 rejected, 1 rejected eager-control cell adverse in both directions.
+- Review triggers retained: one-cell A1/B1 p99 31.636% slower; list A2/B2 p99
+  5.309% slower. Neither reproduces in the reverse paired leg.
+
+Exact paired source work
+selector       calls/bytes       CFB structural   globals        selected      versions
+open           334/138459        265/136704        69/1755        0/0           168
+open+list      334/138459        265/136704        69/1755        0/0           162
+open+one       362/138593        265/136704        69/1755        28/134        224
+
+All fields above are exact across every sample in all four legs for control and
+candidate. Unselected worksheet and opaque payload calls/bytes are zero.
+
+Decision boundary
+- The mechanism removes repeated in-memory chain walks and small header
+  allocations. It does not reduce logical reads, bytes, or version probes.
+- No FileSource, physical-I/O, cold-cache, allocation/RSS, peak-memory,
+  producer, encrypted, edit/save, broad XLS, or broad CFB claim.
+- tools/perf_abba_summary.py rejects this lifecycle corpus as a native XLS
+  numeric selector mismatch. The four raw reports are authoritative; this
+  corrected projection includes their paired source counters.
+- The diagnostic one-sample provenance probe is excluded.

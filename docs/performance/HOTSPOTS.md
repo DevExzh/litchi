@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## CFB monotonic cursor result and next XLS hotspot (change 0277)
+
+[Change 0277](changes/0277-cfb-monotonic-cursor-abba.md) removes repeated
+in-memory FAT/MiniFAT chain walks and small header allocations from the XLS
+source-backed forward scans. Strict A1/B1/B2/A2 evidence accepts the three
+source p50/mean cells and open p95, but rejects list/one-cell tails and retains
+the 31.64% and 5.31% adverse p99 review triggers. Logical ranges, bytes,
+version probes, and locality are exact-neutral, while the tracked source still
+runs roughly 11-12x eager. The next hotspot/evidence boundary is an owned vs
+atomic-only vs tracked vs FileSource/facade phase breakdown, followed only then
+by bounded safe span batching. `performance_claim: none`; the matrix remains
+**398 names** and **36 cases / 198 default records**.
+
 ## XLS source-global coalescing result and next hotspot (change 0276)
 
 [Change 0276](changes/0276-xls-source-global-coalescing.md) removes the
