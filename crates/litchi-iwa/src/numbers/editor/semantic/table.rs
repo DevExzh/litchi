@@ -9,15 +9,17 @@ use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
 
-type FocusedPopupError = litchi_numbers::cell::data_format::pop_up_menu::transaction::Error;
+use litchi_numbers::cell::CellControl;
 
-fn focused_popup_error(error: FocusedPopupError) -> Error {
+type FocusedControlError = litchi_numbers::cell::data_format::control::transaction::Error;
+
+fn focused_control_error(error: FocusedControlError) -> Error {
     Error::InvalidFormat(format!(
-        "focused Numbers Pop-Up Menu operation failed: {error}"
+        "focused Numbers cell-control operation failed: {error}"
     ))
 }
 
-fn focused_popup_location(
+fn focused_control_location(
     editor: &NumbersEditor,
     table_id: u64,
     row: usize,
@@ -31,49 +33,49 @@ fn focused_popup_location(
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
     let position =
         litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers Pop-Up Menu coordinate: {error}"))
+            Error::InvalidFormat(format!("invalid Numbers cell-control coordinate: {error}"))
         })?;
     let source_bytes = editor.to_bytes()?;
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
         Error::InvalidFormat(format!(
-            "focused Numbers Pop-Up Menu source validation failed: {error}"
+            "focused Numbers cell-control source validation failed: {error}"
         ))
     })?;
     Ok((source, sheet, table, position))
 }
 
-fn focused_popup_format(
+fn focused_control_format(
     editor: &NumbersEditor,
     table_id: u64,
     row: usize,
     column: usize,
-) -> Result<Option<PopUpMenu>> {
-    let (source, sheet, table, position) = focused_popup_location(editor, table_id, row, column)?;
+) -> Result<Option<CellControl>> {
+    let (source, sheet, table, position) = focused_control_location(editor, table_id, row, column)?;
     source
-        .table_cell_pop_up_menu_format(sheet, table, position)
-        .map_err(focused_popup_error)
+        .table_cell_control_format(sheet, table, position)
+        .map_err(focused_control_error)
 }
 
-fn commit_focused_popup_format(
+fn commit_focused_control_format(
     editor: &NumbersEditor,
     table_id: u64,
     row: usize,
     column: usize,
-    format: Option<PopUpMenu>,
+    format: Option<CellControl>,
 ) -> Result<NumbersEditor> {
     let source_bytes = editor.to_bytes()?;
-    let (source, sheet, table, position) = focused_popup_location(editor, table_id, row, column)?;
+    let (source, sheet, table, position) = focused_control_location(editor, table_id, row, column)?;
     let edit = source
-        .edit_table_cell_pop_up_menu_format(sheet, table, position)
-        .map_err(focused_popup_error)?;
+        .edit_table_cell_control_format(sheet, table, position)
+        .map_err(focused_control_error)?;
     let commit = match format {
         Some(format) => edit.set(format).commit(),
         None => edit.clear().commit(),
     }
-    .map_err(focused_popup_error)?;
+    .map_err(focused_control_error)?;
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
-        Error::InvalidFormat("could not allocate focused Numbers Pop-Up Menu candidate".to_owned())
+        Error::InvalidFormat("could not allocate focused Numbers cell-control candidate".to_owned())
     })?;
     commit
         .package()
@@ -229,14 +231,14 @@ impl NumbersEditor {
         column: usize,
     ) -> Result<DataFormat> {
         let format = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
-        if matches!(&format, DataFormat::PopUpMenu(_)) {
-            return focused_popup_format(self, table_id, row, column)?.map_or_else(
+        if CellControl::try_from(format.clone()).is_ok() {
+            return focused_control_format(self, table_id, row, column)?.map_or_else(
                 || {
                     Err(Error::InvalidFormat(
-                        "focused Numbers Pop-Up Menu read lost the selected format".to_owned(),
+                        "focused Numbers cell-control read lost the selected format".to_owned(),
                     ))
                 },
-                |format| Ok(DataFormat::PopUpMenu(format)),
+                |format| Ok(format.into_data_format()),
             );
         }
         Ok(format)
@@ -251,16 +253,12 @@ impl NumbersEditor {
         format: DataFormat,
     ) -> Result<()> {
         let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
-        if matches!(&format, DataFormat::PopUpMenu(_)) {
-            let format = match format {
-                DataFormat::PopUpMenu(format) => format,
-                _ => unreachable!("the Pop-Up Menu branch already matched"),
-            };
-            *self = commit_focused_popup_format(self, table_id, row, column, Some(format))?;
+        if let Ok(control) = CellControl::try_from(format.clone()) {
+            *self = commit_focused_control_format(self, table_id, row, column, Some(control))?;
             return Ok(());
         }
-        if matches!(current, DataFormat::PopUpMenu(_)) {
-            let mut staged = commit_focused_popup_format(self, table_id, row, column, None)?;
+        if CellControl::try_from(current).is_ok() {
+            let mut staged = commit_focused_control_format(self, table_id, row, column, None)?;
             cell_data_format::set_cell_data_format(
                 &mut staged.package,
                 table_id,
@@ -733,178 +731,6 @@ impl NumbersEditor {
             if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Duration reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read an explicit Checkbox format for one table cell.
-    pub fn table_cell_checkbox_format(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<Checkbox>> {
-        cell_data_format::cell_checkbox_format(&self.package, table_id, row, column)
-    }
-
-    /// Create or replace an explicit native Checkbox format transactionally.
-    pub fn set_table_cell_checkbox_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        format: Checkbox,
-    ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
-    }
-
-    /// Restore Automatic from an explicit Checkbox cell.
-    pub fn reset_table_cell_checkbox_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_checkbox_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers Checkbox reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read an explicit Star Rating format for one table cell.
-    pub fn table_cell_star_rating_format(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<StarRating>> {
-        cell_data_format::cell_star_rating_format(&self.package, table_id, row, column)
-    }
-
-    /// Create or replace an explicit native five-star rating transactionally.
-    pub fn set_table_cell_star_rating_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        format: StarRating,
-    ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
-    }
-
-    /// Restore Automatic from an explicit Star Rating cell.
-    pub fn reset_table_cell_star_rating_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_star_rating_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers Star Rating reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read an explicit Slider format for one table cell.
-    pub fn table_cell_slider_format(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<Slider>> {
-        cell_data_format::cell_slider_format(&self.package, table_id, row, column)
-    }
-
-    /// Create or replace an explicit native Slider format transactionally.
-    pub fn set_table_cell_slider_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        format: Slider,
-    ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
-    }
-
-    /// Restore Automatic from an explicit Slider cell.
-    pub fn reset_table_cell_slider_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_slider_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers Slider reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read an explicit Stepper format for one table cell.
-    pub fn table_cell_stepper_format(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<Stepper>> {
-        cell_data_format::cell_stepper_format(&self.package, table_id, row, column)
-    }
-
-    /// Create or replace an explicit native Stepper format transactionally.
-    pub fn set_table_cell_stepper_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        format: Stepper,
-    ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
-    }
-
-    /// Restore Automatic from an explicit Stepper cell.
-    pub fn reset_table_cell_stepper_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_stepper_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers Stepper reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;

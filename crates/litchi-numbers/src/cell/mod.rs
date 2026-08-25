@@ -7,6 +7,12 @@
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
+/// Unified archive-free interactive cell controls.
+///
+/// The value types are defined by the focused data-format modules and are
+/// re-exported here as a selector-friendly entry point. Native control-cell
+/// records and package transactions remain private to the package adapter.
+pub use data_format::control::CellControl;
 /// Native BNC adapters stay crate-private.  Their wire/common finite scalar
 /// is converted to the Numbers-owned [`FiniteF64`] at this boundary.
 pub(crate) mod wire {

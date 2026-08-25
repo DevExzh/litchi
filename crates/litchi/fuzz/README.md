@@ -95,6 +95,18 @@ not cross the fuzz target boundary. The checked-in seeds under
 `corpus/numbers_table_cell_pop_up_menu/` are command recipes, not native
 package bytes.
 
+`numbers_table_cell_control` is the unified selector-first cell-control
+lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
+Pop-Up Menu values through `Package::{table_cell_control_format,
+edit_table_cell_control_format,apply_table_cell_control_format}`. When a
+source admits the rooted control graph it exercises no-op and Some-to-Some
+reads, cross-kind replacement, clear/reset, exact inverse/apply/conflict,
+candidate readback, and source-byte atomicity. It also probes invalid ranges,
+all selector forms, bounded ingress limits, and redacted errors against the
+native Numbers seed. The recipes under
+`corpus/numbers_table_cell_control/` are command bytes only; no native IDs,
+BNC payloads, archive names, or generated values cross this target.
+
 `numbers_table_sort_order` is the focused selector-first persisted table-sort
 configuration target. It offers arbitrary bytes to bounded Numbers ingress
 and reuses native `basic.numbers` for no-op, set, clear/reset, exact patch apply,
@@ -379,6 +391,14 @@ Run the focused Numbers Pop-Up Menu lifecycle target with its command seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_pop_up_menu \
   corpus/numbers_table_cell_pop_up_menu -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the unified Numbers cell-control target with its command seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_control \
+  corpus/numbers_table_cell_control -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

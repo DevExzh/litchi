@@ -231,6 +231,8 @@ pub mod sheet;
 /// Sparse semantic table vocabulary.
 pub mod table;
 
+pub use cell::CellControl;
+pub use cell::data_format::{Checkbox, PopUpMenu, Slider, StarRating, Stepper};
 pub use document::{
     DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
     DocumentSourceLimits, DocumentSourceLimitsError, Error as DocumentError, IoKind,
