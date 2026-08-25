@@ -1735,10 +1735,18 @@ fn run_source(corpus: &Corpus, managed: bool) -> AnyResult<SourceRun> {
     })
 }
 
+fn cargo_lock_path_for(manifest_directory: &Path) -> PathBuf {
+    manifest_directory.join("Cargo.lock")
+}
+
+fn cargo_lock_path() -> PathBuf {
+    cargo_lock_path_for(Path::new(env!("CARGO_MANIFEST_DIR")))
+}
+
 fn provenance() -> AnyResult<Provenance> {
     let executable = env::current_exe()?;
     let executable_identity = hash_file_bounded(&executable, MAX_EXECUTABLE_HASH_BYTES)?;
-    let cargo_lock = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.lock");
+    let cargo_lock = cargo_lock_path();
     let cargo_lock_identity = hash_file_bounded(&cargo_lock, MAX_CARGO_LOCK_HASH_BYTES).ok();
     let repository = repository_root();
     let rustc_vv = command_text("rustc", &["-Vv"]);
@@ -1773,6 +1781,7 @@ fn provenance() -> AnyResult<Provenance> {
         rustc_vv,
         rustc_vv_sha256,
         executable_identity_policy: EXECUTABLE_IDENTITY_POLICY,
+        cargo_lock_path: cargo_lock.display().to_string(),
         cargo_lock_bytes: cargo_lock_identity.as_ref().map(|value| value.bytes),
         cargo_lock_sha256: cargo_lock_identity.map(|value| value.sha256),
         profile: EXPECTED_PROFILE.map(|value| value.to_owned()),
@@ -1804,6 +1813,7 @@ struct Provenance {
     rustc_vv: Option<String>,
     rustc_vv_sha256: Option<String>,
     executable_identity_policy: &'static str,
+    cargo_lock_path: String,
     cargo_lock_bytes: Option<usize>,
     cargo_lock_sha256: Option<String>,
     profile: Option<String>,
@@ -2314,6 +2324,19 @@ mod tests {
         assert!(exact_pin_matches(Some("abc"), Some("abc")));
         assert!(!exact_pin_matches(Some("abc"), Some("def")));
         assert!(!exact_pin_matches(None, Some("abc")));
+    }
+
+    #[test]
+    fn cargo_lock_path_is_package_local() {
+        let manifest_directory = Path::new("/evidence-worktree/tools/perf-baseline");
+        assert_eq!(
+            cargo_lock_path_for(manifest_directory),
+            PathBuf::from("/evidence-worktree/tools/perf-baseline/Cargo.lock")
+        );
+        assert_ne!(
+            cargo_lock_path_for(manifest_directory),
+            manifest_directory.join("../../Cargo.lock")
+        );
     }
 
     #[test]
