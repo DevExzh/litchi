@@ -3109,3 +3109,31 @@ balanced groups are source-preserved by the hidden codec. This owner edits
 persisted configuration only: it does not reorder rows, apply “Sort Now”, own
 table storage/UID/formula/comment movement, create/remove tables, repair
 unsupported producer graphs, or expose a native graph API.
+
+## 2026-08-26 amendment: Pages body-table sort semantic ownership
+
+Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` adds
+selector-first `Package::{body_table_sort_order, edit_body_table_sort_order,
+apply_body_table_sort_order}` ownership. Reads return the archive-free
+persisted `Order`; an edit produces a conflict-checked commit, exact patch,
+inverse, redacted diagnostics, and typed resource errors. The public semantic
+vocabulary is `BodyTableSelector` plus
+`table::sort::{Order, Rule, Scope, ColumnIndex, Direction, RowRange}`. No
+native identifier, physical member, archive, wire, generated, Prost, or Buffa
+value crosses the facade.
+
+The owner resolves one rooted body table, refuses locked or otherwise
+unproven table graphs, and changes only `TableModelArchive` field 44. Field 45
+(`sort_rule_reference_tracker`) is strictly validated for source authority but
+remains opaque and byte-exact. Exact no-op, patch application, inverse,
+candidate reopen, semantic readback, and object/member locality are package
+operations. The physical PagesEditor apply/reorder executor remains in
+`litchi-iwa`; this slice does not reorder rows, mutate cells, alter row/column
+UIDs, touch formulas/comments/storage, or create/remove tables.
+
+Unknown framing and unrelated model fields remain source-preserved. Malformed,
+duplicate, aliased, locked, or unsupported producer graphs fail closed before
+publication. Metadata, UUIDs, save tokens, previews, and unrelated package
+members are not mutation targets and remain exact. This is persisted sort
+configuration ownership only, not a public physical row-sort or general table
+graph API.

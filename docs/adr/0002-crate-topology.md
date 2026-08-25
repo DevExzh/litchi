@@ -3687,3 +3687,32 @@ the `litchi-iwa -> litchi-numbers` edge, debts 014 and 017, migration hosts,
 generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
 No crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by this cut.
+
+## 2026-08-26 amendment: Wave84 Pages body-table sort boundary
+
+Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` makes
+`litchi-pages` the selector-first owner of persisted body-table sort-order
+reads, edits, exact patch application, and inverse artifacts for admitted
+rooted Pages tables. The archive-free facade is
+`Package::{body_table_sort_order, edit_body_table_sort_order,
+apply_body_table_sort_order}` with `BodyTableSelector` and
+`table::sort::{Order, Rule, Scope, ColumnIndex, Direction, RowRange}`. Native
+object identifiers, component/member locators, raw bytes, archive and wire
+values, generated messages, Prost values, and Buffa views do not cross this
+boundary.
+
+The strict shared neutral codec owns the source-preserving projection of
+`TableModelArchive` persisted sort field 44. The package owns rooted table
+selection, lock refusal, operation-local resource accounting, exact patch and
+inverse artifacts, prepared reassembly, candidate reopen, semantic readback,
+and object/member locality. Field 45,
+`sort_rule_reference_tracker`, is strictly validated but remains opaque and
+byte-exact. The physical PagesEditor apply/reorder path remains in
+`litchi-iwa`; this owner does not move rows or rewrite table storage.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 017 and the
+`litchi-iwa -> litchi-pages` edge remain open, as do migration hosts,
+generated-schema and normal Prost/Buffa owners, and the IWA monolith. No
+crate, dependency edge, debt item, production manifest dependency, or
+monolith owner is removed by this cut.
