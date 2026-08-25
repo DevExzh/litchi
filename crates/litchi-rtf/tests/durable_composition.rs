@@ -175,6 +175,80 @@ fn durable_composition_replays_and_inverts_exact_underline_styles() {
 }
 
 #[test]
+fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap() {
+    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut strike_edit = source.edit();
+    strike_edit
+        .set_text_strike(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let strike = strike_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(strike.operations()[0].op, "character-strike.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(strike.clone()).unwrap();
+    disjoint.join(underline.clone()).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    assert!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .strike()
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().strike()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(strike).unwrap();
+    let mut overlapping_underline = source.edit();
+    overlapping_underline
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
 fn durable_join_preflights_combined_reversible_payload_before_mutation() {
     let left_text = "a".repeat(100_000);
     let right_text = "b".repeat(100_000);
