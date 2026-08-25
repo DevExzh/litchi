@@ -3657,6 +3657,37 @@ generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
 No crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by this cut.
 
+## 2026-08-26 amendment: Wave86 Numbers unified cell-control split-read boundary
+
+Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` narrows the
+unified Numbers cell-control boundary to strict reads and byte-exact no-ops
+for selected split-component graphs. The existing selector-first facade is
+`Package::{table_cell_control_format, edit_table_cell_control_format,
+apply_table_cell_control_format}` with `SheetSelector`, `TableSelector`,
+`CellPosition`, and archive-free `CellControl` values. This amendment does
+not add a crate, dependency edge, generated-schema owner, or physical graph
+owner.
+
+The split-read route proves the selected current/effective component edge,
+rejects conflicting or versioned ownership, physical aliases, and effective
+locator disagreement, and uses one cached `RegistryFacts`/physical census per
+logical read. Selected `TableModel` sidecar references require exactly one
+aggregate occurrence; an explicit `FieldInfo` occurrence must be unique and
+`ObjectReference` typed, while producer-omitted `FieldInfo` remains accepted.
+The exact `FieldInfo` path is not part of this boundary claim. The root
+Document/TableInfo-to-CalculationEngine/TableModel metadata edge is not owned
+or proven here. Same-component graphs do not require external-edge inspection.
+
+Opaque inbound references are accepted for read/no-op, but every changed
+split-component route, including popup-only routes, calls the pre-publication
+cross-component refusal and leaves source bytes unchanged. No cross-component
+copy-on-write, UUID/save-token transition, candidate/locality verification,
+or inverse artifact is claimed. The inventory remains 64 workspace packages,
+239 internal dependency declarations, and 13 ordered migration debts; debts
+015 and 017 and the `litchi-iwa -> litchi-numbers` and
+`litchi-iwa -> litchi-pages` edges, migration hosts, generated-schema and
+normal Prost/Buffa owners, and the IWA monolith remain.
+
 ## 2026-08-25 amendment: Wave83 Numbers table-sort boundary
 
 Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`

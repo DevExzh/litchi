@@ -2568,3 +2568,30 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 migration hosts, generated-schema and normal Prost/Buffa owners, and the IWA
 monolith. No crate, dependency edge, debt item, production manifest
 dependency, or monolith is removed by this cut.
+
+## 2026-08-26 amendment: Wave86 current-topology Numbers unified cell-control split-read cut
+
+Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` makes the
+current topology claim for unified Numbers controls deliberately bounded:
+strict reads and byte-exact no-ops may traverse selected split-component
+format/control graphs, while all changed split-component routes fail closed
+before native/ZIP candidate publication. The package proves current/effective
+locator and external-edge ownership for the selected edge, rejects versioned,
+conflicting, effective-locator-disagreeing, and physical-alias targets, and
+uses one cached `RegistryFacts`/physical census per logical read.
+
+Selected `TableModel` sidecar refs require one aggregate occurrence; explicit
+`FieldInfo` is accepted only when unique and `ObjectReference` typed, with
+producer-omitted `FieldInfo` accepted and no exact path claim. The root
+Document/TableInfo-to-CalculationEngine/TableModel metadata edge is not owned
+or proven. Same-component graphs do not require external-edge inspection;
+opaque inbound refs are accepted for read/no-op but reject changed routes.
+No cross-component COW, UUID/save-token, locality, candidate reopen, inverse,
+or successful split write is part of the topology cut.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debt 017 and the
+`litchi-iwa -> litchi-pages` edge, migration hosts, generated-schema and
+normal Prost/Buffa owners, and the IWA monolith. No crate, dependency edge,
+debt item, production manifest dependency, or monolith is removed by Wave86.

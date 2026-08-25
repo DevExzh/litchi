@@ -13940,3 +13940,49 @@ candidate open/save/reopen, and normalized semantic reread are therefore
 withheld for Wave85. This source is current UI provenance and exact evidence
 of the cross-component scope boundary only; it is not Rust/native byte parity,
 publication acceptance, performance/RSS, or a full-workspace claim.
+
+## 2026-08-26 amendment: Wave86 Numbers unified cell-control split-read verification record
+
+Implementation commit `3dfe506f4febe7f389db4f60b2988430bbd6038e` was verified
+with these scoped gates:
+
+- `litchi-numbers` library check passed, with only the existing
+  `object_count` deprecation warnings;
+- the focused unified cell-control integration passed 20/20;
+- the focused Pop-Up Menu integration passed 19/19;
+- strict scoped library/test Clippy passed with the documented existing
+  deprecation and `manual_contains` allowances;
+- the package control fuzz-target check passed with only existing
+  `object_count`/text deprecation warnings;
+- boundary Python compilation passed and the boundary unittest passed 525/525;
+- `cargo fmt --all --check` passed before the final comment-only adjustment,
+  and scoped documentation/source diff checks passed.
+
+The live boundary checker exited 1 only for the three known untracked Pages
+table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`). It reported no Wave86
+Numbers control finding. The workspace-wide precommit remained blocked only by
+unrelated preserved formatting/lint/test state; no full-workspace-green claim
+follows.
+
+The exact source and committed corpus are the same file bytes:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `/private/tmp/litchi-wave85-numbers-controls-native/source.numbers` | 143,744 | `9af60c5d67a02675902be60a4bd9ea2767650924aca5662854d0d4bd9882344f` |
+| committed corpus `crates/litchi/fuzz/corpus/numbers_table_cell_control/split_component_source.numbers` | 143,744 | `9af60c5d67a02675902be60a4bd9ea2767650924aca5662854d0d4bd9882344f` |
+
+Numbers 14.4 opened the source at its exact path without repair, recovery, or
+conversion UI. Accessibility inspection exposed Table 1 as 22 by 7 and
+reported B2 Checkbox unchecked, B3 Star Rating 3/5, B4 Slider 25 with range
+0..25 and step 1 using automatic decimal formatting, and B5 Stepper 5 with
+range 0..5 and step 1 using automatic decimal formatting. Rust strict read
+matched those four controls through the split graph. No UI mutation, save,
+close/reopen round-trip, Rust candidate, inverse, native normalization, or
+publication was performed.
+
+This is bounded strict read/no-op and source-corpus evidence only. It makes no
+Rust/native byte-parity, cross-component COW, UUID/save-token, locality,
+inverse, performance/RSS, durable-publication, host/edge/debt, monolith-exit,
+or full-workspace claim.
