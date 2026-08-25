@@ -14,6 +14,7 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
 use litchi_numbers::CellPosition;
+use litchi_numbers::cell::data_format::control::transaction::Error as ControlError;
 use litchi_numbers::cell::data_format::control::{
     CellControl, DisplayFormat, Range, Slider, Stepper,
 };
@@ -27,6 +28,11 @@ use prost::Message as _;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
+const CALCULATION_MEMBER: &str = "Index/CalculationEngine.iwa";
+const TILE_MEMBER: &str = "Index/Tables/Tile.iwa";
+const FORMAT_MEMBER: &str = "Index/Tables/DataList-904498-2.iwa";
+const CONTROL_MEMBER: &str = "Index/Tables/DataList-904499-2.iwa";
+const POPUP_MEMBER: &str = "Index/Tables/Popup-905753.iwa";
 const VIEW_STATE_MEMBER: &str = "Index/ViewState.iwa";
 const METADATA_MEMBER: &str = "Index/Metadata.iwa";
 const METADATA_TYPE: u32 = 11_006;
@@ -37,9 +43,18 @@ const TABLE_INFO_ID: u64 = 3;
 const TABLE_MODEL_ID: u64 = 4;
 const SIDECAR_ID: u64 = 5;
 const TILE_ID: u64 = 6;
+const FORMAT_LIST_ID: u64 = 7;
+const CONTROL_LIST_ID: u64 = 8;
 const CONTROL_MODEL_ID: u64 = 50;
 const VIEW_STATE_ID: u64 = 300;
 const METADATA_OBJECT_ID: u64 = 900;
+const CALCULATION_COMPONENT_ID: u64 = 200;
+const TILE_COMPONENT_ID: u64 = 201;
+// Native anonymous format-list sidecars use the list object's identifier as
+// the external target component identifier.
+const FORMAT_COMPONENT_ID: u64 = FORMAT_LIST_ID;
+const CONTROL_COMPONENT_ID: u64 = 203;
+const POPUP_COMPONENT_ID: u64 = 204;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FixtureMode {
@@ -83,6 +98,31 @@ enum MetadataCorruption {
     AmbiguousControlIdentifier,
     DataOwnerControlIdentifier,
     RootDataMapControlIdentifier,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SplitMetadataCorruption {
+    MissingCalculationExternal,
+    MissingTileExternal,
+    MissingControlExternal,
+    MissingPopupExternal,
+    DuplicateCalculationExternal,
+    DuplicatePopupExternal,
+    ComponentAndObjectFormatExternal,
+    VersionedCalculationExternal,
+    VersionedPopupExternal,
+    VersionedAnonymousFormatComponent,
+    WrongCalculationLocator,
+    WrongControlLocator,
+    OpaquePopupInbound,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SplitModelReferenceCorruption {
+    MissingFormatAggregate,
+    DuplicateFormatAggregate,
+    WrongFormatFieldType,
+    DuplicateFormatField,
 }
 
 trait ExactBytes {
@@ -573,6 +613,291 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
     )?)
 }
 
+/// Rebuild the synthetic graph with the component split used by the native
+/// Wave85 source: the rooted model lives in CalculationEngine, its tile is a
+/// Tables member, format/control lists are separate list members, and the
+/// popup model is a separate current component.  The source is deliberately
+/// metadata-complete even though the current owner rejects this dependency
+/// shape before mutation; the test below keeps that rejection atomic while
+/// allowing a future cross-component owner to exercise the full transaction.
+fn split_component_fixture() -> TestResult<Vec<u8>> {
+    let source = fixture(FixtureMode::Mixed)?;
+    let archive = member_archive(&source, DOCUMENT_MEMBER)?;
+    let document = archive
+        .object(DOCUMENT_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("Document object is missing"))?;
+    let sheet = archive
+        .object(SHEET_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("Sheet object is missing"))?;
+    let info = archive
+        .object(TABLE_INFO_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("TableInfo object is missing"))?;
+    let mut model = archive
+        .object(TABLE_MODEL_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("TableModel object is missing"))?;
+    let sidecar = archive
+        .object(SIDECAR_ID)
+        .ok_or_else(|| io::Error::other("sidecar object is missing"))?;
+    let tile = archive
+        .object(TILE_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("Tile object is missing"))?;
+    let popup = archive
+        .object(CONTROL_MODEL_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("Pop-Up model is missing"))?;
+
+    let mut model_payload = tst::TableModelArchive::decode(
+        model
+            .messages
+            .first()
+            .ok_or_else(|| io::Error::other("TableModel payload is missing"))?
+            .data
+            .as_slice(),
+    )?;
+    model_payload.base_data_store.format_table_pre_bnc = reference(FORMAT_LIST_ID);
+    model_payload.base_data_store.format_table = Some(reference(FORMAT_LIST_ID));
+    model_payload.base_data_store.control_cell_spec_table = Some(reference(CONTROL_LIST_ID));
+    model
+        .messages
+        .first_mut()
+        .ok_or_else(|| io::Error::other("TableModel payload is missing"))?
+        .data = model_payload.encode_to_vec();
+    if let Some(info) = model.archive_info.message_infos.first_mut() {
+        info.object_references = vec![SIDECAR_ID, TILE_ID, FORMAT_LIST_ID, CONTROL_LIST_ID];
+    }
+
+    let scalar_sidecar = object_with_messages(sidecar, &[0, 1])?;
+    let format_sidecar = object_with_messages_with_identifier(sidecar, FORMAT_LIST_ID, &[2])?;
+    let control_sidecar = object_with_messages_with_identifier(sidecar, CONTROL_LIST_ID, &[3])?;
+
+    let document_member = compressed(vec![document, sheet, info])?;
+    let calculation_member = compressed(vec![model, scalar_sidecar])?;
+    let tile_member = compressed(vec![tile])?;
+    let format_member = compressed(vec![format_sidecar])?;
+    let control_member = compressed(vec![control_sidecar])?;
+    let popup_member = compressed(vec![popup])?;
+    let view_member = Catalog::from_bytes(&source)?
+        .iter()
+        .find(|entry| entry.name() == VIEW_STATE_MEMBER)
+        .ok_or_else(|| io::Error::other("ViewState member is missing"))?
+        .data()
+        .to_vec();
+    let metadata_member = compressed(vec![object(
+        METADATA_OBJECT_ID,
+        METADATA_TYPE,
+        split_metadata_payload()?,
+    )?])?;
+
+    Ok(litchi_iwa_archive::package::to_bytes(
+        [
+            (DOCUMENT_MEMBER, document_member.as_slice()),
+            (CALCULATION_MEMBER, calculation_member.as_slice()),
+            (TILE_MEMBER, tile_member.as_slice()),
+            (FORMAT_MEMBER, format_member.as_slice()),
+            (CONTROL_MEMBER, control_member.as_slice()),
+            (POPUP_MEMBER, popup_member.as_slice()),
+            (VIEW_STATE_MEMBER, view_member.as_slice()),
+            (METADATA_MEMBER, metadata_member.as_slice()),
+            ("preview.jpg", b"split control preview".as_slice()),
+            ("preview-micro.jpg", b"split control micro".as_slice()),
+            ("preview-web.jpg", b"split control web".as_slice()),
+            (
+                "Data/sentinel.bin",
+                b"split unrelated control data".as_slice(),
+            ),
+        ],
+        Limits::default(),
+    )?)
+}
+
+/// Keep the rooted model, tile, and both lists co-located while moving only
+/// the shared Pop-Up Menu model to its own metadata-owned member. This guards
+/// the early changed-operation refusal against the smallest split graph.
+fn popup_only_split_fixture() -> TestResult<Vec<u8>> {
+    let source = fixture(FixtureMode::Mixed)?;
+    let popup = member_archive(&source, DOCUMENT_MEMBER)?
+        .object(CONTROL_MODEL_ID)
+        .cloned()
+        .ok_or_else(|| io::Error::other("Pop-Up model is missing"))?;
+    let source = rewrite_member(&source, DOCUMENT_MEMBER, |archive| {
+        archive
+            .remove_object(CONTROL_MODEL_ID)
+            .ok_or_else(|| io::Error::other("Pop-Up model is missing"))?;
+        Ok(())
+    })?;
+    let source = rewrite_metadata_root(&source, |metadata| {
+        let document = metadata
+            .components
+            .iter_mut()
+            .find(|component| component.identifier == 100)
+            .ok_or_else(|| io::Error::other("Document metadata is missing"))?;
+        document
+            .object_uuid_map_entries
+            .retain(|entry| entry.identifier != CONTROL_MODEL_ID);
+        document
+            .external_references
+            .push(tsp::ComponentExternalReference {
+                component_identifier: POPUP_COMPONENT_ID,
+                object_identifier: Some(CONTROL_MODEL_ID),
+                is_weak: None,
+            });
+        metadata.components.push(tsp::ComponentInfo {
+            identifier: POPUP_COMPONENT_ID,
+            preferred_locator: "Tables/Popup-905753".to_owned(),
+            locator: Some("Tables/Popup-905753".to_owned()),
+            save_token: Some(15),
+            object_uuid_map_entries: vec![uuid_entry(CONTROL_MODEL_ID)],
+            ..Default::default()
+        });
+        Ok(())
+    })?;
+    let popup_member = compressed(vec![popup])?;
+    let mut entries = Catalog::from_bytes(&source)?
+        .iter()
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .collect::<Vec<_>>();
+    entries.push((POPUP_MEMBER.to_owned(), popup_member));
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries
+            .iter()
+            .map(|(name, data)| (name.as_str(), data.as_slice())),
+        Limits::default(),
+    )?)
+}
+
+fn object_with_messages(source: &ArchiveObject, indices: &[usize]) -> TestResult<ArchiveObject> {
+    object_with_messages_with_identifier(
+        source,
+        source
+            .archive_info
+            .identifier
+            .ok_or_else(|| io::Error::other("source object identifier is missing"))?,
+        indices,
+    )
+}
+
+fn object_with_messages_with_identifier(
+    source: &ArchiveObject,
+    identifier: u64,
+    indices: &[usize],
+) -> TestResult<ArchiveObject> {
+    let messages = indices
+        .iter()
+        .map(|index| {
+            source
+                .messages
+                .get(*index)
+                .cloned()
+                .ok_or_else(|| io::Error::other("sidecar message is missing"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut object = ArchiveObject::new(identifier, messages)?;
+    object.archive_info = source.archive_info.clone();
+    object.archive_info.identifier = Some(identifier);
+    object.archive_info.message_infos = indices
+        .iter()
+        .map(|index| {
+            source
+                .archive_info
+                .message_infos
+                .get(*index)
+                .cloned()
+                .ok_or_else(|| io::Error::other("sidecar message metadata is missing"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(object)
+}
+
+fn split_metadata_component(
+    identifier: u64,
+    locator: &str,
+    token: u64,
+    object_ids: &[u64],
+    external_references: &[tsp::ComponentExternalReference],
+) -> TestResult<Vec<u8>> {
+    let mut data = tsp::ComponentInfo {
+        identifier,
+        preferred_locator: locator.to_owned(),
+        locator: Some(locator.to_owned()),
+        save_token: Some(token),
+        object_uuid_map_entries: object_ids.iter().copied().map(uuid_entry).collect(),
+        external_references: external_references.to_vec(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_varint_field(&mut data, 90, identifier.saturating_add(20_000))?;
+    Ok(data)
+}
+
+fn split_metadata_payload() -> TestResult<Vec<u8>> {
+    let external = |component_identifier, object_identifier| tsp::ComponentExternalReference {
+        component_identifier,
+        object_identifier: Some(object_identifier),
+        is_weak: None,
+    };
+    let external_component = |component_identifier| tsp::ComponentExternalReference {
+        component_identifier,
+        object_identifier: None,
+        is_weak: None,
+    };
+    let document = split_metadata_component(
+        100,
+        "Document",
+        9,
+        &[DOCUMENT_ID, SHEET_ID, TABLE_INFO_ID],
+        &[external(CALCULATION_COMPONENT_ID, TABLE_MODEL_ID)],
+    )?;
+    let calculation = split_metadata_component(
+        CALCULATION_COMPONENT_ID,
+        "CalculationEngine",
+        11,
+        &[TABLE_MODEL_ID, SIDECAR_ID],
+        &[
+            external(100, TABLE_INFO_ID),
+            external_component(TILE_COMPONENT_ID),
+            external_component(FORMAT_COMPONENT_ID),
+            external(CONTROL_COMPONENT_ID, CONTROL_LIST_ID),
+        ],
+    )?;
+    let tile = split_metadata_component(TILE_COMPONENT_ID, "Tables/Tile", 12, &[TILE_ID], &[])?;
+    let control = split_metadata_component(
+        CONTROL_COMPONENT_ID,
+        "Tables/DataList-904499-2",
+        14,
+        &[CONTROL_LIST_ID],
+        &[external(POPUP_COMPONENT_ID, CONTROL_MODEL_ID)],
+    )?;
+    let popup = split_metadata_component(
+        POPUP_COMPONENT_ID,
+        "Tables/Popup-905753",
+        15,
+        &[CONTROL_MODEL_ID],
+        &[],
+    )?;
+    let view = split_metadata_component(300, "ViewState", 7, &[VIEW_STATE_ID], &[])?;
+    let versioned = split_metadata_component(100, "Document", 3, &[999], &[])?;
+    let mut data = tsp::PackageMetadata {
+        last_object_identifier: 1_000,
+        save_token: Some(10),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    // The format-list sidecar deliberately has no ComponentInfo. Native
+    // Numbers packages authorize this producer shape with the current
+    // CalculationEngine component-level external edge above.
+    for component in [document, calculation, tile, control, popup, view] {
+        append_length_delimited_field(&mut data, 3, &component)?;
+    }
+    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_varint_field(&mut data, 90, 0xfeed_beef)?;
+    Ok(data)
+}
+
 fn member_archive(source: &[u8], member: &str) -> TestResult<Archive> {
     let catalog = Catalog::from_bytes(source)?;
     let entry = catalog
@@ -891,6 +1216,31 @@ fn assert_read_rejects(source: &[u8], label: &str) -> TestResult {
     }
 }
 
+fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
+    let package = Package::from_bytes(source)?;
+    let before = package.exact_bytes();
+    assert!(
+        package
+            .table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(0, 0),
+            )
+            .is_err(),
+        "hostile split graph read was accepted: {label}"
+    );
+    let result = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(0, 0),
+        )
+        .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
+    assert!(result.is_err(), "hostile split graph published: {label}");
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
 fn with_corruption(source: &[u8], corruption: Corruption) -> TestResult<Vec<u8>> {
     match corruption {
         Corruption::WrongInteraction => rewrite_control_list(source, |list| {
@@ -1111,18 +1461,22 @@ fn with_metadata_corruption(source: &[u8], corruption: MetadataCorruption) -> Te
 }
 
 fn with_physical_alias(source: &[u8]) -> TestResult<Vec<u8>> {
+    with_physical_alias_for_member(source, DOCUMENT_MEMBER, "Index/ControlAlias.iwa")
+}
+
+fn with_physical_alias_for_member(source: &[u8], member: &str, alias: &str) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(source)?;
-    let document = catalog
+    let aliased = catalog
         .iter()
-        .find(|entry| entry.name() == DOCUMENT_MEMBER)
-        .ok_or_else(|| io::Error::other("Document member missing"))?
+        .find(|entry| entry.name() == member)
+        .ok_or_else(|| io::Error::other(format!("{member} member missing")))?
         .data()
         .to_vec();
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect::<Vec<_>>();
-    entries.push(("Index/ControlAlias.iwa".to_owned(), document));
+    entries.push((alias.to_owned(), aliased));
     Ok(litchi_iwa_archive::package::to_bytes(
         entries
             .iter()
@@ -1156,6 +1510,151 @@ fn with_reserved_identifier(source: &[u8], identifier: u64) -> TestResult<Vec<u8
     })
 }
 
+fn with_split_metadata_corruption(
+    source: &[u8],
+    corruption: SplitMetadataCorruption,
+) -> TestResult<Vec<u8>> {
+    if matches!(corruption, SplitMetadataCorruption::OpaquePopupInbound) {
+        return rewrite_member(source, VIEW_STATE_MEMBER, |archive| {
+            let object = archive
+                .object_mut(VIEW_STATE_ID)
+                .ok_or_else(|| io::Error::other("ViewState object is missing"))?;
+            let info = object
+                .archive_info
+                .message_infos
+                .first_mut()
+                .ok_or_else(|| io::Error::other("ViewState message metadata is missing"))?;
+            info.object_references.push(CONTROL_MODEL_ID);
+            Ok(())
+        });
+    }
+    rewrite_metadata_root(source, |metadata| {
+        let calculation_index = metadata
+            .components
+            .iter()
+            .position(|component| component.identifier == CALCULATION_COMPONENT_ID)
+            .ok_or_else(|| io::Error::other("CalculationEngine metadata is missing"))?;
+        match corruption {
+            SplitMetadataCorruption::MissingCalculationExternal => {
+                metadata.components[calculation_index]
+                    .external_references
+                    .retain(|reference| reference.component_identifier != FORMAT_COMPONENT_ID);
+            },
+            SplitMetadataCorruption::MissingTileExternal => {
+                metadata.components[calculation_index]
+                    .external_references
+                    .retain(|reference| reference.component_identifier != TILE_COMPONENT_ID);
+            },
+            SplitMetadataCorruption::MissingControlExternal => {
+                metadata.components[calculation_index]
+                    .external_references
+                    .retain(|reference| reference.component_identifier != CONTROL_COMPONENT_ID);
+            },
+            SplitMetadataCorruption::MissingPopupExternal => {
+                let control = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == CONTROL_COMPONENT_ID)
+                    .ok_or_else(|| io::Error::other("control metadata is missing"))?;
+                control
+                    .external_references
+                    .retain(|reference| reference.component_identifier != POPUP_COMPONENT_ID);
+            },
+            SplitMetadataCorruption::DuplicateCalculationExternal => {
+                let reference = metadata.components[calculation_index]
+                    .external_references
+                    .iter()
+                    .find(|reference| reference.component_identifier == FORMAT_COMPONENT_ID)
+                    .cloned()
+                    .ok_or_else(|| io::Error::other("format external edge is missing"))?;
+                metadata.components[calculation_index]
+                    .external_references
+                    .push(reference);
+            },
+            SplitMetadataCorruption::DuplicatePopupExternal => {
+                let control = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == CONTROL_COMPONENT_ID)
+                    .ok_or_else(|| io::Error::other("control metadata is missing"))?;
+                let reference = control
+                    .external_references
+                    .iter()
+                    .find(|reference| reference.component_identifier == POPUP_COMPONENT_ID)
+                    .cloned()
+                    .ok_or_else(|| io::Error::other("popup external edge is missing"))?;
+                control.external_references.push(reference);
+            },
+            SplitMetadataCorruption::ComponentAndObjectFormatExternal => {
+                metadata.components[calculation_index]
+                    .external_references
+                    .push(tsp::ComponentExternalReference {
+                        component_identifier: FORMAT_COMPONENT_ID,
+                        object_identifier: Some(FORMAT_LIST_ID),
+                        is_weak: None,
+                    });
+            },
+            SplitMetadataCorruption::VersionedCalculationExternal => {
+                let reference = metadata.components[calculation_index]
+                    .external_references
+                    .iter()
+                    .find(|reference| reference.component_identifier == FORMAT_COMPONENT_ID)
+                    .cloned()
+                    .ok_or_else(|| io::Error::other("format external edge is missing"))?;
+                metadata.components[calculation_index]
+                    .external_references
+                    .retain(|candidate| candidate.component_identifier != FORMAT_COMPONENT_ID);
+                metadata.components[calculation_index]
+                    .versioned_external_references
+                    .push(reference);
+            },
+            SplitMetadataCorruption::VersionedPopupExternal => {
+                let control = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == CONTROL_COMPONENT_ID)
+                    .ok_or_else(|| io::Error::other("control metadata is missing"))?;
+                let reference = control
+                    .external_references
+                    .iter()
+                    .find(|reference| reference.component_identifier == POPUP_COMPONENT_ID)
+                    .cloned()
+                    .ok_or_else(|| io::Error::other("popup external edge is missing"))?;
+                control
+                    .external_references
+                    .retain(|candidate| candidate.component_identifier != POPUP_COMPONENT_ID);
+                control.versioned_external_references.push(reference);
+            },
+            SplitMetadataCorruption::VersionedAnonymousFormatComponent => {
+                metadata.versioned_components.push(tsp::ComponentInfo {
+                    identifier: FORMAT_COMPONENT_ID,
+                    preferred_locator: "Tables/DataList-904498-2".to_owned(),
+                    locator: Some("Tables/DataList-904498-2".to_owned()),
+                    save_token: Some(1),
+                    ..Default::default()
+                });
+            },
+            SplitMetadataCorruption::WrongCalculationLocator => {
+                metadata.components[calculation_index].preferred_locator =
+                    "Wrong/CalculationEngine".to_owned();
+                metadata.components[calculation_index].locator =
+                    Some("Wrong/CalculationEngine".to_owned());
+            },
+            SplitMetadataCorruption::WrongControlLocator => {
+                let control = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == CONTROL_COMPONENT_ID)
+                    .ok_or_else(|| io::Error::other("control metadata is missing"))?;
+                control.preferred_locator = "Wrong/Tables/Control".to_owned();
+                control.locator = Some("Wrong/Tables/Control".to_owned());
+            },
+            SplitMetadataCorruption::OpaquePopupInbound => unreachable!(),
+        }
+        Ok(())
+    })
+}
+
 fn with_locked_table(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_member(source, DOCUMENT_MEMBER, |archive| {
         let object = archive
@@ -1168,6 +1667,46 @@ fn with_locked_table(source: &[u8]) -> TestResult<Vec<u8>> {
         let mut info = tst::TableInfoArchive::decode(message.data.as_slice())?;
         info.super_.locked = Some(true);
         message.data = info.encode_to_vec();
+        Ok(())
+    })
+}
+
+fn with_split_model_reference_corruption(
+    source: &[u8],
+    corruption: SplitModelReferenceCorruption,
+) -> TestResult<Vec<u8>> {
+    rewrite_member(source, CALCULATION_MEMBER, |archive| {
+        let object = archive
+            .object_mut(TABLE_MODEL_ID)
+            .ok_or_else(|| io::Error::other("TableModel object is missing"))?;
+        let info = object
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("TableModel metadata is missing"))?;
+        match corruption {
+            SplitModelReferenceCorruption::MissingFormatAggregate => {
+                info.object_references
+                    .retain(|identifier| *identifier != FORMAT_LIST_ID);
+            },
+            SplitModelReferenceCorruption::DuplicateFormatAggregate => {
+                info.object_references.push(FORMAT_LIST_ID);
+            },
+            SplitModelReferenceCorruption::WrongFormatFieldType => {
+                let mut field = FieldInfo::new(vec![99]);
+                field.r#type = Some(FieldType::Value);
+                field.object_references.push(FORMAT_LIST_ID);
+                info.field_infos.push(field);
+            },
+            SplitModelReferenceCorruption::DuplicateFormatField => {
+                for path in [vec![98], vec![99]] {
+                    let mut field = FieldInfo::new(path);
+                    field.r#type = Some(FieldType::ObjectReference);
+                    field.object_references.push(FORMAT_LIST_ID);
+                    info.field_infos.push(field);
+                }
+            },
+        }
         Ok(())
     })
 }
@@ -1748,5 +2287,205 @@ fn locked_table_refuses_control_mutation_without_source_changes() -> TestResult 
         .commit();
     assert!(result.is_err());
     assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+fn split_replacements() -> TestResult<[CellControl; 5]> {
+    Ok([
+        CellControl::Checkbox(Checkbox),
+        CellControl::StarRating(StarRating),
+        CellControl::Slider(Slider::new(
+            range(-20.0, 40.0, 5.0),
+            DisplayFormat::Number(Number::default()),
+        )),
+        CellControl::Stepper(Stepper::new(
+            range(2.0, 30.0, 2.0),
+            DisplayFormat::Number(Number::default()),
+        )),
+        CellControl::PopUpMenu(
+            PopUpMenu::new(["Override", "Fallback"])?.with_initial_selection(
+                litchi_numbers::cell::data_format::pop_up_menu::InitialSelection::Blank,
+            ),
+        ),
+    ])
+}
+
+fn assert_split_read_noop_and_write_reject(
+    source: &[u8],
+    position: CellPosition,
+    expected_before: CellControl,
+    replacement: CellControl,
+) -> TestResult {
+    let package = Package::from_bytes(source)?;
+    let before = package.exact_bytes();
+    let observed = package.table_cell_control_format(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        position,
+    )?;
+    assert_eq!(observed, Some(expected_before.clone()));
+
+    let no_op = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .set(expected_before.clone())
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().exact_bytes(), source);
+
+    if replacement == expected_before {
+        return Ok(());
+    }
+    let result = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .set(replacement)
+        .commit();
+    assert!(result.is_err());
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
+fn split_components_read_noop_and_all_control_transitions_are_atomic() -> TestResult {
+    let source = split_component_fixture()?;
+    let positions = [
+        CellPosition::new(0, 0),
+        CellPosition::new(1, 0),
+        CellPosition::new(2, 0),
+        CellPosition::new(3, 0),
+        CellPosition::new(4, 0),
+    ];
+    for ((position, expected), replacement) in positions
+        .into_iter()
+        .zip(controls()?)
+        .zip(split_replacements()?)
+    {
+        assert_split_read_noop_and_write_reject(&source, position, expected, replacement)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn split_components_clear_and_inverse_are_fail_closed_until_all_members_are_owned() -> TestResult {
+    let source = split_component_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.exact_bytes();
+    let result = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(0, 0),
+        )?
+        .clear()
+        .commit();
+    assert!(result.is_err());
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
+fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() -> TestResult {
+    let source = split_component_fixture()?;
+    for corruption in [
+        SplitMetadataCorruption::MissingCalculationExternal,
+        SplitMetadataCorruption::MissingTileExternal,
+        SplitMetadataCorruption::MissingControlExternal,
+        SplitMetadataCorruption::MissingPopupExternal,
+        SplitMetadataCorruption::DuplicateCalculationExternal,
+        SplitMetadataCorruption::DuplicatePopupExternal,
+        SplitMetadataCorruption::ComponentAndObjectFormatExternal,
+        SplitMetadataCorruption::VersionedCalculationExternal,
+        SplitMetadataCorruption::VersionedPopupExternal,
+        SplitMetadataCorruption::VersionedAnonymousFormatComponent,
+        SplitMetadataCorruption::WrongCalculationLocator,
+        SplitMetadataCorruption::WrongControlLocator,
+    ] {
+        let hostile = with_split_metadata_corruption(&source, corruption)?;
+        assert_split_owner_rejects(&hostile, &format!("split edge {corruption:?}"))?;
+    }
+    for corruption in [
+        SplitModelReferenceCorruption::MissingFormatAggregate,
+        SplitModelReferenceCorruption::DuplicateFormatAggregate,
+        SplitModelReferenceCorruption::WrongFormatFieldType,
+        SplitModelReferenceCorruption::DuplicateFormatField,
+    ] {
+        let hostile = with_split_model_reference_corruption(&source, corruption)?;
+        assert_split_owner_rejects(&hostile, &format!("split model edge {corruption:?}"))?;
+    }
+    let opaque =
+        with_split_metadata_corruption(&source, SplitMetadataCorruption::OpaquePopupInbound)?;
+    let package = Package::from_bytes(&opaque)?;
+    assert_eq!(
+        package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?,
+        Some(CellControl::PopUpMenu(menu()?)),
+    );
+    let before = package.exact_bytes();
+    assert!(
+        package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(4, 0),
+            )?
+            .clear()
+            .commit()
+            .is_err()
+    );
+    assert_eq!(package.exact_bytes(), before);
+    for (member, alias) in [
+        (CALCULATION_MEMBER, "Index/CalculationAlias.iwa"),
+        (TILE_MEMBER, "Index/Tables/TileAlias.iwa"),
+        (FORMAT_MEMBER, "Index/Tables/FormatAlias.iwa"),
+        (CONTROL_MEMBER, "Index/Tables/ControlAlias.iwa"),
+        (POPUP_MEMBER, "Index/Tables/PopupAlias.iwa"),
+    ] {
+        let aliased = with_physical_alias_for_member(&source, member, alias)?;
+        assert_split_owner_rejects(&aliased, &format!("split physical alias {member}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn popup_only_split_reads_but_every_changed_control_route_refuses_atomically() -> TestResult {
+    let source = popup_only_split_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(0, 0),
+        )?,
+        Some(CellControl::Checkbox(Checkbox)),
+    );
+    assert_eq!(
+        package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?,
+        Some(CellControl::PopUpMenu(menu()?)),
+    );
+    for (position, desired) in [
+        (CellPosition::new(0, 0), CellControl::StarRating(StarRating)),
+        (CellPosition::new(4, 0), CellControl::Checkbox(Checkbox)),
+    ] {
+        let before = package.exact_bytes();
+        let result = package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )?
+            .set(desired)
+            .commit();
+        assert!(matches!(
+            result,
+            Err(ControlError::UnsupportedDependency { .. })
+        ));
+        assert_eq!(package.exact_bytes(), before);
+    }
     Ok(())
 }

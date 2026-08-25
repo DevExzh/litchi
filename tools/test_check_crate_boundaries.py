@@ -575,6 +575,13 @@ def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
         "fn resource_allocation_retained_max_minus_one() {}\n"
         "fn prepared_execution_requirements() {}\n"
         "fn verify_locality_candidate_reopen_atomic_inverse() {}\n"
+        "fn prove_cross_component_reference() {}\n"
+        "fn reject_cross_component_write() {}\n"
+        "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n"
+        "fn effective_locator() {}\n"
+        "fn require_external_edge() {}\n"
+        "fn object_identifier() {}\n"
+        "fn has_physical_alias() {}\n"
         "impl Package {\n"
         "pub fn table_cell_control_format<'sheet, 'table, 'cell>(&self, "
         "sheet: SheetSelector<'sheet>, table: TableSelector<'table>, "
@@ -636,6 +643,15 @@ def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
         boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_CORPUS,
     ):
         (root / corpus).mkdir(parents=True, exist_ok=True)
+    integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n"
+        "fn assert_split_read_noop_and_write_reject() { no_op; is_noop; exact_bytes; write_reject; changed_edit_rejects; }\n"
+        "fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() { alias; external; opaque; atomic; }\n",
+        encoding="utf-8",
+    )
 
 
 def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
@@ -22355,6 +22371,22 @@ fn rewrite_movie_title_operation(
             boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE,
             Path("crates/litchi-numbers/src/package/table_cell_control.rs"),
         )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE,
+            Path("crates/litchi-numbers/tests/table_cell_control.rs"),
+        )
+        self.assertIn(
+            "pre-candidate changed-operation refusal",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS,
+        )
+        self.assertIn(
+            "effective locator coverage",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS,
+        )
+        self.assertIn(
+            "split-component no-op exact bytes",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS,
+        )
 
     def test_focused_numbers_table_cell_control_is_dormant_until_complete_owner(
         self,
@@ -22447,8 +22479,13 @@ fn rewrite_movie_title_operation(
                 with self.subTest(marker=label):
                     add_numbers_table_cell_control_canonical_scaffold(root)
                     owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
-                    owner_source = owner.read_text(encoding="utf-8").replace(
-                        marker_line, ""
+                    owner_source = owner.read_text(encoding="utf-8")
+                    removals = [marker_line]
+                    for removal in removals:
+                        owner_source = owner_source.replace(removal, "")
+                    owner_source = owner_source.replace(
+                        "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+                        "",
                     )
                     if label == "control-cell":
                         owner_source = owner_source.replace("CellControl", "MissingControl")
@@ -22510,15 +22547,152 @@ fn rewrite_movie_title_operation(
             root = Path(directory)
             add_numbers_table_cell_control_canonical_scaffold(root)
             owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            bounded_lines = (
+                "fn prove_cross_component_reference() {}\n",
+                "fn reject_cross_component_write() {}\n",
+                "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+                "fn effective_locator() {}\n",
+                "fn require_external_edge() {}\n",
+                "fn object_identifier() {}\n",
+                "fn has_physical_alias() {}\n",
+            )
+            cfg_decoys = "".join(f"#[cfg(test)]\n{line}" for line in bounded_lines)
             owner.write_text(
-                owner.read_text(encoding="utf-8")
+                complete.replace("".join(bounded_lines), "") + cfg_decoys,
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("bounded cross-component owner is missing" in item for item in violations),
+                violations,
+            )
+            owner.write_text(
+                complete
                 + "#[cfg(test)]\n"
-                "pub fn test_only_raw_control(table_id: u64, bytes: &[u8]) {}\n",
+                "pub fn test_only_raw_control(table_id: u64, bytes: &[u8]) {}\n"
+                + cfg_decoys,
                 encoding="utf-8",
             )
             self.assertEqual(
                 boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
                 [],
+            )
+
+    def test_focused_numbers_table_cell_control_requires_bounded_split_contract(
+        self,
+    ) -> None:
+        owner_marker_lines = {
+            "strict cross-component read/no-op": "fn prove_cross_component_reference() {}\n",
+            "pre-candidate changed-operation refusal": "fn reject_cross_component_write() {}\n",
+            "refusal precedes candidate allocation": "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+            "effective locator coverage": "fn effective_locator() {}\n",
+            "current external-edge coverage": "fn require_external_edge() {}\n",
+            "object/component edge scope": "fn object_identifier() {}\n",
+            "target alias rejection": "fn has_physical_alias() {}\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for label, marker_line in owner_marker_lines.items():
+                with self.subTest(owner_marker=label):
+                    owner_source = complete.replace(marker_line, "")
+                    if label == "current external-edge coverage":
+                        owner_source = owner_source.replace(
+                            "fn prove_cross_component_reference() {}\n", ""
+                        )
+                    if label == "pre-candidate changed-operation refusal":
+                        owner_source = owner_source.replace(
+                            "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+                            "",
+                        )
+                    owner.write_text(owner_source, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(
+                            f"bounded cross-component owner is missing {label} marker" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+            owner.write_text(complete, encoding="utf-8")
+            integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+            complete_test = integration.read_text(encoding="utf-8")
+            removals = {
+                "split-component read coverage": "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n",
+                "split-component no-op exact bytes": "is_noop; exact_bytes; ",
+                "split-component changed refusal": "write_reject; changed_edit_rejects; ",
+                "split-component alias/edge atomicity": "alias; external; opaque; atomic; ",
+            }
+            for label, removal in removals.items():
+                with self.subTest(integration_marker=label):
+                    integration.write_text(complete_test.replace(removal, ""), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"integration is missing {label}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_cell_control_allows_same_component_fast_path(
+        self,
+    ) -> None:
+        """The bounded split ratchet must not reject the existing local route."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn same_component_fast_path() { let touched_components = 1; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_cell_control_split_fixture_is_cfg_test_masked(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+            integration.write_text(
+                "#[cfg(test)]\n"
+                "mod decoy {\n"
+                "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n"
+                "fn assert_split_read_noop_and_write_reject() { is_noop; exact_bytes; write_reject; }\n"
+                "fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() { alias; external; opaque; atomic; }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("integration is missing split-component read coverage" in item for item in violations), violations)
+
+            integration.write_text(
+                "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n"
+                "fn assert_split_read_noop_and_write_reject() { is_noop; exact_bytes; write_reject; }\n"
+                "fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() { alias; external; opaque; atomic; }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertFalse(
+                any("cell-control integration is missing" in item for item in violations),
+                violations,
             )
 
     def test_numbers_table_cell_control_host_retirement_is_owner_gated_and_scoped(

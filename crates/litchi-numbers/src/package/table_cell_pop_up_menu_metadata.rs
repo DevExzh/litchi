@@ -344,6 +344,66 @@ impl<'source> RegistryFacts<'source> {
         current.ok_or_else(|| MetadataError::kind(FailureKind::MissingRoute))
     }
 
+    /// Prove one current, effective-locator-resolved external edge for a
+    /// cross-component native graph.  Component UUID records are deliberately
+    /// not used as a substitute: sidecar members commonly have no object UUID
+    /// bindings, while the owning CalculationEngine component carries the
+    /// authoritative external edge. Native producers use both object-specific
+    /// records and component-level records (`object_identifier = None`), so
+    /// either shape may cover a requested object. A covering edge must be
+    /// current, unversioned, and have the exact weak/reference shape requested
+    /// by the caller; duplicate or conflicting records fail closed.
+    pub(super) fn require_external_edge(
+        &self,
+        source_component_index: usize,
+        target_component_index: usize,
+        object_identifier: Option<u64>,
+        is_weak: Option<bool>,
+    ) -> Result<()> {
+        let source = self.selector(source_component_index)?;
+        let target_identifier = match self.selector(target_component_index) {
+            Ok(target) => target.identifier(),
+            Err(error) => {
+                // Some native table sidecars are physical IWA members but do
+                // not have their own current ComponentInfo. Their one current
+                // external edge uses the sidecar object's identifier as the
+                // target component identifier. Admit that producer shape only
+                // when there is no current or versioned component record to
+                // contradict it; ambiguous/versioned selector failures must
+                // not be normalized into this fallback.
+                let object_identifier = object_identifier.ok_or(error)?;
+                if self.components.iter().any(|component| {
+                    component.component_index == Some(target_component_index)
+                        || component.identifier == object_identifier
+                }) {
+                    return Err(error);
+                }
+                object_identifier
+            },
+        };
+        let mut exact = 0usize;
+        let mut conflicting = false;
+        for reference in &self.external_references {
+            if reference.source_component_index != Some(source_component_index)
+                || reference.source_identifier != source.identifier()
+                || reference.target_component_identifier != target_identifier
+                || (reference.object_identifier != object_identifier
+                    && reference.object_identifier.is_some())
+            {
+                continue;
+            }
+            if !reference.current || reference.versioned || reference.is_weak != is_weak {
+                conflicting = true;
+                continue;
+            }
+            exact = exact.saturating_add(1);
+        }
+        if conflicting || exact != 1 {
+            return Err(MetadataError::kind(FailureKind::Conflict));
+        }
+        Ok(())
+    }
+
     /// Reject any existing ownership record before appending a fresh UUID.
     pub(super) fn require_uuid_absent(&self, object_identifier: u64) -> Result<()> {
         if self
@@ -452,9 +512,29 @@ pub(super) struct FreshIdentifier {
 /// budget.  The returned report is the exact codec inspection report and must
 /// be merged into the owner transaction budget once.
 pub(super) fn inspect(source: &Package, options: RewriteOptions) -> Result<RegistryFacts<'_>> {
+    inspect_with_policy(source, options, false)
+}
+
+/// Inspect metadata for the bounded read-only cross-component projection.
+/// Native packages may list current file-backed Data components that are not
+/// IWA members; retain them in the collision census without treating their
+/// absence as mutation authority. Every component selected by an actual edge
+/// is still required to resolve through `RegistryFacts::selector`.
+pub(super) fn inspect_cross_component_read(
+    source: &Package,
+    options: RewriteOptions,
+) -> Result<RegistryFacts<'_>> {
+    inspect_with_policy(source, options, true)
+}
+
+fn inspect_with_policy(
+    source: &Package,
+    options: RewriteOptions,
+    allow_unmapped_current: bool,
+) -> Result<RegistryFacts<'_>> {
     let metadata = strict_source(source)?;
     let physical = physical_identifiers(source)?;
-    let mut visitor = RegistryVisitor::new(source);
+    let mut visitor = RegistryVisitor::new(source, allow_unmapped_current);
     let inspection = inspect_package_metadata_with_visitor(metadata.payload, options, &mut visitor)
         .map_err(map_rewrite_error)?;
     visitor.finish(metadata, inspection, physical)
@@ -498,10 +578,11 @@ struct RegistryVisitor<'source> {
     root_data_map_identifier: Option<u64>,
     maximum_identifier: u64,
     invalid: bool,
+    allow_unmapped_current: bool,
 }
 
 impl<'source> RegistryVisitor<'source> {
-    fn new(source: &'source Package) -> Self {
+    fn new(source: &'source Package, allow_unmapped_current: bool) -> Self {
         Self {
             source,
             components: Vec::new(),
@@ -512,6 +593,7 @@ impl<'source> RegistryVisitor<'source> {
             root_data_map_identifier: None,
             maximum_identifier: 0,
             invalid: false,
+            allow_unmapped_current,
         }
     }
 
@@ -555,7 +637,7 @@ impl<'source> RegistryVisitor<'source> {
         let mut current_identifiers = Vec::new();
         let mut current_locators = Vec::new();
         for component in self.components.iter().filter(|component| component.current) {
-            if component.component_index.is_none() {
+            if component.component_index.is_none() && !self.allow_unmapped_current {
                 return Err(MetadataError::invalid());
             }
             current_identifiers
@@ -603,7 +685,7 @@ impl PackageMetadataVisitor for RegistryVisitor<'_> {
             component.preferred_locator(),
             component.effective_locator(),
         );
-        if component.is_current() && component_index.is_none() {
+        if component.is_current() && component_index.is_none() && !self.allow_unmapped_current {
             self.invalid = true;
         }
         Self::push(
@@ -732,19 +814,15 @@ fn find_physical_descriptor(
     preferred_locator: &str,
     effective_locator: &str,
 ) -> Option<usize> {
-    // ComponentInfo.locator (the effective locator) is authoritative.  A
-    // preferred/member locator is only a compatibility spelling; accepting it
-    // first can silently select a different physical member when an explicit
-    // locator override is present.  If both spellings resolve to different
-    // members, fail closed rather than guessing.
-    let effective = find_physical_component(source, effective_locator);
-    let preferred = find_physical_component(source, preferred_locator);
-    match (preferred, effective) {
-        (Some(preferred), Some(effective)) if preferred != effective => None,
-        (Some(_), None) if preferred_locator != effective_locator => None,
-        (Some(preferred), _) => Some(preferred),
-        (None, Some(effective)) => Some(effective),
-        (None, None) => None,
+    // ComponentInfo.locator (the effective locator) is authoritative. Native
+    // producers commonly retain a generic preferred locator while the exact
+    // current member is named by an explicit locator; both physical spellings
+    // may legitimately exist. When they differ, require the effective member
+    // and never fall back to the preferred spelling.
+    if preferred_locator != effective_locator {
+        find_physical_component(source, effective_locator)
+    } else {
+        find_physical_component(source, preferred_locator)
     }
 }
 

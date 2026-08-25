@@ -946,6 +946,7 @@ fn rewrite_transaction(
     if target.locked {
         return Err(Error::TableLocked { path });
     }
+    reject_cross_component_write(source, target, path)?;
     let mut budget = TransactionBudget::new(source);
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::UnsupportedSource)?;
@@ -1671,7 +1672,8 @@ pub(super) fn resolve_cell<'sheet, 'table>(
 }
 
 pub(super) fn read_popup(source: &Package, target: CellTarget) -> Result<Option<PopUpMenu>, Error> {
-    read_popup_with_policy(source, target, false)
+    let mut authority = None;
+    read_popup_with_policy(source, target, false, &mut authority)
 }
 
 /// Read the complete archive-free control sum for one rooted cell.
@@ -1684,16 +1686,19 @@ pub(super) fn read_cell_control(
     source: &Package,
     target: CellTarget,
 ) -> Result<Option<CellControl>, Error> {
-    let scalar = read_non_popup_control(source, target)?;
+    let mut authority = None;
+    let scalar = read_non_popup_control(source, target, &mut authority)?;
     if let Some(control) = scalar {
         return Ok(Some(control));
     }
-    read_popup(source, target).map(|menu| menu.map(CellControl::PopUpMenu))
+    read_popup_with_policy(source, target, false, &mut authority)
+        .map(|menu| menu.map(CellControl::PopUpMenu))
 }
 
-fn read_non_popup_control(
-    source: &Package,
+fn read_non_popup_control<'source>(
+    source: &'source Package,
     target: CellTarget,
+    authority: &mut Option<popup_metadata::RegistryFacts<'source>>,
 ) -> Result<Option<CellControl>, Error> {
     let path = Path::Cell {
         sheet: target.sheet_position,
@@ -1736,8 +1741,17 @@ fn read_non_popup_control(
         .find(|tile| tile.0 == tile_id)
         .map(|tile| tile.1)
         .ok_or(Error::CellNotFound)?;
-    let tile_message =
-        resolve_typed_message(source, tile_ref, target.component_index, 6_002, path)?;
+    let tile_component_index = resolved_component_index(source, tile_ref, path)?;
+    validate_selected_model_reference(source, target, tile_ref, path)?;
+    prove_cross_component_reference(
+        source,
+        authority,
+        target.component_index,
+        tile_component_index,
+        Some(tile_ref),
+        path,
+    )?;
+    let tile_message = resolve_typed_message_any(source, tile_ref, 6_002, path)?;
     let mut rows = RowCollector::default();
     storage_codec::decode_tile_with_visitor(
         &tile_message.data,
@@ -1779,9 +1793,15 @@ fn read_non_popup_control(
         .resolve_ref_id(&source.state.components, format_table_identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
-    if format_resolved.component_index != target.component_index {
-        return Err(Error::UnsupportedDependency { path });
-    }
+    validate_selected_model_reference(source, target, format_table_identifier, path)?;
+    prove_cross_component_reference(
+        source,
+        authority,
+        target.component_index,
+        format_resolved.component_index,
+        Some(format_table_identifier),
+        path,
+    )?;
     let mut format_payload = None;
     for message in format_resolved
         .messages
@@ -1837,9 +1857,15 @@ fn read_non_popup_control(
         .resolve_ref_id(&source.state.components, control_table_identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
-    if control_resolved.component_index != target.component_index {
-        return Err(Error::UnsupportedDependency { path });
-    }
+    validate_selected_model_reference(source, target, control_table_identifier, path)?;
+    prove_cross_component_reference(
+        source,
+        authority,
+        target.component_index,
+        control_resolved.component_index,
+        Some(control_table_identifier),
+        path,
+    )?;
     let mut selected = None;
     for (message_index, message) in control_resolved
         .messages
@@ -1886,13 +1912,17 @@ fn read_non_popup_control(
             let control_codec::CellSpecSnapshot::Popup(spec) = spec else {
                 continue;
             };
-            let popup = resolve_typed_message(
+            let popup_identifier = spec.popup_model().identifier();
+            let popup_component_index = resolved_component_index(source, popup_identifier, path)?;
+            prove_cross_component_reference(
                 source,
-                spec.popup_model().identifier(),
-                target.component_index,
-                6_206,
+                authority,
+                control_resolved.component_index,
+                popup_component_index,
+                Some(popup_identifier),
                 path,
             )?;
+            let popup = resolve_typed_message_any(source, popup_identifier, 6_206, path)?;
             popup_codec::decode_popup_menu_model_with_report(
                 &popup.data,
                 popup_codec::DecodeOptions::for_source(&popup.data),
@@ -2214,10 +2244,11 @@ fn ensure_numeral_format_fields(
     Ok(())
 }
 
-fn read_popup_with_policy(
-    source: &Package,
+fn read_popup_with_policy<'source>(
+    source: &'source Package,
     target: CellTarget,
     allow_missing_control_field_infos: bool,
+    authority: &mut Option<popup_metadata::RegistryFacts<'source>>,
 ) -> Result<Option<PopUpMenu>, Error> {
     let path = Path::Cell {
         sheet: target.sheet_position,
@@ -2260,8 +2291,17 @@ fn read_popup_with_policy(
         .find(|tile| tile.0 == tile_id)
         .map(|tile| tile.1)
         .ok_or(Error::CellNotFound)?;
-    let tile_message =
-        resolve_typed_message(source, tile_ref, target.component_index, 6_002, path)?;
+    let tile_component_index = resolved_component_index(source, tile_ref, path)?;
+    validate_selected_model_reference(source, target, tile_ref, path)?;
+    prove_cross_component_reference(
+        source,
+        authority,
+        target.component_index,
+        tile_component_index,
+        Some(tile_ref),
+        path,
+    )?;
+    let tile_message = resolve_typed_message_any(source, tile_ref, 6_002, path)?;
     let mut rows = RowCollector::default();
     let (_, _) = storage_codec::decode_tile_with_visitor(
         &tile_message.data,
@@ -2301,9 +2341,15 @@ fn read_popup_with_policy(
         .resolve_ref_id(&source.state.components, format_table_identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
-    if format_resolved.component_index != target.component_index {
-        return Err(Error::UnsupportedDependency { path });
-    }
+    validate_selected_model_reference(source, target, format_table_identifier, path)?;
+    prove_cross_component_reference(
+        source,
+        authority,
+        target.component_index,
+        format_resolved.component_index,
+        Some(format_table_identifier),
+        path,
+    )?;
     let mut format_entries = None;
     for message in format_resolved
         .messages
@@ -2346,9 +2392,15 @@ fn read_popup_with_policy(
         .resolve_ref_id(&source.state.components, control_table_identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
-    if resolved.component_index != target.component_index {
-        return Err(Error::UnsupportedDependency { path });
-    }
+    validate_selected_model_reference(source, target, control_table_identifier, path)?;
+    prove_cross_component_reference(
+        source,
+        authority,
+        target.component_index,
+        resolved.component_index,
+        Some(control_table_identifier),
+        path,
+    )?;
     let mut selected_entries = None;
     for (message_index, message) in resolved.messages.iter().enumerate() {
         if message.type_ != 6_005 {
@@ -2413,13 +2465,17 @@ fn read_popup_with_policy(
     {
         return Err(Error::InvalidSource { path });
     }
-    let popup_message = resolve_typed_message(
+    let popup_identifier = spec.popup_model().identifier();
+    let popup_component_index = resolved_component_index(source, popup_identifier, path)?;
+    prove_cross_component_reference(
         source,
-        spec.popup_model().identifier(),
-        target.component_index,
-        6_206,
+        authority,
+        resolved.component_index,
+        popup_component_index,
+        Some(popup_identifier),
         path,
     )?;
+    let popup_message = resolve_typed_message_any(source, popup_identifier, 6_206, path)?;
     let (popup, _) = popup_codec::decode_popup_menu_model_with_report(
         &popup_message.data,
         popup_options(&popup_message.data),
@@ -2583,7 +2639,13 @@ fn read_popup_with_budget(
     budget.charge_wire_work(payload_len.saturating_mul(16), path)?;
     budget.charge_payload_items(1, path)?;
     budget.charge_transaction_work(payload_len.saturating_mul(16), path)?;
-    read_popup_with_policy(source, target, allow_missing_control_field_infos)
+    let mut authority = None;
+    read_popup_with_policy(
+        source,
+        target,
+        allow_missing_control_field_infos,
+        &mut authority,
+    )
 }
 
 fn changed_member_count(
@@ -2628,10 +2690,79 @@ fn target_row_tile(tile_size: u32, row: u32) -> u32 {
     row / tile_size.max(1)
 }
 
-fn resolve_typed_message(
+fn resolved_component_index(source: &Package, identifier: u64, path: Path) -> Result<usize, Error> {
+    source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .map(|resolved| resolved.component_index)
+        .ok_or(Error::InvalidSource { path })
+}
+
+/// Require the selected TableModel message header to declare each native
+/// sidecar edge exactly once. Producer-omitted FieldInfo is accepted; when a
+/// FieldInfo occurrence is present, it must be unique and object-reference
+/// typed. This bounded slice does not claim exact field-path authority for
+/// producer-omitted metadata.
+fn validate_selected_model_reference(
+    source: &Package,
+    target: CellTarget,
+    identifier: u64,
+    path: Path,
+) -> Result<(), Error> {
+    let info = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .and_then(|component| component.archive().objects.get(target.object_index))
+        .and_then(|object| object.archive_info.message_infos.get(target.message_index))
+        .ok_or(Error::InvalidSource { path })?;
+    if info
+        .object_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    let mut field_occurrences = 0usize;
+    for field in &info.field_infos {
+        let occurrences = field
+            .object_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count();
+        if occurrences == 0 {
+            continue;
+        }
+        if field
+            .r#type
+            .is_some_and(|kind| kind != litchi_iwa_core::FieldType::ObjectReference)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        field_occurrences = field_occurrences
+            .checked_add(occurrences)
+            .ok_or(Error::InvalidSource { path })?;
+    }
+    if field_occurrences > 1 {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
+}
+
+/// Resolve a generated-free message through the package index without
+/// imposing the model component as an implicit owner.  The caller must prove
+/// every cross-component edge with `prove_cross_component_reference`; this
+/// split is what prevents a sidecar member from being mistaken for an
+/// unowned/ambiguous object while still allowing the native graph to span
+/// CalculationEngine, Tile, and DataList members.
+fn resolve_typed_message_any(
     source: &Package,
     identifier: u64,
-    component_index: usize,
     message_type: u32,
     path: Path,
 ) -> Result<&RawMessage, Error> {
@@ -2641,9 +2772,6 @@ fn resolve_typed_message(
         .resolve_ref_id(&source.state.components, identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
-    if resolved.component_index != component_index {
-        return Err(Error::UnsupportedDependency { path });
-    }
     let mut matches = resolved
         .messages
         .iter()
@@ -2653,6 +2781,175 @@ fn resolve_typed_message(
         return Err(Error::InvalidSource { path });
     }
     Ok(message)
+}
+
+/// Changed routes remain intentionally single-member until the native writer
+/// can clone and publish every touched sidecar together with one metadata
+/// save-token transition. Keep this guard before native/archive candidate
+/// allocation so a real cross-component graph fails closed with its source
+/// bytes untouched; the read/no-op route above is independently allowed after
+/// exact metadata edge proof.
+pub(super) fn reject_cross_component_write(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<(), Error> {
+    let model = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .and_then(|component| component.archive().objects.get(target.object_index))
+        .and_then(|object| object.messages.get(target.message_index))
+        .ok_or(Error::InvalidSource { path })?;
+    let (model_snapshot, _) =
+        storage_codec::decode_table_model_with_report(&model.data, storage_options(&model.data))
+            .map_err(|_| Error::InvalidSource { path })?;
+    let (store, _) = storage_codec::decode_data_store_with_report(
+        model_snapshot.base_data_store(),
+        storage_options(model_snapshot.base_data_store()),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let mut tiles = TileCollector::default();
+    let (tile_storage, _) = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        storage_options(store.tiles()),
+        &mut tiles,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let tile_id = target.position.row() / tile_storage.tile_size().unwrap_or(1).max(1);
+    let tile_identifier = tiles
+        .tiles
+        .iter()
+        .find(|(id, _)| *id == tile_id)
+        .map(|(_, identifier)| *identifier)
+        .ok_or(Error::CellNotFound)?;
+    let mut identifiers = vec![tile_identifier];
+    if let Some(reference) = store.format_table() {
+        identifiers.push(reference.identifier());
+    }
+    let control_table_identifier = store
+        .control_cell_spec_table()
+        .map(|reference| reference.identifier());
+    if let Some(identifier) = control_table_identifier {
+        identifiers.push(identifier);
+    }
+    for identifier in identifiers {
+        let resolved = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, identifier)
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        if resolved.component_index != target.component_index {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    if let Some(identifier) = control_table_identifier {
+        let resolved = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, identifier)
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        let mut control_list_seen = false;
+        for message in resolved
+            .messages
+            .iter()
+            .filter(|message| message.type_ == 6_005)
+        {
+            let mut entries = ListCollector::default();
+            let (list, _) = storage_codec::decode_table_data_list_with_visitor(
+                &message.data,
+                storage_options(&message.data),
+                &mut entries,
+            )
+            .map_err(|_| Error::InvalidSource { path })?;
+            if list.list_type() != LIST_CONTROL_CELL_SPEC {
+                continue;
+            }
+            if control_list_seen || entries.segments != 0 || duplicate_list_keys(&entries.entries) {
+                return Err(Error::InvalidSource { path });
+            }
+            control_list_seen = true;
+            for entry in &entries.entries {
+                let spec = entry
+                    .cell_spec
+                    .as_deref()
+                    .ok_or(Error::InvalidSource { path })?;
+                let (spec, _) = control_codec::decode_any_cell_spec_with_report(
+                    spec,
+                    control_codec::DecodeOptions::for_source(spec),
+                )
+                .map_err(|_| Error::InvalidSource { path })?;
+                let control_codec::CellSpecSnapshot::Popup(spec) = spec else {
+                    continue;
+                };
+                let popup = source
+                    .state
+                    .index
+                    .resolve_ref_id(&source.state.components, spec.popup_model().identifier())
+                    .map_err(|_| Error::InvalidSource { path })?
+                    .ok_or(Error::InvalidSource { path })?;
+                if popup.component_index != target.component_index {
+                    return Err(Error::UnsupportedDependency { path });
+                }
+            }
+        }
+        if !control_list_seen {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    Ok(())
+}
+
+/// Validate the metadata ownership edge before a cross-component read is
+/// exposed.  Sidecar components normally have no UUID object records, so an
+/// exact current external component edge is the required authority.  Missing
+/// Metadata, a missing/ambiguous effective locator, versioned edges, duplicate
+/// edges, and weak/reference-shape conflicts all fail closed.
+fn prove_cross_component_reference<'source>(
+    source: &'source Package,
+    authority: &mut Option<popup_metadata::RegistryFacts<'source>>,
+    source_component_index: usize,
+    target_component_index: usize,
+    object_identifier: Option<u64>,
+    path: Path,
+) -> Result<(), Error> {
+    if source_component_index == target_component_index {
+        return Ok(());
+    }
+    if authority.is_none() {
+        let bytes = source.source_bytes().len().max(1);
+        let options = MetadataRewriteOptions::new(
+            bytes,
+            bytes.saturating_mul(2),
+            bytes.saturating_mul(16),
+            bytes.saturating_mul(64),
+            64,
+            bytes.saturating_mul(2),
+            bytes.saturating_mul(2),
+            1,
+        );
+        *authority = Some(
+            popup_metadata::inspect_cross_component_read(source, options)
+                .map_err(|_| Error::UnsupportedDependency { path })?,
+        );
+    }
+    let facts = authority
+        .as_ref()
+        .ok_or(Error::UnsupportedDependency { path })?;
+    if facts.has_physical_alias() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    facts
+        .require_external_edge(
+            source_component_index,
+            target_component_index,
+            object_identifier,
+            None,
+        )
+        .map_err(|_| Error::UnsupportedDependency { path })
 }
 
 #[derive(Default)]
