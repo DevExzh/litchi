@@ -1,0 +1,169 @@
+{
+  "schema": "litchi.xlsx.cell-values-abba.v1",
+  "tool": "xlsx_cell_values_abba",
+  "package_version": "0.1.0",
+  "mode": "evidence",
+  "evidence_min_samples": 20,
+  "statistical_gates_enforced": true,
+  "warmup": 20,
+  "samples": 500,
+  "fresh_child_per_leg": true,
+  "leg_order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "benchmark_bin": {
+    "path": "/dev/shm/litchi-cell-values-release/release/litchi-perf-baseline",
+    "sha256": "fb095d2f55d5c272865b8e3d98903cfee8cc8c85425b4d79c5ba731d87e64816",
+    "bytes": 51073272,
+    "profile": "release"
+  },
+  "runner_identity": {
+    "executable_sha256": "14ed12cf8050eef6caf98911bc90fe2213b68ee18656a3c448afe3be48e099ea",
+    "git_revision": "3b826423bb073cf4e2edc854c5a1bdd09dbebbcc",
+    "git_dirty": false,
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu": null,
+    "memory": "MemTotal:       32812712 kB",
+    "rustflags": null
+  },
+  "revision_scope": "same runner revision, benchmark executable identity, and child configuration for every fresh leg; evidence additionally requires a clean git worktree",
+  "claim_scope": "same-revision total eager-owned open/edit/save versus source-backed open/edit/one-overlay publication on the pinned synthetic corpus; directional A1->B1 and A2->B2 comparisons are claim-bearing within this scope",
+  "timing_scope": "primary_ns is exactly the existing child elapsed_ns.samples[0] total; eager/source phase subvectors are not compared",
+  "cells": [
+    {
+      "cell": "medium/one_edit",
+      "shape": "medium",
+      "workload": "one_edit",
+      "eager_case": "xlsx_eager_cell_values_one_edit_save",
+      "source_case": "xlsx_source_backed_cell_values_one_edit_save",
+      "expected_update_count": 1,
+      "expected_touched_worksheets": 1
+    },
+    {
+      "cell": "medium/one_percent",
+      "shape": "medium",
+      "workload": "one_percent",
+      "eager_case": "xlsx_eager_cell_values_one_percent_edit_save",
+      "source_case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "expected_update_count": 93,
+      "expected_touched_worksheets": 4
+    },
+    {
+      "cell": "medium/batch",
+      "shape": "medium",
+      "workload": "batch",
+      "eager_case": "xlsx_eager_cell_values_batch_edit_save",
+      "source_case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "expected_update_count": 256,
+      "expected_touched_worksheets": 4
+    },
+    {
+      "cell": "dense-sparse/one_edit",
+      "shape": "dense-sparse",
+      "workload": "one_edit",
+      "eager_case": "xlsx_eager_cell_values_one_edit_save",
+      "source_case": "xlsx_source_backed_cell_values_one_edit_save",
+      "expected_update_count": 1,
+      "expected_touched_worksheets": 1
+    },
+    {
+      "cell": "dense-sparse/one_percent",
+      "shape": "dense-sparse",
+      "workload": "one_percent",
+      "eager_case": "xlsx_eager_cell_values_one_percent_edit_save",
+      "source_case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "expected_update_count": 178,
+      "expected_touched_worksheets": 4
+    },
+    {
+      "cell": "dense-sparse/batch",
+      "shape": "dense-sparse",
+      "workload": "batch",
+      "eager_case": "xlsx_eager_cell_values_batch_edit_save",
+      "source_case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "expected_update_count": 256,
+      "expected_touched_worksheets": 4
+    }
+  ],
+  "corpus_generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+  "validations": [
+    "exact child case, shape, workload, update count, and touched-worksheet semantics",
+    "complete corpus manifest, archive hash/bytes, and workbook/worksheet/member identity",
+    "output, source semantic, and untouched-member hashes where the child exposes them",
+    "bounded sequential sink accepted bytes, write calls, and <=64 KiB largest write",
+    "source xlsx_cell_values logical counters, materializations, cache, and budget fields",
+    "B1/B2 source counter neutrality and source output/semantic identity",
+    "fresh-child provenance, executable identity, and clean revision for evidence"
+  ],
+  "unavailable_field_policy": "missing fields are recorded as unavailable and block only the affected claim; no value is inferred",
+  "exclusions": [
+    "phase subvectors and phase-attribution comparisons",
+    "cross-implementation ZIP byte identity; eager/source children validate their own semantic result and only same-side hashes are compared",
+    "cross-revision behavior",
+    "physical I/O, allocation, RSS, CPU utilization, and cache warmth",
+    "managed-budget behavior",
+    "formula, date, structural, and unsupported XLSX edits",
+    "general XLSX CRUD or real-producer interoperability"
+  ],
+  "corpora": {
+    "dense-sparse": {
+      "name": "xlsx-cell-values-dense-sparse",
+      "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+      "package_format": "XLSX/OPC/ZIP",
+      "shape": "dense-sparse",
+      "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+      "compression": "deflate",
+      "entry_count": 17792,
+      "archive_member_count": 17,
+      "entry_bytes": 4,
+      "uncompressed_payload_bytes": 4265472,
+      "archive_bytes": 4251863,
+      "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+      "target_entry": "Sheet1!A1",
+      "target_payload_bytes": 1,
+      "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "workbook_member": "xl/workbook.xml",
+      "worksheet_members": [
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ],
+      "shared_strings_member": null,
+      "styles_member": "xl/styles.xml"
+    },
+    "medium": {
+      "name": "xlsx-cell-values-medium",
+      "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+      "package_format": "XLSX/OPC/ZIP",
+      "shape": "medium",
+      "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+      "compression": "deflate",
+      "entry_count": 9216,
+      "archive_member_count": 17,
+      "entry_bytes": 4,
+      "uncompressed_payload_bytes": 4231168,
+      "archive_bytes": 4226429,
+      "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "target_entry": "Sheet1!A1",
+      "target_payload_bytes": 1,
+      "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "workbook_member": "xl/workbook.xml",
+      "worksheet_members": [
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/sheet4.xml"
+      ],
+      "shared_strings_member": null,
+      "styles_member": "xl/styles.xml"
+    }
+  },
+  "claim_blockers": [],
+  "performance_claim": "none: evidence authorization pending all cells, gates, and provenance"
+}
