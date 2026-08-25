@@ -1,9 +1,9 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::pages::{PagesEditor, Position};
+use litchi_iwa::pages::PagesEditor;
 use litchi_pages::Package;
-use litchi_pages::footnote::body::Selector;
+use litchi_pages::footnote::body::{Position, Selector};
 use tempfile::NamedTempFile;
 
 const BODY: &str = "Alpha Beta";
@@ -17,13 +17,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nth(1)
             .ok_or("usage: create_pages_footnotes <output.pages>")?,
     );
-    let mut pages = PagesEditor::create_with_text(BODY)?;
-    let footnote = pages.insert_body_footnote(
-        Position::from_utf16_index(FOOTNOTE_POSITION)?,
-        INITIAL_FOOTNOTE_TEXT,
-    )?;
+    let pages = PagesEditor::create_with_text(BODY)?;
     let package = Package::from_bytes(&pages.to_bytes()?)?;
-    let mut edit = package.edit_body_footnote_text(Selector::At(footnote.position))?;
+    let position = Position::from_utf16_index(FOOTNOTE_POSITION)?;
+    let inserted = Package::insert_body_footnote(&package, position, INITIAL_FOOTNOTE_TEXT, None)?;
+    let footnote = inserted
+        .package()
+        .body_footnotes()?
+        .into_iter()
+        .find(|footnote| footnote.position == position)
+        .ok_or("inserted footnote was not found")?;
+    let mut edit = inserted
+        .package()
+        .edit_body_footnote(Selector::At(footnote.position))?;
     edit.set(FOOTNOTE_TEXT)?;
     let commit = edit.commit()?;
     save_new(&output, commit.package())?;

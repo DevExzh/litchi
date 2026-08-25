@@ -4013,6 +4013,185 @@ IWA_PAGES_FOOTNOTE_TEXT_CALL = re.compile(
 PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
 PAGES_FOOTNOTE_TEXT_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "footnote_text.rs"
 PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD = "edit_body_footnote_text"
+# Body-footnote graph lifecycle remains in the compatibility host until a
+# complete selector-first package owner exists.  Keep this ratchet dormant in
+# that migration window: the existing host still owns graph creation/removal,
+# while ``footnote_text.rs`` owns only existing-storage text replacement.
+# Once the private lifecycle owner is introduced, the host methods and all
+# production callsites become retired together.  Test fixtures are masked
+# item-by-item so a cfg(test) oracle cannot hide a later production route.
+RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "footnotes.rs"
+)
+RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHODS = (
+    "insert_body_footnote",
+    "remove_body_footnote",
+)
+RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHODS
+)
+IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+    r"(?P<method>insert_body_footnote|remove_body_footnote)\b"
+    r"[ \t\r\n]*\("
+)
+IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>insert_body_footnote|remove_body_footnote)\b"
+        r"[ \t\r\n]*\(",
+    ),
+)
+PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE = (
+    PAGES_SOURCE_ROOT / "footnote" / "body.rs"
+)
+PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "body_footnote.rs"
+)
+PAGES_FOOTNOTE_LIFECYCLE_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "body_footnote"
+)
+PAGES_FOOTNOTE_LIFECYCLE_IMPLEMENTATION_SOURCES = (
+    PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE,
+    PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE,
+)
+PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "footnote.rs",
+)
+PAGES_FOOTNOTE_LIFECYCLE_SELECTOR_SOURCE = (
+    PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
+)
+PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES = (
+    "Footnote",
+    "Position",
+    "Selector",
+)
+PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES = (
+    "BodyFootnoteEdit",
+    "BodyFootnotePatch",
+    "BodyFootnoteCommit",
+    "BodyFootnoteDiagnostics",
+    "BodyFootnoteError",
+    "BodyFootnoteLimitKind",
+)
+PAGES_FOOTNOTE_LIFECYCLE_SHORT_NAMES = frozenset(
+    PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+    + PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES
+)
+PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS = (
+    "edit_body_footnote",
+    "insert_body_footnote",
+    "apply_body_footnote",
+)
+PAGES_FOOTNOTE_LIFECYCLE_FLAT_METHODS = frozenset(
+    {
+        "remove_body_footnote",
+        "insert_footnote",
+        "remove_footnote",
+        "apply_footnote",
+        "edit_footnote",
+    }
+)
+PAGES_FOOTNOTE_LIFECYCLE_FLAT_ALIASES = frozenset(
+    {
+        "FootnoteEdit",
+        "FootnotePatch",
+        "FootnoteCommit",
+        "FootnoteDiagnostics",
+        "FootnoteError",
+        "FootnoteLimitKind",
+        "BodyFootnoteInsert",
+        "BodyFootnoteRemove",
+        "BodyFootnoteInsertCommit",
+        "BodyFootnoteRemoveCommit",
+        "BodyFootnoteTransaction",
+    }
+)
+PAGES_FOOTNOTE_LIFECYCLE_ALIAS_TARGETS = frozenset(
+    PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+    + PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES
+)
+PAGES_FOOTNOTE_LIFECYCLE_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?body_footnote"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_PACKAGE_FOOTNOTE_LIFECYCLE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body_footnote\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_FOOTNOTE_LIFECYCLE_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_footnote\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_FOOTNOTE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?footnote\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_FOOTNOTE_BODY_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_FOOTNOTE_LIFECYCLE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "DrawableArchive",
+        "EntryEdit",
+        "ExactArtifacts",
+        "FootnoteGraph",
+        "FootnoteObjectIds",
+        "FootnoteStorageProjection",
+        "IWorkPackage",
+        "NativeFootnote",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+PAGES_FOOTNOTE_LIFECYCLE_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_FOOTNOTE_LIFECYCLE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tsd", "tsp", "tswp"}
+)
+# The body-footnote spelling is the public semantic contract used by the
+# dormant ratchet.  Keep the shorter aliases for callers of the boundary tool
+# that use the wording from the migration notes.
+PAGES_BODY_FOOTNOTE_SEMANTIC_SOURCE = PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
+PAGES_BODY_FOOTNOTE_OWNER_SOURCE = PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+PAGES_BODY_FOOTNOTE_OWNER_HELPER_ROOT = PAGES_FOOTNOTE_LIFECYCLE_OWNER_HELPER_ROOT
+PAGES_BODY_FOOTNOTE_IMPLEMENTATION_SOURCES = (
+    PAGES_FOOTNOTE_LIFECYCLE_IMPLEMENTATION_SOURCES
+)
+PAGES_BODY_FOOTNOTE_EXPORT_SOURCES = PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES
+PAGES_BODY_FOOTNOTE_SELECTOR_SOURCE = PAGES_FOOTNOTE_LIFECYCLE_SELECTOR_SOURCE
+PAGES_BODY_FOOTNOTE_SEMANTIC_TYPES = PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES
+PAGES_BODY_FOOTNOTE_CANONICAL_TYPES = PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+PAGES_BODY_FOOTNOTE_PACKAGE_METHODS = PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS
+RETIRED_IWA_PAGES_BODY_FOOTNOTE_METHODS = (
+    RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHODS
+)
 PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
     PAGES_SOURCE_ROOT / "document.rs",
     PAGES_SOURCE_ROOT / "lib.rs",
@@ -7383,6 +7562,59 @@ def _pages_table_dimension_public_leak(identifier: str) -> str | None:
     ):
         return "physical package name"
     return None
+
+
+def _pages_footnote_lifecycle_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in body-footnote APIs."""
+
+    if identifier in PAGES_FOOTNOTE_LIFECYCLE_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_FOOTNOTE_LIFECYCLE_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_FOOTNOTE_LIFECYCLE_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_footnote_lifecycle_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_FOOTNOTE_LIFECYCLE_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_pages_footnote_lifecycle_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (
+            PAGES_FOOTNOTE_LIFECYCLE_FLAT_ALIASES
+            | PAGES_FOOTNOTE_LIFECYCLE_SHORT_NAMES
+        )
+    ) or _pages_footnote_lifecycle_owner_declaration(declaration)
 
 
 def _pages_table_dimension_owner_declaration(declaration: str) -> bool:
@@ -12472,6 +12704,109 @@ def audit_iwa_pages_footnote_text_source_topology(root: Path = ROOT) -> list[str
     return sorted(set(violations))
 
 
+def _pages_footnote_lifecycle_owner_present(root: Path) -> bool:
+    """Return whether the private focused body-footnote owner has landed.
+
+    A package-module declaration can be introduced while an owner is being
+    assembled.  Treat the dedicated source file as the activation token so a
+    half-landed migration does not turn the dormant ratchet into repository
+    noise; once that file exists the private-module and complete-contract
+    checks fail closed.
+    """
+
+    return (root / PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE).is_file()
+
+
+def audit_iwa_pages_footnote_lifecycle_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Pages body-footnote lifecycle paths after owner activation.
+
+    The current compatibility host deliberately owns insertion and removal.
+    This audit therefore remains completely dormant until the focused package
+    publishes its private ``body_footnote`` owner.  Activation retires only
+    the two public lifecycle methods and production callsites; body-footnote
+    readers and private graph helpers remain outside this narrow ratchet.
+    """
+
+    if not _pages_footnote_lifecycle_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            ):
+                for method in sorted(RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHOD_SET):
+                    if re.search(
+                        rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(method)}\b",
+                        declaration,
+                    ) is None:
+                        continue
+                    violations.append(
+                        "retired litchi-iwa Pages body-footnote lifecycle public "
+                        f"method {method}: {path.relative_to(root)}:{line_number}"
+                    )
+
+            code = _mask_rust_non_code(production_source)
+            for match in IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL.finditer(code):
+                # Focused Package calls are the replacement route and are
+                # allowed to retain the semantic method names. The ratchet
+                # targets host PagesEditor compatibility calls only.
+                if match.group("receiver") in {"Package", "PagesPackage"}:
+                    continue
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                # A declaration has already been handled above; this call
+                # branch catches a differently named compatibility helper.
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    code[line_start:line_end],
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote lifecycle call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            )
+            for match in IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL.finditer(source):
+                if match.group("receiver") in {"Package", "PagesPackage"}:
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote lifecycle example "
+                    f"call {match.group('method')}: "
+                    f"{example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote lifecycle README "
+                    f"call {match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_pages_footnote_text_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -12498,6 +12833,302 @@ def audit_pages_footnote_text_facade_source_topology(
         "focused litchi-pages footnote-text public API is missing Package method "
         f"{PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD}: {PAGES_FOOTNOTE_TEXT_OWNER_SOURCE}"
     ]
+
+
+def audit_pages_footnote_lifecycle_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the dormant selector-first body-footnote lifecycle contract."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir() or not _pages_footnote_lifecycle_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source,
+        frozenset(PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES),
+    )
+    for name in PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES:
+        if name in semantic_exports:
+            continue
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing semantic "
+            f"footnote::body type {name}: "
+            f"{PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE}"
+        )
+
+    selector_source = semantic_source
+    for name in ("Selector", "Position"):
+        if name in _rust_canonical_exports(selector_source, frozenset({name})):
+            continue
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing semantic "
+            f"selector/{name}: {PAGES_FOOTNOTE_LIFECYCLE_SELECTOR_SOURCE}"
+        )
+
+    owner_path = root / PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+    package_path = root / PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    if PAGES_PACKAGE_FOOTNOTE_LIFECYCLE_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing private "
+            "package owner module: "
+            f"{PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_PAGES_PACKAGE_FOOTNOTE_LIFECYCLE_MODULE.finditer(
+        package_source
+    ):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-pages body-footnote public API exposes public "
+            "package::body_footnote module: "
+            f"{PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]}:{line_number}"
+        )
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing private "
+            f"package owner source: {PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE}"
+        )
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_FOOTNOTE_LIFECYCLE_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_FOOTNOTE_LIFECYCLE_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+
+    owner_parts = [
+        _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for path in sorted(dedicated_sources)
+        if path != semantic_path and path.is_file()
+    ]
+    owner_source = "\n".join(owner_parts)
+    canonical_exports = _rust_canonical_exports(
+        owner_source,
+        frozenset(PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES),
+    )
+    for name in PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing canonical "
+            f"package type {name}: {PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE}"
+        )
+
+    owner_methods = {
+        name
+        for source in owner_parts
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            source, "Package"
+        )
+    }
+    for method in PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS:
+        if method in owner_methods:
+            continue
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing Package "
+            f"method {method}: {PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE}"
+        )
+    for method in sorted(PAGES_FOOTNOTE_LIFECYCLE_FLAT_METHODS & owner_methods):
+        violations.append(
+            "focused litchi-pages body-footnote public API retains flat Package "
+            f"method {method}: {PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE}"
+        )
+
+    lib_path = root / PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_FOOTNOTE_MODULE.search(_mask_rust_non_code(lib_source)) is None:
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing canonical "
+            f"root footnote module: {PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[0]}"
+        )
+    root_exports = _rust_canonical_exports(
+        lib_source, frozenset(PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES)
+    )
+    for name in PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES:
+        if name in root_exports:
+            continue
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing root "
+            f"re-export {name}: {PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[0]}"
+        )
+
+    footnote_path = root / PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[2]
+    footnote_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(footnote_path.read_text(encoding="utf-8"))
+        )
+        if footnote_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_FOOTNOTE_BODY_MODULE.search(footnote_source) is None:
+        violations.append(
+            "focused litchi-pages body-footnote public API is missing canonical "
+            f"footnote::body module: {PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[2]}"
+        )
+
+    if package_path.is_file():
+        package_code = _mask_rust_non_code(package_source)
+        if PAGES_PACKAGE_FOOTNOTE_LIFECYCLE_MODULE.search(package_code) is None:
+            violations.append(
+                "focused litchi-pages body-footnote public API is missing private "
+                f"package owner module: {PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]}"
+            )
+
+    # Inspect the complete focused source tree after masking cfg(test) items.
+    # This catches a new sibling's alias or public module without treating
+    # source-built fixtures as production API.
+    for path in sorted(source_root.rglob("*.rs")):
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        for declaration, line_number in _rust_public_declarations(production_source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "body_footnote"]:
+                violations.append(
+                    "focused litchi-pages body-footnote public API exposes duplicate "
+                    f"body_footnote module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {"body_footnote", "footnote", "package"} & set(identifiers):
+                    violations.append(
+                        "focused litchi-pages body-footnote public API retains root "
+                        "aliases via owner glob: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_FOOTNOTE_LIFECYCLE_ALIAS_TARGETS
+                    or "body_footnote" in target_identifiers
+                    or ("footnote" in target_identifiers and "body" in target_identifiers)
+                ) and alias and alias != target:
+                    if path == semantic_path and alias in {
+                        "Commit",
+                        "Diagnostics",
+                        "Edit",
+                        "Error",
+                        "LimitKind",
+                        "Patch",
+                    }:
+                        continue
+                    violations.append(
+                        "focused litchi-pages body-footnote public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_FOOTNOTE_LIFECYCLE_ALIAS_TARGETS
+                    or "body_footnote" in target_identifiers
+                    or ("footnote" in target_identifiers and "body" in target_identifiers)
+                ) and alias != target:
+                    violations.append(
+                        "focused litchi-pages body-footnote public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            )
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(production_source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_pages_footnote_lifecycle_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages body-footnote public API retains root "
+                    f"aliases via owner glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_FOOTNOTE_LIFECYCLE_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages body-footnote public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_footnote_lifecycle_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages body-footnote public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages body-footnote public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
 
 
 def _audit_iwa_chart_caption_source_topology(
@@ -19625,6 +20256,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_package_no_eager_prost_source_topology()
         + audit_iwa_pages_footnote_text_source_topology()
         + audit_pages_footnote_text_facade_source_topology()
+        + audit_iwa_pages_footnote_lifecycle_source_topology()
+        + audit_pages_footnote_lifecycle_facade_source_topology()
         + audit_iwa_pages_page_layout_source_topology()
         + audit_pages_page_layout_facade_source_topology()
         + audit_iwa_pages_table_lock_source_topology()

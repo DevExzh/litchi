@@ -96,6 +96,21 @@ enum aliases, exact no-op and changed commits, exact-source patch conflicts,
 inverse replay, failed-commit source atomicity, tightened output/resource
 profiles, and content-redacted failures without writing a package to disk.
 
+`pages_body_footnote_lifecycle` is the focused selector-first body-footnote
+graph lifecycle target. It offers arbitrary bytes to bounded Pages ingress and
+reuses the same input as bounded text/custom-marker commands against native
+`basic.pages`. When the fixed source accepts an insertion, the harness checks
+source immutability, semantic readback, exact no-op diagnostics, exact-source
+patch application/conflicts, inverse restoration, and complete graph removal.
+Existing valid notes are also exercised through selector-based removal; typed
+structural-marker, missing-selector, malformed-ingress, and physical input
+limit failures remain atomic. The target never writes a package to disk.
+
+The checked-in seeds under `corpus/pages_body_footnote_lifecycle/` are small
+`hex:` command recipes. The native package is embedded from the repository's
+`basic.pages` fixture, so this corpus is isolated from the low-level protobuf
+body/footnote corpora.
+
 `parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
 32 MiB aggregate expanded bytes, 4,096 values of each semantic collection,

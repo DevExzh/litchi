@@ -7,5 +7,7 @@ target
 !/corpus/keynote_chart_title/hidden_stale.hex
 !/corpus/keynote_chart_title/malformed_parent.hex
 !/corpus/keynote_chart_title/malformed_wire.hex
+!/corpus/pages_body_footnote_lifecycle/
+!/corpus/pages_body_footnote_lifecycle/*
 artifacts
 coverage

@@ -714,6 +714,56 @@ def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
     selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
 
 
+def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub struct Position;\n"
+        "pub enum Selector { At(Position), Index(usize) }\n"
+        "pub struct Footnote { position: Position }\n"
+        "pub use crate::package::body_footnote::{"
+        "BodyFootnoteCommit as Commit, BodyFootnoteDiagnostics as Diagnostics, "
+        "BodyFootnoteEdit as Edit, BodyFootnoteError as Error, "
+        "BodyFootnoteLimitKind as LimitKind, BodyFootnotePatch as Patch};\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[0]
+    package_export = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]
+    footnote_export = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[2]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod footnote;\n"
+        "pub use package::{BodyFootnoteCommit, BodyFootnoteDiagnostics, "
+        "BodyFootnoteEdit, BodyFootnoteError, BodyFootnoteLimitKind, "
+        "BodyFootnotePatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod body_footnote;\n"
+        "pub use body_footnote::{BodyFootnoteCommit, BodyFootnoteDiagnostics, "
+        "BodyFootnoteEdit, BodyFootnoteError, BodyFootnoteLimitKind, "
+        "BodyFootnotePatch};\n",
+        encoding="utf-8",
+    )
+    footnote_export.write_text("pub mod body;\n", encoding="utf-8")
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -13611,6 +13661,310 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_pages_footnote_text_facade_source_topology(root), []
             )
+
+    def test_body_footnote_lifecycle_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHODS,
+            ("insert_body_footnote", "remove_body_footnote"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE,
+            Path("crates/litchi-pages/src/footnote/body.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_footnote.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES,
+            ("Footnote", "Position", "Selector"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS,
+            (
+                "edit_body_footnote",
+                "insert_body_footnote",
+                "apply_body_footnote",
+            ),
+        )
+
+    def test_body_footnote_lifecycle_audit_is_dormant_before_owner_lands(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn insert_body_footnote() {}\n"
+                "pub fn remove_body_footnote() {}\n"
+                "fn bridge(editor: &mut PagesEditor) {\n"
+                "    editor.insert_body_footnote();\n"
+                "    editor.remove_body_footnote();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod body_footnote;\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_pages_footnote_lifecycle_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_pages_footnote_lifecycle_facade_source_topology(root),
+                [],
+            )
+
+    def test_retired_body_footnote_lifecycle_rejects_methods_callsites_and_examples(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("// owner activation marker\n", encoding="utf-8")
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/legacy.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn insert_body_footnote() {}\n"
+                "pub fn remove_body_footnote() {}\n"
+                "fn bridge(editor: &mut PagesEditor) {\n"
+                "    editor.insert_body_footnote();\n"
+                "    PagesEditor::remove_body_footnote();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "create.rs").write_text(
+                "fn main() {\n"
+                "    pages.insert_body_footnote();\n"
+                "    pages.remove_body_footnote();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "pages.insert_body_footnote();\n"
+                "PagesEditor::remove_body_footnote();\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_footnote_lifecycle_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("public method insert_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("public method remove_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("lifecycle call insert_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("lifecycle example call remove_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("lifecycle README call remove_body_footnote" in item for item in violations),
+                violations,
+            )
+
+    def test_retired_body_footnote_lifecycle_masks_cfg_tests_and_non_code(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("// owner activation marker\n", encoding="utf-8")
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/fixtures.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    pub fn insert_body_footnote() {}\n"
+                "    fn test_only(editor: &mut PagesEditor) {\n"
+                "        editor.remove_body_footnote();\n"
+                "    }\n"
+                "}\n"
+                "// editor.insert_body_footnote();\n"
+                'const NOTE: &str = "PagesEditor::remove_body_footnote()";\n'
+                "pub fn body_footnote_graphs() {}\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "fixtures.rs").write_text(
+                "#[cfg(test)]\n"
+                "fn test_only() { pages.insert_body_footnote(); }\n"
+                "// pages.remove_body_footnote();\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_footnote_lifecycle_source_topology(root),
+                [],
+            )
+
+    def test_focused_body_footnote_lifecycle_requires_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub struct Position;\n"
+                "pub enum Selector { At(Position) }\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                "pub struct BodyFootnoteEdit;\n"
+                "impl Package { pub fn insert_body_footnote() {} }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_lifecycle_facade_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("missing semantic footnote::body type Footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing canonical package type BodyFootnotePatch" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing Package method edit_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing Package method apply_body_footnote" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_body_footnote_lifecycle_rejects_public_owner_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            package = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub mod body_footnote;\n"
+                "pub use body_footnote::*;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn insert_body_footnote(object_id: u64, source_bytes: &[u8], wire: WireView, generated: GeneratedProjection, archive: Archive) {}\n"
+                "pub fn edit_body_footnote() {}\n"
+                "pub fn apply_body_footnote() {}\n"
+                "}\n"
+                "pub type FootnotePatch = BodyFootnotePatch;\n",
+                encoding="utf-8",
+            )
+            sibling = root / boundaries.PAGES_SOURCE_ROOT / "aliases.rs"
+            sibling.write_text(
+                "pub use package::BodyFootnotePatch as FootnotePatch;\n"
+                "pub type Alternate = BodyFootnoteCommit;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_lifecycle_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "public package::body_footnote module",
+                "retains root aliases via owner glob",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes generated type GeneratedProjection",
+                "exposes archive/IWA type Archive",
+                "retains flat alias FootnotePatch",
+                "alternate alias FootnotePatch",
+                "alternate alias Alternate",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_body_footnote_lifecycle_allows_canonical_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn insert_body_footnote() {}\n"
+                "pub fn edit_body_footnote() {}\n"
+                "pub fn apply_body_footnote() {}\n"
+                "}\n"
+                "fn resolve_reference(object_id: u64, source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n"
+                "#[cfg(test)]\n"
+                "pub fn test_only_raw(object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_footnote_lifecycle_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_body_footnote_lifecycle_masks_cfg_tests_item_by_item(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            sibling = root / boundaries.PAGES_SOURCE_ROOT / "fixtures.rs"
+            sibling.write_text(
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    pub type TestOnly = BodyFootnotePatch;\n"
+                "    pub fn test_only_raw(object_id: u64) {}\n"
+                "}\n"
+                "// pub use package::BodyFootnotePatch as Ignored;\n"
+                "pub type ProductionAlias = BodyFootnotePatch;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_lifecycle_facade_source_topology(
+                root
+            )
+
+            self.assertFalse(any("TestOnly" in item for item in violations), violations)
+            self.assertFalse(any("test_only_raw" in item for item in violations), violations)
+            self.assertTrue(
+                any("alternate alias ProductionAlias" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_body_footnote_lifecycle_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_footnote_lifecycle_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_pages_footnote_lifecycle_facade_source_topology()", main_source
+        )
 
     def test_retired_iwa_pages_page_layout_method_inventory_is_exact(self) -> None:
         self.assertEqual(

@@ -1240,6 +1240,12 @@ pub mod pages_footnote_codec;
 #[doc(hidden)]
 pub mod pages_footnote_marker_codec;
 
+/// Internal generated-free Pages body-footnote graph creation and table
+/// rewrite codec.  It composes the focused body, footnote-reference, marker,
+/// and text-storage projections without exposing generated protobuf values.
+#[doc(hidden)]
+pub mod pages_footnote_graph_codec;
+
 /// Internal strict Pages document page-layout projection. Generated types stay
 /// private and caller-owned raw bytes remain authoritative.
 #[doc(hidden)]
