@@ -1444,3 +1444,35 @@ latency, throughput, zero-copy, or performance result. No production manifest
 dependency, generated schema, normal Prost owner, Buffa owner, or workspace
 dependency edge changed; fuzz manifests only register the bounded codec and
 package targets.
+
+## 2026-08-25 amendment: Wave81 Numbers table-cell Pop-Up Menu resource record
+
+Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
+carries one operation-local transaction budget through physical source and
+catalog inventory, rooted sheet/table/cell resolution, model/store/tile/list/
+cell-spec/model scans, exhaustive BNC key/refcount census, strict Pop-Up Menu
+and storage-wire reports, metadata ownership and identifier scans, native and
+metadata rewrites, archive and Snappy bounds, prepared ZIP reassembly,
+candidate reopen, semantic readback, locality, and retained exact source/target
+patch artifacts. Independent source and candidate traversals are charged as
+independent work; nesting is merged by maximum, while a borrowed payload
+already charged by the enclosing phase is not charged twice.
+
+Residual physical input/output, entry, payload, fields, work, nesting,
+references, items, text, components, additions, allocations, retained bytes,
+and scratch limits are passed to the strict codec/storage phases. Prepared
+model and cell-spec writes, package-metadata transitions, native archive and
+compression bounds, and exact reassembly execution requirements are checked
+before their corresponding output allocation. Fallible reservations and typed
+archive/core/codec limit mappings leave the immutable source and published
+package unchanged on failure. Candidate reopen and object/member locality are
+charged before publication.
+
+Native, metadata, and final ZIP values are staged private candidates; the
+later stages consume identifiers and bytes produced by earlier stages.
+Publication is atomic, but this record does not claim one global output-free
+preflight, one allocation, or support for cross-component control graphs.
+These are operation-local accounting facts only and establish no package-wide
+peak memory, RSS, latency, throughput, zero-copy, or performance result. No
+production dependency edge or normal generated-schema/Prost/Buffa owner
+changed; fuzz manifests only register the bounded codec and package targets.

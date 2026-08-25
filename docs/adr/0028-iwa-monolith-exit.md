@@ -5182,3 +5182,37 @@ reopen evidence, a byte-exact pre-native inverse, and strict normalized Rust
 reread. Numbers normalized the ZIP bytes; this is not Rust/native byte parity,
 arbitrary producer-graph acceptance, a performance/RSS result, durable
 publication evidence, or a full-workspace claim.
+
+## 2026-08-25 amendment: Wave81 Numbers table-cell Pop-Up Menu bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `4ea040b4f9cf97f61ae9a690c6ae592b1b7ac567`
+moves admitted rooted Numbers table-cell Pop-Up Menu reads and lifecycle edits
+into the selector-first package. The archive-free facade contains no native ID
+or physical IWA type. The strict hidden codec, storage-wire owner, metadata
+owner, and package jointly own exact model/cell-spec parsing, table-list and
+BNC refcount proof, same-component copy-on-write/reuse/create/reset/final-cull,
+identifier and save-token transitions, staged-private atomic publication,
+candidate reopen, exact patch/inverse, and locality for this narrow slice.
+
+This is not general data-format, control-cell, table, or cross-component graph
+ownership. Cross-component aliases or dependencies, segmented/malformed lists,
+unproven inbound references, inconsistent refcounts, ambiguous/current-
+versioned metadata, other control formats, and unsupported producer graphs
+fail closed. The generic Numbers data-format host delegates the Pop-Up Menu
+branch to the package, while Pages/Keynote adapters and the remaining Numbers
+compatibility surface retain their recorded responsibilities.
+
+Debt 015, the `litchi-iwa -> litchi-numbers` dependency edge, debt 017 and the
+Pages edge, `litchi-iwa`, remaining migration hosts, generated-schema, Buffa,
+and normal Prost owners, and the IWA monolith remain. No crate, dependency
+edge, debt item, production manifest dependency, generated-schema owner,
+normal Prost owner, migration host, or monolith-exit gate is retired by
+Wave81.
+
+The Numbers 14.4 source record proves a native Pop-Up Menu can be authored,
+saved, closed, and reopened without repair. Strict Rust read refused its
+cross-component graph with `UnsupportedDependency`, so no Rust candidate,
+inverse, normalized reread, or native mutation acceptance is claimed. This is
+not Rust/native byte parity, arbitrary producer-graph acceptance, a
+performance/RSS result, durable publication evidence, or a full-workspace
+claim.
