@@ -13844,3 +13844,51 @@ save/close/reopen and strict semantic-reread evidence only; it is not
 Rust/native byte parity, physical-sort acceptance, arbitrary producer-graph
 acceptance, performance/RSS, publication durability, or a full-workspace
 claim.
+
+## 2026-08-26 amendment: Wave84 Pages body-table sort verification record
+
+Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` was verified
+with these focused gates:
+
+- the strict shared sort codec passed 7/7;
+- the focused `litchi-pages` body-table sort integration passed 16/16;
+- `litchi-pages` library and test-target Clippy with `-D warnings` passed;
+- `litchi-pages` library and all-target checks passed;
+- the focused `litchi-iwa` Pages sort host regression passed 1/1;
+- the strict sort fuzz-target check passed, with only unrelated existing
+  warnings;
+- boundary Python compilation passed and the boundary unittest passed 515/515;
+- Rust formatting and diff checks passed.
+
+The live boundary checker exited 1 only for the three known user-owned
+untracked Pages table-lock findings (`body_table_lock_state`,
+`set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`). It reported no Wave84
+sort finding. This record makes no full-workspace-green claim.
+
+The native record used the following disposable artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `/private/tmp/litchi-wave61-pages-native-source.pages` | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Rust candidate `/private/tmp/litchi-wave84-pages-sort-final-candidate.pages` | 108,854 | `a7af56d81ed0fd2d663df5a18521fc3b0d710a5d1e90f19a9d857fd2017c1061` |
+| exact Rust inverse | 108,857 | `f448bb887b636c77d140e858713abd03e164f05b0321f4c4a2cbf9def70c6a70` |
+| Pages-normalized candidate `/private/tmp/litchi-wave84-pages-sort-candidate.pages` | 109,102 | `deed12bf2a6acaee6d4cefa0e815d8abfc1659cec4a528a5f0c5edc5c28cc8cd` |
+
+The source contains one rooted Table 1 with a 5-by-4 shape, field 44 encoded
+as an explicit empty marker that reads semantically as `None`, and field 45
+present. Rust produced a candidate with the entire table sorted
+by column 0 ascending and column 2 descending; the inverse restored the source
+bytes exactly. Pages 14.4 opened the candidate without repair, recovery, or
+conversion UI, rendered Table 1 as 5-by-4, and saved, closed, and reopened the
+exact path without repair. The sort menu commands were visible but disabled
+because the fixture cells were empty, so no UI-visible distinction between
+the two rules is claimed. Strict Rust reread of the normalized artifact
+returned the same two rules; the normalized no-op/inverse artifact remained
+109,102 bytes with SHA
+`deed12bf2a6acaee6d4cefa0e815d8abfc1659cec4a528a5f0c5edc5c28cc8cd`.
+
+Pages normalized the ZIP bytes. This is bounded open/render/save/close/reopen
+and strict semantic-reread evidence only; it is not Rust/native byte parity,
+physical row-sort acceptance, performance/RSS, durable publication, or a
+full-workspace claim.

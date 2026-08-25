@@ -2519,3 +2519,26 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 migration hosts, generated-schema and normal Prost/Buffa owners, and the IWA
 monolith. No crate, dependency edge, debt item, production manifest
 dependency, or monolith is removed by this cut.
+
+## 2026-08-26 amendment: Wave84 current-topology Pages body-table sort cut
+
+Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` makes
+`litchi-pages` the current owner of selector-first persisted body-table
+sort-order reads, exact configuration edits, patch application, and inverse
+artifacts for admitted rooted Pages tables. The package owns
+`BodyTableSelector` resolution, strict field-44 codec execution,
+operation-local resource accounting, candidate reopen, semantic readback, and
+exact model/member locality. Field 45 and Metadata remain opaque and exact.
+
+The physical PagesEditor sort/apply/reorder executor remains in
+`litchi-iwa`, along with row movement, table storage, UID, formula, comment,
+cell, and other physical graph responsibilities. Pages and Keynote sort
+adapters remain at their recorded hosts. Locked, aliased, malformed, or
+otherwise unsupported table graphs fail closed.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 017 and the
+`litchi-iwa -> litchi-pages` edge remain open, as do migration hosts,
+generated-schema and normal Prost/Buffa owners, and the IWA monolith. No
+crate, dependency edge, debt item, production manifest dependency, or
+monolith is removed by this cut.

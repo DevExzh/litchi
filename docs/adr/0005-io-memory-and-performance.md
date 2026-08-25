@@ -1534,3 +1534,29 @@ claim. Metadata and preview bytes are preserved rather than rewritten. No
 production dependency edge or normal generated-schema/Prost owner changed;
 the private Buffa projection and fuzz manifests register only this bounded
 codec and package route.
+
+## 2026-08-26 amendment: Wave84 Pages body-table sort resource record
+
+Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` carries one
+aggregate operation-local resource budget through source/catalog and rooted
+body-table selection, lock/dependency checks, strict persisted-sort codec
+projection and rewrite, model/archive scans, candidate verification and
+semantic reread, object/member locality, physical archive and compression
+bounds, and prepared ZIP reassembly. Independent source and candidate walks
+are charged independently; nesting is merged by maximum, and already-charged
+borrowed payload bytes are not charged twice.
+
+Residual input/output, entry, payload, object, message, reference, field,
+work, nesting, rule, row-range, allocation, retained-byte, scratch,
+compression, and reassembly ceilings are propagated across the operation.
+Prepared codec and reassembly requirements are checked with fallible
+reservations and typed limit mappings before their corresponding publication
+steps. Failures leave the immutable source and published package unchanged.
+
+Native archive, codec, compression, and final ZIP values are staged as private
+candidates before semantic verification and publication. This is an
+operation-local accounting record with prepared reassembly; it makes no claim
+of a single allocation, zero-allocation preflight, zero-copy behavior,
+package-wide peak memory or RSS, latency, throughput, or performance. The
+owner does not mutate Metadata, UUIDs, save tokens, or previews. No production
+dependency edge or normal generated-schema/Prost/Buffa owner changed.

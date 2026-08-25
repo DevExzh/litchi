@@ -5275,3 +5275,33 @@ semantic reread of the Numbers-normalized artifact. Numbers normalized the ZIP
 bytes; this is not Rust/native byte parity, physical-sort acceptance,
 arbitrary producer-graph acceptance, performance/RSS, durable publication
 evidence, or a full-workspace claim.
+
+## 2026-08-26 amendment: Wave84 Pages body-table sort bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `31d5081ca6cd56256e463bee0019e4c7241d6df1` moves
+admitted rooted Pages persisted body-table sort configuration into the
+selector-first `litchi-pages` package. The archive-free facade contains only
+`BodyTableSelector` and `table::sort::{Order, Rule, Scope, ColumnIndex,
+Direction, RowRange}` values. The strict shared neutral codec and package
+jointly own raw-preserving field-44 projection, lock refusal, operation-local
+budgeting, staged-private atomic publication, candidate readback/locality,
+exact patch/inverse, and prepared reassembly. Field 45 is strictly validated
+but remains opaque and byte-exact; Metadata, UUIDs, save tokens, and previews
+are not mutated.
+
+This is persisted sort-order ownership only. It is not physical row sorting,
+table storage or UID movement, formula/comment/cell editing, table topology,
+table creation/removal, Pages/Keynote sort ownership, or general graph repair.
+The physical PagesEditor apply/reorder executor and remaining compatibility
+responsibilities stay in `litchi-iwa`; unsupported, malformed, aliased, locked,
+or otherwise unproven graphs fail closed. Native UI rule distinction was
+withheld because the empty-cell fixture left the sort commands disabled.
+
+Debt 017, the `litchi-iwa -> litchi-pages` dependency edge, `litchi-iwa`,
+remaining migration hosts, generated-schema, Buffa, and normal Prost owners,
+and the IWA monolith remain. No crate, dependency edge, debt item, production
+manifest dependency, generated-schema owner, normal Prost owner, migration
+host, or monolith-exit gate is retired by Wave84. The native record is bounded
+open/render/save/close/reopen evidence only, with normalized ZIP bytes; it is
+not Rust/native byte parity, physical-sort acceptance, performance/RSS,
+durable publication, or a full-workspace claim.
