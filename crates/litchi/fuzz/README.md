@@ -73,6 +73,15 @@ name, local row/column references, bounded deep formula trees near the
 aggregate work ceiling, exact-source patch application and conflicts,
 inversion, and content-redacted failures.
 
+`numbers_table_appearance` is the focused selector-first table-appearance
+lifecycle target. It offers arbitrary bytes to bounded Numbers ingress and
+reuses the native `basic.numbers` seed for no-op, reset, toggle, and complete
+appearance replacements. It checks archive-free row-banding, row-sizing, and
+all five gridline regions; exact package-byte no-op behavior; source-bound
+forward apply, patch conflicts, inverse restoration, candidate readback, and
+content-redacted selector/ingress failures. It never exposes native style
+objects, identifiers, protobuf payloads, or archive names.
+
 
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
@@ -172,6 +181,11 @@ profile, with 8 KiB formula-render work and depth 32. Its stress command builds
 at most a 5,461-node bounded formula tree; keep `-max_len` at 1 KiB so
 arbitrary ingress remains bounded while native transaction commands receive
 every input.
+
+`numbers_table_appearance` uses the same finite Numbers physical and semantic
+profile. The command prefix is at most eight bytes; keep `-max_len` at 512 bytes
+so arbitrary ingress remains bounded while every input also reaches the native
+appearance transaction.
 
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
@@ -289,6 +303,15 @@ Run the focused Numbers formula-authoring target:
 ```sh
 cargo +nightly fuzz run numbers_formula_cells -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-appearance target with its checked-in command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_appearance \
+  corpus/numbers_table_appearance -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 
 

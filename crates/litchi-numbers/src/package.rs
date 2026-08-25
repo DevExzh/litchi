@@ -36,6 +36,7 @@ pub(crate) mod sheet_order;
     reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
 )]
 mod table;
+pub(crate) mod table_appearance;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cells;
 pub(crate) mod table_dimension;

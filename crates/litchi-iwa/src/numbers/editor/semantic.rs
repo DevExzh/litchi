@@ -36,7 +36,6 @@ use crate::shapes::{
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
-use crate::table_appearance::TableAppearance;
 use crate::text::{
     Alignment, Background, Borders, IWorkTextEditor, Indents, LineSpacing, Outline,
     ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
@@ -55,6 +54,7 @@ use litchi_iwa_common::comment::{
     Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, TableCellComment,
     TableCellReply,
 };
+use litchi_iwa_common::table::appearance::Appearance;
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
 use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,

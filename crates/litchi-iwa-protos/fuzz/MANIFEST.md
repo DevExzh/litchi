@@ -15,6 +15,7 @@ generated libFuzzer output part of the repository.
 | `pages_movie_caption_codec` | `fuzz_targets/pages_movie_caption_codec.rs` | `corpus/pages_movie_caption_codec/` |
 | `pages_header_footer_codec` | `fuzz_targets/pages_header_footer_codec.rs` | `corpus/pages_header_footer_codec/` |
 | `numbers_table_data_list` | `fuzz_targets/numbers_table_data_list.rs` | `corpus/numbers_table_data_list/` |
+| `table_appearance` | `fuzz_targets/table_appearance.rs` | `corpus/table_appearance/` |
 | `comment_storage_codec` | `fuzz_targets/comment_storage_codec.rs` | `corpus/comment_storage_codec/` |
 | `keynote_chart_title` | `fuzz_targets/keynote_chart_title.rs` | `corpus/keynote_chart_title/` |
 

@@ -151,6 +151,36 @@
 //! # }
 //! ```
 //!
+//! # Table-appearance transactions
+//!
+//! Use [`table::appearance`] to read and transactionally replace the complete
+//! effective appearance of one rooted table. Select a sheet with
+//! [`SheetSelector`] and then a table on that sheet with [`TableSelector`].
+//! The archive-free [`Appearance`] value contains only row-banding,
+//! row-sizing, and per-region gridline settings; native style objects,
+//! inheritance graphs, identifiers, and wire payloads are not part of the
+//! public API.
+//!
+//! ```no_run
+//! use litchi_numbers::{Appearance, Package, SheetSelector, TableSelector};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.numbers")?;
+//! let sheet = SheetSelector::name("Summary");
+//! let table = TableSelector::name("Revenue");
+//! let before = package.table_appearance(sheet, table)?;
+//! let commit = package
+//!     .edit_table_appearance(sheet, table)?
+//!     .set(Appearance::default())
+//!     .commit()?;
+//! let restored = commit
+//!     .package()
+//!     .apply_table_appearance(&commit.patch().inverse())?;
+//! # let _ = (before, restored);
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Reorder sheets
 //!
 //! Use the direct [`sheet::order`] namespace for the transaction types. A move
@@ -230,6 +260,7 @@ pub use package::{
 };
 pub use selector::{SheetSelector, TableSelector};
 pub use sheet::{Builder as SheetBuilder, SelectorError as TableSelectorError, Sheet};
+pub use table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};
 pub use table::dimension::{Dimension, Points, Size};
 pub use table::topology::{ColumnDeletion, RowDeletion};
 pub use table::{

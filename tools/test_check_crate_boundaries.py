@@ -292,6 +292,69 @@ def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
     table_export.write_text("pub mod title;\n", encoding="utf-8")
 
 
+def add_numbers_table_appearance_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_APPEARANCE_TRANSACTION_TYPES
+        )
+        + "fn copy_on_write_style_variation() {}\n"
+        + "fn metadata_save_token_watermark() {}\n"
+        + "fn transaction_budget_preflight() {}\n"
+        + "fn verify_locality_candidate_reopen() {}\n"
+        + "impl Package {\n"
+        + "pub fn table_appearance<'sheet, 'table>(&self, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>) -> Result<Appearance, Error> {}\n"
+        + "pub fn edit_table_appearance<'sheet, 'table>(&self, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, value: Appearance) -> Result<Edit, Error> {}\n"
+        + "pub fn apply_table_appearance(&self, patch: &Patch) -> Result<Commit, Error> {}\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, table_export = (
+        root / path for path in boundaries.NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES
+    )
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text("pub mod table;\n", encoding="utf-8")
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "pub(crate) mod table_appearance;\n", encoding="utf-8"
+    )
+    table_export.parent.mkdir(parents=True, exist_ok=True)
+    table_export.write_text("pub mod appearance;\n", encoding="utf-8")
+
+    codec = root / boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub fn decode_table_model_with_report() {}\n"
+        "pub fn prepare_table_model_style_rewrite() {}\n"
+        "pub fn canonical_table_style_variation() {}\n"
+        "pub fn append_stylesheet_style() {}\n"
+        "fn canonical_unknown_report() {}\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -17352,6 +17415,242 @@ fn rewrite_movie_title_operation(
                     root
                 ),
                 [],
+            )
+
+    def test_numbers_table_appearance_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_METHODS,
+            ("table_appearance", "set_table_appearance"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TYPES,
+            (
+                "TableAppearance",
+                "TableRowBanding",
+                "TableRowSizing",
+                "TableGridlineVisibility",
+                "TableGridlines",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_EXAMPLE,
+            Path("crates/litchi-iwa/examples/create_iwork_table_appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/table/appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE,
+            Path("crates/litchi-iwa-protos/src/table_appearance_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_MODULE,
+            "table_appearance_codec",
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_REQUIRED_APIS,
+            (
+                "decode_table_model_with_report",
+                "prepare_table_model_style_rewrite",
+                "canonical_table_style_variation",
+                "append_stylesheet_style",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_APPEARANCE_PACKAGE_METHODS,
+            ("table_appearance", "edit_table_appearance", "apply_table_appearance"),
+        )
+
+    def test_focused_numbers_table_appearance_is_dormant_until_owner_and_codec_exist(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_numbers_table_appearance_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_appearance_source_topology(root),
+                [],
+            )
+
+            add_numbers_table_appearance_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_appearance_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_appearance_requires_each_contract_part(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+
+            semantic = root / boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE
+            semantic.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES[:-1]
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical table::appearance type RowSizing" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_appearance_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE
+            codec.write_text("", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("hidden codec is missing strict API" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "SheetSelector<'sheet>", "MissingSheetSelector<'sheet>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first SheetSelector" in item for item in violations),
+                violations,
+            )
+
+            marker_lines = {
+                "copy-on-write": "fn copy_on_write_style_variation() {}\n",
+                "metadata": "fn metadata_save_token_watermark() {}\n",
+                "budget": "fn transaction_budget_preflight() {}\n",
+                "locality": "fn verify_locality_candidate_reopen() {}\n",
+            }
+            for label, marker_line in marker_lines.items():
+                with self.subTest(marker=label):
+                    add_numbers_table_appearance_canonical_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(marker_line, ""),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_appearance_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableAppearanceEdit = Edit;\n"
+                + "pub fn raw_table_appearance(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::table_appearance::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias TableAppearanceEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_appearance_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn test_only_raw_table_appearance(object_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_appearance_facade_source_topology(root),
+                [],
+            )
+
+    def test_numbers_table_appearance_host_retirement_is_owner_gated_and_scoped(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_appearance.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn table_appearance() {}\n"
+                "pub fn set_table_appearance() {}\n"
+                "pub fn table_appearance_info() -> TableAppearance {}\n"
+                "#[cfg(test)]\n"
+                "pub fn test_only_table_appearance(object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_appearance_source_topology(root),
+                [],
+            )
+            add_numbers_table_appearance_canonical_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_appearance_source_topology(root)
+            self.assertTrue(
+                any("method table_appearance" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("method set_table_appearance" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(any("test_only_table_appearance" in item for item in violations))
+            shared = root / "crates/litchi-iwa/src/table_appearance.rs"
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text("pub(crate) fn table_appearance() {}\n", encoding="utf-8")
+            self.assertFalse(
+                any(
+                    "src/table_appearance.rs" in item
+                    for item in boundaries.audit_iwa_numbers_table_appearance_source_topology(root)
+                )
             )
 
     def test_numbers_table_dimension_boundary_inventories_are_exact(self) -> None:

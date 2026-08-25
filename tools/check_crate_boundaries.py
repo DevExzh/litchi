@@ -2464,6 +2464,201 @@ NUMBERS_TABLE_TITLE_SETTINGS_WIRE_TYPES = frozenset(
 NUMBERS_TABLE_TITLE_SETTINGS_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tn", "tsp", "tswp"}
 )
+
+# Numbers table appearance is the next copy-on-write style owner candidate.
+# Keep this inventory dormant until the selector-first package owner and its
+# strict hidden codec exist together.  The old litchi-iwa editor currently
+# owns style inheritance, COW variation creation, metadata UUID/watermark
+# publication, and native-ID based access; activating only one half would
+# make the boundary report an incomplete migration as complete.
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_METHODS = (
+    "table_appearance",
+    "set_table_appearance",
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TYPES = (
+    "TableAppearance",
+    "TableRowBanding",
+    "TableRowSizing",
+    "TableGridlineVisibility",
+    "TableGridlines",
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TYPE_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TYPES
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/create_iwork_table_appearance.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TESTS = (
+    "scratch_table_appearance_is_copy_on_write",
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TEST_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TESTS
+)
+RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_appearance.rs",
+)
+IWA_NUMBERS_README_TABLE_APPEARANCE_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor|pages|editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_appearance|set_table_appearance)\b"
+        r"[ \t\r\n]*\(",
+    ),
+)
+IWA_NUMBERS_README_TABLE_APPEARANCE_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>create_iwork_table_appearance)(?:\.rs)?"
+    r"(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/table/appearance.rs"
+)
+NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_appearance.rs"
+)
+NUMBERS_TABLE_APPEARANCE_OWNER_HELPER_ROOT = Path(
+    "crates/litchi-numbers/src/package/table_appearance"
+)
+NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/table_appearance_codec.rs"
+)
+NUMBERS_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+NUMBERS_TABLE_APPEARANCE_CODEC_MODULE = "table_appearance_codec"
+NUMBERS_TABLE_APPEARANCE_CODEC_REQUIRED_APIS = (
+    "decode_table_model_with_report",
+    "prepare_table_model_style_rewrite",
+    "canonical_table_style_variation",
+    "append_stylesheet_style",
+)
+NUMBERS_TABLE_APPEARANCE_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE,
+)
+NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    Path("crates/litchi-numbers/src/package.rs"),
+    Path("crates/litchi-numbers/src/table.rs"),
+)
+NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES = (
+    "Appearance",
+    "Banding",
+    "GridlineVisibility",
+    "Gridlines",
+    "RowSizing",
+)
+NUMBERS_TABLE_APPEARANCE_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_APPEARANCE_CANONICAL_TYPES = (
+    *NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES,
+    *NUMBERS_TABLE_APPEARANCE_TRANSACTION_TYPES,
+)
+NUMBERS_TABLE_APPEARANCE_SHORT_NAMES = frozenset(
+    NUMBERS_TABLE_APPEARANCE_CANONICAL_TYPES
+)
+NUMBERS_TABLE_APPEARANCE_PACKAGE_METHODS = (
+    "table_appearance",
+    "edit_table_appearance",
+    "apply_table_appearance",
+)
+NUMBERS_TABLE_APPEARANCE_FLAT_ALIAS_PREFIXES = (
+    "Appearance",
+    "TableAppearance",
+    "TableStyleAppearance",
+)
+NUMBERS_TABLE_APPEARANCE_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_APPEARANCE_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_APPEARANCE_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_APPEARANCE_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_appearance|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?appearance)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_APPEARANCE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_appearance\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_TABLE_APPEARANCE_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_appearance\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_APPEARANCE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?appearance\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_APPEARANCE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableAppearanceArchive",
+        "TableAppearanceSnapshot",
+        "TableStyleArchive",
+        "TableStylePresetArchive",
+    }
+)
+NUMBERS_TABLE_APPEARANCE_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_TABLE_APPEARANCE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tst", "tswp"}
+)
+NUMBERS_TABLE_APPEARANCE_CODEC_REQUIRED_MARKERS = (
+    "canonical",
+    "unknown",
+    "report",
+)
+NUMBERS_TABLE_APPEARANCE_OWNER_REQUIRED_MARKERS = {
+    "copy-on-write": re.compile(
+        r"(?<![A-Za-z0-9])(?:copy_on_write|copy-on-write|style_variation|"
+        r"shared_style|Cow)(?![A-Za-z0-9])"
+    ),
+    "metadata": re.compile(
+        r"(?<![A-Za-z0-9])(?:metadata|save_token|object_uuid|"
+        r"external_reference|watermark)(?![A-Za-z0-9])"
+    ),
+    "budget": re.compile(
+        r"(?<![A-Za-z0-9])(?:budget|WireBudget|TransactionBudget|"
+        r"charge_|preflight)(?![A-Za-z0-9])"
+    ),
+    "locality": re.compile(
+        r"(?<![A-Za-z0-9])(?:locality|verify_locality|candidate|reopen|"
+        r"same_content)(?![A-Za-z0-9])"
+    ),
+}
 RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS = (
     "table_dimension_size",
     "set_table_dimension_size",
@@ -7592,6 +7787,48 @@ def _numbers_table_title_settings_public_leak(identifier: str) -> str | None:
     return _iwork_public_leak(identifier)
 
 
+def _numbers_table_appearance_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in appearance APIs."""
+
+    if identifier in NUMBERS_TABLE_APPEARANCE_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_TABLE_APPEARANCE_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_APPEARANCE_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_table_appearance_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_TABLE_APPEARANCE_OWNER_PATH.search(declaration) is not None or any(
+        identifier in NUMBERS_TABLE_APPEARANCE_PACKAGE_METHODS
+        for identifier in identifiers
+    )
+
+
+def _is_numbers_table_appearance_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers & NUMBERS_TABLE_APPEARANCE_FLAT_ALIASES
+    ) or _numbers_table_appearance_owner_declaration(declaration)
+
+
 def _numbers_table_title_settings_owner_declaration(declaration: str) -> bool:
     identifiers = [
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -11412,6 +11649,385 @@ def audit_numbers_table_title_settings_facade_source_topology(
                     "focused litchi-numbers table-title settings public API exposes "
                     f"raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def _numbers_table_appearance_owner_present(root: Path) -> bool:
+    owner_path = root / NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+    codec_path = root / NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE
+    package_path = root / NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and codec_path.is_file()
+        and NUMBERS_PACKAGE_TABLE_APPEARANCE_MODULE.search(package_source) is not None
+    )
+
+
+def audit_iwa_numbers_table_appearance_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Numbers table-appearance ownership after package activation."""
+
+    if not _numbers_table_appearance_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_paths = {
+        root / path
+        for path in RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_SOURCE
+        if (root / path).is_file()
+    }
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if source_root.is_dir():
+        source_paths.update(source_root.rglob("*.rs"))
+
+    for path in sorted(source_paths):
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        code = _mask_rust_non_code(production_source)
+        for declaration, line_number in _rust_public_declarations(production_source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            for method in sorted(
+                identifiers & RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_METHOD_SET
+            ):
+                violations.append(
+                    "retired litchi-iwa Numbers table-appearance method "
+                    f"{method}: {path.relative_to(root)}:{line_number}"
+                )
+            for type_name in sorted(
+                identifiers & RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TYPE_SET
+            ):
+                violations.append(
+                    "retired litchi-iwa Numbers table-appearance public type "
+                    f"{type_name}: {path.relative_to(root)}:{line_number}"
+                )
+
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_appearance|"
+            r"set_table_appearance)\b[ \t\r\n]*\(",
+            code,
+        ):
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            line_end = code.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(code)
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                code[line_start:line_end],
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-appearance call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+
+    tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        production_source = _mask_rust_cfg_test_items(
+            tests_path.read_text(encoding="utf-8")
+        )
+        for name, line_number in _rust_function_declarations(production_source):
+            if name in RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_TEST_SET:
+                violations.append(
+                    "retired litchi-iwa Numbers table-appearance test "
+                    f"{name}: {IWA_NUMBERS_EDITOR_TEST_SOURCE}:{line_number}"
+                )
+
+    example = root / RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_EXAMPLE
+    if example.is_file():
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(example.read_text(encoding="utf-8"))
+        )
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_appearance|"
+            r"set_table_appearance)\b[ \t\r\n]*\(",
+            source,
+        ):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-appearance example call "
+                f"{match.group(0).split('(')[0].strip()}: "
+                f"{RETIRED_IWA_NUMBERS_TABLE_APPEARANCE_EXAMPLE}:{line_number}"
+            )
+
+    readme_path = root / IWA_NUMBERS_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_NUMBERS_README_TABLE_APPEARANCE_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table-appearance README call "
+                    f"{match.group('method')}: {IWA_NUMBERS_README}:{line_number}"
+                )
+        for match in IWA_NUMBERS_README_TABLE_APPEARANCE_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-appearance README example "
+                f"reference {match.group('example')}: {IWA_NUMBERS_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_appearance_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Numbers appearance owner.
+
+    This is intentionally dormant until the private package owner appears.
+    The activation token prevents a half-migrated COW/metadata route from
+    making the current compatibility host appear retired.
+    """
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir() or not _numbers_table_appearance_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES)
+    )
+    for name in NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-numbers table-appearance public API is missing "
+                f"canonical table::appearance type {name}: "
+                f"{NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE}"
+            )
+
+    table_path = root / NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[2]
+    table_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(table_path.read_text(encoding="utf-8"))
+        )
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_APPEARANCE_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-numbers table-appearance public API is missing "
+            f"canonical table::appearance module: {NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[2]}"
+        )
+
+    package_path = root / NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    if NUMBERS_PACKAGE_TABLE_APPEARANCE_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-numbers table-appearance public API is missing private "
+            f"package owner module: {NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_NUMBERS_PACKAGE_TABLE_APPEARANCE_MODULE.finditer(
+        package_source
+    ):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-numbers table-appearance public API exposes public "
+            f"package::table_appearance module: {NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    owner_code = _mask_rust_non_code(owner_source)
+    owner_exports = _rust_canonical_exports(
+        owner_source, frozenset(NUMBERS_TABLE_APPEARANCE_TRANSACTION_TYPES)
+    )
+    for name in NUMBERS_TABLE_APPEARANCE_TRANSACTION_TYPES:
+        if name not in owner_exports:
+            violations.append(
+                "focused litchi-numbers table-appearance public API is missing "
+                f"canonical package type {name}: {NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in NUMBERS_TABLE_APPEARANCE_PACKAGE_METHODS:
+        declaration = owner_methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-numbers table-appearance public API is missing "
+                f"Package method {method}: {NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_table_appearance" and not re.search(
+            r"\bSheetSelector\b", declaration
+        ):
+            violations.append(
+                "focused litchi-numbers table-appearance Package method "
+                f"{method} must accept selector-first SheetSelector: "
+                f"{NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+        if method != "apply_table_appearance" and not re.search(
+            r"\bTableSelector\b", declaration
+        ):
+            violations.append(
+                "focused litchi-numbers table-appearance Package method "
+                f"{method} must accept selector-first TableSelector: "
+                f"{NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+
+    for label, marker in NUMBERS_TABLE_APPEARANCE_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-numbers table-appearance owner is missing "
+                f"{label} transaction marker: {NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+
+    codec_path = root / NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE
+    codec_source = (
+        _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        if codec_path.is_file()
+        else ""
+    )
+    codec_code = _mask_rust_non_code(codec_source)
+    # The strict codec documents raw preservation in module docs, including
+    # balanced unknown groups. Keep API matching code-only, but let contract
+    # markers be proven by non-test source documentation as well.
+    codec_marker_source = codec_source
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-numbers table-appearance public API is missing strict "
+            f"hidden codec source: {NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE}"
+        )
+    else:
+        for api in NUMBERS_TABLE_APPEARANCE_CODEC_REQUIRED_APIS:
+            if re.search(rf"\b(?:pub\s+)?(?:fn|struct)\s+{re.escape(api)}\b", codec_code) is None:
+                violations.append(
+                    "focused litchi-numbers table-appearance hidden codec is missing "
+                    f"strict API {api}: {NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE}"
+                )
+        for marker in NUMBERS_TABLE_APPEARANCE_CODEC_REQUIRED_MARKERS:
+            if re.search(re.escape(marker), codec_marker_source) is None:
+                violations.append(
+                    "focused litchi-numbers table-appearance hidden codec is missing "
+                    f"strict {marker} marker: {NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE}"
+                )
+    codec_lib_path = root / NUMBERS_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE
+    codec_lib_source = (
+        _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+        if codec_lib_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(NUMBERS_TABLE_APPEARANCE_CODEC_MODULE)}\b",
+        codec_lib_source,
+    ) is None:
+        violations.append(
+            "focused litchi-numbers table-appearance public API is missing hidden "
+            f"codec module {NUMBERS_TABLE_APPEARANCE_CODEC_MODULE}: "
+            f"{NUMBERS_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE}"
+        )
+
+    lib_path = root / NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if re.search(r"\bpub\s+mod\s+table\b", _mask_rust_non_code(lib_source)) is None:
+        violations.append(
+            "focused litchi-numbers table-appearance public API is missing root "
+            f"table module: {NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[0]}"
+        )
+
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_APPEARANCE_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    if (root / NUMBERS_TABLE_APPEARANCE_OWNER_HELPER_ROOT).is_dir():
+        dedicated_sources.update(
+            (root / NUMBERS_TABLE_APPEARANCE_OWNER_HELPER_ROOT).rglob("*.rs")
+        )
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        for declaration, line_number in _rust_public_declarations(production_source):
+            if not _is_numbers_table_appearance_public_declaration(
+                declaration, dedicated_source=dedicated_source
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "table_appearance"]:
+                violations.append(
+                    "focused litchi-numbers table-appearance public API exposes "
+                    f"duplicate table_appearance module: {path.relative_to(root)}:{line_number}"
+                )
+            public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+            if (
+                public_use_or_type
+                and "*" in declaration
+                and ("table_appearance" in identifiers or "appearance" in identifiers)
+            ):
+                violations.append(
+                    "focused litchi-numbers table-appearance public API retains "
+                    f"root aliases via glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if identifier in NUMBERS_TABLE_APPEARANCE_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-numbers table-appearance public API retains "
+                        f"flat alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_appearance_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-numbers table-appearance public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers table-appearance public API exposes raw "
+                    f"byte slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
                 )
 
     return sorted(set(violations))
@@ -21630,6 +22246,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_chart_caption_source_topology()
         + audit_iwa_numbers_table_title_settings_source_topology()
         + audit_numbers_table_title_settings_facade_source_topology()
+        + audit_iwa_numbers_table_appearance_source_topology()
+        + audit_numbers_table_appearance_facade_source_topology()
         + audit_iwa_numbers_table_dimension_source_topology()
         + audit_numbers_table_dimension_facade_source_topology()
         + audit_numbers_formula_facade_source_topology()

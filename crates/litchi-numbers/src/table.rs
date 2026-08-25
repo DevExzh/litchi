@@ -6,6 +6,8 @@
 //! tables retain one immutable boxed slice. No dense grid is allocated by the
 //! semantic model.
 
+/// Lossless table appearance values and selector-first transactions.
+pub mod appearance;
 /// Presence-preserving semantic cell reads.
 pub mod cells;
 /// Compact, archive-free cell coordinates and A1 selectors.
