@@ -22608,6 +22608,10 @@ fn rewrite_movie_title_operation(
             Path("crates/litchi-numbers/src/package/table_cell_control.rs"),
         )
         self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/semantic/table.rs"),
+        )
+        self.assertEqual(
             boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE,
             Path("crates/litchi-numbers/tests/table_cell_control.rs"),
         )
@@ -22641,6 +22645,114 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
                 [],
+            )
+
+    def test_numbers_table_cell_control_bridge_routes_generic_writes_to_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            bridge = root / boundaries.IWA_NUMBERS_TABLE_CELL_CONTROL_BRIDGE_SOURCE
+            bridge.parent.mkdir(parents=True, exist_ok=True)
+            bridge.write_text(
+                "use litchi_numbers::cell::CellControl;\n"
+                "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};\n"
+                "fn focused_control_location() -> (SheetSelector<'static>, TableSelector<'static>, CellPosition) {\n"
+                "    focused_table_location(); CellPosition::try_from_usize(0, 0).unwrap()\n"
+                "}\n"
+                "fn focused_control_format() {\n"
+                "    let (source, sheet, table, position) = focused_control_location();\n"
+                "    source.table_cell_control_format(sheet, table, position);\n"
+                "}\n"
+                "fn commit_focused_control_format(format: Option<CellControl>) {\n"
+                "    let (source, sheet, table, position) = focused_control_location();\n"
+                "    let edit = source.edit_table_cell_control_format(sheet, table, position);\n"
+                "    match format { Some(value) => edit.set(value).commit(), None => edit.clear().commit() };\n"
+                "}\n"
+                "impl NumbersEditor {\n"
+                "    pub fn table_cell_data_format(&self) {\n"
+                "        if CellControl::try_from(()).is_ok() { focused_control_format(); }\n"
+                "    }\n"
+                "    pub fn set_table_cell_data_format(&mut self, value: CellControl) {\n"
+                "        commit_focused_control_format(Some(value));\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_control_bridge_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            broken = bridge.read_text(encoding="utf-8").replace(
+                "source.table_cell_control_format(sheet, table, position);",
+                "cell_data_format::cell_slider_format();",
+            )
+            bridge.write_text(broken, encoding="utf-8")
+            violations = boundaries.audit_iwa_numbers_table_cell_control_bridge_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must call focused Package table_cell_control_format" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("legacy per-kind/raw-ID adapter" in item for item in violations),
+                violations,
+            )
+
+            bridge.write_text(
+                broken.replace(
+                    "cell_data_format::cell_slider_format();",
+                    "source.table_cell_control_format(sheet, table, position);",
+                ).replace(
+                    "commit_focused_control_format(Some(value));",
+                    "cell_data_format::set_cell_data_format();",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_control_source_topology(root)
+            self.assertTrue(
+                any("retired litchi-iwa Numbers cell-control call" in item for item in violations)
+                or any(
+                    "generic bridge set_table_cell_data_format must route" in item
+                    for item in boundaries.audit_iwa_numbers_table_cell_control_bridge_source_topology(root)
+                ),
+                violations,
+            )
+
+    def test_numbers_table_cell_control_host_scope_keeps_pages_keynote_and_debt015(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            pages = root / "crates/litchi-iwa/src/pages/editor/tables/control.rs"
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
+            for adapter in (pages, keynote):
+                adapter.parent.mkdir(parents=True, exist_ok=True)
+                adapter.write_text(
+                    "pub fn table_cell_slider_format() {}\n"
+                    "pub fn set_table_cell_slider_format() {}\n"
+                    "pub fn reset_table_cell_slider_format() {}\n",
+                    encoding="utf-8",
+                )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_control_source_topology(root),
+                [],
+            )
+
+            policy = boundaries.load_policy(boundaries.DEFAULT_POLICY)
+            self.assertTrue(
+                any(
+                    item.order == 15
+                    and item.edge == boundaries.Edge("litchi-iwa", "litchi-numbers")
+                    for item in policy.migration_debt
+                ),
+                "debt 015 must remain until the Numbers host migration is complete",
             )
 
     def test_focused_numbers_table_cell_control_requires_each_contract_part(self) -> None:
