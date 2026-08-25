@@ -295,11 +295,11 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         STEPPER_COLUMN,
         numbers_stepper_format()?,
     )?;
-    editor.set_table_cell_pop_up_menu_format(
+    editor.set_table_cell_data_format(
         table_id,
         ROW,
         POP_UP_MENU_COLUMN,
-        numbers_pop_up_menu_format()?,
+        numbers_pop_up_menu_format()?.into(),
     )?;
     editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
     editor.set_table_cell_custom_format(

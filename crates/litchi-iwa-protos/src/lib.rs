@@ -561,6 +561,29 @@ mod buffa_numbers_table_cell_storage_generated {
     ));
 }
 
+/// Private lazy-view roots for singular Numbers popup-menu cell envelopes.
+/// Repeated menu values and control-cell list entries stay on handwritten
+/// source-preserving paths and never cross the generated boundary.
+#[doc(hidden)]
+mod buffa_numbers_table_cell_pop_up_menu_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-cell-pop-up-menu/iwa_numbers_table_cell_pop_up_menu_buffa_protos.rs"
+    ));
+}
+
 /// Private lazy-view roots for Numbers formula dependency envelopes.
 #[doc(hidden)]
 mod buffa_numbers_table_cell_dependency_generated {
@@ -1294,6 +1317,10 @@ pub mod numbers_table_title_codec;
 /// Strict generated-free Numbers table-cell storage projection.
 #[doc(hidden)]
 pub mod numbers_table_cell_storage_codec;
+
+/// Strict generated-free Numbers control-cell popup-menu projection.
+#[doc(hidden)]
+pub mod numbers_table_cell_pop_up_menu_codec;
 
 /// Format-neutral strict table-dimension/header-bucket seam.
 ///

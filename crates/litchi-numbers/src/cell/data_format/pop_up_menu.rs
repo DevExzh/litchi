@@ -110,6 +110,18 @@ pub struct PopUpMenu {
     initial_selection: InitialSelection,
 }
 
+/// Selector-first exact-source transactions for one table cell's pop-up menu.
+///
+/// The transaction implementation remains in the Numbers package adapter;
+/// this semantic namespace exposes only archive-free values and transaction
+/// handles. Native object identifiers, table-list records, and protobuf
+/// payloads never cross this boundary.
+pub mod transaction {
+    pub use crate::package::table_cell_pop_up_menu::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+    };
+}
+
 impl PopUpMenu {
     /// Validates and constructs a menu in display order.
     ///

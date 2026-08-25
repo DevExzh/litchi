@@ -1,0 +1,31 @@
+// Bounded singular projections for the Numbers control-cell popup route.
+// Repeated PopUpMenuModel.tsce_item values and table-data-list entries remain
+// handwritten so the generated sidecar cannot materialize input-width Vecs.
+syntax = "proto2";
+package LitchiIwaNumbersTableCellPopUpMenuProjection;
+
+message CellValueArchive {
+  required int32 cell_value_type = 1;
+  optional bytes boolean_value = 2;
+  optional bytes date_value = 3;
+  optional bytes number_value = 4;
+  optional bytes string_value = 5;
+  optional bytes error_value = 6;
+}
+
+message StringCellValueArchive {
+  required string value = 1;
+  required bytes format = 2;
+  optional bool format_is_implicit = 3;
+  optional bool format_is_explicit = 4;
+  optional bool is_regex = 5;
+  optional bool is_case_sensitive_regex = 6;
+}
+
+message CellSpecArchive {
+  required uint32 interaction_type = 1;
+  optional bytes formula = 2;
+  optional bytes chooser_control_popup_model = 6;
+  optional bool chooser_control_start_w_first = 7;
+  optional bool category_summary_should_display_label = 8;
+}

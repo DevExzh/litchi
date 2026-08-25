@@ -128,6 +128,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "numbers_table_cell_pop_up_menu_codec"
+path = "fuzz_targets/numbers_table_cell_pop_up_menu_codec.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

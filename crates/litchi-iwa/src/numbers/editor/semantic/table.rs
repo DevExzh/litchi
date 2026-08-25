@@ -9,6 +9,79 @@ use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
 
+type FocusedPopupError = litchi_numbers::cell::data_format::pop_up_menu::transaction::Error;
+
+fn focused_popup_error(error: FocusedPopupError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers Pop-Up Menu operation failed: {error}"
+    ))
+}
+
+fn focused_popup_location(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<(
+    FocusedNumbersPackage,
+    litchi_numbers::SheetSelector<'static>,
+    litchi_numbers::TableSelector<'static>,
+    litchi_numbers::table::CellPosition,
+)> {
+    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
+    let position =
+        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
+            Error::InvalidFormat(format!("invalid Numbers Pop-Up Menu coordinate: {error}"))
+        })?;
+    let source_bytes = editor.to_bytes()?;
+    let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Numbers Pop-Up Menu source validation failed: {error}"
+        ))
+    })?;
+    Ok((source, sheet, table, position))
+}
+
+fn focused_popup_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<PopUpMenu>> {
+    let (source, sheet, table, position) = focused_popup_location(editor, table_id, row, column)?;
+    source
+        .table_cell_pop_up_menu_format(sheet, table, position)
+        .map_err(focused_popup_error)
+}
+
+fn commit_focused_popup_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<PopUpMenu>,
+) -> Result<NumbersEditor> {
+    let source_bytes = editor.to_bytes()?;
+    let (source, sheet, table, position) = focused_popup_location(editor, table_id, row, column)?;
+    let edit = source
+        .edit_table_cell_pop_up_menu_format(sheet, table, position)
+        .map_err(focused_popup_error)?;
+    let commit = match format {
+        Some(format) => edit.set(format).commit(),
+        None => edit.clear().commit(),
+    }
+    .map_err(focused_popup_error)?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
+        Error::InvalidFormat("could not allocate focused Numbers Pop-Up Menu candidate".to_owned())
+    })?;
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    NumbersEditor::from_bytes(&bytes)
+}
+
 enum FocusedCommentReplacement {
     Published(NumbersEditor),
     LegacyFallback,
@@ -155,7 +228,18 @@ impl NumbersEditor {
         row: usize,
         column: usize,
     ) -> Result<DataFormat> {
-        cell_data_format::cell_data_format(&self.package, table_id, row, column)
+        let format = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
+        if matches!(&format, DataFormat::PopUpMenu(_)) {
+            return focused_popup_format(self, table_id, row, column)?.map_or_else(
+                || {
+                    Err(Error::InvalidFormat(
+                        "focused Numbers Pop-Up Menu read lost the selected format".to_owned(),
+                    ))
+                },
+                |format| Ok(DataFormat::PopUpMenu(format)),
+            );
+        }
+        Ok(format)
     }
 
     /// Create, replace, or reset one cell's typed data format transactionally.
@@ -166,6 +250,33 @@ impl NumbersEditor {
         column: usize,
         format: DataFormat,
     ) -> Result<()> {
+        let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
+        if matches!(&format, DataFormat::PopUpMenu(_)) {
+            let format = match format {
+                DataFormat::PopUpMenu(format) => format,
+                _ => unreachable!("the Pop-Up Menu branch already matched"),
+            };
+            *self = commit_focused_popup_format(self, table_id, row, column, Some(format))?;
+            return Ok(());
+        }
+        if matches!(current, DataFormat::PopUpMenu(_)) {
+            let mut staged = commit_focused_popup_format(self, table_id, row, column, None)?;
+            cell_data_format::set_cell_data_format(
+                &mut staged.package,
+                table_id,
+                row,
+                column,
+                &format,
+            )?;
+            let verified = Self::from_bytes(&staged.to_bytes()?)?;
+            if verified.table_cell_data_format(table_id, row, column)? != format {
+                return Err(Error::InvalidFormat(
+                    "Numbers table-cell data format failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(());
+        }
         let mut staged = self.package.clone();
         cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, &format)?;
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -794,49 +905,6 @@ impl NumbersEditor {
             if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
                 return Err(Error::InvalidFormat(
                     "Numbers Stepper reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
-    /// Read an explicit Pop-Up Menu format for one table cell.
-    pub fn table_cell_pop_up_menu_format(
-        &self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<PopUpMenu>> {
-        cell_data_format::cell_pop_up_menu_format(&self.package, table_id, row, column)
-    }
-
-    /// Create or replace an explicit native Pop-Up Menu format transactionally.
-    pub fn set_table_cell_pop_up_menu_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-        format: PopUpMenu,
-    ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
-    }
-
-    /// Restore Automatic from an explicit Pop-Up Menu cell.
-    pub fn reset_table_cell_pop_up_menu_format(
-        &mut self,
-        table_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_pop_up_menu_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers Pop-Up Menu reset failed package validation".to_owned(),
                 ));
             }
             *self = verified;

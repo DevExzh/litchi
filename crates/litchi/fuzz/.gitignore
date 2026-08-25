@@ -11,5 +11,7 @@ target
 !/corpus/pages_body_footnote_lifecycle/*
 !/corpus/pages_section_text/
 !/corpus/pages_section_text/*
+!/corpus/numbers_table_cell_pop_up_menu/
+!/corpus/numbers_table_cell_pop_up_menu/*
 artifacts
 coverage

@@ -1,0 +1,1956 @@
+//! Native, same-component Pop-Up Menu graph transitions.
+//!
+//! This module is deliberately below the public Pop-Up Menu facade.  It takes
+//! already-resolved native routes and returns private archive bytes; selector,
+//! package metadata, ZIP, preview, and publication policy remain owned by the
+//! facade.  The input is a single decompressed IWA archive, so a route that
+//! crosses components cannot accidentally be treated as a local edit.
+
+use std::fmt;
+
+use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
+use litchi_iwa_core::archive::{
+    ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, FieldObjectReferenceTransition, ObjectReferenceTransition,
+};
+use litchi_iwa_core::{
+    Archive, ArchiveObject, FieldInfo, FieldType, Limits, RawMessage, SnappyStream,
+};
+use litchi_iwa_protos::{
+    numbers_table_cell_pop_up_menu_codec as popup_codec,
+    numbers_table_cell_storage_codec as storage_codec,
+};
+use litchi_numbers_wire::{
+    BncCell,
+    popup_menu::{
+        PopUpMenuBncState, PopUpMenuRewriteError, PopUpMenuRewriteOptions, prepare_pop_up_menu_bnc,
+    },
+};
+
+use super::table_cell_pop_up_menu::{Path, TransactionBudget};
+
+const TABLE_MODEL_TYPE: u32 = 6_001;
+const TILE_TYPE: u32 = 6_002;
+const TABLE_DATA_LIST_TYPE: u32 = 6_005;
+const POPUP_MODEL_TYPE: u32 = 6_206;
+const LIST_STRING: i32 = 1;
+const LIST_FORMAT: i32 = 2;
+const LIST_CONTROL_CELL_SPEC: i32 = 12;
+
+/// A native Pop-Up Menu value after semantic validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct NativePopUpValue<'items> {
+    /// Menu labels, excluding the required native NIL sentinel.
+    pub(super) items: &'items [&'items str],
+    /// Native CellSpecArchive chooser flag.
+    pub(super) starts_with_first: bool,
+    /// Existing String table key for the selected first item, if any.
+    pub(super) first_item_string_identifier: Option<u32>,
+}
+
+/// A fully resolved same-component native graph.
+///
+/// Every identifier must occur in the supplied archive exactly once.  The
+/// package owner resolves these identifiers from its rooted selector before
+/// calling this module; retaining identifiers here keeps the native helper
+/// independent from facade selectors and generated model types.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct NativePopUpInput<'source> {
+    pub(super) archive: &'source Archive,
+    pub(super) model_identifier: u64,
+    pub(super) tile_identifier: u64,
+    pub(super) tile_row: u32,
+    pub(super) tile_column: u32,
+    pub(super) control_table_identifier: u64,
+    pub(super) format_table_identifier: u64,
+    /// The physical component/member name containing `archive`.
+    pub(super) member_name: &'source str,
+    /// FormatStructArchive bytes used when a format-list entry is created.
+    pub(super) format_payload: &'source [u8],
+    /// Identifier reserved by the package metadata allocator for a new
+    /// PopUpMenuModel object. It is unused when an identical model is reused.
+    pub(super) new_popup_model_identifier: Option<u64>,
+    pub(super) desired: Option<NativePopUpValue<'source>>,
+    pub(super) limits: Limits,
+    pub(super) path: Path,
+}
+
+/// Owned native output returned to the package transaction.
+///
+/// `archive_bytes` is the decompressed IWA candidate. The caller compresses it
+/// and places it in the final private ZIP candidate. `cell_bytes` is exposed
+/// separately so callers can perform an object-level locality assertion for
+/// the selected BNC cell.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct NativePopUpOutput {
+    pub(super) archive_bytes: Vec<u8>,
+    pub(super) cell_bytes: Vec<u8>,
+    pub(super) format_identifier: Option<u32>,
+    pub(super) control_cell_spec_identifier: Option<u32>,
+    pub(super) popup_model_identifier: Option<u64>,
+    pub(super) added_object_identifiers: Vec<u64>,
+    pub(super) removed_object_identifiers: Vec<u64>,
+    pub(super) changed_member_names: Vec<String>,
+}
+
+/// Native graph failure. The facade maps this to its content-redacted error
+/// enum; no native payload is included in the error value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NativePopUpError {
+    InvalidSource,
+    UnsupportedDependency,
+    Allocation,
+    Limit,
+    Codec,
+    Archive,
+}
+
+impl fmt::Display for NativePopUpError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InvalidSource => "invalid Pop-Up Menu native source",
+            Self::UnsupportedDependency => "unsupported Pop-Up Menu native dependency",
+            Self::Allocation => "Pop-Up Menu native allocation failed",
+            Self::Limit => "Pop-Up Menu native limit exceeded",
+            Self::Codec => "Pop-Up Menu native codec rejected the source",
+            Self::Archive => "Pop-Up Menu native archive rewrite failed",
+        })
+    }
+}
+
+impl std::error::Error for NativePopUpError {}
+
+type Result<T> = std::result::Result<T, NativePopUpError>;
+
+/// Plan and execute one same-component Pop-Up Menu graph transition.
+///
+/// The function validates the model/DataStore field-21 route, exactly one
+/// control and format list, the selected tile/BNC cell, every existing popup
+/// CellSpec, and every type-6206 model it encounters. It then uses the strict
+/// prepared codecs for BNC, CellSpec, PopUpMenuModel, and TableDataList. Raw
+/// protobuf fields outside the selected list entry/row are copied verbatim.
+///
+/// Existing menu/spec objects are reused when their canonical semantic bytes
+/// match. A new model is created only when no identical model exists and the
+/// caller supplied a collision-free metadata-reserved identifier. A model is
+/// culled only after a complete same-archive inbound scan proves that no
+/// remaining control-list entry references it. Empty control lists are kept.
+pub(super) fn rewrite_native_popup_menu(
+    input: NativePopUpInput<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<NativePopUpOutput> {
+    let source = input.archive;
+    let decoded_bytes = source
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .map(|message| message.data.len())
+        .sum::<usize>();
+    budget
+        .charge_archive(source, decoded_bytes, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    validate_unique_route(source, input.model_identifier)?;
+    validate_unique_route(source, input.tile_identifier)?;
+    validate_unique_route(source, input.control_table_identifier)?;
+    validate_unique_route(source, input.format_table_identifier)?;
+    if input.model_identifier == input.tile_identifier
+        || input.model_identifier == input.control_table_identifier
+        || input.model_identifier == input.format_table_identifier
+        || input.tile_identifier == input.control_table_identifier
+        || input.tile_identifier == input.format_table_identifier
+    {
+        return Err(NativePopUpError::UnsupportedDependency);
+    }
+
+    let model_object = unique_object(source, input.model_identifier)?;
+    let model_message_index = unique_message_index(model_object, TABLE_MODEL_TYPE)?;
+    let model_payload = &model_object.messages[model_message_index].data;
+    let storage_options = storage_options(model_payload);
+    let (model, _) = storage_codec::decode_table_model_with_report(model_payload, storage_options)
+        .map_err(|_| NativePopUpError::Codec)?;
+    let (store, _) =
+        storage_codec::decode_data_store_with_report(model.base_data_store(), storage_options)
+            .map_err(|_| NativePopUpError::Codec)?;
+    if store
+        .control_cell_spec_table()
+        .map(|reference| reference.identifier())
+        != Some(input.control_table_identifier)
+        || store.format_table().map(|reference| reference.identifier())
+            != Some(input.format_table_identifier)
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+
+    let tile_identifier = tile_identifier(
+        store.tiles(),
+        input.tile_identifier,
+        input.tile_row,
+        storage_options,
+    )?;
+    if tile_identifier != input.tile_identifier {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let tile_object = unique_object(source, input.tile_identifier)?;
+    let tile_message_index = unique_message_index(tile_object, TILE_TYPE)?;
+    let tile_payload = &tile_object.messages[tile_message_index].data;
+    let cell_source = tile_cell(tile_payload, input.tile_row, input.tile_column)?;
+    let cell = BncCell::parse(cell_source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let old_format = cell.format_identifier();
+    let old_control = cell.control_cell_spec_identifier();
+    if old_format.is_some() != old_control.is_some() {
+        return Err(NativePopUpError::InvalidSource);
+    }
+
+    let control_list_object = unique_object(source, input.control_table_identifier)?;
+    let control =
+        unique_list_message(control_list_object, LIST_CONTROL_CELL_SPEC, storage_options)?;
+    let format_list_object = unique_object(source, input.format_table_identifier)?;
+    let format = unique_list_message(format_list_object, LIST_FORMAT, storage_options)?;
+    let bnc_references = census_bnc_references(source, storage_options)?;
+    validate_bnc_refcounts(
+        &bnc_references,
+        format.payload,
+        LIST_FORMAT,
+        storage_options,
+    )?;
+    validate_bnc_refcounts(
+        &bnc_references,
+        control.payload,
+        LIST_CONTROL_CELL_SPEC,
+        storage_options,
+    )?;
+    if let Some(format_key) = old_format {
+        let format_entries = decode_list_entries(format.payload, storage_options)?;
+        let entry = format_entries
+            .entries
+            .iter()
+            .find(|entry| entry.key == format_key)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if entry.ref_count == 0 || entry.payload_kind != PayloadKind::Format {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    // A string list is part of the rooted DataStore graph even when this
+    // transition does not need to add a string key. Decode it to reject a
+    // duplicate/malformed list owner before any candidate allocation.
+    let string_object = unique_object(source, store.string_table().identifier())?;
+    let _ = unique_list_message(string_object, LIST_STRING, storage_options)?;
+
+    let old_state = inspect_old_state(
+        source,
+        control.payload,
+        old_control,
+        old_format,
+        storage_options,
+    )?;
+    // Only models reachable from the rooted control-list graph may be reused.
+    // A semantically identical orphan 6206 object is not a safe deduplication
+    // candidate: it may be versioned, unregistered, or owned by another
+    // component in Metadata.iwa.
+    let rooted_popup_identifiers = popup_references_from_list(control.payload)?;
+    let desired_state = match input.desired {
+        None => None,
+        Some(desired) => Some(prepare_desired_state(
+            source,
+            control.payload,
+            desired,
+            &rooted_popup_identifiers,
+            input.new_popup_model_identifier,
+            storage_options,
+        )?),
+    };
+
+    // All native graph vectors, BNC output, archive serialization, and
+    // compression remain private candidates. Reserve a conservative envelope
+    // before the first clone/output allocation; the exact codec reports are
+    // charged by their prepared plans where available.
+    let maximum_archive_bytes = input.limits.max_archive_bytes();
+    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
+        .map_err(|_| NativePopUpError::Limit)?;
+    budget
+        .charge_allocations(12, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    budget
+        .charge_transaction_work(
+            maximum_archive_bytes.saturating_add(maximum_compressed_bytes),
+            input.path,
+        )
+        .map_err(|_| NativePopUpError::Limit)?;
+
+    let mut candidate = source.clone();
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+
+    let desired_format_payload = input.format_payload;
+    let (format_bytes, format_key) = rewrite_list_for_format(
+        format.payload,
+        old_state.map(|state| state.format_key),
+        desired_state.as_ref().map(|state| state.format_key),
+        desired_state.as_ref().map(|_| desired_format_payload),
+        storage_options,
+    )?;
+    let (control_bytes, control_key, desired_popup_identifier) = rewrite_control_list(
+        control.payload,
+        old_state,
+        desired_state.as_ref(),
+        storage_options,
+    )?;
+
+    replace_message_preserving_header(
+        &mut candidate,
+        input.format_table_identifier,
+        format.message_index,
+        format_bytes,
+        input.limits,
+    )?;
+    replace_control_message_with_transition(
+        &mut candidate,
+        input.control_table_identifier,
+        control.message_index,
+        control.payload,
+        control_bytes,
+        input.limits,
+    )?;
+
+    let desired_bnc = match desired_state.as_ref() {
+        Some(state) => PopUpMenuBncState::set(
+            format_key.ok_or(NativePopUpError::InvalidSource)?,
+            control_key.ok_or(NativePopUpError::InvalidSource)?,
+            state.first_item_string_identifier,
+        ),
+        None => PopUpMenuBncState::reset(),
+    };
+    let bnc_plan = prepare_pop_up_menu_bnc(cell_source, desired_bnc, bnc_options(cell_source))
+        .map_err(map_bnc_error)?;
+    let bnc_limits = bnc_plan.execution_requirements().exact_limits();
+    let bnc_output = bnc_plan
+        .execute(bnc_limits)
+        .map_err(map_bnc_error)?
+        .into_bytes();
+    let tile_bytes = patch_tile_cell(tile_payload, input.tile_row, input.tile_column, &bnc_output)?;
+    replace_message_preserving_header(
+        &mut candidate,
+        input.tile_identifier,
+        tile_message_index,
+        tile_bytes,
+        input.limits,
+    )?;
+
+    if let Some(desired) = desired_state.as_ref() {
+        if desired.new_popup_payload.is_some() {
+            let identifier = desired
+                .popup_identifier
+                .ok_or(NativePopUpError::InvalidSource)?;
+            if candidate.object(identifier).is_some() {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            let object = ArchiveObject::new_with_limits(
+                identifier,
+                vec![RawMessage {
+                    type_: POPUP_MODEL_TYPE,
+                    data: desired
+                        .new_popup_payload
+                        .clone()
+                        .ok_or(NativePopUpError::InvalidSource)?,
+                }],
+                input.limits,
+            )
+            .map_err(|_| NativePopUpError::Archive)?;
+            candidate
+                .objects
+                .try_reserve_exact(1)
+                .map_err(|_| NativePopUpError::Allocation)?;
+            candidate.objects.push(object);
+            added.push(identifier);
+        }
+    }
+
+    if let Some(old) = old_state.and_then(|state| state.popup_identifier) {
+        if !archive_has_popup_reference(&candidate, old)? {
+            candidate
+                .remove_object(old)
+                .ok_or(NativePopUpError::InvalidSource)?;
+            removed.push(old);
+        }
+    }
+
+    // Candidate archive locality: every object not explicitly authorized by
+    // this transition must remain source-identical, including ArchiveInfo,
+    // aggregate/FieldInfo references, unknown header framing, and raw payload
+    // bytes.  A semantic reread alone would miss an unrelated registry/object
+    // mutation caused by a broad replacement loop.
+    let mut changed_identifiers = vec![
+        input.tile_identifier,
+        input.control_table_identifier,
+        input.format_table_identifier,
+    ];
+    changed_identifiers.extend(added.iter().copied());
+    changed_identifiers.extend(removed.iter().copied());
+    for source_object in &source.objects {
+        let identifier = source_object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if removed.contains(&identifier) || changed_identifiers.contains(&identifier) {
+            continue;
+        }
+        let candidate_object = candidate
+            .object(identifier)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if !source_object.same_content_ignoring_offsets(candidate_object) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    for candidate_object in &candidate.objects {
+        let identifier = candidate_object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if source.object(identifier).is_none() && !added.contains(&identifier) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+
+    // The list refcounts and the actual BNC references must agree after the
+    // private graph transition as well.  This catches a stale refcount before
+    // the candidate leaves the native owner, including the final-reset/cull
+    // branch where the selected list entry disappears.
+    let candidate_bnc_references = census_bnc_references(&candidate, storage_options)?;
+    let candidate_format = unique_list_message(
+        unique_object(&candidate, input.format_table_identifier)?,
+        LIST_FORMAT,
+        storage_options,
+    )?;
+    let candidate_control = unique_list_message(
+        unique_object(&candidate, input.control_table_identifier)?,
+        LIST_CONTROL_CELL_SPEC,
+        storage_options,
+    )?;
+    validate_bnc_refcounts(
+        &candidate_bnc_references,
+        candidate_format.payload,
+        LIST_FORMAT,
+        storage_options,
+    )?;
+    validate_bnc_refcounts(
+        &candidate_bnc_references,
+        candidate_control.payload,
+        LIST_CONTROL_CELL_SPEC,
+        storage_options,
+    )?;
+
+    let archive_bytes = candidate
+        .to_bytes_with_limits(input.limits)
+        .map_err(|_| NativePopUpError::Archive)?;
+    let changed_members = vec![input.member_name.to_owned()];
+    Ok(NativePopUpOutput {
+        archive_bytes,
+        cell_bytes: bnc_output,
+        format_identifier: format_key,
+        control_cell_spec_identifier: control_key,
+        popup_model_identifier: desired_popup_identifier,
+        added_object_identifiers: added,
+        removed_object_identifiers: removed,
+        changed_member_names: changed_members,
+    })
+}
+
+/// Census the popup model IDs reachable from the selected control list
+/// without cloning or rewriting the archive.  The facade runs this pass
+/// before native candidate allocation so metadata can prove exact current
+/// UUID ownership for every reused model.
+pub(super) fn existing_popup_model_identifiers(input: NativePopUpInput<'_>) -> Result<Vec<u64>> {
+    validate_unique_route(input.archive, input.control_table_identifier)?;
+    let control_object = unique_object(input.archive, input.control_table_identifier)?;
+    let options = control_object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == TABLE_DATA_LIST_TYPE)
+        .max_by_key(|message| message.data.len())
+        .map(|message| storage_options(&message.data))
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let control = unique_list_message(control_object, LIST_CONTROL_CELL_SPEC, options)?;
+    let identifiers = popup_references_from_list(control.payload)?;
+    for &identifier in &identifiers {
+        let popup = unique_object(input.archive, identifier)?;
+        let message_index = unique_message_index(popup, POPUP_MODEL_TYPE)?;
+        popup_codec::decode_popup_menu_model_with_report(
+            &popup.messages[message_index].data,
+            popup_options_for_bytes(&popup.messages[message_index].data),
+        )
+        .map_err(|_| NativePopUpError::Codec)?;
+    }
+    Ok(identifiers)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ListMessage<'source> {
+    message_index: usize,
+    payload: &'source [u8],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OldState {
+    format_key: u32,
+    control_key: u32,
+    popup_identifier: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct DesiredState {
+    format_key: u32,
+    control_key: u32,
+    popup_identifier: Option<u64>,
+    starts_with_first: bool,
+    first_item_string_identifier: Option<u32>,
+    new_popup_payload: Option<Vec<u8>>,
+}
+
+fn prepare_desired_state(
+    archive: &Archive,
+    control_payload: &[u8],
+    desired: NativePopUpValue<'_>,
+    rooted_popup_identifiers: &[u64],
+    new_identifier: Option<u64>,
+    options: storage_codec::DecodeOptions,
+) -> Result<DesiredState> {
+    if desired.items.is_empty() {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let popup_options = popup_options_for_items(desired.items);
+    let canonical = popup_codec::canonical_popup_menu_model(desired.items, popup_options)
+        .map_err(|_| NativePopUpError::Codec)?
+        .into_bytes();
+    let mut popup_identifier = None;
+    let mut new_popup_payload = None;
+    for object in &archive.objects {
+        if object.archive_info.identifier == Some(0) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let mut messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == POPUP_MODEL_TYPE);
+        let Some(message) = messages.next() else {
+            continue;
+        };
+        if messages.next().is_some() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let object_identifier = object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if !rooted_popup_identifiers.contains(&object_identifier) {
+            continue;
+        }
+        let (snapshot, _) = popup_codec::decode_popup_menu_model_with_report(
+            &message.data,
+            popup_options_for_bytes(&message.data),
+        )
+        .map_err(|_| NativePopUpError::Codec)?;
+        if snapshot
+            .items()
+            .map(|item| item.value())
+            .eq(desired.items.iter().copied())
+        {
+            if popup_identifier.replace(object_identifier).is_some() {
+                return Err(NativePopUpError::UnsupportedDependency);
+            }
+        }
+    }
+    if popup_identifier.is_none() {
+        let id = new_identifier.ok_or(NativePopUpError::UnsupportedDependency)?;
+        if id == 0 || archive.object(id).is_some() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        popup_identifier = Some(id);
+        new_popup_payload = Some(canonical);
+    }
+    let popup_identifier = popup_identifier.ok_or(NativePopUpError::InvalidSource)?;
+    let control = decode_list_entries(control_payload, options)?;
+    let mut control_key = None;
+    for entry in &control.entries {
+        if entry.payload_kind != PayloadKind::ControlCellSpec {
+            continue;
+        }
+        if entry.ref_count == 0 {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let (snapshot, _) = popup_codec::decode_cell_spec_with_report(
+            &entry.payload,
+            popup_options_for_bytes(&entry.payload),
+        )
+        .map_err(|_| NativePopUpError::Codec)?;
+        if snapshot.interaction_type() == 7
+            && snapshot.popup_model().identifier() == popup_identifier
+            && snapshot.starts_with_first() == desired.starts_with_first
+        {
+            if control_key.replace(entry.key).is_some() {
+                return Err(NativePopUpError::UnsupportedDependency);
+            }
+        }
+    }
+    if control_key.is_none() {
+        let mut candidate = control.next_list_id.max(1);
+        while control.entries.iter().any(|entry| entry.key == candidate) {
+            candidate = candidate
+                .checked_add(1)
+                .ok_or(NativePopUpError::InvalidSource)?;
+        }
+        control_key = Some(candidate);
+    }
+    let control_key = control_key.ok_or(NativePopUpError::InvalidSource)?;
+    Ok(DesiredState {
+        format_key: 0,
+        control_key,
+        popup_identifier: Some(popup_identifier),
+        starts_with_first: desired.starts_with_first,
+        first_item_string_identifier: desired.first_item_string_identifier,
+        new_popup_payload,
+    })
+}
+
+#[derive(Debug, Default)]
+struct BncReferenceCounts {
+    format: Vec<(u32, u32)>,
+    control: Vec<(u32, u32)>,
+}
+
+impl BncReferenceCounts {
+    fn increment(entries: &mut Vec<(u32, u32)>, identifier: u32) -> Result<()> {
+        if let Some((_, count)) = entries.iter_mut().find(|(key, _)| *key == identifier) {
+            *count = count
+                .checked_add(1)
+                .ok_or(NativePopUpError::InvalidSource)?;
+            return Ok(());
+        }
+        entries
+            .try_reserve_exact(1)
+            .map_err(|_| NativePopUpError::Allocation)?;
+        entries.push((identifier, 1));
+        Ok(())
+    }
+
+    fn count(entries: &[(u32, u32)], identifier: u32) -> u32 {
+        entries
+            .iter()
+            .find(|(key, _)| *key == identifier)
+            .map_or(0, |(_, count)| *count)
+    }
+}
+
+struct BncReferenceVisitor<'a> {
+    counts: &'a mut BncReferenceCounts,
+    failed: bool,
+}
+
+impl storage_codec::StorageVisitor for BncReferenceVisitor<'_> {
+    fn visit_tile_row(
+        &mut self,
+        row: storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        if census_bnc_row(row, self.counts).is_err() {
+            self.failed = true;
+        }
+        Ok(())
+    }
+}
+
+fn census_bnc_references(
+    archive: &Archive,
+    options: storage_codec::DecodeOptions,
+) -> Result<BncReferenceCounts> {
+    let mut counts = BncReferenceCounts::default();
+    for object in &archive.objects {
+        let mut messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == TILE_TYPE);
+        let Some(message) = messages.next() else {
+            continue;
+        };
+        if messages.next().is_some() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let mut visitor = BncReferenceVisitor {
+            counts: &mut counts,
+            failed: false,
+        };
+        storage_codec::decode_tile_with_visitor(&message.data, options, &mut visitor)
+            .map_err(|_| NativePopUpError::Codec)?;
+        if visitor.failed {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    Ok(counts)
+}
+
+fn census_bnc_row(
+    row: storage_codec::TileRowInfoSnapshot<'_>,
+    counts: &mut BncReferenceCounts,
+) -> Result<()> {
+    let (storage, offsets) = match (row.cell_storage_buffer(), row.cell_offsets()) {
+        (Some(storage), Some(offsets)) => (storage, offsets),
+        (None, None) => (
+            row.cell_storage_buffer_pre_bnc(),
+            row.cell_offsets_pre_bnc(),
+        ),
+        _ => return Err(NativePopUpError::InvalidSource),
+    };
+    if !offsets.len().is_multiple_of(2) {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let unit = if row.has_wide_offsets().unwrap_or(false) {
+        4usize
+    } else {
+        1usize
+    };
+    let mut previous = None;
+    let mut occupied = 0usize;
+    for encoded in offsets.chunks_exact(2) {
+        let raw = u16::from_le_bytes([encoded[0], encoded[1]]);
+        if raw == u16::MAX {
+            continue;
+        }
+        let start = usize::from(raw)
+            .checked_mul(unit)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if start >= storage.len() || previous.is_some_and(|prior| prior >= start) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        if let Some(prior) = previous {
+            census_bnc_cell(&storage[prior..start], counts)?;
+        }
+        previous = Some(start);
+        occupied = occupied
+            .checked_add(1)
+            .ok_or(NativePopUpError::InvalidSource)?;
+    }
+    if let Some(start) = previous {
+        census_bnc_cell(&storage[start..], counts)?;
+    }
+    if occupied != usize::try_from(row.cell_count()).map_err(|_| NativePopUpError::InvalidSource)? {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(())
+}
+
+fn census_bnc_cell(bytes: &[u8], counts: &mut BncReferenceCounts) -> Result<()> {
+    let cell = BncCell::parse(bytes).map_err(|_| NativePopUpError::InvalidSource)?;
+    match (
+        cell.format_identifier(),
+        cell.control_cell_spec_identifier(),
+    ) {
+        (None, None) => Ok(()),
+        (Some(format), Some(control)) => {
+            if format == 0 || control == 0 {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            BncReferenceCounts::increment(&mut counts.format, format)?;
+            BncReferenceCounts::increment(&mut counts.control, control)
+        },
+        _ => Err(NativePopUpError::InvalidSource),
+    }
+}
+
+fn validate_bnc_refcounts(
+    counts: &BncReferenceCounts,
+    payload: &[u8],
+    list_type: i32,
+    options: storage_codec::DecodeOptions,
+) -> Result<()> {
+    let list = decode_list_entries(payload, options)?;
+    let mut seen = Vec::new();
+    for entry in list.entries {
+        let observed = match list_type {
+            LIST_FORMAT if entry.payload_kind == PayloadKind::Format => {
+                BncReferenceCounts::count(&counts.format, entry.key)
+            },
+            LIST_CONTROL_CELL_SPEC if entry.payload_kind == PayloadKind::ControlCellSpec => {
+                BncReferenceCounts::count(&counts.control, entry.key)
+            },
+            _ => continue,
+        };
+        if observed != entry.ref_count {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        if list_type == LIST_FORMAT && entry.payload_kind == PayloadKind::Format
+            || list_type == LIST_CONTROL_CELL_SPEC
+                && entry.payload_kind == PayloadKind::ControlCellSpec
+        {
+            seen.push(entry.key);
+        }
+    }
+    let expected = if list_type == LIST_FORMAT {
+        &counts.format
+    } else {
+        &counts.control
+    };
+    if expected
+        .iter()
+        .any(|(identifier, _)| !seen.contains(identifier))
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(())
+}
+
+fn inspect_old_state(
+    archive: &Archive,
+    control_payload: &[u8],
+    old_control: Option<u32>,
+    old_format: Option<u32>,
+    options: storage_codec::DecodeOptions,
+) -> Result<Option<OldState>> {
+    let (Some(control_key), Some(format_key)) = (old_control, old_format) else {
+        if old_control.is_some() || old_format.is_some() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        return Ok(None);
+    };
+    let list = decode_list_entries(control_payload, options)?;
+    let entry = list
+        .entries
+        .iter()
+        .find(|entry| entry.key == control_key)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    if entry.ref_count == 0 || entry.payload_kind != PayloadKind::ControlCellSpec {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let (spec, _) = popup_codec::decode_cell_spec_with_report(
+        &entry.payload,
+        popup_options_for_bytes(&entry.payload),
+    )
+    .map_err(|_| NativePopUpError::Codec)?;
+    if spec.interaction_type() != 7
+        || spec.popup_model().identifier() == 0
+        || spec.starts_with_first() && spec.popup_model().identifier() == 0
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let popup_identifier = spec.popup_model().identifier();
+    let popup = unique_object(archive, popup_identifier)?;
+    let popup_message = unique_message_index(popup, POPUP_MODEL_TYPE)?;
+    popup_codec::decode_popup_menu_model_with_report(
+        &popup.messages[popup_message].data,
+        popup_options_for_bytes(&popup.messages[popup_message].data),
+    )
+    .map_err(|_| NativePopUpError::Codec)?;
+    Ok(Some(OldState {
+        format_key,
+        control_key,
+        popup_identifier: Some(popup_identifier),
+    }))
+}
+
+fn rewrite_list_for_format(
+    source: &[u8],
+    old_key: Option<u32>,
+    _desired_key: Option<u32>,
+    payload: Option<&[u8]>,
+    options: storage_codec::DecodeOptions,
+) -> Result<(Vec<u8>, Option<u32>)> {
+    let list = decode_list_entries(source, options)?;
+    let Some(payload) = payload else {
+        let Some(old_key) = old_key else {
+            return Ok((source.to_owned(), None));
+        };
+        let entry = list
+            .entries
+            .iter()
+            .find(|entry| entry.key == old_key)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let mutation = if entry.ref_count > 1 {
+            storage_codec::TableDataListEntryMutation::RefCount(
+                storage_codec::TableDataListEntryRefCountEdit::new(
+                    old_key,
+                    entry.ref_count,
+                    entry.ref_count - 1,
+                ),
+            )
+        } else {
+            storage_codec::TableDataListEntryMutation::Remove(
+                storage_codec::TableDataListEntryRemovalSpec::format(
+                    old_key,
+                    entry.ref_count,
+                    &entry.payload,
+                ),
+            )
+        };
+        return Ok((apply_list_mutation(source, mutation, options)?, None));
+    };
+    let mut desired_key = list
+        .entries
+        .iter()
+        .find(|entry| entry.payload_kind == PayloadKind::Format && entry.payload == payload)
+        .map(|entry| entry.key)
+        .unwrap_or_else(|| list.next_list_id.max(1));
+    while list.entries.iter().any(|entry| {
+        entry.key == desired_key
+            && !(entry.payload_kind == PayloadKind::Format && entry.payload == payload)
+    }) {
+        desired_key = desired_key
+            .checked_add(1)
+            .ok_or(NativePopUpError::InvalidSource)?;
+    }
+    let mut output = source.to_owned();
+    if let Some(old_key) = old_key
+        && old_key != desired_key
+        && let Some(entry) = list.entries.iter().find(|entry| entry.key == old_key)
+    {
+        let mutation = if entry.ref_count > 1 {
+            storage_codec::TableDataListEntryMutation::RefCount(
+                storage_codec::TableDataListEntryRefCountEdit::new(
+                    old_key,
+                    entry.ref_count,
+                    entry.ref_count - 1,
+                ),
+            )
+        } else {
+            storage_codec::TableDataListEntryMutation::Remove(
+                storage_codec::TableDataListEntryRemovalSpec::format(
+                    old_key,
+                    entry.ref_count,
+                    &entry.payload,
+                ),
+            )
+        };
+        output = apply_list_mutation(&output, mutation, options)?;
+    }
+    if list.entries.iter().any(|entry| entry.key == desired_key) {
+        if old_key != Some(desired_key) {
+            let entry = list
+                .entries
+                .iter()
+                .find(|entry| entry.key == desired_key)
+                .ok_or(NativePopUpError::InvalidSource)?;
+            output = apply_list_mutation(
+                &output,
+                storage_codec::TableDataListEntryMutation::RefCount(
+                    storage_codec::TableDataListEntryRefCountEdit::new(
+                        desired_key,
+                        entry.ref_count,
+                        entry.ref_count.saturating_add(1),
+                    ),
+                ),
+                options,
+            )?;
+        }
+    } else {
+        output = apply_list_mutation(
+            &output,
+            storage_codec::TableDataListEntryMutation::Append(
+                storage_codec::TableDataListEntryAppend::format(desired_key, 1, payload),
+            ),
+            options,
+        )?;
+    }
+    Ok((output, Some(desired_key)))
+}
+
+fn rewrite_control_list(
+    source: &[u8],
+    old: Option<OldState>,
+    desired: Option<&DesiredState>,
+    options: storage_codec::DecodeOptions,
+) -> Result<(Vec<u8>, Option<u32>, Option<u64>)> {
+    let original = decode_list_entries(source, options)?;
+    let mut output = source.to_owned();
+    let desired_key = desired.as_ref().map(|state| state.control_key);
+    let desired_popup = desired.as_ref().and_then(|state| state.popup_identifier);
+    if let Some(old) = old {
+        if desired_key != Some(old.control_key) {
+            let entry = original
+                .entries
+                .iter()
+                .find(|entry| entry.key == old.control_key)
+                .ok_or(NativePopUpError::InvalidSource)?;
+            let mutation = if entry.ref_count > 1 {
+                storage_codec::TableDataListEntryMutation::RefCount(
+                    storage_codec::TableDataListEntryRefCountEdit::new(
+                        old.control_key,
+                        entry.ref_count,
+                        entry.ref_count - 1,
+                    ),
+                )
+            } else {
+                storage_codec::TableDataListEntryMutation::Remove(
+                    storage_codec::TableDataListEntryRemovalSpec::control_cell_spec(
+                        old.control_key,
+                        entry.ref_count,
+                        &entry.payload,
+                    ),
+                )
+            };
+            output = apply_list_mutation(&output, mutation, options)?;
+        }
+    }
+    if let Some(desired) = desired {
+        let after = decode_list_entries(&output, options)?;
+        if let Some(entry) = after
+            .entries
+            .iter()
+            .find(|entry| entry.key == desired.control_key)
+        {
+            if old.map(|old| old.control_key) != Some(desired.control_key) {
+                output = apply_list_mutation(
+                    &output,
+                    storage_codec::TableDataListEntryMutation::RefCount(
+                        storage_codec::TableDataListEntryRefCountEdit::new(
+                            desired.control_key,
+                            entry.ref_count,
+                            entry.ref_count.saturating_add(1),
+                        ),
+                    ),
+                    options,
+                )?;
+            }
+        } else {
+            let popup_identifier = desired_popup.ok_or(NativePopUpError::InvalidSource)?;
+            let spec = popup_codec::canonical_cell_spec(
+                popup_identifier,
+                desired.starts_with_first,
+                popup_options_for_bytes(source),
+            )
+            .map_err(|_| NativePopUpError::Codec)?
+            .into_bytes();
+            output = apply_list_mutation(
+                &output,
+                storage_codec::TableDataListEntryMutation::Append(
+                    storage_codec::TableDataListEntryAppend::control_cell_spec(
+                        desired.control_key,
+                        1,
+                        &spec,
+                    ),
+                ),
+                options,
+            )?;
+        }
+    }
+    Ok((output, desired_key, desired_popup))
+}
+
+fn apply_list_mutation(
+    source: &[u8],
+    mutation: storage_codec::TableDataListEntryMutation<'_>,
+    options: storage_codec::DecodeOptions,
+) -> Result<Vec<u8>> {
+    // The native fixture family has two historical format-list enum values:
+    // `FORMAT` (2) and `MULTIPLE_CHOICE_LIST_FORMAT` (7).  The strict storage
+    // append codec intentionally owns the popup-specific value 7.  For a
+    // source-preserving append into an older value-2 list, temporarily route
+    // the prepared operation through 7 and restore the original root scalar;
+    // all entry/unknown/segment bytes still come from the prepared codec.
+    if matches!(
+        &mutation,
+        storage_codec::TableDataListEntryMutation::Append(append)
+            if matches!(append.payload(), storage_codec::TableDataListEntryPayload::Format(_))
+    ) && table_data_list_type(source, options)? == Some(LIST_FORMAT)
+    {
+        let routed = replace_table_data_list_type(source, 7)?;
+        let plan = storage_codec::prepare_table_data_list_entry_rewrite(&routed, mutation, options)
+            .map_err(|_| NativePopUpError::Codec)?;
+        let limits = plan.requirements().exact_limits();
+        let (bytes, _) = plan.execute(limits).map_err(|_| NativePopUpError::Codec)?;
+        let key = match mutation {
+            storage_codec::TableDataListEntryMutation::Append(append) => append.key(),
+            _ => unreachable!(),
+        };
+        let bytes = advance_table_data_list_next_id(&bytes, key)?;
+        return replace_table_data_list_type(&bytes, LIST_FORMAT);
+    }
+    let appended_key = match mutation {
+        storage_codec::TableDataListEntryMutation::Append(append) => Some(append.key()),
+        _ => None,
+    };
+    let plan = storage_codec::prepare_table_data_list_entry_rewrite(source, mutation, options)
+        .map_err(|_| NativePopUpError::Codec)?;
+    let limits = plan.requirements().exact_limits();
+    let (bytes, _) = plan.execute(limits).map_err(|_| NativePopUpError::Codec)?;
+    match appended_key {
+        Some(key) => advance_table_data_list_next_id(&bytes, key),
+        None => Ok(bytes),
+    }
+}
+
+fn table_data_list_type(
+    source: &[u8],
+    options: storage_codec::DecodeOptions,
+) -> Result<Option<i32>> {
+    storage_codec::decode_table_data_list_type_with_report(source, options)
+        .map(|(snapshot, _)| Some(snapshot.list_type()))
+        .map_err(|_| NativePopUpError::Codec)
+}
+
+fn replace_table_data_list_type(source: &[u8], replacement: i32) -> Result<Vec<u8>> {
+    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let mut output = Vec::with_capacity(source.len());
+    let mut replaced = false;
+    for field in view.fields() {
+        if field.number() == 1 {
+            if replaced || field.wire_type() != 0 {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            litchi_iwa_common::wire::append_varint_field(
+                &mut output,
+                1,
+                u64::try_from(replacement).map_err(|_| NativePopUpError::InvalidSource)?,
+            )
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+            replaced = true;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    if !replaced {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(output)
+}
+
+fn advance_table_data_list_next_id(source: &[u8], appended_key: u32) -> Result<Vec<u8>> {
+    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let mut next = None;
+    for field in view.fields() {
+        if field.number() != 2 {
+            continue;
+        }
+        if next.is_some() || field.wire_type() != 0 {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let (value, consumed) = decode_varint_from_bytes(field.payload())
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+        if consumed != field.payload().len() || value > u64::from(u32::MAX) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        next = Some(value as u32);
+    }
+    let current = next.ok_or(NativePopUpError::InvalidSource)?;
+    if appended_key < current {
+        return Ok(source.to_owned());
+    }
+    let replacement = appended_key
+        .checked_add(1)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let mut output = Vec::with_capacity(source.len());
+    let mut replaced = false;
+    for field in view.fields() {
+        if field.number() == 2 {
+            if replaced || field.wire_type() != 0 {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            litchi_iwa_common::wire::append_varint_field(&mut output, 2, u64::from(replacement))
+                .map_err(|_| NativePopUpError::InvalidSource)?;
+            replaced = true;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    if !replaced {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(output)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PayloadKind {
+    Format,
+    ControlCellSpec,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ListEntry {
+    key: u32,
+    ref_count: u32,
+    payload_kind: PayloadKind,
+    payload: Vec<u8>,
+}
+
+#[derive(Debug)]
+struct ListFacts {
+    next_list_id: u32,
+    entries: Vec<ListEntry>,
+}
+
+fn decode_list_entries(source: &[u8], options: storage_codec::DecodeOptions) -> Result<ListFacts> {
+    let mut visitor = ListVisitor::default();
+    let (list, _) =
+        storage_codec::decode_table_data_list_with_visitor(source, options, &mut visitor)
+            .map_err(|_| NativePopUpError::Codec)?;
+    if list.list_type() != LIST_CONTROL_CELL_SPEC
+        && list.list_type() != LIST_FORMAT
+        && list.list_type() != LIST_STRING
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    if visitor.entries.iter().enumerate().any(|(index, entry)| {
+        visitor.entries[index + 1..]
+            .iter()
+            .any(|other| other.key == entry.key)
+    }) {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    // Segmented lists are a separate storage ownership route.  This first
+    // popup transaction only rewrites one rooted list and must fail closed
+    // rather than treating a segment reference as an opaque sidecar.
+    if visitor.segments != 0 {
+        return Err(NativePopUpError::UnsupportedDependency);
+    }
+    Ok(ListFacts {
+        next_list_id: list.next_list_id(),
+        entries: visitor.entries,
+    })
+}
+
+#[derive(Default)]
+struct ListVisitor {
+    entries: Vec<ListEntry>,
+    segments: usize,
+}
+
+impl storage_codec::StorageVisitor for ListVisitor {
+    fn visit_list_entry_record(
+        &mut self,
+        record: storage_codec::TableDataListEntryRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        let snapshot = record.snapshot();
+        let (payload_kind, payload) = if let Some(payload) = snapshot.cell_spec() {
+            (PayloadKind::ControlCellSpec, payload)
+        } else if let Some(payload) = snapshot.format() {
+            (PayloadKind::Format, payload)
+        } else if let Some(value) = snapshot.string_value() {
+            (PayloadKind::Other, value.as_bytes())
+        } else {
+            const EMPTY: &[u8] = &[];
+            (PayloadKind::Other, EMPTY)
+        };
+        self.entries.push(ListEntry {
+            key: snapshot.key(),
+            ref_count: snapshot.ref_count(),
+            payload_kind,
+            payload: payload.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        _reference: storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.segments = self.segments.saturating_add(1);
+        Ok(())
+    }
+}
+
+fn unique_list_message<'source>(
+    object: &'source ArchiveObject,
+    list_type: i32,
+    options: storage_codec::DecodeOptions,
+) -> Result<ListMessage<'source>> {
+    let mut selected = None;
+    for (message_index, message) in object.messages.iter().enumerate() {
+        if message.type_ != TABLE_DATA_LIST_TYPE {
+            continue;
+        }
+        // Route by the strict root envelope first.  Unselected formula/style
+        // lists are deliberately left opaque so a popup transition cannot
+        // rewrite or reject unrelated list payloads merely because their
+        // entry schema is outside this route.
+        let (snapshot, _) =
+            storage_codec::decode_table_data_list_type_with_report(&message.data, options)
+                .map_err(|_| NativePopUpError::Codec)?;
+        if snapshot.list_type() != list_type {
+            continue;
+        }
+        let list = decode_list_entries(&message.data, options)?;
+        if list.entries.is_empty() && list.next_list_id == 0 {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        if selected.is_some() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let info = object
+            .archive_info
+            .message_infos
+            .get(message_index)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if info.object_references.contains(&0) || duplicate_identifiers(&info.object_references) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        selected = Some(ListMessage {
+            message_index,
+            payload: &message.data,
+        });
+    }
+    selected.ok_or(NativePopUpError::InvalidSource)
+}
+
+fn unique_object(archive: &Archive, identifier: u64) -> Result<&ArchiveObject> {
+    if identifier == 0 {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let mut matches = archive
+        .objects
+        .iter()
+        .filter(|object| object.archive_info.identifier == Some(identifier));
+    let object = matches.next().ok_or(NativePopUpError::InvalidSource)?;
+    if matches.next().is_some() {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(object)
+}
+
+fn validate_unique_route(archive: &Archive, identifier: u64) -> Result<()> {
+    let _ = unique_object(archive, identifier)?;
+    Ok(())
+}
+
+fn unique_message_index(object: &ArchiveObject, message_type: u32) -> Result<usize> {
+    let mut matches = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_, message)| message.type_ == message_type);
+    let index = matches.next().map(|(index, _)| index);
+    if matches.next().is_some() {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    index.ok_or(NativePopUpError::InvalidSource)
+}
+
+fn tile_identifier(
+    source: &[u8],
+    expected: u64,
+    row: u32,
+    options: storage_codec::DecodeOptions,
+) -> Result<u64> {
+    let mut visitor = TileReferenceVisitor::default();
+    let storage = storage_codec::decode_tile_storage_with_visitor(source, options, &mut visitor)
+        .map_err(|_| NativePopUpError::Codec)?
+        .0;
+    let tile_size = storage.tile_size().ok_or(NativePopUpError::InvalidSource)?;
+    let tile_id = row / tile_size.max(1);
+    let mut matches = visitor
+        .tiles
+        .iter()
+        .filter(|tile| tile.0 == tile_id)
+        .map(|tile| tile.1);
+    let identifier = matches.next().ok_or(NativePopUpError::InvalidSource)?;
+    if matches.next().is_some() || identifier != expected {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(identifier)
+}
+
+#[derive(Default)]
+struct TileReferenceVisitor {
+    tiles: Vec<(u32, u64)>,
+}
+
+impl storage_codec::StorageVisitor for TileReferenceVisitor {
+    fn visit_tile_reference(
+        &mut self,
+        record: storage_codec::TileReferenceRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.tiles
+            .push((record.tile_id(), record.reference().identifier()));
+        Ok(())
+    }
+}
+
+fn storage_options(source: &[u8]) -> storage_codec::DecodeOptions {
+    let bytes = source.len().max(1);
+    storage_codec::DecodeOptions::new(
+        bytes,
+        bytes.saturating_mul(16).max(1),
+        bytes.saturating_mul(128).max(1),
+        64,
+        bytes.saturating_mul(8).max(1),
+        bytes.saturating_mul(8).max(1),
+    )
+}
+
+fn popup_options_for_bytes(source: &[u8]) -> popup_codec::DecodeOptions {
+    popup_codec::DecodeOptions::for_source(source)
+        .with_max_output_bytes(source.len().saturating_mul(4).max(1))
+        .with_max_items(source.len().max(1))
+        .with_max_text_bytes(source.len().saturating_mul(4).max(1))
+}
+
+fn popup_options_for_items(items: &[&str]) -> popup_codec::DecodeOptions {
+    let text_bytes = items
+        .iter()
+        .fold(0usize, |total, item| total.saturating_add(item.len()));
+    let bound = text_bytes
+        .saturating_add(items.len().saturating_mul(128))
+        .saturating_add(128)
+        .max(1);
+    popup_codec::DecodeOptions::new(
+        bound,
+        bound,
+        bound,
+        bound.saturating_mul(16),
+        64,
+        bound,
+        items.len().max(1),
+        text_bytes.max(1),
+    )
+}
+
+fn bnc_options(source: &[u8]) -> PopUpMenuRewriteOptions {
+    let bytes = source.len().max(1);
+    PopUpMenuRewriteOptions {
+        max_input_bytes: bytes,
+        max_output_bytes: bytes.saturating_mul(4).max(1),
+        max_fields: 128,
+        max_work_bytes: bytes.saturating_mul(128).max(1),
+        recursion_limit: 8,
+        max_references: 64,
+    }
+}
+
+fn map_bnc_error(error: PopUpMenuRewriteError) -> NativePopUpError {
+    match error {
+        PopUpMenuRewriteError::InvalidFormat(_) => NativePopUpError::InvalidSource,
+        PopUpMenuRewriteError::InputBytes { .. }
+        | PopUpMenuRewriteError::OutputBytes { .. }
+        | PopUpMenuRewriteError::Fields { .. }
+        | PopUpMenuRewriteError::Work { .. }
+        | PopUpMenuRewriteError::Nesting { .. }
+        | PopUpMenuRewriteError::References { .. }
+        | PopUpMenuRewriteError::RetainedBytes { .. }
+        | PopUpMenuRewriteError::ScratchBytes { .. } => NativePopUpError::Limit,
+        PopUpMenuRewriteError::Allocations { .. } | PopUpMenuRewriteError::Allocation { .. } => {
+            NativePopUpError::Allocation
+        },
+    }
+}
+
+fn replace_message_preserving_header(
+    archive: &mut Archive,
+    object_identifier: u64,
+    message_index: usize,
+    payload: Vec<u8>,
+    limits: Limits,
+) -> Result<()> {
+    let object = archive
+        .object_mut(object_identifier)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let message_type = object
+        .messages
+        .get(message_index)
+        .ok_or(NativePopUpError::InvalidSource)?
+        .type_;
+    object
+        .replace_message_preserving_header_with_limits(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data: payload,
+            },
+            limits,
+        )
+        .map_err(|_| NativePopUpError::Archive)?;
+    Ok(())
+}
+
+fn replace_control_message_with_transition(
+    archive: &mut Archive,
+    object_identifier: u64,
+    message_index: usize,
+    source_payload: &[u8],
+    payload: Vec<u8>,
+    limits: Limits,
+) -> Result<()> {
+    let object = archive
+        .object_mut(object_identifier)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let message_type = object
+        .messages
+        .get(message_index)
+        .ok_or(NativePopUpError::InvalidSource)?
+        .type_;
+    let source_entries = decode_list_entries(source_payload, storage_options(source_payload))?;
+    let after_entries = decode_list_entries(&payload, storage_options(&payload))?;
+    let before = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(NativePopUpError::InvalidSource)?
+        .object_references
+        .clone();
+    if duplicate_identifiers(&before) || before.contains(&0) {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let after = popup_references_from_list(&payload)?;
+    if duplicate_identifiers(&after) || after.contains(&0) {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let before_entries = source_entries
+        .entries
+        .iter()
+        .filter(|entry| entry.payload_kind == PayloadKind::ControlCellSpec)
+        .map(|entry| {
+            let payload = entry.payload.as_slice();
+            let (spec, _) = popup_codec::decode_cell_spec_with_report(
+                payload,
+                popup_options_for_bytes(payload),
+            )
+            .map_err(|_| NativePopUpError::Codec)?;
+            if entry.ref_count == 0 || spec.popup_model().identifier() == 0 {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            Ok((entry.key, spec.popup_model().identifier()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let after_entries = after_entries
+        .entries
+        .iter()
+        .filter(|entry| entry.payload_kind == PayloadKind::ControlCellSpec)
+        .map(|entry| {
+            let payload = entry.payload.as_slice();
+            let (spec, _) = popup_codec::decode_cell_spec_with_report(
+                payload,
+                popup_options_for_bytes(payload),
+            )
+            .map_err(|_| NativePopUpError::Codec)?;
+            if entry.ref_count == 0 || spec.popup_model().identifier() == 0 {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            Ok((entry.key, spec.popup_model().identifier()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if duplicate_keys(&before_entries) || duplicate_keys(&after_entries) {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let mut expected_before = before_entries.iter().map(|(_, id)| *id).collect::<Vec<_>>();
+    expected_before.sort_unstable();
+    expected_before.dedup();
+    let mut sorted_before = before.clone();
+    sorted_before.sort_unstable();
+    if sorted_before != expected_before {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let mut expected_after = after_entries.iter().map(|(_, id)| *id).collect::<Vec<_>>();
+    expected_after.sort_unstable();
+    expected_after.dedup();
+    let mut sorted_after = after.clone();
+    sorted_after.sort_unstable();
+    if sorted_after != expected_after {
+        return Err(NativePopUpError::InvalidSource);
+    }
+
+    let info = object
+        .archive_info
+        .message_infos
+        .get_mut(message_index)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    if info.field_infos.is_empty() && !before.is_empty() {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    // A builder-produced list may omit FieldInfo records only for entries
+    // introduced by this transition. Existing rooted entries must already
+    // have an exact [3,key] record; otherwise their aggregate and per-entry
+    // ownership cannot be proved. Never invent a broadcast aggregate field.
+    for (key, _) in &after_entries {
+        if !info
+            .field_infos
+            .iter()
+            .any(|field| field.path.path.as_slice() == [3, *key])
+        {
+            if before_entries
+                .iter()
+                .any(|(before_key, _)| *before_key == *key)
+            {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            let mut field = FieldInfo::new(vec![3, *key]);
+            field.r#type = Some(FieldType::ObjectReference);
+            info.field_infos.push(field);
+        }
+    }
+    let mut field_changes = Vec::new();
+    for (field_info_index, field) in info.field_infos.iter().enumerate() {
+        let Some(path_key) = field
+            .path
+            .path
+            .strip_prefix(&[3])
+            .and_then(|rest| (rest.len() == 1).then_some(rest[0]))
+        else {
+            continue;
+        };
+        let old_id = before_entries
+            .iter()
+            .find(|(key, _)| *key == path_key)
+            .map(|(_, id)| *id);
+        let new_id = after_entries
+            .iter()
+            .find(|(key, _)| *key == path_key)
+            .map(|(_, id)| *id);
+        if old_id.is_none() && new_id.is_none() {
+            if !field.object_references.is_empty()
+                || field.effective_type() == FieldType::ObjectReference
+            {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            continue;
+        }
+        let before_matches = match old_id {
+            Some(identifier) => field.object_references.as_slice() == [identifier],
+            None => field.object_references.is_empty(),
+        };
+        if field
+            .r#type
+            .is_some_and(|kind| kind != FieldType::ObjectReference)
+            || !before_matches
+        {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        field_changes.push(OwnedFieldChange {
+            field_info_index,
+            path: field.path.path.clone(),
+            before: field.object_references.clone(),
+            after: new_id.into_iter().collect(),
+        });
+    }
+    for (key, _) in &after_entries {
+        if !field_changes
+            .iter()
+            .any(|change| change.path.as_slice() == [3, *key])
+        {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    for (key, _) in &before_entries {
+        if !field_changes
+            .iter()
+            .any(|change| change.path.as_slice() == [3, *key])
+        {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    if field_changes
+        .iter()
+        .map(|change| change.path.as_slice())
+        .enumerate()
+        .any(|(index, path)| {
+            field_changes[index + 1..]
+                .iter()
+                .any(|other| other.path.as_slice() == path)
+        })
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let mut transitions = Vec::new();
+    transitions
+        .try_reserve_exact(field_changes.len())
+        .map_err(|_| NativePopUpError::Allocation)?;
+    for change in &field_changes {
+        transitions.push(FieldObjectReferenceTransition {
+            field_info_index: change.field_info_index,
+            expected_path: change.path.as_slice(),
+            before: change.before.as_slice(),
+            after: change.after.as_slice(),
+        });
+    }
+    let transition = ObjectReferenceTransition {
+        aggregate_before: before.as_slice(),
+        aggregate_after: after.as_slice(),
+        fields: transitions.as_slice(),
+    };
+    object
+        .replace_message_transitioning_object_references_preserving_header_with_limits(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data: payload,
+            },
+            transition,
+            limits,
+        )
+        .map_err(|_| NativePopUpError::Archive)?;
+    // Remove control FieldInfo records for entries that no longer exist.  The
+    // transition above has already validated and rewritten every retained
+    // path, so this cleanup cannot shift an index used by the transition.
+    if let Some(info) = object.archive_info.message_infos.get_mut(message_index) {
+        info.field_infos.retain(|field| {
+            let Some(key) = field
+                .path
+                .path
+                .strip_prefix(&[3])
+                .and_then(|rest| (rest.len() == 1).then_some(rest[0]))
+            else {
+                return true;
+            };
+            after_entries.iter().any(|(after_key, _)| *after_key == key)
+        });
+    }
+    let _ = source_payload;
+    Ok(())
+}
+
+#[derive(Debug)]
+struct OwnedFieldChange {
+    field_info_index: usize,
+    path: Vec<u32>,
+    before: Vec<u64>,
+    after: Vec<u64>,
+}
+
+fn popup_references_from_list(source: &[u8]) -> Result<Vec<u64>> {
+    let list = decode_list_entries(source, storage_options(source))?;
+    let mut references = Vec::new();
+    for entry in list.entries {
+        if entry.payload_kind != PayloadKind::ControlCellSpec {
+            continue;
+        }
+        let (spec, _) = popup_codec::decode_cell_spec_with_report(
+            &entry.payload,
+            popup_options_for_bytes(&entry.payload),
+        )
+        .map_err(|_| NativePopUpError::Codec)?;
+        let identifier = spec.popup_model().identifier();
+        if identifier == 0 {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        if !references.contains(&identifier) {
+            references.push(identifier);
+        }
+    }
+    Ok(references)
+}
+
+/// Return whether a known archive metadata edge or rooted control-list entry
+/// points at a popup model.  The facade calls this over every package member
+/// before allowing a cull; the native candidate still repeats the selected
+/// archive check after its list rewrite.
+pub(super) fn archive_has_popup_reference(archive: &Archive, identifier: u64) -> Result<bool> {
+    for object in &archive.objects {
+        for info in &object.archive_info.message_infos {
+            if info.object_references.contains(&identifier)
+                || info
+                    .field_infos
+                    .iter()
+                    .any(|field| field.object_references.contains(&identifier))
+            {
+                return Ok(true);
+            }
+        }
+        for message in &object.messages {
+            if message.type_ != TABLE_DATA_LIST_TYPE {
+                continue;
+            }
+            if table_data_list_type(&message.data, storage_options(&message.data))?
+                != Some(LIST_CONTROL_CELL_SPEC)
+            {
+                continue;
+            }
+            let list = decode_list_entries(&message.data, storage_options(&message.data))?;
+            for entry in list.entries {
+                if entry.payload_kind != PayloadKind::ControlCellSpec {
+                    continue;
+                }
+                let (spec, _) = popup_codec::decode_cell_spec_with_report(
+                    &entry.payload,
+                    popup_options_for_bytes(&entry.payload),
+                )
+                .map_err(|_| NativePopUpError::Codec)?;
+                if spec.popup_model().identifier() == identifier {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// Global-cull variant: an unknown ArchiveInfo/FieldInfo edge is itself an
+/// ownership risk.  Callers use this only for non-selected package members so
+/// a future opaque producer cannot keep a model alive while the selected native
+/// archive is being rewritten.
+pub(super) fn archive_has_popup_reference_strict(
+    archive: &Archive,
+    identifier: u64,
+    limits: Limits,
+) -> Result<bool> {
+    let mut visitor = PopupReferenceVisitor {
+        identifier,
+        found: false,
+    };
+    for object in &archive.objects {
+        object
+            .inspect_references_with_policy_and_limits(
+                &mut visitor,
+                ArchiveReferencePolicy::RejectUnknownMetadata,
+                limits,
+            )
+            .map_err(|_| NativePopUpError::Archive)?;
+    }
+    // ArchiveInfo does not carry the embedded CellSpec payloads of known
+    // control-list objects.  Include that strict native census as well, so a
+    // cross-component rooted list cannot be mistaken for an unowned orphan.
+    Ok(visitor.found || archive_has_popup_reference(archive, identifier)?)
+}
+
+struct PopupReferenceVisitor {
+    identifier: u64,
+    found: bool,
+}
+
+impl ArchiveReferenceVisitor for PopupReferenceVisitor {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object
+            && occurrence.referenced_identifier == self.identifier
+        {
+            self.found = true;
+        }
+        Ok(())
+    }
+}
+
+fn duplicate_identifiers(values: &[u64]) -> bool {
+    values
+        .iter()
+        .enumerate()
+        .any(|(index, value)| values[index + 1..].contains(value))
+}
+
+fn duplicate_keys(values: &[(u32, u64)]) -> bool {
+    values
+        .iter()
+        .enumerate()
+        .any(|(index, (key, _))| values[index + 1..].iter().any(|(other, _)| other == key))
+}
+
+fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8]> {
+    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let mut selected = None;
+    for field in view.fields() {
+        if field.number() != 5 {
+            continue;
+        }
+        let payload = field
+            .canonical_payload()
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+        let row_view = WireView::parse(payload).map_err(|_| NativePopUpError::InvalidSource)?;
+        let row_index = row_view
+            .fields()
+            .find(|field| field.number() == 1)
+            .and_then(|field| {
+                decode_varint_from_bytes(field.payload())
+                    .ok()
+                    .map(|(value, _)| value)
+            })
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let row_index = u32::try_from(row_index).map_err(|_| NativePopUpError::InvalidSource)?;
+        if row_index != row {
+            continue;
+        }
+        if selected.is_some() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let cell_count = row_view
+            .fields()
+            .find(|field| field.number() == 2)
+            .and_then(|field| {
+                decode_varint_from_bytes(field.payload())
+                    .ok()
+                    .map(|(value, _)| value)
+            })
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if cell_count != 1 || column != 0 {
+            return Err(NativePopUpError::UnsupportedDependency);
+        }
+        let buffer = row_view
+            .fields()
+            .find(|field| field.number() == 6)
+            .ok_or(NativePopUpError::InvalidSource)?
+            .canonical_payload()
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+        selected = Some(buffer);
+    }
+    selected.ok_or(NativePopUpError::InvalidSource)
+}
+
+fn patch_tile_cell(source: &[u8], row: u32, column: u32, replacement: &[u8]) -> Result<Vec<u8>> {
+    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let mut output = Vec::new();
+    let mut selected = false;
+    for field in view.fields() {
+        if field.number() != 5 {
+            output.extend_from_slice(field.raw());
+            continue;
+        }
+        let payload = field
+            .canonical_payload()
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+        let row_view = WireView::parse(payload).map_err(|_| NativePopUpError::InvalidSource)?;
+        let row_index = row_view
+            .fields()
+            .find(|candidate| candidate.number() == 1)
+            .and_then(|candidate| {
+                decode_varint_from_bytes(candidate.payload())
+                    .ok()
+                    .map(|(value, _)| value)
+            })
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if row_index != row {
+            output.extend_from_slice(field.raw());
+            continue;
+        }
+        if selected {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let patched_row = patch_row_cell(payload, column, replacement)?;
+        litchi_iwa_common::wire::append_length_delimited_field(&mut output, 5, &patched_row)
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+        selected = true;
+    }
+    if !selected {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(output)
+}
+
+fn patch_row_cell(source: &[u8], column: u32, replacement: &[u8]) -> Result<Vec<u8>> {
+    if column != 0 {
+        return Err(NativePopUpError::UnsupportedDependency);
+    }
+    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let cell_count = view
+        .fields()
+        .find(|field| field.number() == 2)
+        .and_then(|field| {
+            decode_varint_from_bytes(field.payload())
+                .ok()
+                .map(|(value, _)| value)
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    if cell_count != 1 {
+        return Err(NativePopUpError::UnsupportedDependency);
+    }
+    let mut output = Vec::new();
+    let mut replaced = false;
+    for field in view.fields() {
+        if field.number() == 6 {
+            if replaced {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            litchi_iwa_common::wire::append_length_delimited_field(&mut output, 6, replacement)
+                .map_err(|_| NativePopUpError::InvalidSource)?;
+            replaced = true;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    if !replaced {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(output)
+}
