@@ -351,3 +351,44 @@ fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
     }
     panic!("no selected run satisfied the narrow all-caps closure: {fixture}");
 }
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Document::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_double_strike(span, true).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    let double_strike_text = reopened
+                        .body()
+                        .runs()
+                        .filter(|candidate| candidate.format().double_strike())
+                        .map(|candidate| candidate.text())
+                        .collect::<String>();
+                    assert!(double_strike_text.contains(run.text()));
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow double-strike closure: {fixture}");
+}

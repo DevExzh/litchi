@@ -917,6 +917,11 @@ enum Operation {
         before: bool,
         after: bool,
     },
+    DoubleStrike {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
     Hidden {
         span: TextSpan,
         before: bool,
@@ -1037,6 +1042,7 @@ impl Operation {
             | Self::Italic { .. }
             | Self::Underline { .. }
             | Self::Strike { .. }
+            | Self::DoubleStrike { .. }
             | Self::Hidden { .. }
             | Self::SmallCaps { .. }
             | Self::AllCaps { .. } => 0,
@@ -1070,6 +1076,10 @@ impl Operation {
             Self::Strike { span, .. } => {
                 vec![format!("body:character:{}-{}:strike", span.start, span.end)]
             },
+            Self::DoubleStrike { span, .. } => vec![format!(
+                "body:character:{}-{}:double-strike",
+                span.start, span.end
+            )],
             Self::Hidden { span, .. } => {
                 vec![format!("body:character:{}-{}:hidden", span.start, span.end)]
             },
@@ -1111,6 +1121,7 @@ impl Operation {
             | Self::Italic { span, .. }
             | Self::Underline { span, .. }
             | Self::Strike { span, .. }
+            | Self::DoubleStrike { span, .. }
             | Self::Hidden { span, .. }
             | Self::SmallCaps { span, .. }
             | Self::AllCaps { span, .. }
@@ -1140,6 +1151,7 @@ impl Operation {
                 | Self::Italic { .. }
                 | Self::Underline { .. }
                 | Self::Strike { .. }
+                | Self::DoubleStrike { .. }
                 | Self::Hidden { .. }
                 | Self::SmallCaps { .. }
                 | Self::AllCaps { .. }
@@ -1700,6 +1712,72 @@ impl Edit {
             span,
             before,
             after: strike,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact double-strike state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw double-strike state.
+    /// Single strikethrough is retained as an independent formatting facet
+    /// and is never normalized by this operation.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_double_strike(
+        &mut self,
+        span: TextSpan,
+        double_strike: bool,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "double-strike edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = double_strike_for_span(&self.source, span)?;
+        self.operations.push(Operation::DoubleStrike {
+            span,
+            before,
+            after: double_strike,
         });
         Ok(self)
     }
@@ -2398,6 +2476,7 @@ impl Edit {
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
                     | Operation::Strike { .. }
+                    | Operation::DoubleStrike { .. }
                     | Operation::Hidden { .. }
                     | Operation::SmallCaps { .. }
                     | Operation::AllCaps { .. }
@@ -2818,6 +2897,7 @@ impl Edit {
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
                     | Operation::Strike { .. }
+                    | Operation::DoubleStrike { .. }
                     | Operation::Hidden { .. }
                     | Operation::SmallCaps { .. }
                     | Operation::AllCaps { .. }
@@ -2848,6 +2928,11 @@ impl Edit {
         } else {
             false
         };
+        let base_double_strike = if property_operation && !layout_operation {
+            base_double_strike_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
         let base_hidden = if property_operation && !layout_operation {
             base_hidden_for_edit(&self.source, &self.operations)?
         } else {
@@ -2873,6 +2958,7 @@ impl Edit {
         baseline.italic = base_italic;
         baseline.underline = base_underline;
         baseline.strike = base_strike;
+        baseline.double_strike = base_double_strike;
         baseline.hidden = base_hidden;
         baseline.smallcaps = base_small_caps;
         baseline.all_caps = base_all_caps;
@@ -2880,6 +2966,7 @@ impl Edit {
         let mut projected_italic_ranges = Vec::new();
         let mut projected_underline_ranges = Vec::new();
         let mut projected_strike_ranges = Vec::new();
+        let mut projected_double_strike_ranges = Vec::new();
         let mut projected_hidden_ranges = Vec::new();
         let mut projected_small_caps_ranges = Vec::new();
         let mut projected_all_caps_ranges = Vec::new();
@@ -2943,6 +3030,10 @@ impl Edit {
                     projected_strike_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::DoubleStrike { span, after, .. } => {
+                    projected_double_strike_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Hidden { span, after, .. } => {
                     projected_hidden_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
@@ -2989,6 +3080,9 @@ impl Edit {
         let has_strike_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Strike { before, after, .. } if before != after)
         });
+        let has_double_strike_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::DoubleStrike { before, after, .. } if before != after)
+        });
         let has_hidden_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Hidden { before, after, .. } if before != after)
         });
@@ -3008,6 +3102,7 @@ impl Edit {
             || has_italic_delta
             || has_underline_delta
             || has_strike_delta
+            || has_double_strike_delta
             || has_hidden_delta
             || has_small_caps_delta
             || has_all_caps_delta;
@@ -3048,6 +3143,10 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::Strike { .. }));
+        let has_double_strike_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::DoubleStrike { .. }));
         let has_hidden_operation = self
             .operations
             .iter()
@@ -3075,6 +3174,11 @@ impl Edit {
                 "strike edits refuse non-ASCII transport encodings",
             ));
         }
+        if has_double_strike_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "double-strike edits refuse non-ASCII transport encodings",
+            ));
+        }
         if has_hidden_operation && !source_bytes.is_ascii() {
             return Err(Error::UnsupportedSource(
                 "hidden edits refuse non-ASCII transport encodings",
@@ -3099,6 +3203,7 @@ impl Edit {
             || has_italic_operation
             || has_underline_operation
             || has_strike_operation
+            || has_double_strike_operation
             || has_hidden_operation
             || has_small_caps_operation
             || has_all_caps_operation
@@ -3107,6 +3212,7 @@ impl Edit {
                 && !has_italic_operation
                 && !has_underline_operation
                 && !has_strike_operation
+                && !has_double_strike_operation
                 && !has_hidden_operation
                 && !has_small_caps_operation
                 && !has_all_caps_operation
@@ -3122,6 +3228,7 @@ impl Edit {
                     has_italic_operation,
                     has_underline_operation,
                     has_strike_operation,
+                    has_double_strike_operation,
                     has_hidden_operation,
                     has_small_caps_operation,
                     has_all_caps_operation,
@@ -3141,6 +3248,7 @@ impl Edit {
                 || has_italic_operation
                 || has_underline_operation
                 || has_strike_operation
+                || has_double_strike_operation
                 || has_hidden_operation
                 || has_small_caps_operation
                 || has_all_caps_operation
@@ -3167,6 +3275,8 @@ impl Edit {
                     underline_changes: &projected_underline_ranges,
                     base_strike,
                     strike_changes: &projected_strike_ranges,
+                    base_double_strike,
+                    double_strike_changes: &projected_double_strike_ranges,
                     base_hidden,
                     hidden_changes: &projected_hidden_ranges,
                     base_small_caps,
@@ -3250,6 +3360,13 @@ impl Edit {
             if all_caps_for_span(&snapshot, all_caps_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate all-caps property did not survive RTF validation",
+                ));
+            }
+        }
+        for (double_strike_span, expected) in projected_double_strike_ranges {
+            if double_strike_for_span(&snapshot, double_strike_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate double-strike property did not survive RTF validation",
                 ));
             }
         }
@@ -3556,6 +3673,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -3636,6 +3754,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -4291,6 +4410,7 @@ fn project_text(
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -4435,6 +4555,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::Italic { .. }
         | Operation::Underline { .. }
         | Operation::Strike { .. }
+        | Operation::DoubleStrike { .. }
         | Operation::Hidden { .. }
         | Operation::SmallCaps { .. }
         | Operation::AllCaps { .. }
@@ -4587,6 +4708,7 @@ fn plain_body_character_editability(
     allow_mixed_italic: bool,
     allow_mixed_underline: bool,
     allow_mixed_strike: bool,
+    allow_mixed_double_strike: bool,
     allow_mixed_hidden: bool,
     allow_mixed_small_caps: bool,
     allow_mixed_all_caps: bool,
@@ -4613,6 +4735,9 @@ fn plain_body_character_editability(
             }
             if allow_mixed_strike {
                 raw_character.strike = false;
+            }
+            if allow_mixed_double_strike {
+                raw_character.double_strike = false;
             }
             if allow_mixed_hidden {
                 raw_character.hidden = false;
@@ -4652,6 +4777,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -4707,6 +4833,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
@@ -4752,6 +4879,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Bold { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -4807,6 +4935,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Bold { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
@@ -4855,6 +4984,7 @@ fn base_underline_for_edit(
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -4910,6 +5040,7 @@ fn base_underline_for_edit(
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
@@ -4944,6 +5075,20 @@ fn uniform_body_strike(source: &Snapshot) -> Result<bool, Error> {
     Ok(value.unwrap_or(false))
 }
 
+fn uniform_body_double_strike(source: &Snapshot) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let double_strike = run.format().raw().double_strike;
+        if value.is_some_and(|existing| existing != double_strike) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(double_strike);
+    }
+    Ok(value.unwrap_or(false))
+}
+
 fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
     let strike_spans = operations
         .iter()
@@ -4955,6 +5100,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -5010,6 +5156,95 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
+    let double_strike_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::DoubleStrike { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if double_strike_spans.is_empty() {
+        return uniform_body_double_strike(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &double_strike_spans) {
+                let value = run.format().raw().double_strike;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed double-strike state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::DoubleStrike { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
@@ -5056,6 +5291,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
@@ -5111,6 +5347,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
@@ -5156,6 +5393,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::AllCaps { .. }
             | Operation::InsertParagraph { .. }
@@ -5211,6 +5449,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::AllCaps { .. }
                 | Operation::InsertParagraph { .. }
@@ -5256,6 +5495,7 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::InsertParagraph { .. }
@@ -5311,6 +5551,7 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::InsertParagraph { .. }
@@ -5460,6 +5701,43 @@ fn strike_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
                     ));
                 }
                 value = Some(strike);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
+fn double_strike_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let double_strike = run.format().raw().double_strike;
+                if value.is_some_and(|existing| existing != double_strike) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed double-strike state",
+                    ));
+                }
+                value = Some(double_strike);
                 covered = covered.saturating_add(end - start);
             }
             run_position = run_end;
@@ -5650,6 +5928,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -5849,6 +6128,7 @@ enum CharacterPropertyChange {
     Italic(bool),
     Underline(UnderlineStyle),
     Strike(bool),
+    DoubleStrike(bool),
     Hidden(bool),
     SmallCaps(bool),
     AllCaps(bool),
@@ -5863,6 +6143,8 @@ struct CharacterPropertyOverlays<'a> {
     underline_changes: &'a [(TextSpan, UnderlineStyle)],
     base_strike: bool,
     strike_changes: &'a [(TextSpan, bool)],
+    base_double_strike: bool,
+    double_strike_changes: &'a [(TextSpan, bool)],
     base_hidden: bool,
     hidden_changes: &'a [(TextSpan, bool)],
     base_small_caps: bool,
@@ -5885,6 +6167,9 @@ fn encoded_body_with_properties(
         .and_then(|bytes| bytes.checked_add(overlays.italic_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(overlays.underline_changes.len().saturating_mul(12)))
         .and_then(|bytes| bytes.checked_add(overlays.strike_changes.len().saturating_mul(6)))
+        .and_then(|bytes| {
+            bytes.checked_add(overlays.double_strike_changes.len().saturating_mul(10))
+        })
         .and_then(|bytes| bytes.checked_add(overlays.hidden_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(overlays.small_caps_changes.len().saturating_mul(8)))
         .and_then(|bytes| bytes.checked_add(overlays.all_caps_changes.len().saturating_mul(6)))
@@ -5956,6 +6241,14 @@ fn encoded_body_with_properties(
             )
             .chain(
                 overlays
+                    .double_strike_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::DoubleStrike(value))),
+            )
+            .chain(
+                overlays
                     .hidden_changes
                     .iter()
                     .copied()
@@ -6018,6 +6311,16 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold);
                     write_strike(&mut output, overlays.base_strike);
+                },
+                CharacterPropertyChange::DoubleStrike(value) => {
+                    // Double-strike controls are local character state. Keep
+                    // single strike untouched and reassert bold for a stable
+                    // run boundary around the selected fragment.
+                    write_bold(&mut output, overlays.base_bold);
+                    write_double_strike(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold);
+                    write_double_strike(&mut output, overlays.base_double_strike);
                 },
                 CharacterPropertyChange::Hidden(value) => {
                     // Hidden controls are local character state. Reasserting
@@ -6307,6 +6610,14 @@ fn write_strike(output: &mut Vec<u8>, strike: bool) {
     }
 }
 
+fn write_double_strike(output: &mut Vec<u8>, double_strike: bool) {
+    if double_strike {
+        output.extend_from_slice(br"\striked ");
+    } else {
+        output.extend_from_slice(br"\striked0 ");
+    }
+}
+
 fn write_hidden(output: &mut Vec<u8>, hidden: bool) {
     if hidden {
         output.extend_from_slice(br"\v ");
@@ -6423,6 +6734,12 @@ enum Change {
         after: UnderlineStyle,
     },
     Strike {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    DoubleStrike {
         span: TextSpan,
         after_span: TextSpan,
         before: bool,
@@ -6590,6 +6907,17 @@ impl Change {
                 before,
                 after,
             } => Self::Strike {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::DoubleStrike {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::DoubleStrike {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -6847,6 +7175,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::DoubleStrike {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::DoubleStrike {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::Hidden {
                 span,
                 before,
@@ -7015,6 +7353,7 @@ fn semantic_changes(
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
@@ -7240,6 +7579,21 @@ fn durable_operation(
             litchi_core::patch::PatchOperation::new(
                 limits,
                 "character-strike.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::DoubleStrike {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("double_strike".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-double-strike.set",
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Bool(*after),
@@ -7747,6 +8101,25 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("strike value must be Boolean".to_string())
                 })?;
                 edit.set_text_strike(span, replacement)?;
+            },
+            "character-double-strike.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("double_strike")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing double-strike precondition".to_string())
+                    })?;
+                if double_strike_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character double-strike state differs",
+                    ));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("double-strike value must be Boolean".to_string())
+                })?;
+                edit.set_text_double_strike(span, replacement)?;
             },
             "character-hidden.set" => {
                 let span = parse_text_target(&operation.target)?;
