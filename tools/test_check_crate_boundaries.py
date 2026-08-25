@@ -714,6 +714,59 @@ def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
     selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
 
 
+def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub struct HeaderFooter;\n"
+        "pub enum Template { First, Even, Odd }\n"
+        "pub enum Kind { Header, Footer }\n"
+        "pub struct HeaderFooterSelector<'a> { section: &'a str }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "pub fn header_footers() {}\n"
+        + "pub fn edit_header_footer_text() {}\n"
+        + "pub fn apply_header_footer_text() {}\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+    package_export = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[1]
+    semantic_export = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[2]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod header_footer;\n"
+        "pub use header_footer::HeaderFooterSelector;\n"
+        "pub use package::{HeaderFooterTextCommit, HeaderFooterTextDiagnostics, "
+        "HeaderFooterTextEdit, HeaderFooterTextError, HeaderFooterTextLimitKind, "
+        "HeaderFooterTextPatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod header_footer_text;\n"
+        "pub use header_footer_text::{HeaderFooterTextCommit, "
+        "HeaderFooterTextDiagnostics, HeaderFooterTextEdit, HeaderFooterTextError, "
+        "HeaderFooterTextLimitKind, HeaderFooterTextPatch};\n",
+        encoding="utf-8",
+    )
+    semantic_export.write_text(
+        "pub struct HeaderFooter;\n"
+        "pub enum Template { First, Even, Odd }\n"
+        "pub enum Kind { Header, Footer }\n"
+        "pub struct HeaderFooterSelector<'a> { section: &'a str }\n",
+        encoding="utf-8",
+    )
+
+
 def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -15277,6 +15330,361 @@ fn rewrite_movie_title_operation(
         )
         self.assertIn(
             "+ audit_pages_table_dimension_facade_source_topology()", main_source
+        )
+
+    def test_pages_header_footer_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_HEADER_FOOTER_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_HEADER_FOOTER_METHODS,
+            (
+                "header_footers",
+                "replace_header_footer_text",
+                "set_header_footer_text",
+                "clear_header_footer",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/header_footer_text.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_HEADER_FOOTER_PACKAGE_METHODS,
+            (
+                "header_footers",
+                "edit_header_footer_text",
+                "apply_header_footer_text",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_HEADER_FOOTER_SEMANTIC_TYPES,
+            ("HeaderFooter", "Template", "Kind"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_HEADER_FOOTER_SELECTOR_TYPES,
+            ("HeaderFooterSelector",),
+        )
+        self.assertIn(
+            "HeaderFooterTextPatch",
+            boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES,
+        )
+
+    def test_focused_pages_header_footer_requires_canonical_types_and_methods(
+        self,
+    ) -> None:
+        for missing in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_header_footer_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "pub fn header_footers() {}\n"
+                        + "pub fn edit_header_footer_text() {}\n"
+                        + "pub fn apply_header_footer_text() {}\n"
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_header_footer_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+        for missing in boundaries.PAGES_HEADER_FOOTER_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_header_footer_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "\n".join(
+                            f"pub fn {method}() {{}}"
+                            for method in boundaries.PAGES_HEADER_FOOTER_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "\n}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_header_footer_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+    def test_focused_pages_header_footer_requires_semantics_selector_and_exports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+            semantic.write_text("pub enum OtherRole { Header }\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_HEADER_FOOTER_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+            lib.write_text("pub mod header_footer;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_header_footer_facade_source_topology(
+                root
+            )
+            for name in boundaries.PAGES_HEADER_FOOTER_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(
+                        f"missing semantic header_footer type {name}" in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+            self.assertTrue(
+                any("missing canonical HeaderFooterSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing root HeaderFooterSelector re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_header_footer_rejects_leaks_aliases_and_raw_ids(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn header_footers(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo, "
+                "storage: TextStorageId, info: PagesHeaderFooterInfo) {}\n"
+                "pub fn edit_header_footer_text() {}\n"
+                "pub fn apply_header_footer_text() {}\n"
+                "}\n"
+                "pub type HeaderFooterPatchAlias = HeaderFooterTextPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod header_footer;\n"
+                "pub use package::*;\n"
+                "pub use package::HeaderFooterTextPatch as FooterPatch;\n"
+                "pub use litchi_iwa_protos::HeaderFooterArchive as HeaderFooterTextPatch;\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+            with semantic.open("a", encoding="utf-8") as stream:
+                stream.write("pub use crate::header_footer::Kind as FooterKind;\n")
+
+            violations = boundaries.audit_pages_header_footer_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type TextStorageId",
+                "exposes archive/IWA type PagesHeaderFooterInfo",
+                "retains root aliases via owner glob",
+                "alternate alias FooterPatch for HeaderFooterTextPatch",
+                "alternate alias HeaderFooterPatchAlias for HeaderFooterTextPatch",
+                "alternate alias FooterKind for Kind",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_header_footer_masks_cfg_test_and_scans_alias_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomFooterPatch = HeaderFooterTextPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyFooterPatch = HeaderFooterTextPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::HeaderFooterTextPatch as FooterPatch;\n"
+                    "pub mod header_footer;\n"
+                )
+
+            violations = boundaries.audit_pages_header_footer_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "alternate alias CustomFooterPatch for HeaderFooterTextPatch",
+                "aliases via owner glob",
+                "alternate alias FooterPatch for HeaderFooterTextPatch",
+                "exposes duplicate header_footer module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyFooterPatch" in item for item in violations))
+
+    def test_focused_pages_header_footer_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn header_footers() {}\n"
+                "pub fn edit_header_footer_text() {}\n"
+                "pub fn apply_header_footer_text() {}\n"
+                "}\n"
+                "fn resolve_storage(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_pages_header_footer_facade_source_topology(root), []
+            )
+
+    def test_iwa_pages_header_footer_audit_activates_only_with_package_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.RETIRED_IWA_PAGES_HEADER_FOOTER_SOURCE
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text(
+                "pub fn header_footers() {}\n"
+                "pub fn replace_header_footer_text(storage_id: TextStorageId) {}\n"
+                "pub fn set_header_footer_text(storage_id: TextStorageId) {}\n"
+                "pub fn clear_header_footer(storage_id: TextStorageId) {}\n"
+                "#[cfg(test)]\n"
+                "pub fn header_footers_for_test() {}\n",
+                encoding="utf-8",
+            )
+            info = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/types.rs"
+            info.parent.mkdir(parents=True, exist_ok=True)
+            info.write_text(
+                "pub struct PagesHeaderFooterInfo;\n"
+                "#[cfg(test)]\n"
+                "pub struct TestPagesHeaderFooterInfo;\n",
+                encoding="utf-8",
+            )
+            attachments = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/number_attachments.rs"
+            attachments.parent.mkdir(parents=True, exist_ok=True)
+            attachments.write_text(
+                "pub fn header_footer_number_attachments(storage_id: TextStorageId) {}\n"
+                "pub fn insert_header_footer_number_attachment(storage_id: TextStorageId) {}\n"
+                "pub fn update_header_footer_number_attachment(storage_id: TextStorageId) {}\n"
+                "pub fn remove_header_footer_number_attachment(storage_id: TextStorageId) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_header_footer_source_topology(root), []
+            )
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_pages_header_footer_source_topology(root)
+            for method in boundaries.RETIRED_IWA_PAGES_HEADER_FOOTER_METHODS:
+                self.assertTrue(
+                    any(f"method {method}:" in item for item in violations),
+                    msg=f"missing retired method {method}: {violations!r}",
+                )
+            for method in boundaries.RETIRED_IWA_PAGES_HEADER_FOOTER_NUMBER_ATTACHMENT_METHODS:
+                self.assertTrue(
+                    any(f"method {method} must accept" in item for item in violations),
+                    msg=f"missing raw attachment method {method}: {violations!r}",
+                )
+            self.assertTrue(any("info type PagesHeaderFooterInfo" in item for item in violations))
+            self.assertFalse(any("for_test" in item for item in violations))
+
+    def test_iwa_pages_header_footer_rejects_legacy_fallback_and_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            example = root / boundaries.IWA_PAGES_HEADER_FOOTER_EXAMPLE_ROOT / "edit.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn edit() { pages.header_footers(); legacy_fallback(); }\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "pages.set_header_footer_text(storage_id);\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_header_footer_source_topology(root)
+            self.assertTrue(any("example call header_footers" in item for item in violations))
+            self.assertTrue(any("legacy fallback legacy_fallback" in item for item in violations))
+            self.assertTrue(any("README call set_header_footer_text" in item for item in violations))
+
+    def test_iwa_pages_header_footer_allows_typed_number_attachment_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            attachments = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/number_attachments.rs"
+            attachments.parent.mkdir(parents=True, exist_ok=True)
+            attachments.write_text(
+                "pub fn header_footer_number_attachments(selector: HeaderFooterSelector) {}\n"
+                "pub fn insert_header_footer_number_attachment(selector: HeaderFooterSelector) {}\n"
+                "pub fn update_header_footer_number_attachment(selector: HeaderFooterSelector) {}\n"
+                "pub fn remove_header_footer_number_attachment(selector: HeaderFooterSelector) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_header_footer_source_topology(root), []
+            )
+
+    def test_focused_pages_header_footer_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_header_footer_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_pages_header_footer_facade_source_topology()", main_source
         )
 
     def test_pages_table_title_boundary_inventories_are_exact(self) -> None:

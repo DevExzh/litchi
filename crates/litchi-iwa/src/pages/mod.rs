@@ -6,7 +6,7 @@
 //! ## Features
 //!
 //! - Floating drawables (images, shapes)
-//! - Header and footer extraction
+//! - Header/footer number-attachment compatibility operations
 //!
 //! ## Example
 //!
@@ -32,8 +32,8 @@ pub mod editor;
 pub use creation::PagesDocumentBuilder;
 pub use editor::{
     PagesAudioInfo, PagesBodyChartInfo, PagesBodyShapeInfo, PagesCellValue, PagesDrawableTextInfo,
-    PagesEditor, PagesHeaderFooterInfo, PagesImageInfo, PagesMovieInfo, PagesSectionInfo,
-    PagesTable, PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
+    PagesEditor, PagesImageInfo, PagesMovieInfo, PagesSectionInfo, PagesTable,
+    PagesTableCellParagraphList, PagesTableCellParagraphListBullet,
     PagesTableCellParagraphListBulletGeometry, PagesTableCellParagraphListIndentation,
     PagesTableCellParagraphListLabelColor, PagesTableCellParagraphListLevel,
     PagesTableCellParagraphListLevelPlacement, PagesTableCellParagraphListNumberFormat,

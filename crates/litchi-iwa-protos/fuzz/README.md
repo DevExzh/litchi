@@ -440,6 +440,31 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -timeout=10 -rss_limit_mb=2048
 ```
 
+## Pages header/footer section-template codec
+
+`pages_header_footer_codec` exercises the strict source-preserving
+`TP.SectionTemplateArchive` projection used by the Pages header/footer owner.
+It decodes repeated header and footer `TSP.Reference` records without owning
+native identifiers and rewrites a complete set of
+references while preserving unknown fields, balanced groups, source order,
+and unknown overlong scalar values. The replacement path verifies output
+counts, exact report accounting, and caller-source immutability.
+
+The target accepts raw inputs up to 64 KiB and uses finite ceilings of 8,192
+fields, 256 KiB of work, 128 KiB of output, nesting depth 64, and 8,192
+references. The checked-in recipes under `corpus/pages_header_footer_codec/`
+cover canonical and optional reference fields, unknown groups and overlong
+unknown scalars, missing/duplicate/non-canonical identifiers, wrong wire
+types, truncation, and unterminated groups. Recipes are hand-authored
+`hex:` protobuf payloads, not copied native package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check pages_header_footer_codec
+```
+
 ## Numbers comment-storage codec
 
 `comment_storage_codec` sends one bounded, caller-owned

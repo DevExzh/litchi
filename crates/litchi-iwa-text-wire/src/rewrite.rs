@@ -209,6 +209,7 @@ pub enum RewriteBehavior {
 /// Resource and text facts proven by full storage validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StorageValidation {
+    storage_kind: u64,
     utf8_len: usize,
     utf16_len: usize,
     fragments: usize,
@@ -220,6 +221,13 @@ pub struct StorageValidation {
 }
 
 impl StorageValidation {
+    /// Exact effective `TSWP.StorageArchive.kind` value. An absent field uses
+    /// the schema default (`TEXTBOX`, value 3).
+    #[must_use]
+    pub const fn storage_kind(self) -> u64 {
+        self.storage_kind
+    }
+
     /// Aggregate source text length in UTF-8 bytes.
     #[must_use]
     pub const fn utf8_len(self) -> usize {
@@ -738,6 +746,7 @@ impl<'source> RawFields<'source> {
 
 #[derive(Debug, Clone, Copy)]
 struct TextPreflight {
+    storage_kind: u64,
     fragments: usize,
     text_bytes: usize,
     utf16_len: usize,
@@ -813,6 +822,7 @@ fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<Te
     let mut text_bytes = 0usize;
     let mut utf16_len = 0usize;
     let mut field_count = 0usize;
+    let mut storage_kind = None;
     let mut fields = RawFields::new(source);
     while let Some(field) = fields.next()? {
         field_count = checked_add(field_count, 1, "root field count")?;
@@ -846,12 +856,16 @@ fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<Te
                     checked_add(utf16_len, character.len_utf16(), "preflight UTF-16 length")?;
             }
         }
+        if field.number == 1 {
+            storage_kind = Some(field.canonical_varint("TSWP storage kind")?);
+        }
     }
     enforce_limit("text fragments", fragments, limits.max_fragments())?;
     enforce_limit("text bytes", text_bytes, limits.max_text_bytes())?;
     let _utf16_u32 =
         u32::try_from(utf16_len).map_err(|_error| arithmetic("source UTF-16 u32 length"))?;
     Ok(TextPreflight {
+        storage_kind: storage_kind.unwrap_or(3),
         fragments,
         text_bytes,
         utf16_len,
@@ -2433,6 +2447,7 @@ pub fn validate_storage_with_limits(
     let empty_range = Range { start: 0, end: 0 };
     let text = decode_text_plan(source, &empty_range, "", text_preflight, limits)?;
     Ok(StorageValidation {
+        storage_kind: text_preflight.storage_kind,
         utf8_len: text_preflight.text_bytes,
         utf16_len: text.before_utf16_len,
         fragments: text_preflight.fragments,
@@ -2486,6 +2501,7 @@ pub fn decode_storage_with_limits(
 
     let storage = materialize_validated_storage(view.fragments(), text_preflight, limits)?;
     let validation = StorageValidation {
+        storage_kind: text_preflight.storage_kind,
         utf8_len: text_preflight.text_bytes,
         utf16_len: text_preflight.utf16_len,
         fragments: text_preflight.fragments,

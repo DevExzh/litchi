@@ -1268,6 +1268,8 @@ pub mod numbers_sheet_order_codec;
 /// remain private and the repeated TP archive stays source-authoritative.
 #[doc(hidden)]
 pub mod pages_drawable_order_codec;
+#[doc(hidden)]
+pub mod pages_header_footer_codec;
 
 /// Internal strict Numbers table-header settings projection. Generated types
 /// remain private and scalar facts borrow only caller-owned source bytes.

@@ -4769,6 +4769,167 @@ PAGES_TABLE_DIMENSION_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tst", "tsp", "tswp"}
 )
 
+# Header/footer text is the next Pages text-storage edge.  Keep its
+# migration inventory dormant until a complete selector-first owner lands:
+# the current host still resolves native TextStorageId values and owns the
+# package graph.  Once activated, the facade ratchet requires the semantic
+# role vocabulary plus one private package transaction owner, and the host
+# ratchet retires every raw PagesEditor discovery/mutation method together.
+RETIRED_IWA_PAGES_HEADER_FOOTER_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+RETIRED_IWA_PAGES_HEADER_FOOTER_METHODS = (
+    "header_footers",
+    "replace_header_footer_text",
+    "set_header_footer_text",
+    "clear_header_footer",
+)
+RETIRED_IWA_PAGES_HEADER_FOOTER_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_HEADER_FOOTER_METHODS
+)
+RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE = "PagesHeaderFooterInfo"
+IWA_PAGES_HEADER_FOOTER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+    r"(?P<method>header_footers|replace_header_footer_text|"
+    r"set_header_footer_text|clear_header_footer)\b[ \t\r\n]*\(",
+)
+IWA_PAGES_HEADER_FOOTER_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_HEADER_FOOTER_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>header_footers|replace_header_footer_text|"
+        r"set_header_footer_text|clear_header_footer)\b[ \t\r\n]*\(",
+    ),
+)
+PAGES_HEADER_FOOTER_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "header_footer.rs"
+PAGES_HEADER_FOOTER_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "header_footer_text.rs"
+)
+PAGES_HEADER_FOOTER_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "header_footer_text"
+)
+PAGES_HEADER_FOOTER_IMPLEMENTATION_SOURCES = (
+    PAGES_HEADER_FOOTER_OWNER_SOURCE,
+    PAGES_HEADER_FOOTER_SEMANTIC_SOURCE,
+)
+PAGES_HEADER_FOOTER_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_HEADER_FOOTER_SEMANTIC_SOURCE,
+)
+PAGES_HEADER_FOOTER_SELECTOR_SOURCE = PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+PAGES_HEADER_FOOTER_SEMANTIC_TYPES = ("HeaderFooter", "Template", "Kind")
+PAGES_HEADER_FOOTER_SELECTOR_TYPES = ("HeaderFooterSelector",)
+PAGES_HEADER_FOOTER_CANONICAL_TYPES = (
+    "HeaderFooterTextEdit",
+    "HeaderFooterTextPatch",
+    "HeaderFooterTextCommit",
+    "HeaderFooterTextDiagnostics",
+    "HeaderFooterTextError",
+    "HeaderFooterTextLimitKind",
+)
+PAGES_HEADER_FOOTER_SHORT_NAMES = frozenset(
+    PAGES_HEADER_FOOTER_CANONICAL_TYPES
+    + PAGES_HEADER_FOOTER_SEMANTIC_TYPES
+    + PAGES_HEADER_FOOTER_SELECTOR_TYPES
+)
+PAGES_HEADER_FOOTER_PUBLIC_NAMES = PAGES_HEADER_FOOTER_SHORT_NAMES
+PAGES_HEADER_FOOTER_PACKAGE_METHODS = (
+    "header_footers",
+    "edit_header_footer_text",
+    "apply_header_footer_text",
+)
+PAGES_HEADER_FOOTER_FLAT_METHODS = frozenset(
+    {
+        "header_footer_text",
+        "edit_header_footer",
+        "apply_header_footer",
+        "replace_header_footer_text",
+        "set_header_footer_text",
+        "clear_header_footer",
+    }
+)
+PAGES_HEADER_FOOTER_FLAT_ALIASES = frozenset(
+    {
+        "HeaderFooterText",
+        "HeaderFooterEdit",
+        "HeaderFooterPatch",
+        "HeaderFooterCommit",
+        "HeaderFooterDiagnostics",
+        "HeaderFooterError",
+        "HeaderFooterLimitKind",
+        "HeaderFooterRegion",
+        "HeaderFooterSlot",
+        "HeaderFooterInfo",
+        "PagesHeaderFooterInfo",
+        "TextStorageId",
+    }
+)
+PAGES_HEADER_FOOTER_ALIAS_TARGETS = frozenset(
+    PAGES_HEADER_FOOTER_CANONICAL_TYPES
+    + PAGES_HEADER_FOOTER_SEMANTIC_TYPES
+    + PAGES_HEADER_FOOTER_SELECTOR_TYPES
+)
+PAGES_HEADER_FOOTER_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:header_footer_text|header_footer|"
+    r"header[ \t\r\n]*footer)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_HEADER_FOOTER_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?header_footer\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_HEADER_FOOTER_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?header_footer_text\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_PACKAGE_HEADER_FOOTER_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?header_footer_text\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_HEADER_FOOTER_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "HeaderFooterArchive",
+        "HeaderFooterLocation",
+        "HeaderFooterSnapshot",
+        "IWorkPackage",
+        "RawMessage",
+        "Resolved",
+        "SectionArchive",
+        "SectionTemplateArchive",
+        "SnappyStream",
+        "SourceCatalog",
+        "StorageArchive",
+        "TextStorage",
+        "TextStorageId",
+        "PagesHeaderFooterInfo",
+    }
+)
+PAGES_HEADER_FOOTER_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_HEADER_FOOTER_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tsd", "tsp", "tswp"}
+)
+
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
     "document_options",
     "set_document_options",
@@ -7638,6 +7799,55 @@ def _is_pages_table_dimension_public_declaration(
         identifiers
         & (PAGES_TABLE_DIMENSION_FLAT_ALIASES | PAGES_TABLE_DIMENSION_PUBLIC_NAMES)
     ) or _pages_table_dimension_owner_declaration(declaration)
+
+
+def _pages_header_footer_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in Pages header/footer APIs."""
+
+    if identifier in PAGES_HEADER_FOOTER_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_HEADER_FOOTER_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_HEADER_FOOTER_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_header_footer_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_HEADER_FOOTER_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_HEADER_FOOTER_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_header_footer_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (PAGES_HEADER_FOOTER_FLAT_ALIASES | PAGES_HEADER_FOOTER_PUBLIC_NAMES)
+    ) or _pages_header_footer_owner_declaration(declaration)
 
 
 def _is_pages_table_lock_public_declaration(
@@ -12650,6 +12860,185 @@ def audit_iwa_pages_table_dimension_source_topology(root: Path = ROOT) -> list[s
                     "retired litchi-iwa Pages table-dimension README call "
                     f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
                 )
+
+    return sorted(set(violations))
+
+
+def _pages_header_footer_owner_present(root: Path) -> bool:
+    return (root / PAGES_HEADER_FOOTER_OWNER_SOURCE).is_file()
+
+
+RETIRED_IWA_PAGES_HEADER_FOOTER_NUMBER_ATTACHMENT_METHODS = frozenset(
+    {
+        "header_footer_number_attachments",
+        "insert_header_footer_number_attachment",
+        "update_header_footer_number_attachment",
+        "remove_header_footer_number_attachment",
+    }
+)
+PAGES_HEADER_FOOTER_LEGACY_MARKERS = frozenset(
+    {
+        "legacy_header_footer",
+        "header_footer_legacy",
+        "legacy_fallback",
+        "LegacyFallback",
+        "fallback_header_footer",
+    }
+)
+
+
+def audit_iwa_pages_header_footer_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire the raw Pages header/footer host after owner activation.
+
+    Header/footer discovery and text mutation currently live on
+    ``PagesEditor`` and expose ``TextStorageId``/``PagesHeaderFooterInfo``.
+    Keep this audit dormant until the private package owner exists so the
+    compatibility host remains an intentional migration baseline.  Activation
+    is deliberately item-scoped: unrelated Pages graph readers remain valid,
+    while every old discovery/mutation method, public info type, and legacy
+    fallback is rejected.  cfg(test) fixtures are masked one item at a time.
+    """
+
+    if not _pages_header_footer_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            code = _mask_rust_non_code(production_source)
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            ):
+                for method in sorted(RETIRED_IWA_PAGES_HEADER_FOOTER_METHOD_SET):
+                    if re.search(
+                        rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(method)}\b",
+                        declaration,
+                    ) is not None:
+                        violations.append(
+                            "retired litchi-iwa Pages header/footer method "
+                            f"{method}: {path.relative_to(root)}:{line_number}"
+                        )
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            ):
+                function = RUST_FUNCTION_DECLARATION.search(declaration)
+                if function is None:
+                    continue
+                method = function.group(1)
+                if (
+                    method in RETIRED_IWA_PAGES_HEADER_FOOTER_NUMBER_ATTACHMENT_METHODS
+                    and "HeaderFooterSelector"
+                    not in {
+                        match.group(1)
+                        for match in RUST_IDENTIFIER.finditer(declaration)
+                    }
+                ):
+                    violations.append(
+                        "retired litchi-iwa Pages header/footer number-attachment "
+                        f"method {method} must accept HeaderFooterSelector: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+            for match in re.finditer(
+                rf"(?<![A-Za-z0-9_#]){re.escape(RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE)}"
+                r"(?![A-Za-z0-9_])",
+                code,
+            ):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Pages header/footer info type "
+                    f"{RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for marker in sorted(PAGES_HEADER_FOOTER_LEGACY_MARKERS):
+                for match in re.finditer(
+                    rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                    code,
+                ):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages header/footer legacy fallback "
+                        f"{marker}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_HEADER_FOOTER_CALL.finditer(code):
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                # A declaration is reported above; this branch catches a
+                # differently named compatibility helper calling the old API.
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    code[line_start:line_end],
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages header/footer call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_HEADER_FOOTER_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            )
+            for marker in sorted(PAGES_HEADER_FOOTER_LEGACY_MARKERS):
+                if re.search(
+                    rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                    source,
+                ) is not None:
+                    line_number = source.count("\n", 0, source.find(marker)) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages header/footer example legacy "
+                        f"fallback {marker}: {example_path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_HEADER_FOOTER_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages header/footer example call "
+                    f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
+                )
+            if re.search(
+                rf"\b{re.escape(RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE)}\b",
+                source,
+            ):
+                line_number = source.count(
+                    "\n", 0, source.find(RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE)
+                ) + 1
+                violations.append(
+                    "retired litchi-iwa Pages header/footer example info type: "
+                    f"{example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_HEADER_FOOTER_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages header/footer README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+        if re.search(
+            rf"\b{re.escape(RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE)}\b",
+            source,
+        ):
+            line_number = source.count(
+                "\n", 0, source.find(RETIRED_IWA_PAGES_HEADER_FOOTER_INFO_TYPE)
+            ) + 1
+            violations.append(
+                "retired litchi-iwa Pages header/footer README info type: "
+                f"{IWA_PAGES_README}:{line_number}"
+            )
 
     return sorted(set(violations))
 
@@ -19234,6 +19623,294 @@ def audit_pages_table_dimension_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_pages_header_footer_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Pages header/footer owner.
+
+    This ratchet is dormant until ``package/header_footer_text.rs`` exists.
+    The existing ``header_footer::{Template, Kind}`` role vocabulary remains
+    useful during that migration, but it does not by itself constitute a
+    package owner.  Once activated, all public transaction names, selector
+    exports, private-module boundaries, alias routes, and raw physical/wire
+    leaks are checked across the complete Pages source tree.
+    """
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir() or not _pages_header_footer_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source,
+        frozenset(PAGES_HEADER_FOOTER_SEMANTIC_TYPES),
+    )
+    for name in PAGES_HEADER_FOOTER_SEMANTIC_TYPES:
+        if name in semantic_exports:
+            continue
+        violations.append(
+            "focused litchi-pages header/footer public API is missing semantic "
+            f"header_footer type {name}: {PAGES_HEADER_FOOTER_SEMANTIC_SOURCE}"
+        )
+
+    selector_path = root / PAGES_HEADER_FOOTER_SELECTOR_SOURCE
+    selector_source = (
+        _mask_rust_cfg_test_items(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    for name in PAGES_HEADER_FOOTER_SELECTOR_TYPES:
+        if name in _rust_canonical_exports(selector_source, frozenset({name})):
+            continue
+        violations.append(
+            "focused litchi-pages header/footer public API is missing canonical "
+            f"{name}: {PAGES_HEADER_FOOTER_SELECTOR_SOURCE}"
+        )
+
+    owner_path = root / PAGES_HEADER_FOOTER_OWNER_SOURCE
+    package_path = root / PAGES_HEADER_FOOTER_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    if PAGES_PACKAGE_HEADER_FOOTER_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-pages header/footer public API is missing private "
+            f"package owner module: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_PAGES_PACKAGE_HEADER_FOOTER_MODULE.finditer(package_source):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-pages header/footer public API exposes public "
+            f"package::header_footer_text module: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    canonical_exports = _rust_canonical_exports(
+        owner_source, frozenset(PAGES_HEADER_FOOTER_CANONICAL_TYPES)
+    )
+    for name in PAGES_HEADER_FOOTER_CANONICAL_TYPES:
+        if name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-pages header/footer public API is missing canonical "
+            f"package type {name}: {PAGES_HEADER_FOOTER_OWNER_SOURCE}"
+        )
+
+    owner_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in PAGES_HEADER_FOOTER_PACKAGE_METHODS:
+        if method in owner_methods:
+            continue
+        violations.append(
+            "focused litchi-pages header/footer public API is missing Package "
+            f"method {method}: {PAGES_HEADER_FOOTER_OWNER_SOURCE}"
+        )
+    for method in sorted(PAGES_HEADER_FOOTER_FLAT_METHODS & owner_methods):
+        violations.append(
+            "focused litchi-pages header/footer public API retains flat Package "
+            f"method {method}: {PAGES_HEADER_FOOTER_OWNER_SOURCE}"
+        )
+
+    lib_path = root / PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        )
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_HEADER_FOOTER_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages header/footer public API is missing canonical "
+            f"root header_footer module: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]}"
+        )
+    for name in PAGES_HEADER_FOOTER_CANONICAL_TYPES:
+        if name in _rust_canonical_exports(lib_source, frozenset({name})):
+            continue
+        violations.append(
+            "focused litchi-pages header/footer public API is missing root "
+            f"re-export {name}: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]}"
+        )
+    if "HeaderFooterSelector" not in _rust_canonical_exports(
+        lib_source, frozenset({"HeaderFooterSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages header/footer public API is missing root "
+            f"HeaderFooterSelector re-export: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]}"
+        )
+
+    if PUBLIC_PAGES_HEADER_FOOTER_MODULE.search(
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(
+                semantic_path.read_text(encoding="utf-8")
+                if semantic_path.is_file()
+                else ""
+            )
+        )
+    ) is not None:
+        # A semantic source defining a second public module is an alternate
+        # route, not the canonical root module.
+        violations.append(
+            "focused litchi-pages header/footer semantic source exposes duplicate "
+            f"header_footer module: {PAGES_HEADER_FOOTER_SEMANTIC_SOURCE}"
+        )
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_HEADER_FOOTER_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_HEADER_FOOTER_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_HEADER_FOOTER_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+
+    # Every sibling is checked after cfg(test) item masking.  This catches a
+    # second public alias/module even when it is declared after a fixture.
+    root_header_module_seen = False
+    for path in sorted(source_root.rglob("*.rs")):
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        for declaration, line_number in _rust_public_declarations(production_source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                identifiers[:3] == ["pub", "mod", "header_footer"]
+                and (path != lib_path or root_header_module_seen)
+            ):
+                violations.append(
+                    "focused litchi-pages header/footer public API exposes duplicate "
+                    f"header_footer module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:3] == ["pub", "mod", "header_footer"] and path == lib_path:
+                root_header_module_seen = True
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {"header_footer_text", "header_footer", "package", "selector"} & set(
+                    identifiers
+                ):
+                    violations.append(
+                        "focused litchi-pages header/footer public API retains root "
+                        f"aliases via owner glob: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_HEADER_FOOTER_ALIAS_TARGETS
+                    or "header_footer_text" in target_identifiers
+                    or "header_footer" in target_identifiers
+                ) and alias and alias != target:
+                    violations.append(
+                        "focused litchi-pages header/footer public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_HEADER_FOOTER_ALIAS_TARGETS
+                    or "header_footer_text" in target_identifiers
+                    or "header_footer" in target_identifiers
+                ) and alias != target:
+                    violations.append(
+                        "focused litchi-pages header/footer public API retains "
+                        f"alternate alias {alias} for {target}: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(production_source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(production_source)
+            )
+        for declaration, line_number, public_declaration, complete_scope in declarations:
+            if not _is_pages_header_footer_public_declaration(
+                declaration, dedicated_source=complete_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                public_declaration
+                and path in export_sources
+                and identifiers[:2] == ["pub", "use"]
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages header/footer public API retains root "
+                    f"aliases via owner glob: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_HEADER_FOOTER_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages header/footer public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_header_footer_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages header/footer public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages header/footer public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_settings_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Pages document-settings APIs and modules out of the host."""
 
@@ -20268,6 +20945,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_headers_facade_source_topology()
         + audit_iwa_pages_table_dimension_source_topology()
         + audit_pages_table_dimension_facade_source_topology()
+        + audit_iwa_pages_header_footer_source_topology()
+        + audit_pages_header_footer_facade_source_topology()
         + audit_iwa_pages_chart_caption_source_topology()
         + audit_iwa_pages_drawable_order_source_topology()
         + audit_iwa_pages_document_settings_source_topology()

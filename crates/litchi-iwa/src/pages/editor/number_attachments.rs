@@ -6,9 +6,9 @@ use super::PagesEditor;
 use crate::Result;
 use crate::text::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings, TextPosition,
-    TextStorageId,
 };
 use litchi_iwa_common::comment::DrawableId;
+use litchi_pages::header_footer::HeaderFooterSelector;
 
 impl PagesEditor {
     /// Read every number attachment in the main Pages body.
@@ -45,23 +45,23 @@ impl PagesEditor {
             .remove_text_number_attachment(self.body_storage_id, id)
     }
 
-    /// Read every number attachment in a reachable header/footer storage.
+    /// Read every number attachment in a reachable header/footer slot.
     pub fn header_footer_number_attachments(
         &self,
-        storage_id: TextStorageId,
+        selector: HeaderFooterSelector<'_>,
     ) -> Result<Vec<TextNumberAttachment>> {
-        self.require_header_footer(storage_id)?;
+        let storage_id = self.require_header_footer_selector(selector)?;
         self.text.text_number_attachments(storage_id)
     }
 
-    /// Atomically insert a native page number or page count in a header/footer.
+    /// Atomically insert a native page number or page count in a header/footer slot.
     pub fn insert_header_footer_number_attachment(
         &mut self,
-        storage_id: TextStorageId,
+        selector: HeaderFooterSelector<'_>,
         position: TextPosition,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
-        self.require_header_footer(storage_id)?;
+        let storage_id = self.require_header_footer_selector(selector)?;
         self.text
             .insert_text_number_attachment(storage_id, position, settings)
     }
@@ -69,11 +69,11 @@ impl PagesEditor {
     /// Atomically update a reachable header/footer number attachment.
     pub fn update_header_footer_number_attachment(
         &mut self,
-        storage_id: TextStorageId,
+        selector: HeaderFooterSelector<'_>,
         id: TextNumberAttachmentId,
         settings: TextNumberAttachmentSettings,
     ) -> Result<TextNumberAttachment> {
-        self.require_header_footer(storage_id)?;
+        let storage_id = self.require_header_footer_selector(selector)?;
         self.text
             .update_text_number_attachment(storage_id, id, settings)
     }
@@ -81,10 +81,10 @@ impl PagesEditor {
     /// Delete a header/footer number attachment and its U+FFFC placeholder.
     pub fn remove_header_footer_number_attachment(
         &mut self,
-        storage_id: TextStorageId,
+        selector: HeaderFooterSelector<'_>,
         id: TextNumberAttachmentId,
     ) -> Result<TextNumberAttachment> {
-        self.require_header_footer(storage_id)?;
+        let storage_id = self.require_header_footer_selector(selector)?;
         self.text.remove_text_number_attachment(storage_id, id)
     }
 

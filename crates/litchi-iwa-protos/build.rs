@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_drawable_order_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_header_footer_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
@@ -1156,6 +1157,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         ),
         (
             "src/pages_drawable_order_codec.rs",
+            "crate::buffa_pages_drawable_order_generated::",
+            "mod buffa_pages_drawable_order_generated {",
+        ),
+        (
+            "src/pages_header_footer_codec.rs",
             "crate::buffa_pages_drawable_order_generated::",
             "mod buffa_pages_drawable_order_generated {",
         ),
