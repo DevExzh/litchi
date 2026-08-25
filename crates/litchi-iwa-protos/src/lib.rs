@@ -1319,6 +1319,11 @@ pub mod table_dimension_codec {
     };
 }
 
+/// Format-neutral strict table-appearance projection and source-preserving
+/// rewrite. Generated schema types remain private to this crate.
+#[doc(hidden)]
+pub mod table_appearance_codec;
+
 /// Strict generated-free Numbers table-cell dependency/cache projection.
 #[doc(hidden)]
 pub mod numbers_table_cell_dependency_codec;

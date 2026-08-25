@@ -15,7 +15,7 @@ pub struct NumbersTableInfo {
     pub rows: usize,
     pub columns: usize,
     /// Effective alternating-row and automatic-sizing settings.
-    pub appearance: TableAppearance,
+    pub appearance: Appearance,
 }
 
 /// Stable identity and name of a sheet in workbook order.

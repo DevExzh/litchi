@@ -1637,14 +1637,16 @@ impl ArchiveObject {
     /// Replace one payload and apply an exact object-reference transition under
     /// explicit resource limits.
     ///
-    /// Both directional states are fully authorized before raw rewriting. Each
-    /// list must be unique and nonzero; retained identifiers may be reordered,
-    /// removals may occur anywhere, and newly introduced identifiers must form
-    /// the final suffix. Selected `FieldInfo` occurrences are authorized by
-    /// ordinal, path, and complete before/after lists. Every field-local value
-    /// must remain a member of its direction's aggregate list. All work and
-    /// allocations are bounded by the header and metadata limits, and failure
-    /// leaves the object unchanged.
+    /// Both directional states are fully authorized before raw rewriting. The
+    /// aggregate and every selected field list must be unique and nonzero;
+    /// retained identifiers may be reordered, removals may occur anywhere,
+    /// and newly introduced identifiers must form the final suffix. Selected
+    /// `FieldInfo` occurrences are authorized by ordinal, path, and complete
+    /// before/after lists. Untouched field lists retain their exact order and
+    /// duplicate occurrences, but every retained value must remain a nonzero
+    /// member of both aggregate states. All work and allocations are bounded
+    /// by the header and metadata limits, and failure leaves the object
+    /// unchanged.
     pub fn replace_message_transitioning_object_references_preserving_header_with_limits(
         &mut self,
         index: usize,
@@ -2620,13 +2622,28 @@ fn prepare_object_reference_transition<'a>(
         }
     }
     for (field_index, current_field) in current.field_infos.iter().enumerate() {
-        let (before, after) = fields.get(field_index).and_then(Option::as_ref).map_or(
+        let selected = fields.get(field_index).and_then(Option::as_ref);
+        let (before, after) = selected.map_or(
             (
                 current_field.object_references.as_slice(),
                 current_field.object_references.as_slice(),
             ),
             |field| (field.authorization.before, field.authorization.after),
         );
+        if selected.is_none() {
+            for identifier in before {
+                if *identifier == 0
+                    || !transition.aggregate_before.contains(identifier)
+                    || !transition.aggregate_after.contains(identifier)
+                {
+                    return Err(Error::invalid_archive(
+                        message_index,
+                        "retained FieldInfo references are not aggregate members",
+                    ));
+                }
+            }
+            continue;
+        }
         let mut local = HashSet::new();
         local
             .try_reserve(before.len().max(after.len()))
@@ -7808,6 +7825,38 @@ mod tests {
         assert_eq!(info.field_infos[0].object_references, [20, 40]);
         assert_eq!(info.field_infos[1].object_references, [30]);
         assert_eq!(Archive::parse(&encoded)?.to_bytes()?, encoded);
+        Ok(())
+    }
+
+    #[test]
+    fn exact_reference_transition_retains_duplicate_unselected_field_members() -> Result<()> {
+        let fixture = reference_transition_fixture()?;
+        let mut parsed = Archive::parse(&fixture.source)?;
+        parsed.objects[0].archive_info.message_infos[0].field_infos[1].object_references =
+            vec![30, 30];
+        let source = parsed.to_bytes()?;
+        let mut parsed = Archive::parse(&source)?;
+        parsed.objects[0].replace_message_transitioning_object_references_preserving_header(
+            0,
+            RawMessage {
+                type_: 9,
+                data: vec![0xfa, 0xfb, 0xfc, 0xfd],
+            },
+            ObjectReferenceTransition {
+                aggregate_before: &[10, 20, 30],
+                aggregate_after: &[30, 20, 40],
+                fields: &[FieldObjectReferenceTransition {
+                    field_info_index: 0,
+                    expected_path: &[4, 1],
+                    before: &[10, 20],
+                    after: &[20, 40],
+                }],
+            },
+        )?;
+        assert_eq!(
+            parsed.objects[0].archive_info.message_infos[0].field_infos[1].object_references,
+            [30, 30]
+        );
         Ok(())
     }
 

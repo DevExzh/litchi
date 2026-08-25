@@ -4,7 +4,7 @@
 
 use super::super::selectors;
 use super::*;
-use litchi_numbers::{SheetSelector, TableSelector};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 impl NumbersEditor {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -52,19 +52,45 @@ impl NumbersEditor {
     }
 
     pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
+        let focused_package = Package::from_bytes(&self.package.to_bytes()?).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Numbers table-appearance package projection failed: {error}"
+            ))
+        })?;
+        let read_focused_appearance = litchi_numbers::Package::table_appearance;
+        // Source-built and older compatibility packages may not carry the
+        // strict Metadata ownership required for focused appearance edits.
+        // Preserve their read-only table catalog behavior through the shared
+        // legacy projector; all appearance mutation remains in litchi-numbers.
+        let read_compatibility_appearance = crate::table_appearance::table_appearance;
         let mut tables = table_models(&self.package)?
             .into_iter()
             .map(|descriptor| {
+                let (sheet_selector, table_selector) =
+                    selectors::focused_table_location(self, descriptor.object_id)?;
                 Ok(NumbersTableInfo {
                     object_id: descriptor.object_id,
                     index: 0,
                     name: descriptor.model.table_name,
                     rows: descriptor.model.number_of_rows as usize,
                     columns: descriptor.model.number_of_columns as usize,
-                    appearance: crate::table_appearance::table_appearance(
-                        &self.package,
-                        descriptor.object_id,
-                    )?,
+                    appearance: match read_focused_appearance(
+                        &focused_package,
+                        sheet_selector,
+                        table_selector,
+                    ) {
+                        Ok(appearance) => appearance,
+                        Err(focused_error) => read_compatibility_appearance(
+                            &self.package,
+                            descriptor.object_id,
+                        )
+                        .map_err(|compatibility_error| {
+                            Error::InvalidFormat(format!(
+                                "Numbers table-appearance projection failed: focused owner: \
+                                 {focused_error}; compatibility reader: {compatibility_error}"
+                            ))
+                        })?,
+                    },
                 })
             })
             .collect::<Result<Vec<_>>>()?;

@@ -1255,6 +1255,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/hyperlink_codec.rs",
         "src/keynote_chart_caption_graph_codec.rs",
         "src/pages_footnote_graph_codec.rs",
+        "src/table_appearance_codec.rs",
     ];
 
     let mut expected_paths = CODECS

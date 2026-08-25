@@ -56,7 +56,6 @@ use crate::shapes::{
     reset_shape_text_layout, set_shape_geometry, set_shape_properties, set_shape_text_columns,
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
-use crate::table_appearance::TableAppearance;
 use crate::text::layout::Layout;
 use crate::text::{
     Alignment, Background, Borders, IWorkTextEditor, Indents, LineSpacing, Outline,
@@ -228,7 +227,6 @@ mod sheet_movies;
 mod sheet_shapes;
 mod storage;
 mod stroke_layers;
-mod table_appearance;
 mod table_bootstrap;
 mod table_cells;
 mod table_create;

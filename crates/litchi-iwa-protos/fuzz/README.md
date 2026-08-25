@@ -178,6 +178,43 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
 
+## Format-neutral table-appearance codec
+
+`table_appearance` drives the generated-free `table_appearance_codec` facade
+over bounded TableModel, TableStyle, and Stylesheet payloads. Successful model
+and stylesheet rewrites execute with exact prepared requirements and decode
+again, exercising source preservation, candidate verification, unknown-field
+retention, and typed output/field/work/allocation ceilings. Malformed,
+duplicate, wrong-wire, non-canonical, truncated, and unbalanced-group inputs
+are observed without mutating their caller-owned source. The recipes under
+`corpus/table_appearance/` include canonical known properties, unknown
+overlong scalars/groups, style-edge rewrites, and strict failure shapes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check table_appearance
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-appearance-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/table_appearance/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  table_appearance "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root; set
+`KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
+
 `numbers_tile_storage` sends one bounded, caller-owned byte source through both
 tile entry points:
 

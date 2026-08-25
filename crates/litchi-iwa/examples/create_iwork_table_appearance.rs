@@ -7,22 +7,22 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_iwa::table_appearance::{
-    TableAppearance, TableGridlineVisibility, TableGridlines, TableRowBanding, TableRowSizing,
+use litchi_numbers::{
+    Appearance, Banding, GridlineVisibility, Gridlines, Package, RowSizing, SheetSelector,
+    TableSelector,
 };
-use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_pages::table::headers::{Count as PagesHeaderCount, Settings as PagesHeaderSettings};
 use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
-const APPEARANCE: TableAppearance = TableAppearance {
-    row_banding: TableRowBanding::Enabled,
-    row_sizing: TableRowSizing::FitCellContents,
-    gridlines: TableGridlines {
-        body_horizontal: TableGridlineVisibility::Hidden,
-        header_columns_horizontal: TableGridlineVisibility::Visible,
-        body_vertical: TableGridlineVisibility::Hidden,
-        header_rows_vertical: TableGridlineVisibility::Visible,
-        footer_rows_vertical: TableGridlineVisibility::Hidden,
+const APPEARANCE: Appearance = Appearance {
+    row_banding: Banding::Enabled,
+    row_sizing: RowSizing::FitCellContents,
+    gridlines: Gridlines {
+        body_horizontal: GridlineVisibility::Hidden,
+        header_columns_horizontal: GridlineVisibility::Visible,
+        body_vertical: GridlineVisibility::Hidden,
+        header_rows_vertical: GridlineVisibility::Visible,
+        footer_rows_vertical: GridlineVisibility::Hidden,
     },
 };
 
@@ -49,10 +49,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    numbers.set_table_appearance(numbers_table, APPEARANCE)?;
+    numbers = set_focused_numbers_table_appearance(numbers, APPEARANCE)?;
     numbers.save(&numbers_path)?;
+    let numbers_package = Package::from_bytes(&numbers.to_bytes()?)?;
+    let read_focused_appearance = Package::table_appearance;
     assert_eq!(
-        NumbersEditor::open(&numbers_path)?.table_appearance(numbers_table)?,
+        read_focused_appearance(&numbers_package, SheetSelector::index(0), numbers_table)?,
         APPEARANCE
     );
 
@@ -121,6 +123,20 @@ fn set_focused_table_headers(
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
         .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(NumbersEditor::from_bytes(&bytes)?)
+}
+
+fn set_focused_numbers_table_appearance(
+    editor: NumbersEditor,
+    appearance: Appearance,
+) -> Result<NumbersEditor, Box<dyn std::error::Error>> {
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_appearance(SheetSelector::index(0), TableSelector::index(0))?
+        .set(appearance)
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
