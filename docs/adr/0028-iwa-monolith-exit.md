@@ -5246,3 +5246,32 @@ reopen of the Rust candidate, an exact pre-native inverse, and strict semantic
 reread of the Keynote-normalized artifact. Keynote normalized the ZIP bytes;
 this is not Rust/native byte parity, arbitrary producer-graph acceptance,
 performance/RSS, durable publication evidence, or a full-workspace claim.
+
+## 2026-08-25 amendment: Wave83 Numbers table-sort bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
+moves admitted rooted Numbers persisted sort-order reads and configuration
+edits into the selector-first package. The archive-free facade contains no
+native ID or physical IWA type. The strict hidden codec and package jointly
+own raw-preserving field-44 projection, rooted selection, operation-local
+budgeting, staged-private atomic publication, candidate readback/locality,
+exact patch/inverse, and preview/metadata preservation for this narrow slice.
+
+This is not physical row sorting, table storage, row/column UID, formula,
+comment, border, table topology, Pages/Keynote sort, or general graph
+ownership. The physical `apply_table_sort_order*` executors and remaining
+compatibility responsibilities stay in `litchi-iwa`; unsupported, malformed,
+aliased, locked-change, or otherwise unproven graphs fail closed.
+
+Debt 015, the `litchi-iwa -> litchi-numbers` dependency edge, debts 014 and
+017, `litchi-iwa`, remaining migration hosts, generated-schema, Buffa, and
+normal Prost owners, and the IWA monolith remain. No crate, dependency edge,
+debt item, production manifest dependency, generated-schema owner, normal
+Prost owner, migration host, or monolith-exit gate is retired by Wave83.
+
+The Numbers 14.4 record proves bounded native open/render/sort-control/save/
+close/reopen of the Rust candidate, an exact pre-native inverse, and strict
+semantic reread of the Numbers-normalized artifact. Numbers normalized the ZIP
+bytes; this is not Rust/native byte parity, physical-sort acceptance,
+arbitrary producer-graph acceptance, performance/RSS, durable publication
+evidence, or a full-workspace claim.

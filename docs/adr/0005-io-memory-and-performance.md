@@ -1505,3 +1505,32 @@ Metadata and preview bytes are outside the mutation set and remain exact. No
 production dependency edge or normal generated-schema/Prost owner changed;
 the private Buffa projection and fuzz manifests register only this bounded
 codec and package route.
+
+## 2026-08-25 amendment: Wave83 Numbers table-sort resource record
+
+Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
+carries one operation-local transaction budget through source/catalog and
+rooted table inventory, archive/object/message/reference scans, strict
+sort-order codec reports and execution requirements, model replacement,
+preview and member locality, physical archive/compression bounds, prepared ZIP
+reassembly, candidate reopen, semantic readback, and retained exact
+source/target patch artifacts. Independent source and candidate traversals are
+charged independently, while nesting is merged by maximum and already-charged
+borrowed payload bytes are not charged twice.
+
+Residual input/output, entry, payload, object, message, item, reference,
+field, work, nesting, rule, column, allocation, retained-byte, and scratch
+ceilings are passed between phases. Codec prepare/execute reports are checked
+against their requirements; archive, compression, preview staging, candidate,
+and package-output bounds use checked arithmetic and fallible reservations.
+Typed codec/archive/core limit and allocation failures leave the immutable
+source and published package unchanged.
+
+Codec output, native archive, compression, and final ZIP values are staged
+private candidates before semantic verification and publication. This record
+therefore makes no one-global-output-free-preflight, single-allocation,
+zero-copy, package-wide peak-memory/RSS, latency, throughput, or performance
+claim. Metadata and preview bytes are preserved rather than rewritten. No
+production dependency edge or normal generated-schema/Prost owner changed;
+the private Buffa projection and fuzz manifests register only this bounded
+codec and package route.

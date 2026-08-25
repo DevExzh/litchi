@@ -3083,3 +3083,29 @@ unknown groups and overlong unknown scalars; stricter package graph ingress
 may fail closed before that selected edge. This owner does not create or
 remove movie graphs, replace media/posters, edit geometry, title, caption, or
 builds, repair unsupported producer graphs, or expose native graph values.
+
+## 2026-08-25 amendment: Numbers table-sort semantic ownership
+
+Implementation commit `20aca0ede7817e7fbb630338dbb4bcc852d7d500`
+adds selector-first `Package::{table_sort_order, edit_table_sort_order,
+apply_table_sort_order}` ownership. Reads return `Option<Order>`; an `Edit`
+can set a checked `Order`, clear/reset its rules, and produce a conflict-checked
+`Commit`, exact `Patch`, inverse, redacted `Diagnostics`, typed `Path`, and
+typed resource errors. `Order`, `Rule`, `Scope`, `ColumnIndex`, and `Direction`
+are archive-free values; no native identifier or physical representation
+crosses the facade.
+
+The owner resolves one exact rooted sheet/table/model, rejects changed edits
+to locked tables, and preserves the selected model's unrelated fields,
+message metadata, all unselected objects/members, Metadata, and previews.
+Absent field 44 and an explicit empty sort marker both read as `None`. Clearing
+an absent value is byte-exact; clearing an existing value retains its field-44
+marker, scope, and admitted unknown framing while removing only the rules.
+Field 45, including any reference tracker, remains opaque and byte-exact.
+
+Known scope/rule fields, rule columns/directions, duplicate columns, bounds,
+wire framing, and resources are strict. Admitted unknown overlong scalars and
+balanced groups are source-preserved by the hidden codec. This owner edits
+persisted configuration only: it does not reorder rows, apply “Sort Now”, own
+table storage/UID/formula/comment movement, create/remove tables, repair
+unsupported producer graphs, or expose a native graph API.
