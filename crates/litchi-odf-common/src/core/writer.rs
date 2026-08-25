@@ -34,6 +34,13 @@ fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
             "ZIP-encrypted ODF entries cannot be copied by the package writer".to_string(),
         ));
     }
+    let has_canonical_manifest = source.has_file(MANIFEST_PATH)?;
+    let has_legacy_manifest = source.has_file("manifest.xml")?;
+    if has_canonical_manifest && has_legacy_manifest {
+        return Err(Error::Unsupported(
+            "ODF source contains both canonical and legacy manifest members".to_string(),
+        ));
+    }
     let package = source.package()?;
     let manifest_bytes = source
         .get_file(MANIFEST_PATH)
@@ -606,6 +613,7 @@ struct ManifestEntry {
 struct PreservedManifest {
     bytes: Vec<u8>,
     entries: std::collections::HashMap<String, ManifestEntry>,
+    physical_paths: HashSet<String>,
 }
 
 /// Helper to create standard ODF directory structure.
@@ -1619,25 +1627,18 @@ impl<W: Write> PackageWriter<W> {
         self.preserved_manifest = None;
 
         let has_canonical_manifest = source.has_file(MANIFEST_PATH)?;
-        let has_legacy_manifest = source.has_file("manifest.xml")?;
-        if has_canonical_manifest && has_legacy_manifest {
-            return Err(Error::Unsupported(
-                "ODF source contains both canonical and legacy manifest members".to_string(),
-            ));
-        }
         if !has_canonical_manifest {
             return Ok(());
         }
+        ensure_source_manifest_rewritable(source)?;
         let source_files = source.files()?;
-        if source_files.iter().any(|path| path.ends_with('/'))
-            || source_files
-                .iter()
-                .any(|path| is_signature_owner_path(path))
+        if source_files
+            .iter()
+            .any(|path| is_signature_owner_path(path))
         {
             return Ok(());
         }
 
-        ensure_source_manifest_rewritable(source)?;
         let package = source.package()?;
         let source_manifest = package.manifest();
         if source_manifest.has_encrypted_entries()
@@ -1655,6 +1656,19 @@ impl<W: Write> PackageWriter<W> {
         })?;
         if byte_count > self.limits.max_metadata_bytes {
             return Ok(());
+        }
+
+        let mut physical_paths = HashSet::new();
+        physical_paths
+            .try_reserve(source_files.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODF preserved physical member paths",
+                source,
+            })?;
+        for path in &source_files {
+            if !physical_paths.insert(normalized_manifest_path(path).to_string()) {
+                return Ok(());
+            }
         }
 
         let mut entries = std::collections::HashMap::new();
@@ -1680,7 +1694,11 @@ impl<W: Write> PackageWriter<W> {
             );
         }
 
-        self.preserved_manifest = Some(PreservedManifest { bytes, entries });
+        self.preserved_manifest = Some(PreservedManifest {
+            bytes,
+            entries,
+            physical_paths,
+        });
         Ok(())
     }
 
@@ -1698,6 +1716,17 @@ impl<W: Write> PackageWriter<W> {
     fn preserved_manifest_if_equivalent(&self) -> Option<&[u8]> {
         let preserved = self.preserved_manifest.as_ref()?;
         if self.document_signer.is_some() || preserved.entries.len() != self.manifest_entries.len()
+        {
+            return None;
+        }
+        let expected_physical_count = self.member_paths.len().checked_add(1)?;
+        if preserved.physical_paths.len() != expected_physical_count
+            || !preserved.physical_paths.contains(MANIFEST_PATH)
+            || !self.member_paths.iter().all(|path| {
+                preserved
+                    .physical_paths
+                    .contains(normalized_manifest_path(path))
+            })
         {
             return None;
         }
@@ -2808,6 +2837,89 @@ mod tests {
 
         // Verify it's a valid ZIP (starts with PK)
         assert_eq!(&bytes[0..2], b"PK");
+    }
+
+    fn physical_inventory_source() -> (OwnedPackage, Vec<u8>) {
+        let manifest = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="Pictures/" m:media-type=""/></m:manifest>"#;
+        let mut bytes = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(Cursor::new(&mut bytes));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("mimetype", options).unwrap();
+            zip.write_all(b"application/vnd.oasis.opendocument.text")
+                .unwrap();
+            zip.start_file("content.xml", options).unwrap();
+            zip.write_all(b"<content/>").unwrap();
+            zip.start_file("META-INF/manifest.xml", options).unwrap();
+            zip.write_all(manifest).unwrap();
+            zip.finish().unwrap();
+        }
+        (OwnedPackage::from_bytes(bytes).unwrap(), manifest.to_vec())
+    }
+
+    #[test]
+    fn preserved_manifest_requires_physical_inventory_equivalence() {
+        let (source, source_manifest) = physical_inventory_source();
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file_with_media_type("content.xml", b"<content/>", "text/xml")
+            .unwrap();
+        writer.copy_auxiliary_files_from(&source).unwrap();
+        writer.preserve_source_manifest(&source).unwrap();
+        let output = writer.finish().unwrap();
+        let output_package = OwnedPackage::from_bytes(output).unwrap();
+        assert_eq!(
+            output_package.get_file(MANIFEST_PATH).unwrap(),
+            source_manifest
+        );
+
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .add_file_with_media_type("content.xml", b"<content/>", "text/xml")
+            .unwrap();
+        writer.copy_auxiliary_files_from(&source).unwrap();
+        writer.preserve_source_manifest(&source).unwrap();
+        writer
+            .add_file_with_media_type("extra.bin", b"extra", "application/octet-stream")
+            .unwrap();
+        let output_package = OwnedPackage::from_bytes(writer.finish().unwrap()).unwrap();
+        assert_ne!(
+            output_package.get_file(MANIFEST_PATH).unwrap(),
+            source_manifest
+        );
+    }
+
+    #[test]
+    fn copying_auxiliary_files_rejects_canonical_and_legacy_manifest_ambiguity() {
+        let canonical = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/></m:manifest>"#;
+        let mut bytes = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(Cursor::new(&mut bytes));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("mimetype", options).unwrap();
+            zip.write_all(b"application/vnd.oasis.opendocument.text")
+                .unwrap();
+            zip.start_file(MANIFEST_PATH, options).unwrap();
+            zip.write_all(canonical).unwrap();
+            zip.start_file("manifest.xml", options).unwrap();
+            zip.write_all(canonical).unwrap();
+            zip.finish().unwrap();
+        }
+        let source = OwnedPackage::from_bytes(bytes).unwrap();
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        let error = writer.copy_auxiliary_files_from(&source).unwrap_err();
+        assert!(error.to_string().contains("both canonical and legacy"));
     }
 }
 
