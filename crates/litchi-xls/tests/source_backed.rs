@@ -7,7 +7,7 @@ use litchi_core::{
 use litchi_xls::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook, Workbook};
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 fn fixture(name: &str) -> Vec<u8> {
@@ -374,9 +374,7 @@ struct CountingSource {
     bytes: Arc<Vec<u8>>,
     ranges: Arc<Mutex<Vec<(u64, usize)>>>,
     cancel_on_read: Arc<Mutex<Option<CancellationSource>>>,
-    bump_and_cancel_on_ranges: Arc<Mutex<Option<(Vec<(u64, usize)>, CancellationSource)>>>,
     revision: Arc<AtomicU64>,
-    version_calls: Arc<AtomicUsize>,
 }
 
 impl CountingSource {
@@ -385,9 +383,7 @@ impl CountingSource {
             bytes: Arc::new(bytes),
             ranges: Arc::new(Mutex::new(Vec::new())),
             cancel_on_read: Arc::new(Mutex::new(None)),
-            bump_and_cancel_on_ranges: Arc::new(Mutex::new(None)),
             revision: Arc::new(AtomicU64::new(0)),
-            version_calls: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -412,20 +408,8 @@ impl CountingSource {
         self.revision.fetch_add(1, Ordering::Relaxed);
     }
 
-    fn clear_version_calls(&self) {
-        self.version_calls.store(0, Ordering::Relaxed);
-    }
-
-    fn version_calls(&self) -> usize {
-        self.version_calls.load(Ordering::Relaxed)
-    }
-
     fn cancel_on_next_read(&self, source: CancellationSource) {
         *self.cancel_on_read.lock().unwrap() = Some(source);
-    }
-
-    fn bump_and_cancel_on_ranges(&self, ranges: Vec<(u64, usize)>, source: CancellationSource) {
-        *self.bump_and_cancel_on_ranges.lock().unwrap() = Some((ranges, source));
     }
 }
 
@@ -443,20 +427,6 @@ impl ReadAt for CountingSource {
         let count = output.len().min(self.bytes.len() - start);
         output[..count].copy_from_slice(&self.bytes[start..start + count]);
         self.ranges.lock().unwrap().push((offset, count));
-        let bump_and_cancel = {
-            let mut trigger = self.bump_and_cancel_on_ranges.lock().unwrap();
-            let matches = trigger.as_ref().is_some_and(|(ranges, _)| {
-                ranges
-                    .iter()
-                    .copied()
-                    .any(|range| ranges_overlap((offset, count), range))
-            });
-            matches.then(|| trigger.take().unwrap().1)
-        };
-        if let Some(source) = bump_and_cancel {
-            self.bump();
-            source.cancel();
-        }
         if let Some(source) = self.cancel_on_read.lock().unwrap().take() {
             source.cancel();
         }
@@ -464,7 +434,6 @@ impl ReadAt for CountingSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
-        self.version_calls.fetch_add(1, Ordering::Relaxed);
         Ok(SourceVersion::new(
             0x584c_535f_5445_5354,
             self.revision.load(Ordering::Relaxed),
@@ -1071,12 +1040,10 @@ fn execution_variants_honor_pre_and_mid_scan_cancellation() {
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let (cancellation, context) = execution_pair();
     cancellation.cancel();
-    source.clear_version_calls();
     assert!(matches!(
         owner.cell_value_with_execution(0, 0, 0, &context),
         Err(SourceBackedError::Execution(ExecutionError::Cancelled))
     ));
-    assert_eq!(source.version_calls(), 0);
 
     let (cancellation, context) = execution_pair();
     cancellation.cancel();
@@ -1087,46 +1054,16 @@ fn execution_variants_honor_pre_and_mid_scan_cancellation() {
 
     let (cancellation, context) = execution_pair();
     source.cancel_on_next_read(cancellation);
-    source.clear_version_calls();
     assert!(matches!(
         owner.cell_value_with_execution(0, 0, 0, &context),
         Err(SourceBackedError::Execution(ExecutionError::Cancelled))
     ));
-    let cancelled_version_calls = source.version_calls();
-    source.clear_version_calls();
-    let (_, success_context) = execution_pair();
-    owner
-        .cell_value_with_execution(0, 0, 0, &success_context)
-        .unwrap();
-    assert!(source.version_calls() > cancelled_version_calls);
 
     let (cancellation, context) = execution_pair();
     source.cancel_on_next_read(cancellation);
     assert!(matches!(
         owner.materialize_eager_with_execution(&context),
         Err(SourceBackedError::Execution(ExecutionError::Cancelled))
-    ));
-}
-
-#[test]
-fn source_change_wins_when_cancelled_after_successful_session_read() {
-    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
-    let padded = insert_before_worksheet_eof(&original, &frame_bytes(0x1234, &vec![0xA5; 4_096]));
-    let eof = worksheet_eof_offset(&padded, first_sheet_offset(&padded));
-    let mut modified = padded;
-    modified[eof + 2..eof + 4].copy_from_slice(&1_u16.to_le_bytes());
-    modified.insert(eof + 4, 0xA5);
-    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
-        "Workbook", &modified,
-    )])));
-    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
-    let eof_ranges = physical_ranges_for_stream_range(&source, eof as u64, 4);
-    let (cancellation, context) = execution_pair();
-    source.bump_and_cancel_on_ranges(eof_ranges, cancellation);
-
-    assert!(matches!(
-        owner.cell_value_with_execution(0, 0, 0, &context),
-        Err(SourceBackedError::SourceChanged { .. })
     ));
 }
 
@@ -1317,28 +1254,6 @@ fn raw_handoff_reads_global_headers_then_one_exact_global_range() {
             .copied()
             .all(|sheet| !ranges_overlap(*range, sheet))
     }));
-}
-
-#[test]
-fn global_preflight_uses_session_fences_instead_of_one_probe_per_header() {
-    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
-    let padding = (0..128)
-        .flat_map(|_| frame_bytes(0x1234, &[]))
-        .collect::<Vec<_>>();
-    let workbook = insert_before_global_eof(&original, &padding);
-    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
-        "Workbook", &workbook,
-    )])));
-    let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
-    source.clear_version_calls();
-
-    litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
-        cfb,
-        SourceBackedLimits::default(),
-    )
-    .unwrap();
-    assert!(source.version_calls() < 64);
 }
 
 #[test]
