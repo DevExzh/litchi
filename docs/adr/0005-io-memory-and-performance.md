@@ -1476,3 +1476,32 @@ These are operation-local accounting facts only and establish no package-wide
 peak memory, RSS, latency, throughput, zero-copy, or performance result. No
 production dependency edge or normal generated-schema/Prost/Buffa owner
 changed; fuzz manifests only register the bounded codec and package targets.
+
+## 2026-08-25 amendment: Wave82 Keynote movie-playback resource record
+
+Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
+carries one conservative operation-local `PlaybackBudget` through source and
+component inventory, rooted slide/movie selection, strict owner/reference and
+movie-data scans, codec reports and execution requirements, native archive and
+Snappy bounds, prepared ZIP reassembly, candidate reopen/validation, semantic
+readback, and member/object locality. Independent source and candidate scans
+are charged independently, while nesting is merged by maximum.
+
+Residual input/output, wire fields/work/nesting, references, components,
+allocations, retained bytes, and scratch limits are passed to the strict codec
+and physical phases. The prepared playback rewrite exposes exact execution
+requirements and checks every execution axis before emission. Archive,
+compression, and package-output bounds are precharged before codec execution;
+prepared ZIP reassembly uses its exact requirements and execution limits
+before producing the final package. Fallible reservations and typed codec,
+archive, and core limit mappings leave the immutable source and published
+package unchanged on failure.
+
+The codec payload, physical archive, compression buffer, and final package are
+staged private candidates before semantic verification and publication. This
+record therefore makes no one-global-preflight, single-allocation, zero-copy,
+package-wide peak-memory/RSS, latency, throughput, or performance claim.
+Metadata and preview bytes are outside the mutation set and remain exact. No
+production dependency edge or normal generated-schema/Prost owner changed;
+the private Buffa projection and fuzz manifests register only this bounded
+codec and package route.

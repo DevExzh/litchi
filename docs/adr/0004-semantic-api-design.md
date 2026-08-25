@@ -3055,3 +3055,31 @@ locked/dependent graphs fail closed. This owner is limited to rooted
 same-component Pop-Up Menu graphs; it is not a general Numbers data-format,
 table topology, other control, cross-component graph-repair, or public native
 graph API.
+
+## 2026-08-25 amendment: Keynote movie-playback semantic ownership
+
+Implementation commit `666ee3ec3be5d7574ebb9324154b550fde83a5f1`
+adds selector-first `Package::{slide_movie_playback_settings,
+edit_slide_movie_playback_settings, apply_slide_movie_playback_settings}`
+ownership. Reads return an optional archive-free `MediaPlaybackSettings`;
+an `Edit` replaces the value and produces a conflict-checked `Commit`, exact
+`Patch`, inverse, redacted `Diagnostics`, and typed resource errors. Optional
+start, poster, loop, and volume values retain the native omitted/present
+distinction, while the playback end remains required and validated.
+
+The package resolves an exact slide position and movie source position, admits
+only a unique same-component type-3007 movie with exactly one strict
+`movie_data` edge and a strict slide-parent/owner route, and refuses non-file,
+duplicate, cross-component, or otherwise ambiguous graphs. A changed edit
+rewrites only the selected playback projection, validates the full candidate,
+rereads the selected semantic value, proves every unrelated object/member
+byte-authoritative, and preserves all preview and Metadata members exactly.
+Metadata is deliberately independent for this no-allocation scalar edit.
+
+The hidden codec rejects malformed, duplicate, wrong-wire, non-canonical, and
+non-finite known playback fields, resolves modern/legacy loop conflicts, and
+preserves admitted unknown framing. Its codec boundary retains balanced
+unknown groups and overlong unknown scalars; stricter package graph ingress
+may fail closed before that selected edge. This owner does not create or
+remove movie graphs, replace media/posters, edit geometry, title, caption, or
+builds, repair unsupported producer graphs, or expose native graph values.
