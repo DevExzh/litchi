@@ -687,3 +687,122 @@ fn content_only_raw_publication_preserves_noncompact_referenced_xml() {
     );
     assert_eq!(source.bytes(), source_bytes);
 }
+
+fn custom_manifest_source() -> (Vec<u8>, Vec<u8>) {
+    const MIME: &str = "application/vnd.oasis.opendocument.presentation";
+    const OPAQUE_PATH: &str = "Opaque/foreign.bin";
+    let mut builder = Builder::new();
+    builder.add_slide_with_title("Source", "Body").unwrap();
+    let base = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let package = base.package().unwrap();
+
+    let mut manifest = b"\xef\xbb\xbf".to_vec();
+    manifest.extend_from_slice(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<!-- retained producer manifest formatting -->
+<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" m:version="1.3">
+<!-- entries are intentionally multiline and prefix-qualified -->
+"#,
+    );
+    for (path, entry) in &package.manifest().entries {
+        let media_type = match path.as_str() {
+            "content.xml" | "styles.xml" | "meta.xml" => "text/xml; charset=UTF-8",
+            _ => entry.media_type.as_str(),
+        };
+        manifest.extend_from_slice(
+            format!(
+                "  <m:file-entry m:full-path=\"{path}\" m:media-type=\"{}\"/>\n",
+                media_type
+            )
+            .as_bytes(),
+        );
+    }
+    manifest.extend_from_slice(
+        br#"  <m:file-entry m:full-path="Pictures/" m:media-type=""/>
+  <m:file-entry m:full-path="Opaque/foreign.bin" m:media-type="application/octet-stream"/>
+</m:manifest>
+"#,
+    );
+
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    for path in package.files().unwrap() {
+        if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") {
+            continue;
+        }
+        let bytes = package.get_file(&path).unwrap();
+        archive.write_deflated(&path, &bytes).unwrap();
+    }
+    archive
+        .write_deflated(OPAQUE_PATH, b"opaque producer payload")
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", &manifest)
+        .unwrap();
+    (archive.finish_to_bytes().unwrap(), manifest)
+}
+
+#[test]
+fn content_only_edit_preserves_bom_multiline_custom_manifest_and_opaque_member() {
+    let (source_bytes, source_manifest) = custom_manifest_source();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let mut transaction = source.transaction().unwrap();
+    transaction
+        .add_text_box(
+            0usize,
+            &TextBox::new(
+                "Manifest-preserving box",
+                RichText::plain("content-only edit").unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let changed = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+
+    assert_eq!(
+        changed.get_file("META-INF/manifest.xml").unwrap(),
+        source_manifest
+    );
+    assert_eq!(
+        changed.get_file("Opaque/foreign.bin").unwrap(),
+        b"opaque producer payload"
+    );
+    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Opaque/foreign.bin"));
+    let reopened = Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert!(reopened.content_xml().contains("Manifest-preserving box"));
+    assert_eq!(source.bytes(), source_bytes);
+}
+
+#[test]
+fn media_topology_change_regenerates_custom_source_manifest() {
+    let (source_bytes, source_manifest) = custom_manifest_source();
+    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let mut transaction = source.transaction().unwrap();
+    transaction
+        .embed_media("Pictures/new.png", b"new image", "image/png")
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    let changed = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let changed_manifest = changed.get_file("META-INF/manifest.xml").unwrap();
+
+    assert_ne!(changed_manifest, source_manifest);
+    assert_eq!(
+        changed
+            .package()
+            .unwrap()
+            .manifest()
+            .get_media_type("Pictures/new.png"),
+        Some("image/png")
+    );
+    assert_eq!(
+        changed.get_file("Opaque/foreign.bin").unwrap(),
+        b"opaque producer payload"
+    );
+    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+    assert!(!identical.contains("META-INF/manifest.xml"));
+    Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert_eq!(source.bytes(), source_bytes);
+}
