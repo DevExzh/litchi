@@ -52,6 +52,10 @@ pub(crate) struct ChangedRows {
 /// XML pass.  The returned content is structurally and semantically rechecked
 /// before publication by the caller.
 pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
+    replace_tables_bounded(xml, sheets, validation::MAX_CONTENT_XML_BYTES)
+}
+
+fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) -> Result<String> {
     validation::validate_content_xml_size(xml)?;
     validation::validate_sheets(sheets)?;
     let spans = scan(xml)?;
@@ -60,6 +64,7 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
     tables.sort_unstable_by_key(|index| spans[*index].start);
 
     for table in &tables {
+        validate_rewritable_table_content(xml, &spans, *table)?;
         for child in direct_children_any(&spans, *table) {
             if !is_element(&spans[child], TABLE_NAMESPACE, "table-row") {
                 return Err(Error::InvalidFormat(
@@ -68,43 +73,98 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
                 ));
             }
         }
+        for row in direct_children(&spans, *table, TABLE_NAMESPACE, "table-row") {
+            validate_rewritable_row(xml, &spans, row)?;
+        }
     }
 
-    let mut rendered = Vec::with_capacity(sheets.len());
-    for sheet in sheets {
-        rendered.push(codec::write_sheet(sheet)?);
+    let removed_bytes = tables.iter().try_fold(0usize, |total, table| {
+        total
+            .checked_add(spans[*table].end - spans[*table].start)
+            .ok_or_else(|| invalid("flat ODS removed table size overflows usize"))
+    })?;
+    let mut retained_bytes = xml
+        .len()
+        .checked_sub(removed_bytes)
+        .ok_or_else(|| invalid("flat ODS retained table size underflows usize"))?;
+    let expands_empty_spreadsheet = sheets.len() > tables.len() && spans[spreadsheet].empty;
+    let empty_opening = if expands_empty_spreadsheet {
+        let opening = xml
+            .get(spans[spreadsheet].start..spans[spreadsheet].tag_end)
+            .ok_or_else(|| invalid("invalid spreadsheet start span"))?;
+        let opening = opening
+            .trim_end()
+            .strip_suffix("/>")
+            .ok_or_else(|| invalid("empty spreadsheet has no self-closing tag"))?;
+        let expanded_shell_bytes = opening
+            .len()
+            .checked_add(spans[spreadsheet].qname.len())
+            .and_then(|value| value.checked_add(4))
+            .ok_or_else(|| invalid("flat ODS spreadsheet expansion size overflows usize"))?;
+        retained_bytes = retained_bytes
+            .checked_sub(spans[spreadsheet].tag_end - spans[spreadsheet].start)
+            .and_then(|value| value.checked_add(expanded_shell_bytes))
+            .ok_or_else(|| invalid("flat ODS spreadsheet expansion size overflows usize"))?;
+        Some(opening.to_string())
+    } else {
+        None
+    };
+    if retained_bytes > max_output_bytes {
+        return Err(Error::InvalidFormat(format!(
+            "flat ODS output exceeds the {max_output_bytes} byte limit"
+        )));
     }
 
-    let mut edits = Vec::<(usize, usize, String)>::with_capacity(
-        tables.len().max(rendered.len()).saturating_add(1),
-    );
-    for (position, table) in tables.iter().enumerate() {
-        let replacement = rendered.get(position).cloned().unwrap_or_default();
-        edits.push((spans[*table].start, spans[*table].end, replacement));
-    }
-
-    if rendered.len() > tables.len() {
-        let extras = rendered[tables.len()..].join("");
-        if spans[spreadsheet].empty {
-            let opening = xml
-                .get(spans[spreadsheet].start..spans[spreadsheet].tag_end)
-                .ok_or_else(|| invalid("invalid spreadsheet start span"))?;
-            let opening = opening
-                .trim_end()
-                .strip_suffix("/>")
-                .ok_or_else(|| invalid("empty spreadsheet has no self-closing tag"))?;
-            let mut replacement = String::with_capacity(opening.len() + extras.len() + 32);
-            replacement.push_str(opening);
-            replacement.push('>');
-            replacement.push_str(&extras);
-            replacement.push_str("</");
-            replacement.push_str(&spans[spreadsheet].qname);
-            replacement.push('>');
-            edits.push((
-                spans[spreadsheet].start,
-                spans[spreadsheet].tag_end,
+    let mut edits = Vec::<RowEdit>::with_capacity(tables.len().max(sheets.len()).saturating_add(1));
+    let mut rendered_bytes = 0usize;
+    let mut extras = String::new();
+    for (position, sheet) in sheets.iter().enumerate() {
+        let remaining = max_output_bytes
+            .checked_sub(retained_bytes)
+            .and_then(|value| value.checked_sub(rendered_bytes))
+            .ok_or_else(|| invalid("flat ODS worksheet output budget underflows usize"))?;
+        let replacement = codec::write_sheet_bounded(sheet, remaining)?;
+        rendered_bytes = rendered_bytes
+            .checked_add(replacement.len())
+            .ok_or_else(|| invalid("flat ODS rendered table size overflows usize"))?;
+        if let Some(table) = tables.get(position) {
+            edits.push(RowEdit {
+                start: spans[*table].start,
+                end: spans[*table].end,
                 replacement,
-            ));
+            });
+        } else {
+            extras
+                .try_reserve_exact(replacement.len())
+                .map_err(|_error| invalid("flat ODS extra table allocation failed"))?;
+            extras.push_str(&replacement);
+        }
+    }
+    for table in tables.iter().skip(sheets.len()) {
+        edits.push(RowEdit {
+            start: spans[*table].start,
+            end: spans[*table].end,
+            replacement: String::new(),
+        });
+    }
+
+    if !extras.is_empty() {
+        if spans[spreadsheet].empty {
+            let opening = empty_opening
+                .as_deref()
+                .ok_or_else(|| invalid("empty spreadsheet opening is missing"))?;
+            let prefix = format!("{opening}>");
+            let suffix = format!("</{}>", spans[spreadsheet].qname);
+            extras
+                .try_reserve_exact(prefix.len().saturating_add(suffix.len()))
+                .map_err(|_error| invalid("flat ODS spreadsheet expansion allocation failed"))?;
+            extras.insert_str(0, &prefix);
+            extras.push_str(&suffix);
+            edits.push(RowEdit {
+                start: spans[spreadsheet].start,
+                end: spans[spreadsheet].tag_end,
+                replacement: extras,
+            });
         } else {
             let insertion = direct_children_any(&spans, spreadsheet)
                 .into_iter()
@@ -112,14 +172,148 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
                 .map(|child| spans[child].start)
                 .min()
                 .unwrap_or(spans[spreadsheet].close_start);
-            edits.push((insertion, insertion, extras));
+            edits.push(RowEdit {
+                start: insertion,
+                end: insertion,
+                replacement: extras,
+            });
         }
     }
 
-    let updated = apply_edits(xml, edits)?;
+    let updated = apply_edits_bounded(xml, edits, max_output_bytes)?;
     crate::authoring::validate_content_xml(&updated)?;
     codec::parse(&updated)?;
     Ok(updated)
+}
+
+fn validate_rewritable_table_content(xml: &str, spans: &[Span], span_index: usize) -> Result<()> {
+    let table = spans
+        .get(span_index)
+        .ok_or_else(|| invalid("flat ODS table span is invalid"))?;
+    validate_rewritable_table_attributes(xml, spans, span_index)?;
+    if table.empty {
+        return Ok(());
+    }
+    let mut children = direct_children_any(spans, span_index);
+    children.sort_unstable_by_key(|child| spans[*child].start);
+    let mut cursor = table.tag_end;
+    for child in children {
+        validate_ignorable_table_gap(xml, cursor, spans[child].start)?;
+        cursor = spans[child].end;
+    }
+    validate_ignorable_table_gap(xml, cursor, table.close_start)
+}
+
+fn validate_rewritable_table_attributes(
+    xml: &str,
+    spans: &[Span],
+    span_index: usize,
+) -> Result<()> {
+    let table = spans
+        .get(span_index)
+        .ok_or_else(|| invalid("flat ODS table span is invalid"))?;
+    let mut ancestors = Vec::new();
+    let mut parent = table.parent;
+    while let Some(index) = parent {
+        let ancestor = spans
+            .get(index)
+            .ok_or_else(|| invalid("flat ODS table ancestor span is invalid"))?;
+        if ancestor.empty {
+            return Err(invalid("flat ODS table ancestor cannot be empty"));
+        }
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
+    }
+    if ancestors.is_empty() {
+        return Err(invalid("flat ODS table has no document ancestors"));
+    }
+
+    let mut source = String::new();
+    for ancestor in ancestors.iter().rev() {
+        source.push_str(
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid("flat ODS table ancestor opening span is invalid"))?,
+        );
+    }
+    let opening = xml
+        .get(table.start..table.tag_end)
+        .ok_or_else(|| invalid("flat ODS table opening span is invalid"))?;
+    if table.empty {
+        source.push_str(opening);
+    } else {
+        source.push_str(
+            opening
+                .strip_suffix('>')
+                .ok_or_else(|| invalid("flat ODS table opening tag is invalid"))?,
+        );
+        source.push_str("/>");
+    }
+    for ancestor in &ancestors {
+        source.push_str("</");
+        source.push_str(&ancestor.qname);
+        source.push('>');
+    }
+
+    let mut reader = NsReader::from_str(&source);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid flat ODS table XML: {error}"))
+            })?;
+        match event {
+            Event::Empty(element) => {
+                let namespace = resolve_namespace(&namespace)?;
+                let local = decode(element.local_name().as_ref(), "table element local name")?;
+                if is_element_name(namespace.as_deref(), &local, TABLE_NAMESPACE, "table") {
+                    for attribute in element.attributes().with_checks(true) {
+                        let attribute = attribute.map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid flat ODS table attribute: {error}"
+                            ))
+                        })?;
+                        let name = attribute.key.as_ref();
+                        if name == b"xmlns" || name.starts_with(b"xmlns:") {
+                            continue;
+                        }
+                        let (attribute_namespace, attribute_local) =
+                            reader.resolver().resolve_attribute(attribute.key);
+                        let attribute_namespace = resolve_namespace(&attribute_namespace)?;
+                        let attribute_local =
+                            decode(attribute_local.as_ref(), "table attribute local name")?;
+                        if attribute_namespace.as_deref() != Some(TABLE_NAMESPACE)
+                            || !matches!(attribute_local.as_str(), "name" | "style-name")
+                        {
+                            return Err(Error::InvalidFormat(format!(
+                                "flat ODS edit would discard unmodeled table attribute '{attribute_local}'"
+                            )));
+                        }
+                    }
+                    return Ok(());
+                }
+            },
+            Event::Eof => return Err(invalid("flat ODS table opening element is missing")),
+            _ => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn validate_ignorable_table_gap(xml: &str, start: usize, end: usize) -> Result<()> {
+    let gap = xml
+        .get(start..end)
+        .ok_or_else(|| invalid("flat ODS table content span is invalid"))?;
+    if gap
+        .bytes()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))
+    {
+        return Ok(());
+    }
+    Err(invalid(
+        "flat ODS edit would discard unmodeled table-level markup",
+    ))
 }
 
 /// The scanned element layout of one immutable `content.xml` projection.
@@ -456,6 +650,12 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
             || !is_element(child, codec::TEXT_NAMESPACE, "p")
             || paragraph_owner == Some(parent_index)
         {
+            if child.namespace.as_deref() == Some(codec::TEXT_NAMESPACE) && child.local != "p" {
+                return Err(invalid(&format!(
+                    "flat ODS edit would discard unsupported inline content '{}'",
+                    child.qname
+                )));
+            }
             return Err(invalid(
                 "flat ODS edit requires at most one direct text paragraph per cell",
             ));
@@ -855,24 +1055,37 @@ fn direct_children_any(spans: &[Span], parent: usize) -> Vec<usize> {
         .collect()
 }
 
-fn apply_edits(xml: &str, mut edits: Vec<(usize, usize, String)>) -> Result<String> {
-    edits.sort_unstable_by_key(|(start, _, _)| *start);
-    let mut output = String::with_capacity(xml.len());
-    let mut cursor = 0usize;
-    for (start, end, replacement) in edits {
-        if start < cursor || end < start || end > xml.len() {
-            return Err(Error::InvalidFormat(
-                "overlapping or out-of-bounds ODS worksheet edit".to_string(),
-            ));
-        }
-        output.push_str(&xml[cursor..start]);
-        output.push_str(&replacement);
-        cursor = end;
-    }
-    output.push_str(&xml[cursor..]);
-    Ok(output)
-}
-
 fn invalid(message: &str) -> Error {
     Error::InvalidFormat(message.to_string())
+}
+
+#[cfg(test)]
+mod fallback_bound_tests {
+    use super::replace_tables_bounded;
+    use crate::worksheet::{Sheet, codec};
+
+    const EMPTY_CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:spreadsheet/></office:body></office:document-content>"#,
+    );
+
+    #[test]
+    fn cumulative_sheet_budget_rejects_before_combined_publication() {
+        let sheets = [
+            Sheet::new("First").expect("test sheet should be valid"),
+            Sheet::new("Second").expect("test sheet should be valid"),
+        ];
+        let complete = replace_tables_bounded(EMPTY_CONTENT, &sheets, usize::MAX)
+            .expect("small replacement should render");
+        let limit = complete.len() - 1;
+        assert!(codec::write_sheet_bounded(&sheets[0], limit).is_ok());
+        assert!(codec::write_sheet_bounded(&sheets[1], limit).is_ok());
+
+        let error = replace_tables_bounded(EMPTY_CONTENT, &sheets, limit)
+            .expect_err("cumulative output must honor the shared byte budget");
+        assert!(error.to_string().contains("byte limit"));
+    }
 }
