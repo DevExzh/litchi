@@ -30,6 +30,12 @@ struct VersionedSource {
     bytes: Vec<u8>,
     id: u64,
     revision: AtomicU64,
+    read_calls: AtomicU64,
+    read_bytes: AtomicU64,
+    selected_worksheet_offset: AtomicU64,
+    unselected_worksheet_offset: AtomicU64,
+    selected_worksheet_data_reads: AtomicU64,
+    unselected_worksheet_data_reads: AtomicU64,
     rejected_read_offset: AtomicU64,
     rejected_read_count: AtomicU64,
     flip_after_read_offset: AtomicU64,
@@ -101,6 +107,12 @@ impl VersionedSource {
             bytes,
             id: NEXT_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
             revision: AtomicU64::new(0),
+            read_calls: AtomicU64::new(0),
+            read_bytes: AtomicU64::new(0),
+            selected_worksheet_offset: AtomicU64::new(u64::MAX),
+            unselected_worksheet_offset: AtomicU64::new(u64::MAX),
+            selected_worksheet_data_reads: AtomicU64::new(0),
+            unselected_worksheet_data_reads: AtomicU64::new(0),
             rejected_read_offset: AtomicU64::new(u64::MAX),
             rejected_read_count: AtomicU64::new(0),
             flip_after_read_offset: AtomicU64::new(u64::MAX),
@@ -110,16 +122,38 @@ impl VersionedSource {
     fn changed(&self) {
         self.revision.fetch_add(1, Ordering::SeqCst);
     }
-    fn reject_small_read_at(&self, offset: u64) {
+    fn reject_read_at(&self, offset: u64) {
         self.rejected_read_count.store(0, Ordering::SeqCst);
         self.rejected_read_offset.store(offset, Ordering::SeqCst);
     }
-    fn rejected_small_read_count(&self) -> u64 {
+    fn rejected_read_count(&self) -> u64 {
         self.rejected_read_count.load(Ordering::SeqCst)
     }
     fn flip_after_read_at(&self, offset: u64) {
         self.flip_after_read_offset.store(offset, Ordering::SeqCst);
         self.pending_version_flip.store(0, Ordering::SeqCst);
+    }
+    fn set_worksheet_diagnostic_offsets(&self, selected: u64, unselected: u64) {
+        self.selected_worksheet_offset
+            .store(selected, Ordering::SeqCst);
+        self.unselected_worksheet_offset
+            .store(unselected, Ordering::SeqCst);
+    }
+    fn reset_read_diagnostics(&self) {
+        self.read_calls.store(0, Ordering::SeqCst);
+        self.read_bytes.store(0, Ordering::SeqCst);
+        self.selected_worksheet_data_reads
+            .store(0, Ordering::SeqCst);
+        self.unselected_worksheet_data_reads
+            .store(0, Ordering::SeqCst);
+    }
+    fn read_diagnostics(&self) -> (u64, u64, u64, u64) {
+        (
+            self.read_calls.load(Ordering::SeqCst),
+            self.read_bytes.load(Ordering::SeqCst),
+            self.selected_worksheet_data_reads.load(Ordering::SeqCst),
+            self.unselected_worksheet_data_reads.load(Ordering::SeqCst),
+        )
     }
 }
 
@@ -128,6 +162,15 @@ impl ReadAt for VersionedSource {
         Ok(self.bytes.len() as u64)
     }
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.read_calls.fetch_add(1, Ordering::SeqCst);
+        if offset == self.selected_worksheet_offset.load(Ordering::SeqCst) {
+            self.selected_worksheet_data_reads
+                .fetch_add(1, Ordering::SeqCst);
+        }
+        if offset == self.unselected_worksheet_offset.load(Ordering::SeqCst) {
+            self.unselected_worksheet_data_reads
+                .fetch_add(1, Ordering::SeqCst);
+        }
         let flip_offset = self.flip_after_read_offset.load(Ordering::SeqCst);
         if offset == flip_offset
             && self
@@ -140,7 +183,7 @@ impl ReadAt for VersionedSource {
             // must observe the new one.
             self.pending_version_flip.store(3, Ordering::SeqCst);
         }
-        if offset == self.rejected_read_offset.load(Ordering::SeqCst) && output.len() < 64 * 1024 {
+        if offset == self.rejected_read_offset.load(Ordering::SeqCst) {
             self.rejected_read_count.fetch_add(1, Ordering::SeqCst);
             return Err(io::Error::other("selected worksheet payload read rejected"));
         }
@@ -150,6 +193,10 @@ impl ReadAt for VersionedSource {
         }
         let count = output.len().min(self.bytes.len() - offset);
         output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+        self.read_bytes.fetch_add(
+            u64::try_from(count).map_err(|_| io::Error::other("read size"))?,
+            Ordering::SeqCst,
+        );
         Ok(count)
     }
     fn version(&self) -> io::Result<SourceVersion> {
@@ -1172,18 +1219,50 @@ fn exact_noop_publication_does_not_reparse_an_oversized_selected_worksheet() {
         .unwrap();
     assert!(commit.patch().is_empty());
 
-    source.reject_small_read_at(worksheet_data_offset);
+    source.reject_read_at(worksheet_data_offset);
     let uncached_reload = SourceBackedEditor::from_read_at(source.clone()).unwrap();
     assert!(uncached_reload.edit_sheets(["Sheet1".into()]).is_err());
-    let rejected_reads = source.rejected_small_read_count();
+    let rejected_reads = source.rejected_read_count();
     assert!(rejected_reads > 0);
 
     let mut output = Vec::new();
     editor
         .publish_multi_commit_to_stream(&mut output, &commit)
         .unwrap();
-    assert_eq!(source.rejected_small_read_count(), rejected_reads);
+    assert_eq!(source.rejected_read_count(), rejected_reads);
     assert_eq!(output, bytes);
+}
+
+#[test]
+fn changed_publication_reuses_selected_semantics_without_extra_source_reads() {
+    let bytes = oversized_multi_sheet_source();
+    let selected_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
+    let unselected_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet2.xml");
+    let source = Arc::new(VersionedSource::new(bytes));
+    source.set_worksheet_diagnostic_offsets(selected_offset, unselected_offset);
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    assert_eq!(editor.cache_diagnostics().successful_loads, 0);
+
+    let edit = editor
+        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 2u32)])
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    let loaded = editor.cache_diagnostics();
+    assert_eq!(loaded.successful_loads, 2);
+    assert_eq!(loaded.cold_loads, 2);
+
+    source.reset_read_diagnostics();
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let (raw_read_calls, raw_read_bytes, selected_data_reads, _unselected_data_reads) =
+        source.read_diagnostics();
+    assert!(raw_read_calls > 0);
+    assert!(raw_read_bytes > 0);
+    assert_eq!(selected_data_reads, 1);
+    assert!(!output.is_empty());
 }
 
 #[test]
@@ -1391,7 +1470,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
     let exact = workbook_bytes + worksheet_bytes;
     let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
     let source = Arc::new(VersionedSource::new(bytes));
-    source.reject_small_read_at(worksheet_data_offset);
+    source.reject_read_at(worksheet_data_offset);
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         source.clone(),
@@ -1407,7 +1486,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
             ExecutionError::ResourceLimit(_)
         )))
     ));
-    assert_eq!(source.rejected_small_read_count(), 0);
+    assert_eq!(source.rejected_read_count(), 0);
     assert_eq!(editor.cache_diagnostics().successful_loads, 1);
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
