@@ -1203,6 +1203,70 @@ impl Document {
         }
     }
 
+    /// Get one paragraph by zero-based position.
+    ///
+    /// DOCX and ODT use their owner-provided selected-paragraph primitives so
+    /// source-backed documents remain bounded and preserve freshness checks.
+    /// Legacy DOC and RTF use the existing full paragraph projection because
+    /// their owners do not expose a selected-paragraph API. Pages and other
+    /// variants return an explicit unsupported-operation error.
+    pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
+        match &self.inner {
+            #[cfg(feature = "doc")]
+            DocumentImpl::Doc(doc, _) => Ok(doc
+                .paragraphs()
+                .map_err(Error::from)?
+                .into_iter()
+                .nth(index)
+                .map(Paragraph::Doc)),
+            #[cfg(feature = "docx")]
+            DocumentImpl::Docx(package, _) => {
+                let paragraph = package
+                    .document()
+                    .and_then(|document| document.paragraph(index))
+                    .map_err(crate::map_ooxml_error)?;
+                Ok(paragraph.map(Paragraph::Docx))
+            },
+            #[cfg(feature = "docx")]
+            DocumentImpl::DocxSource(package, _) => {
+                let result = package
+                    .document()
+                    .and_then(|document| document.paragraph(index))
+                    .map(|paragraph| paragraph.map(Paragraph::Docx))
+                    .map_err(Self::map_source_docx_error);
+                Self::finish_source_docx_result(package, result)
+            },
+            #[cfg(feature = "rtf")]
+            DocumentImpl::Rtf(_) => self
+                .paragraphs()
+                .map(|paragraphs| paragraphs.into_iter().nth(index)),
+            #[cfg(feature = "odt")]
+            DocumentImpl::Odt(doc) => {
+                let paragraph = doc.paragraph(index).map_err(|error| {
+                    Error::ParseError(format!("Failed to get paragraph: {error}"))
+                })?;
+                Ok(paragraph.map(Paragraph::Odt))
+            },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = doc
+                    .paragraph(index)
+                    .map(|paragraph| paragraph.map(Paragraph::Odt))
+                    .map_err(|error| {
+                        Error::ParseError(format!("Failed to get paragraph: {error}"))
+                    });
+                Self::finish_source_odt_result(doc, result)
+            },
+            #[allow(
+                unreachable_patterns,
+                reason = "match arms are feature-gated; fallback is unreachable when every format feature is enabled"
+            )]
+            _ => Err(Error::Unsupported(
+                "selected paragraphs are not supported for this document format".to_owned(),
+            )),
+        }
+    }
+
     /// Get an iterator over paragraphs in the document.
     ///
     /// For Pages, this follows semantic section order and projects headings,
@@ -1874,6 +1938,18 @@ mod tests {
         text
     }
 
+    fn paragraph_signature(paragraph: &Paragraph) -> (String, Vec<String>) {
+        (
+            paragraph.text().expect("paragraph text"),
+            paragraph
+                .runs()
+                .expect("paragraph runs")
+                .into_iter()
+                .map(|run| run.text().expect("run text"))
+                .collect(),
+        )
+    }
+
     #[test]
     #[cfg(feature = "docx")]
     fn test_document_open_docx() {
@@ -1899,6 +1975,31 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "doc")]
+    fn paragraph_matches_doc_projection_and_bounds() {
+        let document = Document::open(test_data_path().join("ole/doc/FancyFoot.doc"))
+            .expect("open DOC fixture");
+        let paragraphs = document.paragraphs().expect("project DOC paragraphs");
+        assert!(!paragraphs.is_empty());
+        for index in [0, paragraphs.len() - 1] {
+            let selected = document
+                .paragraph(index)
+                .expect("select DOC paragraph")
+                .expect("DOC paragraph exists");
+            assert_eq!(
+                paragraph_signature(&selected),
+                paragraph_signature(&paragraphs[index])
+            );
+        }
+        assert!(
+            document
+                .paragraph(paragraphs.len())
+                .expect("select out-of-range DOC paragraph")
+                .is_none()
+        );
+    }
+
+    #[test]
     #[cfg(feature = "rtf")]
     fn paragraph_text_matches_rtf_projection_and_bounds() {
         let document =
@@ -1912,6 +2013,31 @@ mod tests {
             );
         }
         assert_eq!(document.paragraph_text(paragraphs.len()).unwrap(), None);
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn paragraph_matches_rtf_projection_and_bounds() {
+        let document =
+            Document::open(test_data_path().join("rtf/testUnicode.rtf")).expect("open RTF fixture");
+        let paragraphs = document.paragraphs().expect("project RTF paragraphs");
+        assert!(!paragraphs.is_empty());
+        for index in [0, paragraphs.len() - 1] {
+            let selected = document
+                .paragraph(index)
+                .expect("select RTF paragraph")
+                .expect("RTF paragraph exists");
+            assert_eq!(
+                paragraph_signature(&selected),
+                paragraph_signature(&paragraphs[index])
+            );
+        }
+        assert!(
+            document
+                .paragraph(paragraphs.len())
+                .expect("select out-of-range RTF paragraph")
+                .is_none()
+        );
     }
 
     #[test]
@@ -2196,6 +2322,61 @@ mod tests {
 
     #[test]
     #[cfg(feature = "docx")]
+    fn paragraph_matches_bulk_text_and_runs_for_eager_and_source() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>middle </w:t></w:r><w:r><w:t>value</w:t></w:r></w:p><w:p><w:r><w:t>last</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let source = Document::from_bytes(bytes.clone()).expect("open source-backed DOCX");
+        let eager_package = crate::opc::OpcPackage::from_bytes_with_limits(
+            &bytes,
+            crate::opc::ReadLimits::default(),
+        )
+        .expect("open eager OPC oracle");
+        let eager = Document::from_detected(DetectedFormat::Docx(eager_package))
+            .expect("open eager DOCX oracle");
+        let source_bulk = source.paragraphs().expect("source paragraphs");
+        let eager_bulk = eager.paragraphs().expect("eager paragraphs");
+        assert_eq!(source_bulk.len(), 3);
+        assert_eq!(eager_bulk.len(), 3);
+
+        for index in [0, 1] {
+            let source_selected = source
+                .paragraph(index)
+                .expect("source selected paragraph")
+                .expect("source paragraph exists");
+            let eager_selected = eager
+                .paragraph(index)
+                .expect("eager selected paragraph")
+                .expect("eager paragraph exists");
+            assert_eq!(
+                paragraph_signature(&source_selected),
+                paragraph_signature(&source_bulk[index])
+            );
+            assert_eq!(
+                paragraph_signature(&eager_selected),
+                paragraph_signature(&eager_bulk[index])
+            );
+            assert_eq!(
+                paragraph_signature(&source_selected),
+                paragraph_signature(&eager_selected)
+            );
+        }
+        assert!(
+            source
+                .paragraph(usize::MAX)
+                .expect("source out-of-range paragraph")
+                .is_none()
+        );
+        assert!(
+            eager
+                .paragraph(usize::MAX)
+                .expect("eager out-of-range paragraph")
+                .is_none()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "docx")]
     fn managed_docx_facade_paragraph_text_avoids_rich_paragraph_refusal() {
         let bytes = minimal_docx(
             br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>managed</w:t></w:r></w:p><w:p><w:r><w:t>selected</w:t></w:r></w:p></w:body></w:document>"#,
@@ -2233,6 +2414,10 @@ mod tests {
         assert!(matches!(
             document.paragraphs(),
             Err(Error::InvalidFormat(message)) if message.contains("document paragraphs")
+        ));
+        assert!(matches!(
+            document.paragraph(1),
+            Err(Error::InvalidFormat(message)) if message.contains("document paragraph")
         ));
         drop(document);
         assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
@@ -2275,6 +2460,12 @@ mod tests {
             document
                 .paragraph_text(0)
                 .expect_err("paragraph text must reject stale source"),
+            expected,
+        );
+        assert_source_changed(
+            document
+                .paragraph(0)
+                .expect_err("paragraph must reject stale source"),
             expected,
         );
     }
@@ -2662,6 +2853,91 @@ mod tests {
         assert_eq!(source_metadata.has_data(), eager_metadata.has_data());
         assert_eq!(source_metadata.title, eager_metadata.title);
         assert_eq!(source_metadata.author, eager_metadata.author);
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_paragraph_matches_eager_source_and_bulk_projection() {
+        let path = test_data_path().join("odf/odt/table-cell-column-span.odt");
+        let bytes = std::fs::read(&path).expect("read ODT fixture");
+        let source = Document::open(&path).expect("open source-backed ODT");
+        let eager = Document::from_bytes(bytes).expect("open eager ODT");
+        let source_bulk = source.paragraphs().expect("source paragraphs");
+        let eager_bulk = eager.paragraphs().expect("eager paragraphs");
+        assert!(!source_bulk.is_empty());
+        assert_eq!(source_bulk.len(), eager_bulk.len());
+
+        let mut indexes = vec![0, source_bulk.len() / 2, source_bulk.len() - 1];
+        indexes.sort_unstable();
+        indexes.dedup();
+        for index in indexes {
+            let source_selected = source
+                .paragraph(index)
+                .expect("select source-backed ODT paragraph")
+                .expect("source-backed ODT paragraph exists");
+            let eager_selected = eager
+                .paragraph(index)
+                .expect("select eager ODT paragraph")
+                .expect("eager ODT paragraph exists");
+            assert_eq!(
+                paragraph_signature(&source_selected),
+                paragraph_signature(&source_bulk[index])
+            );
+            assert_eq!(
+                paragraph_signature(&eager_selected),
+                paragraph_signature(&eager_bulk[index])
+            );
+            assert_eq!(
+                paragraph_signature(&source_selected),
+                paragraph_signature(&eager_selected)
+            );
+        }
+        assert!(
+            source
+                .paragraph(source_bulk.len())
+                .expect("select out-of-range source-backed ODT paragraph")
+                .is_none()
+        );
+        assert!(
+            eager
+                .paragraph(eager_bulk.len())
+                .expect("select out-of-range eager ODT paragraph")
+                .is_none()
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_paragraph_reports_source_mutation() {
+        let fixture = test_data_path().join("odf/odt/table-cell-column-span.odt");
+        let temporary = tempfile::NamedTempFile::new().expect("temporary ODT path");
+        std::fs::copy(&fixture, temporary.path()).expect("copy ODT fixture");
+        let document = Document::open(temporary.path()).expect("open source-backed ODT");
+        let expected = match &document.inner {
+            DocumentImpl::OdtSource(source) => source.source_version().expect("source version"),
+            _ => unreachable!("filesystem ODT must retain source owner"),
+        };
+        assert!(
+            document
+                .paragraph(0)
+                .expect("initial source-backed ODT paragraph")
+                .is_some()
+        );
+
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen ODT source");
+        file.write_all(b"source mutation")
+            .expect("mutate ODT source");
+
+        assert_source_changed(
+            document
+                .paragraph(0)
+                .expect_err("paragraph must reject stale ODT source"),
+            expected,
+        );
     }
 
     #[test]
