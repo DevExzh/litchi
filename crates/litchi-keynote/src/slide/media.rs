@@ -294,6 +294,17 @@ pub mod playback {
         Duration::try_from_secs_f32(seconds as f32)
             .map_err(|_error| Error::TimeOutOfRange { field })
     }
+
+    /// Package transaction types for an existing file-backed movie's scalar
+    /// playback settings.  The transaction itself remains implemented by the
+    /// package adapter; this nested namespace keeps the semantic media value
+    /// and its operation vocabulary together without exposing native records.
+    pub mod transaction {
+        pub use crate::{
+            SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
+            SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
+        };
+    }
 }
 
 pub use playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};

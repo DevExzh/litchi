@@ -40,6 +40,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_movie_playback"
+path = "fuzz_targets/keynote_movie_playback.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_chart_title"
 path = "fuzz_targets/keynote_chart_title.rs"
 test = false

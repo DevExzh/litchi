@@ -11,7 +11,6 @@ use crate::data_reference_registry::{
 };
 use crate::media::MediaAssetId;
 use crate::media_playback::media_playback_settings;
-use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
     geometry_from_drawable, restore_drawable_original_size,
@@ -361,48 +360,6 @@ impl KeynoteEditor {
         if verified.slide_movie_properties(slide_index, drawable_object_id)? != properties {
             return Err(Error::InvalidFormat(
                 "Keynote movie properties update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
-    /// Read trim, poster, repeat, and volume settings for one ordinary slide movie.
-    pub fn slide_movie_playback_settings(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<MediaPlaybackSettings> {
-        self.require_file_movie(slide_index, drawable_object_id)?
-            .info
-            .playback
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote movie {drawable_object_id} has no playback settings"
-                ))
-            })
-    }
-
-    /// Update playback settings while retaining unrelated and unknown movie fields.
-    pub fn set_slide_movie_playback_settings(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        settings: MediaPlaybackSettings,
-    ) -> Result<()> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        let mut staged = self.package().clone();
-        let expected = replace_movie_playback_settings(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            "Keynote movie",
-            settings,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_movie_playback_settings(slide_index, drawable_object_id)? != expected {
-            return Err(Error::InvalidFormat(
-                "Keynote movie playback update failed validation".to_owned(),
             ));
         }
         *self = verified;
@@ -1001,9 +958,12 @@ mod tests {
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::DrawablePoint;
     use litchi_core::Position;
-    use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
-    use litchi_keynote::MovieSelector;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+    use litchi_keynote::slide::media::{
+        MediaLoopMode as KeynoteMediaLoopMode, MediaPlaybackSettings as KeynotePlaybackSettings,
+        MediaVolume as KeynoteMediaVolume,
+    };
+    use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
     use std::time::Duration;
 
     const MOVIE: &[u8] = b"\0\0\0\x18ftypqt  source-built-movie";
@@ -1075,24 +1035,58 @@ mod tests {
             std::slice::from_ref(&created)
         );
 
-        let initial_playback = created.playback.unwrap();
-        let changed_playback = MediaPlaybackSettings {
-            loop_mode: Some(MediaLoopMode::BackAndForth),
-            volume: Some(MediaVolume::new(0.75).unwrap()),
+        let initial_playback = KeynotePackage::from_bytes(&editor.to_bytes().unwrap())
+            .unwrap()
+            .slide_movie_playback_settings(
+                SlideSelector::position(Position::new(0)),
+                MovieSelector::index(0),
+            )
+            .unwrap()
+            .unwrap();
+        let changed_playback = KeynotePlaybackSettings {
+            loop_mode: Some(KeynoteMediaLoopMode::BackAndForth),
+            volume: Some(KeynoteMediaVolume::new(0.75).unwrap()),
             ..initial_playback
         };
-        editor
-            .set_slide_movie_playback_settings(0, created.drawable_object_id, changed_playback)
+        let package = KeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let commit = package
+            .edit_slide_movie_playback_settings(
+                SlideSelector::position(Position::new(0)),
+                MovieSelector::index(0),
+            )
+            .unwrap()
+            .set(changed_playback)
+            .unwrap()
+            .commit()
             .unwrap();
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).unwrap();
+        editor = KeynoteEditor::from_bytes(&bytes).unwrap();
         assert_eq!(
-            editor
-                .slide_movie_playback_settings(0, created.drawable_object_id)
+            KeynotePackage::from_bytes(&editor.to_bytes().unwrap())
+                .unwrap()
+                .slide_movie_playback_settings(
+                    SlideSelector::position(Position::new(0)),
+                    MovieSelector::index(0),
+                )
+                .unwrap()
                 .unwrap(),
             changed_playback
         );
-        editor
-            .set_slide_movie_playback_settings(0, created.drawable_object_id, initial_playback)
+        let package = KeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let commit = package
+            .edit_slide_movie_playback_settings(
+                SlideSelector::position(Position::new(0)),
+                MovieSelector::index(0),
+            )
+            .unwrap()
+            .set(initial_playback)
+            .unwrap()
+            .commit()
             .unwrap();
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).unwrap();
+        editor = KeynoteEditor::from_bytes(&bytes).unwrap();
 
         let changed_properties = properties("Accessible Keynote movie");
         editor

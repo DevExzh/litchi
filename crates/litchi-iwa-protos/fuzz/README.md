@@ -178,6 +178,25 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
 
+## Keynote movie-playback codec
+
+`movie_playback_codec` drives the hidden `movie_playback_codec` projection for
+one bounded `TSD.MovieArchive` playback payload. Valid sources are decoded by
+the scalar and reported paths, then passed through a prepared rewrite with
+exact output/field/work/depth/allocation/retained/scratch limits and strict
+candidate readback. The harness keeps the source caller-owned and exercises
+unknown overlong scalars, balanced unknown groups, duplicate/wrong-wire
+known fields, truncation, and max-minus-one execution ceilings. The recipes
+under `corpus/movie_playback_codec/` are hand-authored protobuf wire cases,
+not native Keynote package members.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check movie_playback_codec
+```
+
 ## Format-neutral table-appearance codec
 
 `table_appearance` drives the generated-free `table_appearance_codec` facade

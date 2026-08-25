@@ -135,6 +135,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "movie_playback_codec"
+path = "fuzz_targets/movie_playback_codec.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

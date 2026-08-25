@@ -306,6 +306,43 @@ mod buffa_keynote_movie_caption_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the selected scalar playback fields
+/// of one TSD MovieArchive. The complete media graph remains source-owned.
+#[doc(hidden)]
+mod buffa_movie_playback_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa 0.9.1 generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-movie-playback/iwa_movie_playback_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Keynote chart-title
 /// generated extension fields.
 ///
@@ -1171,6 +1208,12 @@ pub mod keynote_chart_caption_codec;
 /// preservation authority.
 #[doc(hidden)]
 pub mod keynote_movie_caption_codec;
+
+/// Internal strict raw-preserving MovieArchive playback-settings codec.
+/// Generated Buffa values remain private and the source payload is the
+/// preservation authority.
+#[doc(hidden)]
+pub mod movie_playback_codec;
 
 /// Format-neutral strict chart-caption edge projection and wire rewrite.
 ///

@@ -1043,6 +1043,205 @@ IWA_KEYNOTE_MOVIE_TITLE_CODEC_CALL = re.compile(
     r"(?:keynote_movie_title_codec|movie_title_codec)[ \t\r\n]*::[ \t\r\n]*"
     r"(?:decode|rewrite|validate)[A-Za-z0-9_]*\b"
 )
+# Wave82 moves the scalar playback edge of a file-backed Keynote movie into
+# the package crate.  This is intentionally separate from the title/caption
+# graph ratchets above: playback changes only selected MovieArchive scalar
+# fields and must not acquire graph/Metadata ownership by implication.
+KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
+KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_movie_playback.rs"
+)
+KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES = frozenset(
+    {
+        "SlideMoviePlaybackCommit",
+        "SlideMoviePlaybackDiagnostics",
+        "SlideMoviePlaybackEdit",
+        "SlideMoviePlaybackError",
+        "SlideMoviePlaybackLimitKind",
+        "SlideMoviePlaybackPatch",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_TYPES = frozenset(
+    {"MediaLoopMode", "MediaPlaybackSettings", "MediaVolume", "TimeField"}
+)
+KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES = frozenset({"MovieSelector", "SlideSelector"})
+KEYNOTE_MOVIE_PLAYBACK_PACKAGE_METHODS = frozenset(
+    {
+        "slide_movie_playback_settings",
+        "edit_slide_movie_playback_settings",
+        "apply_slide_movie_playback_settings",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_EDIT_METHODS = frozenset({"set", "commit"})
+KEYNOTE_MOVIE_PLAYBACK_FLAT_ALIASES = frozenset(
+    {
+        "Playback",
+        "PlaybackSettings",
+        "MoviePlayback",
+        "MoviePlaybackSettings",
+        "MoviePlaybackSnapshot",
+        "MoviePlaybackWrite",
+        "MoviePlaybackEdit",
+        "MoviePlaybackPatch",
+        "MoviePlaybackCommit",
+        "MoviePlaybackDiagnostics",
+        "MoviePlaybackError",
+        "MoviePlaybackLimitKind",
+        "PlaybackSettingsEdit",
+        "PlaybackSettingsPatch",
+        "PlaybackSettingsCommit",
+        "PlaybackSettingsDiagnostics",
+        "PlaybackSettingsError",
+        "PlaybackSettingsLimitKind",
+        "PlaybackEdit",
+        "PlaybackPatch",
+        "PlaybackCommit",
+        "PlaybackDiagnostics",
+        "PlaybackError",
+        "PlaybackLimitKind",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "MoviePlaybackSnapshot",
+        "MoviePlaybackWrite",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsp", "tsd", "litchi_iwa_protos"}
+)
+KEYNOTE_MOVIE_PLAYBACK_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|playback|storage|reference|native|"
+    r"archive|message|component|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_MOVIE_PLAYBACK_TRANSACTION_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]+)?mod[ \t]+(?:r#)?transaction\b"
+)
+KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/movie_playback_codec.rs"
+)
+KEYNOTE_MOVIE_PLAYBACK_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_MOVIE_PLAYBACK_CODEC_MODULE = "movie_playback_codec"
+KEYNOTE_MOVIE_PLAYBACK_CODEC_FUNCTIONS = frozenset(
+    {
+        "decode_movie_playback_with_report",
+        "prepare_movie_playback_rewrite",
+        "rewrite_movie_playback",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_CODEC_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "MoviePlaybackSnapshot",
+        "MoviePlaybackWrite",
+        "PreparedMoviePlaybackRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+    }
+)
+KEYNOTE_MOVIE_PLAYBACK_CODEC_MARKER_GROUPS = {
+    "private Buffa/lazy ingress": (
+        "buffa",
+        "Buffa",
+        "lazy",
+        "Lazy",
+        "visit_with",
+        "sidecar",
+    ),
+    "unknown/raw preservation": (
+        "unknown",
+        "Unknown",
+        "overlong",
+        "balanced",
+        "raw_fields",
+    ),
+    "resource/preflight accounting": (
+        "max_input",
+        "max_output",
+        "max_fields",
+        "max_work",
+        "max_depth",
+        "max_references",
+        "try_reserve",
+        "RewriteExecutionRequirements",
+    ),
+}
+KEYNOTE_MOVIE_PLAYBACK_FUZZ_SOURCES = (
+    Path("crates/litchi-iwa-protos/fuzz/fuzz_targets/movie_playback_codec.rs"),
+    Path("crates/litchi/fuzz/fuzz_targets/keynote_movie_playback.rs"),
+)
+KEYNOTE_MOVIE_PLAYBACK_FUZZ_CORPORA = (
+    Path("crates/litchi-iwa-protos/fuzz/corpus/movie_playback_codec"),
+    Path("crates/litchi/fuzz/corpus/keynote_movie_playback"),
+)
+KEYNOTE_MOVIE_PLAYBACK_PACKAGE_MARKER_GROUPS = {
+    "aggregate transaction budget": ("TransactionBudget", "transaction_budget", "budget"),
+    "preflight/candidate": ("preflight", "candidate", "reopen", "locality"),
+    "exact inverse/artifacts": ("ExactArtifacts", "inverse", "PatchConflict", "same_content"),
+    "codec report accounting": ("codec_report", "charge_codec", "wire", "fields", "work"),
+    "physical archive accounting": ("archive", "snappy", "Snappy", "zip", "ZIP", "output"),
+}
+IWA_KEYNOTE_MOVIE_PLAYBACK_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_movies.rs"
+)
+IWA_KEYNOTE_MOVIE_PLAYBACK_TYPED_METHODS = frozenset(
+    {
+        "slide_movie_playback_settings_by_selector",
+        "set_slide_movie_playback_settings_by_selector",
+    }
+)
+IWA_KEYNOTE_MOVIE_PLAYBACK_LEGACY_METHODS = frozenset(
+    {"slide_movie_playback_settings", "set_slide_movie_playback_settings"}
+)
+IWA_KEYNOTE_MOVIE_PLAYBACK_RAW_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_movie_playback_settings|"
+    r"set_slide_movie_playback_settings)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_MOVIE_PLAYBACK_IDENTIFIER_POSITION_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:movie_position_for_identifier|movie_position_from_identifier|"
+    r"movie_index_for_identifier|movie_index_from_identifier|"
+    r"movie_position_from_object|movie_index_from_object)(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_MOVIE_PLAYBACK_EXAMPLES = (
+    Path("crates/litchi-iwa/examples/create_keynote_movie.rs"),
+)
+
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -20163,6 +20362,353 @@ def audit_keynote_movie_caption_lifecycle_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_movie_playback_owner_present(root: Path) -> bool:
+    """Return whether the playback owner has crossed the activation seam."""
+
+    owner_path = root / KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+    codec_path = root / KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE
+    package_path = root / KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and codec_path.is_file()
+        and re.search(r"(?m)^mod[ \t]+slide_movie_playback\s*;", package_source)
+        is not None
+    )
+
+
+def audit_keynote_movie_playback_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free movie-playback boundary.
+
+    The audit is intentionally dormant until the private owner, neutral codec,
+    and package wiring exist together.  This avoids turning the still-live
+    KeynoteEditor compatibility surface into a false migration failure while
+    the owner is being assembled.
+    """
+
+    if not _keynote_movie_playback_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE
+    package_path = root / KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[1]
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    semantic = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+    owner_code = _mask_rust_non_code(owner)
+    semantic_code = _mask_rust_non_code(semantic)
+    package_code = _mask_rust_non_code(package)
+    library_code = _mask_rust_non_code(library)
+    package_library_code = _mask_rust_non_code(package + library)
+
+    if re.search(r"(?m)^pub[ \t]+mod[ \t]+slide_movie_playback\b", package_library_code):
+        violations.append(
+            "focused litchi-keynote movie-playback owner module must remain private: "
+            f"{KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]}"
+        )
+    if re.search(r"(?m)^mod[ \t]+slide_movie_playback\s*;", package_code) is None:
+        violations.append(
+            "focused litchi-keynote movie-playback owner module is missing: "
+            f"{KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES):
+        for source, path in ((owner, owner_path), (package, package_path), (library, lib_path)):
+            if name not in _rust_canonical_exports(source, KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES):
+                violations.append(
+                    "focused litchi-keynote movie-playback public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+    for name in sorted(KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_TYPES):
+        if name not in _rust_canonical_exports(semantic, KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_TYPES):
+            violations.append(
+                "focused litchi-keynote movie-playback semantic API is missing "
+                f"{name}: {KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE}"
+            )
+    if not KEYNOTE_MOVIE_PLAYBACK_TRANSACTION_MODULE.search(semantic_code + owner_code):
+        violations.append(
+            "focused litchi-keynote movie-playback semantic API is missing public transaction module: "
+            f"{KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE}"
+        )
+    for name in sorted(KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES):
+        if name not in _rust_canonical_exports(semantic + library, KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES):
+            violations.append(
+                "focused litchi-keynote movie-playback public API is missing selector "
+                f"{name}: {KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[1]}"
+            )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    }
+    for name in sorted(KEYNOTE_MOVIE_PLAYBACK_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote movie-playback Package method is missing "
+                f"{name}: {KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_movie_playback_settings":
+            for selector in ("SlideSelector", "MovieSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote movie-playback Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE}"
+                    )
+
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?SlideMoviePlaybackEdit\b",
+        owner_code,
+    )
+    edit_body = owner_code if edit_impl is None else owner_code[edit_impl.end() :]
+    for name in sorted(KEYNOTE_MOVIE_PLAYBACK_EDIT_METHODS):
+        if not re.search(rf"\bpub[ \t]+fn[ \t]+{re.escape(name)}\b", edit_body):
+            violations.append(
+                "focused litchi-keynote movie-playback edit is missing "
+                f"{name}: {KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE}"
+            )
+
+    facade_names = (
+        KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES
+        | KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_TYPES
+        | KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES
+        | KEYNOTE_MOVIE_PLAYBACK_PACKAGE_METHODS
+        | KEYNOTE_MOVIE_PLAYBACK_FLAT_ALIASES
+        | {"SlideMoviePlaybackEdit"}
+    )
+    for source, source_path in (
+        (owner, owner_path),
+        (semantic, semantic_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = source_path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_MOVIE_PLAYBACK_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_MOVIE_PLAYBACK_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_MOVIE_PLAYBACK_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote movie-playback public API exposes "
+                        f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_MOVIE_PLAYBACK_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote movie-playback public API retains flat alias "
+                        f"{identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote movie-playback public API exposes raw byte slice "
+                    f"{byte_slice}: {source_path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MOVIE_PLAYBACK_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote movie-playback public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {source_path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote movie-playback public API retains a glob re-export: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+
+    codec_path = root / KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE
+    codec = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+    codec_code = _mask_rust_non_code(codec)
+    for function in sorted(KEYNOTE_MOVIE_PLAYBACK_CODEC_FUNCTIONS):
+        if re.search(rf"\b(?:pub[ \t]+)?fn[ \t]+{re.escape(function)}\b", codec_code) is None:
+            violations.append(
+                "focused litchi-keynote movie-playback hidden codec is missing strict API "
+                f"{function}: {KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE}"
+            )
+    for type_name in sorted(KEYNOTE_MOVIE_PLAYBACK_CODEC_TYPES):
+        if re.search(
+            rf"\b(?:pub[ \t]+)?(?:struct|enum|type)[ \t]+{re.escape(type_name)}\b",
+            codec_code,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote movie-playback hidden codec is missing strict type "
+                f"{type_name}: {KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_MOVIE_PLAYBACK_CODEC_MARKER_GROUPS.items():
+        if not any(marker in codec for marker in markers):
+            violations.append(
+                "focused litchi-keynote movie-playback hidden codec is missing "
+                f"{label} marker: {KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE}"
+            )
+    codec_lib = (
+        _mask_rust_cfg_test_items(
+            (root / KEYNOTE_MOVIE_PLAYBACK_CODEC_PUBLIC_SOURCE).read_text(encoding="utf-8")
+        )
+        if (root / KEYNOTE_MOVIE_PLAYBACK_CODEC_PUBLIC_SOURCE).is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(KEYNOTE_MOVIE_PLAYBACK_CODEC_MODULE)}\b",
+        codec_lib,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote movie-playback public API is missing hidden codec module "
+            f"{KEYNOTE_MOVIE_PLAYBACK_CODEC_MODULE}: {KEYNOTE_MOVIE_PLAYBACK_CODEC_PUBLIC_SOURCE}"
+        )
+
+    for fuzz_path in KEYNOTE_MOVIE_PLAYBACK_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote movie-playback boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-keynote movie-playback fuzz target is missing fuzz_target! harness: "
+                f"{fuzz_path}"
+            )
+    for corpus in KEYNOTE_MOVIE_PLAYBACK_FUZZ_CORPORA:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-keynote movie-playback boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_movie_playback_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require aggregate resource/prepublication markers for playback edits."""
+
+    if not _keynote_movie_playback_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    for label, markers in KEYNOTE_MOVIE_PLAYBACK_PACKAGE_MARKER_GROUPS.items():
+        if not any(marker in owner for marker in markers):
+            violations.append(
+                "focused litchi-keynote movie-playback owner is missing "
+                f"{label} marker: {KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE}"
+            )
+    if "movie_playback_codec" not in owner:
+        violations.append(
+            "focused litchi-keynote movie-playback owner must route through hidden movie_playback_codec: "
+            f"{KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[str]:
+    """Retire KeynoteEditor movie playback methods after package activation.
+
+    Pages/Numbers/audio users of the shared ``media_playback`` helper are
+    deliberately outside this source-root scan.  The migration surface is
+    Keynote-only and callers should use ``litchi_keynote::Package`` directly;
+    no replacement public KeynoteEditor bridge is accepted.
+    """
+
+    if not _keynote_movie_playback_owner_present(root):
+        return []
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    violations: list[str] = []
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for match in declaration.finditer(source):
+            name = match.group(1)
+            if name in IWA_KEYNOTE_MOVIE_PLAYBACK_LEGACY_METHODS or (
+                "movie_playback_settings" in name and name.endswith("_by_selector")
+            ):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote movie-playback public method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+        for match in IWA_KEYNOTE_MOVIE_PLAYBACK_IDENTIFIER_POSITION_FALLBACK.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote movie-playback identifier-to-position fallback "
+                f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_MOVIE_PLAYBACK_RAW_ID_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            line_end = len(source) if line_end < 0 else line_end
+            line = source[line_start:line_end]
+            if re.search(rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line):
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote movie-playback call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+
+    for example_path in IWA_KEYNOTE_MOVIE_PLAYBACK_EXAMPLES:
+        path = root / example_path
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for match in IWA_KEYNOTE_MOVIE_PLAYBACK_RAW_ID_CALL.finditer(source):
+            line = source[source.rfind("\n", 0, match.start()) + 1 : source.find("\n", match.end())]
+            if "package." in line or "Package::" in line:
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote movie-playback example call "
+                f"{match.group('method')}: {example_path}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -22908,6 +23454,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_movie_caption_source_topology()
         + audit_keynote_movie_caption_facade_source_topology()
         + audit_keynote_movie_caption_lifecycle_source_topology()
+        + audit_iwa_keynote_movie_playback_source_topology()
+        + audit_keynote_movie_playback_facade_source_topology()
+        + audit_keynote_movie_playback_resource_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

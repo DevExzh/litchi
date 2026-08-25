@@ -13,6 +13,7 @@ mod slide_chart_caption;
 mod slide_chart_title;
 pub(crate) mod slide_delete;
 mod slide_movie_caption;
+mod slide_movie_playback;
 mod slide_movie_title;
 mod slide_notes;
 mod slide_order;
@@ -84,6 +85,10 @@ pub use slide_chart_title::{
 pub use slide_movie_caption::{
     SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
     SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
+};
+pub use slide_movie_playback::{
+    SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
+    SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
 };
 pub use slide_movie_title::{
     SlideMovieTitleCommit, SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,

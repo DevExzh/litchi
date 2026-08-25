@@ -205,6 +205,23 @@ semantic profile. Popup commands consume a fixed prefix and construct at most
 three validated menu items of 4 KiB each; keep `-max_len` at 1 KiB so malformed
 ingress and native create/reuse/reset transactions both receive every input.
 
+`keynote_movie_playback` is the focused selector-first movie-playback target.
+It offers arbitrary bytes to bounded Keynote ingress and reuses the same
+input as bounded `SlideSelector`/`MovieSelector` commands. When the source
+contains an existing file-backed movie, it covers exact no-op and playback
+replacement, optional-field clearing through a complete semantic value,
+candidate readback, exact patch application/conflict, inverse restoration,
+and source atomicity. Movie creation/removal, media replacement, geometry,
+and other graph operations remain outside this target. The checked-in seeds
+under `corpus/keynote_movie_playback/` are command recipes, not native
+Keynote packages.
+
+The target uses the finite Keynote physical profile above; keep `-max_len` at
+1 KiB so malformed ingress and the fixed movie transaction both receive every
+input. The tracked `basic.key` seed is embedded only as a valid package
+fallback; a file-backed movie-bearing seed can be supplied by a future native
+campaign without changing the public harness boundary.
+
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
