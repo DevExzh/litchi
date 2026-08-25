@@ -44,6 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_header_footer_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_sort_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_pop_up_menu_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
@@ -159,6 +160,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_table_title_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_numbers_table_sort_order_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_table_cell_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_table_data_list_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_table_cell_pop_up_menu_projection_provenance(
@@ -486,6 +491,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_title_projection_budget(&buffa_table_title_out_directory)?;
+
+    // The sort-order envelope needs only its required scalar scope.  The
+    // repeated rule records remain borrowed and source-authoritative in the
+    // handwritten codec so a generated view cannot materialise input-width
+    // vectors or become the rewrite owner.
+    let buffa_table_sort_order_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-sort-order");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableSortOrderArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_sort_order_out_directory)
+        .include_file("iwa_numbers_table_sort_order_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_table_sort_order_projection_budget(&buffa_table_sort_order_out_directory)?;
 
     // Scalar-cell edits traverse several collection-heavy native archives.
     // Project only singular envelopes and scalars; the generated-free codec
@@ -1035,6 +1061,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "66e04d6d4049bd2bdaa79da79f52e01431cd1579890c903c16ac1764e1476715",
         ),
         (
+            "TSTTableSortOrderArchive.proto",
+            312,
+            "e80baaf95c45acca8f0cda844a2f7e730c6d20444d39f0881a70aafec6289f5a",
+        ),
+        (
             "TSWPStorageArchive.proto",
             587,
             "54be1aea50f7e6a211ccb2e19b4abbf9b7ab9c9748a99941dad3e68b7cfa37ba",
@@ -1237,6 +1268,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/numbers_table_title_codec.rs",
             "crate::buffa_numbers_table_title_generated::",
             "mod buffa_numbers_table_title_generated {",
+        ),
+        (
+            "src/numbers_table_sort_order_codec.rs",
+            "crate::buffa_numbers_table_sort_order_generated::",
+            "mod buffa_numbers_table_sort_order_generated {",
         ),
         (
             "src/numbers_table_cell_storage_codec.rs",
@@ -2818,6 +2854,66 @@ optional bool table_name_border_enabled = 37;\n\
         || production_codec.contains(".encode(")
     {
         return Err("Numbers table-title projection/codec drifted from the exact TST/TSP scalar routes, lost its private generated boundary or shared reference lazy view, introduced generated repeated storage, or added Prost/production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_sort_order_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const ROUTER_MARKERS: [&str; 12] = [
+        "pub struct SortOrderSnapshot",
+        "pub struct SortRule",
+        "pub fn decode_table_sort_order(",
+        "pub fn decode_table_sort_order_with_report(",
+        "pub fn prepare_table_sort_order_rewrite",
+        "pub struct PreparedTableSortOrderRewrite",
+        "pub struct RewriteExecutionRequirements",
+        "pub struct RewriteExecutionLimits",
+        "pub fn rewrite_table_sort_order(",
+        "const SORT_ORDER_FIELD: u32 = 44;",
+        "const SORT_RULES_FIELD: u32 = 2;",
+        "unknown overlong",
+    ];
+    const PRIVATE_MARKERS: [&str; 2] = [
+        "mod buffa_numbers_table_sort_order_generated {",
+        "/buffa-numbers-table-sort-order/iwa_numbers_table_sort_order_buffa_protos.rs",
+    ];
+    let canonical = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableSortOrderArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_sort_order_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if canonical
+        .matches("optional .TST.TableSortOrderArchive sort_order = 44;")
+        .count()
+        != 1
+        || canonical.matches("required uint32 index = 1;").count() < 1
+        || canonical
+            .matches("required .TST.TableSortOrderArchive.SortRuleArchive.Direction direction = 2;")
+            .count()
+            != 1
+        || projection_schema
+            != "syntax = \"proto2\";\npackage LitchiIwaNumbersTableSortOrderProjection;\nmessage TableSortOrderArchive {\nrequired int32 type = 1;\n}"
+        || projection.len() > 1024
+        || projection.contains("repeated ")
+        || !ROUTER_MARKERS.iter().all(|marker| codec.contains(marker))
+        || !PRIVATE_MARKERS.iter().all(|marker| lib.contains(marker))
+        || codec.contains("prost::")
+        || codec.contains("encode_to_vec")
+        || codec.contains("to_owned_message")
+    {
+        return Err(
+            "Numbers table-sort-order projection/codec drifted from TST field 44 or exposed generated repeated storage"
+                .into(),
+        );
     }
     Ok(())
 }
@@ -6039,6 +6135,42 @@ fn enforce_table_title_projection_budget(directory: &Path) -> Result<(), Box<dyn
     {
         return Err(format!(
             "Numbers table-title projection generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_sort_order_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("sort projection file overflow")?;
+        let generated = fs::read(entry.path())?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("sort projection byte overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("sort projection repeated-view overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("sort projection lazy-repeated-view overflow")?;
+    }
+    if files != 5 || bytes > 120_000 || repeated_views != 0 || lazy_repeated_views != 0 {
+        return Err(format!(
+            "Numbers table-sort-order projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated views"
         )
         .into());
     }

@@ -1,0 +1,9 @@
+// Bounded lazy projection for the scalar envelope of
+// `TST.TableSortOrderArchive`.  Repeated rules stay source-authoritative and
+// are streamed by the handwritten strict codec.
+syntax = "proto2";
+package LitchiIwaNumbersTableSortOrderProjection;
+
+message TableSortOrderArchive {
+  required int32 type = 1;
+}

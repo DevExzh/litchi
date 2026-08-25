@@ -135,6 +135,49 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
+## Numbers persisted table-sort-order codec
+
+`numbers_table_sort_order_codec` fuzzes the strict field-44 projection of a
+complete `TST.TableModelArchive`. Successful payloads are compared through
+scalar and reported decode paths, then passed through exact prepared
+set/clear/no-op rewrites and candidate readback. Preparation is followed by
+the exact `RewriteExecutionRequirements` replay and independent max-minus-one
+output, field, work, depth, rule, allocation, retained, and scratch probes.
+The fixed recipes under `corpus/numbers_table_sort_order_codec/` cover absent
+and canonical orders, selected-row rules, duplicate and wrong-wire known
+fields, non-canonical varints, duplicate columns, truncation, unknown
+overlong scalars, balanced unknown groups, and unterminated groups. They are
+hand-authored `hex:` complete-model payloads, not native package members.
+
+The target accepts raw inputs up to 64 KiB and uses finite ceilings of 128 KiB
+output, 16,384 fields, 512 KiB work, 1,024 rules, 4,096 columns, and nesting
+depth 64. Type-check it with:
+
+```sh
+cargo +nightly fuzz check numbers_table_sort_order_codec
+```
+
+Run a bounded sanitizer smoke with mutable state outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-sort-codec-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/numbers_table_sort_order_codec/*.hex "$fuzz_corpus/"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_sort_order_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Format-neutral table-dimension codec
 
 `table_dimension` drives the hidden `table_dimension_codec` facade over one

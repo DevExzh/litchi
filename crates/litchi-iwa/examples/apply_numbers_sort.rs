@@ -3,7 +3,7 @@
 use litchi_iwa::numbers::{
     NumbersEditor, NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRule,
 };
-use litchi_numbers::TableSelector;
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
@@ -33,8 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("the document has no tables")?;
     let table = TableSelector::index(0);
     if let Some(direction) = direction {
-        let current = editor
-            .table_sort_order(table)?
+        let package = Package::from_bytes(&editor.to_bytes()?)?;
+        let current = (Package::table_sort_order)(&package, SheetSelector::index(0), table)?
             .ok_or("the table has no persisted sort order")?;
         let redirected = NumbersTableSortOrder::with_scope(
             current.scope(),
@@ -43,7 +43,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .iter()
                 .map(|rule| NumbersTableSortRule::new(rule.column(), direction)),
         )?;
-        editor.set_table_sort_order(table, redirected)?;
+        let package = Package::from_bytes(&editor.to_bytes()?)?;
+        let commit = package
+            .edit_table_sort_order(SheetSelector::index(0), table)?
+            .set(redirected)
+            .commit()?;
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes)?;
+        editor = NumbersEditor::from_bytes(&bytes)?;
     }
     editor.apply_table_sort_order(table)?;
     editor.save(output)?;

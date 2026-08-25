@@ -45,6 +45,7 @@ pub(crate) mod table_cells;
 pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
 mod table_lock;
+pub(crate) mod table_sort;
 pub(crate) mod table_title;
 
 use std::collections::HashSet;

@@ -1,6 +1,8 @@
 //! Typed sort-rule configuration and execution for Numbers tables.
 
 use super::*;
+use litchi_numbers::Package as FocusedNumbersPackage;
+use litchi_numbers::SheetSelector;
 use litchi_numbers::TableSelector;
 use litchi_numbers::table::sort::{self, ColumnIndex, Direction, Order, RowRange, Rule, Scope};
 
@@ -65,9 +67,13 @@ impl NumbersEditor {
     /// by Numbers after its last sort rule is removed. Selected-row orders
     /// expose their persisted [`Scope::SelectedRows`] scope;
     /// their view-state selected interval is intentionally not guessed.
+    #[cfg(test)]
     pub fn table_sort_order(&self, selector: TableSelector) -> Result<Option<Order>> {
         let table_id = super::selectors::table_id(self, selector)?;
-        table_sort_order_in_package(&self.package, table_id)
+        let (source, sheet, table) = focused_table_sort_source(self, table_id)?;
+        source
+            .table_sort_order(sheet, table)
+            .map_err(focused_sort_error)
     }
 
     /// Set the persisted sort-rule configuration transactionally.
@@ -77,17 +83,24 @@ impl NumbersEditor {
     /// entirely by this crate. This operation configures the native rule; it
     /// does not execute it or reorder stored rows. Numbers exposes that
     /// separate action as **Sort Now**.
+    #[cfg(test)]
     pub fn set_table_sort_order(&mut self, selector: TableSelector, order: Order) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
-        let mut staged = self.package.clone();
-        set_table_sort_order_in_package(&mut staged, table_id, &order)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(selector)?.as_ref() != Some(&order) {
+        let (source, sheet, table) = focused_table_sort_source(self, table_id)?;
+        let expected = order.clone();
+        let commit = source
+            .edit_table_sort_order(sheet, table)
+            .map_err(focused_sort_error)?
+            .set(order)
+            .commit()
+            .map_err(focused_sort_error)?;
+        let verified = focused_sort_commit_editor(&commit)?;
+        if verified.table_sort_order(selector)?.as_ref() != Some(&expected) {
             return Err(Error::InvalidFormat(
-                "Numbers table sort order failed round-trip validation".to_owned(),
+                "focused Numbers table sort order failed round-trip validation".to_owned(),
             ));
         }
-        self.package = staged;
+        self.package = verified.package;
         Ok(())
     }
 
@@ -96,19 +109,23 @@ impl NumbersEditor {
     /// When a table already carries native sort metadata, this preserves
     /// Numbers' empty-order marker and any associated reference tracker,
     /// exactly as removing the final rule in the Numbers UI does.
+    #[cfg(test)]
     pub fn clear_table_sort_order(&mut self, selector: TableSelector) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
-        let mut staged = self.package.clone();
-        if !clear_table_sort_order_in_package(&mut staged, table_id)? {
-            return Ok(());
-        }
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let (source, sheet, table) = focused_table_sort_source(self, table_id)?;
+        let commit = source
+            .edit_table_sort_order(sheet, table)
+            .map_err(focused_sort_error)?
+            .clear()
+            .commit()
+            .map_err(focused_sort_error)?;
+        let verified = focused_sort_commit_editor(&commit)?;
         if verified.table_sort_order(selector)?.is_some() {
             return Err(Error::InvalidFormat(
                 "Numbers table sort-order clear failed round-trip validation".to_owned(),
             ));
         }
-        self.package = staged;
+        self.package = verified.package;
         Ok(())
     }
 
@@ -133,7 +150,7 @@ impl NumbersEditor {
     /// and `false` when the body was already in the requested stable order.
     pub fn apply_table_sort_order(&mut self, selector: TableSelector) -> Result<bool> {
         let table_id = super::selectors::table_id(self, selector)?;
-        let order = table_sort_order_in_package(&self.package, table_id)?.ok_or_else(|| {
+        let order = focused_table_sort_order_for_apply(self, table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
             )
@@ -149,7 +166,7 @@ impl NumbersEditor {
             return Ok(false);
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(selector)?.as_ref() != Some(&order) {
+        if table_sort_order_in_package(&verified.package, table_id)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
                 "Numbers table sort execution did not preserve its sort order".to_owned(),
             ));
@@ -174,7 +191,7 @@ impl NumbersEditor {
         rows: RowRange,
     ) -> Result<bool> {
         let table_id = super::selectors::table_id(self, selector)?;
-        let order = table_sort_order_in_package(&self.package, table_id)?.ok_or_else(|| {
+        let order = focused_table_sort_order_for_apply(self, table_id)?.ok_or_else(|| {
             Error::ParseError(
                 "Cannot execute a Numbers sort without a configured table sort order".to_owned(),
             )
@@ -190,7 +207,7 @@ impl NumbersEditor {
             return Ok(false);
         }
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.table_sort_order(selector)?.as_ref() != Some(&order) {
+        if table_sort_order_in_package(&verified.package, table_id)?.as_ref() != Some(&order) {
             return Err(Error::InvalidFormat(
                 "Numbers selected-row sort execution did not preserve its sort order".to_owned(),
             ));
@@ -198,6 +215,50 @@ impl NumbersEditor {
         self.package = staged;
         Ok(true)
     }
+}
+
+fn focused_sort_error(error: litchi_numbers::table::sort::transaction::Error) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers persisted sort operation failed: {error}"
+    ))
+}
+
+fn focused_table_sort_source(
+    editor: &NumbersEditor,
+    table_id: u64,
+) -> Result<(
+    FocusedNumbersPackage,
+    SheetSelector<'static>,
+    TableSelector<'static>,
+)> {
+    let (sheet, table) = super::selectors::focused_table_location(editor, table_id)?;
+    let bytes = editor.to_bytes()?;
+    let source = FocusedNumbersPackage::from_bytes(&bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Numbers persisted-sort source validation failed: {error}"
+        ))
+    })?;
+    Ok((source, sheet, table))
+}
+
+fn focused_table_sort_order_for_apply(
+    editor: &NumbersEditor,
+    table_id: u64,
+) -> Result<Option<Order>> {
+    let (source, sheet, table) = focused_table_sort_source(editor, table_id)?;
+    (FocusedNumbersPackage::table_sort_order)(&source, sheet, table).map_err(focused_sort_error)
+}
+
+#[cfg(test)]
+fn focused_sort_commit_editor(
+    commit: &litchi_numbers::table::sort::transaction::Commit,
+) -> Result<NumbersEditor> {
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    NumbersEditor::from_bytes(&bytes)
 }
 
 /// Read an attached native iWork table's persisted sort-rule configuration.

@@ -95,6 +95,16 @@ not cross the fuzz target boundary. The checked-in seeds under
 `corpus/numbers_table_cell_pop_up_menu/` are command recipes, not native
 package bytes.
 
+`numbers_table_sort_order` is the focused selector-first persisted table-sort
+configuration target. It offers arbitrary bytes to bounded Numbers ingress
+and reuses native `basic.numbers` for no-op, set, clear/reset, exact patch apply,
+conflict, inverse, candidate readback, and failed-commit source-atomicity
+commands. It deliberately does not execute physical row sorting; that path
+rewrites tiles, formulas, comments, and view state and remains a separate
+host operation. The checked-in recipes under
+`corpus/numbers_table_sort_order/` are command inputs, not native package
+copies.
+
 
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
@@ -204,6 +214,11 @@ appearance transaction.
 semantic profile. Popup commands consume a fixed prefix and construct at most
 three validated menu items of 4 KiB each; keep `-max_len` at 1 KiB so malformed
 ingress and native create/reuse/reset transactions both receive every input.
+
+`numbers_table_sort_order` uses the same finite Numbers physical and semantic
+profile. Its command prefix is bounded and only changes persisted field 44;
+keep `-max_len` at 1 KiB so malformed ingress and native set/clear commands
+both receive every input. Physical row execution remains outside this target.
 
 `keynote_movie_playback` is the focused selector-first movie-playback target.
 It offers arbitrary bytes to bounded Keynote ingress and reuses the same
@@ -354,6 +369,14 @@ Run the focused Numbers Pop-Up Menu lifecycle target with its command seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_pop_up_menu \
   corpus/numbers_table_cell_pop_up_menu -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers persisted-sort target with its command seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_sort_order \
+  corpus/numbers_table_sort_order -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

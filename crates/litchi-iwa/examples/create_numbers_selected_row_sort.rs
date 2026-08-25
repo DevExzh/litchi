@@ -48,13 +48,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    editor.set_table_sort_order(
-        table,
-        NumbersTableSortOrder::selected_rows([NumbersTableSortRule::new(
-            NumbersTableSortColumnIndex::new(1)?,
-            NumbersTableSortDirection::Descending,
-        )])?,
-    )?;
+    let order = NumbersTableSortOrder::selected_rows([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1)?,
+        NumbersTableSortDirection::Descending,
+    )])?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_sort_order(SheetSelector::index(0), table)?
+        .set(order)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    editor = NumbersEditor::from_bytes(&bytes)?;
     let selected_rows = NumbersTableSortRowRange::new(1, 4)?;
     if !editor.apply_table_sort_order_to_rows(table, selected_rows)? {
         return Err("expected the selected rows to be reordered".into());

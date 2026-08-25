@@ -27,10 +27,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut editor = NumbersEditor::open(&source)?;
     let table = TableSelector::index(0);
-    assert_eq!(editor.table_sort_order(table)?, Some(expected.clone()));
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    assert_eq!(
+        (Package::table_sort_order)(&package, SheetSelector::index(0), table)?,
+        Some(expected.clone())
+    );
     editor.insert_table_row(table, RowInsertion::body(0))?;
     editor.insert_table_column(table, ColumnInsertion::body(0))?;
-    assert_eq!(editor.table_sort_order(table)?, Some(expected));
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    assert_eq!(
+        (Package::table_sort_order)(&package, SheetSelector::index(0), table)?,
+        Some(expected)
+    );
     editor.save(inserted)?;
 
     let mut editor = NumbersEditor::open(source)?;
@@ -45,7 +53,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("the sort column is inside the fixed header-column region")?;
     editor.remove_table_row(table, RowDeletion::body(0))?;
     editor.remove_table_column(table, ColumnDeletion::body(body_sort_column))?;
-    assert_eq!(editor.table_sort_order(table)?, None);
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    assert_eq!(
+        (Package::table_sort_order)(&package, SheetSelector::index(0), table)?,
+        None
+    );
     editor.save(deleted)?;
     Ok(())
 }

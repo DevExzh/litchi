@@ -32,13 +32,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Change::set(CellPosition::new(4, 1), Input::text("second apple")?),
         ],
     )?;
-    editor.set_table_sort_order(
-        table,
-        NumbersTableSortOrder::new([NumbersTableSortRule::new(
-            NumbersTableSortColumnIndex::new(0)?,
-            NumbersTableSortDirection::Ascending,
-        )])?,
-    )?;
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(0)?,
+        NumbersTableSortDirection::Ascending,
+    )])?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_sort_order(SheetSelector::index(0), table)?
+        .set(order)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    editor = NumbersEditor::from_bytes(&bytes)?;
     if !editor.apply_table_sort_order(table)? {
         return Err("expected the source table to be reordered".into());
     }
