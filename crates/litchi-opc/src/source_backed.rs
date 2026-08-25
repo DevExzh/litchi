@@ -36,6 +36,8 @@ const MAX_SOURCE_OVERLAY_PARTS: usize = 64;
 const MAX_SOURCE_RELATIONSHIP_REMOVALS: usize = 4096;
 const MAX_SOURCE_TOPOLOGY_PARTS: usize = 64;
 const MAX_SOURCE_TOPOLOGY_RELATIONSHIPS: usize = 4096;
+const MAX_SOURCE_RELATIONSHIP_FIELD_BYTES: usize = 64 * 1024;
+const MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES: usize = 8 * 1024 * 1024;
 
 struct PendingOverlay {
     target: usize,
@@ -52,7 +54,8 @@ struct PendingOverlay {
 pub struct SourceTopologyPlan {
     replacements: Vec<TopologyReplacement>,
     additions: Vec<TopologyPartAddition>,
-    relationships: Vec<TopologyRelationshipAddition>,
+    relationships: Vec<TopologyRelationshipChange>,
+    relationship_bytes: usize,
 }
 
 #[derive(Debug)]
@@ -68,12 +71,49 @@ struct TopologyPartAddition {
     payload: Arc<Vec<u8>>,
 }
 
+/// The target requested for a source-backed relationship operation.
+///
+/// Internal targets are validated against the source/new Part graph and are
+/// serialized as owner-relative references. External targets are retained as
+/// URI references exactly as supplied, including query and fragment text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceRelationshipTarget {
+    /// A target Part in the OPC package.
+    Internal(PackURI),
+    /// An external URI reference, preserved without package resolution.
+    External(String),
+}
+
+impl SourceRelationshipTarget {
+    fn mode(&self) -> TargetMode {
+        match self {
+            Self::Internal(_) => TargetMode::Internal,
+            Self::External(_) => TargetMode::External,
+        }
+    }
+}
+
 #[derive(Debug)]
-struct TopologyRelationshipAddition {
+enum TopologyRelationshipOperation {
+    Add {
+        reltype: String,
+        target: SourceRelationshipTarget,
+    },
+    Replace {
+        reltype: String,
+        target: SourceRelationshipTarget,
+        required_mode: Option<TargetMode>,
+    },
+    Remove {
+        required_mode: Option<TargetMode>,
+    },
+}
+
+#[derive(Debug)]
+struct TopologyRelationshipChange {
     owner: PackURI,
     r_id: String,
-    reltype: String,
-    target: PackURI,
+    operation: TopologyRelationshipOperation,
 }
 
 impl SourceTopologyPlan {
@@ -178,6 +218,25 @@ impl SourceTopologyPlan {
         Ok(())
     }
 
+    /// Add a typed relationship owned by the package (`/`), an existing Part,
+    /// or a Part added by this plan.
+    pub fn try_add_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: SourceRelationshipTarget,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Add {
+                reltype: reltype.into(),
+                target,
+            },
+        })
+    }
+
     /// Add an internal relationship owned by the package (`/`), an existing
     /// Part, or a Part added by this plan. The target must be an absolute OPC
     /// Part URI and is serialized as the owner-relative target reference.
@@ -188,32 +247,194 @@ impl SourceTopologyPlan {
         reltype: impl Into<String>,
         target: PackURI,
     ) -> Result<()> {
+        self.try_add_relationship(
+            owner,
+            r_id,
+            reltype,
+            SourceRelationshipTarget::Internal(target),
+        )
+    }
+
+    /// Add an external relationship while preserving the exact URI reference.
+    pub fn try_add_external_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: impl Into<String>,
+    ) -> Result<()> {
+        self.try_add_relationship(
+            owner,
+            r_id,
+            reltype,
+            SourceRelationshipTarget::External(target.into()),
+        )
+    }
+
+    /// Replace an existing typed relationship without changing its rId.
+    pub fn try_replace_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: SourceRelationshipTarget,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Replace {
+                reltype: reltype.into(),
+                target,
+                required_mode: None,
+            },
+        })
+    }
+
+    /// Replace an existing internal relationship without changing its rId.
+    pub fn try_replace_internal_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: PackURI,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Replace {
+                reltype: reltype.into(),
+                target: SourceRelationshipTarget::Internal(target),
+                required_mode: Some(TargetMode::Internal),
+            },
+        })
+    }
+
+    /// Replace an existing external relationship while preserving the exact
+    /// URI reference. The publisher requires the current relationship to be
+    /// external before applying the replacement.
+    pub fn try_replace_external_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: impl Into<String>,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Replace {
+                reltype: reltype.into(),
+                target: SourceRelationshipTarget::External(target.into()),
+                required_mode: Some(TargetMode::External),
+            },
+        })
+    }
+
+    /// Remove an existing relationship by owner and rId.
+    pub fn try_remove_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Remove {
+                required_mode: None,
+            },
+        })
+    }
+
+    /// Remove an existing external relationship by owner and rId.
+    pub fn try_remove_external_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Remove {
+                required_mode: Some(TargetMode::External),
+            },
+        })
+    }
+
+    fn try_push_relationship_change(&mut self, change: TopologyRelationshipChange) -> Result<()> {
         if self.relationships.len() >= MAX_SOURCE_TOPOLOGY_RELATIONSHIPS {
             return Err(overlay_unavailable(format!(
                 "topology relationship set exceeds the {MAX_SOURCE_TOPOLOGY_RELATIONSHIPS}-relationship bound"
             )));
         }
-        let r_id = r_id.into();
-        if !is_xml_id(&r_id) {
+        let TopologyRelationshipChange {
+            ref owner,
+            ref r_id,
+            ref operation,
+        } = change;
+        let mut field_bytes = owner.as_str().len();
+        field_bytes = field_bytes
+            .checked_add(r_id.len())
+            .ok_or_else(|| overlay_unavailable("topology relationship field bytes overflow"))?;
+        if r_id.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES || !is_xml_id(r_id) {
             return Err(OpcError::InvalidRelationship(format!(
-                "relationship Id '{r_id}' is not an XML ID"
+                "relationship Id '{r_id}' is not a bounded XML ID"
             )));
         }
-        let reltype = reltype.into();
-        if reltype.is_empty()
-            || reltype.chars().any(char::is_whitespace)
-            || reltype.chars().any(char::is_control)
-        {
-            return Err(OpcError::InvalidRelationship(
-                "relationship Type is not a valid URI reference".to_string(),
-            ));
+        match operation {
+            TopologyRelationshipOperation::Add { reltype, target }
+            | TopologyRelationshipOperation::Replace {
+                reltype, target, ..
+            } => {
+                if reltype.is_empty()
+                    || reltype.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES
+                    || reltype.chars().any(char::is_whitespace)
+                    || reltype.chars().any(char::is_control)
+                {
+                    return Err(OpcError::InvalidRelationship(
+                        "relationship Type is not a bounded URI reference".to_string(),
+                    ));
+                }
+                field_bytes = field_bytes.checked_add(reltype.len()).ok_or_else(|| {
+                    overlay_unavailable("topology relationship field bytes overflow")
+                })?;
+                let target_bytes = match target {
+                    SourceRelationshipTarget::Internal(target) => target.as_str().len(),
+                    SourceRelationshipTarget::External(target) => {
+                        if target.is_empty()
+                            || target.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES
+                            || target.chars().any(char::is_control)
+                        {
+                            return Err(OpcError::InvalidRelationship(
+                                "relationship Target is not a bounded URI reference".to_string(),
+                            ));
+                        }
+                        target.len()
+                    },
+                };
+                if target_bytes > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES {
+                    return Err(OpcError::InvalidRelationship(
+                        "relationship Target is not a bounded URI reference".to_string(),
+                    ));
+                }
+                field_bytes = field_bytes.checked_add(target_bytes).ok_or_else(|| {
+                    overlay_unavailable("topology relationship field bytes overflow")
+                })?;
+            },
+            TopologyRelationshipOperation::Remove { .. } => {},
         }
-        if self
-            .relationships
-            .iter()
-            .any(|candidate| candidate.owner.is_equivalent_to(&owner) && candidate.r_id == r_id)
-        {
-            return Err(OpcError::DuplicateRelationshipId(r_id));
+        let next_bytes = self
+            .relationship_bytes
+            .checked_add(field_bytes)
+            .ok_or_else(|| overlay_unavailable("topology relationship bytes overflow"))?;
+        if next_bytes > MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES {
+            return Err(overlay_unavailable(format!(
+                "topology relationship fields exceed the {MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES}-byte bound"
+            )));
+        }
+        if self.relationships.iter().any(|candidate| {
+            candidate.owner.is_equivalent_to(owner) && candidate.r_id.as_str() == r_id.as_str()
+        }) {
+            return Err(OpcError::DuplicateRelationshipId(r_id.clone()));
         }
         self.relationships
             .try_reserve(1)
@@ -221,12 +442,8 @@ impl SourceTopologyPlan {
                 resource: "source-backed OPC topology relationships",
                 source,
             })?;
-        self.relationships.push(TopologyRelationshipAddition {
-            owner,
-            r_id,
-            reltype,
-            target,
-        });
+        self.relationship_bytes = next_bytes;
+        self.relationships.push(change);
         Ok(())
     }
 
@@ -2440,13 +2657,13 @@ impl SourceBackedPackage {
     /// stream.
     ///
     /// Existing Part payloads may be replaced, new typed Parts may be added,
-    /// and internal relationships may be added to the package or an existing
-    /// or newly added Part. Unchanged members retain their exact source ZIP
-    /// records. The content-types manifest retains its original bytes and
-    /// member spelling; only required new `Override` elements are inserted
-    /// immediately before the parsed `Types` closing tag. Existing relationship
-    /// members are changed only when their source bytes are exactly the current
-    /// canonical [`Relationships::to_xml`] form.
+    /// and relationships may be added, replaced, or removed on the package or
+    /// an existing or newly added Part. Unchanged members retain their exact
+    /// source ZIP records. The content-types manifest retains its original
+    /// bytes and member spelling; only required new `Override` elements are
+    /// inserted immediately before the parsed `Types` closing tag. Existing
+    /// relationship members are changed only when their source bytes are
+    /// exactly the current canonical [`Relationships::to_xml`] form.
     ///
     /// An empty plan is an exact source copy, including signed packages and
     /// physical details unsupported by the rewrite preservation primitive.
@@ -2465,6 +2682,7 @@ impl SourceBackedPackage {
             mut replacements,
             mut additions,
             mut relationships,
+            relationship_bytes: _,
         } = plan;
         self.check_topology_progress()?;
         replacements
@@ -2478,25 +2696,6 @@ impl SourceBackedPackage {
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
         self.check_topology_progress()?;
-        // A topology-only change can be refused before generating XML or
-        // reading any replacement payload. Replacement plans still need one
-        // source read to distinguish an exact no-op from a real change.
-        if replacements.is_empty() {
-            if !self.non_part_members.is_empty() {
-                return Err(overlay_unavailable(
-                    "topology publication refuses non-Part or opaque physical members",
-                ));
-            }
-            if self.archive.has_encrypted_entries() {
-                return Err(overlay_unavailable(
-                    "topology publication refuses encrypted ZIP members",
-                ));
-            }
-            if self.has_signature_infrastructure() {
-                return Err(OpcError::SignedSourceRequiresExplicitPolicy);
-            }
-        }
-
         let (physical_members, _physical_member_memory) = self.build_physical_member_lookup()?;
         let content_types_key = folded_ascii_name(
             &self.content_types_member,
@@ -2613,9 +2812,11 @@ impl SourceBackedPackage {
             }
         }
 
-        // Validate all relationship owners and targets before constructing any
-        // generated XML. Targets must resolve to a physical existing or newly
-        // added Part, rather than an arbitrary dangling URI.
+        // Validate all relationship owners and internal targets before
+        // constructing any generated XML. Internal targets must resolve to a
+        // physical existing or newly added Part; external targets remain
+        // caller-owned URI references and are never resolved through the Part
+        // graph.
         for (index, relationship) in relationships.iter_mut().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
@@ -2634,19 +2835,27 @@ impl SourceBackedPackage {
                     additions[owner_index - additions_offset].partname.clone()
                 };
             }
-            if relationship.target.as_str() == PACKAGE_URI {
+            let (TopologyRelationshipOperation::Add { target, .. }
+            | TopologyRelationshipOperation::Replace { target, .. }) = &mut relationship.operation
+            else {
+                continue;
+            };
+            let SourceRelationshipTarget::Internal(target) = target else {
+                continue;
+            };
+            if target.as_str() == PACKAGE_URI {
                 return Err(OpcError::InvalidRelationship(
                     "internal relationship target cannot be the package root".to_string(),
                 ));
             }
-            let target_key = folded_part_name(&relationship.target)?;
+            let target_key = folded_part_name(target)?;
             let Some(target_index) = canonical_part_names.get(&target_key).copied() else {
                 return Err(OpcError::PartNotFound(format!(
                     "relationship target '{}'",
-                    relationship.target
+                    target
                 )));
             };
-            relationship.target = if target_index < additions_offset {
+            *target = if target_index < additions_offset {
                 self.parts[target_index].partname.clone()
             } else {
                 additions[target_index - additions_offset].partname.clone()
@@ -2660,7 +2869,7 @@ impl SourceBackedPackage {
         });
         self.check_topology_progress()?;
 
-        // Group relationship additions by owner and produce canonical XML.
+        // Group relationship changes by owner and produce canonical XML.
         // The member itself is appended only when the source has no such
         // member; an existing member is regenerated in place after a strict
         // canonical-source check.
@@ -2698,29 +2907,87 @@ impl SourceBackedPackage {
                     owner.base_uri().to_string(),
                 )
             };
+            let mut group_changed = false;
             for (index, relationship) in relationships[group_start..group_end].iter().enumerate() {
                 if index & 0x3f == 0 {
                     self.check_topology_progress()?;
                 }
-                if owner_relationships.get(&relationship.r_id).is_some() {
-                    return Err(OpcError::DuplicateRelationshipId(relationship.r_id.clone()));
+                match &relationship.operation {
+                    TopologyRelationshipOperation::Add { reltype, target } => {
+                        if owner_relationships.get(&relationship.r_id).is_some() {
+                            return Err(OpcError::DuplicateRelationshipId(
+                                relationship.r_id.clone(),
+                            ));
+                        }
+                        let (target_ref, target_mode) =
+                            Self::topology_relationship_target_ref(target, &owner_base)?;
+                        owner_relationships.try_add_relationship(
+                            reltype.clone(),
+                            target_ref,
+                            relationship.r_id.clone(),
+                            target_mode,
+                        )?;
+                        group_changed = true;
+                    },
+                    TopologyRelationshipOperation::Replace {
+                        reltype,
+                        target,
+                        required_mode,
+                    } => {
+                        let existing =
+                            owner_relationships.get(&relationship.r_id).ok_or_else(|| {
+                                OpcError::RelationshipNotFound(format!(
+                                    "relationship '{}' was not found",
+                                    relationship.r_id
+                                ))
+                            })?;
+                        if required_mode.is_some_and(|mode| existing.target_mode() != mode) {
+                            return Err(OpcError::InvalidRelationship(format!(
+                                "relationship '{}' does not have the required target mode",
+                                relationship.r_id
+                            )));
+                        }
+                        let (target_ref, target_mode) =
+                            Self::topology_relationship_target_ref(target, &owner_base)?;
+                        if existing.reltype() == reltype
+                            && existing.target_ref() == target_ref
+                            && existing.target_mode() == target_mode
+                        {
+                            continue;
+                        }
+                        let removed = owner_relationships.remove(&relationship.r_id);
+                        debug_assert!(removed.is_some());
+                        owner_relationships.try_add_relationship(
+                            reltype.clone(),
+                            target_ref,
+                            relationship.r_id.clone(),
+                            target_mode,
+                        )?;
+                        group_changed = true;
+                    },
+                    TopologyRelationshipOperation::Remove { required_mode } => {
+                        let existing =
+                            owner_relationships.get(&relationship.r_id).ok_or_else(|| {
+                                OpcError::RelationshipNotFound(format!(
+                                    "relationship '{}' was not found",
+                                    relationship.r_id
+                                ))
+                            })?;
+                        if required_mode.is_some_and(|mode| existing.target_mode() != mode) {
+                            return Err(OpcError::InvalidRelationship(format!(
+                                "relationship '{}' does not have the required target mode",
+                                relationship.r_id
+                            )));
+                        }
+                        let removed = owner_relationships.remove(&relationship.r_id);
+                        debug_assert!(removed.is_some());
+                        group_changed = true;
+                    },
                 }
-                let target_ref = relationship.target.relative_ref(&owner_base);
-                if target_ref.is_empty()
-                    || target_ref.chars().any(char::is_control)
-                    || target_ref.contains(['?', '#'])
-                {
-                    return Err(OpcError::InvalidRelationship(
-                        "internal relationship target is not a valid relative reference"
-                            .to_string(),
-                    ));
-                }
-                owner_relationships.try_add_relationship(
-                    relationship.reltype.clone(),
-                    target_ref,
-                    relationship.r_id.clone(),
-                    TargetMode::Internal,
-                )?;
+            }
+            if !group_changed {
+                group_start = group_end;
+                continue;
             }
             let relationship_count = owner_relationships.len();
             let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
@@ -3058,6 +3325,29 @@ impl SourceBackedPackage {
             }
         }
         self.write_changed_overlays_with_appended(writer, &changed, &appended)
+    }
+
+    fn topology_relationship_target_ref(
+        target: &SourceRelationshipTarget,
+        owner_base: &str,
+    ) -> Result<(String, TargetMode)> {
+        let target_ref = match target {
+            SourceRelationshipTarget::Internal(target) => {
+                let target_ref = target.relative_ref(owner_base);
+                if target_ref.is_empty()
+                    || target_ref.chars().any(char::is_control)
+                    || target_ref.contains(['?', '#'])
+                {
+                    return Err(OpcError::InvalidRelationship(
+                        "internal relationship target is not a valid relative reference"
+                            .to_string(),
+                    ));
+                }
+                target_ref
+            },
+            SourceRelationshipTarget::External(target) => target.clone(),
+        };
+        Ok((target_ref, target.mode()))
     }
 
     /// Replace one existing ordinary Part and publish to a sequential stream.
@@ -6107,6 +6397,170 @@ mod tests {
 
     fn document_relationships() -> &'static [u8] {
         br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rExternal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://remove.invalid/" TargetMode="External"/><Relationship Id="rInternal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../custom/orphan.xml"/></Relationships>"#
+    }
+
+    fn topology_relationship_archive(document_relationships: &[u8]) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships())
+            .unwrap();
+        writer
+            .write_stored("word/document.xml", b"<before/>")
+            .unwrap();
+        writer
+            .write_stored("word/_rels/document.xml.rels", document_relationships)
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn canonical_document_relationships(entries: &[(&str, &str, &str, TargetMode)]) -> Vec<u8> {
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut relationships = Relationships::for_source(&owner);
+        for (r_id, reltype, target, mode) in entries {
+            relationships
+                .try_add_relationship(
+                    (*reltype).to_string(),
+                    (*target).to_string(),
+                    (*r_id).to_string(),
+                    *mode,
+                )
+                .unwrap();
+        }
+        relationships.to_xml().into_bytes()
+    }
+
+    #[test]
+    fn topology_adds_external_relationship_with_exact_uri_reference() {
+        let relationships = canonical_document_relationships(&[]);
+        let source = topology_relationship_archive(&relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_external_relationship(
+            owner.clone(),
+            "rLink",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+            "https://example.invalid/path?q=one#bookmark",
+        )
+        .unwrap();
+
+        let mut output = Vec::new();
+        package.write_topology_to_stream(&mut output, plan).unwrap();
+        let reopened =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let part = reopened.part(&owner).unwrap();
+        let relationship = part.rels().get("rLink").unwrap();
+        assert_eq!(relationship.target_mode(), TargetMode::External);
+        assert_eq!(
+            relationship.target_ref(),
+            "https://example.invalid/path?q=one#bookmark"
+        );
+    }
+
+    #[test]
+    fn topology_replaces_and_removes_external_relationships() {
+        const HYPERLINK: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+        let relationships = canonical_document_relationships(&[
+            (
+                "rReplace",
+                HYPERLINK,
+                "https://before.invalid/",
+                TargetMode::External,
+            ),
+            (
+                "rRemove",
+                HYPERLINK,
+                "https://remove.invalid/",
+                TargetMode::External,
+            ),
+        ]);
+        let source = topology_relationship_archive(&relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_external_relationship(
+            owner.clone(),
+            "rReplace",
+            HYPERLINK,
+            "https://after.invalid/?q=two#fragment",
+        )
+        .unwrap();
+        plan.try_remove_external_relationship(owner.clone(), "rRemove")
+            .unwrap();
+
+        let mut output = Vec::new();
+        package.write_topology_to_stream(&mut output, plan).unwrap();
+        let reopened =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let part = reopened.part(&owner).unwrap();
+        let relationships = part.rels();
+        assert_eq!(
+            relationships.get("rReplace").unwrap().target_ref(),
+            "https://after.invalid/?q=two#fragment"
+        );
+        assert!(relationships.get("rRemove").is_none());
+    }
+
+    #[test]
+    fn topology_exact_external_replacement_preserves_noncanonical_source() {
+        const HYPERLINK: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+        let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship TargetMode="External" Target="https://same.invalid/?q=1#same" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Id="rSame"/></Relationships>"#;
+        let source = topology_relationship_archive(relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
+                .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_external_relationship(
+            PackURI::new("/word/document.xml").unwrap(),
+            "rSame",
+            HYPERLINK,
+            "https://same.invalid/?q=1#same",
+        )
+        .unwrap();
+
+        let mut output = Vec::new();
+        package.write_topology_to_stream(&mut output, plan).unwrap();
+        assert_eq!(output, source);
+    }
+
+    #[test]
+    fn topology_external_wrappers_refuse_internal_relationships_before_output() {
+        const HYPERLINK: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+        let relationships = canonical_document_relationships(&[(
+            "rInternal",
+            HYPERLINK,
+            "document.xml",
+            TargetMode::Internal,
+        )]);
+        let source = topology_relationship_archive(&relationships);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_external_relationship(
+            PackURI::new("/word/document.xml").unwrap(),
+            "rInternal",
+            HYPERLINK,
+            "https://example.invalid/",
+        )
+        .unwrap();
+
+        let mut output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(error, OpcError::InvalidRelationship(_)));
+        assert!(output.is_empty());
     }
 
     fn relationship_batch(prefix: &str, count: usize) -> (Vec<String>, Vec<u8>) {
