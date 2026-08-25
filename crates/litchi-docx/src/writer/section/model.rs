@@ -101,6 +101,46 @@ pub struct SectionHeaderFooterPart {
     pub xml: String,
 }
 
+#[derive(Debug, Clone)]
+pub(super) enum AuthoredChild {
+    Header(Kind),
+    Footer(Kind),
+    FootnotePr,
+    EndnotePr,
+    Type,
+    PageSize,
+    PageMargins,
+    PaperSource,
+    PageBorders,
+    LineNumbering,
+    PageNumbering,
+    Columns,
+    FormProtection,
+    VerticalAlignment,
+    NoEndnote(String),
+    TitlePage,
+    TextDirection,
+    Bidirectional,
+    RtlGutter,
+    DocumentGrid,
+    PrinterSettings,
+    SectionChange(String),
+    Unknown(String),
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct NamespaceBinding {
+    pub(super) prefix: Option<String>,
+    pub(super) uri: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct AuthoredChildRaw {
+    pub(super) raw: String,
+    pub(super) preserved_attributes: Vec<String>,
+    pub(super) original_on_off: Option<bool>,
+}
+
 impl SectionHeaderFooterReference {
     pub fn existing(kind: Kind, relationship_id: impl Into<String>) -> Self {
         Self {
@@ -1012,6 +1052,15 @@ pub struct SectionProperties {
     /// Relationship ID of the printer-settings part (`w:printerSettings`).
     pub printer_settings_relationship_id: Option<String>,
     pub(super) preserved_unknown_children: Vec<String>,
+    pub(super) authored_children: Vec<AuthoredChild>,
+    pub(super) authored_child_raw: Vec<AuthoredChildRaw>,
+    pub(super) namespace_bindings: Vec<NamespaceBinding>,
+    pub(super) root_prefix: Option<String>,
+    pub(super) root_default_namespace: bool,
+    pub(super) root_namespace_resolved: bool,
+    pub(super) root_attributes: Vec<String>,
+    pub(super) suppress_managed_headers: bool,
+    pub(super) suppress_managed_footers: bool,
 }
 
 impl Default for SectionProperties {
@@ -1046,6 +1095,15 @@ impl Default for SectionProperties {
             rtl_gutter: false,
             printer_settings_relationship_id: None,
             preserved_unknown_children: Vec::new(),
+            authored_children: Vec::new(),
+            authored_child_raw: Vec::new(),
+            namespace_bindings: Vec::new(),
+            root_prefix: None,
+            root_default_namespace: false,
+            root_namespace_resolved: true,
+            root_attributes: Vec::new(),
+            suppress_managed_headers: false,
+            suppress_managed_footers: false,
         }
     }
 }
@@ -1125,11 +1183,13 @@ impl SectionProperties {
 
     /// Remove a header reference and any section-owned replacement of that kind.
     pub fn remove_header(&mut self, kind: Kind) -> bool {
+        self.suppress_managed_headers = true;
         remove_reference(&mut self.headers, kind)
     }
 
     /// Remove a footer reference and any section-owned replacement of that kind.
     pub fn remove_footer(&mut self, kind: Kind) -> bool {
+        self.suppress_managed_footers = true;
         remove_reference(&mut self.footers, kind)
     }
 
@@ -1147,8 +1207,10 @@ impl SectionProperties {
             ));
         }
         let references = if header {
+            self.suppress_managed_headers = false;
             &mut self.headers
         } else {
+            self.suppress_managed_footers = false;
             &mut self.footers
         };
         remove_reference(references, kind);
