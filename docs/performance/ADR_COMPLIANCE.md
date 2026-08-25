@@ -1,5 +1,10 @@
 # Performance optimization ADR-compliance matrix
 
+## 2026-08-25: change 0280 leaves architecture unchanged
+
+- Binary identity failed before replication smoke or collection.
+- The operation-scoped session remains absent; existing per-read freshness boundaries and ADR interpretation remain unchanged.
+
 ## 2026-08-25: change 0279 rejected without an ADR change
 
 - The experimental closure-scoped CFB session received architecture and freshness-precedence review, but its strict performance evidence failed the keep gate.

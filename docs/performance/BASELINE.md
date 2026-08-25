@@ -1,5 +1,11 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 2026-08-25: change 0280 replication aborted before smoke
+
+- The frozen replication required exact 0279 binary identities; control matched, candidate did not, so collection stopped with zero samples and performance_claim:none.
+- No 0280 latency, counter, semantic, tail, or pooled evidence exists. The unchanged freshness-session candidate remains rejected.
+- Evidence: changes/0280-freshness-session-replication-aborted.md and results/0280-freshness-session-replication-aborted-20260825/.
+
 ## 2026-08-25: change 0279 freshness session rejected
 
 - A 12,000-sample fresh-child ABBA run failed the unqualified same-side drift limit in four p95/p99 cells, so the candidate was reverted and performance_claim:none.

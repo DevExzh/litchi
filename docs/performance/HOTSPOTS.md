@@ -1,5 +1,10 @@
 # Performance hotspot inventory
 
+## 2026-08-25: unchanged freshness-session replication closed
+
+- Change 0280 failed its binary identity gate before smoke; do not retry the unchanged change 0279 candidate or reinterpret the prior rejected tails.
+- Move the XLS source-backed program to a different bounded design or hotspot while preserving per-read freshness behavior.
+
 ## 2026-08-25: XLS freshness probes remain a measured hotspot
 
 - Change 0279 confirmed that successful-read version probes dominate the selected FileSource path, but the production session candidate was rejected because four same-side p95/p99 drift checks exceeded 5%.

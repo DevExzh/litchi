@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "verdict": "aborted_before_smoke",
+  "retained_samples": 0,
+  "performance_claim": "none",
+  "control": {
+    "revision": "9adbf9ee527b4ccd2e3494c824c761973633ea14",
+    "expected_bytes": 8416176,
+    "actual_bytes": 8416176,
+    "expected_sha256": "394d2e56184bea77dc3b0682f25712739b819c1b8e02aa301d2ab2a291c9bf82",
+    "actual_sha256": "394d2e56184bea77dc3b0682f25712739b819c1b8e02aa301d2ab2a291c9bf82",
+    "exact_match": true
+  },
+  "candidate": {
+    "revision": "0b0e1ed02c2fe4a262826a25a1f64b533bd0e686",
+    "expected_bytes": 8412832,
+    "actual_bytes": 8413200,
+    "expected_sha256": "a4edd3969c3114d15b6f773b2e9493e80bf0d4d117e627f269e1d37a23c4b562",
+    "actual_sha256": "d95c6aa41fb4811fa30ef8dc3f11d77f0205278b48b7b2c8baa85d3b395cae6e",
+    "exact_match": false
+  },
+  "events": [
+    "control rebuilt byte-identically",
+    "parallel candidate build was killed by the host for memory pressure",
+    "candidate build resumed alone with CARGO_BUILD_JOBS=2",
+    "completed candidate binary failed the predeclared exact identity gate"
+  ],
+  "decision": "abort_without_smoke_or_sampling"
+}
