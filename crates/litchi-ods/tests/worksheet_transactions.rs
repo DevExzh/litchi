@@ -11,6 +11,45 @@ const OPAQUE_ROW: &str = concat!(
     r#"</table:table-cell></table:table-row>"#,
 );
 
+const INLINE_LINK_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+    r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
+    r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
+    r#"<table:table-row><table:table-cell office:value-type="string">"#,
+    r#"<text:p><text:a xlink:href="https://example.invalid/never-fetch" xlink:type="simple">linked</text:a></text:p>"#,
+    r#"</table:table-cell></table:table-row></table:table>"#,
+    r#"</office:spreadsheet></office:body></office:document-content>"#,
+);
+
+const TABLE_COMMENT_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+    r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
+    r#"<!--retain producer marker--><table:table-row><table:table-cell/>"#,
+    r#"</table:table-row></table:table></office:spreadsheet></office:body>"#,
+    r#"</office:document-content>"#,
+);
+
+const TABLE_ATTRIBUTE_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+    r#"<office:body><office:spreadsheet><table:table table:name="Data" "#,
+    r#"table:protected="true"><table:table-row><table:table-cell/>"#,
+    r#"</table:table-row></table:table></office:spreadsheet></office:body>"#,
+    r#"</office:document-content>"#,
+);
+
+fn inline_link_source() -> litchi_core::Result<Vec<u8>> {
+    Builder::new().content_xml(INLINE_LINK_CONTENT).build()
+}
+
 fn row_splice_content() -> String {
     format!(
         concat!(
@@ -106,6 +145,102 @@ fn mutable_facade_publishes_batched_worksheet_edits() -> litchi_core::Result<()>
         litchi_core::Error::InvalidFormat("the formula cell is missing".to_string())
     })?;
     assert_eq!(cell.formula.as_deref(), Some("of:=1"));
+    Ok(())
+}
+
+#[test]
+fn structural_fallback_refuses_unsupported_inline_content_without_mutation()
+-> litchi_core::Result<()> {
+    let source = inline_link_source()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.add(Sheet::new("Added")?)?;
+
+    let error = edit.commit().err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "unsupported inline content unexpectedly survived structural fallback".to_string(),
+        )
+    })?;
+    let message = error.to_string();
+    assert!(message.contains("unsupported inline content"), "{message}");
+    assert!(message.contains("text:a"), "{message}");
+    assert_eq!(snapshot.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn builder_set_sheets_refuses_unsupported_inline_content_without_mutation()
+-> litchi_core::Result<()> {
+    let mut builder = Builder::new().content_xml(INLINE_LINK_CONTENT);
+    let before = builder.clone().build()?;
+    let mut sheets = builder.sheets()?;
+    sheets.push(Sheet::new("Added")?);
+
+    let error = builder.set_sheets(sheets).err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "unsupported inline content unexpectedly survived builder set_sheets".to_string(),
+        )
+    })?;
+    let message = error.to_string();
+    assert!(message.contains("unsupported inline content"), "{message}");
+    assert!(message.contains("text:a"), "{message}");
+    assert_eq!(builder.clone().build()?, before);
+    Ok(())
+}
+
+#[test]
+fn structural_fallback_refuses_table_level_markup_without_mutation() -> litchi_core::Result<()> {
+    let source = Builder::new().content_xml(TABLE_COMMENT_CONTENT).build()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.add(Sheet::new("Added")?)?;
+
+    let error = edit.commit().err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "table-level markup unexpectedly survived structural fallback".to_string(),
+        )
+    })?;
+    assert!(error.to_string().contains("table-level markup"));
+    assert_eq!(snapshot.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn builder_set_sheets_refuses_table_level_markup_without_mutation() -> litchi_core::Result<()> {
+    let mut builder = Builder::new().content_xml(TABLE_COMMENT_CONTENT);
+    let before = builder.clone().build()?;
+    let mut sheets = builder.sheets()?;
+    sheets.push(Sheet::new("Added")?);
+
+    let error = builder.set_sheets(sheets).err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "table-level markup unexpectedly survived builder set_sheets".to_string(),
+        )
+    })?;
+    assert!(error.to_string().contains("table-level markup"));
+    assert_eq!(builder.clone().build()?, before);
+    Ok(())
+}
+
+#[test]
+fn structural_fallback_refuses_unmodeled_table_attributes_without_mutation()
+-> litchi_core::Result<()> {
+    let source = Builder::new()
+        .content_xml(TABLE_ATTRIBUTE_CONTENT)
+        .build()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.add(Sheet::new("Added")?)?;
+
+    let error = edit.commit().err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "unmodeled table attribute unexpectedly survived structural fallback".to_string(),
+        )
+    })?;
+    let message = error.to_string();
+    assert!(message.contains("table attribute"), "{message}");
+    assert!(message.contains("protected"), "{message}");
+    assert_eq!(snapshot.as_bytes(), source);
     Ok(())
 }
 

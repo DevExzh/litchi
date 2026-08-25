@@ -1168,11 +1168,41 @@ pub(crate) fn write_sheet(sheet: &Sheet) -> Result<String> {
     Ok(output)
 }
 
+/// Render one worksheet under an exact allocation and output byte bound.
+pub(crate) fn write_sheet_bounded(sheet: &Sheet, max_bytes: usize) -> Result<String> {
+    validation::validate_sheet(sheet)?;
+    let mut output = String::new();
+    bounded_push(&mut output, "<table:table xmlns:table=\"", max_bytes)?;
+    bounded_push(&mut output, TABLE_NAMESPACE, max_bytes)?;
+    bounded_push(&mut output, "\" xmlns:office=\"", max_bytes)?;
+    bounded_push(&mut output, OFFICE_NAMESPACE, max_bytes)?;
+    bounded_push(&mut output, "\" xmlns:text=\"", max_bytes)?;
+    bounded_push(&mut output, TEXT_NAMESPACE, max_bytes)?;
+    bounded_push(&mut output, "\" table:name=\"", max_bytes)?;
+    bounded_push(&mut output, &escape_xml(&sheet.name), max_bytes)?;
+    bounded_push(&mut output, "\"", max_bytes)?;
+    if let Some(style_name) = &sheet.style_name {
+        bounded_push(&mut output, " table:style-name=\"", max_bytes)?;
+        bounded_push(&mut output, &escape_xml(style_name), max_bytes)?;
+        bounded_push(&mut output, "\"", max_bytes)?;
+    }
+    if sheet.rows.is_empty() {
+        bounded_push(&mut output, "/>", max_bytes)?;
+        return Ok(output);
+    }
+    bounded_push(&mut output, ">", max_bytes)?;
+    for row in &sheet.rows {
+        write_row_bounded(&mut output, row, max_bytes, false)?;
+    }
+    bounded_push(&mut output, "</table:table>", max_bytes)?;
+    Ok(output)
+}
+
 /// Render row fragments under an exact allocation and output byte bound.
 pub(crate) fn write_rows_bounded(rows: &[Row], max_bytes: usize) -> Result<String> {
     let mut output = String::new();
     for row in rows {
-        write_row_bounded(&mut output, row, max_bytes)?;
+        write_row_bounded(&mut output, row, max_bytes, true)?;
     }
     Ok(output)
 }
@@ -1183,31 +1213,39 @@ fn bounded_push(output: &mut String, value: &str, max_bytes: usize) -> Result<()
     })?;
     if next > max_bytes {
         return Err(Error::InvalidFormat(format!(
-            "flat ODS rendered rows exceed the {max_bytes} byte limit"
+            "flat ODS rendered worksheet content exceeds the {max_bytes} byte limit"
         )));
     }
     output.try_reserve(value.len()).map_err(|_error| {
-        Error::InvalidFormat("flat ODS row rendering allocation failed".to_string())
+        Error::InvalidFormat("flat ODS worksheet rendering allocation failed".to_string())
     })?;
     output.push_str(value);
     Ok(())
 }
 
-fn write_row_bounded(output: &mut String, row: &Row, max_bytes: usize) -> Result<()> {
+fn write_row_bounded(
+    output: &mut String,
+    row: &Row,
+    max_bytes: usize,
+    bind_namespaces: bool,
+) -> Result<()> {
     validation::validate_cell_runs(&row.cells)?;
-    bounded_push(
-        output,
-        concat!(
-            "<table:table-row xmlns:table=\"",
-            "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
-            "\" xmlns:office=\"",
-            "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
-            "\" xmlns:text=\"",
-            "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
-            "\""
-        ),
-        max_bytes,
-    )?;
+    bounded_push(output, "<table:table-row", max_bytes)?;
+    if bind_namespaces {
+        bounded_push(
+            output,
+            concat!(
+                " xmlns:table=\"",
+                "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+                "\" xmlns:office=\"",
+                "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+                "\" xmlns:text=\"",
+                "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+                "\""
+            ),
+            max_bytes,
+        )?;
+    }
     if row.repeat() > 1 {
         bounded_push(output, " table:number-rows-repeated=\"", max_bytes)?;
         bounded_push(output, &row.repeat().to_string(), max_bytes)?;
