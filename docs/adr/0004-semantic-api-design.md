@@ -3137,3 +3137,36 @@ publication. Metadata, UUIDs, save tokens, previews, and unrelated package
 members are not mutation targets and remain exact. This is persisted sort
 configuration ownership only, not a public physical row-sort or general table
 graph API.
+
+## 2026-08-26 amendment: Numbers unified cell-control semantic ownership
+
+Implementation commit `8f804fdc65f5d99a61d8b73503353901edf87488` adds
+selector-first `Package::{table_cell_control_format,
+edit_table_cell_control_format, apply_table_cell_control_format}` ownership.
+Reads return `Option<CellControl>`; an edit can set any of
+`CellControl::{Checkbox, StarRating, Slider, Stepper, PopUpMenu}` or clear the
+control and produces a conflict-checked commit, exact patch, inverse, redacted
+diagnostics, typed path, and typed resource failures. The semantic namespace
+reuses archive-free `Checkbox`, `StarRating`, `PopUpMenu`, and checked
+`Range`/`DisplayFormat` values; no native identifier or physical value crosses
+the facade.
+
+The owner resolves one exact rooted sheet/table/cell, admits the selected
+model, tile, format list, and control list only when their graph is unique and
+same-component, and strictly validates every mixed control-list entry.
+Checkbox, star, slider, and stepper transitions preserve scalar cell values,
+use copy-on-write list entries, maintain exact BNC/list refcounts, and cull
+unreferenced entries. Pop-Up Menu transitions reuse the existing strict popup
+model/metadata lifecycle rather than introducing a second writer. Exact
+aggregate/FieldInfo authority, current UUID ownership, metadata collisions,
+lock/dependency policy, candidate semantic readback, previews, and unrelated
+objects/members are verified before publication.
+
+Known control fields, fixed64 ranges, display-format fields, references, list
+keys/refcounts, and wire framing are strict. Admitted unknown overlong scalars
+and balanced groups are preserved by the hidden codec. Malformed, segmented,
+aliased, cross-component, ownership-ambiguous, or unsupported graphs fail
+closed. This slice does not own arbitrary scalar formatting, table topology,
+Pages/Keynote control graphs, cross-component repair, or a public native graph
+API. A fresh Numbers 14.4 source demonstrated the cross-component boundary,
+so native mutation acceptance is explicitly withheld rather than inferred.

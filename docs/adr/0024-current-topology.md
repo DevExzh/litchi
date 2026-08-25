@@ -2542,3 +2542,29 @@ dependency declarations, and 13 ordered migration debts. Debt 017 and the
 generated-schema and normal Prost/Buffa owners, and the IWA monolith. No
 crate, dependency edge, debt item, production manifest dependency, or
 monolith is removed by this cut.
+
+## 2026-08-26 amendment: Wave85 current-topology Numbers unified cell-control cut
+
+Implementation commit `8f804fdc65f5d99a61d8b73503353901edf87488` makes
+`litchi-numbers` the current selector-first owner of Checkbox, Star Rating,
+Slider, Stepper, and compatibility Pop-Up Menu reads, set/clear transactions,
+exact patch application, and inverse artifacts for admitted same-component
+Numbers table graphs. The package owns rooted cell/model/tile/list selection,
+strict mixed CellSpec and display-format codec execution, BNC/list refcount
+census, control copy-on-write/cull, metadata UUID/save-token transitions,
+operation-local budgeting, prepared publication, semantic readback, and exact
+object/member locality.
+
+The dedicated Numbers editor control method families are retired. The generic
+data-format bridge consumes the focused owner for file-backed Numbers
+controls. Private source-built compatibility readers/resets, Pages and Keynote
+control adapters, cross-component format/control graphs, general scalar data
+formats, and table topology remain at their recorded owners. Unsupported
+graphs fail closed.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debts 014 and 017,
+migration hosts, generated-schema and normal Prost/Buffa owners, and the IWA
+monolith. No crate, dependency edge, debt item, production manifest
+dependency, or monolith is removed by this cut.
