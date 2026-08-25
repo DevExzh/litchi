@@ -1009,6 +1009,169 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
 }
 
 #[test]
+fn hidden_edit_is_noop_when_state_is_already_hidden_or_visible() {
+    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let mut visible = source.edit();
+    visible
+        .set_text_hidden(TextSpan::new(0, 5).unwrap(), false)
+        .unwrap();
+    let visible_commit = visible.commit().unwrap();
+    assert!(!visible_commit.diagnostics().changed());
+    assert!(visible_commit.snapshot().same_snapshot(&source));
+
+    let mut hidden = source.edit();
+    hidden
+        .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let hidden_commit = hidden.commit().unwrap();
+    let bytes = hidden_commit.snapshot().to_bytes().unwrap();
+    assert!(bytes.windows(br"\v ".len()).any(|window| window == br"\v "));
+    assert!(
+        bytes
+            .windows(br"\v0 ".len())
+            .any(|window| window == br"\v0 ")
+    );
+    let reopened = Document::from_bytes(&bytes).unwrap();
+    let hidden_text = reopened
+        .body()
+        .runs()
+        .filter(|run| run.format().hidden())
+        .map(|run| run.text())
+        .collect::<String>();
+    let visible_text = reopened
+        .body()
+        .runs()
+        .filter(|run| !run.format().hidden())
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(hidden_text.contains("Alpha"));
+    assert!(visible_text.contains("Beta"));
+    let restored = hidden_commit
+        .patch()
+        .inverse()
+        .apply(hidden_commit.snapshot())
+        .unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().hidden()));
+}
+
+#[test]
+fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transport_and_stale_state()
+{
+    use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
+    use serde_json::Value;
+    use std::collections::BTreeMap;
+
+    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_hidden(TextSpan::new(6, 10).unwrap(), true)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    let reopened = Document::from_bytes(&bytes).unwrap();
+    let hidden_text = reopened
+        .body()
+        .runs()
+        .filter(|run| run.format().hidden())
+        .map(|run| run.text())
+        .collect::<String>();
+    let visible_text = reopened
+        .body()
+        .runs()
+        .filter(|run| !run.format().hidden())
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(hidden_text.contains("Beta"));
+    assert!(visible_text.contains("Alpha"));
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().hidden()));
+
+    let mixed = Document::parse(r"{\rtf1\ansi {\v Alpha} Beta}").unwrap();
+    let mut mixed_edit = mixed.edit();
+    assert!(matches!(
+        mixed_edit.set_text_hidden(TextSpan::new(0, 10).unwrap(), false),
+        Err(Error::UnsupportedSource(
+            "the selected character span has mixed hidden state"
+        ))
+    ));
+
+    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut paragraph_edit = paragraph.edit();
+    assert!(matches!(
+        paragraph_edit.set_text_hidden(TextSpan::new(0, 6).unwrap(), true),
+        Err(Error::UnsupportedSource(
+            "hidden edits require non-empty text within one paragraph"
+        ))
+    ));
+
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let mut cp1252_edit = cp1252.edit();
+    cp1252_edit
+        .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    assert!(matches!(
+        cp1252_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "hidden edits refuse non-ASCII transport encodings"
+        ))
+    ));
+
+    let limits = durable_limits(1);
+    let mut durable_edit = source.edit();
+    durable_edit
+        .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let durable_commit = durable_edit.commit().unwrap();
+    let durable = durable_commit.patch().to_durable(limits).unwrap();
+    assert_eq!(durable.operations()[0].op, "character-hidden.set");
+    assert_eq!(
+        durable.operations()[0].preconditions["hidden"],
+        Value::Bool(false)
+    );
+    assert_eq!(durable.operations()[0].value, Value::Bool(true));
+    let applied = source.apply_durable(&durable).unwrap();
+    assert!(applied.body().runs().any(|run| run.format().hidden()));
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().hidden()));
+    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex()),
+    );
+    preconditions.insert("hidden".to_string(), Value::Bool(true));
+    let forward = PatchOperation::new(
+        limits,
+        "character-hidden.set",
+        "body:utf8:0-5",
+        preconditions.clone(),
+        Value::Bool(false),
+    )
+    .unwrap();
+    let inverse = PatchOperation::new(
+        limits,
+        "character-hidden.set",
+        "body:utf8:0-5",
+        preconditions,
+        Value::Bool(true),
+    )
+    .unwrap();
+    let stale = Patch::<litchi_core::patch::Reversible>::new(
+        limits,
+        "litchi-rtf",
+        [ReversibleOperation::new(forward, inverse)],
+        BlobBundle::new(limits.blobs()),
+        BlobBundle::new(limits.blobs()),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale),
+        Err(Error::StalePrecondition("character hidden state differs"))
+    ));
+}
+
+#[test]
 fn italic_durable_patch_rejects_stale_property_and_artifact() {
     use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
     use serde_json::Value;

@@ -917,6 +917,11 @@ enum Operation {
         before: bool,
         after: bool,
     },
+    Hidden {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -1021,7 +1026,8 @@ impl Operation {
             | Self::Bold { .. }
             | Self::Italic { .. }
             | Self::Underline { .. }
-            | Self::Strike { .. } => 0,
+            | Self::Strike { .. }
+            | Self::Hidden { .. } => 0,
         }
     }
 
@@ -1052,6 +1058,9 @@ impl Operation {
             Self::Strike { span, .. } => {
                 vec![format!("body:character:{}-{}:strike", span.start, span.end)]
             },
+            Self::Hidden { span, .. } => {
+                vec![format!("body:character:{}-{}:hidden", span.start, span.end)]
+            },
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
@@ -1078,6 +1087,7 @@ impl Operation {
             | Self::Italic { span, .. }
             | Self::Underline { span, .. }
             | Self::Strike { span, .. }
+            | Self::Hidden { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
@@ -1104,6 +1114,7 @@ impl Operation {
                 | Self::Italic { .. }
                 | Self::Underline { .. }
                 | Self::Strike { .. }
+                | Self::Hidden { .. }
         )
     }
 
@@ -1665,6 +1676,68 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stages one exact hidden-text state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw hidden state. This operates
+    /// only on ordinary body runs and does not interpret stylesheet controls or
+    /// hidden destinations as body formatting.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_hidden(&mut self, span: TextSpan, hidden: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "hidden edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = hidden_for_span(&self.source, span)?;
+        self.operations.push(Operation::Hidden {
+            span,
+            before,
+            after: hidden,
+        });
+        Ok(self)
+    }
+
     /// Inserts one ordinary paragraph immediately after a checked paragraph.
     ///
     /// This is the transaction's explicit structural class. The inserted text
@@ -2165,6 +2238,7 @@ impl Edit {
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
                     | Operation::Strike { .. }
+                    | Operation::Hidden { .. }
                     | Operation::InsertParagraph { .. }
             )
         }) {
@@ -2582,6 +2656,7 @@ impl Edit {
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
                     | Operation::Strike { .. }
+                    | Operation::Hidden { .. }
             )
         });
         let mut alignments = if property_operation {
@@ -2609,6 +2684,11 @@ impl Edit {
         } else {
             false
         };
+        let base_hidden = if property_operation && !layout_operation {
+            base_hidden_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
         let mut baseline = self
             .source
             .body()
@@ -2619,10 +2699,12 @@ impl Edit {
         baseline.italic = base_italic;
         baseline.underline = base_underline;
         baseline.strike = base_strike;
+        baseline.hidden = base_hidden;
         let mut projected_bold_ranges = Vec::new();
         let mut projected_italic_ranges = Vec::new();
         let mut projected_underline_ranges = Vec::new();
         let mut projected_strike_ranges = Vec::new();
+        let mut projected_hidden_ranges = Vec::new();
         let mut paragraph_properties = if layout_operation {
             source_paragraph_properties(&self.source)?
         } else {
@@ -2683,6 +2765,10 @@ impl Edit {
                     projected_strike_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::Hidden { span, after, .. } => {
+                    projected_hidden_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Text { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
@@ -2717,6 +2803,9 @@ impl Edit {
         let has_strike_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Strike { before, after, .. } if before != after)
         });
+        let has_hidden_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Hidden { before, after, .. } if before != after)
+        });
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
@@ -2726,7 +2815,8 @@ impl Edit {
             || has_bold_delta
             || has_italic_delta
             || has_underline_delta
-            || has_strike_delta;
+            || has_strike_delta
+            || has_hidden_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
             return Ok(Commit::new(
@@ -2764,6 +2854,10 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::Strike { .. }));
+        let has_hidden_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Hidden { .. }));
         if has_italic_operation && !source_bytes.is_ascii() {
             return Err(Error::UnsupportedSource(
                 "italic edits refuse non-ASCII transport encodings",
@@ -2779,6 +2873,11 @@ impl Edit {
                 "strike edits refuse non-ASCII transport encodings",
             ));
         }
+        if has_hidden_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "hidden edits refuse non-ASCII transport encodings",
+            ));
+        }
         if layout_operation {
             self.source
                 .model()
@@ -2788,11 +2887,13 @@ impl Edit {
             || has_italic_operation
             || has_underline_operation
             || has_strike_operation
+            || has_hidden_operation
         {
             if has_bold_operation
                 && !has_italic_operation
                 && !has_underline_operation
                 && !has_strike_operation
+                && !has_hidden_operation
             {
                 self.source
                     .model()
@@ -2805,6 +2906,7 @@ impl Edit {
                     has_italic_operation,
                     has_underline_operation,
                     has_strike_operation,
+                    has_hidden_operation,
                 )
                 .map_err(Error::UnsupportedSource)?;
             }
@@ -2821,6 +2923,7 @@ impl Edit {
                 || has_italic_operation
                 || has_underline_operation
                 || has_strike_operation
+                || has_hidden_operation
             {
                 return Err(Error::ParagraphLayoutTextConflict);
             }
@@ -2835,14 +2938,18 @@ impl Edit {
                 &replacement,
                 &alignments,
                 baseline,
-                base_bold,
-                &projected_bold_ranges,
-                base_italic,
-                &projected_italic_ranges,
-                base_underline,
-                &projected_underline_ranges,
-                base_strike,
-                &projected_strike_ranges,
+                CharacterPropertyOverlays {
+                    base_bold,
+                    bold_changes: &projected_bold_ranges,
+                    base_italic,
+                    italic_changes: &projected_italic_ranges,
+                    base_underline,
+                    underline_changes: &projected_underline_ranges,
+                    base_strike,
+                    strike_changes: &projected_strike_ranges,
+                    base_hidden,
+                    hidden_changes: &projected_hidden_ranges,
+                },
                 self.source.limits(),
             )?
         } else {
@@ -2898,6 +3005,13 @@ impl Edit {
             if strike_for_span(&snapshot, strike_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate strike property did not survive RTF validation",
+                ));
+            }
+        }
+        for (hidden_span, expected) in projected_hidden_ranges {
+            if hidden_for_span(&snapshot, hidden_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate hidden property did not survive RTF validation",
                 ));
             }
         }
@@ -3204,6 +3318,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -3281,6 +3396,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -3933,6 +4049,7 @@ fn project_text(
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -4074,6 +4191,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::Italic { .. }
         | Operation::Underline { .. }
         | Operation::Strike { .. }
+        | Operation::Hidden { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
@@ -4223,6 +4341,7 @@ fn plain_body_character_editability(
     allow_mixed_italic: bool,
     allow_mixed_underline: bool,
     allow_mixed_strike: bool,
+    allow_mixed_hidden: bool,
 ) -> Result<(), &'static str> {
     source.model().local_paragraph_property_editability()?;
     let mut paragraph_format = None;
@@ -4246,6 +4365,9 @@ fn plain_body_character_editability(
             }
             if allow_mixed_strike {
                 raw_character.strike = false;
+            }
+            if allow_mixed_hidden {
+                raw_character.hidden = false;
             }
             if character_format.is_some_and(|existing| existing != raw_character) {
                 return Err("the body has mixed run or paragraph formatting");
@@ -4276,6 +4398,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4328,6 +4451,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::Hidden { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4370,6 +4494,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Bold { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4422,6 +4547,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Bold { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
+                | Operation::Hidden { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4467,6 +4593,7 @@ fn base_underline_for_edit(
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4519,6 +4646,7 @@ fn base_underline_for_edit(
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Strike { .. }
+                | Operation::Hidden { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4561,6 +4689,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
+            | Operation::Hidden { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4613,6 +4742,103 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
+                | Operation::Hidden { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_hidden(source: &Snapshot) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let hidden = run.format().raw().hidden;
+        if value.is_some_and(|existing| existing != hidden) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(hidden);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
+    let hidden_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Hidden { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if hidden_spans.is_empty() {
+        return uniform_body_hidden(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &hidden_spans) {
+                let value = run.format().raw().hidden;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed hidden state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Hidden { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4778,6 +5004,43 @@ fn strike_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
     ))
 }
 
+fn hidden_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let hidden = run.format().raw().hidden;
+                if value.is_some_and(|existing| existing != hidden) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed hidden state",
+                    ));
+                }
+                value = Some(hidden);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
 fn formatting_for_span(
     source: &Snapshot,
     span: TextSpan,
@@ -4839,6 +5102,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -5035,29 +5299,37 @@ enum CharacterPropertyChange {
     Italic(bool),
     Underline(UnderlineStyle),
     Strike(bool),
+    Hidden(bool),
+}
+
+struct CharacterPropertyOverlays<'a> {
+    base_bold: bool,
+    bold_changes: &'a [(TextSpan, bool)],
+    base_italic: bool,
+    italic_changes: &'a [(TextSpan, bool)],
+    base_underline: UnderlineStyle,
+    underline_changes: &'a [(TextSpan, UnderlineStyle)],
+    base_strike: bool,
+    strike_changes: &'a [(TextSpan, bool)],
+    base_hidden: bool,
+    hidden_changes: &'a [(TextSpan, bool)],
 }
 
 fn encoded_body_with_properties(
     text: &str,
     alignments: &[Alignment],
     baseline: crate::types::Formatting,
-    base_bold: bool,
-    bold_changes: &[(TextSpan, bool)],
-    base_italic: bool,
-    italic_changes: &[(TextSpan, bool)],
-    base_underline: UnderlineStyle,
-    underline_changes: &[(TextSpan, UnderlineStyle)],
-    base_strike: bool,
-    strike_changes: &[(TextSpan, bool)],
+    overlays: CharacterPropertyOverlays<'_>,
     limits: crate::ParseLimits,
 ) -> Result<Vec<u8>, Error> {
     let extra = alignments
         .len()
         .checked_mul(4)
-        .and_then(|bytes| bytes.checked_add(bold_changes.len().saturating_mul(6)))
-        .and_then(|bytes| bytes.checked_add(italic_changes.len().saturating_mul(6)))
-        .and_then(|bytes| bytes.checked_add(underline_changes.len().saturating_mul(12)))
-        .and_then(|bytes| bytes.checked_add(strike_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(overlays.bold_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(overlays.italic_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(overlays.underline_changes.len().saturating_mul(12)))
+        .and_then(|bytes| bytes.checked_add(overlays.strike_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(overlays.hidden_changes.len().saturating_mul(6)))
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: limits.max_source_bytes(),
@@ -5094,31 +5366,43 @@ fn encoded_body_with_properties(
             .map_err(|error| Error::Write(error.to_string()))?;
         write_alignment(&mut output, alignments.get(paragraph).copied())?;
         let mut cursor = paragraph_start;
-        let mut paragraph_changes = bold_changes
+        let mut paragraph_changes = overlays
+            .bold_changes
             .iter()
             .copied()
             .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
             .map(|(span, value)| (span, CharacterPropertyChange::Bold(value)))
             .chain(
-                italic_changes
+                overlays
+                    .italic_changes
                     .iter()
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::Italic(value))),
             )
             .chain(
-                underline_changes
+                overlays
+                    .underline_changes
                     .iter()
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::Underline(value))),
             )
             .chain(
-                strike_changes
+                overlays
+                    .strike_changes
                     .iter()
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::Strike(value))),
+            )
+            .chain(
+                overlays
+                    .hidden_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Hidden(value))),
             )
             .collect::<Vec<_>>();
         paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
@@ -5128,38 +5412,48 @@ fn encoded_body_with_properties(
                 CharacterPropertyChange::Bold(value) => {
                     write_bold(&mut output, value);
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, base_bold);
+                    write_bold(&mut output, overlays.base_bold);
                 },
                 CharacterPropertyChange::Italic(value) => {
                     // The parser flushes body text at bold controls but not at
                     // italic controls. Reasserting the current bold state around
                     // this italic fragment creates a run boundary without
                     // changing the effective formatting or source envelope.
-                    write_bold(&mut output, base_bold);
+                    write_bold(&mut output, overlays.base_bold);
                     write_italic(&mut output, value);
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, base_bold);
-                    write_italic(&mut output, base_italic);
+                    write_bold(&mut output, overlays.base_bold);
+                    write_italic(&mut output, overlays.base_italic);
                 },
                 CharacterPropertyChange::Underline(value) => {
                     // Underline controls do not by themselves flush all parser
                     // run state. Bold controls force the same safe boundary as
                     // the existing italic property path.
-                    write_bold(&mut output, base_bold);
+                    write_bold(&mut output, overlays.base_bold);
                     write_underline(&mut output, value);
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, base_bold);
-                    write_underline(&mut output, base_underline);
+                    write_bold(&mut output, overlays.base_bold);
+                    write_underline(&mut output, overlays.base_underline);
                 },
                 CharacterPropertyChange::Strike(value) => {
                     // Strike controls do not by themselves flush all parser
                     // run state. Bold controls force the same safe boundary
                     // while the baseline's double-strike facet remains intact.
-                    write_bold(&mut output, base_bold);
+                    write_bold(&mut output, overlays.base_bold);
                     write_strike(&mut output, value);
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, base_bold);
-                    write_strike(&mut output, base_strike);
+                    write_bold(&mut output, overlays.base_bold);
+                    write_strike(&mut output, overlays.base_strike);
+                },
+                CharacterPropertyChange::Hidden(value) => {
+                    // Hidden controls are local character state. Reasserting
+                    // bold around the fragment forces the same run boundary
+                    // used by the other character-property encoders.
+                    write_bold(&mut output, overlays.base_bold);
+                    write_hidden(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold);
+                    write_hidden(&mut output, overlays.base_hidden);
                 },
             }
             cursor = span.end;
@@ -5419,6 +5713,14 @@ fn write_strike(output: &mut Vec<u8>, strike: bool) {
     }
 }
 
+fn write_hidden(output: &mut Vec<u8>, hidden: bool) {
+    if hidden {
+        output.extend_from_slice(br"\v ");
+    } else {
+        output.extend_from_slice(br"\v0 ");
+    }
+}
+
 /// Result of an atomically validated RTF edit.
 pub struct Commit {
     snapshot: Snapshot,
@@ -5511,6 +5813,12 @@ enum Change {
         after: UnderlineStyle,
     },
     Strike {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Hidden {
         span: TextSpan,
         after_span: TextSpan,
         before: bool,
@@ -5660,6 +5968,17 @@ impl Change {
                 before,
                 after,
             } => Self::Strike {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Hidden {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Hidden {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -5884,6 +6203,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::Hidden {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Hidden {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::InsertParagraph {
                 position,
                 span,
@@ -6022,6 +6351,7 @@ fn semantic_changes(
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
+            | Operation::Hidden { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
@@ -6244,6 +6574,21 @@ fn durable_operation(
             litchi_core::patch::PatchOperation::new(
                 limits,
                 "character-strike.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Hidden {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("hidden".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-hidden.set",
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Bool(*after),
@@ -6706,6 +7051,23 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("strike value must be Boolean".to_string())
                 })?;
                 edit.set_text_strike(span, replacement)?;
+            },
+            "character-hidden.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("hidden")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing hidden precondition".to_string())
+                    })?;
+                if hidden_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character hidden state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("hidden value must be Boolean".to_string())
+                })?;
+                edit.set_text_hidden(span, replacement)?;
             },
             "paragraph.insert-after" => {
                 let position = parse_paragraph_target(&operation.target)?;
