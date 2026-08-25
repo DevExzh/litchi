@@ -1,0 +1,12 @@
+{
+  "schema": "litchi.docx.source-selected-paragraph.build.v1",
+  "git_revision": "df2cb38f6ddbb34ae1a83a942755d4baeb8c1179",
+  "cargo_lock_sha256": "723fc29f56056ef8f155f60aa6b4d011d4d648bd3bc4d2e0b03341f65f0d3c71",
+  "rustc_vv_sha256": "0f1e5974425d9a3f3697d68725b2196a47e04096fb98160ce78b3b706d7c5054",
+  "rustc_normalization": "trim trailing whitespace",
+  "profile": "release",
+  "features": "litchi-perf-baseline manifest default features; non-iWork DOCX facade and owner source-backed paths",
+  "build_command": "CARGO_BUILD_JOBS=1 cargo build --manifest-path tools/perf-baseline/Cargo.toml --locked --release --bin docx_source_selected_paragraph --target-dir /dev/shm/litchi-docx-selected-evidence-release-target",
+  "executable_bytes": 8555792,
+  "executable_sha256": "6b65e7c2f50ab28fce1263ffc0d3c04bd60d956ce50fcc6017591648ba43d9fc"
+}

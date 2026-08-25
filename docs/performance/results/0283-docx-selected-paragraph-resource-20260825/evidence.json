@@ -1,0 +1,823 @@
+{
+  "schema": "litchi.docx.source-selected-paragraph.v1",
+  "run_mode": "authoritative",
+  "claim_authorized": true,
+  "claim_scope": "selected paragraph access after one main-document materialization; logical ReadAt/cache/managed-budget evidence only",
+  "performance_claim": "none",
+  "sha256_sidecar_path": "/dev/shm/litchi-docx-selected-evidence-0283/evidence.json.sha256.json",
+  "corpus": {
+    "generator": "litchi-docx-source-selected-paragraph-media-v2",
+    "archive_bytes": 16786572,
+    "archive_sha256": "a4384c2c249ef87bac6150f92b1a839d4555872f5c9b6ffe6b3d849f47bb7fef",
+    "archive_min_bytes": 15728640,
+    "archive_max_bytes": 20971520,
+    "member_count": 15,
+    "media_member_count": 8,
+    "media_payload_bytes": 2097152,
+    "direct_body_paragraph_count": 201,
+    "target_index": 100,
+    "members": {
+      "[Content_Types].xml": {
+        "bytes": 818,
+        "sha256": "849f47a7ef8b85296273d04133f31573d64c9d71de84feba05e5dc20a475fdb6"
+      },
+      "_rels/.rels": {
+        "bytes": 442,
+        "sha256": "b7ae6e1849778a0fa08ce4ad648050804c83b7a055e97ad92c7c234156896480"
+      },
+      "docProps/core.xml": {
+        "bytes": 218,
+        "sha256": "6126834278f255cf3d5774fd2d2609dd745d5192977feb8d636cfc91590e7ad9"
+      },
+      "word/_rels/document.xml.rels": {
+        "bytes": 1475,
+        "sha256": "59751058203e36f24ef75fa098982ff721520dd9e2df0322645a9f5410be2a8f"
+      },
+      "word/document.xml": {
+        "bytes": 12776,
+        "sha256": "e113d449b7d0a59409405c923e11d3fedc32778cb5eaa91cf003270a3807b3cd"
+      },
+      "word/media/source-selected-00.png": {
+        "bytes": 2097152,
+        "sha256": "2429ba44c99c1d4813c334764a892b21f080ec004ec299517ee61e6007e3fefe"
+      },
+      "word/media/source-selected-01.png": {
+        "bytes": 2097152,
+        "sha256": "c74a391bd89d586bdbde2490325f9a9cbb0a4c219fa79c69c232e567016d5acb"
+      },
+      "word/media/source-selected-02.png": {
+        "bytes": 2097152,
+        "sha256": "a71bb0f89f880442c0e0fad2a0583ca79a9660c9d1c3eb691fd1386e55648364"
+      },
+      "word/media/source-selected-03.png": {
+        "bytes": 2097152,
+        "sha256": "b5660cc9edc7eb6b2662c0ab945601cca5f3f4095c57854fb40c986be42fcfdd"
+      },
+      "word/media/source-selected-04.png": {
+        "bytes": 2097152,
+        "sha256": "c06d5134493e56f256c47e8d2a5b8e63840032676c6db0bf69ce2a67ea5f275a"
+      },
+      "word/media/source-selected-05.png": {
+        "bytes": 2097152,
+        "sha256": "e41b5a7457e9a7ac7db866cb237f44708768786314d46e29e4aa378c508ce3e5"
+      },
+      "word/media/source-selected-06.png": {
+        "bytes": 2097152,
+        "sha256": "b374568e8768e6874d6d7be8fbbd06b80ce6242819606b1871752f97b4a1d783"
+      },
+      "word/media/source-selected-07.png": {
+        "bytes": 2097152,
+        "sha256": "c49830169bb2cdf662ca986fd15072ba8c980b00c98ff522cff7e92749d7bd07"
+      },
+      "word/opaque/source-selected.bin": {
+        "bytes": 2048,
+        "sha256": "285ce05337c55fe794fb758e94bf644419e885b58b5d01fdc0c6727216896906"
+      },
+      "word/settings.xml": {
+        "bytes": 84,
+        "sha256": "23bbc7637f0ee8acd3365be9b554ffab913e6457f089e77fe909bb659b7c222f"
+      }
+    }
+  },
+  "provenance": {
+    "executable_path": "/dev/shm/litchi-docx-selected-evidence-release-target/release/docx_source_selected_paragraph",
+    "executable_bytes": 8555792,
+    "executable_sha256": "6b65e7c2f50ab28fce1263ffc0d3c04bd60d956ce50fcc6017591648ba43d9fc",
+    "git_revision": "df2cb38f6ddbb34ae1a83a942755d4baeb8c1179",
+    "git_dirty": false,
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "rustc_vv_sha256": "0f1e5974425d9a3f3697d68725b2196a47e04096fb98160ce78b3b706d7c5054",
+    "executable_identity_policy": "runtime self-identity only; authoritative acceptance requires an independently retained artifact-manifest comparison",
+    "cargo_lock_path": "/dev/shm/litchi-docx-selected-evidence-worktree/tools/perf-baseline/Cargo.lock",
+    "cargo_lock_bytes": 56061,
+    "cargo_lock_sha256": "723fc29f56056ef8f155f60aa6b4d011d4d648bd3bc4d2e0b03341f65f0d3c71",
+    "profile": "release",
+    "features": "litchi-perf-baseline manifest default features; non-iWork DOCX facade and owner source-backed paths",
+    "build_command": "CARGO_BUILD_JOBS=1 cargo build --manifest-path tools/perf-baseline/Cargo.toml --locked --release --bin docx_source_selected_paragraph --target-dir /dev/shm/litchi-docx-selected-evidence-release-target",
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "memory": "32812712 kB",
+    "environment": {}
+  },
+  "target": {
+    "direct_body_index": 100,
+    "expected_paragraph_count": 201,
+    "expected_text": "source-selected-paragraph-0100"
+  },
+  "oracles": {
+    "eager": {
+      "selected_text": "source-selected-paragraph-0100",
+      "out_of_bounds_none": true
+    },
+    "facade": {
+      "selected_text": "source-selected-paragraph-0100",
+      "out_of_bounds_none": true,
+      "stale_source_changed": true
+    }
+  },
+  "source_runs": [
+    {
+      "mode": "unmanaged",
+      "selected_text": "source-selected-paragraph-0100",
+      "out_of_bounds_none": true,
+      "source_version_before": {
+        "id": 4924774511323141681,
+        "revision": 0
+      },
+      "source_version_after_queries": {
+        "id": 4924774511323141681,
+        "revision": 0
+      },
+      "source_version_unchanged_before_stale": true,
+      "open_without_semantic_payload_member_reads": {
+        "source": {
+          "read_calls": 18,
+          "requested_bytes": 2096,
+          "returned_bytes": 2096,
+          "len_calls": 1,
+          "version_calls": 6,
+          "range_records": 18,
+          "zip_structural_requested_bytes": 1300,
+          "zip_structural_returned_bytes": 1300,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {
+            "catalog_relationship": 796,
+            "zip_structural": 1300
+          },
+          "class_returned_bytes": {
+            "catalog_relationship": 796,
+            "zip_structural": 1300
+          },
+          "member_reads": {
+            "<zip-structural-central>": {
+              "class": "zip_structural",
+              "calls": 2,
+              "range_count": 2,
+              "requested_bytes": 1140,
+              "returned_bytes": 1140,
+              "first_offset": 16785456,
+              "last_offset": 16785456
+            },
+            "<zip-structural-eocd>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 22,
+              "returned_bytes": 22,
+              "first_offset": 16786550,
+              "last_offset": 16786550
+            },
+            "<zip-structural-local-[Content_Types].xml>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 0,
+              "last_offset": 0
+            },
+            "<zip-structural-local-_rels/.rels>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 381,
+              "last_offset": 381
+            },
+            "<zip-structural-local-word/_rels/document.xml.rels>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 1593,
+              "last_offset": 1593
+            },
+            "<zip-structural-other>": {
+              "class": "zip_structural",
+              "calls": 6,
+              "range_count": 6,
+              "requested_bytes": 48,
+              "returned_bytes": 48,
+              "first_offset": 365,
+              "last_offset": 1914
+            },
+            "[Content_Types].xml": {
+              "class": "catalog_relationship",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 316,
+              "returned_bytes": 316,
+              "first_offset": 49,
+              "last_offset": 49
+            },
+            "_rels/.rels": {
+              "class": "catalog_relationship",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 217,
+              "returned_bytes": 217,
+              "first_offset": 422,
+              "last_offset": 422
+            },
+            "word/_rels/document.xml.rels": {
+              "class": "catalog_relationship",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 263,
+              "returned_bytes": 263,
+              "first_offset": 1651,
+              "last_offset": 1651
+            }
+          }
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "document_materialization_main_document_only_semantic_payload": {
+        "source": {
+          "read_calls": 5,
+          "requested_bytes": 709,
+          "returned_bytes": 709,
+          "len_calls": 0,
+          "version_calls": 7,
+          "range_records": 5,
+          "zip_structural_requested_bytes": 46,
+          "zip_structural_returned_bytes": 46,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {
+            "main_document": 663,
+            "zip_structural": 46
+          },
+          "class_returned_bytes": {
+            "main_document": 663,
+            "zip_structural": 46
+          },
+          "member_reads": {
+            "<zip-structural-local-word/document.xml>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 867,
+              "last_offset": 867
+            },
+            "<zip-structural-other>": {
+              "class": "zip_structural",
+              "calls": 2,
+              "range_count": 2,
+              "requested_bytes": 16,
+              "returned_bytes": 16,
+              "first_offset": 1577,
+              "last_offset": 1577
+            },
+            "word/document.xml": {
+              "class": "main_document",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 663,
+              "returned_bytes": 663,
+              "first_offset": 914,
+              "last_offset": 914
+            }
+          }
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 1,
+          "waiter_joins": 0,
+          "successful_loads": 1,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "paragraph_query": {
+        "source": {
+          "read_calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0,
+          "len_calls": 0,
+          "version_calls": 0,
+          "range_records": 0,
+          "zip_structural_requested_bytes": 0,
+          "zip_structural_returned_bytes": 0,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {},
+          "class_returned_bytes": {},
+          "member_reads": {}
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "out_of_bounds_query": {
+        "source": {
+          "read_calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0,
+          "len_calls": 0,
+          "version_calls": 0,
+          "range_records": 0,
+          "zip_structural_requested_bytes": 0,
+          "zip_structural_returned_bytes": 0,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {},
+          "class_returned_bytes": {},
+          "member_reads": {}
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "stale_refusal": {
+        "snapshot_stable_selected_text": true,
+        "snapshot_query_no_source_work": true,
+        "package_reentry_typed_source_changed": true,
+        "snapshot_semantics": "immutable document snapshot intentionally remains stable after source revision",
+        "observed_revision": 1,
+        "source": {
+          "read_calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0,
+          "len_calls": 0,
+          "version_calls": 0,
+          "range_records": 0,
+          "zip_structural_requested_bytes": 0,
+          "zip_structural_returned_bytes": 0,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {},
+          "class_returned_bytes": {},
+          "member_reads": {}
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "cache_after_document_materialization": {
+        "hits": 0,
+        "cold_loads": 1,
+        "waiter_joins": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "evictions": 0,
+        "bypasses": 0,
+        "oversized_bypasses": 0,
+        "allocation_bypasses": 0,
+        "retained_entries": 1,
+        "retained_bytes": 12776,
+        "in_flight_loads": 0,
+        "budget_managed": false,
+        "budget_reservation_failures": 0,
+        "budget_memory_used": 0,
+        "budget_cache_reserved_bytes": 0,
+        "budget_memory_limit": null,
+        "budget_input_bytes_used": 0,
+        "budget_input_bytes_limit": null,
+        "budget_output_bytes_used": 0,
+        "budget_output_bytes_limit": null,
+        "budget_work_used": 0,
+        "budget_work_limit": null,
+        "budget_objects_used": 0,
+        "budget_objects_limit": null,
+        "budget_catalog_reserved_objects": 0,
+        "budget_cache_reserved_objects": 0
+      },
+      "cache_after_queries": {
+        "hits": 0,
+        "cold_loads": 1,
+        "waiter_joins": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "evictions": 0,
+        "bypasses": 0,
+        "oversized_bypasses": 0,
+        "allocation_bypasses": 0,
+        "retained_entries": 1,
+        "retained_bytes": 12776,
+        "in_flight_loads": 0,
+        "budget_managed": false,
+        "budget_reservation_failures": 0,
+        "budget_memory_used": 0,
+        "budget_cache_reserved_bytes": 0,
+        "budget_memory_limit": null,
+        "budget_input_bytes_used": 0,
+        "budget_input_bytes_limit": null,
+        "budget_output_bytes_used": 0,
+        "budget_output_bytes_limit": null,
+        "budget_work_used": 0,
+        "budget_work_limit": null,
+        "budget_objects_used": 0,
+        "budget_objects_limit": null,
+        "budget_catalog_reserved_objects": 0,
+        "budget_cache_reserved_objects": 0
+      },
+      "budget": null
+    },
+    {
+      "mode": "managed",
+      "selected_text": "source-selected-paragraph-0100",
+      "out_of_bounds_none": true,
+      "source_version_before": {
+        "id": 4924774511323141681,
+        "revision": 0
+      },
+      "source_version_after_queries": {
+        "id": 4924774511323141681,
+        "revision": 0
+      },
+      "source_version_unchanged_before_stale": true,
+      "open_without_semantic_payload_member_reads": {
+        "source": {
+          "read_calls": 18,
+          "requested_bytes": 2096,
+          "returned_bytes": 2096,
+          "len_calls": 1,
+          "version_calls": 6,
+          "range_records": 18,
+          "zip_structural_requested_bytes": 1300,
+          "zip_structural_returned_bytes": 1300,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {
+            "catalog_relationship": 796,
+            "zip_structural": 1300
+          },
+          "class_returned_bytes": {
+            "catalog_relationship": 796,
+            "zip_structural": 1300
+          },
+          "member_reads": {
+            "<zip-structural-central>": {
+              "class": "zip_structural",
+              "calls": 2,
+              "range_count": 2,
+              "requested_bytes": 1140,
+              "returned_bytes": 1140,
+              "first_offset": 16785456,
+              "last_offset": 16785456
+            },
+            "<zip-structural-eocd>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 22,
+              "returned_bytes": 22,
+              "first_offset": 16786550,
+              "last_offset": 16786550
+            },
+            "<zip-structural-local-[Content_Types].xml>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 0,
+              "last_offset": 0
+            },
+            "<zip-structural-local-_rels/.rels>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 381,
+              "last_offset": 381
+            },
+            "<zip-structural-local-word/_rels/document.xml.rels>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 1593,
+              "last_offset": 1593
+            },
+            "<zip-structural-other>": {
+              "class": "zip_structural",
+              "calls": 6,
+              "range_count": 6,
+              "requested_bytes": 48,
+              "returned_bytes": 48,
+              "first_offset": 365,
+              "last_offset": 1914
+            },
+            "[Content_Types].xml": {
+              "class": "catalog_relationship",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 316,
+              "returned_bytes": 316,
+              "first_offset": 49,
+              "last_offset": 49
+            },
+            "_rels/.rels": {
+              "class": "catalog_relationship",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 217,
+              "returned_bytes": 217,
+              "first_offset": 422,
+              "last_offset": 422
+            },
+            "word/_rels/document.xml.rels": {
+              "class": "catalog_relationship",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 263,
+              "returned_bytes": 263,
+              "first_offset": 1651,
+              "last_offset": 1651
+            }
+          }
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "document_materialization_main_document_only_semantic_payload": {
+        "source": {
+          "read_calls": 5,
+          "requested_bytes": 709,
+          "returned_bytes": 709,
+          "len_calls": 0,
+          "version_calls": 7,
+          "range_records": 5,
+          "zip_structural_requested_bytes": 46,
+          "zip_structural_returned_bytes": 46,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {
+            "main_document": 663,
+            "zip_structural": 46
+          },
+          "class_returned_bytes": {
+            "main_document": 663,
+            "zip_structural": 46
+          },
+          "member_reads": {
+            "<zip-structural-local-word/document.xml>": {
+              "class": "zip_structural",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 30,
+              "returned_bytes": 30,
+              "first_offset": 867,
+              "last_offset": 867
+            },
+            "<zip-structural-other>": {
+              "class": "zip_structural",
+              "calls": 2,
+              "range_count": 2,
+              "requested_bytes": 16,
+              "returned_bytes": 16,
+              "first_offset": 1577,
+              "last_offset": 1577
+            },
+            "word/document.xml": {
+              "class": "main_document",
+              "calls": 1,
+              "range_count": 1,
+              "requested_bytes": 663,
+              "returned_bytes": 663,
+              "first_offset": 914,
+              "last_offset": 914
+            }
+          }
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 1,
+          "waiter_joins": 0,
+          "successful_loads": 1,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "paragraph_query": {
+        "source": {
+          "read_calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0,
+          "len_calls": 0,
+          "version_calls": 0,
+          "range_records": 0,
+          "zip_structural_requested_bytes": 0,
+          "zip_structural_returned_bytes": 0,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {},
+          "class_returned_bytes": {},
+          "member_reads": {}
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "out_of_bounds_query": {
+        "source": {
+          "read_calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0,
+          "len_calls": 0,
+          "version_calls": 0,
+          "range_records": 0,
+          "zip_structural_requested_bytes": 0,
+          "zip_structural_returned_bytes": 0,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {},
+          "class_returned_bytes": {},
+          "member_reads": {}
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "stale_refusal": {
+        "snapshot_stable_selected_text": true,
+        "snapshot_query_no_source_work": true,
+        "package_reentry_typed_source_changed": true,
+        "snapshot_semantics": "immutable document snapshot intentionally remains stable after source revision",
+        "observed_revision": 1,
+        "source": {
+          "read_calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0,
+          "len_calls": 0,
+          "version_calls": 0,
+          "range_records": 0,
+          "zip_structural_requested_bytes": 0,
+          "zip_structural_returned_bytes": 0,
+          "unclassified_requested_bytes": 0,
+          "unclassified_returned_bytes": 0,
+          "class_requested_bytes": {},
+          "class_returned_bytes": {},
+          "member_reads": {}
+        },
+        "cache": {
+          "hits": 0,
+          "cold_loads": 0,
+          "waiter_joins": 0,
+          "successful_loads": 0,
+          "failed_loads": 0,
+          "evictions": 0,
+          "bypasses": 0,
+          "oversized_bypasses": 0,
+          "allocation_bypasses": 0,
+          "budget_reservation_failures": 0
+        }
+      },
+      "cache_after_document_materialization": {
+        "hits": 0,
+        "cold_loads": 1,
+        "waiter_joins": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "evictions": 0,
+        "bypasses": 0,
+        "oversized_bypasses": 0,
+        "allocation_bypasses": 0,
+        "retained_entries": 1,
+        "retained_bytes": 12776,
+        "in_flight_loads": 0,
+        "budget_managed": true,
+        "budget_reservation_failures": 0,
+        "budget_memory_used": 12776,
+        "budget_cache_reserved_bytes": 12776,
+        "budget_memory_limit": 268585152,
+        "budget_input_bytes_used": 2805,
+        "budget_input_bytes_limit": 18446744073709551615,
+        "budget_output_bytes_used": 0,
+        "budget_output_bytes_limit": 18446744073709551615,
+        "budget_work_used": 12776,
+        "budget_work_limit": 18446744073709551615,
+        "budget_objects_used": 17,
+        "budget_objects_limit": 18446744073709551615,
+        "budget_catalog_reserved_objects": 16,
+        "budget_cache_reserved_objects": 1
+      },
+      "cache_after_queries": {
+        "hits": 0,
+        "cold_loads": 1,
+        "waiter_joins": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "evictions": 0,
+        "bypasses": 0,
+        "oversized_bypasses": 0,
+        "allocation_bypasses": 0,
+        "retained_entries": 1,
+        "retained_bytes": 12776,
+        "in_flight_loads": 0,
+        "budget_managed": true,
+        "budget_reservation_failures": 0,
+        "budget_memory_used": 12776,
+        "budget_cache_reserved_bytes": 12776,
+        "budget_memory_limit": 268585152,
+        "budget_input_bytes_used": 2805,
+        "budget_input_bytes_limit": 18446744073709551615,
+        "budget_output_bytes_used": 0,
+        "budget_output_bytes_limit": 18446744073709551615,
+        "budget_work_used": 12776,
+        "budget_work_limit": 18446744073709551615,
+        "budget_objects_used": 17,
+        "budget_objects_limit": 18446744073709551615,
+        "budget_catalog_reserved_objects": 16,
+        "budget_cache_reserved_objects": 1
+      },
+      "budget": {
+        "memory_before_open": 0,
+        "memory_after_document": 12776,
+        "memory_after_drop": 0,
+        "released_after_drop": true
+      }
+    }
+  ],
+  "unavailable": {
+    "allocation": "not_available: this runner has no allocator sampler",
+    "elapsed_time": "not_available: this runner has no timing path",
+    "general_docx_claims": "not_available: this runner covers only one DOCX selected paragraph",
+    "physical_io": "not_available: logical ReadAt only",
+    "rss": "not_available: this runner has no process-memory sampler"
+  }
+}
