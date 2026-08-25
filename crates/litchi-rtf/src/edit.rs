@@ -10,7 +10,9 @@
 //! comments, notes, and root shape text frames while refusing unknown
 //! destinations and dependent positioned content.
 
-use crate::{Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath};
+use crate::{
+    Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath, UnderlineStyle,
+};
 use bumpalo::Bump;
 use serde_json::Value;
 use std::borrow::Cow;
@@ -905,6 +907,11 @@ enum Operation {
         before: bool,
         after: bool,
     },
+    Underline {
+        span: TextSpan,
+        before: UnderlineStyle,
+        after: UnderlineStyle,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -1005,7 +1012,10 @@ impl Operation {
                 let _ = (before, after);
                 0
             },
-            Self::Alignment { .. } | Self::Bold { .. } | Self::Italic { .. } => 0,
+            Self::Alignment { .. }
+            | Self::Bold { .. }
+            | Self::Italic { .. }
+            | Self::Underline { .. } => 0,
         }
     }
 
@@ -1026,6 +1036,12 @@ impl Operation {
             },
             Self::Italic { span, .. } => {
                 vec![format!("body:character:{}-{}:italic", span.start, span.end)]
+            },
+            Self::Underline { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:underline",
+                    span.start, span.end
+                )]
             },
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
@@ -1051,6 +1067,7 @@ impl Operation {
             Self::Text { span, .. }
             | Self::Bold { span, .. }
             | Self::Italic { span, .. }
+            | Self::Underline { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
@@ -1075,6 +1092,7 @@ impl Operation {
                 | Self::ParagraphLayout { .. }
                 | Self::Bold { .. }
                 | Self::Italic { .. }
+                | Self::Underline { .. }
         )
     }
 
@@ -1504,6 +1522,72 @@ impl Edit {
             span,
             before,
             after: italic,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact underline style for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one effective underline style and
+    /// may not consume a paragraph boundary. Unknown or mixed character
+    /// ranges are refused rather than normalized.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_underline(
+        &mut self,
+        span: TextSpan,
+        underline: UnderlineStyle,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "underline edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = underline_for_span(&self.source, span)?;
+        self.operations.push(Operation::Underline {
+            span,
+            before,
+            after: underline,
         });
         Ok(self)
     }
@@ -2006,6 +2090,7 @@ impl Edit {
                 Operation::Text { .. }
                     | Operation::Bold { .. }
                     | Operation::Italic { .. }
+                    | Operation::Underline { .. }
                     | Operation::InsertParagraph { .. }
             )
         }) {
@@ -2421,6 +2506,7 @@ impl Edit {
                     | Operation::ParagraphLayout { .. }
                     | Operation::Bold { .. }
                     | Operation::Italic { .. }
+                    | Operation::Underline { .. }
             )
         });
         let mut alignments = if property_operation {
@@ -2438,8 +2524,23 @@ impl Edit {
         } else {
             false
         };
+        let base_underline = if property_operation && !layout_operation {
+            base_underline_for_edit(&self.source, &self.operations)?
+        } else {
+            UnderlineStyle::None
+        };
+        let mut baseline = self
+            .source
+            .body()
+            .runs()
+            .next()
+            .map_or_else(crate::types::Formatting::default, |run| *run.format().raw());
+        baseline.bold = base_bold;
+        baseline.italic = base_italic;
+        baseline.underline = base_underline;
         let mut projected_bold_ranges = Vec::new();
         let mut projected_italic_ranges = Vec::new();
+        let mut projected_underline_ranges = Vec::new();
         let mut paragraph_properties = if layout_operation {
             source_paragraph_properties(&self.source)?
         } else {
@@ -2492,6 +2593,10 @@ impl Edit {
                     projected_italic_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::Underline { span, after, .. } => {
+                    projected_underline_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Text { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
@@ -2520,6 +2625,9 @@ impl Edit {
         let has_italic_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Italic { before, after, .. } if before != after)
         });
+        let has_underline_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Underline { before, after, .. } if before != after)
+        });
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
@@ -2527,7 +2635,8 @@ impl Edit {
             || alignments != original_alignments
             || has_layout_delta
             || has_bold_delta
-            || has_italic_delta;
+            || has_italic_delta
+            || has_underline_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
             return Ok(Commit::new(
@@ -2557,9 +2666,18 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::Italic { .. }));
+        let has_underline_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Underline { .. }));
         if has_italic_operation && !source_bytes.is_ascii() {
             return Err(Error::UnsupportedSource(
                 "italic edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_underline_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "underline edits refuse non-ASCII transport encodings",
             ));
         }
         if layout_operation {
@@ -2567,8 +2685,8 @@ impl Edit {
                 .model()
                 .local_paragraph_property_editability()
                 .map_err(Error::UnsupportedSource)?;
-        } else if has_bold_operation || has_italic_operation {
-            if has_bold_operation && !has_italic_operation {
+        } else if has_bold_operation || has_italic_operation || has_underline_operation {
+            if has_bold_operation && !has_italic_operation && !has_underline_operation {
                 self.source
                     .model()
                     .plain_body_bold_editability()
@@ -2578,6 +2696,7 @@ impl Edit {
                     &self.source,
                     has_bold_operation,
                     has_italic_operation,
+                    has_underline_operation,
                 )
                 .map_err(Error::UnsupportedSource)?;
             }
@@ -2588,9 +2707,12 @@ impl Edit {
                 .map_err(Error::UnsupportedSource)?;
         }
         let span = retained_or_located_body_source_span(&self.source, source_bytes)?;
-        validate_opaque_preservation(&self.source, source_bytes, &span)?;
         let replacement_bytes = if layout_operation {
-            if replacement != self.source.text() || has_bold_operation || has_italic_operation {
+            if replacement != self.source.text()
+                || has_bold_operation
+                || has_italic_operation
+                || has_underline_operation
+            {
                 return Err(Error::ParagraphLayoutTextConflict);
             }
             ensure_paragraph_layout_source(&self.source)?;
@@ -2603,10 +2725,13 @@ impl Edit {
             encoded_body_with_properties(
                 &replacement,
                 &alignments,
+                baseline,
                 base_bold,
                 &projected_bold_ranges,
                 base_italic,
                 &projected_italic_ranges,
+                base_underline,
+                &projected_underline_ranges,
                 self.source.limits(),
             )?
         } else {
@@ -2614,6 +2739,7 @@ impl Edit {
         };
         let bytes = splice_body(source_bytes, span, &replacement_bytes, self.source.limits())?;
         let snapshot = Snapshot::from_bytes_with_limits(&bytes, self.source.limits())?;
+        validate_opaque_preservation(&self.source, &snapshot, &self.operations)?;
         if snapshot.text() != replacement {
             return Err(Error::UnsupportedSource(
                 "candidate body text did not survive RTF validation",
@@ -2647,6 +2773,13 @@ impl Edit {
             if italic_for_span(&snapshot, italic_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate italic property did not survive RTF validation",
+                ));
+            }
+        }
+        for (underline_span, expected) in projected_underline_ranges {
+            if underline_for_span(&snapshot, underline_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate underline property did not survive RTF validation",
                 ));
             }
         }
@@ -2951,6 +3084,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
+            | Operation::Underline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -3026,6 +3160,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
+            | Operation::Underline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -3676,6 +3811,7 @@ fn project_text(
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
+            | Operation::Underline { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -3815,6 +3951,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::ParagraphLayout { .. }
         | Operation::Bold { .. }
         | Operation::Italic { .. }
+        | Operation::Underline { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
@@ -3962,6 +4099,7 @@ fn plain_body_character_editability(
     source: &Snapshot,
     allow_mixed_bold: bool,
     allow_mixed_italic: bool,
+    allow_mixed_underline: bool,
 ) -> Result<(), &'static str> {
     source.model().local_paragraph_property_editability()?;
     let mut paragraph_format = None;
@@ -3979,6 +4117,9 @@ fn plain_body_character_editability(
             }
             if allow_mixed_italic {
                 raw_character.italic = false;
+            }
+            if allow_mixed_underline {
+                raw_character.underline = UnderlineStyle::None;
             }
             if character_format.is_some_and(|existing| existing != raw_character) {
                 return Err("the body has mixed run or paragraph formatting");
@@ -4007,6 +4148,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Italic { .. }
+            | Operation::Underline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4057,6 +4199,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::Italic { .. }
+                | Operation::Underline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4097,6 +4240,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
+            | Operation::Underline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4147,6 +4291,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::Bold { .. }
+                | Operation::Underline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4161,6 +4306,101 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_underline(source: &Snapshot) -> Result<UnderlineStyle, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let underline = run.format().underline();
+        if value.is_some_and(|existing| existing != underline) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(underline);
+    }
+    Ok(value.unwrap_or(UnderlineStyle::None))
+}
+
+fn base_underline_for_edit(
+    source: &Snapshot,
+    operations: &[Operation],
+) -> Result<UnderlineStyle, Error> {
+    let underline_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Underline { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if underline_spans.is_empty() {
+        return uniform_body_underline(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &underline_spans) {
+                let value = run.format().underline();
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed underline state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Underline { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(UnderlineStyle::None)
     }))
 }
 
@@ -4238,6 +4478,43 @@ fn italic_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
     ))
 }
 
+fn underline_for_span(source: &Snapshot, span: TextSpan) -> Result<UnderlineStyle, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let underline = run.format().underline();
+                if value.is_some_and(|existing| existing != underline) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed underline state",
+                    ));
+                }
+                value = Some(underline);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
 fn project_base_span(span: TextSpan, operations: &[Operation]) -> Result<TextSpan, Error> {
     Ok(TextSpan {
         start: project_base_position(span.start, operations)?,
@@ -4257,6 +4534,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
+            | Operation::Underline { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -4382,25 +4660,47 @@ fn ordinary_body_source_span(
 
 fn validate_opaque_preservation(
     source: &Snapshot,
-    source_bytes: &[u8],
-    body_span: &Range<usize>,
+    target: &Snapshot,
+    operations: &[Operation],
 ) -> Result<(), Error> {
-    for node in source.opaque() {
-        if !matches!(node.anchor(), crate::opaque::Anchor::Body(_)) {
-            continue;
-        }
-        let opaque = node.source();
-        if opaque.is_empty() {
+    let source_nodes = source
+        .opaque()
+        .iter()
+        .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
+        .collect::<Vec<_>>();
+    let target_nodes = target
+        .opaque()
+        .iter()
+        .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
+        .collect::<Vec<_>>();
+    if source_nodes.len() != target_nodes.len() {
+        return Err(Error::UnsupportedSource(
+            "body-anchored opaque syntax changed during publication",
+        ));
+    }
+    for (source_node, target_node) in source_nodes.iter().zip(&target_nodes) {
+        let crate::opaque::Anchor::Body(source_position) = source_node.anchor() else {
             return Err(Error::UnsupportedSource(
-                "an empty body-anchored opaque node cannot be located",
+                "source opaque anchor is not a body position",
+            ));
+        };
+        let crate::opaque::Anchor::Body(target_position) = target_node.anchor() else {
+            return Err(Error::UnsupportedSource(
+                "target opaque anchor is not a body position",
+            ));
+        };
+        let projected_position = project_base_position(source_position, operations)?;
+        if target_position != projected_position
+            || target_node.kind() != source_node.kind()
+            || target_node.source() != source_node.source()
+        {
+            return Err(Error::UnsupportedSource(
+                "body-anchored opaque syntax changed during publication",
             ));
         }
-        let retained_before_body = source_bytes
-            .get(..body_span.start)
-            .is_some_and(|prefix| prefix.windows(opaque.len()).any(|window| window == opaque));
-        if !retained_before_body {
+        if source_node.source().is_empty() {
             return Err(Error::UnsupportedSource(
-                "body-anchored opaque syntax is retained losslessly but not editable here",
+                "an empty body-anchored opaque node cannot be located",
             ));
         }
     }
@@ -4425,13 +4725,23 @@ fn encoded_body_text(text: &str, limits: crate::ParseLimits) -> Result<Vec<u8>, 
     Ok(output)
 }
 
+#[derive(Clone, Copy)]
+enum CharacterPropertyChange {
+    Bold(bool),
+    Italic(bool),
+    Underline(UnderlineStyle),
+}
+
 fn encoded_body_with_properties(
     text: &str,
     alignments: &[Alignment],
+    baseline: crate::types::Formatting,
     base_bold: bool,
     bold_changes: &[(TextSpan, bool)],
     base_italic: bool,
     italic_changes: &[(TextSpan, bool)],
+    base_underline: UnderlineStyle,
+    underline_changes: &[(TextSpan, UnderlineStyle)],
     limits: crate::ParseLimits,
 ) -> Result<Vec<u8>, Error> {
     let extra = alignments
@@ -4439,6 +4749,7 @@ fn encoded_body_with_properties(
         .checked_mul(4)
         .and_then(|bytes| bytes.checked_add(bold_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(italic_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(underline_changes.len().saturating_mul(12)))
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: limits.max_source_bytes(),
@@ -4469,38 +4780,62 @@ fn encoded_body_with_properties(
         if paragraph_start == text.len() && text.ends_with('\n') {
             break;
         }
+        output.extend_from_slice(br"\plain ");
+        RtfWriter::new(&mut output)
+            .write_formatting(&baseline)
+            .map_err(|error| Error::Write(error.to_string()))?;
         write_alignment(&mut output, alignments.get(paragraph).copied())?;
         let mut cursor = paragraph_start;
         let mut paragraph_changes = bold_changes
             .iter()
             .copied()
             .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
-            .map(|(span, value)| (span, value, false))
+            .map(|(span, value)| (span, CharacterPropertyChange::Bold(value)))
             .chain(
                 italic_changes
                     .iter()
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
-                    .map(|(span, value)| (span, value, true)),
+                    .map(|(span, value)| (span, CharacterPropertyChange::Italic(value))),
+            )
+            .chain(
+                underline_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Underline(value))),
             )
             .collect::<Vec<_>>();
-        paragraph_changes.sort_unstable_by_key(|(span, _, _)| (span.start, span.end));
-        for (span, value, italic) in paragraph_changes {
+        paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+        for (span, change) in paragraph_changes {
             write_encoded_fragment(&mut output, text, cursor..span.start)?;
-            if italic {
-                // The parser flushes body text at bold controls but not at
-                // italic controls. Reasserting the current bold state around
-                // this italic fragment creates a run boundary without
-                // changing the effective formatting or source envelope.
-                write_bold(&mut output, base_bold);
-                write_italic(&mut output, value);
-                write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                write_bold(&mut output, base_bold);
-                write_italic(&mut output, base_italic);
-            } else {
-                write_bold(&mut output, value);
-                write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                write_bold(&mut output, base_bold);
+            match change {
+                CharacterPropertyChange::Bold(value) => {
+                    write_bold(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, base_bold);
+                },
+                CharacterPropertyChange::Italic(value) => {
+                    // The parser flushes body text at bold controls but not at
+                    // italic controls. Reasserting the current bold state around
+                    // this italic fragment creates a run boundary without
+                    // changing the effective formatting or source envelope.
+                    write_bold(&mut output, base_bold);
+                    write_italic(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, base_bold);
+                    write_italic(&mut output, base_italic);
+                },
+                CharacterPropertyChange::Underline(value) => {
+                    // Underline controls do not by themselves flush all parser
+                    // run state. Bold controls force the same safe boundary as
+                    // the existing italic property path.
+                    write_bold(&mut output, base_bold);
+                    write_underline(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, base_bold);
+                    write_underline(&mut output, base_underline);
+                },
             }
             cursor = span.end;
         }
@@ -4641,6 +4976,30 @@ fn write_bold(output: &mut Vec<u8>, bold: bool) {
 
 fn write_italic(output: &mut Vec<u8>, italic: bool) {
     output.extend_from_slice(if italic { br"\i " } else { br"\i0 " });
+}
+
+fn write_underline(output: &mut Vec<u8>, underline: UnderlineStyle) {
+    output.extend_from_slice(match underline {
+        UnderlineStyle::None => br"\ulnone ",
+        UnderlineStyle::Single => br"\ul ",
+        UnderlineStyle::Double => br"\uldb ",
+        UnderlineStyle::Dotted => br"\uld ",
+        UnderlineStyle::Dashed => br"\uldash ",
+        UnderlineStyle::DashDot => br"\uldashd ",
+        UnderlineStyle::DashDotDot => br"\uldashdd ",
+        UnderlineStyle::Words => br"\ulw ",
+        UnderlineStyle::Thick => br"\ulth ",
+        UnderlineStyle::Wave => br"\ulwave ",
+        UnderlineStyle::Hairline => br"\ulhair ",
+        UnderlineStyle::ThickDotted => br"\ulthd ",
+        UnderlineStyle::ThickDashed => br"\ulthdash ",
+        UnderlineStyle::ThickDashDot => br"\ulthdashd ",
+        UnderlineStyle::ThickDashDotDot => br"\ulthdashdd ",
+        UnderlineStyle::ThickLongDash => br"\ulthldash ",
+        UnderlineStyle::LongDash => br"\ulldash ",
+        UnderlineStyle::HeavyWave => br"\ulhwave ",
+        UnderlineStyle::DoubleWave => br"\ululdbwave ",
+    });
 }
 
 fn write_alignment(output: &mut Vec<u8>, alignment: Option<Alignment>) -> Result<(), Error> {
@@ -4812,6 +5171,12 @@ enum Change {
         before: bool,
         after: bool,
     },
+    Underline {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: UnderlineStyle,
+        after: UnderlineStyle,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -4934,6 +5299,17 @@ impl Change {
                 before,
                 after,
             } => Self::Italic {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Underline {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Underline {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -5138,6 +5514,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::Underline {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Underline {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::InsertParagraph {
                 position,
                 span,
@@ -5274,6 +5660,7 @@ fn semantic_changes(
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
+            | Operation::Underline { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
@@ -5466,6 +5853,24 @@ fn durable_operation(
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Bool(*after),
+            )
+        },
+        Change::Underline {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "underline".to_string(),
+                Value::String(underline_name(*before).to_string()),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-underline.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(underline_name(*after).to_string()),
             )
         },
         Change::InsertParagraph {
@@ -5885,6 +6290,29 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("italic value must be Boolean".to_string())
                 })?;
                 edit.set_text_italic(span, replacement)?;
+            },
+            "character-underline.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("underline")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing underline precondition".to_string())
+                    })?;
+                if underline_name(underline_for_span(source, span)?) != expected {
+                    return Err(Error::StalePrecondition(
+                        "character underline state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_underline)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("underline value must be a string".to_string())
+                    })?;
+                edit.set_text_underline(span, replacement)?;
             },
             "paragraph.insert-after" => {
                 let position = parse_paragraph_target(&operation.target)?;
@@ -6507,6 +6935,55 @@ fn parse_alignment(value: &str) -> Option<Alignment> {
         "right" => Some(Alignment::Right),
         "center" => Some(Alignment::Center),
         "justify" => Some(Alignment::Justify),
+        _ => None,
+    }
+}
+
+const fn underline_name(underline: UnderlineStyle) -> &'static str {
+    match underline {
+        UnderlineStyle::None => "none",
+        UnderlineStyle::Single => "single",
+        UnderlineStyle::Double => "double",
+        UnderlineStyle::Dotted => "dotted",
+        UnderlineStyle::Dashed => "dashed",
+        UnderlineStyle::DashDot => "dash-dot",
+        UnderlineStyle::DashDotDot => "dash-dot-dot",
+        UnderlineStyle::Words => "words",
+        UnderlineStyle::Thick => "thick",
+        UnderlineStyle::Wave => "wave",
+        UnderlineStyle::Hairline => "hairline",
+        UnderlineStyle::ThickDotted => "thick-dotted",
+        UnderlineStyle::ThickDashed => "thick-dashed",
+        UnderlineStyle::ThickDashDot => "thick-dash-dot",
+        UnderlineStyle::ThickDashDotDot => "thick-dash-dot-dot",
+        UnderlineStyle::ThickLongDash => "thick-long-dash",
+        UnderlineStyle::LongDash => "long-dash",
+        UnderlineStyle::HeavyWave => "heavy-wave",
+        UnderlineStyle::DoubleWave => "double-wave",
+    }
+}
+
+fn parse_underline(value: &str) -> Option<UnderlineStyle> {
+    match value {
+        "none" => Some(UnderlineStyle::None),
+        "single" => Some(UnderlineStyle::Single),
+        "double" => Some(UnderlineStyle::Double),
+        "dotted" => Some(UnderlineStyle::Dotted),
+        "dashed" => Some(UnderlineStyle::Dashed),
+        "dash-dot" => Some(UnderlineStyle::DashDot),
+        "dash-dot-dot" => Some(UnderlineStyle::DashDotDot),
+        "words" => Some(UnderlineStyle::Words),
+        "thick" => Some(UnderlineStyle::Thick),
+        "wave" => Some(UnderlineStyle::Wave),
+        "hairline" => Some(UnderlineStyle::Hairline),
+        "thick-dotted" => Some(UnderlineStyle::ThickDotted),
+        "thick-dashed" => Some(UnderlineStyle::ThickDashed),
+        "thick-dash-dot" => Some(UnderlineStyle::ThickDashDot),
+        "thick-dash-dot-dot" => Some(UnderlineStyle::ThickDashDotDot),
+        "thick-long-dash" => Some(UnderlineStyle::ThickLongDash),
+        "long-dash" => Some(UnderlineStyle::LongDash),
+        "heavy-wave" => Some(UnderlineStyle::HeavyWave),
+        "double-wave" => Some(UnderlineStyle::DoubleWave),
         _ => None,
     }
 }

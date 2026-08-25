@@ -365,7 +365,8 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
         | Operation::Bold { .. }
-        | Operation::Italic { .. } => PublicationDomain::Ordinary,
+        | Operation::Italic { .. }
+        | Operation::Underline { .. } => PublicationDomain::Ordinary,
         Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
         | Operation::AnnotationText { .. }
@@ -463,6 +464,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         Operation::Text { span, .. }
         | Operation::Bold { span, .. }
         | Operation::Italic { span, .. }
+        | Operation::Underline { span, .. }
         | Operation::InsertParagraph { span, .. } => Some(*span),
         _ => None,
     }
@@ -611,13 +613,9 @@ impl DurableComposition {
             })?;
         bounded_operations.extend(self.operations.iter().cloned());
         bounded_operations.extend(incoming.iter().cloned());
-        core::Patch::<core::ForwardOnly>::new(
-            self.limits,
-            "litchi-rtf",
-            bounded_operations,
-            core::BlobBundle::new(self.limits.blobs()),
-        )
-        .map_err(|error| CompositionError::Durable(error.to_string()))?;
+        bounded_operations.sort_by(compare_durable_operations);
+        validate_durable_forward_limit(self.limits, &bounded_operations)?;
+        preflight_durable_reversible(&self.source, self.limits, &bounded_operations)?;
         self.operations
             .try_reserve(incoming.len())
             .map_err(|_error| {
@@ -1175,7 +1173,8 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
             "body-text.replace"
             | "paragraph-alignment.set"
             | "character-bold.set"
-            | "character-italic.set" => DurableDomain::Ordinary,
+            | "character-italic.set"
+            | "character-underline.set" => DurableDomain::Ordinary,
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -1557,7 +1556,7 @@ fn durable_inverse_targets_equal(
 ) -> bool {
     let target_span_len = match forward.op.as_str() {
         "body-text.replace" => forward.value.as_str().map(str::len),
-        "character-bold.set" | "character-italic.set" => None,
+        "character-bold.set" | "character-italic.set" | "character-underline.set" => None,
         _ => return durable_targets_equal(forward, inverse),
     };
     let Some(source_span) = super::parse_text_target(&forward.target).ok() else {
@@ -1607,6 +1606,7 @@ fn durable_inverse_values_match(forward: &DurableOperation, inverse: &DurableOpe
         "paragraph-alignment.set" => "alignment",
         "character-bold.set" => "bold",
         "character-italic.set" => "italic",
+        "character-underline.set" => "underline",
         _ => return false,
     };
     inverse.preconditions.get(key) == Some(&forward.value)
@@ -1617,7 +1617,8 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
     match (left.op.as_str(), right.op.as_str()) {
         ("body-text.replace", "body-text.replace")
         | ("character-bold.set", "character-bold.set")
-        | ("character-italic.set", "character-italic.set") => {
+        | ("character-italic.set", "character-italic.set")
+        | ("character-underline.set", "character-underline.set") => {
             super::parse_text_target(&left.target).ok()
                 == super::parse_text_target(&right.target).ok()
         },
@@ -1714,6 +1715,27 @@ fn verify_durable_inverse_semantics(
                     ));
                 }
             },
+            "character-underline.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("underline")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing underline state".to_string(),
+                        )
+                    })?;
+                if super::underline_name(
+                    super::underline_for_span(restored, span).map_err(CompositionError::Edit)?,
+                ) != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore underline state".to_string(),
+                    ));
+                }
+            },
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -1766,6 +1788,13 @@ fn verify_durable_character_properties(
                 {
                     return Err(CompositionError::Durable(
                         "durable branch inverse did not restore body italic state".to_string(),
+                    ));
+                }
+                if super::underline_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != run.format().underline()
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore body underline state".to_string(),
                     ));
                 }
             }
@@ -1823,6 +1852,7 @@ fn validate_durable_operation_shape(
         | "paragraph-alignment.set"
         | "character-bold.set"
         | "character-italic.set"
+        | "character-underline.set"
         | "table-cell-text.replace"
         | "header-footer-text.replace"
         | "annotation-text.replace"
@@ -1854,7 +1884,7 @@ fn validate_durable_operation_shape(
                 ));
             }
         },
-        "character-bold.set" | "character-italic.set" => {
+        "character-bold.set" | "character-italic.set" | "character-underline.set" => {
             let span =
                 super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
             super::validate_span(source.text(), span).map_err(CompositionError::Edit)?;
@@ -1906,7 +1936,8 @@ fn durable_operation_domain(operation: &DurableOperation) -> Option<DurableDomai
         "body-text.replace"
         | "paragraph-alignment.set"
         | "character-bold.set"
-        | "character-italic.set" => Some(DurableDomain::Ordinary),
+        | "character-italic.set"
+        | "character-underline.set" => Some(DurableDomain::Ordinary),
         "table-cell-text.replace"
         | "header-footer-text.replace"
         | "annotation-text.replace"
@@ -1938,9 +1969,10 @@ fn ordinary_durable_conflict(
 
 fn durable_text_span(operation: &DurableOperation) -> Option<super::TextSpan> {
     match operation.op.as_str() {
-        "body-text.replace" | "character-bold.set" | "character-italic.set" => {
-            super::parse_text_target(&operation.target).ok()
-        },
+        "body-text.replace"
+        | "character-bold.set"
+        | "character-italic.set"
+        | "character-underline.set" => super::parse_text_target(&operation.target).ok(),
         _ => None,
     }
 }
@@ -2055,6 +2087,19 @@ fn commit_durable_operations(
                     CompositionError::Durable("italic value is not Boolean".to_string())
                 })?;
                 edit.set_text_italic(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-underline.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation
+                    .value
+                    .as_str()
+                    .and_then(super::parse_underline)
+                    .ok_or_else(|| {
+                        CompositionError::Durable("invalid underline value".to_string())
+                    })?;
+                edit.set_text_underline(span, value)
                     .map_err(CompositionError::Edit)?;
             },
             "table-cell-text.replace" => {

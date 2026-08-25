@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Alignment, Document, HeaderFooterType, TableCellPath,
+    Alignment, Document, HeaderFooterType, TableCellPath, UnderlineStyle,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
         HistoryLimits, Limits, MergePlan, MergeResolution, TextSpan, TransferPlan,
@@ -264,6 +264,24 @@ fn durable_patch_reports_a_stale_semantic_precondition() {
     use std::collections::BTreeMap;
 
     let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let mut overlap = source.edit();
+    overlap
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    assert!(matches!(
+        overlap.set_text_underline(TextSpan::new(4, 5).unwrap(), UnderlineStyle::Double),
+        Err(Error::Conflict {
+            existing: 0,
+            incoming: 1
+        })
+    ));
+    let mut empty_edit = source.edit();
+    assert!(matches!(
+        empty_edit.set_text_underline(TextSpan::new(0, 0).unwrap(), UnderlineStyle::Single),
+        Err(Error::UnsupportedSource(
+            "underline edits require non-empty text within one paragraph"
+        ))
+    ));
     let limits = durable_limits(1);
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -603,6 +621,260 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
             "compressed RTF needs a transport-aware rewrite"
         ))
     ));
+}
+
+#[test]
+fn underline_edit_preserves_uniform_body_character_baseline_and_inverse() {
+    let source = Document::parse(r"{\rtf1\ansi\b\uldb Alpha Beta}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_underline(TextSpan::new(6, 10).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    assert!(reopened.body().runs().all(|run| run.format().bold()));
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "Alpha ")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Double
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "Beta")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(
+        restored.to_bytes().unwrap(),
+        source.to_bytes().unwrap(),
+        "inverse must restore the exact source artifact"
+    );
+}
+
+#[test]
+fn underline_property_supports_exact_styles_and_inverse() {
+    let styles = [
+        UnderlineStyle::None,
+        UnderlineStyle::Single,
+        UnderlineStyle::Double,
+        UnderlineStyle::Dotted,
+        UnderlineStyle::Dashed,
+        UnderlineStyle::DashDot,
+        UnderlineStyle::DashDotDot,
+        UnderlineStyle::Words,
+        UnderlineStyle::Thick,
+        UnderlineStyle::Wave,
+        UnderlineStyle::Hairline,
+        UnderlineStyle::ThickDotted,
+        UnderlineStyle::ThickDashed,
+        UnderlineStyle::ThickDashDot,
+        UnderlineStyle::ThickDashDotDot,
+        UnderlineStyle::ThickLongDash,
+        UnderlineStyle::LongDash,
+        UnderlineStyle::HeavyWave,
+        UnderlineStyle::DoubleWave,
+    ];
+    for style in styles {
+        let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+        let mut edit = source.edit();
+        edit.set_text_underline(TextSpan::new(0, 5).unwrap(), style)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        if style == UnderlineStyle::None {
+            assert!(!commit.diagnostics().changed());
+        }
+        assert_eq!(
+            commit
+                .snapshot()
+                .body()
+                .runs()
+                .next()
+                .unwrap()
+                .format()
+                .underline(),
+            style
+        );
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert!(
+            restored
+                .body()
+                .runs()
+                .all(|run| { run.format().underline() == UnderlineStyle::None })
+        );
+    }
+}
+
+#[test]
+fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state() {
+    let mixed = Document::parse(r"{\rtf1\ansi {\ul Alpha} Beta}").unwrap();
+    let mut mixed_edit = mixed.edit();
+    assert!(matches!(
+        mixed_edit.set_text_underline(TextSpan::new(0, 10).unwrap(), UnderlineStyle::None),
+        Err(Error::UnsupportedSource(
+            "the selected character span has mixed underline state"
+        ))
+    ));
+
+    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut paragraph_edit = paragraph.edit();
+    assert!(matches!(
+        paragraph_edit.set_text_underline(TextSpan::new(0, 6).unwrap(), UnderlineStyle::Single),
+        Err(Error::UnsupportedSource(
+            "underline edits require non-empty text within one paragraph"
+        ))
+    ));
+
+    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let mut opaque_edit = opaque.edit();
+    opaque_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    assert!(matches!(
+        opaque_edit.commit(),
+        Err(Error::UnsupportedSource(_))
+    ));
+
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let mut misaligned = cp1252.edit();
+    assert!(matches!(
+        misaligned.set_text_underline(TextSpan::new(4, 5).unwrap(), UnderlineStyle::Single),
+        Err(Error::SpanNotOnCharacterBoundary { position: 4 })
+    ));
+    let mut cp1252_edit = cp1252.edit();
+    cp1252_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    assert!(matches!(
+        cp1252_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "underline edits refuse non-ASCII transport encodings"
+        ))
+    ));
+
+    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let limits = durable_limits(1);
+    let mut edit = source.edit();
+    edit.set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Double)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let durable = commit.patch().to_durable(limits).unwrap();
+    assert_eq!(durable.operations()[0].op, "character-underline.set");
+    assert_eq!(
+        durable.operations()[0].preconditions["underline"],
+        Value::String("none".to_string())
+    );
+    assert_eq!(
+        durable.operations()[0].value,
+        Value::String("double".to_string())
+    );
+    let applied = source.apply_durable(&durable).unwrap();
+    assert_eq!(
+        applied.body().runs().next().unwrap().format().underline(),
+        UnderlineStyle::Double
+    );
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| { run.format().underline() == UnderlineStyle::None })
+    );
+
+    use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
+    use serde_json::Value;
+    use std::collections::BTreeMap;
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex()),
+    );
+    preconditions.insert("underline".to_string(), Value::String("single".to_string()));
+    let forward = PatchOperation::new(
+        limits,
+        "character-underline.set",
+        "body:utf8:0-5",
+        preconditions.clone(),
+        Value::String("double".to_string()),
+    )
+    .unwrap();
+    let inverse = PatchOperation::new(
+        limits,
+        "character-underline.set",
+        "body:utf8:0-5",
+        preconditions,
+        Value::String("single".to_string()),
+    )
+    .unwrap();
+    let stale = Patch::<litchi_core::patch::Reversible>::new(
+        limits,
+        "litchi-rtf",
+        [ReversibleOperation::new(forward, inverse)],
+        BlobBundle::new(limits.blobs()),
+        BlobBundle::new(limits.blobs()),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale),
+        Err(Error::StalePrecondition(
+            "character underline state differs"
+        ))
+    ));
+
+    let mut valid_preconditions = BTreeMap::new();
+    valid_preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex()),
+    );
+    valid_preconditions.insert("underline".to_string(), Value::String("none".to_string()));
+    let invalid_forward = PatchOperation::new(
+        limits,
+        "character-underline.set",
+        "body:utf8:0-5",
+        valid_preconditions.clone(),
+        Value::String("invalid".to_string()),
+    )
+    .unwrap();
+    let invalid_inverse = PatchOperation::new(
+        limits,
+        "character-underline.set",
+        "body:utf8:0-5",
+        valid_preconditions,
+        Value::String("none".to_string()),
+    )
+    .unwrap();
+    let invalid = Patch::<litchi_core::patch::Reversible>::new(
+        limits,
+        "litchi-rtf",
+        [ReversibleOperation::new(invalid_forward, invalid_inverse)],
+        BlobBundle::new(limits.blobs()),
+        BlobBundle::new(limits.blobs()),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&invalid),
+        Err(Error::DurablePatch(message))
+            if message == "underline value must be a string"
+    ));
+}
+
+#[test]
+fn body_opaque_validation_cannot_be_masked_by_duplicate_metadata_bytes() {
+    let bytes = br"{\rtf1\ansi{\*\future42 retained}Alpha{\future42 retained}}";
+    let source = Document::from_bytes(bytes).unwrap();
+    let mut edit = source.edit();
+    edit.set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
 }
 
 #[test]
