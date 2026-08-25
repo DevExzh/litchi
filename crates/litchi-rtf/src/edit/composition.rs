@@ -368,6 +368,7 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Italic { .. }
         | Operation::Underline { .. }
         | Operation::Strike { .. }
+        | Operation::DoubleStrike { .. }
         | Operation::Hidden { .. }
         | Operation::SmallCaps { .. }
         | Operation::AllCaps { .. } => PublicationDomain::Ordinary,
@@ -470,6 +471,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::Italic { span, .. }
         | Operation::Underline { span, .. }
         | Operation::Strike { span, .. }
+        | Operation::DoubleStrike { span, .. }
         | Operation::Hidden { span, .. }
         | Operation::SmallCaps { span, .. }
         | Operation::AllCaps { span, .. }
@@ -1184,6 +1186,7 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
             | "character-italic.set"
             | "character-underline.set"
             | "character-strike.set"
+            | "character-double-strike.set"
             | "character-hidden.set"
             | "character-small-caps.set"
             | "character-all-caps.set" => DurableDomain::Ordinary,
@@ -1572,6 +1575,7 @@ fn durable_inverse_targets_equal(
         | "character-italic.set"
         | "character-underline.set"
         | "character-strike.set"
+        | "character-double-strike.set"
         | "character-hidden.set"
         | "character-small-caps.set"
         | "character-all-caps.set" => None,
@@ -1626,6 +1630,7 @@ fn durable_inverse_values_match(forward: &DurableOperation, inverse: &DurableOpe
         "character-italic.set" => "italic",
         "character-underline.set" => "underline",
         "character-strike.set" => "strike",
+        "character-double-strike.set" => "double_strike",
         "character-hidden.set" => "hidden",
         "character-small-caps.set" => "small_caps",
         "character-all-caps.set" => "all_caps",
@@ -1642,6 +1647,7 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
         | ("character-italic.set", "character-italic.set")
         | ("character-underline.set", "character-underline.set")
         | ("character-strike.set", "character-strike.set")
+        | ("character-double-strike.set", "character-double-strike.set")
         | ("character-hidden.set", "character-hidden.set")
         | ("character-small-caps.set", "character-small-caps.set")
         | ("character-all-caps.set", "character-all-caps.set") => {
@@ -1779,6 +1785,26 @@ fn verify_durable_inverse_semantics(
                 {
                     return Err(CompositionError::Durable(
                         "durable branch inverse did not restore strike state".to_string(),
+                    ));
+                }
+            },
+            "character-double-strike.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("double_strike")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing double-strike state".to_string(),
+                        )
+                    })?;
+                if super::double_strike_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore double-strike state".to_string(),
                     ));
                 }
             },
@@ -1975,6 +2001,7 @@ fn validate_durable_operation_shape(
         | "character-italic.set"
         | "character-underline.set"
         | "character-strike.set"
+        | "character-double-strike.set"
         | "character-hidden.set"
         | "character-small-caps.set"
         | "character-all-caps.set"
@@ -2013,6 +2040,7 @@ fn validate_durable_operation_shape(
         | "character-italic.set"
         | "character-underline.set"
         | "character-strike.set"
+        | "character-double-strike.set"
         | "character-hidden.set"
         | "character-small-caps.set"
         | "character-all-caps.set" => {
@@ -2070,6 +2098,7 @@ fn durable_operation_domain(operation: &DurableOperation) -> Option<DurableDomai
         | "character-italic.set"
         | "character-underline.set"
         | "character-strike.set"
+        | "character-double-strike.set"
         | "character-hidden.set"
         | "character-small-caps.set"
         | "character-all-caps.set" => Some(DurableDomain::Ordinary),
@@ -2109,6 +2138,7 @@ fn durable_text_span(operation: &DurableOperation) -> Option<super::TextSpan> {
         | "character-italic.set"
         | "character-underline.set"
         | "character-strike.set"
+        | "character-double-strike.set"
         | "character-hidden.set"
         | "character-small-caps.set"
         | "character-all-caps.set" => super::parse_text_target(&operation.target).ok(),
@@ -2249,6 +2279,15 @@ fn commit_durable_operations(
                     .as_bool()
                     .ok_or_else(|| CompositionError::Durable("invalid strike value".to_string()))?;
                 edit.set_text_strike(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-double-strike.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation.value.as_bool().ok_or_else(|| {
+                    CompositionError::Durable("invalid double-strike value".to_string())
+                })?;
+                edit.set_text_double_strike(span, value)
                     .map_err(CompositionError::Edit)?;
             },
             "character-hidden.set" => {
