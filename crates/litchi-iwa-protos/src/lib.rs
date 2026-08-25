@@ -343,6 +343,44 @@ mod buffa_movie_playback_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the selected Keynote MovieArchive
+/// geometry envelopes. Point and Size remain borrowed raw payloads; the
+/// handwritten codec owns their strict fixed32 validation and preservation.
+#[doc(hidden)]
+mod buffa_keynote_movie_geometry_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-movie-geometry/iwa_keynote_movie_geometry_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Keynote chart-title
 /// generated extension fields.
 ///
@@ -1236,6 +1274,12 @@ pub mod keynote_movie_caption_codec;
 /// preservation authority.
 #[doc(hidden)]
 pub mod movie_playback_codec;
+
+/// Internal strict raw-preserving Keynote MovieArchive geometry projection.
+/// Generated Buffa values remain private and the source payload is the
+/// preservation authority.
+#[doc(hidden)]
+pub mod keynote_movie_geometry_codec;
 
 /// Format-neutral strict chart-caption edge projection and wire rewrite.
 ///

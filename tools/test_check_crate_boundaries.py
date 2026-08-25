@@ -742,6 +742,95 @@ def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod geometry {\n"
+        "pub mod transaction;\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_TYPES
+        )
+        + "}\n"
+        "pub use geometry::MovieGeometry;\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES
+        )
+        + "struct TransactionBudget;\n"
+        + "fn transaction_budget_preflight() { budget; }\n"
+        + "fn preflight_candidate_reopen_locality() { ExactArtifacts; inverse; locality; }\n"
+        + "fn charge_codec_report_fields_work() { codec_report; wire; fields; work; }\n"
+        + "fn charge_archive_snappy_zip_output() { archive; Snappy; ZIP; output; }\n"
+        + "fn invalidate_previews_after_geometry_change() { preview; invalidated_previews; }\n"
+        + "fn keynote_movie_geometry_codec_route() { keynote_movie_geometry_codec; }\n"
+        + "impl Package {\n"
+        + "pub fn slide_movie_geometry<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MovieGeometry, Error> { let _ = (slide, movie); todo!() }\n"
+        + "pub fn edit_slide_movie_geometry<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MovieGeometry) -> Result<SlideMovieGeometryEdit, Error> { let _ = (slide, movie, value); todo!() }\n"
+        + "pub fn apply_slide_movie_geometry(&self, patch: &SlideMovieGeometryPatch) -> Result<SlideMovieGeometryCommit, Error> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideMovieGeometryEdit { pub fn set(self, value: MovieGeometry) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideMovieGeometryCommit, Error> { todo!() } }\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_movie_geometry;\n"
+        "pub use slide_movie_geometry::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod slide;\n"
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::movie::MovieSelector;\n"
+        "pub use slide::media::geometry::MovieGeometry;\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_TYPES
+        )
+        + "pub fn decode_movie_geometry_with_report() {}\n"
+        + "pub fn prepare_movie_geometry_rewrite() {}\n"
+        + "pub fn rewrite_movie_geometry() {}\n"
+        + "// private Buffa lazy sidecar ingress; unknown balanced raw fields; max_input max_output max_fields max_work max_depth max_references try_reserve\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in boundaries.KEYNOTE_MOVIE_GEOMETRY_FUZZ_SOURCES:
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in boundaries.KEYNOTE_MOVIE_GEOMETRY_FUZZ_CORPORA:
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -12076,6 +12165,153 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_keynote_movie_playback_source_topology()",
             "+ audit_keynote_movie_playback_facade_source_topology()",
             "+ audit_keynote_movie_playback_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_movie_geometry_facade_is_dormant_until_owner_and_then_strict(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_facade_source_topology(root), []
+            )
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_facade_source_topology(root), []
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_geometry(bytes: &[u8], movie_id: u64) -> MovieGeometrySnapshot { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_facade_masks_cfg_test_decoys_and_rejects_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\npub fn decoy(movie_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::SlideMovieGeometryEdit as GeometryEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_codec_resource_preview_and_fuzz_ratchets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_resource_source_topology(root), []
+            )
+            codec = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            for markers in boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_MARKER_GROUPS.values():
+                for marker in markers:
+                    codec_source = codec_source.replace(marker, "")
+            codec.write_text(codec_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("resource/preflight" in item for item in violations), violations)
+            codec.write_text(
+                codec.read_text(encoding="utf-8") + "fn resource() { max_work; try_reserve; }\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_MOVIE_GEOMETRY_PACKAGE_MARKER_GROUPS["preview invalidation"]:
+                owner_source = owner_source.replace(marker, "")
+            owner.write_text(owner_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_movie_geometry_resource_source_topology(root)
+            self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+            fuzz = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_host_requires_typed_bridge_and_keeps_compatibility(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn slide_movie_geometry(&self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn set_slide_movie_geometry(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn restore_slide_movie_original_size(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn flip_slide_movie(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn slide_movie_geometry_by_selector(&self, slide: SlideSelector, movie: MovieSelector) {}\n"
+                "pub fn set_slide_movie_geometry_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n"
+                "pub fn restore_slide_movie_original_size_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n"
+                "pub fn flip_slide_movie_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n"
+                "pub fn slide_shape_geometry(&self) {}\n",
+                encoding="utf-8",
+            )
+            helper = root / next(
+                path
+                for path in boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_COMPATIBILITY_SOURCES
+                if path != boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE
+            )
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "pub fn set_slide_movie_geometry(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "fn compatibility_call() { self.set_slide_movie_geometry(0, 7, geometry); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_geometry_source_topology(root)
+            self.assertEqual(violations, [], violations)
+            self.assertFalse(any("slide_shape_geometry" in item for item in violations), violations)
+
+            host.write_text(
+                "pub fn slide_movie_geometry(&self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn set_slide_movie_geometry(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn restore_slide_movie_original_size(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn flip_slide_movie(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                "pub fn slide_movie_geometry_by_selector(&self, slide: SlideSelector, movie: MovieSelector) {}\n"
+                "pub fn set_slide_movie_geometry_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n"
+                "pub fn restore_slide_movie_original_size_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_geometry_source_topology(root)
+            self.assertTrue(any("typed selector method is missing" in item for item in violations), violations)
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "pub fn flip_slide_movie_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) {}\n",
+                encoding="utf-8",
+            )
+
+            example = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES[0]
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create() { editor.set_slide_movie_geometry(0, 7, geometry); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_movie_geometry_source_topology(root)
+            self.assertTrue(any("focused example uses raw-ID call" in item for item in violations), violations)
+            example.write_text(
+                "fn create() { package.edit_slide_movie_geometry(slide, movie, geometry); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_iwa_keynote_movie_geometry_source_topology(root), [])
+
+    def test_keynote_movie_geometry_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_movie_geometry_source_topology()",
+            "+ audit_keynote_movie_geometry_facade_source_topology()",
+            "+ audit_keynote_movie_geometry_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

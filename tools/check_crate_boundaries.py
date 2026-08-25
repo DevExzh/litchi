@@ -1242,6 +1242,213 @@ IWA_KEYNOTE_MOVIE_PLAYBACK_EXAMPLES = (
     Path("crates/litchi-iwa/examples/create_keynote_movie.rs"),
 )
 
+# Wave87 moves Keynote movie geometry behind a selector-first package facade.
+# Keep this separate from playback/title/caption and from generic image, shape,
+# or audio geometry. Geometry writes own preview invalidation as an explicit
+# transition concern.
+KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
+KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_movie_geometry.rs"
+)
+KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES = frozenset(
+    {
+        "SlideMovieGeometryCommit",
+        "SlideMovieGeometryDiagnostics",
+        "SlideMovieGeometryEdit",
+        "SlideMovieGeometryError",
+        "SlideMovieGeometryLimitKind",
+        "SlideMovieGeometryPatch",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_TYPES = frozenset({"MovieGeometry"})
+KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES = frozenset({"MovieSelector", "SlideSelector"})
+KEYNOTE_MOVIE_GEOMETRY_PACKAGE_METHODS = frozenset(
+    {
+        "slide_movie_geometry",
+        "edit_slide_movie_geometry",
+        "apply_slide_movie_geometry",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_EDIT_METHODS = frozenset({"set", "commit"})
+KEYNOTE_MOVIE_GEOMETRY_FLAT_ALIASES = frozenset(
+    {
+        "Geometry",
+        "GeometryCommit",
+        "GeometryDiagnostics",
+        "GeometryEdit",
+        "GeometryError",
+        "GeometryLimitKind",
+        "GeometryPatch",
+        "MovieGeometryCommit",
+        "MovieGeometryDiagnostics",
+        "MovieGeometryEdit",
+        "MovieGeometryError",
+        "MovieGeometryLimitKind",
+        "MovieGeometryPatch",
+        "MovieGeometrySnapshot",
+        "MovieGeometryWrite",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "MovieGeometrySnapshot",
+        "MovieGeometryWrite",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsp", "tsd", "litchi_iwa_protos"}
+)
+KEYNOTE_MOVIE_GEOMETRY_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|movie|geometry|storage|reference|placement|"
+    r"native|archive|message|component|entry|metadata|package|uuid)[A-Za-z_]*"
+    r"(?:id|identifier))[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u64|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_MOVIE_GEOMETRY_TRANSACTION_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]+)?mod[ \t]+(?:r#)?transaction\b"
+)
+KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_movie_geometry_codec.rs"
+)
+KEYNOTE_MOVIE_GEOMETRY_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_MOVIE_GEOMETRY_CODEC_MODULE = "keynote_movie_geometry_codec"
+KEYNOTE_MOVIE_GEOMETRY_CODEC_FUNCTIONS = frozenset(
+    {
+        "decode_movie_geometry_with_report",
+        "prepare_movie_geometry_rewrite",
+        "rewrite_movie_geometry",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_CODEC_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "MovieGeometrySnapshot",
+        "MovieGeometryWrite",
+        "PreparedMovieGeometryRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+    }
+)
+KEYNOTE_MOVIE_GEOMETRY_CODEC_MARKER_GROUPS = {
+    "private Buffa/lazy ingress": (
+        "buffa",
+        "Buffa",
+        "lazy",
+        "Lazy",
+        "visit_with",
+        "sidecar",
+    ),
+    "unknown/raw preservation": (
+        "unknown",
+        "Unknown",
+        "overlong",
+        "balanced",
+        "raw_fields",
+    ),
+    "resource/preflight accounting": (
+        "max_input",
+        "max_output",
+        "max_fields",
+        "max_work",
+        "max_depth",
+        "max_references",
+        "try_reserve",
+        "RewriteExecutionRequirements",
+    ),
+}
+KEYNOTE_MOVIE_GEOMETRY_FUZZ_SOURCES = (
+    Path("crates/litchi-iwa-protos/fuzz/fuzz_targets/keynote_movie_geometry_codec.rs"),
+    Path("crates/litchi/fuzz/fuzz_targets/keynote_slide_movie_geometry.rs"),
+)
+KEYNOTE_MOVIE_GEOMETRY_FUZZ_CORPORA = (
+    Path("crates/litchi-iwa-protos/fuzz/corpus/keynote_movie_geometry_codec"),
+    Path("crates/litchi/fuzz/corpus/keynote_slide_movie_geometry"),
+)
+KEYNOTE_MOVIE_GEOMETRY_PACKAGE_MARKER_GROUPS = {
+    "aggregate transaction budget": ("TransactionBudget", "transaction_budget", "budget"),
+    "preflight/candidate": ("preflight", "candidate", "reopen", "locality"),
+    "exact inverse/artifacts": ("ExactArtifacts", "inverse", "PatchConflict", "same_content"),
+    "codec report accounting": ("codec_report", "charge_codec", "wire", "fields", "work"),
+    "physical archive accounting": ("archive", "snappy", "Snappy", "zip", "ZIP", "output"),
+    "preview invalidation": (
+        "preview",
+        "previews",
+        "invalidate_preview",
+        "invalidated_previews",
+        "deleted_previews",
+    ),
+}
+IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_movies.rs"
+IWA_KEYNOTE_MOVIE_GEOMETRY_COMPATIBILITY_SOURCES = frozenset(
+    {
+        IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE,
+        IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_movies" / "geometry.rs",
+    }
+)
+IWA_KEYNOTE_MOVIE_GEOMETRY_TYPED_METHODS = frozenset(
+    {
+        "slide_movie_geometry_by_selector",
+        "set_slide_movie_geometry_by_selector",
+        "restore_slide_movie_original_size_by_selector",
+        "flip_slide_movie_by_selector",
+    }
+)
+IWA_KEYNOTE_MOVIE_GEOMETRY_LEGACY_METHODS = frozenset(
+    {
+        "slide_movie_geometry",
+        "set_slide_movie_geometry",
+        "restore_slide_movie_original_size",
+        "flip_slide_movie",
+    }
+)
+IWA_KEYNOTE_MOVIE_GEOMETRY_RAW_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_movie_geometry|"
+    r"set_slide_movie_geometry|restore_slide_movie_original_size|flip_slide_movie)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_MOVIE_GEOMETRY_IDENTIFIER_POSITION_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:movie_position_for_identifier|movie_position_from_identifier|"
+    r"movie_index_for_identifier|movie_index_from_identifier|"
+    r"movie_position_from_object|movie_index_from_object)(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES = (
+    Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
+)
+
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -22996,6 +23203,365 @@ def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[
     return sorted(set(violations))
 
 
+def _keynote_movie_geometry_owner_present(root: Path) -> bool:
+    """Return whether the Wave87 geometry owner has crossed its activation seam."""
+
+    owner_path = root / KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+    codec_path = root / KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+    package_path = root / KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and codec_path.is_file()
+        and re.search(r"(?m)^mod[ \t]+slide_movie_geometry\s*;", package_source)
+        is not None
+    )
+
+
+def audit_keynote_movie_geometry_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free movie-geometry boundary."""
+
+    if not _keynote_movie_geometry_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE
+    package_path = root / KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[1]
+    owner = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    semantic = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    library = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+    owner_code = _mask_rust_non_code(owner)
+    semantic_code = _mask_rust_non_code(semantic)
+    package_code = _mask_rust_non_code(package)
+    library_code = _mask_rust_non_code(library)
+    package_library_code = _mask_rust_non_code(package + library)
+
+    if re.search(r"(?m)^pub[ \t]+mod[ \t]+slide_movie_geometry\b", package_library_code):
+        violations.append(
+            "focused litchi-keynote movie-geometry owner module must remain private: "
+            f"{KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]}"
+        )
+    if re.search(r"(?m)^mod[ \t]+slide_movie_geometry\s*;", package_code) is None:
+        violations.append(
+            "focused litchi-keynote movie-geometry owner module is missing: "
+            f"{KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES):
+        for source, path in ((owner, owner_path), (package, package_path), (library, lib_path)):
+            if name not in _rust_canonical_exports(source, KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES):
+                violations.append(
+                    "focused litchi-keynote movie-geometry public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+    for name in sorted(KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_TYPES):
+        if name not in _rust_canonical_exports(semantic + library, KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_TYPES):
+            violations.append(
+                "focused litchi-keynote movie-geometry semantic API is missing "
+                f"{name}: {KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
+            )
+    if re.search(r"(?m)^\s*pub\s+mod\s+geometry\s*\{", semantic_code) is None:
+        violations.append(
+            "focused litchi-keynote movie-geometry semantic API is missing geometry module: "
+            f"{KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
+        )
+    elif re.search(
+        r"pub\s+mod\s+geometry\s*\{.*?pub\s+mod\s+transaction\b",
+        semantic_code,
+        re.DOTALL,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote movie-geometry transaction module must remain under "
+            f"slide::media::geometry: {KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
+        )
+    if not KEYNOTE_MOVIE_GEOMETRY_TRANSACTION_MODULE.search(semantic_code + owner_code):
+        violations.append(
+            "focused litchi-keynote movie-geometry semantic API is missing public transaction module: "
+            f"{KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
+        )
+    for name in sorted(KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES):
+        if name not in _rust_canonical_exports(semantic + library, KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES):
+            violations.append(
+                "focused litchi-keynote movie-geometry public API is missing selector "
+                f"{name}: {KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[1]}"
+            )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
+    }
+    for name in sorted(KEYNOTE_MOVIE_GEOMETRY_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote movie-geometry Package method is missing "
+                f"{name}: {KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_movie_geometry":
+            for selector in ("SlideSelector", "MovieSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote movie-geometry Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE}"
+                    )
+
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?SlideMovieGeometryEdit\b",
+        owner_code,
+    )
+    edit_body = owner_code if edit_impl is None else owner_code[edit_impl.end() :]
+    for name in sorted(KEYNOTE_MOVIE_GEOMETRY_EDIT_METHODS):
+        if not re.search(rf"\bpub[ \t]+fn[ \t]+{re.escape(name)}\b", edit_body):
+            violations.append(
+                "focused litchi-keynote movie-geometry edit is missing "
+                f"{name}: {KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE}"
+            )
+
+    facade_names = (
+        KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES
+        | KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_TYPES
+        | KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES
+        | KEYNOTE_MOVIE_GEOMETRY_PACKAGE_METHODS
+        | KEYNOTE_MOVIE_GEOMETRY_FLAT_ALIASES
+        | {"SlideMovieGeometryEdit"}
+    )
+    for source, source_path in (
+        (owner, owner_path),
+        (semantic, semantic_path),
+        (package, package_path),
+        (library, lib_path),
+    ):
+        if not source:
+            continue
+        dedicated = source_path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
+            if not dedicated and not (identifiers & facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_MOVIE_GEOMETRY_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_MOVIE_GEOMETRY_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_MOVIE_GEOMETRY_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote movie-geometry public API exposes "
+                        f"{reason} {identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_MOVIE_GEOMETRY_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote movie-geometry public API retains flat alias "
+                        f"{identifier}: {source_path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote movie-geometry public API exposes raw byte slice "
+                    f"{byte_slice}: {source_path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MOVIE_GEOMETRY_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote movie-geometry public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {source_path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote movie-geometry public API retains a glob re-export: "
+                    f"{source_path.relative_to(root)}:{line_number}"
+                )
+
+    codec_path = root / KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+    codec = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+    codec_code = _mask_rust_non_code(codec)
+    for function in sorted(KEYNOTE_MOVIE_GEOMETRY_CODEC_FUNCTIONS):
+        if re.search(rf"\b(?:pub[ \t]+)?fn[ \t]+{re.escape(function)}\b", codec_code) is None:
+            violations.append(
+                "focused litchi-keynote movie-geometry hidden codec is missing strict API "
+                f"{function}: {KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE}"
+            )
+    for type_name in sorted(KEYNOTE_MOVIE_GEOMETRY_CODEC_TYPES):
+        if re.search(
+            rf"\b(?:pub[ \t]+)?(?:struct|enum|type)[ \t]+{re.escape(type_name)}\b",
+            codec_code,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote movie-geometry hidden codec is missing strict type "
+                f"{type_name}: {KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_MOVIE_GEOMETRY_CODEC_MARKER_GROUPS.items():
+        if not any(marker in codec for marker in markers):
+            violations.append(
+                "focused litchi-keynote movie-geometry hidden codec is missing "
+                f"{label} marker: {KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE}"
+            )
+    codec_lib_path = root / KEYNOTE_MOVIE_GEOMETRY_CODEC_PUBLIC_SOURCE
+    codec_lib = (
+        _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+        if codec_lib_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(KEYNOTE_MOVIE_GEOMETRY_CODEC_MODULE)}\b",
+        codec_lib,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote movie-geometry public API is missing hidden codec module "
+            f"{KEYNOTE_MOVIE_GEOMETRY_CODEC_MODULE}: {KEYNOTE_MOVIE_GEOMETRY_CODEC_PUBLIC_SOURCE}"
+        )
+
+    for fuzz_path in KEYNOTE_MOVIE_GEOMETRY_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote movie-geometry boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-keynote movie-geometry fuzz target is missing fuzz_target! harness: "
+                f"{fuzz_path}"
+            )
+    for corpus in KEYNOTE_MOVIE_GEOMETRY_FUZZ_CORPORA:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-keynote movie-geometry boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_movie_geometry_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require resource, candidate, locality, and preview invalidation markers."""
+
+    if not _keynote_movie_geometry_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    for label, markers in KEYNOTE_MOVIE_GEOMETRY_PACKAGE_MARKER_GROUPS.items():
+        if not any(marker in owner for marker in markers):
+            violations.append(
+                "focused litchi-keynote movie-geometry owner is missing "
+                f"{label} marker: {KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE}"
+            )
+    if "keynote_movie_geometry_codec" not in owner:
+        violations.append(
+            "focused litchi-keynote movie-geometry owner must route through hidden "
+            f"keynote_movie_geometry_codec: {KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_movie_geometry_source_topology(root: Path = ROOT) -> list[str]:
+    """Require a typed bridge while retaining the legacy geometry fallback.
+
+    MovieGeometry intentionally does not cover native angle/flip/flags and
+    synthetic compatibility graphs.  The legacy KeynoteEditor declarations
+    and their internal calls therefore remain allowed in the focused host and
+    its geometry helper.  Once the package owner activates, callers outside
+    those compatibility sources must use all four selector methods, and the
+    focused edit example may not call the raw-ID surface.
+    """
+
+    if not _keynote_movie_geometry_owner_present(root):
+        return []
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    violations: list[str] = []
+    public_typed_declaration = re.compile(
+        r"(?m)^\s*pub(?:\([^()]*\))?\s+fn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    typed_methods: set[str] = set()
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        typed_methods.update(
+            match.group(1)
+            for match in public_typed_declaration.finditer(source)
+            if match.group(1) in IWA_KEYNOTE_MOVIE_GEOMETRY_TYPED_METHODS
+        )
+        # `editor/tests.rs` is included by a cfg(test) module in editor.rs;
+        # its compatibility calls are test-only even though the standalone
+        # file does not carry the attribute itself.
+        if path.name == "tests.rs":
+            continue
+        if path in {
+            root / relative
+            for relative in IWA_KEYNOTE_MOVIE_GEOMETRY_COMPATIBILITY_SOURCES
+        }:
+            continue
+        for match in IWA_KEYNOTE_MOVIE_GEOMETRY_IDENTIFIER_POSITION_FALLBACK.finditer(
+            source
+        ):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-geometry caller retains identifier-to-position fallback "
+                f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_MOVIE_GEOMETRY_RAW_ID_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-geometry caller retains raw-ID call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+
+    for name in sorted(IWA_KEYNOTE_MOVIE_GEOMETRY_TYPED_METHODS - typed_methods):
+        violations.append(
+            "litchi-iwa Keynote movie-geometry typed selector method is missing "
+            f"{name}: {IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE}"
+        )
+
+    for example_path in IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES:
+        path = root / example_path
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for match in IWA_KEYNOTE_MOVIE_GEOMETRY_RAW_ID_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "litchi-iwa Keynote movie-geometry focused example uses raw-ID call "
+                f"{match.group('method')}: {example_path}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -25744,6 +26310,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_movie_playback_source_topology()
         + audit_keynote_movie_playback_facade_source_topology()
         + audit_keynote_movie_playback_resource_source_topology()
+        + audit_iwa_keynote_movie_geometry_source_topology()
+        + audit_keynote_movie_geometry_facade_source_topology()
+        + audit_keynote_movie_geometry_resource_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

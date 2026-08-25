@@ -135,6 +135,44 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
+## Keynote movie geometry codec
+
+`keynote_movie_geometry_codec` drives the strict, source-preserving geometry
+projection for the drawable envelope inside `TSD.MovieArchive`. Successful
+inputs exercise scalar decode accounting, prepared rewrite/execute replay,
+candidate readback, and one-shot equivalence without exposing generated
+protobuf values. The target also probes malformed and truncated envelopes,
+unknown balanced groups, unknown overlong scalars, unterminated groups, and a
+deep group chain that must stop at the typed nesting ceiling.
+
+The target accepts at most 64 KiB and uses 8,192 fields, 512 KiB of work, 128
+KiB of output, and recursion depth 64. Prepared execution is replayed against
+exact and max-minus-one output, field, work, depth, allocation, retained-byte,
+and scratch ceilings; every refusal is checked after preserving the caller's
+source bytes. Recipes under `corpus/keynote_movie_geometry_codec/` are
+hand-authored `hex:` wire inputs, not copied native packages.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check keynote_movie_geometry_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-keynote-movie-geometry-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/keynote_movie_geometry_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  keynote_movie_geometry_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Numbers persisted table-sort-order codec
 
 `numbers_table_sort_order_codec` fuzzes the strict field-44 projection of a

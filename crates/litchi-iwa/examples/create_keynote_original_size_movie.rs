@@ -7,6 +7,7 @@ use std::time::Duration;
 use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
+use litchi_keynote::{MovieSelector, Position};
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
 const MOVIE_POSITION: Point = Point { x: 720.0, y: 405.0 };
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Original Size Movie")
         .subtitle("Typed native media dimensions")
         .build()?;
-    let created = editor.add_slide_movie(
+    editor.add_slide_movie(
         0,
         movie_filename,
         &movie,
@@ -52,12 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         SlideMovieOptions::new(MOVIE_POSITION, DISPLAYED_MOVIE_SIZE, MOVIE_DURATION)?
             .with_natural_size(ORIGINAL_MOVIE_SIZE)?,
     )?;
-    editor.restore_slide_movie_original_size(0, created.drawable_object_id)?;
+    editor
+        .restore_slide_movie_original_size_by_selector(Position::new(0), MovieSelector::index(0))?;
     editor.save(output)?;
-    println!(
-        "created Keynote movie {} at its original size",
-        created.drawable_object_id
-    );
+    println!("created Keynote movie at its original size");
     Ok(())
 }
 

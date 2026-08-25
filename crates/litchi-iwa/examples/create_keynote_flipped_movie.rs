@@ -8,6 +8,7 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::shapes::DrawableFlipAxis;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
+use litchi_keynote::{MovieSelector, Position};
 
 const MOVIE_DURATION: Duration = Duration::from_secs(8);
 const MOVIE_POSITION: Point = Point { x: 800.0, y: 450.0 };
@@ -40,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .title("Flipped Movie")
         .subtitle("Typed native Arrange flip")
         .build()?;
-    let created = editor.add_slide_movie(
+    editor.add_slide_movie(
         0,
         movie_filename,
         &movie,
@@ -48,12 +49,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &poster,
         SlideMovieOptions::new(MOVIE_POSITION, MOVIE_SIZE, MOVIE_DURATION)?,
     )?;
-    editor.flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)?;
+    editor.flip_slide_movie_by_selector(
+        Position::new(0),
+        MovieSelector::index(0),
+        DrawableFlipAxis::Horizontal,
+    )?;
     editor.save(output)?;
-    println!(
-        "created horizontally flipped Keynote movie {}",
-        created.drawable_object_id
-    );
+    println!("created horizontally flipped Keynote movie");
     Ok(())
 }
 

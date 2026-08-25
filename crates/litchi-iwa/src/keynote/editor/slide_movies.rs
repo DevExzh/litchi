@@ -309,6 +309,15 @@ impl KeynoteEditor {
         geometry: DrawableGeometry,
     ) -> Result<()> {
         let source = self.require_file_movie(slide_index, drawable_object_id)?;
+        if let Some(result) = try_set_file_movie_geometry_with_package(
+            self,
+            slide_index,
+            drawable_object_id,
+            &source,
+            geometry,
+        ) {
+            return result;
+        }
         let mut staged = self.package().clone();
         set_movie_geometry(
             &mut staged,
@@ -959,10 +968,12 @@ mod tests {
     use crate::shapes::DrawablePoint;
     use litchi_core::Position;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+    use litchi_keynote::slide::media::geometry::MovieGeometry;
     use litchi_keynote::slide::media::{
         MediaLoopMode as KeynoteMediaLoopMode, MediaPlaybackSettings as KeynotePlaybackSettings,
         MediaVolume as KeynoteMediaVolume,
     };
+    use litchi_keynote::slide::media::{Point as KeynotePoint, Size as KeynoteSize};
     use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
     use std::time::Duration;
 
@@ -971,7 +982,6 @@ mod tests {
     const REPLACEMENT_MOVIE: &[u8] = b"\0\0\0\x18ftypqt  replacement-movie";
     const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nsource-built-poster";
     const REPLACEMENT_POSTER: &[u8] = b"GIF89areplacement-poster";
-    const MISSING_DRAWABLE_OBJECT_ID: u64 = u64::MAX;
     const POSITION: DrawablePoint = DrawablePoint { x: 100.0, y: 120.0 };
     const DISPLAY_SIZE: DrawableSize = DrawableSize {
         width: 640.0,
@@ -1112,7 +1122,28 @@ mod tests {
             DrawableProperties::default()
         );
 
-        let changed_geometry = DrawableGeometry {
+        let changed_geometry = MovieGeometry::new(
+            KeynotePoint { x: 48.0, y: 72.0 },
+            KeynoteSize {
+                width: 320.0,
+                height: 180.0,
+            },
+        )
+        .unwrap();
+        editor
+            .set_slide_movie_geometry_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                changed_geometry,
+            )
+            .unwrap();
+        assert_eq!(
+            editor
+                .slide_movie_geometry_by_selector(Position::new(0), MovieSelector::index(0))
+                .unwrap(),
+            Some(changed_geometry)
+        );
+        let native_geometry = DrawableGeometry {
             position: Some(DrawablePoint { x: 48.0, y: 72.0 }),
             size: Some(DrawableSize {
                 width: 320.0,
@@ -1122,48 +1153,59 @@ mod tests {
             angle: Some(8.0),
         };
         editor
-            .set_slide_movie_geometry(0, created.drawable_object_id, changed_geometry)
+            .set_slide_movie_geometry(0, created.drawable_object_id, native_geometry)
             .unwrap();
         assert_eq!(
             editor
                 .slide_movie_geometry(0, created.drawable_object_id)
                 .unwrap(),
-            changed_geometry
+            native_geometry
         );
         let restored_original_size = editor
-            .restore_slide_movie_original_size(0, created.drawable_object_id)
+            .restore_slide_movie_original_size_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+            )
             .unwrap();
-        let expected_original_size_geometry = DrawableGeometry {
-            size: Some(NATURAL_SIZE),
-            ..changed_geometry
-        };
+        let expected_original_size_geometry = MovieGeometry::new(
+            KeynotePoint { x: 48.0, y: 72.0 },
+            KeynoteSize {
+                width: NATURAL_SIZE.width,
+                height: NATURAL_SIZE.height,
+            },
+        )
+        .unwrap();
         assert_eq!(restored_original_size, expected_original_size_geometry);
         assert_eq!(
             editor
-                .slide_movie_geometry(0, created.drawable_object_id)
+                .slide_movie_geometry_by_selector(Position::new(0), MovieSelector::index(0))
                 .unwrap(),
-            expected_original_size_geometry
+            Some(expected_original_size_geometry)
         );
         let horizontally_flipped = editor
-            .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
+            .flip_slide_movie_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                DrawableFlipAxis::Horizontal,
+            )
             .unwrap();
         assert_eq!(
-            editor
-                .slide_movie_geometry(0, created.drawable_object_id)
-                .unwrap(),
+            editor.slide_movies(0).unwrap()[0].geometry,
             horizontally_flipped
         );
-        assert_ne!(horizontally_flipped.flags, changed_geometry.flags);
+        assert_ne!(horizontally_flipped.flags, native_geometry.flags);
         let vertically_flipped = editor
-            .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .flip_slide_movie_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                DrawableFlipAxis::Vertical,
+            )
             .unwrap();
         assert_eq!(
-            editor
-                .slide_movie_geometry(0, created.drawable_object_id)
-                .unwrap(),
+            editor.slide_movies(0).unwrap()[0].geometry,
             vertically_flipped
         );
-        assert_ne!(vertically_flipped.angle, changed_geometry.angle);
+        assert_ne!(vertically_flipped.angle, native_geometry.angle);
         assert_eq!(
             editor
                 .replace_slide_movie_data(0, created.drawable_object_id, REPLACEMENT_MOVIE)
@@ -1182,7 +1224,11 @@ mod tests {
             .set_slide_movie_properties(0, created.drawable_object_id, duplicate_properties.clone())
             .unwrap();
         let source_geometry = editor
-            .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Vertical)
+            .flip_slide_movie_by_selector(
+                Position::new(0),
+                MovieSelector::index(0),
+                DrawableFlipAxis::Vertical,
+            )
             .unwrap();
 
         let duplicate = editor
@@ -1459,25 +1505,36 @@ mod tests {
         );
         assert_eq!(editor.to_bytes().unwrap(), baseline);
 
-        let created = editor
+        editor
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
             .unwrap();
         let before_flip = editor.to_bytes().unwrap();
         assert!(
             editor
-                .flip_slide_movie(0, MISSING_DRAWABLE_OBJECT_ID, DrawableFlipAxis::Horizontal,)
+                .flip_slide_movie_by_selector(
+                    Position::new(0),
+                    MovieSelector::index(9),
+                    DrawableFlipAxis::Horizontal,
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_flip);
         assert!(
             editor
-                .restore_slide_movie_original_size(0, MISSING_DRAWABLE_OBJECT_ID)
+                .restore_slide_movie_original_size_by_selector(
+                    Position::new(0),
+                    MovieSelector::index(9),
+                )
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before_flip);
         assert!(
             editor
-                .flip_slide_movie(0, created.drawable_object_id, DrawableFlipAxis::Horizontal)
+                .flip_slide_movie_by_selector(
+                    Position::new(0),
+                    MovieSelector::index(0),
+                    DrawableFlipAxis::Horizontal,
+                )
                 .is_ok()
         );
     }

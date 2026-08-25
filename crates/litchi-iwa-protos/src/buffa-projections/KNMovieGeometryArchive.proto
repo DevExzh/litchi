@@ -1,0 +1,19 @@
+// Private lazy projection for the bounded Keynote MovieArchive geometry edge.
+syntax = "proto2";
+
+package LitchiIwaKeynoteMovieGeometryProjection;
+
+message PointSizeArchive {
+  required bytes position = 1;
+  required bytes size = 2;
+  optional uint32 flags = 3;
+  optional float angle = 4;
+}
+
+message DrawableArchive {
+  required PointSizeArchive geometry = 1;
+}
+
+message MovieArchive {
+  required DrawableArchive super = 1;
+}
