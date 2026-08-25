@@ -3,6 +3,7 @@
 use std::{io, sync::Arc};
 
 use litchi_iwa_archive::package::Catalog;
+use litchi_iwa_core::{FieldInfo, FieldPath};
 use litchi_numbers::{
     Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector,
@@ -48,6 +49,12 @@ fn changed_settings(base: Settings) -> Settings {
         repeating_header_rows_enabled: base.repeating_header_rows_enabled,
         repeating_header_columns_enabled: base.repeating_header_columns_enabled,
     }
+}
+
+fn declared_field(path: &[u32], references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(FieldPath::new(path.to_vec()));
+    field.object_references = references.to_vec();
+    field
 }
 
 #[test]
@@ -269,6 +276,81 @@ fn selected_model_reference_metadata_must_be_unique_and_exact() -> TestResult<()
             Err(Error::InvalidSource { .. })
         ));
         assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn selected_model_field_info_is_canonical_when_present() -> TestResult<()> {
+    let source = fixture::synthetic_package()?;
+    let cases = vec![
+        (
+            "canonical",
+            vec![declared_field(&[2], &[fixture::TABLE_MODEL])],
+            true,
+        ),
+        (
+            "canonical with unrelated field",
+            vec![
+                declared_field(&[99], &[99_999]),
+                declared_field(&[2], &[fixture::TABLE_MODEL]),
+            ],
+            true,
+        ),
+        (
+            "aggregate-only selected reference with unrelated field",
+            vec![declared_field(&[99], &[99_999])],
+            true,
+        ),
+        (
+            "selected reference at wrong path",
+            vec![declared_field(&[1], &[fixture::TABLE_MODEL])],
+            false,
+        ),
+        (
+            "selected reference in duplicate fields",
+            vec![
+                declared_field(&[2], &[fixture::TABLE_MODEL]),
+                declared_field(&[2], &[fixture::TABLE_MODEL]),
+            ],
+            false,
+        ),
+        (
+            "selected reference duplicated in one field",
+            vec![declared_field(
+                &[2],
+                &[fixture::TABLE_MODEL, fixture::TABLE_MODEL],
+            )],
+            false,
+        ),
+    ];
+
+    for (label, field_infos, accepted) in cases {
+        let malformed = fixture::rewrite_tables(&source, |archive| {
+            let table_info = archive
+                .object_mut(fixture::TABLE_INFO)
+                .ok_or_else(|| io::Error::other("synthetic table info is missing"))?;
+            table_info.archive_info.message_infos[0].field_infos = field_infos;
+            Ok(())
+        })?;
+        let package = Package::from_bytes(&malformed)?;
+        let before = package.table_header_settings(0usize, 0usize)?;
+        let changed = Settings {
+            header_rows_frozen: Some(!before.header_rows_are_frozen()),
+            ..before
+        };
+        let result = package
+            .edit_table_headers(0usize, 0usize)?
+            .set(changed)
+            .commit();
+        if accepted {
+            assert!(result.is_ok(), "{label} FieldInfo shape must be accepted");
+        } else {
+            assert!(
+                matches!(result, Err(Error::InvalidSource { .. })),
+                "{label} FieldInfo shape must be rejected"
+            );
+        }
     }
     Ok(())
 }

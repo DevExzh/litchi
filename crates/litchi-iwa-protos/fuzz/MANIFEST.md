@@ -16,6 +16,7 @@ generated libFuzzer output part of the repository.
 | `pages_header_footer_codec` | `fuzz_targets/pages_header_footer_codec.rs` | `corpus/pages_header_footer_codec/` |
 | `numbers_table_data_list` | `fuzz_targets/numbers_table_data_list.rs` | `corpus/numbers_table_data_list/` |
 | `table_appearance` | `fuzz_targets/table_appearance.rs` | `corpus/table_appearance/` |
+| `numbers_table_sort_order_codec` | `fuzz_targets/numbers_table_sort_order_codec.rs` | `corpus/numbers_table_sort_order_codec/` |
 | `comment_storage_codec` | `fuzz_targets/comment_storage_codec.rs` | `corpus/comment_storage_codec/` |
 | `keynote_chart_title` | `fuzz_targets/keynote_chart_title.rs` | `corpus/keynote_chart_title/` |
 | `movie_playback_codec` | `fuzz_targets/movie_playback_codec.rs` | `corpus/movie_playback_codec/` |

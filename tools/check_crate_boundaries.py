@@ -4085,6 +4085,245 @@ NUMBERS_SHEET_ORDER_WIRE_TYPES = frozenset(
     }
 )
 NUMBERS_SHEET_ORDER_PROTO_ORIGINS = frozenset({"tn", "tsp"})
+
+# Numbers persisted table-sort configuration is a narrow field-44 owner.  The
+# physical Sort Now executor remains in litchi-iwa (including row/tile/UID,
+# header, hidden-axis, formula, comment, and rejection policy), and the Pages
+# and Keynote compatibility adapters are deliberately outside this Numbers
+# ratchet.  Keep the inventory dormant until the selector-first package owner,
+# strict raw-preserving codec, and both fuzz targets exist together.
+RETIRED_IWA_NUMBERS_TABLE_SORT_METHODS = (
+    "table_sort_order",
+    "set_table_sort_order",
+    "clear_table_sort_order",
+)
+RETIRED_IWA_NUMBERS_TABLE_SORT_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_SORT_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_SORT_TESTS = (
+    "table_sort_order_is_typed_transactional_and_native_clear_compatible",
+    "table_sort_order_rejects_duplicate_wire_fields_transactionally",
+    "table_sort_order_rejects_malformed_nested_wire_transactionally",
+    "source_created_table_supports_sort_order_configuration_crud",
+)
+RETIRED_IWA_NUMBERS_TABLE_SORT_TEST_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_SORT_TESTS
+)
+RETIRED_IWA_NUMBERS_TABLE_SORT_EXAMPLES = (
+    Path("crates/litchi-iwa/examples/apply_numbers_sort.rs"),
+    Path("crates/litchi-iwa/examples/create_numbers_hidden_row_sort.rs"),
+    Path("crates/litchi-iwa/examples/create_numbers_selected_row_sort.rs"),
+    Path("crates/litchi-iwa/examples/create_numbers_sorted.rs"),
+    Path("crates/litchi-iwa/examples/create_numbers_text_sorted.rs"),
+    Path("crates/litchi-iwa/examples/edit_numbers_sorted_table_topology.rs"),
+)
+IWA_NUMBERS_README_TABLE_SORT_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor)"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_sort_order|set_table_sort_order|clear_table_sort_order)"
+        r"\b[ \t\r\n]*\(",
+    ),
+)
+IWA_NUMBERS_README_TABLE_SORT_EXAMPLE = re.compile(
+    r"(?<![A-Za-z0-9_])(?P<example>(?:apply_numbers_sort|"
+    r"create_numbers_(?:hidden_row_sort|selected_row_sort|sorted|text_sorted)|"
+    r"edit_numbers_sorted_table_topology))(?:\.rs)?"
+    r"(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_SORT_SEMANTIC_SOURCE = NUMBERS_SOURCE_ROOT / "table" / "sort.rs"
+NUMBERS_TABLE_SORT_TRANSACTION_SOURCE = (
+    NUMBERS_SOURCE_ROOT / "table" / "sort" / "transaction.rs"
+)
+NUMBERS_TABLE_SORT_OWNER_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "table_sort.rs"
+NUMBERS_TABLE_SORT_OWNER_HELPER_ROOT = NUMBERS_SOURCE_ROOT / "package" / "table_sort"
+NUMBERS_TABLE_SORT_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_SORT_SEMANTIC_SOURCE,
+    NUMBERS_TABLE_SORT_TRANSACTION_SOURCE,
+    NUMBERS_TABLE_SORT_OWNER_SOURCE,
+)
+NUMBERS_TABLE_SORT_EXPORT_SOURCES = (
+    NUMBERS_SOURCE_ROOT / "lib.rs",
+    NUMBERS_SOURCE_ROOT / "package.rs",
+    NUMBERS_SOURCE_ROOT / "table.rs",
+)
+NUMBERS_TABLE_SORT_SEMANTIC_TYPES = (
+    "ColumnIndex",
+    "Direction",
+    "Order",
+    "RowRange",
+    "Rule",
+    "Scope",
+)
+NUMBERS_TABLE_SORT_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_SORT_CANONICAL_TYPES = (
+    *NUMBERS_TABLE_SORT_SEMANTIC_TYPES,
+    *NUMBERS_TABLE_SORT_TRANSACTION_TYPES,
+)
+NUMBERS_TABLE_SORT_SHORT_NAMES = frozenset(NUMBERS_TABLE_SORT_CANONICAL_TYPES)
+NUMBERS_TABLE_SORT_PACKAGE_METHODS = (
+    "table_sort_order",
+    "edit_table_sort_order",
+    "apply_table_sort_order",
+)
+NUMBERS_TABLE_SORT_FLAT_ALIAS_PREFIXES = (
+    "Sort",
+    "SortOrder",
+    "TableSort",
+    "TableSortOrder",
+)
+NUMBERS_TABLE_SORT_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in NUMBERS_TABLE_SORT_FLAT_ALIAS_PREFIXES
+    for suffix in NUMBERS_TABLE_SORT_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_SORT_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_sort|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?sort)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_SORT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_sort\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_PACKAGE_TABLE_SORT_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_sort\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_SORT_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?sort\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_TABLE_SORT_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_SORT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_sort_order_codec.rs"
+)
+NUMBERS_TABLE_SORT_CODEC_ALTERNATE_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/table_sort_order_codec.rs"
+)
+NUMBERS_TABLE_SORT_CODEC_SOURCES = (
+    NUMBERS_TABLE_SORT_CODEC_SOURCE,
+    NUMBERS_TABLE_SORT_CODEC_ALTERNATE_SOURCE,
+)
+NUMBERS_TABLE_SORT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+NUMBERS_TABLE_SORT_CODEC_MODULE = "numbers_table_sort_order_codec"
+NUMBERS_TABLE_SORT_CODEC_NEUTRAL_MODULE = "table_sort_order_codec"
+NUMBERS_TABLE_SORT_CODEC_MODULES = (
+    NUMBERS_TABLE_SORT_CODEC_MODULE,
+    NUMBERS_TABLE_SORT_CODEC_NEUTRAL_MODULE,
+)
+NUMBERS_TABLE_SORT_CODEC_REQUIRED_APIS = (
+    "SortOrderSnapshot",
+    "decode_table_sort_order",
+    "decode_table_sort_order_with_report",
+    "prepare_table_sort_order_rewrite",
+    "PreparedTableSortOrderRewrite",
+    "canonical_table_sort_order",
+    "rewrite_table_sort_order",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+)
+NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE = Path(
+    "crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_sort_order_codec.rs"
+)
+NUMBERS_TABLE_SORT_CODEC_FUZZ_CORPUS = Path(
+    "crates/litchi-iwa-protos/fuzz/corpus/numbers_table_sort_order_codec"
+)
+NUMBERS_TABLE_SORT_FUZZ_SOURCE = Path(
+    "crates/litchi/fuzz/fuzz_targets/numbers_table_sort_order.rs"
+)
+NUMBERS_TABLE_SORT_FUZZ_CORPUS = Path(
+    "crates/litchi/fuzz/corpus/numbers_table_sort_order"
+)
+NUMBERS_TABLE_SORT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "SortRuleArchive",
+        "SortRuleReferenceTrackerArchive",
+        "TableModelArchive",
+        "TableSortOrderArchive",
+        "TableSortOrderSnapshot",
+    }
+)
+NUMBERS_TABLE_SORT_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_TABLE_SORT_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tn", "tsp", "tst", "tswp"}
+)
+NUMBERS_TABLE_SORT_CODEC_REQUIRED_MARKERS = (
+    "unknown",
+    "unknown overlong",
+    "report",
+    "SORT_ORDER_FIELD",
+    "SORT_RULES_FIELD",
+)
+NUMBERS_TABLE_SORT_OWNER_REQUIRED_MARKERS = {
+    "table-model": re.compile(
+        r"(?<![A-Za-z0-9])(?:table[_-]?model|TableModel|sort[_-]?order)(?![A-Za-z0-9])"
+    ),
+    "field44/field45": re.compile(
+        r"(?<![A-Za-z0-9])(?:field44|field45|sort_order|sort_rule_reference_tracker)"
+        r"(?![A-Za-z0-9])"
+    ),
+    "budget": re.compile(
+        r"(?<![A-Za-z0-9])(?:budget|WireBudget|TransactionBudget|charge_|preflight)"
+        r"(?![A-Za-z0-9])"
+    ),
+    "locality": re.compile(
+        r"(?<![A-Za-z0-9])(?:locality|verify_locality|candidate|reopen|same_content)"
+        r"(?![A-Za-z0-9])"
+    ),
+    "atomic/inverse": re.compile(
+        r"(?<![A-Za-z0-9])(?:atomic|inverse|conflict|source_bytes|unchanged)"
+        r"(?![A-Za-z0-9])"
+    ),
+}
+NUMBERS_TABLE_SORT_RAW_PARAMETER = re.compile(
+    r"\b(?:table_id|object_id|model_id|native_id|source_bytes|bytes|row|column)"
+    r"\b[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])\b"
+)
+
 NUMBERS_TABLE_LOCK_IMPLEMENTATION_SOURCES = (
     NUMBERS_SOURCE_ROOT / "package" / "table_lock.rs",
     NUMBERS_SOURCE_ROOT / "table" / "lock.rs",
@@ -8132,6 +8371,54 @@ def _is_numbers_sheet_order_public_declaration(
     ) or _numbers_sheet_order_owner_declaration(declaration)
 
 
+def _numbers_table_sort_public_leak(identifier: str) -> str | None:
+    """Classify native/wire vocabulary forbidden in persisted sort APIs."""
+
+    if identifier in NUMBERS_TABLE_SORT_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_TABLE_SORT_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_SORT_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_table_sort_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return NUMBERS_TABLE_SORT_OWNER_PATH.search(declaration) is not None or any(
+        identifier in NUMBERS_TABLE_SORT_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_numbers_table_sort_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (NUMBERS_TABLE_SORT_FLAT_ALIASES | {"sort", "table_sort"})
+    ) or _numbers_table_sort_owner_declaration(declaration)
+
+
 def _numbers_table_header_settings_public_leak(identifier: str) -> str | None:
     """Classify implementation vocabulary forbidden in header transactions."""
 
@@ -11618,6 +11905,409 @@ def audit_numbers_sheet_order_facade_source_topology(
                     "focused litchi-numbers sheet-order public API exposes "
                     f"raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def _numbers_table_sort_owner_present(root: Path) -> bool:
+    owner_path = root / NUMBERS_TABLE_SORT_OWNER_SOURCE
+    package_path = root / NUMBERS_TABLE_SORT_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and any((root / path).is_file() for path in NUMBERS_TABLE_SORT_CODEC_SOURCES)
+        and NUMBERS_PACKAGE_TABLE_SORT_MODULE.search(package_source) is not None
+    )
+
+
+def audit_iwa_numbers_table_sort_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire only the Numbers persisted sort config host surface.
+
+    The physical ``apply_table_sort_order*`` executor is deliberately retained
+    here.  It owns row/tile/UID/header/hidden-axis movement and is not the
+    field-44 package transaction.  Pages and Keynote adapters are outside the
+    ``crates/litchi-iwa/src/numbers`` scope and therefore do not trigger this
+    Numbers-only ratchet.
+    """
+
+    if not _numbers_table_sort_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if source_root.is_dir():
+        call_pattern = re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_sort_order|"
+            r"set_table_sort_order|clear_table_sort_order)\b"
+            r"[ \t\r\n]*\(",
+        )
+        for path in sorted(source_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            for name, line_number in _rust_function_declarations(source):
+                if name in RETIRED_IWA_NUMBERS_TABLE_SORT_METHOD_SET:
+                    violations.append(
+                        "retired litchi-iwa Numbers table-sort method "
+                        f"{name}: {path.relative_to(root)}:{line_number}"
+                    )
+            code = _mask_rust_non_code(source)
+            for match in call_pattern.finditer(code):
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                line = code[line_start:line_end]
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                    line,
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table-sort call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
+    if tests_path.is_file():
+        source = tests_path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name in RETIRED_IWA_NUMBERS_TABLE_SORT_TEST_SET:
+                violations.append(
+                    "retired litchi-iwa Numbers table-sort test "
+                    f"{name}: {IWA_NUMBERS_EDITOR_TEST_SOURCE}:{line_number}"
+                )
+
+    for example in RETIRED_IWA_NUMBERS_TABLE_SORT_EXAMPLES:
+        path = root / example
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_sort_order|"
+            r"set_table_sort_order|clear_table_sort_order)\b"
+            r"[ \t\r\n]*\(",
+            source,
+        ):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-sort example call "
+                f"{match.group(0).split('(')[0].strip()}: {example}:{line_number}"
+            )
+
+    readme_path = root / IWA_NUMBERS_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_NUMBERS_README_TABLE_SORT_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table-sort README call "
+                    f"{match.group('method')}: {IWA_NUMBERS_README}:{line_number}"
+                )
+        for match in IWA_NUMBERS_README_TABLE_SORT_EXAMPLE.finditer(source):
+            line_number = source.count("\n", 0, match.start("example")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-sort README example reference "
+                f"{match.group('example')}: {IWA_NUMBERS_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_sort_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free persisted sort owner."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir() or not _numbers_table_sort_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(NUMBERS_TABLE_SORT_SEMANTIC_TYPES)
+    )
+    for name in NUMBERS_TABLE_SORT_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-numbers table-sort public API is missing "
+                f"canonical table::sort type {name}: {NUMBERS_TABLE_SORT_SEMANTIC_SOURCE}"
+            )
+    if PUBLIC_NUMBERS_TABLE_SORT_TRANSACTION_MODULE.search(
+        _mask_rust_non_code(semantic_source)
+    ) is None:
+        violations.append(
+            "focused litchi-numbers table-sort public API is missing canonical "
+            f"table::sort::transaction module: {NUMBERS_TABLE_SORT_SEMANTIC_SOURCE}"
+        )
+
+    lib_path = root / NUMBERS_TABLE_SORT_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-numbers table-sort public API is missing canonical root "
+            f"table module: {NUMBERS_TABLE_SORT_EXPORT_SOURCES[0]}"
+        )
+    table_path = root / NUMBERS_TABLE_SORT_EXPORT_SOURCES[2]
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_NUMBERS_TABLE_SORT_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-numbers table-sort public API is missing canonical "
+            f"table::sort module: {NUMBERS_TABLE_SORT_EXPORT_SOURCES[2]}"
+        )
+
+    package_path = root / NUMBERS_TABLE_SORT_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    if NUMBERS_PACKAGE_TABLE_SORT_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-numbers table-sort public API is missing private package "
+            f"owner module: {NUMBERS_TABLE_SORT_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_NUMBERS_PACKAGE_TABLE_SORT_MODULE.finditer(package_source):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-numbers table-sort public API exposes public "
+            f"package::table_sort module: {NUMBERS_TABLE_SORT_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_SORT_OWNER_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    owner_exports = _rust_canonical_exports(
+        owner_source, frozenset(NUMBERS_TABLE_SORT_TRANSACTION_TYPES)
+    )
+    for name in NUMBERS_TABLE_SORT_TRANSACTION_TYPES:
+        if name not in owner_exports:
+            violations.append(
+                "focused litchi-numbers table-sort public API is missing canonical "
+                f"package type {name}: {NUMBERS_TABLE_SORT_OWNER_SOURCE}"
+            )
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in NUMBERS_TABLE_SORT_PACKAGE_METHODS:
+        declaration = owner_methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-numbers table-sort public API is missing "
+                f"Package method {method}: {NUMBERS_TABLE_SORT_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_table_sort_order":
+            for selector in ("SheetSelector", "TableSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-numbers table-sort Package method "
+                        f"{method} must accept selector-first {selector}: "
+                        f"{NUMBERS_TABLE_SORT_OWNER_SOURCE}"
+                    )
+    owner_code = _mask_rust_non_code(owner_source)
+    for label, marker in NUMBERS_TABLE_SORT_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-numbers table-sort owner is missing "
+                f"{label} transaction marker: {NUMBERS_TABLE_SORT_OWNER_SOURCE}"
+            )
+
+    codec_path = next(
+        (root / path for path in NUMBERS_TABLE_SORT_CODEC_SOURCES if (root / path).is_file()),
+        None,
+    )
+    codec_source = (
+        _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        if codec_path is not None
+        else ""
+    )
+    if codec_path is None:
+        violations.append(
+            "focused litchi-numbers table-sort public API is missing strict hidden "
+            f"codec source: {NUMBERS_TABLE_SORT_CODEC_SOURCE}"
+        )
+    else:
+        codec_code = _mask_rust_non_code(codec_source)
+        for api in NUMBERS_TABLE_SORT_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct)\s+{re.escape(api)}\b", codec_code
+            ) is None:
+                violations.append(
+                    "focused litchi-numbers table-sort hidden codec is missing "
+                    f"strict API {api}: {codec_path.relative_to(root)}"
+                )
+        for marker in NUMBERS_TABLE_SORT_CODEC_REQUIRED_MARKERS:
+            if re.search(re.escape(marker), codec_source) is None:
+                violations.append(
+                    "focused litchi-numbers table-sort hidden codec is missing "
+                    f"strict {marker} marker: {codec_path.relative_to(root)}"
+                )
+        codec_modules = (
+            NUMBERS_TABLE_SORT_CODEC_MODULES
+            if codec_path == root / NUMBERS_TABLE_SORT_CODEC_SOURCE
+            else (NUMBERS_TABLE_SORT_CODEC_NEUTRAL_MODULE,)
+        )
+        codec_lib_path = root / NUMBERS_TABLE_SORT_CODEC_PUBLIC_SOURCE
+        codec_lib_source = (
+            _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+            if codec_lib_path.is_file()
+            else ""
+        )
+        for codec_module in codec_modules:
+            if re.search(
+                rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+                rf"pub\s+mod\s+{re.escape(codec_module)}\b",
+                codec_lib_source,
+            ) is None:
+                violations.append(
+                    "focused litchi-numbers table-sort public API is missing hidden codec "
+                    f"module {codec_module}: {NUMBERS_TABLE_SORT_CODEC_PUBLIC_SOURCE}"
+                )
+
+    for target in (
+        NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE,
+        NUMBERS_TABLE_SORT_FUZZ_SOURCE,
+    ):
+        absolute = root / target
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-numbers table-sort boundary is missing fuzz target: "
+                f"{target}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-numbers table-sort fuzz target is missing "
+                f"fuzz_target! harness: {target}"
+            )
+    for corpus in (
+        NUMBERS_TABLE_SORT_CODEC_FUZZ_CORPUS,
+        NUMBERS_TABLE_SORT_FUZZ_CORPUS,
+    ):
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-numbers table-sort boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+
+    dedicated_sources = {
+        root / path
+        for path in NUMBERS_TABLE_SORT_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    owner_helper_root = root / NUMBERS_TABLE_SORT_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in NUMBERS_TABLE_SORT_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            if not _is_numbers_table_sort_public_declaration(
+                declaration, dedicated_source=dedicated_source
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+            if (
+                path in export_sources
+                and public_use_or_type
+                and _numbers_table_sort_owner_declaration(declaration)
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-numbers table-sort public API retains root aliases "
+                    f"via table::sort glob: {path.relative_to(root)}:{line_number}"
+                )
+            if (
+                path in export_sources
+                and public_use_or_type
+                and _numbers_table_sort_owner_declaration(declaration)
+            ):
+                violations.append(
+                    "focused litchi-numbers table-sort public API exposes public "
+                    f"table-sort owner alias: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if identifier in NUMBERS_TABLE_SORT_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-numbers table-sort public API retains flat alias "
+                        f"{identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                if (
+                    path in export_sources
+                    and public_use_or_type
+                    and _numbers_table_sort_owner_declaration(declaration)
+                    and identifier in NUMBERS_TABLE_SORT_SHORT_NAMES
+                ):
+                    violations.append(
+                        "focused litchi-numbers table-sort public API retains root alias "
+                        f"{identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_sort_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-numbers table-sort public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers table-sort public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+                )
+            for match in NUMBERS_TABLE_SORT_RAW_PARAMETER.finditer(declaration):
+                parameter = re.sub(r"\s+", " ", match.group(0)).strip()
+                parameter_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-numbers table-sort public API exposes raw "
+                    f"parameter {parameter}: {path.relative_to(root)}:{parameter_line}"
                 )
 
     return sorted(set(violations))
@@ -23474,6 +24164,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_names_facade_source_topology()
         + audit_iwa_numbers_sheet_order_source_topology()
         + audit_numbers_sheet_order_facade_source_topology()
+        + audit_iwa_numbers_table_sort_source_topology()
+        + audit_numbers_table_sort_facade_source_topology()
         + audit_iwa_numbers_table_header_settings_source_topology()
         + audit_numbers_table_header_settings_facade_source_topology()
         + audit_iwa_numbers_chart_caption_source_topology()

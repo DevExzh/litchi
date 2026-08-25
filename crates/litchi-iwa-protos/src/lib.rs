@@ -1085,6 +1085,28 @@ mod buffa_numbers_table_header_settings_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the Numbers table sort-order
+/// envelope. Repeated rules remain source-authoritative in the handwritten
+/// strict codec.
+#[doc(hidden)]
+mod buffa_numbers_table_sort_order_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        clippy::all,
+        clippy::allow_attributes_without_reason,
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        non_snake_case,
+        reason = "Buffa generated projection is private to this crate."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-sort-order/iwa_numbers_table_sort_order_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for Keynote slide transitions.
 ///
 /// It contains only the nested transition attributes and slide-node transition
@@ -1356,6 +1378,16 @@ pub mod table_header_settings_codec {
 /// private and caller-owned source bytes remain the rewrite authority.
 #[doc(hidden)]
 pub mod numbers_table_title_codec;
+
+/// Strict generated-free Numbers table-sort-order projection and rewrite.
+#[doc(hidden)]
+pub mod numbers_table_sort_order_codec;
+
+/// Neutral spelling for the persisted Numbers table-sort-order seam.
+#[doc(hidden)]
+pub mod table_sort_order_codec {
+    pub use super::numbers_table_sort_order_codec::*;
+}
 
 /// Strict generated-free Numbers table-cell storage projection.
 #[doc(hidden)]

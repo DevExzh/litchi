@@ -271,6 +271,104 @@ def add_numbers_sheet_order_canonical_scaffold(root: Path) -> None:
     sheet_export.write_text(sheet_source + "pub mod order;\n", encoding="utf-8")
 
 
+def add_numbers_table_sort_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use litchi_iwa_common::table::sort::{"
+        + ", ".join(boundaries.NUMBERS_TABLE_SORT_SEMANTIC_TYPES)
+        + "};\n"
+        "pub mod transaction;\n",
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_SORT_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_SORT_TRANSACTION_TYPES
+        ),
+        encoding="utf-8",
+    )
+    owner = root / boundaries.NUMBERS_TABLE_SORT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_SORT_TRANSACTION_TYPES
+        )
+        + "fn table_model_field44_field45() {}\n"
+        + "fn transaction_budget_preflight() {}\n"
+        + "fn verify_locality_candidate_reopen_atomic_inverse() {}\n"
+        + "impl Package {\n"
+        + "pub fn table_sort_order(&self, sheet: SheetSelector, table: TableSelector) "
+        "-> Result<Order, Error> {}\n"
+        + "pub fn edit_table_sort_order(&self, sheet: SheetSelector, table: TableSelector) "
+        "-> Result<Edit, Error> {}\n"
+        + "pub fn apply_table_sort_order(&self, patch: &Patch) "
+        "-> Result<Commit, Error> {}\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export, package_export, table_export = (
+        root / path for path in boundaries.NUMBERS_TABLE_SORT_EXPORT_SOURCES
+    )
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text("pub mod table;\n", encoding="utf-8")
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "pub(crate) mod table_sort;\n", encoding="utf-8"
+    )
+    table_export.parent.mkdir(parents=True, exist_ok=True)
+    table_export.write_text("pub mod sort;\n", encoding="utf-8")
+
+    codec = root / boundaries.NUMBERS_TABLE_SORT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct SortOrderSnapshot;\n"
+        "pub struct PreparedTableSortOrderRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_table_sort_order() {}\n"
+        "pub fn decode_table_sort_order_with_report() {}\n"
+        "pub fn prepare_table_sort_order_rewrite() {}\n"
+        "pub fn canonical_table_sort_order() {}\n"
+        "pub fn rewrite_table_sort_order() {}\n"
+        "const SORT_ORDER_FIELD: u32 = 44;\n"
+        "const SORT_RULES_FIELD: u32 = 2;\n"
+        "// unknown overlong fields are retained\n"
+        "fn report_field44_field45() {}\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_SORT_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_SORT_CODEC_MODULE};\n"
+        "\n#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_SORT_CODEC_NEUTRAL_MODULE} {{\n"
+        f"    pub use super::{boundaries.NUMBERS_TABLE_SORT_CODEC_MODULE}::*;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in (
+        boundaries.NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_SORT_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_SORT_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_SORT_FUZZ_CORPUS,
+    ):
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -6850,6 +6948,267 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ),
                 [],
             )
+
+    def test_numbers_table_sort_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_SORT_METHODS,
+            ("table_sort_order", "set_table_sort_order", "clear_table_sort_order"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_SORT_PACKAGE_METHODS,
+            ("table_sort_order", "edit_table_sort_order", "apply_table_sort_order"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/table/sort.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_SORT_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_sort.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_SORT_CODEC_SOURCE,
+            Path("crates/litchi-iwa-protos/src/numbers_table_sort_order_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_SORT_CODEC_MODULE,
+            "numbers_table_sort_order_codec",
+        )
+        self.assertIn(
+            "decode_table_sort_order_with_report",
+            boundaries.NUMBERS_TABLE_SORT_CODEC_REQUIRED_APIS,
+        )
+        self.assertIn(
+            "prepare_table_sort_order_rewrite",
+            boundaries.NUMBERS_TABLE_SORT_CODEC_REQUIRED_APIS,
+        )
+        self.assertIn(
+            boundaries.NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE,
+            (
+                boundaries.NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE,
+                boundaries.NUMBERS_TABLE_SORT_FUZZ_SOURCE,
+            ),
+        )
+
+    def test_focused_numbers_table_sort_is_dormant_until_owner_and_codec_exist(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_sort.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "pub fn table_sort_order() {}\n"
+                "pub fn set_table_sort_order() {}\n"
+                "pub fn clear_table_sort_order() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_sort_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_sort_facade_source_topology(root), []
+            )
+
+            add_numbers_table_sort_canonical_scaffold(root)
+            source.write_text(
+                "pub fn apply_table_sort_order() {}\n"
+                "pub fn apply_table_sort_order_to_rows() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_sort_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_sort_facade_source_topology(root), []
+            )
+
+    def test_focused_numbers_table_sort_requires_each_contract_part(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8").replace("Order", "MissingOrder"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(
+                any("canonical table::sort type Order" in violation for violation in violations)
+            )
+
+            owner = root / boundaries.NUMBERS_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn edit_table_sort_order", "pub fn missing_table_sort_order"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(
+                any("Package method edit_table_sort_order" in violation for violation in violations)
+            )
+
+            codec = root / boundaries.NUMBERS_TABLE_SORT_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "prepare_table_sort_order_rewrite",
+                    "missing_table_sort_order_rewrite",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(
+                any(
+                    "strict API prepare_table_sort_order_rewrite" in violation
+                    for violation in violations
+                )
+            )
+
+            fuzz = root / boundaries.NUMBERS_TABLE_SORT_FUZZ_SOURCE
+            fuzz.unlink()
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in violation for violation in violations))
+
+    def test_focused_numbers_table_sort_rejects_aliases_leaks_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub struct SortEdit;\n"
+                + "pub fn raw(source_bytes: &[u8], object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_SORT_EXPORT_SOURCES[1]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use crate::table_sort::*;\n"
+                + "pub type SortPatch = bool;\n"
+                + "pub mod table_sort;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn physical(source_bytes: &[u8], object_id: u64) -> TableModelArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(any("flat alias SortEdit" in violation for violation in violations))
+            self.assertTrue(any("raw source bytes source_bytes" in violation for violation in violations))
+            self.assertTrue(any("raw identifier object_id" in violation for violation in violations))
+            self.assertTrue(any("root aliases via table::sort glob" in violation for violation in violations))
+            self.assertTrue(any("public package::table_sort module" in violation for violation in violations))
+            self.assertTrue(any("archive/IWA type TableModelArchive" in violation for violation in violations))
+
+    def test_focused_numbers_table_sort_masks_cfg_test_and_keeps_physical_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "#[cfg(test)]\nmod tests { pub fn raw(source_bytes: &[u8], object_id: u64) -> ArchiveObject { todo!() } }\n",
+                encoding="utf-8",
+            )
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_sort.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn apply_table_sort_order() {}\n"
+                "pub fn apply_table_sort_order_to_rows() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_sort_facade_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_sort_source_topology(root), []
+            )
+            pages = root / "crates/litchi-iwa/src/pages/editor/tables/sort.rs"
+            pages.parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text(
+                "pub fn set_table_sort_order() {}\n", encoding="utf-8"
+            )
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
+            keynote.parent.mkdir(parents=True, exist_ok=True)
+            keynote.write_text(
+                "pub fn set_slide_table_sort_order() {}\n", encoding="utf-8"
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_sort_source_topology(root), []
+            )
+
+    def test_focused_numbers_table_sort_host_retires_only_config_methods(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_sort.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn table_sort_order() {}\n"
+                "pub fn set_table_sort_order() {}\n"
+                "pub fn clear_table_sort_order() {}\n"
+                "pub fn apply_table_sort_order() {}\n"
+                "fn bridge() { editor.table_sort_order(); editor.set_table_sort_order(); }\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_sort_source_topology(root)
+            self.assertTrue(any("method table_sort_order" in violation for violation in violations))
+            self.assertTrue(any("method set_table_sort_order" in violation for violation in violations))
+            self.assertTrue(any("method clear_table_sort_order" in violation for violation in violations))
+            self.assertTrue(any("call table_sort_order" in violation for violation in violations))
+            self.assertTrue(any("retired litchi-iwa Numbers table-sort test" in violation for violation in violations))
+            self.assertFalse(any("method apply_table_sort_order" in violation for violation in violations))
+
+    def test_focused_numbers_table_sort_dispatch_is_wired(self) -> None:
+        main_source = Path(boundaries.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            "+ audit_iwa_numbers_table_sort_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_numbers_table_sort_facade_source_topology()", main_source
+        )
+
+    def test_numbers_table_sort_host_does_not_scan_pages_or_keynote_adapters(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            pages = root / "crates/litchi-iwa/src/pages/editor/tables/sort.rs"
+            pages.parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text(
+                "pub fn table_sort_order() {}\n"
+                "pub fn set_table_sort_order() {}\n"
+                "pub fn clear_table_sort_order() {}\n",
+                encoding="utf-8",
+            )
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
+            keynote.parent.mkdir(parents=True, exist_ok=True)
+            keynote.write_text(
+                "pub fn table_sort_order() {}\n"
+                "pub fn set_table_sort_order() {}\n"
+                "pub fn clear_table_sort_order() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_sort_source_topology(root), []
+            )
+
+    def test_numbers_table_sort_fuzz_contract_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            fuzz = root / boundaries.NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE
+            fuzz.write_text("fn main() {}\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz_target! harness" in violation for violation in violations))
 
     def test_numbers_sheet_order_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

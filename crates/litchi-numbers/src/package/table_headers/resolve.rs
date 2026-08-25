@@ -314,6 +314,11 @@ pub(in crate::package) fn validate_message_metadata(
     object: &litchi_iwa_core::ArchiveObject,
     message_index: usize,
 ) -> Result<(), Error> {
+    if object.archive_info.message_infos.len() != object.messages.len() {
+        return Err(Error::InvalidSource {
+            path: Path::Package,
+        });
+    }
     let info =
         object
             .archive_info
@@ -349,6 +354,11 @@ pub(in crate::package) fn require_declared_reference(
     identifier: u64,
     accepted_path: &[u32],
 ) -> Result<(), Error> {
+    // Reference ownership is only meaningful when the archive header and
+    // payload have a complete, position-preserving message alignment.  Most
+    // producers omit FieldInfo entirely; that aggregate-only form remains
+    // supported below, but a partial header must never be treated as proof.
+    validate_message_metadata(object, message_index)?;
     let info =
         object
             .archive_info
@@ -384,6 +394,10 @@ pub(in crate::package) fn require_declared_reference(
             field_occurrence = true;
         }
     }
+    // Apple producers can declare this edge only in the aggregate reference
+    // list while emitting unrelated FieldInfo records. When a FieldInfo does
+    // carry the selected identifier, the loop above still requires exactly
+    // one occurrence at the canonical path.
     Ok(())
 }
 

@@ -52,13 +52,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_cell_comment(table_id, 2, 1, "South comment follows its sorted row")?;
     let reply_id =
         editor.add_cell_comment_reply(table_id, 2, 1, "Numbers keeps this thread intact")?;
-    editor.set_table_sort_order(
-        table,
-        NumbersTableSortOrder::new([NumbersTableSortRule::new(
-            NumbersTableSortColumnIndex::new(1)?,
-            NumbersTableSortDirection::Ascending,
-        )])?,
-    )?;
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1)?,
+        NumbersTableSortDirection::Ascending,
+    )])?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_table_sort_order(SheetSelector::index(0), table)?
+        .set(order)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    editor = NumbersEditor::from_bytes(&bytes)?;
     if !editor.apply_table_sort_order(table)? {
         return Err("expected the source table to be reordered".into());
     }

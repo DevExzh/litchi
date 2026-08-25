@@ -11,7 +11,61 @@ use litchi_iwa_common::table::cell::{
     layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
 };
 use litchi_numbers::table::lock::State as FocusedTableLockState;
+use litchi_numbers::table::sort::Order as FocusedSortOrder;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
+
+fn focused_sort_order(
+    editor: &NumbersEditor,
+    table: TableSelector<'_>,
+) -> crate::Result<Option<FocusedSortOrder>> {
+    let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    (FocusedNumbersPackage::table_sort_order)(&package, SheetSelector::index(0), table)
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+}
+
+fn set_focused_sort_order(
+    editor: &mut NumbersEditor,
+    table: TableSelector<'_>,
+    order: FocusedSortOrder,
+) -> crate::Result<()> {
+    let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    let commit =
+        (FocusedNumbersPackage::edit_table_sort_order)(&package, SheetSelector::index(0), table)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?
+            .set(order)
+            .commit()
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn clear_focused_sort_order(
+    editor: &mut NumbersEditor,
+    table: TableSelector<'_>,
+) -> crate::Result<()> {
+    let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    let commit =
+        (FocusedNumbersPackage::edit_table_sort_order)(&package, SheetSelector::index(0), table)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?
+            .clear()
+            .commit()
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    *editor = NumbersEditor::from_bytes(&bytes)?;
+    Ok(())
+}
 
 fn cell_number(value: f64) -> CellValue {
     CellValue::number(value).expect("finite test number")
@@ -5238,7 +5292,7 @@ fn table_axis_delete_rejects_live_formula_references_transactionally() {
 }
 
 #[test]
-fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
+fn focused_package_sort_order_is_typed_transactional_and_native_clear_compatible() {
     let mut sort_unknown = Vec::new();
     append_unknown_varint(&mut sort_unknown, 98, 980);
     let mut rule_unknown = Vec::new();
@@ -5288,7 +5342,7 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         Some(
             NumbersTableSortOrder::new([NumbersTableSortRule::new(
                 NumbersTableSortColumnIndex::new(1).unwrap(),
@@ -5309,11 +5363,9 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         ),
     ])
     .unwrap();
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         Some(order.clone())
     );
     assert_eq!(order.rules()[0].column().get(), 2);
@@ -5324,7 +5376,7 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
     let changed = editor.to_bytes().unwrap();
     let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
     assert_eq!(
-        reparsed.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&reparsed, TableSelector::index(0)).unwrap(),
         Some(order.clone())
     );
 
@@ -5362,9 +5414,7 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         vec![tracker.as_slice()]
     );
 
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), changed);
 
     let out_of_bounds = NumbersTableSortOrder::new([NumbersTableSortRule::new(
@@ -5372,18 +5422,12 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    assert!(
-        editor
-            .set_table_sort_order(TableSelector::index(0), out_of_bounds)
-            .is_err()
-    );
+    assert!(set_focused_sort_order(&mut editor, TableSelector::index(0), out_of_bounds).is_err());
     assert_eq!(editor.to_bytes().unwrap(), changed);
 
-    editor
-        .clear_table_sort_order(TableSelector::index(0))
-        .unwrap();
+    clear_focused_sort_order(&mut editor, TableSelector::index(0)).unwrap();
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         None
     );
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
@@ -5413,15 +5457,13 @@ fn table_sort_order_is_typed_transactional_and_native_clear_compatible() {
         vec![tracker.as_slice()]
     );
     let cleared = editor.to_bytes().unwrap();
-    editor
-        .clear_table_sort_order(TableSelector::index(0))
-        .unwrap();
+    clear_focused_sort_order(&mut editor, TableSelector::index(0)).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), cleared);
     assert_ne!(cleared, baseline);
 }
 
 #[test]
-fn table_sort_order_rejects_duplicate_wire_fields_transactionally() {
+fn focused_package_sort_order_rejects_duplicate_wire_fields_transactionally() {
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Ascending,
@@ -5456,17 +5498,13 @@ fn table_sort_order_rejects_duplicate_wire_fields_transactionally() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.table_sort_order(TableSelector::index(0)).is_err());
-    assert!(
-        editor
-            .set_table_sort_order(TableSelector::index(0), order)
-            .is_err()
-    );
+    assert!(focused_sort_order(&editor, TableSelector::index(0)).is_err());
+    assert!(set_focused_sort_order(&mut editor, TableSelector::index(0), order).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
-fn table_sort_order_rejects_malformed_nested_wire_transactionally() {
+fn focused_package_sort_order_rejects_malformed_nested_wire_transactionally() {
     const SORT_TYPE_FIELD: u32 = 1;
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
@@ -5506,17 +5544,9 @@ fn table_sort_order_rejects_malformed_nested_wire_transactionally() {
         .unwrap();
     let mut editor = NumbersEditor::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
-    assert!(editor.table_sort_order(TableSelector::index(0)).is_err());
-    assert!(
-        editor
-            .set_table_sort_order(TableSelector::index(0), order)
-            .is_err()
-    );
-    assert!(
-        editor
-            .clear_table_sort_order(TableSelector::index(0))
-            .is_err()
-    );
+    assert!(focused_sort_order(&editor, TableSelector::index(0)).is_err());
+    assert!(set_focused_sort_order(&mut editor, TableSelector::index(0), order).is_err());
+    assert!(clear_focused_sort_order(&mut editor, TableSelector::index(0)).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
@@ -5627,35 +5657,29 @@ fn source_created_large_table_allocates_header_buckets_only_when_needed() {
 }
 
 #[test]
-fn source_created_table_supports_sort_order_configuration_crud() {
+fn source_created_table_supports_focused_sort_order_configuration_crud() {
     let mut editor = NumbersDocumentBuilder::new()
         .table_dimensions(4, 3)
         .build()
         .unwrap();
     let baseline = editor.to_bytes().unwrap();
-    editor
-        .clear_table_sort_order(TableSelector::index(0))
-        .unwrap();
+    clear_focused_sort_order(&mut editor, TableSelector::index(0)).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), baseline);
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
     let reparsed = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reparsed.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&reparsed, TableSelector::index(0)).unwrap(),
         Some(order)
     );
 
-    editor
-        .clear_table_sort_order(TableSelector::index(0))
-        .unwrap();
+    clear_focused_sort_order(&mut editor, TableSelector::index(0)).unwrap();
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         None
     );
 }
@@ -5716,14 +5740,10 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     )])
     .unwrap();
     assert_eq!(order.scope(), NumbersTableSortScope::SelectedRows);
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
+    let reparsed = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        NumbersEditor::from_bytes(&editor.to_bytes().unwrap())
-            .unwrap()
-            .table_sort_order(TableSelector::index(0))
-            .unwrap(),
+        focused_sort_order(&reparsed, TableSelector::index(0)).unwrap(),
         Some(order.clone())
     );
 
@@ -5749,7 +5769,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
             .unwrap()
     );
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         Some(order)
     );
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -5802,30 +5822,60 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
 
 #[test]
 fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
-    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_dimensions(5, 2)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
-        10,
+        table_id,
         [
-            TableCellUpdate::new(0, 0, CellValue::Text("C first".to_owned())),
-            TableCellUpdate::new(0, 1, cell_number(3.0)),
-            TableCellUpdate::new(1, 0, CellValue::Text("A".to_owned())),
-            TableCellUpdate::new(1, 1, cell_number(1.0)),
-            TableCellUpdate::new(2, 0, CellValue::Text("C second".to_owned())),
-            TableCellUpdate::new(2, 1, cell_number(3.0)),
-            TableCellUpdate::new(3, 0, CellValue::Text("B".to_owned())),
-            TableCellUpdate::new(3, 1, cell_number(2.0)),
+            TableCellUpdate::new(0, 0, CellValue::Text("Name".to_owned())),
+            TableCellUpdate::new(0, 1, CellValue::Text("Rank".to_owned())),
+            TableCellUpdate::new(1, 0, CellValue::Text("C first".to_owned())),
+            TableCellUpdate::new(1, 1, cell_number(3.0)),
+            TableCellUpdate::new(2, 0, CellValue::Text("A".to_owned())),
+            TableCellUpdate::new(2, 1, cell_number(1.0)),
+            TableCellUpdate::new(3, 0, CellValue::Text("C second".to_owned())),
+            TableCellUpdate::new(3, 1, cell_number(3.0)),
+            TableCellUpdate::new(4, 0, CellValue::Text("B".to_owned())),
+            TableCellUpdate::new(4, 1, cell_number(2.0)),
         ],
     )
     .unwrap();
+    let read_uid_map = |editor: &NumbersEditor| {
+        let locations = object_locations(editor.package()).unwrap();
+        let model_archive = editor
+            .package()
+            .archive(locations.get(&table_id).unwrap())
+            .unwrap();
+        let model = model_archive
+            .object(table_id)
+            .unwrap()
+            .messages
+            .iter()
+            .find_map(|message| TableModelArchive::decode(message.data.as_slice()).ok())
+            .unwrap();
+        let uid_identifier = model.base_column_row_uids.unwrap().identifier;
+        editor
+            .package()
+            .archive(locations.get(&uid_identifier).unwrap())
+            .unwrap()
+            .object(uid_identifier)
+            .unwrap()
+            .messages
+            .iter()
+            .find_map(|message| tst::ColumnRowUidMapArchive::decode(message.data.as_slice()).ok())
+            .unwrap()
+    };
+    let before_uid_map = read_uid_map(&editor);
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1).unwrap(),
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
 
     assert!(
         editor
@@ -5833,33 +5883,48 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
             .unwrap()
     );
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         Some(order)
     );
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets()[0].tables().next().unwrap();
-    assert_eq!(table.get_cell(0, 0), Some(&CellValue::Text("A".to_owned())));
-    assert_eq!(table.get_cell(0, 1), Some(&cell_number(1.0)));
-    assert_eq!(table.get_cell(1, 0), Some(&CellValue::Text("B".to_owned())));
-    assert_eq!(table.get_cell(1, 1), Some(&cell_number(2.0)));
     assert_eq!(
-        table.get_cell(2, 0),
-        Some(&CellValue::Text("C first".to_owned()))
+        table.get_cell(0, 0),
+        Some(&CellValue::Text("Name".to_owned()))
     );
-    assert_eq!(table.get_cell(2, 1), Some(&cell_number(3.0)));
+    assert_eq!(
+        table.get_cell(0, 1),
+        Some(&CellValue::Text("Rank".to_owned()))
+    );
+    assert_eq!(table.get_cell(1, 0), Some(&CellValue::Text("A".to_owned())));
+    assert_eq!(table.get_cell(1, 1), Some(&cell_number(1.0)));
+    assert_eq!(table.get_cell(2, 0), Some(&CellValue::Text("B".to_owned())));
+    assert_eq!(table.get_cell(2, 1), Some(&cell_number(2.0)));
     assert_eq!(
         table.get_cell(3, 0),
-        Some(&CellValue::Text("C second".to_owned()))
+        Some(&CellValue::Text("C first".to_owned()))
     );
     assert_eq!(table.get_cell(3, 1), Some(&cell_number(3.0)));
+    assert_eq!(
+        table.get_cell(4, 0),
+        Some(&CellValue::Text("C second".to_owned()))
+    );
+    assert_eq!(table.get_cell(4, 1), Some(&cell_number(3.0)));
 
-    let archive = editor.package().archive("Index/Document.iwa").unwrap();
-    let uid_map = tst::ColumnRowUidMapArchive::decode(
-        archive.object(40).unwrap().messages[0].data.as_slice(),
-    )
-    .unwrap();
-    assert_eq!(uid_map.row_uid_for_index, [1, 3, 0, 2]);
-    assert_eq!(uid_map.row_index_for_uid, [2, 0, 3, 1]);
+    let uid_map = read_uid_map(&editor);
+    let expected_row_uid_for_index = [
+        before_uid_map.row_uid_for_index[0],
+        before_uid_map.row_uid_for_index[2],
+        before_uid_map.row_uid_for_index[4],
+        before_uid_map.row_uid_for_index[1],
+        before_uid_map.row_uid_for_index[3],
+    ];
+    let mut expected_row_index_for_uid = vec![0; expected_row_uid_for_index.len()];
+    for (physical_index, stable_index) in expected_row_uid_for_index.iter().copied().enumerate() {
+        expected_row_index_for_uid[stable_index as usize] = physical_index as u32;
+    }
+    assert_eq!(uid_map.row_uid_for_index, expected_row_uid_for_index);
+    assert_eq!(uid_map.row_index_for_uid, expected_row_index_for_uid);
 
     let sorted = editor.to_bytes().unwrap();
     assert!(
@@ -5899,9 +5964,7 @@ fn source_created_table_executes_stable_plain_text_sort() {
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
 
     assert!(
         editor
@@ -5909,7 +5972,7 @@ fn source_created_table_executes_stable_plain_text_sort() {
             .unwrap()
     );
     assert_eq!(
-        editor.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
         Some(order)
     );
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -5982,16 +6045,16 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
         ],
     )
     .unwrap();
-    editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(0).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(0).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
     let mut package = editor.into_package();
     move_table_data_list_entries_to_segment(&mut package, STRING_LIST_ID, STRING_SEGMENT_ID);
     let mut editor = NumbersEditor::from_package(package).unwrap();
@@ -6042,16 +6105,16 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
         ],
     )
     .unwrap();
-    editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(0).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(0).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
     let mut package = editor.into_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -6455,9 +6518,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         NumbersTableSortDirection::Ascending,
     )])
     .unwrap();
-    editor
-        .set_table_sort_order(TableSelector::index(0), order.clone())
-        .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
 
     assert!(
         editor
@@ -6510,7 +6571,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     assert_eq!(moved_replies[0].comment, original_reply.comment);
     let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reopened.table_sort_order(TableSelector::index(0)).unwrap(),
+        focused_sort_order(&reopened, TableSelector::index(0)).unwrap(),
         Some(order)
     );
     assert!(reopened.cell_comment(table_id, 2, 1).unwrap().is_none());
@@ -6572,16 +6633,16 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
     editor
         .set_table_hidden_axes(test_table_selector(&editor, table_id), &hidden)
         .unwrap();
-    editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(1).unwrap(),
-                NumbersTableSortDirection::Descending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(1).unwrap(),
+            NumbersTableSortDirection::Descending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
 
     assert!(
         editor
@@ -6675,16 +6736,16 @@ fn table_sort_moves_rows_across_tile_boundaries() {
         ],
     )
     .unwrap();
-    editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(0).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(0).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
 
     assert!(
         editor
@@ -6769,16 +6830,16 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
         ],
     )
     .unwrap();
-    editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(1).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(1).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
     assert!(
         editor
             .apply_table_sort_order(TableSelector::index(0))
@@ -6843,16 +6904,16 @@ fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
             ],
         )
         .unwrap();
-        editor
-            .set_table_sort_order(
-                TableSelector::index(0),
-                NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                    NumbersTableSortColumnIndex::new(1).unwrap(),
-                    NumbersTableSortDirection::Ascending,
-                )])
-                .unwrap(),
-            )
-            .unwrap();
+        set_focused_sort_order(
+            &mut editor,
+            TableSelector::index(0),
+            NumbersTableSortOrder::new([NumbersTableSortRule::new(
+                NumbersTableSortColumnIndex::new(1).unwrap(),
+                NumbersTableSortDirection::Ascending,
+            )])
+            .unwrap(),
+        )
+        .unwrap();
         let before = editor.to_bytes().unwrap();
         if should_sort {
             assert!(
@@ -6964,16 +7025,16 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
         ],
     )
     .unwrap();
-    spill_editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(1).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut spill_editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(1).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
     let before = spill_editor.to_bytes().unwrap();
     assert!(
         spill_editor
@@ -6997,16 +7058,16 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
         ],
     )
     .unwrap();
-    formula_editor
-        .set_table_sort_order(
-            TableSelector::index(0),
-            NumbersTableSortOrder::new([NumbersTableSortRule::new(
-                NumbersTableSortColumnIndex::new(1).unwrap(),
-                NumbersTableSortDirection::Ascending,
-            )])
-            .unwrap(),
-        )
-        .unwrap();
+    set_focused_sort_order(
+        &mut formula_editor,
+        TableSelector::index(0),
+        NumbersTableSortOrder::new([NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(1).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        )])
+        .unwrap(),
+    )
+    .unwrap();
     let before = formula_editor.to_bytes().unwrap();
     assert!(
         formula_editor
