@@ -575,6 +575,18 @@ impl<'a> Format<'a> {
         self.raw.underline
     }
 
+    /// Whether single-strike formatting is active.
+    #[must_use]
+    pub const fn strike(self) -> bool {
+        self.raw.strike
+    }
+
+    /// Whether double-strike formatting is active.
+    #[must_use]
+    pub const fn double_strike(self) -> bool {
+        self.raw.double_strike
+    }
+
     /// Font size in half-points.
     #[must_use]
     pub const fn size(self) -> NonZeroU16 {
