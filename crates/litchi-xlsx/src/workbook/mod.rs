@@ -14,6 +14,7 @@ pub mod worksheet;
 mod codec;
 mod model;
 mod package;
+mod source_merge;
 
 #[cfg(test)]
 mod tests;
@@ -28,6 +29,11 @@ pub use litchi_core::patch::HistoryLimits;
 pub(crate) use model::Inner;
 pub use model::{DateSystem, Flavor, Selector, Visibility, Workbook, Worksheet, WorksheetKind};
 pub use source::{SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet};
+pub use source_merge::{
+    Commit as SourceBackedMergeCommit, Diagnostics as SourceBackedMergeDiagnostics,
+    Patch as SourceBackedMergePatch, Snapshot as SourceBackedMergeSnapshot,
+    SourceBackedEditor as SourceBackedMergeEditor, SourceEdit as SourceBackedMergeEdit,
+};
 
 /// Explicit budgeted undo/redo retention for immutable workbook snapshots.
 pub type History = litchi_core::patch::History<Workbook>;
