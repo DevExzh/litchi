@@ -14,6 +14,7 @@ use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
     CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector,
+    cell::data_format::control::transaction::Patch,
     cell::data_format::control::{CellControl, DisplayFormat, Range, Slider, Stepper},
     cell::data_format::{Checkbox, Number, PopUpMenu, StarRating},
 };
@@ -34,6 +35,7 @@ const PRIVATE_SHEET: &str = "__litchi_private_control_sheet_85__";
 const PRIVATE_TABLE: &str = "__litchi_private_control_table_85__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_control_input_85__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
+const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
 
 fuzz_target!(|data: &[u8]| {
     match Package::from_bytes_with_options(data, options()) {
@@ -45,6 +47,16 @@ fuzz_target!(|data: &[u8]| {
     // reach a semantic table.  Reuse the same command against a fixed native
     // source so every campaign still exercises selectors and transactions.
     exercise_package(native_package(), data);
+    // A valid ZIP supplied as fuzz input may be a multi-member native source
+    // whose control lists live outside the selected model component.  Probe
+    // its first bounded table window as well: unsupported split ownership
+    // must remain source-atomic, while any admitted route must survive a
+    // serialized candidate reopen and exact forward/inverse replay.
+    if data.starts_with(ZIP_LOCAL_HEADER)
+        && let Ok(package) = Package::from_bytes_with_options(data, options())
+    {
+        exercise_split_component_window(&package, data);
+    }
     exercise_constructors(data);
     exercise_selector_errors(native_package(), data);
     exercise_redacted_ingress();
@@ -128,6 +140,12 @@ fn exercise_set(
     };
     let patch = commit.patch().clone();
     let target_bytes = package_bytes(commit.package());
+    if !patch.is_noop() {
+        assert!(
+            commit.diagnostics().full_reparse_performed(),
+            "a published control candidate must be reopened before publication"
+        );
+    }
     assert_eq!(patch.before(), before.as_ref());
     assert_eq!(patch.after(), Some(&desired));
     assert_eq!(patch.is_noop(), target_bytes == source_bytes);
@@ -153,6 +171,13 @@ fn exercise_set(
         .unwrap_or_else(|error| panic!("control inverse must apply: {error}"));
     assert_eq!(package_bytes(restored.package()), source_bytes);
     assert_eq!(patch.inverse().inverse(), patch);
+    exercise_reopened_replay(
+        &source_bytes,
+        &target_bytes,
+        &patch,
+        position,
+        commit.diagnostics().touched_components(),
+    );
     let first_target = commit.package();
     let second_kind = usize::from(data.get(1).copied().unwrap_or_default() % 5);
     if second_kind != control_kind(&desired) {
@@ -161,6 +186,7 @@ fn exercise_set(
             && let Ok(second_commit) = edit.set(second.clone()).commit()
         {
             let second_patch = second_commit.patch().clone();
+            let second_source_bytes = package_bytes(first_target);
             let second_bytes = package_bytes(second_commit.package());
             assert_eq!(second_patch.after(), Some(&second));
             assert_eq!(
@@ -187,6 +213,13 @@ fn exercise_set(
                     .apply_table_cell_control_format(&second_patch)
                     .is_err()
             );
+            exercise_reopened_replay(
+                &second_source_bytes,
+                &second_bytes,
+                &second_patch,
+                position,
+                second_commit.diagnostics().touched_components(),
+            );
         }
     }
 
@@ -203,6 +236,8 @@ fn exercise_set(
             return;
         };
         let clear_patch = clear_commit.patch().clone();
+        let clear_source_bytes = package_bytes(first_target);
+        let clear_target_bytes = package_bytes(clear_commit.package());
         assert_eq!(clear_patch.after(), None);
         assert_eq!(
             clear_commit
@@ -219,6 +254,89 @@ fn exercise_set(
             package_bytes(restored.package()),
             package_bytes(first_target)
         );
+        exercise_reopened_replay(
+            &clear_source_bytes,
+            &clear_target_bytes,
+            &clear_patch,
+            position,
+            clear_commit.diagnostics().touched_components(),
+        );
+    }
+}
+
+/// Replay a successful patch through serialized source/target packages.
+///
+/// This deliberately works from package bytes rather than retaining the
+/// private candidate returned by `commit`. Sources with missing, duplicate,
+/// versioned, or wrong-locator ownership must fail before this function is
+/// reached and leave their source bytes unchanged.
+fn exercise_reopened_replay(
+    source_bytes: &[u8],
+    target_bytes: &[u8],
+    patch: &Patch,
+    position: CellPosition,
+    touched_components: usize,
+) {
+    let source = Package::from_bytes_with_options(source_bytes, options())
+        .unwrap_or_else(|error| panic!("published control source must reopen: {error}"));
+    let target = Package::from_bytes_with_options(target_bytes, options())
+        .unwrap_or_else(|error| panic!("published control target must reopen: {error}"));
+    let selected = target
+        .table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .unwrap_or_else(|error| panic!("reopened control target read failed: {error}"));
+    assert_eq!(selected, patch.after().cloned());
+
+    let restored = target
+        .apply_table_cell_control_format(&patch.inverse())
+        .unwrap_or_else(|error| panic!("reopened control inverse must apply: {error}"));
+    assert_eq!(package_bytes(restored.package()), source_bytes);
+
+    let replayed = source
+        .apply_table_cell_control_format(patch)
+        .unwrap_or_else(|error| panic!("reopened control patch must apply: {error}"));
+    assert_eq!(package_bytes(replayed.package()), target_bytes);
+    if !patch.is_noop() {
+        assert!(source.apply_table_cell_control_format(patch).is_err());
+    }
+    assert_eq!(package_bytes(&source), source_bytes);
+
+    // Keep the diagnostic cardinality visible to coverage without assuming a
+    // particular physical layout for successful same-owner candidates.
+    if touched_components > 1 {
+        black_box(touched_components);
+    }
+}
+
+/// Probe a bounded region of a file-backed native input.  The Wave85 source
+/// recipe has controls in this window and intentionally exercises the
+/// strict read boundary: the owner admits the metadata-proven split graph but
+/// rejects any changed transaction atomically until multi-member publication
+/// is owned.
+fn exercise_split_component_window(package: &Package, data: &[u8]) {
+    for row in 0..8 {
+        for column in 0..8 {
+            let position = CellPosition::new(row, column);
+            let Ok(before) = package.table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            ) else {
+                continue;
+            };
+            let Some(before) = before else {
+                continue;
+            };
+            let source_bytes = package_bytes(package);
+            let desired = control(
+                usize::from(
+                    data.get((row as usize + column as usize) % data.len().max(1))
+                        .copied()
+                        .unwrap_or_default(),
+                ) % 5,
+                data,
+            );
+            exercise_set(package, data, position, Some(before), source_bytes, desired);
+        }
     }
 }
 

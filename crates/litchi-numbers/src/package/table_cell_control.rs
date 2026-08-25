@@ -464,6 +464,7 @@ fn rewrite(
         TableSelector::index(table),
         position,
     )?;
+    popup::reject_cross_component_write(source, target, path)?;
     let mut budget = popup::TransactionBudget::for_cell_control(source);
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::UnsupportedSource)?;

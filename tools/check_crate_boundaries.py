@@ -3311,6 +3311,68 @@ NUMBERS_TABLE_CELL_CONTROL_OWNER_REQUIRED_MARKERS = {
         r"(?<![A-Za-z0-9])(?:locality|verify_locality|candidate|reopen|same_content)(?![A-Za-z0-9])"
     ),
 }
+# Wave86 is intentionally a bounded cross-component slice. Reads and exact
+# no-ops may traverse a split graph, but every changed operation must refuse
+# before candidate/native allocation until a later wave owns multi-member
+# mutation. Require strict read/edge/locator proof and the early refusal
+# guard; do not require successful split writes, token batching, or
+# cross-component candidate/locality machinery.
+NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE = Path(
+    "crates/litchi-numbers/tests/table_cell_control.rs"
+)
+NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS = {
+    "strict cross-component read/no-op": re.compile(
+        r"(?<![A-Za-z0-9_])(?:prove[_-]?cross[_-]?component[_-]?reference|"
+        r"read[_-]?popup[_-]?with[_-]?(?:policy|budget))(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "pre-candidate changed-operation refusal": re.compile(
+        r"(?<![A-Za-z0-9_])reject[_-]?cross[_-]?component[_-]?write(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "refusal precedes candidate allocation": re.compile(
+        r"(?is)reject[_-]?cross[_-]?component[_-]?write\s*\([^;]{0,500}\)"
+        r"\s*(?:\?\s*)?;[\s\S]{0,1800}(?:let\s+mut\s+budget|"
+        r"physical[_-]?source|preflight|rewrite[_-]?(?:native|scalar)|"
+        r"prepare[_-]?reassembly)"
+    ),
+    "effective locator coverage": re.compile(
+        r"(?<![A-Za-z0-9_])(?:effective[_-]?locator|effective[_-]?location|"
+        r"resolved[_-]?location)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "current external-edge coverage": re.compile(
+        r"(?<![A-Za-z0-9_])(?:require[_-]?external[_-]?edge|"
+        r"prove[_-]?cross[_-]?component[_-]?reference|external[_-]?edge)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "object/component edge scope": re.compile(
+        r"(?<![A-Za-z0-9_])(?:object[_-]?identifier|component[_-]?identifier|"
+        r"Option\s*<\s*u64\s*>)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "target alias rejection": re.compile(
+        r"(?<![A-Za-z0-9_])(?:has[_-]?physical[_-]?alias|physical[_-]?alias)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS = {
+    "split-component read coverage": re.compile(
+        r"\bfn\s+split_components?[_a-z0-9]*read[_a-z0-9]*\s*\(", re.IGNORECASE
+    ),
+    "split-component no-op exact bytes": re.compile(
+        r"(?is)(?:split_components?|assert_split_read_noop_and_write_reject)"
+        r"[\s\S]{0,5000}(?:is_noop|no_op)[\s\S]{0,2000}exact_bytes"
+    ),
+    "split-component changed refusal": re.compile(
+        r"(?is)(?:split_components?|assert_split_read_noop_and_write_reject)"
+        r"[\s\S]{0,6000}(?:write_reject;|changed_edit_rejects|\.is_err\(\))"
+    ),
+    "split-component alias/edge atomicity": re.compile(
+        r"(?is)split_components?[\s\S]{0,8000}(?:assert_changed_edit_rejects|"
+        r"assert_split_owner_rejects|\.is_err\(\)|external;|opaque;|atomic;)"
+    ),
+}
 NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_SOURCE = Path(
     "crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_cell_control_codec.rs"
 )
@@ -14428,6 +14490,24 @@ def audit_numbers_table_cell_control_facade_source_topology(
         for path in sorted(owner_related_paths)
         if path.is_file()
     )
+    # The unified owner delegates the legacy Pop-Up Menu graph and its strict
+    # metadata selector/edge proof through these package siblings. Include
+    # both in the bounded Wave86 graph contract.
+    owner_graph_paths = set(owner_related_paths)
+    for popup_graph_name in (
+        "table_cell_pop_up_menu.rs",
+        "table_cell_pop_up_menu_metadata.rs",
+    ):
+        popup_graph_path = owner_path.parent / popup_graph_name
+        if popup_graph_path.is_file():
+            owner_graph_paths.add(popup_graph_path)
+    owner_graph_code = "\n".join(
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for path in sorted(owner_graph_paths)
+        if path.is_file()
+    )
     owner_exports = _rust_canonical_exports(
         owner_source, frozenset(NUMBERS_TABLE_CELL_CONTROL_TRANSACTION_TYPES)
     )
@@ -14491,6 +14571,28 @@ def audit_numbers_table_cell_control_facade_source_topology(
             violations.append(
                 "focused litchi-numbers cell-control owner is missing "
                 f"{label} transaction marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
+            )
+
+    for label, marker in NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_graph_code) is None:
+            violations.append(
+                "focused litchi-numbers cell-control bounded cross-component owner is missing "
+                f"{label} marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
+            )
+
+    split_test_path = root / NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+    split_test_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(split_test_path.read_text(encoding="utf-8"))
+        )
+        if split_test_path.is_file()
+        else ""
+    )
+    for label, marker in NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS.items():
+        if marker.search(split_test_source) is None:
+            violations.append(
+                "focused litchi-numbers cell-control integration is missing "
+                f"{label}: {NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE}"
             )
 
     codec_path = root / NUMBERS_TABLE_CELL_CONTROL_CODEC_SOURCE
