@@ -125,6 +125,12 @@ pub(crate) fn header_footer(sheet: &Worksheet) -> Result<Option<crate::header_fo
     crate::header_footer::parse_worksheet_header_footer(xml(sheet)?)
 }
 
+/// Parse direct worksheet hyperlinks and validate their inert relationship
+/// projections.
+pub(crate) fn hyperlinks(sheet: &Worksheet) -> Result<Vec<crate::hyperlinks::Hyperlink>> {
+    crate::hyperlinks::parse(xml(sheet)?, relationships(sheet)?)
+}
+
 /// Parse ignored-error declarations.
 pub(crate) fn ignored_errors(
     sheet: &Worksheet,

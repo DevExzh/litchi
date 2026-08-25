@@ -87,6 +87,7 @@ mod error;
 pub mod external_links;
 pub mod formula;
 pub mod header_footer;
+pub mod hyperlinks;
 pub mod ignored_errors;
 pub mod layout;
 pub mod merge;
@@ -207,6 +208,7 @@ pub use external_links::{
 };
 pub use formula::Formula;
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
+pub use hyperlinks::{Hyperlink, HyperlinkReference};
 pub use ignored_errors::{
     IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
     IgnoredErrorsExtension, parse_worksheet_ignored_errors,
