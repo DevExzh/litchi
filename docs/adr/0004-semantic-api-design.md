@@ -2952,3 +2952,34 @@ text-box graphs.
 
 No native ID, raw storage type, archive/member name, wire field, generated
 schema type, Prost message, or Buffa view crosses the semantic facade.
+
+## 2026-08-25 amendment: Pages section-text host-retirement semantic ownership
+
+Implementation commit `507193d3c2ea7c6f6939f47189be5a7b425661c0`
+completes the focused host-retirement cut for existing rooted Pages section
+text. `SectionSelector` chooses by checked position or semantic name;
+`TextPosition` and `TextSpan` express checked section-relative UTF-16
+boundaries. `Package` exposes semantic read, whole-section set/clear, staged
+span replacement/insertion/deletion, exact patch application, and inverse
+restoration without exposing native IDs, object or component routes, ZIP/IWA
+artifacts, wire values, generated messages, Prost values, or Buffa views.
+
+The package resolves the unique `Document -> body storage -> ordered section`
+chain and authorizes a changed write only in the canonical rooted member. The
+text-wire owner strictly validates the source and performs a raw-preserving
+splice: known framing and reference tables remain canonical, balanced unknown
+groups and overlong unknown scalar values remain byte-exact, section boundary
+indexes shift by checked UTF-16 deltas, and unrelated storage fields retain
+their original order and framing. Exact ArchiveInfo/MessageInfo metadata,
+unknown object headers, unrelated objects/members, Metadata, previews, and
+unselected section text are preserved.
+
+The ownership census accepts only the rooted document edge and the exact
+aggregate-only type-10015 drawables-z-order consumer emitted by Pages; the
+latter orders the same stable storage identity and is preserved. Other
+aggregate, `FieldInfo`, data-reference, shared, divergent-alias, dependent-
+marker, rootless, or nested ownership fails closed. Because this operation
+neither allocates nor removes an object and does not invalidate layout,
+Metadata identifiers/save tokens and previews do not change. Section graph
+lifecycle, whole-body replacement across structural boundaries, and other
+text, table, annotation, or media graphs are outside this owner.
