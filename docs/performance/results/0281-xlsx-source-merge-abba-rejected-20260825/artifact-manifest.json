@@ -1,0 +1,36 @@
+{
+  "schema": "litchi.xlsx.source-merge-abba.v1",
+  "self_excluded": true,
+  "files": [
+    {
+      "path": "protocol.json",
+      "bytes": 2842,
+      "sha256": "d28b87698fb47580e9059f12efb591166aec3c730544f2cbeb7ef4fd6c0df527"
+    },
+    {
+      "path": "samples.jsonl",
+      "bytes": 13920772,
+      "sha256": "7dccbb973de50bcd7de7aac4065e31df67ed24f261290648bb74f58238ca4605"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 27466,
+      "sha256": "22b961f12c74de3385a9a02bf614ab0d310fcb37a57f923e09403740cb65fc25"
+    },
+    {
+      "path": "failures.jsonl",
+      "bytes": 169,
+      "sha256": "e4639c29fa1b61a1d7be458dc5abc8d5f7af0ce6fd0e4ec5e53fba2c319a9525"
+    },
+    {
+      "path": "sha256.txt",
+      "bytes": 430,
+      "sha256": "c736458133d7c5d1e96aa8bfe1c92e84ab5dd063b176e182fb27689f487b4842"
+    },
+    {
+      "path": "process-time.txt",
+      "bytes": 69,
+      "sha256": "af373b2b1a587af5d3624829eed05029d93a58452b665c3de7801c2bc688986a"
+    }
+  ]
+}
