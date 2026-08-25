@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::edit::{DurableComposition, DurableMergePlan, Limits, MergeResolution};
-use litchi_rtf::{Alignment, Document, edit::TextSpan};
+use litchi_rtf::{Alignment, Document, UnderlineStyle, edit::TextSpan};
 
 fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -14,6 +14,17 @@ fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
         max_operations,
         8,
         64 * 1024,
+        256 * 1024,
+    )
+}
+
+fn reversible_payload_limits() -> litchi_core::patch::PatchLimits {
+    litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(0, 0, 0),
+        300_000,
+        8,
+        8,
+        256 * 1024,
         256 * 1024,
     )
 }
@@ -106,6 +117,97 @@ fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
     let mut character = DurableComposition::new(&source, limits(8));
     character.join(bold).unwrap();
     assert!(character.join(italic).is_err());
+}
+
+#[test]
+fn durable_composition_replays_and_inverts_exact_underline_styles() {
+    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::DoubleWave)
+        .unwrap();
+    let branch = edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(branch.operations()[0].op, "character-underline.set");
+    assert_eq!(
+        branch.operations()[0].value,
+        serde_json::Value::String("double-wave".into())
+    );
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(branch).unwrap();
+    let combined = composition.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::DoubleWave
+    );
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| { run.format().underline() == UnderlineStyle::None })
+    );
+
+    let mut invalid_edit = source.edit();
+    invalid_edit
+        .set_text_underline(TextSpan::new(7, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let invalid_branch = invalid_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(combined).unwrap();
+    assert!(composition.join(invalid_branch).is_err());
+}
+
+#[test]
+fn durable_join_preflights_combined_reversible_payload_before_mutation() {
+    let left_text = "a".repeat(100_000);
+    let right_text = "b".repeat(100_000);
+    let input = format!(r"{{\rtf1\ansi {} {}}}", left_text, right_text);
+    let source = Document::parse(&input).unwrap();
+    let second_start = left_text.len().saturating_add(1);
+    let first = {
+        let mut edit = source.edit_with_limits(Limits::new(1));
+        edit.replace_text(TextSpan::new(0, left_text.len()).unwrap(), "A")
+            .unwrap();
+        edit.commit()
+            .unwrap()
+            .patch()
+            .to_durable(reversible_payload_limits())
+            .unwrap()
+    };
+    let second = {
+        let mut edit = source.edit_with_limits(Limits::new(1));
+        edit.replace_text(
+            TextSpan::new(second_start, second_start.saturating_add(right_text.len())).unwrap(),
+            "B",
+        )
+        .unwrap();
+        edit.commit()
+            .unwrap()
+            .patch()
+            .to_durable(reversible_payload_limits())
+            .unwrap()
+    };
+    let mut composition = DurableComposition::new(&source, reversible_payload_limits());
+    composition.join(first).unwrap();
+    assert!(composition.join(second).is_err());
+    assert_eq!(composition.len(), 1);
 }
 
 #[test]
