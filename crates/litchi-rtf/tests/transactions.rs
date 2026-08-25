@@ -11,6 +11,7 @@ use litchi_rtf::{
         HistoryLimits, Limits, MergePlan, MergeResolution, TextSpan, TransferPlan,
     },
 };
+use std::num::NonZeroU16;
 
 fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -2116,5 +2117,230 @@ fn destination_subedits_join_disjointly_and_plan_same_target_conflicts() {
                 .unwrap()
         ),
         Err(CompositionError::Conflicts(conflicts)) if conflicts.len() == 1
+    ));
+}
+
+#[test]
+fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
+    let source = Document::parse(r"{\rtf1\ansi\fs24\afs22 Alpha Beta}").unwrap();
+    assert!(
+        source
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+
+    let mut noop = source.edit();
+    noop.set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(24).unwrap())
+        .unwrap();
+    let noop_commit = noop.commit().unwrap();
+    assert!(!noop_commit.diagnostics().changed());
+    assert!(noop_commit.snapshot().same_snapshot(&source));
+
+    let mut edit = source.edit();
+    edit.set_text_font_size(TextSpan::new(6, 10).unwrap(), NonZeroU16::new(23).unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let bytes = commit.snapshot().to_bytes().unwrap();
+    let encoded = String::from_utf8_lossy(&bytes);
+    assert!(encoded.contains(r"\fs23 "));
+    assert!(encoded.contains(r"\fs24 "));
+    assert!(!encoded.contains(r"\fs0"));
+    let reopened = Document::from_bytes(&bytes).unwrap();
+    assert_eq!(reopened.text(), source.text());
+    let size_23_text = reopened
+        .body()
+        .runs()
+        .filter(|run| run.format().size().get() == 23)
+        .map(|run| run.text())
+        .collect::<String>();
+    let size_24_text = reopened
+        .body()
+        .runs()
+        .filter(|run| run.format().size().get() == 24)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(size_23_text.contains("Beta"));
+    assert!(size_24_text.contains("Alpha"));
+
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.text(), source.text());
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened_restored.text(), source.text());
+
+    let plain = Document::parse(r"{\rtf1\ansi Plain}").unwrap();
+    assert!(
+        plain
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+    let defchp = Document::parse(r"{\rtf1\ansi{\*\defchp\fs23} Plain}").unwrap();
+    assert!(
+        defchp
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+
+    let mut maximum = plain.edit();
+    maximum
+        .set_text_font_size(
+            TextSpan::new(0, 5).unwrap(),
+            NonZeroU16::new(65535).unwrap(),
+        )
+        .unwrap();
+    let maximum =
+        Document::from_bytes(&maximum.commit().unwrap().snapshot().to_bytes().unwrap()).unwrap();
+    assert!(
+        maximum
+            .body()
+            .runs()
+            .any(|run| run.format().size().get() == 65535)
+    );
+}
+
+#[test]
+fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
+    use litchi_core::patch::{BlobBundle, Patch, PatchOperation, ReversibleOperation};
+    use serde_json::{Number, Value};
+    use std::collections::BTreeMap;
+
+    let mixed = Document::parse(r"{\rtf1\ansi {\fs23 Alpha} Beta}").unwrap();
+    let mut mixed_edit = mixed.edit();
+    assert!(matches!(
+        mixed_edit.set_text_font_size(TextSpan::new(0, 10).unwrap(), NonZeroU16::new(24).unwrap()),
+        Err(Error::UnsupportedSource(
+            "the selected character span has mixed font-size state"
+        ))
+    ));
+
+    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut paragraph_edit = paragraph.edit();
+    assert!(matches!(
+        paragraph_edit
+            .set_text_font_size(TextSpan::new(0, 6).unwrap(), NonZeroU16::new(23).unwrap()),
+        Err(Error::UnsupportedSource(
+            "font-size edits require non-empty text within one paragraph"
+        ))
+    ));
+
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let mut cp1252_edit = cp1252.edit();
+    cp1252_edit
+        .set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
+        .unwrap();
+    assert!(matches!(
+        cp1252_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "font-size edits refuse non-ASCII transport encodings"
+        ))
+    ));
+
+    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
+        .unwrap();
+    let durable = edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(durable_limits(1))
+        .unwrap();
+    assert_eq!(durable.operations()[0].op, "character-font-size.set");
+    assert_eq!(
+        durable.operations()[0].preconditions["font_size_half_points"],
+        Value::Number(Number::from(24_u64))
+    );
+    assert_eq!(
+        durable.operations()[0].value,
+        Value::Number(Number::from(23_u64))
+    );
+    let applied = source.apply_durable(&durable).unwrap();
+    assert!(
+        applied
+            .body()
+            .runs()
+            .any(|run| run.format().size().get() == 23)
+    );
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let artifact = litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex();
+    let make_patch = |precondition: Value, value: Value| {
+        let mut preconditions = BTreeMap::new();
+        preconditions.insert(
+            "artifact_sha256".to_string(),
+            Value::String(artifact.clone()),
+        );
+        preconditions.insert("font_size_half_points".to_string(), precondition);
+        let forward = PatchOperation::new(
+            durable_limits(1),
+            "character-font-size.set",
+            "body:utf8:0-5",
+            preconditions.clone(),
+            value,
+        )
+        .unwrap();
+        let inverse = PatchOperation::new(
+            durable_limits(1),
+            "character-font-size.set",
+            "body:utf8:0-5",
+            preconditions,
+            Value::Number(Number::from(24_u64)),
+        )
+        .unwrap();
+        Patch::<litchi_core::patch::Reversible>::new(
+            durable_limits(1),
+            "litchi-rtf",
+            [ReversibleOperation::new(forward, inverse)],
+            BlobBundle::new(durable_limits(1).blobs()),
+            BlobBundle::new(durable_limits(1).blobs()),
+        )
+        .unwrap()
+    };
+    let malformed = [
+        Value::Null,
+        Value::Bool(true),
+        Value::String("23".to_string()),
+        Value::Number(Number::from(-1_i64)),
+        Value::Number(Number::from(0_u64)),
+        Value::Number(Number::from(65536_u64)),
+        serde_json::json!(23.5),
+    ];
+    for value in malformed.iter().cloned() {
+        assert!(matches!(
+            source.apply_durable(&make_patch(
+                Value::Number(Number::from(24_u64)),
+                value.clone(),
+            )),
+            Err(Error::DurablePatch(_))
+        ));
+        assert!(matches!(
+            source.apply_durable(&make_patch(value, Value::Number(Number::from(23_u64)))),
+            Err(Error::DurablePatch(_))
+        ));
+    }
+    assert!(matches!(
+        source.apply_durable(&make_patch(
+            Value::Number(Number::from(23_u64)),
+            Value::Number(Number::from(24_u64)),
+        )),
+        Err(Error::StalePrecondition(
+            "character font-size state differs"
+        ))
     ));
 }

@@ -367,6 +367,7 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Bold { .. }
         | Operation::Italic { .. }
         | Operation::Underline { .. }
+        | Operation::FontSize { .. }
         | Operation::Strike { .. }
         | Operation::DoubleStrike { .. }
         | Operation::Hidden { .. }
@@ -470,6 +471,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::Bold { span, .. }
         | Operation::Italic { span, .. }
         | Operation::Underline { span, .. }
+        | Operation::FontSize { span, .. }
         | Operation::Strike { span, .. }
         | Operation::DoubleStrike { span, .. }
         | Operation::Hidden { span, .. }
@@ -1185,6 +1187,7 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
             | "character-bold.set"
             | "character-italic.set"
             | "character-underline.set"
+            | "character-font-size.set"
             | "character-strike.set"
             | "character-double-strike.set"
             | "character-hidden.set"
@@ -1574,6 +1577,7 @@ fn durable_inverse_targets_equal(
         "character-bold.set"
         | "character-italic.set"
         | "character-underline.set"
+        | "character-font-size.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -1629,6 +1633,7 @@ fn durable_inverse_values_match(forward: &DurableOperation, inverse: &DurableOpe
         "character-bold.set" => "bold",
         "character-italic.set" => "italic",
         "character-underline.set" => "underline",
+        "character-font-size.set" => "font_size_half_points",
         "character-strike.set" => "strike",
         "character-double-strike.set" => "double_strike",
         "character-hidden.set" => "hidden",
@@ -1646,6 +1651,7 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
         | ("character-bold.set", "character-bold.set")
         | ("character-italic.set", "character-italic.set")
         | ("character-underline.set", "character-underline.set")
+        | ("character-font-size.set", "character-font-size.set")
         | ("character-strike.set", "character-strike.set")
         | ("character-double-strike.set", "character-double-strike.set")
         | ("character-hidden.set", "character-hidden.set")
@@ -1868,6 +1874,28 @@ fn verify_durable_inverse_semantics(
                     ));
                 }
             },
+            "character-font-size.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("font_size_half_points")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .and_then(std::num::NonZeroU16::new)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing font-size state".to_string(),
+                        )
+                    })?;
+                if super::font_size_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore font-size state".to_string(),
+                    ));
+                }
+            },
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -2000,6 +2028,7 @@ fn validate_durable_operation_shape(
         | "character-bold.set"
         | "character-italic.set"
         | "character-underline.set"
+        | "character-font-size.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2039,6 +2068,7 @@ fn validate_durable_operation_shape(
         "character-bold.set"
         | "character-italic.set"
         | "character-underline.set"
+        | "character-font-size.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2097,6 +2127,7 @@ fn durable_operation_domain(operation: &DurableOperation) -> Option<DurableDomai
         | "character-bold.set"
         | "character-italic.set"
         | "character-underline.set"
+        | "character-font-size.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2137,6 +2168,7 @@ fn durable_text_span(operation: &DurableOperation) -> Option<super::TextSpan> {
         | "character-bold.set"
         | "character-italic.set"
         | "character-underline.set"
+        | "character-font-size.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2269,6 +2301,20 @@ fn commit_durable_operations(
                         CompositionError::Durable("invalid underline value".to_string())
                     })?;
                 edit.set_text_underline(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-font-size.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .and_then(std::num::NonZeroU16::new)
+                    .ok_or_else(|| {
+                        CompositionError::Durable("invalid font-size value".to_string())
+                    })?;
+                edit.set_text_font_size(span, value)
                     .map_err(CompositionError::Edit)?;
             },
             "character-strike.set" => {
