@@ -86,8 +86,15 @@ pub(crate) struct Raw {
     root_name: Vec<u8>,
     root_prefix: Option<Vec<u8>>,
     attribute_prefix: Option<Vec<u8>>,
+    namespace_bindings: Vec<NamespaceBinding>,
     suffix: Vec<u8>,
     children: Vec<Node>,
+}
+
+#[derive(Debug, Clone)]
+struct NamespaceBinding {
+    prefix: Option<Vec<u8>>,
+    uri: String,
 }
 
 #[derive(Debug, Clone)]
@@ -249,7 +256,7 @@ pub(crate) fn encode(snapshot: &Snapshot) -> Result<Vec<u8>> {
         &snapshot.raw,
         &snapshot.state,
         snapshot.dirty,
-        u8::MAX,
+        Some(u8::MAX),
         &mut inserted,
     )?;
     output.extend_from_slice(&snapshot.raw.close_tag());
@@ -303,13 +310,40 @@ impl Raw {
         }
     }
 
-    fn attribute_name(&self, local_name: &str) -> String {
+    fn attribute_name(&self, local_name: &str) -> Result<String> {
         match &self.attribute_prefix {
             Some(prefix) if !prefix.is_empty() => {
-                format!("{}:{local_name}", String::from_utf8_lossy(prefix))
+                Ok(format!("{}:{local_name}", String::from_utf8_lossy(prefix)))
             },
-            _ => local_name.to_owned(),
+            _ => Err(Error::InvalidFormat(format!(
+                "cannot generate WordprocessingML attribute '{local_name}' without a named WordprocessingML prefix"
+            ))),
         }
+    }
+
+    fn has_namespace_binding(&self, prefix: &[u8]) -> bool {
+        self.namespace_bindings
+            .iter()
+            .any(|binding| binding.prefix.as_deref() == Some(prefix))
+    }
+
+    fn detached_fragment(&self, xml: &[u8]) -> Vec<u8> {
+        let mut detached = Vec::with_capacity(xml.len() + 128);
+        detached.extend_from_slice(b"<litchiRoot");
+        for binding in &self.namespace_bindings {
+            detached.extend_from_slice(b" xmlns");
+            if let Some(prefix) = &binding.prefix {
+                detached.push(b':');
+                detached.extend_from_slice(prefix);
+            }
+            detached.extend_from_slice(b"=\"");
+            detached.extend_from_slice(escape_namespace_uri(&binding.uri).as_bytes());
+            detached.push(b'"');
+        }
+        detached.extend_from_slice(b">");
+        detached.extend_from_slice(xml);
+        detached.extend_from_slice(b"</litchiRoot>");
+        detached
     }
 }
 
@@ -318,50 +352,70 @@ fn insert_missing_before(
     raw: &Raw,
     state: &State,
     dirty: Dirty,
-    before_rank: u8,
+    before_rank: Option<u8>,
     inserted: &mut [bool; 4],
 ) -> Result<()> {
+    let start = if dirty.start {
+        state
+            .start
+            .map(|value| write_start(raw, value))
+            .transpose()?
+    } else {
+        None
+    };
+    let page_size = if dirty.page_size {
+        state
+            .page_size
+            .map(|value| write_page_size(raw, &value))
+            .transpose()?
+    } else {
+        None
+    };
+    let margins = if dirty.margins {
+        state
+            .margins
+            .map(|value| write_margins(raw, &value))
+            .transpose()?
+    } else {
+        None
+    };
+    let columns = if dirty.columns {
+        state
+            .columns
+            .as_ref()
+            .map(|value| write_columns(raw, value))
+            .transpose()?
+    } else {
+        None
+    };
     let fields = [
         (
             0,
-            4,
+            section_child_rank("type").expect("section type rank"),
             dirty.start,
-            state
-                .start
-                .map(|value| write_start(raw, value))
-                .transpose()?,
+            start,
         ),
         (
             1,
-            5,
+            section_child_rank("pgSz").expect("section page size rank"),
             dirty.page_size,
-            state
-                .page_size
-                .map(|value| write_page_size(raw, &value))
-                .transpose()?,
+            page_size,
         ),
         (
             2,
-            6,
+            section_child_rank("pgMar").expect("section margin rank"),
             dirty.margins,
-            state
-                .margins
-                .map(|value| write_margins(raw, &value))
-                .transpose()?,
+            margins,
         ),
         (
             3,
-            10,
+            section_child_rank("cols").expect("section columns rank"),
             dirty.columns,
-            state
-                .columns
-                .as_ref()
-                .map(|value| write_columns(raw, value))
-                .transpose()?,
+            columns,
         ),
     ];
     for (index, rank, dirty, bytes) in fields {
-        if dirty && !inserted[index] && rank < before_rank {
+        if dirty && !inserted[index] && before_rank.is_some_and(|before_rank| rank < before_rank) {
             if let Some(bytes) = bytes {
                 output.extend_from_slice(&bytes);
             }
@@ -371,20 +425,14 @@ fn insert_missing_before(
     Ok(())
 }
 
-fn node_rank(node: &Node) -> u8 {
+fn node_rank(node: &Node) -> Option<u8> {
     match node {
         Node::Element {
             local_name,
             word: true,
             ..
-        } => match local_name.as_str() {
-            "type" => 4,
-            "pgSz" => 5,
-            "pgMar" => 6,
-            "cols" => 10,
-            _ => u8::MAX,
-        },
-        Node::Element { .. } | Node::Raw(_) => u8::MAX,
+        } => section_child_rank(local_name),
+        Node::Element { .. } | Node::Raw(_) => None,
     }
 }
 
@@ -394,7 +442,7 @@ fn write_start(raw: &Raw, start: Start) -> Result<Vec<u8>> {
         xml,
         "<{} {}=\"{}\"/>",
         raw.element_name("type"),
-        raw.attribute_name("val"),
+        raw.attribute_name("val")?,
         start.to_xml()
     )?;
     Ok(xml.into_bytes())
@@ -408,7 +456,7 @@ fn write_page_size(raw: &Raw, page_size: &PageSize) -> Result<Vec<u8>> {
         write!(
             xml,
             " {}=\"{}\"",
-            raw.attribute_name("w"),
+            raw.attribute_name("w")?,
             width.try_to_twips()?
         )?;
     }
@@ -416,14 +464,14 @@ fn write_page_size(raw: &Raw, page_size: &PageSize) -> Result<Vec<u8>> {
         write!(
             xml,
             " {}=\"{}\"",
-            raw.attribute_name("h"),
+            raw.attribute_name("h")?,
             height.try_to_twips()?
         )?;
     }
     write!(
         xml,
         " {}=\"{}\"/>",
-        raw.attribute_name("orient"),
+        raw.attribute_name("orient")?,
         page_size.orientation.to_xml()
     )?;
     Ok(xml.into_bytes())
@@ -449,7 +497,7 @@ fn write_measurement(raw: &Raw, xml: &mut String, name: &str, value: Option<Emu>
         write!(
             xml,
             " {}=\"{}\"",
-            raw.attribute_name(name),
+            raw.attribute_name(name)?,
             value.try_to_twips()?
         )?;
     }
@@ -463,21 +511,21 @@ fn write_columns(raw: &Raw, columns: &Columns) -> Result<Vec<u8>> {
         xml,
         "<{} {}=\"{}\" {}=\"{}\"",
         raw.element_name("cols"),
-        raw.attribute_name("equalWidth"),
+        raw.attribute_name("equalWidth")?,
         i32::from(columns.equal_width),
-        raw.attribute_name("num"),
+        raw.attribute_name("num")?,
         columns.count
     )?;
     if let Some(space) = columns.space {
         write!(
             xml,
             " {}=\"{}\"",
-            raw.attribute_name("space"),
+            raw.attribute_name("space")?,
             space.try_to_twips()?
         )?;
     }
     if columns.separator {
-        write!(xml, " {}=\"1\"", raw.attribute_name("sep"))?;
+        write!(xml, " {}=\"1\"", raw.attribute_name("sep")?)?;
     }
     if columns.columns.is_empty() {
         xml.push_str("/>");
@@ -489,14 +537,14 @@ fn write_columns(raw: &Raw, columns: &Columns) -> Result<Vec<u8>> {
             xml,
             "<{} {}=\"{}\"",
             raw.element_name("col"),
-            raw.attribute_name("w"),
+            raw.attribute_name("w")?,
             column.width.try_to_twips()?
         )?;
         if let Some(space) = column.space {
             write!(
                 xml,
                 " {}=\"{}\"",
-                raw.attribute_name("space"),
+                raw.attribute_name("space")?,
                 space.try_to_twips()?
             )?;
         }
@@ -612,6 +660,7 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
     let mut root_name = Vec::new();
     let mut root_prefix = None;
     let mut attribute_prefix: Option<Vec<u8>> = None;
+    let mut namespace_bindings = Vec::new();
     let mut root_start = 0usize;
     let mut root_end = 0usize;
     let mut root_seen = false;
@@ -673,6 +722,9 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
                         .name()
                         .prefix()
                         .map(|prefix| prefix.into_inner().to_vec());
+                    namespace_bindings = root_namespace_bindings(&element, decoder)?;
+                    attribute_prefix =
+                        root_attribute_prefix(root_prefix.as_deref(), &namespace_bindings);
                     root_open = Some(xml[event_start..event_end].to_vec());
                 } else if stack.len() == 1 {
                     direct_child_start = Some((
@@ -680,9 +732,6 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
                         String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
                         word_element,
                     ));
-                    if attribute_prefix.is_none() {
-                        attribute_prefix = first_attribute_prefix(&element);
-                    }
                 }
                 stack.push(element.name().as_ref().to_vec());
                 if stack.len() > MAX_XML_DEPTH {
@@ -708,11 +757,10 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
                         .prefix()
                         .map(|prefix| prefix.into_inner().to_vec());
                     root_open = Some(xml[event_start..event_end].to_vec());
-                    attribute_prefix = first_attribute_prefix(&element);
+                    namespace_bindings = root_namespace_bindings(&element, decoder)?;
+                    attribute_prefix =
+                        root_attribute_prefix(root_prefix.as_deref(), &namespace_bindings);
                 } else if stack.len() == 1 {
-                    if attribute_prefix.is_none() {
-                        attribute_prefix = first_attribute_prefix(&element);
-                    }
                     children.push(Node::Element {
                         local_name: String::from_utf8_lossy(element.local_name().as_ref())
                             .into_owned(),
@@ -800,6 +848,7 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
         root_name,
         root_prefix,
         attribute_prefix,
+        namespace_bindings,
         suffix: xml[root_end..].to_vec(),
         children,
     })
@@ -807,8 +856,8 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
 
 fn decode_state(raw: &Raw) -> Result<State> {
     let mut state = State::default();
-    let mut seen = [false; 20];
-    let mut last_rank = 0usize;
+    let mut seen = [false; 21];
+    let mut last_rank = None;
     for node in &raw.children {
         let Node::Element {
             local_name,
@@ -819,12 +868,13 @@ fn decode_state(raw: &Raw) -> Result<State> {
             continue;
         };
         if let Some(rank) = section_child_rank(local_name) {
-            if rank < last_rank {
+            if last_rank.is_some_and(|last_rank| rank < last_rank) {
                 return Err(Error::InvalidFormat(format!(
                     "section property '{local_name}' is out of schema order"
                 )));
             }
-            last_rank = rank;
+            last_rank = Some(rank);
+            let rank = usize::from(rank);
             if seen[rank] && !matches!(local_name.as_str(), "headerReference" | "footerReference") {
                 return Err(Error::InvalidFormat(format!(
                     "section properties contain duplicate '{local_name}'"
@@ -837,7 +887,7 @@ fn decode_state(raw: &Raw) -> Result<State> {
                 if state.start.is_some() {
                     return Err(Error::InvalidFormat("duplicate section type".into()));
                 }
-                let value = required_attribute(child, b"val")?;
+                let value = required_attribute(raw, child, b"val")?;
                 state.start = Some(Start::from_xml(&value).ok_or_else(|| {
                     Error::InvalidFormat(format!("invalid section type '{value}'"))
                 })?);
@@ -852,7 +902,7 @@ fn decode_state(raw: &Raw) -> Result<State> {
                 if state.margins.is_some() {
                     return Err(Error::InvalidFormat("duplicate section margins".into()));
                 }
-                state.margins = Some(parse_margins(child)?);
+                state.margins = Some(parse_margins(raw, child)?);
             },
             "cols" => {
                 if state.columns.is_some() {
@@ -877,33 +927,35 @@ fn decode_state(raw: &Raw) -> Result<State> {
     Ok(state)
 }
 
-fn section_child_rank(name: &str) -> Option<usize> {
+fn section_child_rank(name: &str) -> Option<u8> {
     match name {
         "headerReference" | "footerReference" => Some(0),
-        "footnotePr" => Some(2),
-        "endnotePr" => Some(3),
-        "type" => Some(4),
-        "pgSz" => Some(5),
-        "pgMar" => Some(6),
-        "paperSrc" => Some(7),
-        "pgBorders" => Some(8),
-        "lnNumType" => Some(9),
-        "pgNumType" => Some(10),
-        "cols" => Some(11),
-        "formProt" => Some(12),
-        "vAlign" => Some(13),
+        "footnotePr" => Some(1),
+        "endnotePr" => Some(2),
+        "type" => Some(3),
+        "pgSz" => Some(4),
+        "pgMar" => Some(5),
+        "paperSrc" => Some(6),
+        "pgBorders" => Some(7),
+        "lnNumType" => Some(8),
+        "pgNumType" => Some(9),
+        "cols" => Some(10),
+        "formProt" => Some(11),
+        "vAlign" => Some(12),
+        "noEndnote" => Some(13),
         "titlePg" => Some(14),
         "textDirection" => Some(15),
         "bidi" => Some(16),
         "rtlGutter" => Some(17),
         "docGrid" => Some(18),
         "printerSettings" => Some(19),
+        "sectPrChange" => Some(20),
         _ => None,
     }
 }
 
 fn parse_page_size(raw: &Raw, xml: &[u8]) -> Result<PageSize> {
-    let attrs = attributes(xml, AttributeFamily::Word)?;
+    let attrs = attributes(raw, xml, AttributeFamily::Word)?;
     let width = attr(&attrs, "w")
         .map(|value| parse_measurement(value, "page width", false, true))
         .transpose()?;
@@ -918,7 +970,6 @@ fn parse_page_size(raw: &Raw, xml: &[u8]) -> Result<PageSize> {
         })
         .transpose()?
         .unwrap_or_default();
-    let _ = raw;
     Ok(PageSize {
         width,
         height,
@@ -926,8 +977,8 @@ fn parse_page_size(raw: &Raw, xml: &[u8]) -> Result<PageSize> {
     })
 }
 
-fn parse_margins(xml: &[u8]) -> Result<Margins> {
-    let attrs = attributes(xml, AttributeFamily::Word)?;
+fn parse_margins(raw: &Raw, xml: &[u8]) -> Result<Margins> {
+    let attrs = attributes(raw, xml, AttributeFamily::Word)?;
     Ok(Margins {
         top: parse_attr_measurement(&attrs, "top", true, false)?,
         right: parse_attr_measurement(&attrs, "right", false, false)?,
@@ -940,7 +991,7 @@ fn parse_margins(xml: &[u8]) -> Result<Margins> {
 }
 
 fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
-    let attrs = attributes(xml, AttributeFamily::Word)?;
+    let attrs = attributes(raw, xml, AttributeFamily::Word)?;
     let mut columns = Columns {
         equal_width: attr(&attrs, "equalWidth")
             .is_none_or(|value| value != "0" && value != "false"),
@@ -960,7 +1011,7 @@ fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
         if name != "col" {
             continue;
         }
-        let attrs = attributes(&child, AttributeFamily::Word)?;
+        let attrs = attributes(raw, &child, AttributeFamily::Word)?;
         let width = parse_attr_measurement(&attrs, "w", false, false)?
             .ok_or_else(|| Error::InvalidFormat("section column omits required width".into()))?;
         columns.columns.push(Column {
@@ -968,13 +1019,12 @@ fn parse_columns(raw: &Raw, xml: &[u8]) -> Result<Columns> {
             space: parse_attr_measurement(&attrs, "space", false, false)?,
         });
     }
-    let _ = raw;
     validate_columns(&columns)?;
     Ok(columns)
 }
 
 fn parse_reference(raw: &Raw, xml: &[u8]) -> Result<Reference> {
-    let attrs = attributes(xml, AttributeFamily::Reference(raw))?;
+    let attrs = attributes(raw, xml, AttributeFamily::Reference)?;
     let kind = Kind::from_xml(required_attr(&attrs, "type")?.as_str())
         .ok_or_else(|| Error::InvalidFormat("invalid section header/footer type".into()))?;
     let relationship_id = required_attr(&attrs, "id")?;
@@ -1153,20 +1203,26 @@ fn direct_children(xml: &[u8]) -> Result<Vec<(String, Vec<u8>)>> {
 }
 
 #[derive(Clone, Copy)]
-enum AttributeFamily<'a> {
+enum AttributeFamily {
     Word,
-    Reference(&'a Raw),
+    Reference,
 }
 
-fn attributes(xml: &[u8], family: AttributeFamily<'_>) -> Result<Vec<(String, String)>> {
-    let mut reader = NsReader::from_reader(xml);
+fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(String, String)>> {
+    let detached = raw.detached_fragment(xml);
+    let mut reader = NsReader::from_reader(detached.as_slice());
+    reader.config_mut().trim_text(false);
     let (element, resolver) = loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
+        let (_, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "section child namespace resolution failed: {error}"
+            ))
+        })?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let _ = namespace;
+                if element.local_name().as_ref() == b"litchiRoot" {
+                    continue;
+                }
                 break (element, reader.resolver().clone());
             },
             Event::Eof => {
@@ -1200,6 +1256,7 @@ fn attributes(xml: &[u8], family: AttributeFamily<'_>) -> Result<Vec<(String, St
             &namespace,
             ResolveResult::Unknown(prefix)
                 if fragment_prefix.as_deref() == Some(prefix.as_slice())
+                    && !raw.has_namespace_binding(prefix.as_slice())
         );
         let relevant = match family {
             AttributeFamily::Word => {
@@ -1207,11 +1264,11 @@ fn attributes(xml: &[u8], family: AttributeFamily<'_>) -> Result<Vec<(String, St
                     || matches!(namespace, ResolveResult::Unbound)
                     || same_fragment_prefix
             },
-            AttributeFamily::Reference(raw) if name == "id" => {
+            AttributeFamily::Reference if name == "id" => {
                 is_relationship_namespace(&namespace)
-                    || matches!(&namespace, ResolveResult::Unknown(prefix) if raw.declares_relationship_prefix(prefix.as_slice())?)
+                    || matches!(&namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r" && !raw.has_namespace_binding(prefix.as_slice()))
             },
-            AttributeFamily::Reference(_) => {
+            AttributeFamily::Reference => {
                 is_wordprocessing_namespace(&namespace)
                     || matches!(namespace, ResolveResult::Unbound)
                     || same_fragment_prefix
@@ -1239,43 +1296,6 @@ fn is_relationship_namespace(namespace: &ResolveResult<'_>) -> bool {
         b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
     matches!(namespace, ResolveResult::Bound(quick_xml::name::Namespace(value)) if *value == TRANSITIONAL || *value == STRICT)
-        || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r")
-}
-
-impl Raw {
-    fn declares_relationship_prefix(&self, prefix: &[u8]) -> Result<bool> {
-        let mut reader = Reader::from_reader(self.root_open.as_slice());
-        let element = match reader
-            .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
-        {
-            Event::Start(element) | Event::Empty(element) => element,
-            _ => {
-                return Err(Error::InvalidFormat(
-                    "section properties have an invalid opening element".into(),
-                ));
-            },
-        };
-        for attribute in element.attributes() {
-            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-            if attribute
-                .key
-                .prefix()
-                .is_some_and(|value| value.as_ref() == b"xmlns")
-                && attribute.key.local_name().as_ref() == prefix
-            {
-                let value = attribute
-                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                    .map_err(|error| Error::Xml(error.to_string()))?;
-                return Ok(matches!(
-                    value.as_bytes(),
-                    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-                        | b"http://purl.oclc.org/ooxml/officeDocument/relationships"
-                ));
-            }
-        }
-        Ok(false)
-    }
 }
 
 fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
@@ -1290,15 +1310,21 @@ fn required_attr(attrs: &[(String, String)], name: &str) -> Result<String> {
         .ok_or_else(|| Error::InvalidFormat(format!("missing section attribute '{name}'")))
 }
 
-fn required_attribute(xml: &[u8], name: &[u8]) -> Result<String> {
-    let mut reader = NsReader::from_reader(xml);
+fn required_attribute(raw: &Raw, xml: &[u8], name: &[u8]) -> Result<String> {
+    let detached = raw.detached_fragment(xml);
+    let mut reader = NsReader::from_reader(detached.as_slice());
+    reader.config_mut().trim_text(false);
     let (element, decoder, resolver) = loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
+        let (_, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "section child namespace resolution failed: {error}"
+            ))
+        })?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let _ = namespace;
+                if element.local_name().as_ref() == b"litchiRoot" {
+                    continue;
+                }
                 break (element, reader.decoder(), reader.resolver().clone());
             },
             Event::Eof => {
@@ -1331,6 +1357,7 @@ fn required_attribute(xml: &[u8], name: &[u8]) -> Result<String> {
             &namespace,
             ResolveResult::Unknown(prefix)
                 if element_prefix.as_deref() == Some(prefix.as_slice())
+                    && !raw.has_namespace_binding(prefix.as_slice())
         );
         if !is_wordprocessing_namespace(&namespace)
             && !matches!(namespace, ResolveResult::Unbound)
@@ -1371,13 +1398,58 @@ fn element_prefix(element: &BytesStart<'_>) -> Option<Vec<u8>> {
         .map(|prefix| prefix.into_inner().to_vec())
 }
 
-fn first_attribute_prefix(element: &BytesStart<'_>) -> Option<Vec<u8>> {
-    element.attributes().flatten().find_map(|attribute| {
-        attribute
-            .key
-            .prefix()
-            .and_then(|prefix| (prefix.as_ref() != b"xmlns").then(|| prefix.into_inner().to_vec()))
+fn root_namespace_bindings(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Vec<NamespaceBinding>> {
+    let mut bindings = Vec::new();
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let name = attribute.key.as_ref();
+        let prefix = if name == b"xmlns" {
+            Some(None)
+        } else {
+            name.strip_prefix(b"xmlns:")
+                .map(|prefix| Some(prefix.to_vec()))
+        };
+        let Some(prefix) = prefix else {
+            continue;
+        };
+        let uri = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        bindings.push(NamespaceBinding { prefix, uri });
+    }
+    Ok(bindings)
+}
+
+fn root_attribute_prefix(
+    root_prefix: Option<&[u8]>,
+    bindings: &[NamespaceBinding],
+) -> Option<Vec<u8>> {
+    if let Some(prefix) = root_prefix.filter(|prefix| !prefix.is_empty()) {
+        return Some(prefix.to_vec());
+    }
+    bindings.iter().find_map(|binding| {
+        let prefix = binding.prefix.as_deref()?;
+        is_wordprocessing_namespace_uri(&binding.uri).then(|| prefix.to_vec())
     })
+}
+
+fn is_wordprocessing_namespace_uri(value: &str) -> bool {
+    matches!(
+        value,
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            | "http://purl.oclc.org/ooxml/wordprocessingml/main"
+    )
+}
+
+fn escape_namespace_uri(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('"', "&quot;")
 }
 
 fn validate_root_namespace(namespace: &ResolveResult<'_>) -> Result<()> {
@@ -1419,7 +1491,7 @@ fn is_xml_declaration_or_misc(bytes: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, decode};
+    use super::{Dirty, Error, Node, decode, encode};
 
     fn section_xml(children: &str) -> Vec<u8> {
         format!(
@@ -1458,5 +1530,220 @@ mod tests {
         ] {
             assert!(decode(&section_xml(children)).is_err());
         }
+    }
+
+    fn snapshot_without(children: &str, removed: &[&str]) -> super::Snapshot {
+        let mut snapshot = decode(&section_xml(children)).expect("valid section fixture");
+        snapshot.raw.children.retain(|node| {
+            !matches!(
+                node,
+                Node::Element { local_name, .. }
+                    if removed.iter().any(|name| local_name.as_str() == *name)
+            )
+        });
+        snapshot.dirty = Dirty {
+            page_size: true,
+            margins: true,
+            start: true,
+            columns: true,
+        };
+        snapshot
+    }
+
+    #[test]
+    fn opaque_barriers_stay_before_late_modeled_insertions() {
+        let snapshot = snapshot_without(
+            r#"<x:foreign xmlns:x="urn:foreign"/><!--opaque--><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/><w:cols w:num="2" w:equalWidth="1"/><w:docGrid/><w:sectPrChange/>"#,
+            &["pgSz", "pgMar", "cols"],
+        );
+        let output = String::from_utf8(encode(&snapshot).expect("encode section")).unwrap();
+        assert!(output.contains(r#"<x:foreign xmlns:x="urn:foreign"/>"#));
+        assert!(output.contains("<!--opaque-->"));
+        let foreign = output.find("<x:foreign").expect("foreign child");
+        let comment = output.find("<!--opaque-->").expect("opaque comment");
+        let page_size = output.find("<w:pgSz").expect("inserted page size");
+        let margins = output.find("<w:pgMar").expect("inserted margins");
+        let columns = output.find("<w:cols").expect("inserted columns");
+        let doc_grid = output.find("<w:docGrid").expect("doc grid");
+        let section_change = output.find("<w:sectPrChange").expect("section change");
+        assert!(foreign < comment);
+        assert!(comment < page_size);
+        assert!(page_size < margins);
+        assert!(margins < columns);
+        assert!(columns < doc_grid);
+        assert!(doc_grid < section_change);
+    }
+
+    #[test]
+    fn late_schema_barriers_preserve_pg_borders_no_endnote_and_change_order() {
+        let snapshot = snapshot_without(
+            r#"<w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/><w:pgBorders/><w:cols w:num="2" w:equalWidth="1"/><w:noEndnote/><w:sectPrChange/>"#,
+            &["type", "pgSz", "pgMar", "cols"],
+        );
+        let output = String::from_utf8(encode(&snapshot).expect("encode section")).unwrap();
+        let borders = output.find("<w:pgBorders").expect("page borders");
+        let page_size = output.find("<w:pgSz").expect("inserted page size");
+        let margins = output.find("<w:pgMar").expect("inserted margins");
+        let columns = output.find("<w:cols").expect("inserted columns");
+        let no_endnote = output.find("<w:noEndnote").expect("noEndnote");
+        let section_change = output.find("<w:sectPrChange").expect("section change");
+        assert!(page_size < margins);
+        assert!(margins < borders);
+        assert!(borders < columns);
+        assert!(columns < no_endnote);
+        assert!(no_endnote < section_change);
+    }
+
+    #[test]
+    fn only_opaque_children_receive_all_modeled_fields_at_root_close() {
+        let snapshot = snapshot_without(
+            r#"<x:foreign xmlns:x="urn:foreign"/><!--opaque--><w:type w:val="continuous"/><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/><w:cols w:num="2" w:equalWidth="1"/>"#,
+            &["type", "pgSz", "pgMar", "cols"],
+        );
+        let output = String::from_utf8(encode(&snapshot).expect("encode section")).unwrap();
+        assert!(output.contains(r#"<x:foreign xmlns:x="urn:foreign"/>"#));
+        assert!(output.contains("<!--opaque-->"));
+        let foreign_end = output.find("/><!--opaque-->").expect("opaque order");
+        let type_start = output.find("<w:type").expect("inserted type");
+        let page_size = output.find("<w:pgSz").expect("inserted page size");
+        let margins = output.find("<w:pgMar").expect("inserted margins");
+        let columns = output.find("<w:cols").expect("inserted columns");
+        assert!(foreign_end < type_start);
+        assert!(type_start < page_size);
+        assert!(page_size < margins);
+        assert!(margins < columns);
+    }
+
+    #[test]
+    fn reversed_no_endnote_and_section_change_are_rejected() {
+        let xml = section_xml(r#"<w:sectPrChange/><w:noEndnote/>"#);
+        assert!(matches!(
+            decode(&xml),
+            Err(Error::InvalidFormat(message)) if message.contains("out of schema order")
+        ));
+    }
+
+    fn dirty_page_size(xml: &str) -> Result<Vec<u8>, Error> {
+        let mut snapshot = decode(xml.as_bytes())?;
+        snapshot.dirty.page_size = true;
+        encode(&snapshot)
+    }
+
+    #[test]
+    fn generated_qnames_use_named_root_word_prefix() {
+        let output = String::from_utf8(dirty_page_size(
+            r#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>"#,
+        )
+        .expect("named root prefix encodes"))
+        .unwrap();
+        assert!(output.contains("<w:pgSz w:w=\""));
+    }
+
+    #[test]
+    fn generated_qnames_use_named_alias_with_default_element_namespace() {
+        let output = String::from_utf8(dirty_page_size(
+            r#"<alias:sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:alias="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><pgSz w="12240" h="15840"/></alias:sectPr>"#,
+        )
+        .expect("named alias encodes"))
+        .unwrap();
+        assert!(output.contains("alias:w=\""));
+        assert!(!output.contains("r:w=\""));
+        assert!(!output.contains("x:w=\""));
+    }
+
+    #[test]
+    fn default_only_or_unbound_word_namespace_rejects_generated_attributes() {
+        for xml in [
+            r#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><pgSz w="12240" h="15840"/></sectPr>"#,
+            r#"<sectPr><pgSz w="12240" h="15840"/></sectPr>"#,
+            r#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:foreign"><pgSz w="12240" h="15840"/></sectPr>"#,
+        ] {
+            assert!(matches!(
+                dirty_page_size(xml),
+                Err(Error::InvalidFormat(message))
+                    if message.contains("without a named WordprocessingML prefix")
+            ));
+        }
+    }
+
+    #[test]
+    fn child_relationship_or_foreign_attributes_cannot_hijack_generated_prefix() {
+        let output = String::from_utf8(dirty_page_size(
+            r#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:foreign"><x:foreign r:id="r1" x:value="v"/><pgSz w="12240" h="15840"/></sectPr>"#,
+        )
+        .expect("root binding controls generated prefix"))
+        .unwrap();
+        assert!(output.contains("w:w=\""));
+        assert!(!output.contains("r:w=\""));
+        assert!(!output.contains("x:w=\""));
+    }
+
+    #[test]
+    fn explicit_root_bindings_decode_child_word_and_relationship_attributes_exactly() {
+        let xml = br#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><headerReference w:type="default" r:id="rHeader"/><pgSz w:w="12240" w:h="15840"/></sectPr>"#;
+        let snapshot = decode(xml).expect("explicit root bindings decode");
+        assert!(snapshot.state.page_size.is_some());
+        assert_eq!(snapshot.state.headers[0].relationship_id, "rHeader");
+        assert_eq!(encode(&snapshot).expect("unchanged encode"), xml);
+    }
+
+    #[test]
+    fn detached_lexical_prefix_fallback_remains_byte_exact() {
+        let xml = br#"<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>"#;
+        let snapshot = decode(xml).expect("detached lexical prefix decodes");
+        assert_eq!(encode(&snapshot).expect("unchanged encode"), xml);
+    }
+
+    #[test]
+    fn explicit_foreign_relationship_binding_cannot_satisfy_reference_id() {
+        let xml = br#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="urn:foreign"><w:headerReference w:type="default" r:id="rHeader"/></w:sectPr>"#;
+        assert!(matches!(
+            decode(xml),
+            Err(Error::InvalidFormat(message))
+                if message.contains("missing section attribute 'id'")
+        ));
+    }
+
+    #[test]
+    fn default_only_page_size_deletion_preserves_margin_bytes() {
+        let xml = br#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><pgSz w="12240" h="15840"/><pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/></sectPr>"#;
+        let mut snapshot = decode(xml).expect("default namespace section decodes");
+        snapshot.state.page_size = None;
+        snapshot.dirty.page_size = true;
+        let output = encode(&snapshot).expect("page size deletion does not need attributes");
+        assert!(
+            !output
+                .windows(b"<pgSz".len())
+                .any(|window| window == b"<pgSz")
+        );
+        assert!(
+            output
+                .windows(
+                    b"<pgMar w:top=\"720\" w:right=\"720\" w:bottom=\"720\" w:left=\"720\"/>".len()
+                )
+                .any(|window| {
+                    window
+                        == b"<pgMar w:top=\"720\" w:right=\"720\" w:bottom=\"720\" w:left=\"720\"/>"
+                })
+        );
+    }
+
+    #[test]
+    fn named_prefix_page_size_addition_precedes_existing_margins() {
+        let xml = section_xml(
+            r#"<w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720"/>"#,
+        );
+        let mut snapshot = decode(&xml).expect("named section decodes");
+        snapshot.raw.children.retain(|node| {
+            !matches!(
+                node,
+                Node::Element { local_name, .. } if local_name == "pgSz"
+            )
+        });
+        snapshot.dirty.page_size = true;
+        let output = String::from_utf8(encode(&snapshot).expect("page size insertion")).unwrap();
+        let page_size = output.find("<w:pgSz").expect("inserted page size");
+        let margins = output.find("<w:pgMar").expect("existing margins");
+        assert!(page_size < margins);
     }
 }
