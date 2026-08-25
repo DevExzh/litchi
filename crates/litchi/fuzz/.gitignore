@@ -9,5 +9,7 @@ target
 !/corpus/keynote_chart_title/malformed_wire.hex
 !/corpus/pages_body_footnote_lifecycle/
 !/corpus/pages_body_footnote_lifecycle/*
+!/corpus/pages_section_text/
+!/corpus/pages_section_text/*
 artifacts
 coverage

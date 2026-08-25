@@ -1,5 +1,7 @@
 #![allow(deprecated)]
 
+use std::ops::Range;
+
 use super::*;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
@@ -9,7 +11,6 @@ use crate::protobuf::tswp::{
     ObjectAttributeTable, StorageArchive, object_attribute_table::ObjectAttribute,
 };
 use crate::shapes::{DrawablePoint, DrawableSize};
-use litchi_pages::Package as PagesPackage;
 use litchi_pages::footnote::{
     Format as FootnoteFormat, Gap as FootnoteGap, Kind as FootnoteKind,
     Numbering as FootnoteNumbering,
@@ -17,6 +18,7 @@ use litchi_pages::footnote::{
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
 use litchi_pages::page_layout::Orientation as PageOrientation;
 use litchi_pages::section::{PageNumber, PageNumbering, Start};
+use litchi_pages::{Package as PagesPackage, SectionSelector, TextSpan};
 
 #[test]
 fn pages_native_discriminants_are_typed_and_lossless() {
@@ -95,13 +97,13 @@ fn semantic_body_update_and_clear_are_transactional() {
 
 #[test]
 fn plain_section_text_rejects_inline_object_markers_atomically() {
-    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let editor = PagesEditor::create_with_text("Body").unwrap();
     let before = editor.to_bytes().unwrap();
-    let section_id = editor.sections()[0].object_id;
+    let package = PagesPackage::from_bytes(&before).unwrap();
 
     assert!(
-        editor
-            .set_section_text(section_id, "bad\u{fffc}object")
+        package
+            .set_section_text(SectionSelector::index(0), "bad\u{fffc}object")
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -607,30 +609,19 @@ fn section_append_remove_is_wire_preserving_and_transactional() {
     editor.remove_section(inserted.object_id).unwrap();
     assert_eq!(editor.to_bytes().unwrap(), before_middle);
 
-    assert_eq!(editor.section_text(section_id).unwrap(), "Body");
-    assert_eq!(editor.section_text(created.object_id).unwrap(), "");
-    editor
-        .set_section_text(created.object_id, "Appended 🚀")
-        .unwrap();
+    assert_eq!(section_text(&editor, 0), "Body");
+    assert_eq!(section_text(&editor, 1), "");
+    set_section_text(&mut editor, 1, "Appended 🚀");
     assert_eq!(editor.body_text().unwrap(), "Body\u{4}Appended 🚀");
     let before_surrogate = editor.to_bytes().unwrap();
-    assert!(
-        editor
-            .replace_section_text(created.object_id, 10..10, "x")
-            .is_err()
-    );
+    assert!(replace_section_text(&mut editor, 1, 10..10, "x").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_surrogate);
-    editor
-        .replace_section_text(created.object_id, 9..11, "東京")
-        .unwrap();
-    assert_eq!(
-        editor.section_text(created.object_id).unwrap(),
-        "Appended 東京"
-    );
-    editor.clear_section_text(section_id).unwrap();
+    replace_section_text(&mut editor, 1, 9..11, "東京").unwrap();
+    assert_eq!(section_text(&editor, 1), "Appended 東京");
+    clear_section_text(&mut editor, 0);
     assert_eq!(editor.body_text().unwrap(), "\u{4}Appended 東京");
     assert_eq!(editor.sections()[1].character_index, 1);
-    editor.set_section_text(section_id, "First").unwrap();
+    set_section_text(&mut editor, 0, "First");
     assert_eq!(editor.body_text().unwrap(), "First\u{4}Appended 東京");
     assert_eq!(editor.sections()[1].character_index, 6);
 
@@ -638,11 +629,15 @@ fn section_append_remove_is_wire_preserving_and_transactional() {
     assert!(editor.replace_body_text(0..6, "crossed").is_err());
     assert!(editor.replace_body_text(0..0, "bad\u{4}break").is_err());
     assert!(editor.set_body_text("flattened").is_err());
-    assert!(editor.section_text(999).is_err());
+    assert!(
+        pages_package(&editor)
+            .section_text(SectionSelector::index(999))
+            .is_err()
+    );
     assert_eq!(editor.to_bytes().unwrap(), before_rejected_body);
 
-    editor.set_section_text(section_id, "Body").unwrap();
-    editor.clear_section_text(created.object_id).unwrap();
+    set_section_text(&mut editor, 0, "Body");
+    clear_section_text(&mut editor, 1);
     assert_eq!(editor.body_text().unwrap(), "Body\u{4}");
 
     let before_rejected = editor.to_bytes().unwrap();
@@ -1367,6 +1362,55 @@ fn floating_text_package() -> IWorkPackage {
         )
         .unwrap();
     package
+}
+
+fn pages_package(editor: &PagesEditor) -> PagesPackage {
+    PagesPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap()
+}
+
+fn section_text(editor: &PagesEditor, index: usize) -> String {
+    pages_package(editor)
+        .section_text(SectionSelector::index(index))
+        .unwrap()
+        .to_owned()
+}
+
+fn set_section_text(editor: &mut PagesEditor, index: usize, replacement: &str) {
+    let package = pages_package(editor);
+    let commit = package
+        .set_section_text(SectionSelector::index(index), replacement)
+        .unwrap();
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).unwrap();
+    *editor = PagesEditor::from_bytes(&bytes).unwrap();
+}
+
+fn clear_section_text(editor: &mut PagesEditor, index: usize) {
+    set_section_text(editor, index, "");
+}
+
+fn replace_section_text(
+    editor: &mut PagesEditor,
+    index: usize,
+    range: Range<usize>,
+    replacement: &str,
+) -> std::result::Result<(), String> {
+    let package = pages_package(editor);
+    let span =
+        TextSpan::from_utf16_indexes(range.start, range.end).map_err(|error| error.to_string())?;
+    let mut edit = package
+        .edit_section_text(SectionSelector::index(index))
+        .map_err(|error| error.to_string())?;
+    edit.replace(span, replacement)
+        .map_err(|error| error.to_string())?;
+    let commit = edit.commit().map_err(|error| error.to_string())?;
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    *editor = PagesEditor::from_bytes(&bytes).map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 fn test_package(text: &str) -> IWorkPackage {

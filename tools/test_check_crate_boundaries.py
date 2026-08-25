@@ -767,6 +767,52 @@ def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_pages_section_text_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_SECTION_TEXT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub enum SectionSelector { Index(usize), Name(String) }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[0]
+    package_export = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[1]
+    selector_export = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[2]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod selector;\n"
+        "pub use selector::SectionSelector;\n"
+        "pub use package::{SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, "
+        "SectionTextError, SectionTextLimitKind, SectionTextPatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod section_text;\n"
+        "pub use section_text::{SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, "
+        "SectionTextError, SectionTextLimitKind, SectionTextPatch};\n",
+        encoding="utf-8",
+    )
+    selector_export.write_text(
+        "pub enum SectionSelector { Index(usize), Name(String) }\n",
+        encoding="utf-8",
+    )
+
+
 def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -15685,6 +15731,344 @@ fn rewrite_movie_title_operation(
         )
         self.assertIn(
             "+ audit_pages_header_footer_facade_source_topology()", main_source
+        )
+
+    def test_pages_section_text_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_SECTION_TEXT_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/section_content.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_SECTION_TEXT_METHODS,
+            (
+                "section_text",
+                "replace_section_text",
+                "set_section_text",
+                "clear_section_text",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/section_text.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS,
+            (
+                "section_text",
+                "edit_section_text",
+                "set_section_text",
+                "clear_section_text",
+                "apply_section_text",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_SECTION_TEXT_SEMANTIC_TYPES,
+            ("SectionSelector",),
+        )
+        self.assertIn(
+            "SectionTextPatch",
+            boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES,
+        )
+
+    def test_focused_pages_section_text_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_text_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_section_text_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+        for missing in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_text_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_section_text_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+    def test_focused_pages_section_text_requires_selector_exports_and_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_text_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_SECTION_TEXT_SEMANTIC_SOURCE
+            semantic.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[0]
+            lib.write_text("pub mod selector;\n", encoding="utf-8")
+            package = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[1]
+            package.write_text("pub mod section_text;\n", encoding="utf-8")
+            duplicate = root / boundaries.PAGES_SOURCE_ROOT / "duplicate.rs"
+            duplicate.write_text("pub mod selector {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_section_text_facade_source_topology(root)
+            self.assertTrue(
+                any("missing semantic selector type SectionSelector" in item for item in violations)
+            )
+            self.assertTrue(
+                any("missing root SectionSelector re-export" in item for item in violations)
+            )
+            self.assertTrue(
+                any("exposes public package::section_text module" in item for item in violations)
+            )
+            self.assertTrue(
+                any("exposes duplicate selector module" in item for item in violations)
+            )
+
+    def test_focused_pages_section_text_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_text_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn section_text(object_id: u64, source_bytes: &[u8], wire: WireView, "
+                "archive: Archive, generated: GeneratedProjection, buffa: BuffaView, "
+                "prost: prost_types::MessageInfo, storage: TextStorageId) {}\n"
+                "pub fn edit_section_text() {}\n"
+                "pub fn set_section_text() {}\n"
+                "pub fn clear_section_text() {}\n"
+                "pub fn apply_section_text() {}\n"
+                "}\n"
+                "pub type CustomSectionTextPatch = SectionTextPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod selector;\n"
+                "pub use selector::SectionSelector;\n"
+                "pub use package::*;\n"
+                "pub use package::SectionTextPatch as OtherPatch;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_section_text_facade_source_topology(root)
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type TextStorageId",
+                "retains root aliases via owner glob",
+                "alternate alias OtherPatch for SectionTextPatch",
+                "alternate alias CustomSectionTextPatch for SectionTextPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_section_text_masks_cfg_test_and_allows_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_text_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomSectionTextPatch = SectionTextPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlySectionTextPatch = SectionTextPatch;\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any(
+                    "CustomSectionTextPatch" in item
+                    for item in boundaries.audit_pages_section_text_facade_source_topology(
+                        root
+                    )
+                )
+            )
+            self.assertFalse(
+                any(
+                    "TestOnlySectionTextPatch" in item
+                    for item in boundaries.audit_pages_section_text_facade_source_topology(
+                        root
+                    )
+                )
+            )
+
+            owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                + "".join(
+                    f"pub fn {method}() {{}}\n"
+                    for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+                )
+                + "}\n"
+                "fn resolve_section(selector: SectionSelector) {}\n"
+                "pub(crate) fn private_source(source_bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            extra.write_text(
+                "#[cfg(test)]\n"
+                "pub type TestOnlySectionTextPatch = SectionTextPatch;\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                boundaries.audit_pages_section_text_facade_source_topology(root)
+            )
+
+    def test_iwa_pages_section_text_audit_activates_and_retires_fallback_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.RETIRED_IWA_PAGES_SECTION_TEXT_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn section_text(section_id: u64) {}\n"
+                "pub fn replace_section_text(section_id: u64) {}\n"
+                "pub fn set_section_text(section_id: u64) {}\n"
+                "pub fn clear_section_text(section_id: u64) {}\n"
+                "fn legacy_section_text(section_id: u64) {}\n"
+                "fn legacy_set_section_text(section_id: u64) {}\n"
+                "fn semantic_read_fallback() {}\n"
+                "fn section_position(section_id: u64) {}\n"
+                "fn section_content_range(section_id: u64) {}\n"
+                "fn section_content_range_at(index: usize) {}\n"
+                "const FOCUSED_INGRESS_FACTOR: usize = 2;\n"
+                "#[cfg(test)]\n"
+                "pub fn set_section_text_for_test() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_section_text_source_topology(root), []
+            )
+            owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_pages_section_text_source_topology(root)
+            for method in boundaries.RETIRED_IWA_PAGES_SECTION_TEXT_METHODS:
+                self.assertTrue(
+                    any(f"method {method}:" in item for item in violations),
+                    msg=f"missing retired method {method}: {violations!r}",
+                )
+            for helper in ("legacy_section_text", "legacy_set_section_text", "semantic_read_fallback"):
+                self.assertTrue(
+                    any(f"legacy helper {helper}:" in item for item in violations),
+                    msg=f"missing retired helper {helper}: {violations!r}",
+                )
+            for helper in (
+                "section_position",
+                "section_content_range",
+                "section_content_range_at",
+            ):
+                self.assertTrue(
+                    any(f"legacy helper {helper}:" in item for item in violations),
+                    msg=f"missing retired helper {helper}: {violations!r}",
+                )
+            self.assertTrue(
+                any("legacy fallback FOCUSED_INGRESS_FACTOR" in item for item in violations)
+            )
+            self.assertFalse(any("for_test" in item for item in violations))
+
+            host.write_text(
+                "fn section_text(section_id: u64) {}\n"
+                "fn replace_section_text(section_id: u64) {}\n"
+                "fn set_section_text(section_id: u64) {}\n"
+                "fn clear_section_text(section_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            private_violations = (
+                boundaries.audit_iwa_pages_section_text_source_topology(root)
+            )
+            for method in boundaries.RETIRED_IWA_PAGES_SECTION_TEXT_METHODS:
+                self.assertTrue(
+                    any(f"method {method}:" in item for item in private_violations),
+                    msg=f"missing private retired method {method}: {private_violations!r}",
+                )
+
+    def test_iwa_pages_section_text_rejects_example_and_readme_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_PAGES_SECTION_TEXT_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn main() { editor.set_section_text(selector, text); }\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "pages.set_section_text(selector, text);\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_section_text_source_topology(root)
+            self.assertTrue(any("example call set_section_text" in item for item in violations))
+            self.assertTrue(any("README call set_section_text" in item for item in violations))
+
+            example.write_text(
+                "fn main() { package.set_section_text(selector, text); }\n",
+                encoding="utf-8",
+            )
+            readme.write_text(
+                "package.set_section_text(selector, text);\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_section_text_source_topology(root), []
+            )
+
+    def test_focused_pages_section_text_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_section_text_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_pages_section_text_facade_source_topology()", main_source
         )
 
     def test_pages_table_title_boundary_inventories_are_exact(self) -> None:
