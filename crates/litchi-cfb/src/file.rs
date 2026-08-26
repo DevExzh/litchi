@@ -260,7 +260,7 @@ pub enum OleError {
     Committed {
         source: io::Error,
     },
-    /// The source exceeded a finite CFB ingress limit before parsing began.
+    /// The source or parsed CFB metadata exceeded a finite ingress limit.
     LimitExceeded {
         /// Resource whose configured ceiling was crossed.
         resource: &'static str,
@@ -295,25 +295,32 @@ pub enum OleError {
 
 /// Finite resource limits for the low-level CFB reader.
 ///
-/// The limit is checked immediately after obtaining the reader length and
+/// The input limit is checked immediately after obtaining the reader length and
 /// before the parser allocates its physical-sector map or traverses any CFB
-/// metadata. The default is deliberately finite and matches the hard ingress
-/// ceiling used by [`crate::SharedOleFile`].
+/// metadata. The directory limit is checked before the directory stream and
+/// derived directory-entry allocations. Both defaults are deliberately finite
+/// and the shared reader carries the same policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OleFileLimits {
     max_input_bytes: u64,
+    max_directory_bytes: u64,
 }
 
 impl OleFileLimits {
     /// Largest source accepted by the low-level CFB reader.
     pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Default directory stream ceiling used by the low-level CFB reader.
+    pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = 64 * 1024 * 1024;
+    /// Largest directory stream ceiling accepted by the low-level CFB reader.
+    pub const MAX_DIRECTORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
     /// Creates a finite input ceiling for one CFB source.
     ///
     /// # Errors
     ///
     /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
-    /// the low-level CFB hard ingress ceiling.
+    /// the low-level CFB hard ingress ceiling. Use
+    /// [`Self::with_max_directory_bytes`] to select a directory ceiling.
     pub const fn new(max_input_bytes: u64) -> Result<Self, OleError> {
         if max_input_bytes == 0 || max_input_bytes > Self::MAX_INPUT_BYTES {
             return Err(OleError::InvalidLimit {
@@ -322,7 +329,10 @@ impl OleFileLimits {
                 maximum: Self::MAX_INPUT_BYTES,
             });
         }
-        Ok(Self { max_input_bytes })
+        Ok(Self {
+            max_input_bytes,
+            max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+        })
     }
 
     /// Maximum source length accepted before parsing begins.
@@ -330,12 +340,41 @@ impl OleFileLimits {
     pub const fn max_input_bytes(self) -> u64 {
         self.max_input_bytes
     }
+
+    /// Selects the maximum padded directory-stream size accepted while
+    /// parsing one CFB source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// [`Self::MAX_DIRECTORY_BYTES`].
+    pub const fn with_max_directory_bytes(
+        mut self,
+        max_directory_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_directory_bytes == 0 || max_directory_bytes > Self::MAX_DIRECTORY_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB directory bytes",
+                value: max_directory_bytes,
+                maximum: Self::MAX_DIRECTORY_BYTES,
+            });
+        }
+        self.max_directory_bytes = max_directory_bytes;
+        Ok(self)
+    }
+
+    /// Maximum padded directory-stream size accepted during parsing.
+    #[must_use]
+    pub const fn max_directory_bytes(self) -> u64 {
+        self.max_directory_bytes
+    }
 }
 
 impl Default for OleFileLimits {
     fn default() -> Self {
         Self {
             max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
         }
     }
 }
@@ -666,7 +705,10 @@ impl<R: Read + Seek> OleFile<R> {
         )?;
 
         // Load directory
-        ole.load_directory((dll_version == 4).then_some(num_dir_sectors))?;
+        ole.load_directory(
+            (dll_version == 4).then_some(num_dir_sectors),
+            limits.max_directory_bytes(),
+        )?;
 
         // Load MiniFAT if needed
         if num_minifat_sectors > 0 {
@@ -885,23 +927,30 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Load directory entries with optimized iterative parsing
-    fn load_directory(&mut self, declared_sector_count: Option<u32>) -> Result<(), OleError> {
+    fn load_directory(
+        &mut self,
+        declared_sector_count: Option<u32>,
+        max_directory_bytes: u64,
+    ) -> Result<(), OleError> {
         let sectors = match declared_sector_count {
-            Some(count) => collect_sector_chain_exact(
+            Some(count) => {
+                let count = usize::try_from(count).map_err(|_err| {
+                    OleError::CorruptedFile("directory sector count does not fit usize".to_string())
+                })?;
+                let data_len = checked_directory_data_len(count, self.sector_size)?;
+                enforce_directory_limit(data_len, max_directory_bytes)?;
+                collect_sector_chain_exact(&self.fat, self.first_dir_sector, count, "directory")?
+            },
+            None => collect_directory_sector_chain(
                 &self.fat,
                 self.first_dir_sector,
-                usize::try_from(count).map_err(|_err| {
-                    OleError::CorruptedFile("directory sector count does not fit usize".to_string())
-                })?,
-                "directory",
+                self.sector_size,
+                max_directory_bytes,
             )?,
-            None => collect_sector_chain(&self.fat, self.first_dir_sector, "directory")?,
         };
+        let data_len = checked_directory_data_len(sectors.len(), self.sector_size)?;
+        enforce_directory_limit(data_len, max_directory_bytes)?;
         self.claim_chain(&sectors, PhysicalSectorRole::Directory)?;
-        let data_len = sectors
-            .len()
-            .checked_mul(self.sector_size)
-            .ok_or_else(|| OleError::CorruptedFile("directory data size overflow".to_string()))?;
         // Initialize the final buffer up front so each sector can be read into
         // its permanent location. This also leaves the unread tail of a short
         // final sector zero-filled, matching `read_sector`.
@@ -2460,6 +2509,26 @@ fn try_filled_vec<T: Clone>(
     Ok(values)
 }
 
+fn checked_directory_data_len(sector_count: usize, sector_size: usize) -> Result<usize, OleError> {
+    sector_count
+        .checked_mul(sector_size)
+        .ok_or_else(|| OleError::CorruptedFile("directory data size overflow".to_string()))
+}
+
+fn enforce_directory_limit(data_len: usize, maximum: u64) -> Result<(), OleError> {
+    let observed = u64::try_from(data_len).map_err(|_err| {
+        OleError::CorruptedFile("directory data size does not fit u64".to_string())
+    })?;
+    if observed > maximum {
+        return Err(OleError::LimitExceeded {
+            resource: "directory bytes",
+            observed,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
 fn read_u16_le(bytes: &[u8], description: &str) -> Result<u16, OleError> {
     let value: [u8; 2] = bytes
         .try_into()
@@ -2496,6 +2565,55 @@ fn next_chain_sector(
         )));
     }
     Ok(next)
+}
+
+fn collect_directory_sector_chain(
+    allocation_table: &[u32],
+    start_sector: u32,
+    sector_size: usize,
+    max_directory_bytes: u64,
+) -> Result<Vec<u32>, OleError> {
+    if start_sector == ENDOFCHAIN {
+        return Ok(Vec::new());
+    }
+
+    let mut sectors = Vec::new();
+    let mut visited = CheckedBitSet::try_with_capacity(allocation_table.len(), "sector-chain map")?;
+    let mut sector = start_sector;
+    while sector != ENDOFCHAIN {
+        let index = usize::try_from(sector).map_err(|_err| {
+            OleError::CorruptedFile("Invalid sector index in directory".to_string())
+        })?;
+        if index >= allocation_table.len() {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector index {sector} in directory"
+            )));
+        }
+        if visited.contains(index) {
+            return Err(OleError::CorruptedFile(format!(
+                "Cycle detected in directory chain at sector {sector}"
+            )));
+        }
+
+        let sector_count = sectors.len().checked_add(1).ok_or_else(|| {
+            OleError::CorruptedFile("directory sector count overflow".to_string())
+        })?;
+        let data_len = checked_directory_data_len(sector_count, sector_size)?;
+        enforce_directory_limit(data_len, max_directory_bytes)?;
+
+        visited.insert(index)?;
+        try_push(&mut sectors, sector, "sector-chain entries")?;
+        let next = *allocation_table.get(index).ok_or_else(|| {
+            OleError::CorruptedFile(format!("Invalid sector index {sector} in directory"))
+        })?;
+        if next != ENDOFCHAIN && next >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector marker 0x{next:08X} in directory chain"
+            )));
+        }
+        sector = next;
+    }
+    Ok(sectors)
 }
 
 fn collect_sector_chain(

@@ -12,7 +12,7 @@ use std::sync::{
 
 use crate::consts::{
     DIRENTRY_SIZE, ENDOFCHAIN, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET, MAXREGSECT,
-    NUM_FAT_SECTORS_OFFSET, SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3,
+    NUM_FAT_SECTORS_OFFSET, SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3, SECTOR_SIZE_V4,
 };
 use crate::{OleError, OleFile, OleFileLimits, writer::OleWriter};
 
@@ -140,6 +140,11 @@ fn rejects_version_3_directory_sector_count() {
 #[test]
 fn low_level_default_ingress_limit_is_finite() {
     assert!(OleFileLimits::default().max_input_bytes() < u64::MAX);
+    assert_eq!(
+        OleFileLimits::default().max_directory_bytes(),
+        OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES
+    );
+    assert_eq!(OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES, 64 * 1024 * 1024);
     assert!(matches!(
         OleFileLimits::new(0),
         Err(OleError::InvalidLimit {
@@ -152,6 +157,22 @@ fn low_level_default_ingress_limit_is_finite() {
         OleFileLimits::new(OleFileLimits::MAX_INPUT_BYTES + 1),
         Err(OleError::InvalidLimit {
             resource: "CFB input bytes",
+            value,
+            maximum,
+        }) if value == maximum + 1
+    ));
+    assert!(matches!(
+        OleFileLimits::default().with_max_directory_bytes(0),
+        Err(OleError::InvalidLimit {
+            resource: "CFB directory bytes",
+            value: 0,
+            maximum: OleFileLimits::MAX_DIRECTORY_BYTES,
+        })
+    ));
+    assert!(matches!(
+        OleFileLimits::default().with_max_directory_bytes(OleFileLimits::MAX_DIRECTORY_BYTES + 1),
+        Err(OleError::InvalidLimit {
+            resource: "CFB directory bytes",
             value,
             maximum,
         }) if value == maximum + 1
@@ -240,7 +261,7 @@ fn hostile_difat_and_minifat_counts_are_rejected_before_index_allocation() {
 
 #[test]
 fn hostile_version_4_directory_count_is_rejected_before_index_allocation() {
-    let mut writer = OleWriter::with_sector_size(crate::consts::SECTOR_SIZE_V4).unwrap();
+    let mut writer = OleWriter::with_sector_size(SECTOR_SIZE_V4).unwrap();
     writer.create_stream(&["Payload"], b"bounded").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
@@ -252,6 +273,73 @@ fn hostile_version_4_directory_count_is_rejected_before_index_allocation() {
         Err(OleError::CorruptedFile(message))
             if message == "Declared directory sector count exceeds the physical file"
     ));
+}
+
+#[test]
+fn version_3_directory_byte_limit_is_checked_at_padded_sector_boundaries() {
+    let bytes = sample_file();
+    let exact = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V3).unwrap())
+        .unwrap();
+    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+        .expect("a directory exactly at its configured limit opens");
+
+    let under = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V3 - 1).unwrap())
+        .unwrap();
+    assert!(matches!(
+        OleFile::open_with_limits(Cursor::new(bytes.clone()), under),
+        Err(OleError::LimitExceeded {
+            resource: "directory bytes",
+            observed,
+            maximum,
+        }) if observed == u64::try_from(SECTOR_SIZE_V3).unwrap() && maximum == observed - 1
+    ));
+
+    let over = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V3 + 1).unwrap())
+        .unwrap();
+    OleFile::open_with_limits(Cursor::new(bytes), over)
+        .expect("a directory below its configured limit opens");
+}
+
+#[test]
+fn version_4_directory_byte_limit_is_checked_before_chain_allocation() {
+    let mut writer = OleWriter::with_sector_size(SECTOR_SIZE_V4).unwrap();
+    writer.create_stream(&["Payload"], b"bounded").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let bytes = output.into_inner();
+
+    let exact = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V4).unwrap())
+        .unwrap();
+    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+        .expect("a version 4 directory exactly at its configured limit opens");
+
+    let under = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V4 - 1).unwrap())
+        .unwrap();
+    assert!(matches!(
+        OleFile::open_with_limits(Cursor::new(bytes.clone()), under),
+        Err(OleError::LimitExceeded {
+            resource: "directory bytes",
+            observed,
+            maximum,
+        }) if observed == u64::try_from(SECTOR_SIZE_V4).unwrap() && maximum == observed - 1
+    ));
+
+    let over = OleFileLimits::new(bytes.len() as u64)
+        .unwrap()
+        .with_max_directory_bytes(u64::try_from(SECTOR_SIZE_V4 + 1).unwrap())
+        .unwrap();
+    OleFile::open_with_limits(Cursor::new(bytes), over)
+        .expect("a version 4 directory below its configured limit opens");
 }
 
 #[test]

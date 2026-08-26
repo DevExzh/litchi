@@ -75,11 +75,12 @@ pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, CfbVal
 /// Validates a positional CFB source under explicit finite source and report
 /// limits without changing it.
 ///
-/// An input exceeding `source_limits` produces a complete report value whose
-/// ingress capability is `Blocked`; it is not treated as malformed CFB. A
-/// structural parser rejection instead produces a `Complete` capability plus
-/// one deterministic error issue. Source I/O, source-version changes, and
-/// allocation failures remain errors because no honest report can be made.
+/// An input or directory stream exceeding `source_limits` produces a complete
+/// report value whose ingress capability is `Blocked`; it is not treated as
+/// malformed CFB. A structural parser rejection instead produces a `Complete`
+/// capability plus one deterministic error issue. Source I/O, source-version
+/// changes, and allocation failures remain errors because no honest report can
+/// be made.
 ///
 /// # Errors
 ///
@@ -93,13 +94,10 @@ pub fn validate_source_with_limits(
     let (expected_version, source_size) =
         stable_source_state(source.as_ref()).map_err(CfbValidationError::Ingress)?;
     if source_size > source_limits.max_input_bytes() {
-        let check = CheckCapabilityId::try_new(INGRESS_CHECK, report_limits)?;
-        let status = CheckStatus::blocked(
+        let report = blocked_report(
             "source exceeds the configured CFB validation input ceiling",
             report_limits,
         )?;
-        let report =
-            ValidateReport::try_new([ValidationCheck::new(check, status)], [], report_limits)?;
         require_source_version(source.as_ref(), expected_version)
             .map_err(CfbValidationError::Ingress)?;
         return Ok(report);
@@ -107,6 +105,10 @@ pub fn validate_source_with_limits(
 
     let report = match SharedOleFile::open_with_limits(source.clone(), source_limits) {
         Ok(_validated) => complete_report(report_limits),
+        Err(error) if is_directory_limit_error(&error) => blocked_report(
+            "directory stream exceeds the configured CFB validation ceiling",
+            report_limits,
+        ),
         Err(error) if is_structural_rejection(&error) => {
             rejected_report(&error, source_size, report_limits)
         },
@@ -138,8 +140,9 @@ impl SharedOleFile {
     ) -> Result<ValidateReport, CfbValidationError> {
         self.check_source_version()
             .map_err(CfbValidationError::Ingress)?;
-        let source_limits =
-            SharedOleFileLimits::new(self.file_size()).map_err(CfbValidationError::Ingress)?;
+        let source_limits = SharedOleFileLimits::new(self.file_size())
+            .and_then(|limits| limits.with_max_directory_bytes(self.limits.max_directory_bytes()))
+            .map_err(CfbValidationError::Ingress)?;
         let report =
             validate_source_with_limits(self.source.clone(), source_limits, report_limits)?;
         self.check_source_version()
@@ -174,6 +177,15 @@ fn complete_report(limits: ValidationLimits) -> Result<ValidateReport, CfbValida
         limits,
     )
     .map_err(Into::into)
+}
+
+fn blocked_report(
+    reason: &str,
+    limits: ValidationLimits,
+) -> Result<ValidateReport, CfbValidationError> {
+    let check = CheckCapabilityId::try_new(INGRESS_CHECK, limits)?;
+    let status = CheckStatus::blocked(reason, limits)?;
+    ValidateReport::try_new([ValidationCheck::new(check, status)], [], limits).map_err(Into::into)
 }
 
 fn rejected_report(
@@ -221,6 +233,16 @@ fn is_structural_rejection(error: &OleError) -> bool {
             | OleError::NotOleFile
             | OleError::CorruptedFile(_)
             | OleError::StreamNotFound
+    )
+}
+
+fn is_directory_limit_error(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::LimitExceeded {
+            resource: "directory bytes",
+            ..
+        }
     )
 }
 
