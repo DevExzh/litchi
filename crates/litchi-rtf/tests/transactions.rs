@@ -946,15 +946,14 @@ fn strike_edit_preserves_double_strike_and_creates_later_run_boundary() {
             .runs()
             .all(|run| run.format().double_strike())
     );
-    assert_eq!(
+    assert!(
         reopened
             .body()
             .runs()
             .find(|run| run.text() == "Second")
             .unwrap()
             .format()
-            .strike(),
-        true
+            .strike()
     );
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
