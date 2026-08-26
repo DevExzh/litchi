@@ -6414,6 +6414,9 @@ mod tests {
             .write_stored("word/document.xml", b"<before/>")
             .unwrap();
         writer
+            .write_stored("word/target.xml", b"<target/>")
+            .unwrap();
+        writer
             .write_stored("word/_rels/document.xml.rels", document_relationships)
             .unwrap();
         writer.finish_to_bytes().unwrap()
@@ -6561,6 +6564,67 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, OpcError::InvalidRelationship(_)));
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_internal_replace_requires_and_preserves_internal_mode() {
+        const TEST_RELATIONSHIP: &str = "urn:litchi:test";
+        let relationships = canonical_document_relationships(&[
+            (
+                "rInternal",
+                TEST_RELATIONSHIP,
+                "document.xml",
+                TargetMode::Internal,
+            ),
+            (
+                "rExternal",
+                TEST_RELATIONSHIP,
+                "https://example.invalid/",
+                TargetMode::External,
+            ),
+        ]);
+        let source = topology_relationship_archive(&relationships);
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_internal_relationship(
+            owner.clone(),
+            "rInternal",
+            TEST_RELATIONSHIP,
+            PackURI::new("/word/target.xml").unwrap(),
+        )
+        .unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
+                .unwrap();
+        let mut output = Vec::new();
+        package.write_topology_to_stream(&mut output, plan).unwrap();
+        let reopened =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let part = reopened.part(&owner).unwrap();
+        let relationship = part.rels().get("rInternal").unwrap();
+        assert_eq!(relationship.target_mode(), TargetMode::Internal);
+        assert_eq!(
+            relationship.target_partname().unwrap(),
+            PackURI::new("/word/target.xml").unwrap()
+        );
+
+        let mut mismatch = SourceTopologyPlan::new();
+        mismatch
+            .try_replace_internal_relationship(
+                owner,
+                "rExternal",
+                TEST_RELATIONSHIP,
+                PackURI::new("/word/target.xml").unwrap(),
+            )
+            .unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let mut mismatch_output = Vec::new();
+        let error = package
+            .write_topology_to_stream(&mut mismatch_output, mismatch)
+            .unwrap_err();
+        assert!(matches!(error, OpcError::InvalidRelationship(_)));
+        assert!(mismatch_output.is_empty());
     }
 
     fn relationship_batch(prefix: &str, count: usize) -> (Vec<String>, Vec<u8>) {
