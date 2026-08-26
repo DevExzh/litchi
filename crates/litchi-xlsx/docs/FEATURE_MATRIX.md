@@ -50,7 +50,7 @@ query, macro, chart, pivot, or external content is executed.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Hyperlinks | 🟡 | 🟡 | ❌ | Typed internal and external worksheet hyperlinks can be read and edited on existing worksheets through atomic workbook transactions with reversible, source-checked patches. Strict and Transitional relationship targets remain inert and are never followed. New-sheet authoring and standalone source-backed publication are not yet supported. |
+| Hyperlinks | 🟡 | 🟡 | ❌ | Typed internal and external worksheet hyperlinks can be read and edited on existing worksheets through atomic workbook transactions with reversible, source-checked patches. Strict and Transitional relationship targets remain inert and are never followed. New-sheet authoring, standalone source-backed publication, and signed-workbook semantic edits are not yet supported. |
 | Legacy comments and VML note placeholders | 🟡 | ✅ | ✅ | The contextual `workbook::comments::{snapshot,transaction,patch}` owner provides checked cell/author CRUD for classic notes, exact semantic no-ops, relationship-safe source-checked patches, and inert VML shape-ID retention. VML layout and rendering remain outside the owner. |
 | Threaded comments, persons, and mentions | ✅ | ✅ | ✅ | Threaded comment threads, persons, mentions, replies, legacy placeholders, relationship IDs, and CRUD are supported as metadata; no collaboration service is contacted. |
 | Data validation | ✅ | ✅ | ✅ | Validation ranges, list/custom/date/time/whole/decimal/text-length rules, formulas, prompts, and error messages are typed and writable within supported schemas. |
