@@ -3,8 +3,12 @@
 //! This layer resolves slides, masters, companion parts, and relationships
 //! without changing the borrowed typed facade or interpreting XML payloads.
 
+use litchi_core::{
+    SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
+};
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use std::io::Write;
 
 use crate::parts::{PresentationPart, SlideMasterPart, SlidePart, SlideReference};
 use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
@@ -36,6 +40,45 @@ pub(super) fn validate_slide_catalog(
         )?;
     }
     Ok(())
+}
+
+pub(super) fn write_text_to<W: Write + ?Sized>(
+    package: &OpcPackage,
+    presentation: &PresentationPart<'_>,
+    output: &mut W,
+    options: TextOutputOptions<'_>,
+) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+    let paragraph_separator = options.paragraph_separator();
+    let mut writer = SequentialTextWriter::new(output, options);
+    // This preflight Vec is bounded relationship metadata only. It never
+    // contains slide XML or decoded slide text; the payload remains one slide
+    // at a time below.
+    let references = match presentation.slide_references() {
+        Ok(references) => references,
+        Err(source) => return Err(writer.document_error(source)),
+    };
+    if let Err(source) = validate_slide_catalog(package, presentation, &references) {
+        return Err(writer.document_error(source));
+    }
+
+    for reference in &references {
+        let (_, _, part) = match crate::parts::validate_slide_relationship(
+            presentation.part().rels().get(reference.relationship_id()),
+            reference.relationship_id(),
+            |target| Ok(package.get_part(target)?),
+            |part| part.content_type(),
+        ) {
+            Ok(value) => value,
+            Err(source) => return Err(writer.document_error(source)),
+        };
+        let text = match SlidePart::semantic_text_from_part(part, paragraph_separator) {
+            Ok(text) => text,
+            Err(source) => return Err(writer.document_error(source)),
+        };
+        writer.write_object::<Error>(TextObjectKind::Slide, &text)?;
+    }
+
+    Ok(writer.finish())
 }
 
 pub(super) fn slide_count(package: &OpcPackage, part: &PresentationPart<'_>) -> Result<usize> {

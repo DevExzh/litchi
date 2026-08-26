@@ -7,14 +7,17 @@
 use std::io::Write;
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 use std::cell::Cell;
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
-use litchi_core::{ExecutionContext, ExecutionError, ReadAt, SourceVersion};
+use litchi_core::{
+    ExecutionContext, ExecutionError, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind,
+    TextOutputError, TextOutputOptions, TextOutputReport,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     PackURI, Part, PartData, PartView, ReadLimits, Relationships, SourceBackedPackage,
@@ -91,6 +94,68 @@ impl SourcePart {
             rels: view.rels().clone(),
         }
     }
+}
+
+struct SourceCheckedTextSink<'a, W: ?Sized> {
+    output: &'a mut W,
+    package: &'a SourceBackedPackage,
+    failure: Arc<Mutex<Option<Error>>>,
+}
+
+impl<'a, W: ?Sized> SourceCheckedTextSink<'a, W> {
+    fn record_failure(&self, error: Error) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check(&self) -> std::io::Result<()> {
+        let result = self
+            .package
+            .check_execution()
+            .map_err(Error::from)
+            .and_then(|_| {
+                self.package
+                    .source_version()
+                    .map(|_| ())
+                    .map_err(Error::from)
+            });
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let message = error.to_string();
+                self.record_failure(error);
+                Err(std::io::Error::other(message))
+            },
+        }
+    }
+}
+
+impl<'a, W: Write + ?Sized> Write for SourceCheckedTextSink<'a, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check()?;
+        let result = self.output.write(bytes);
+        let _ = self.check();
+        result
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check()?;
+        let result = self.output.flush();
+        let _ = self.check();
+        result
+    }
+}
+
+fn take_source_text_failure(failure: &Arc<Mutex<Option<Error>>>) -> Option<Error> {
+    failure
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
 }
 
 impl Part for SourcePart {
@@ -213,7 +278,9 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 ///
 /// Opening validates the OPC catalog, package relationships, presentation
 /// part, and presentation-to-slide graph. Slide payloads remain deferred until
-/// [`SourceSlide::text`] selects one. The type has no edit or output APIs.
+/// [`SourceSlide::text`] selects one. The type has no edit APIs; its bounded
+/// semantic text sink is available through
+/// [`SourceBackedPresentation::write_text_to`].
 #[derive(Clone)]
 pub struct SourceBackedPresentation {
     pub(super) inner: Arc<SourceInner>,
@@ -780,6 +847,75 @@ impl SourceBackedPresentation {
             owner: Arc::clone(&self.inner),
             data,
         })
+    }
+
+    /// Stream one semantic text object per slide into a caller-owned sink.
+    ///
+    /// The retained lazy catalog supplies slide order and relationship
+    /// metadata without collecting slide handles or payloads. One selected
+    /// slide is parsed and emitted at a time under the source cache policy.
+    /// The source and execution state is checked around every underlying sink
+    /// write. For parity with [`SourceSlide::text`], use `"\n"` for the
+    /// paragraph and slide separators, and exclude empty objects.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed document, resource-limit, or sink error with exact
+    /// partial-output progress. A source revision or execution cancellation
+    /// observed after accepted output takes precedence over another failure.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        let paragraph_separator = options.paragraph_separator();
+        let source_failure = Arc::new(Mutex::new(None));
+        let mut checked_output = SourceCheckedTextSink {
+            output,
+            package: &self.inner.package,
+            failure: Arc::clone(&source_failure),
+        };
+        let mut writer = SequentialTextWriter::new(&mut checked_output, options);
+        if let Err(source) = self.check_source() {
+            return Err(writer.document_error(source));
+        }
+
+        for slide in self.slides() {
+            if let Err(source) = self.check_source() {
+                return Err(writer.document_error(source));
+            }
+
+            let parsed = slide.semantic_text(paragraph_separator);
+            if let Err(source) = self.check_source() {
+                return Err(writer.document_error(source));
+            }
+            let text = match parsed {
+                Ok(text) => text,
+                Err(source) => return Err(writer.document_error(source)),
+            };
+
+            let emitted = writer.write_object::<Error>(TextObjectKind::Slide, &text);
+            let progress = writer.progress();
+            let source = self
+                .check_source()
+                .err()
+                .or_else(|| take_source_text_failure(&source_failure));
+            if let Some(source) = source {
+                return Err(TextOutputError::Document { source, progress });
+            }
+            emitted?;
+        }
+
+        let progress = writer.progress();
+        if let Some(source) = self
+            .check_source()
+            .err()
+            .or_else(|| take_source_text_failure(&source_failure))
+        {
+            Err(TextOutputError::Document { source, progress })
+        } else {
+            Ok(writer.finish())
+        }
     }
 
     /// Select one slide by checked zero-based presentation position.
@@ -1762,6 +1898,24 @@ impl SourceSlide {
         self.owner.package.check_execution()?;
         self.owner.package.source_version()?;
         Ok((text, name))
+    }
+
+    fn semantic_text(&self, paragraph_separator: &str) -> Result<String> {
+        self.owner.package.check_execution()?;
+        let view = self.owner.package.part(&self.data.part_uri)?;
+        let declared = view.declared_uncompressed_size()?;
+        let raw_xml_limit = SlidePart::semantic_text_raw_xml_limit();
+        if declared > raw_xml_limit as u64 {
+            return Err(Error::Limit {
+                resource: "semantic slide raw XML bytes",
+                limit: raw_xml_limit,
+            });
+        }
+        let part = self.load_part(&view)?;
+        let text = SlidePart::semantic_text_from_part(&part, paragraph_separator)?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
+        Ok(text)
     }
 
     /// Flatten DrawingML text runs from this selected slide in source order.

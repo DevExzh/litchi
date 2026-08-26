@@ -1,6 +1,8 @@
 //! Borrowed typed presentation facade.
 
+use litchi_core::{TextOutputError, TextOutputOptions, TextOutputReport};
 use litchi_opc::OpcPackage;
+use std::io::Write;
 
 use crate::Result;
 use crate::parts::{PresentationPart, SlideReference};
@@ -172,6 +174,27 @@ impl<'a> Presentation<'a> {
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
         package::text(self.package, &self.part)
+    }
+
+    /// Stream one semantic text object per slide into a caller-owned sink.
+    ///
+    /// The complete slide relationship graph is validated before the first
+    /// sink byte is written. Each selected slide is then parsed independently,
+    /// retaining only one bounded slide text value at a time. The bounded
+    /// relationship-metadata preflight is not slide-payload aggregation. For
+    /// parity with [`Self::text`], use `"\n"` for both separators, use
+    /// `"\n"` as the paragraph separator, and exclude empty objects.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed document, resource-limit, or sink error with exact
+    /// partial-output progress.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<crate::Error>> {
+        package::write_text_to(self.package, &self.part, output, options)
     }
 
     /// Load the slide-library synchronization metadata reachable from this

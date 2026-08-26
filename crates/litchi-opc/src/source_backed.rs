@@ -1364,6 +1364,39 @@ impl PartView<'_> {
         &self.package.parts[self.index].relationships
     }
 
+    /// Return the ZIP central-directory declaration for this part's
+    /// uncompressed size without loading its payload.
+    ///
+    /// The value is attacker-controlled central-directory metadata and is not
+    /// proof of the decoded length. [`PartView::data`] still verifies the
+    /// decoded length and closes the central-directory/local-header TOCTOU
+    /// boundary before publishing a payload. Source freshness and the
+    /// caller's cancellation policy are checked before and after this lookup.
+    pub fn declared_uncompressed_size(&self) -> Result<u64> {
+        self.package.source.ensure_current()?;
+        self.package
+            .cache
+            .check_context()
+            .map_err(map_execution_error)?;
+        let entry_id = self
+            .package
+            .parts
+            .get(self.index)
+            .ok_or_else(|| OpcError::PartNotFound(self.index.to_string()))?
+            .entry_id;
+        let declared = self
+            .package
+            .archive
+            .metadata_for(entry_id)?
+            .uncompressed_size();
+        self.package.source.ensure_current()?;
+        self.package
+            .cache
+            .check_context()
+            .map_err(map_execution_error)?;
+        Ok(declared)
+    }
+
     /// Read this part's payload, using the package's bounded cache when able.
     pub fn data(&self) -> Result<PartData> {
         self.package.read_part(self.index)
@@ -6718,6 +6751,62 @@ mod tests {
         assert_eq!(loaded.cold_loads, 1);
         assert_eq!(loaded.successful_loads, 1);
         assert_eq!(loaded.retained_entries, 1);
+    }
+
+    #[test]
+    fn part_view_declared_size_is_metadata_only() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<document/>",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let before = package.cache_diagnostics();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let view = package.part(&document).unwrap();
+
+        assert_eq!(
+            view.declared_uncompressed_size().unwrap(),
+            b"<document/>".len() as u64
+        );
+        let after = package.cache_diagnostics();
+        assert_eq!(after.cold_loads, before.cold_loads);
+        assert_eq!(after.retained_entries, before.retained_entries);
+    }
+
+    #[test]
+    fn part_view_declared_size_checks_source_and_cancellation() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<document/>",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let view = package.part(&document).unwrap();
+        source.changed();
+        assert!(matches!(
+            view.declared_uncompressed_size(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+
+        let (_budget, cancellation_source, context) = managed_context_with_cancellation(u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"<document/>",
+                false,
+            ))),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let view = package.part(&document).unwrap();
+        cancellation_source.cancel();
+        assert!(matches!(
+            view.declared_uncompressed_size(),
+            Err(OpcError::Cancelled)
+        ));
     }
 
     #[test]
