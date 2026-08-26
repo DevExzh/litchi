@@ -3403,7 +3403,8 @@ impl Edit {
             || has_all_caps_delta
             || has_outline_delta
             || has_baseline_delta;
-        let semantic_delta = semantic_changes(&self.operations, &projected_spans);
+        let semantic_delta =
+            semantic_changes_with_replacement(&self.operations, &projected_spans, &replacement);
         if !did_change {
             return Ok(Commit::new(
                 self.source.clone(),
@@ -7802,6 +7803,7 @@ enum Change {
     },
     InsertParagraph {
         position: usize,
+        after_position: usize,
         span: TextSpan,
         after_span: TextSpan,
         text: String,
@@ -8028,12 +8030,14 @@ impl Change {
             },
             Self::InsertParagraph {
                 position,
+                after_position,
                 span,
                 after_span,
                 text,
                 removing,
             } => Self::InsertParagraph {
-                position: *position,
+                position: *after_position,
+                after_position: *position,
                 span: *after_span,
                 after_span: *span,
                 text: text.clone(),
@@ -8162,6 +8166,14 @@ impl Change {
 fn semantic_changes(
     operations: &[Operation],
     projected_spans: &[(usize, TextSpan)],
+) -> Vec<Change> {
+    semantic_changes_with_replacement(operations, projected_spans, "")
+}
+
+fn semantic_changes_with_replacement(
+    operations: &[Operation],
+    projected_spans: &[(usize, TextSpan)],
+    replacement: &str,
 ) -> Vec<Change> {
     operations
         .iter()
@@ -8322,8 +8334,17 @@ fn semantic_changes(
             } => projected_spans
                 .iter()
                 .find_map(|(projected_index, projected)| {
-                    (*projected_index == operation_index).then_some(Change::InsertParagraph {
+                    if *projected_index != operation_index {
+                        return None;
+                    }
+                    let after_position = replacement
+                        .get(..projected.start)?
+                        .bytes()
+                        .filter(|byte| *byte == b'\n')
+                        .count();
+                    Some(Change::InsertParagraph {
                         position: *position,
+                        after_position,
                         span: *span,
                         after_span: *projected,
                         text: text.clone(),
@@ -8800,6 +8821,7 @@ fn durable_operation(
         },
         Change::InsertParagraph {
             position,
+            after_position: _,
             text,
             removing,
             span: _,
