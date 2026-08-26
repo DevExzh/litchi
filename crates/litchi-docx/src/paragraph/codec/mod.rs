@@ -11,5 +11,8 @@ mod runs;
 mod text;
 mod xml;
 
-pub(crate) use text::extract_word_text;
+pub(crate) use text::{
+    extract_word_text, semantic_text_raw_xml_limit, write_text_to,
+    write_text_to_with_operation_check,
+};
 pub(crate) use xml::is_fragment_word_name;

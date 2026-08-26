@@ -20,6 +20,7 @@ use crate::statistics::{
 };
 use crate::table::Table;
 use litchi_opc::OpcPackage;
+use std::io::Write;
 
 use super::super::model::{Block, Document, Element};
 
@@ -45,6 +46,26 @@ impl<'a> Document<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         self.part.extract_text()
+    }
+
+    /// Stream visible main-document paragraphs to a caller-owned sink.
+    ///
+    /// The parser walks the document once in XML order, including paragraphs
+    /// nested in table cells, and retains only the current bounded paragraph
+    /// while it is decoded. Formatting and unsupported payloads are omitted;
+    /// `w:tab`, line breaks, and the two Word hyphen controls retain their
+    /// established text projection. Paragraph separators and empty-object
+    /// handling are selected by `options`.
+    ///
+    /// The sink is never flushed or rolled back. Output can be partial when a
+    /// document, resource-limit, or sink error is observed.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> std::result::Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<Error>>
+    {
+        crate::paragraph::write_text_to(self.part.xml_bytes(), output, options)
     }
 
     /// Return numbered paragraphs with resolved, typed list markers.

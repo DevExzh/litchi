@@ -13,14 +13,17 @@
 //! Streaming text extraction for paragraph and run content.
 
 use crate::error::{Error, Result};
+use litchi_core::{
+    SequentialTextWriter, TextObjectKind, TextOutputError, TextOutputOptions, TextOutputReport,
+};
 use litchi_ooxml_common::private::BindingTracker;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
-use quick_xml::name::{QName, ResolveResult};
-#[cfg(test)]
+use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use quick_xml::reader::Reader;
+use std::io::Write;
 
 use super::super::model::Paragraph;
 use super::xml::is_fragment_word_name;
@@ -191,6 +194,841 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
     }
     result.shrink_to_fit();
     Ok(result)
+}
+
+// The sink path deliberately has its own bounded parser. The established
+// `extract_word_text` projection is retained for compatibility and may return
+// one caller-owned String for legacy APIs; this path must never accumulate a
+// document-wide semantic String or paragraph collection.
+pub(crate) const MAX_SEMANTIC_TEXT_RAW_XML_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SEMANTIC_TEXT_EVENTS: usize = 1_000_000;
+const MAX_SEMANTIC_TEXT_DEPTH: usize = 128;
+const MAX_SEMANTIC_TEXT_PARAGRAPHS: usize = 1_000_000;
+const MAX_SEMANTIC_TEXT_RUNS: usize = 4_000_000;
+const MAX_SEMANTIC_TEXT_EVENT_BYTES: usize = 1024 * 1024;
+const MAX_SEMANTIC_TEXT_NAME_BYTES: usize = 64 * 1024;
+const MAX_SEMANTIC_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
+const MAX_SEMANTIC_TEXT_ATTRIBUTE_BYTES: usize = 1024 * 1024;
+const MAX_SEMANTIC_TEXT_NAMESPACE_BINDINGS: usize = 4096;
+const MAX_SEMANTIC_TEXT_NAMESPACE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_SEMANTIC_TEXT_PARAGRAPH_BYTES: usize = 16 * 1024 * 1024;
+const MAX_SEMANTIC_TEXT_DOCUMENT_BYTES: usize = 64 * 1024 * 1024;
+
+pub(crate) const fn semantic_text_raw_xml_limit() -> usize {
+    MAX_SEMANTIC_TEXT_RAW_XML_BYTES
+}
+
+pub(crate) fn write_text_to<W: Write + ?Sized>(
+    xml_bytes: &[u8],
+    output: &mut W,
+    options: TextOutputOptions<'_>,
+) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+    let mut writer = SequentialTextWriter::new(output, options);
+    write_text_to_with_writer(xml_bytes, &mut writer)?;
+    Ok(writer.finish())
+}
+
+pub(crate) fn write_text_to_with_writer<'options, 'output, W: Write + ?Sized>(
+    xml_bytes: &[u8],
+    writer: &mut SequentialTextWriter<'options, 'output, W>,
+) -> std::result::Result<(), TextOutputError<Error>> {
+    write_text_to_with_operation_check(xml_bytes, writer, || Ok(()))
+}
+
+pub(crate) fn write_text_to_with_operation_check<'options, 'output, W, F>(
+    xml_bytes: &[u8],
+    writer: &mut SequentialTextWriter<'options, 'output, W>,
+    mut operation_check: F,
+) -> std::result::Result<(), TextOutputError<Error>>
+where
+    W: Write + ?Sized,
+    F: FnMut() -> Result<()>,
+{
+    if xml_bytes.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
+        return Err(writer.document_error(Error::InvalidFormat(format!(
+            "semantic DOCX raw XML exceeds {MAX_SEMANTIC_TEXT_RAW_XML_BYTES} bytes"
+        ))));
+    }
+    if xml_bytes.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
+        return Err(writer.document_error(Error::InvalidFormat(format!(
+            "semantic DOCX processed XML exceeds {MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES} bytes"
+        ))));
+    }
+
+    operation_check().map_err(|error| writer.document_error(error))?;
+    preflight_semantic_xml(xml_bytes, &mut operation_check)
+        .map_err(|error| writer.document_error(error))?;
+    operation_check().map_err(|error| writer.document_error(error))?;
+
+    let mut reader = NsReader::from_reader(xml_bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut parser = SemanticTextParser::default();
+    let mut buffer = Vec::new();
+    loop {
+        operation_check().map_err(|error| writer.document_error(error))?;
+        buffer.clear();
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| writer.document_error(Error::Xml(error.to_string())))?;
+        operation_check().map_err(|error| writer.document_error(error))?;
+        let event = event.into_owned();
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            validate_semantic_attribute_names(&reader, element)
+                .map_err(|error| writer.document_error(error))?;
+        }
+        let namespace = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                reader.resolver().resolve_element(element.name()).0
+            },
+            Event::End(element) => reader.resolver().resolve_element(element.name()).0,
+            _ => ResolveResult::Unbound,
+        };
+        if parser
+            .consume(namespace, event, writer, &mut operation_check)
+            .map_err(|error| match error {
+                SemanticTextFailure::Document(source) => writer.document_error(source),
+                SemanticTextFailure::Output(error) => error,
+            })?
+        {
+            return Ok(());
+        }
+        operation_check().map_err(|error| writer.document_error(error))?;
+    }
+}
+
+#[derive(Default)]
+struct SemanticTextXmlBudget {
+    events: usize,
+    depth: usize,
+    namespace_bindings: usize,
+    namespace_bytes: usize,
+}
+
+impl SemanticTextXmlBudget {
+    fn observe_event(&mut self, event: &Event<'_>) -> Result<()> {
+        self.events = self.events.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("semantic DOCX XML event counter overflow".into())
+        })?;
+        if self.events > MAX_SEMANTIC_TEXT_EVENTS {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_EVENTS} events"
+            )));
+        }
+        let bytes = semantic_event_bytes(event);
+        if bytes > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX XML event exceeds {MAX_SEMANTIC_TEXT_EVENT_BYTES} bytes"
+            )));
+        }
+        Ok(())
+    }
+
+    fn observe_namespaces(&mut self, element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+        if element.name().as_ref().len() > MAX_SEMANTIC_TEXT_NAME_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX XML element name exceeds {MAX_SEMANTIC_TEXT_NAME_BYTES} bytes"
+            )));
+        }
+        let mut attribute_bytes = 0usize;
+        for attribute in element.attributes().with_checks(true) {
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+            let key = attribute.key.as_ref();
+            attribute_bytes = attribute_bytes
+                .checked_add(key.len())
+                .and_then(|value| value.checked_add(attribute.value.len()))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("semantic DOCX attribute length overflow".into())
+                })?;
+            if attribute_bytes > MAX_SEMANTIC_TEXT_ATTRIBUTE_BYTES {
+                return Err(Error::InvalidFormat(format!(
+                    "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_ATTRIBUTE_BYTES} attribute bytes"
+                )));
+            }
+            if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                self.namespace_bindings =
+                    self.namespace_bindings.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("semantic DOCX namespace counter overflow".into())
+                    })?;
+                self.namespace_bytes = self
+                    .namespace_bytes
+                    .checked_add(key.len())
+                    .and_then(|value| value.checked_add(attribute.value.len()))
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("semantic DOCX namespace byte counter overflow".into())
+                    })?;
+                if self.namespace_bindings > MAX_SEMANTIC_TEXT_NAMESPACE_BINDINGS {
+                    return Err(Error::InvalidFormat(format!(
+                        "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_NAMESPACE_BINDINGS} namespace bindings"
+                    )));
+                }
+                if self.namespace_bytes > MAX_SEMANTIC_TEXT_NAMESPACE_BYTES {
+                    return Err(Error::InvalidFormat(format!(
+                        "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_NAMESPACE_BYTES} namespace bytes"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn start(&mut self) -> Result<()> {
+        self.depth = self.depth.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("semantic DOCX XML depth counter overflow".into())
+        })?;
+        if self.depth > MAX_SEMANTIC_TEXT_DEPTH {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_DEPTH} depth"
+            )));
+        }
+        Ok(())
+    }
+
+    fn end(&mut self) -> Result<()> {
+        self.depth = self.depth.checked_sub(1).ok_or_else(|| {
+            Error::InvalidFormat("semantic DOCX XML has an unexpected closing element".into())
+        })?;
+        Ok(())
+    }
+}
+
+fn preflight_semantic_xml<F>(xml_bytes: &[u8], operation_check: &mut F) -> Result<()>
+where
+    F: FnMut() -> Result<()>,
+{
+    let mut reader = Reader::from_reader(xml_bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut budget = SemanticTextXmlBudget::default();
+    let mut root_seen = false;
+    let mut root_closed = false;
+
+    loop {
+        operation_check()?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        operation_check()?;
+        budget.observe_event(&event)?;
+        match event {
+            Event::Start(element) => {
+                if budget.depth == 0 {
+                    if root_seen || root_closed {
+                        return Err(Error::InvalidFormat(
+                            "semantic DOCX XML has multiple roots".into(),
+                        ));
+                    }
+                    root_seen = true;
+                }
+                budget.observe_namespaces(&element)?;
+                budget.start()?;
+            },
+            Event::Empty(element) => {
+                if budget.depth == 0 {
+                    if root_seen || root_closed {
+                        return Err(Error::InvalidFormat(
+                            "semantic DOCX XML has multiple roots".into(),
+                        ));
+                    }
+                    root_seen = true;
+                    root_closed = true;
+                }
+                let empty_depth = budget.depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("semantic DOCX XML depth counter overflow".into())
+                })?;
+                if empty_depth > MAX_SEMANTIC_TEXT_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_DEPTH} depth"
+                    )));
+                }
+                budget.observe_namespaces(&element)?;
+            },
+            Event::End(element) => {
+                if element.name().as_ref().len() > MAX_SEMANTIC_TEXT_NAME_BYTES {
+                    return Err(Error::InvalidFormat(format!(
+                        "semantic DOCX XML end name exceeds {MAX_SEMANTIC_TEXT_NAME_BYTES} bytes"
+                    )));
+                }
+                budget.end()?;
+                if budget.depth == 0 {
+                    root_closed = true;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+                    return Err(Error::InvalidFormat(format!(
+                        "semantic DOCX XML reference exceeds {MAX_SEMANTIC_TEXT_REFERENCE_BYTES} bytes"
+                    )));
+                }
+            },
+            Event::Eof => {
+                if !root_seen {
+                    return Err(Error::InvalidFormat(
+                        "semantic DOCX XML lacks an element root".into(),
+                    ));
+                }
+                if budget.depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "semantic DOCX XML has unbalanced elements".into(),
+                    ));
+                }
+                return Ok(());
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_) => {},
+        }
+    }
+}
+
+fn semantic_event_bytes(event: &Event<'_>) -> usize {
+    match event {
+        Event::Start(element) => element.as_ref().len(),
+        Event::Empty(element) => element.as_ref().len(),
+        Event::End(element) => element.as_ref().len(),
+        Event::Text(text) => text.as_ref().len(),
+        Event::CData(text) => text.as_ref().len(),
+        Event::Comment(comment) => comment.as_ref().len(),
+        Event::DocType(doctype) => doctype.as_ref().len(),
+        Event::PI(pi) => pi.as_ref().len(),
+        Event::Decl(decl) => decl.as_ref().len(),
+        Event::GeneralRef(reference) => reference.as_ref().len(),
+        Event::Eof => 0,
+    }
+}
+
+fn validate_semantic_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    let mut total = 0usize;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        total = total
+            .checked_add(attribute.key.as_ref().len())
+            .and_then(|value| value.checked_add(attribute.value.len()))
+            .ok_or_else(|| {
+                Error::InvalidFormat("semantic DOCX attribute length overflow".into())
+            })?;
+        if total > MAX_SEMANTIC_TEXT_ATTRIBUTE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX XML exceeds {MAX_SEMANTIC_TEXT_ATTRIBUTE_BYTES} attribute bytes"
+            )));
+        }
+        let value = attribute
+            .normalized_value(XmlVersion::Implicit1_0)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&value)?;
+    }
+    Ok(())
+}
+
+fn validate_semantic_attribute_names(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> Result<()> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let name = attribute.key.as_ref();
+        if name == b"xmlns" || name.starts_with(b"xmlns:") {
+            continue;
+        }
+        if let ResolveResult::Unknown(prefix) = reader.resolver().resolve_attribute(attribute.key).0
+        {
+            return Err(Error::InvalidFormat(format!(
+                "unresolved semantic DOCX attribute namespace prefix '{}'",
+                String::from_utf8_lossy(prefix.as_ref())
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_semantic_element_namespace(namespace: &ResolveResult<'_>) -> Result<()> {
+    if let ResolveResult::Unknown(prefix) = namespace {
+        return Err(Error::InvalidFormat(format!(
+            "unresolved semantic DOCX element namespace prefix '{}'",
+            String::from_utf8_lossy(prefix.as_ref())
+        )));
+    }
+    Ok(())
+}
+
+fn is_word_element(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+    name.local_name().as_ref() == local_name
+        && matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if *value == crate::namespace::WORDPROCESSINGML_NAMESPACE
+                    || *value == crate::namespace::STRICT_WORDPROCESSINGML_NAMESPACE
+        )
+}
+
+fn is_word_text_name(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    is_word_element(namespace, name, b"t")
+}
+
+fn is_word_control_name(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    is_word_element(namespace, name, b"tab")
+        || is_word_element(namespace, name, b"br")
+        || is_word_element(namespace, name, b"cr")
+        || is_word_element(namespace, name, b"noBreakHyphen")
+        || is_word_element(namespace, name, b"softHyphen")
+}
+
+fn validate_xml_characters(value: &str) -> Result<()> {
+    if value.chars().all(|character| {
+        matches!(
+            character,
+            '\u{9}'
+                | '\u{a}'
+                | '\u{d}'
+                | '\u{20}'..='\u{d7ff}'
+                | '\u{e000}'..='\u{fffd}'
+                | '\u{10000}'..='\u{10ffff}'
+        )
+    }) {
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(
+            "semantic DOCX XML contains an invalid XML character".into(),
+        ))
+    }
+}
+
+fn validate_xml_comment(comment: &str) -> Result<()> {
+    validate_xml_characters(comment)?;
+    if comment.contains("--") || comment.ends_with('-') {
+        return Err(Error::InvalidFormat(
+            "semantic DOCX XML contains an invalid comment".into(),
+        ));
+    }
+    Ok(())
+}
+
+enum SemanticTextFailure {
+    Document(Error),
+    Output(TextOutputError<Error>),
+}
+
+#[derive(Default)]
+struct SemanticTextParser {
+    budget: SemanticTextXmlBudget,
+    root_seen: bool,
+    declaration_seen: bool,
+    document_event_seen: bool,
+    paragraph_depth: Option<usize>,
+    text_depth: Option<usize>,
+    paragraph: Option<String>,
+    paragraphs: usize,
+    runs: usize,
+    decoded_document_bytes: usize,
+}
+
+impl SemanticTextParser {
+    fn increment(value: &mut usize, limit: usize, resource: &'static str) -> Result<()> {
+        *value = value
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat(format!("{resource} counter overflow")))?;
+        if *value > limit {
+            return Err(Error::InvalidFormat(format!("{resource} exceeds {limit}")));
+        }
+        Ok(())
+    }
+
+    fn append(&mut self, value: &str) -> Result<()> {
+        if value.is_empty() {
+            return Ok(());
+        }
+        let paragraph = self.paragraph.as_mut().ok_or_else(|| {
+            Error::InvalidFormat("semantic DOCX text appears outside a paragraph".into())
+        })?;
+        let paragraph_bytes = paragraph.len().checked_add(value.len()).ok_or_else(|| {
+            Error::InvalidFormat("semantic DOCX paragraph length overflow".into())
+        })?;
+        if paragraph_bytes > MAX_SEMANTIC_TEXT_PARAGRAPH_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX paragraph text exceeds {MAX_SEMANTIC_TEXT_PARAGRAPH_BYTES} bytes"
+            )));
+        }
+        let document_bytes = self
+            .decoded_document_bytes
+            .checked_add(value.len())
+            .ok_or_else(|| Error::InvalidFormat("semantic DOCX decoded length overflow".into()))?;
+        if document_bytes > MAX_SEMANTIC_TEXT_DOCUMENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX decoded text exceeds {MAX_SEMANTIC_TEXT_DOCUMENT_BYTES} bytes"
+            )));
+        }
+        paragraph
+            .try_reserve(value.len())
+            .map_err(|source| Error::Allocation {
+                resource: "semantic DOCX current paragraph text",
+                source,
+            })?;
+        paragraph.push_str(value);
+        self.decoded_document_bytes = document_bytes;
+        Ok(())
+    }
+
+    fn append_control(&mut self, character: char) -> Result<()> {
+        let mut encoded = [0_u8; 4];
+        self.append(character.encode_utf8(&mut encoded))
+    }
+
+    fn start_element(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &quick_xml::events::BytesStart<'_>,
+    ) -> Result<()> {
+        validate_semantic_attributes(element)?;
+        let name = element.name();
+        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
+            return Err(Error::InvalidFormat(
+                "foreign semantic DOCX text element is not w:t".into(),
+            ));
+        }
+        if is_word_control_name(namespace, name) && self.paragraph.is_none() {
+            return Err(Error::InvalidFormat(
+                "semantic DOCX control appears outside a paragraph".into(),
+            ));
+        }
+        if is_word_element(namespace, name, b"p") {
+            if self.paragraph_depth.is_some() {
+                return Err(Error::InvalidFormat(
+                    "nested semantic DOCX paragraphs are not supported".into(),
+                ));
+            }
+            Self::increment(
+                &mut self.paragraphs,
+                MAX_SEMANTIC_TEXT_PARAGRAPHS,
+                "semantic DOCX paragraphs",
+            )?;
+        } else if is_word_element(namespace, name, b"r") {
+            Self::increment(&mut self.runs, MAX_SEMANTIC_TEXT_RUNS, "semantic DOCX runs")?;
+        }
+        if self.text_depth.is_some() {
+            return Err(Error::InvalidFormat(
+                "nested semantic DOCX elements inside w:t are not permitted".into(),
+            ));
+        }
+        if is_word_control_name(namespace, name) {
+            let character = if is_word_element(namespace, name, b"tab") {
+                '\t'
+            } else if is_word_element(namespace, name, b"noBreakHyphen") {
+                '\u{2011}'
+            } else if is_word_element(namespace, name, b"softHyphen") {
+                '\u{00ad}'
+            } else {
+                '\n'
+            };
+            self.append_control(character)?;
+        }
+        Ok(())
+    }
+
+    fn empty_element<W: Write + ?Sized, F: FnMut() -> Result<()>>(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &quick_xml::events::BytesStart<'_>,
+        writer: &mut SequentialTextWriter<'_, '_, W>,
+        operation_check: &mut F,
+    ) -> std::result::Result<(), SemanticTextFailure> {
+        validate_semantic_attributes(element).map_err(SemanticTextFailure::Document)?;
+        let name = element.name();
+        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
+            return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                "foreign semantic DOCX text element is not w:t".into(),
+            )));
+        }
+        if self.text_depth.is_some() {
+            return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                "nested semantic DOCX elements inside w:t are not permitted".into(),
+            )));
+        }
+        if is_word_element(namespace, name, b"p") {
+            if self.paragraph_depth.is_some() {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "nested semantic DOCX paragraphs are not supported".into(),
+                )));
+            }
+            Self::increment(
+                &mut self.paragraphs,
+                MAX_SEMANTIC_TEXT_PARAGRAPHS,
+                "semantic DOCX paragraphs",
+            )
+            .map_err(SemanticTextFailure::Document)?;
+            operation_check().map_err(SemanticTextFailure::Document)?;
+            writer
+                .write_object::<Error>(TextObjectKind::Paragraph, "")
+                .map_err(SemanticTextFailure::Output)?;
+        } else if is_word_element(namespace, name, b"r") {
+            Self::increment(&mut self.runs, MAX_SEMANTIC_TEXT_RUNS, "semantic DOCX runs")
+                .map_err(SemanticTextFailure::Document)?;
+        } else if is_word_text_name(namespace, name) {
+            if self.paragraph_depth.is_none() {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "semantic DOCX w:t appears outside a paragraph".into(),
+                )));
+            }
+        } else if is_word_control_name(namespace, name) {
+            if self.paragraph.is_none() {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "semantic DOCX control appears outside a paragraph".into(),
+                )));
+            }
+            let character = if is_word_element(namespace, name, b"tab") {
+                '\t'
+            } else if is_word_element(namespace, name, b"noBreakHyphen") {
+                '\u{2011}'
+            } else if is_word_element(namespace, name, b"softHyphen") {
+                '\u{00ad}'
+            } else {
+                '\n'
+            };
+            self.append_control(character)
+                .map_err(SemanticTextFailure::Document)?;
+        }
+        Ok(())
+    }
+
+    fn end_element<W: Write + ?Sized, F: FnMut() -> Result<()>>(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &quick_xml::events::BytesEnd<'_>,
+        writer: &mut SequentialTextWriter<'_, '_, W>,
+        operation_check: &mut F,
+    ) -> std::result::Result<(), SemanticTextFailure> {
+        validate_semantic_element_namespace(namespace).map_err(SemanticTextFailure::Document)?;
+        let name = element.name();
+        if name.local_name().as_ref() == b"t" && !is_word_text_name(namespace, name) {
+            return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                "foreign semantic DOCX text element is not w:t".into(),
+            )));
+        }
+        if is_word_text_name(namespace, name) {
+            if self.text_depth != Some(self.budget.depth) {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "unbalanced semantic DOCX w:t".into(),
+                )));
+            }
+            self.text_depth = None;
+        }
+        if is_word_element(namespace, name, b"p") {
+            if self.paragraph_depth != Some(self.budget.depth) {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "unbalanced semantic DOCX paragraph".into(),
+                )));
+            }
+            let paragraph = self.paragraph.take().ok_or_else(|| {
+                SemanticTextFailure::Document(Error::InvalidFormat(
+                    "semantic DOCX paragraph state is missing".into(),
+                ))
+            })?;
+            self.paragraph_depth = None;
+            operation_check().map_err(SemanticTextFailure::Document)?;
+            writer
+                .write_object::<Error>(TextObjectKind::Paragraph, &paragraph)
+                .map_err(SemanticTextFailure::Output)?;
+        }
+        Ok(())
+    }
+
+    fn text_event(&mut self, text: &quick_xml::events::BytesText<'_>) -> Result<()> {
+        let decoded = text
+            .xml_content(XmlVersion::Explicit1_0)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let decoded =
+            quick_xml::escape::unescape(&decoded).map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&decoded)?;
+        if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX decoded text event exceeds {MAX_SEMANTIC_TEXT_EVENT_BYTES} bytes"
+            )));
+        }
+        self.append(&decoded)
+    }
+
+    fn cdata_event(&mut self, text: &quick_xml::events::BytesCData<'_>) -> Result<()> {
+        let decoded = text
+            .xml_content(XmlVersion::Explicit1_0)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&decoded)?;
+        if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX decoded CDATA event exceeds {MAX_SEMANTIC_TEXT_EVENT_BYTES} bytes"
+            )));
+        }
+        self.append(&decoded)
+    }
+
+    fn reference_event(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<()> {
+        if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX XML reference exceeds {MAX_SEMANTIC_TEXT_REFERENCE_BYTES} bytes"
+            )));
+        }
+        let decoded = decode_xml_reference(reference)?;
+        validate_xml_characters(&decoded)?;
+        if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "semantic DOCX decoded reference exceeds {MAX_SEMANTIC_TEXT_EVENT_BYTES} bytes"
+            )));
+        }
+        self.append(&decoded)
+    }
+
+    fn consume<W: Write + ?Sized, F: FnMut() -> Result<()>>(
+        &mut self,
+        namespace: ResolveResult<'_>,
+        event: Event<'_>,
+        writer: &mut SequentialTextWriter<'_, '_, W>,
+        operation_check: &mut F,
+    ) -> std::result::Result<bool, SemanticTextFailure> {
+        self.budget
+            .observe_event(&event)
+            .map_err(SemanticTextFailure::Document)?;
+        let declaration_is_first = !self.document_event_seen;
+        if !matches!(event, Event::Eof) {
+            self.document_event_seen = true;
+        }
+        match event {
+            Event::Start(element) => {
+                validate_semantic_element_namespace(&namespace)
+                    .map_err(SemanticTextFailure::Document)?;
+                if self.budget.depth == 0 {
+                    if self.root_seen || !is_word_element(&namespace, element.name(), b"document") {
+                        return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                            "semantic DOCX XML has an invalid root".into(),
+                        )));
+                    }
+                    self.root_seen = true;
+                }
+                self.budget
+                    .observe_namespaces(&element)
+                    .map_err(SemanticTextFailure::Document)?;
+                self.budget.start().map_err(SemanticTextFailure::Document)?;
+                self.start_element(&namespace, &element)
+                    .map_err(SemanticTextFailure::Document)?;
+                let name = element.name();
+                if is_word_element(&namespace, name, b"p") {
+                    self.paragraph_depth = Some(self.budget.depth);
+                    self.paragraph = Some(String::new());
+                } else if is_word_text_name(&namespace, name) {
+                    if self.paragraph_depth.is_none() {
+                        return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                            "semantic DOCX w:t appears outside a paragraph".into(),
+                        )));
+                    }
+                    self.text_depth = Some(self.budget.depth);
+                }
+            },
+            Event::Empty(element) => {
+                validate_semantic_element_namespace(&namespace)
+                    .map_err(SemanticTextFailure::Document)?;
+                if self.budget.depth == 0 {
+                    if self.root_seen || !is_word_element(&namespace, element.name(), b"document") {
+                        return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                            "semantic DOCX XML has an invalid root".into(),
+                        )));
+                    }
+                    self.root_seen = true;
+                }
+                self.budget
+                    .observe_namespaces(&element)
+                    .map_err(SemanticTextFailure::Document)?;
+                self.empty_element(&namespace, &element, writer, operation_check)?;
+            },
+            Event::End(element) => {
+                self.end_element(&namespace, &element, writer, operation_check)?;
+                self.budget.end().map_err(SemanticTextFailure::Document)?;
+            },
+            Event::Text(text) if self.text_depth.is_some() => {
+                self.text_event(&text)
+                    .map_err(SemanticTextFailure::Document)?;
+            },
+            Event::Text(text) => {
+                let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    SemanticTextFailure::Document(Error::Xml(error.to_string()))
+                })?;
+                let decoded = quick_xml::escape::unescape(&decoded).map_err(|error| {
+                    SemanticTextFailure::Document(Error::Xml(error.to_string()))
+                })?;
+                validate_xml_characters(&decoded).map_err(SemanticTextFailure::Document)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                        "semantic DOCX decoded text event is too large".into(),
+                    )));
+                }
+                if self.budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                        "semantic DOCX XML has text outside its root".into(),
+                    )));
+                }
+            },
+            Event::CData(text) if self.text_depth.is_some() => {
+                self.cdata_event(&text)
+                    .map_err(SemanticTextFailure::Document)?;
+            },
+            Event::CData(_) => {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "semantic DOCX CDATA is outside w:t".into(),
+                )));
+            },
+            Event::GeneralRef(reference) if self.text_depth.is_some() => {
+                self.reference_event(&reference)
+                    .map_err(SemanticTextFailure::Document)?;
+            },
+            Event::GeneralRef(_) => {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "semantic DOCX XML reference is outside w:t".into(),
+                )));
+            },
+            Event::Decl(_) => {
+                if self.declaration_seen || !declaration_is_first || self.root_seen {
+                    return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                        "XML declarations must be the first DOCX document event".into(),
+                    )));
+                }
+                self.declaration_seen = true;
+            },
+            Event::DocType(_) => {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "DTD declarations are not permitted in semantic DOCX text".into(),
+                )));
+            },
+            Event::PI(_) => {
+                return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                    "processing instructions are not permitted in semantic DOCX text".into(),
+                )));
+            },
+            Event::Comment(comment) => {
+                let decoded = comment.decode().map_err(|error| {
+                    SemanticTextFailure::Document(Error::Xml(error.to_string()))
+                })?;
+                validate_xml_comment(&decoded).map_err(SemanticTextFailure::Document)?;
+            },
+            Event::Eof => {
+                if !self.root_seen {
+                    return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                        "semantic DOCX XML lacks an element root".into(),
+                    )));
+                }
+                if self.budget.depth != 0
+                    || self.paragraph_depth.is_some()
+                    || self.text_depth.is_some()
+                {
+                    return Err(SemanticTextFailure::Document(Error::InvalidFormat(
+                        "semantic DOCX XML has unbalanced elements".into(),
+                    )));
+                }
+                return Ok(true);
+            },
+        }
+        Ok(false)
+    }
 }
 
 fn word_special_character(

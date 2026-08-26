@@ -29,4 +29,7 @@ pub use model::{
     RunUnderline, RunUnderlineColor,
 };
 
-pub(crate) use codec::{extract_word_text, is_fragment_word_name};
+pub(crate) use codec::{
+    extract_word_text, is_fragment_word_name, semantic_text_raw_xml_limit, write_text_to,
+    write_text_to_with_operation_check,
+};
