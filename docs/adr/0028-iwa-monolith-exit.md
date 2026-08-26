@@ -5641,3 +5641,26 @@ it does not admit segmented or cross-component comment graphs. Native Numbers
 UI acceptance, performance/RSS evidence, a single global allocation-free
 resource preflight, debt or dependency-edge retirement, normal Prost/Buffa
 ownership, and monolith exit remain withheld.
+
+## 2026-08-26 amendment: PackageMetadata scalar lazy ingress (not a monolith-exit gate)
+
+The legacy `litchi-iwa` package-metadata scalar reads no longer materialize a
+generated Prost `PackageMetadata`. Last-object and explicit save-token values,
+the root data-metadata-map presence bit, and allocator reservations across
+current and versioned component, UUID, external-reference, data-owner,
+ambiguous, and root-map namespaces now use the strict two-pass raw visitor with
+a private Buffa lazy-view parity oracle. The projection preserves absent versus
+explicit-zero save tokens, accepts untouched unknown root scalars, rejects
+duplicate or noncanonical known fields, and leaves source bytes authoritative.
+
+A fresh Numbers 14.4 workbook was saved, reopened without repair, and checked
+against the generated-message oracle through the new path. The temporary
+artifact was 134,897 bytes with SHA-256
+`95f96b436da9fc19f17444cc2b75629e4f817c46f97c99e00fd527fd8728db81`;
+it is read-parity evidence, not a tracked fixture or native mutation claim.
+
+Metadata archive discovery and mutation/candidate-verification paths remain in
+the monolith, and the allocator's physical-archive scan is not one aggregate
+transaction budget with metadata inspection. This slice therefore makes no
+zero-copy, single-scan, allocation-free, performance/RSS, dependency-edge,
+debt, normal generated-schema ownership, crate-exit, or monolith-exit claim.

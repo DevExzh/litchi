@@ -1506,6 +1506,7 @@ pub trait PackageMetadataVisitor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PackageMetadataInspection {
     last_object_identifier: u64,
+    save_token: Option<u64>,
     report: RewriteReport,
 }
 
@@ -1513,6 +1514,11 @@ impl PackageMetadataInspection {
     #[must_use]
     pub const fn last_object_identifier(self) -> u64 {
         self.last_object_identifier
+    }
+    /// Explicit package-root save token, if field 8 is present.
+    #[must_use]
+    pub const fn save_token(self) -> Option<u64> {
+        self.save_token
     }
     #[must_use]
     pub const fn report(self) -> RewriteReport {
@@ -1951,6 +1957,7 @@ mod tests {
         let mut versioned = component(9, "versioned", None, &[(3, UuidBits::new(7, 8))], &[]);
         bytes_field(&mut versioned, 7, &data_reference(71, &[(6, 3)], false));
         let mut source = metadata(10, &[current], &[versioned]);
+        put_varint_field(&mut source, 8, 17);
         bytes_field(
             &mut source,
             10,
@@ -1960,6 +1967,7 @@ mod tests {
         let inspection =
             inspect_package_metadata_with_visitor(&source, options(&source), &mut facts).unwrap();
         assert_eq!(inspection.last_object_identifier(), 10);
+        assert_eq!(inspection.save_token(), Some(17));
         assert_eq!(inspection.report().input_bytes(), source.len());
         assert_eq!(inspection.report().components_scanned(), 4);
         assert_eq!(inspection.report().references_scanned(), 20);
@@ -2219,6 +2227,21 @@ mod tests {
                 inspect_package_metadata_with_visitor(
                     &duplicate_last,
                     options(&duplicate_last),
+                    &mut Facts::default()
+                )
+                .unwrap_err()
+            ),
+            InvalidReason::MalformedWire
+        );
+
+        let mut duplicate_save_token = metadata(10, &[], &[]);
+        put_varint_field(&mut duplicate_save_token, 8, 7);
+        put_varint_field(&mut duplicate_save_token, 8, 8);
+        assert_eq!(
+            reason(
+                inspect_package_metadata_with_visitor(
+                    &duplicate_save_token,
+                    options(&duplicate_save_token),
                     &mut Facts::default()
                 )
                 .unwrap_err()
@@ -4992,14 +5015,15 @@ pub fn inspect_package_metadata_with_visitor<V: PackageMetadataVisitor>(
 ) -> Result<PackageMetadataInspection, RewriteError> {
     let mut budget = Budget::new_inspection(source, options)?;
     let mut noop = NoopVisitor;
-    let last = inspect_metadata_pass(source, options, &mut budget, &mut noop)?;
+    let scalars = inspect_metadata_pass(source, options, &mut budget, &mut noop)?;
     budget.preflight_repeat_from_zero()?;
-    let emitted_last = inspect_metadata_pass(source, options, &mut budget, visitor)?;
-    if emitted_last != last {
+    let emitted_scalars = inspect_metadata_pass(source, options, &mut budget, visitor)?;
+    if emitted_scalars != scalars {
         return Err(RewriteError::invalid(InvalidReason::Verification));
     }
     Ok(PackageMetadataInspection {
-        last_object_identifier: last,
+        last_object_identifier: scalars.last_object_identifier,
+        save_token: scalars.save_token,
         report: budget.report(),
     })
 }
@@ -8027,19 +8051,27 @@ struct NoopVisitor;
 
 impl PackageMetadataVisitor for NoopVisitor {}
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct InspectedRootScalars {
+    last_object_identifier: u64,
+    save_token: Option<u64>,
+}
+
 fn inspect_metadata_pass<V: PackageMetadataVisitor>(
     source: &[u8],
     options: RewriteOptions,
     budget: &mut Budget,
     visitor: &mut V,
-) -> Result<u64, RewriteError> {
+) -> Result<InspectedRootScalars, RewriteError> {
     budget.message(source, 1)?;
     let mut last = None;
+    let mut save_token = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         match field.number {
             1 => set_once(&mut last, field.varint()?)?,
             3 | 11 => inspect_component(field.bytes()?, field.number == 3, budget, visitor, 2)?,
+            8 => set_once(&mut save_token, field.varint()?)?,
             10 => {
                 let reference = decode_root_data_metadata_map(field.bytes()?, budget, 2)?;
                 if reference.unknown_fields {
@@ -8050,7 +8082,7 @@ fn inspect_metadata_pass<V: PackageMetadataVisitor>(
             // These are schema-known root scalars/records which are not part
             // of the inspection callbacks above.  They are intentionally
             // ignored rather than being mistaken for unknown extensions.
-            2 | 4 | 5 | 6 | 7 | 8 | 9 => {},
+            2 | 4 | 5 | 6 | 7 | 9 => {},
             _ => visitor.visit_unknown_field()?,
         }
     }
@@ -8062,10 +8094,16 @@ fn inspect_metadata_pass<V: PackageMetadataVisitor>(
         .buffa()
         .decode_lazy_view(source)
         .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?;
-    if !view.has_last_object_identifier() || view.last_object_identifier != last {
+    if !view.has_last_object_identifier()
+        || view.last_object_identifier != last
+        || view.save_token != save_token
+    {
         return Err(RewriteError::invalid(InvalidReason::MalformedWire));
     }
-    Ok(last)
+    Ok(InspectedRootScalars {
+        last_object_identifier: last,
+        save_token,
+    })
 }
 
 fn inspect_component<V: PackageMetadataVisitor>(

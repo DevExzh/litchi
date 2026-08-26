@@ -12,12 +12,74 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::package_metadata_codec::{
-    ComponentDescriptor, ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError, RewriteLimit,
-    RewriteOptions, inspect_package_metadata_with_visitor,
+    ComponentDescriptor, DataReferenceOwnerDescriptor, ExternalReferenceDescriptor,
+    ObjectUuidDescriptor, PackageMetadataInspection, PackageMetadataVisitor, RewriteError,
+    RewriteLimit, RewriteOptions, inspect_package_metadata_with_visitor,
 };
 
 pub(crate) const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
 pub(crate) const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+
+#[derive(Default)]
+struct MetadataRootVisitor {
+    maximum_identifier: u64,
+    has_data_metadata_map: bool,
+}
+
+impl PackageMetadataVisitor for MetadataRootVisitor {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.maximum_identifier = self.maximum_identifier.max(component.identifier());
+        Ok(())
+    }
+
+    fn visit_object_uuid(
+        &mut self,
+        binding: ObjectUuidDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.maximum_identifier = self.maximum_identifier.max(binding.object_identifier());
+        Ok(())
+    }
+
+    fn visit_external_reference(
+        &mut self,
+        reference: ExternalReferenceDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if let Some(identifier) = reference.object_identifier() {
+            self.maximum_identifier = self.maximum_identifier.max(identifier);
+        }
+        Ok(())
+    }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.maximum_identifier = self.maximum_identifier.max(owner.object_identifier());
+        Ok(())
+    }
+
+    fn visit_ambiguous_object_identifier(
+        &mut self,
+        _component: ComponentDescriptor<'_>,
+        identifier: u64,
+    ) -> std::result::Result<(), RewriteError> {
+        self.maximum_identifier = self.maximum_identifier.max(identifier);
+        Ok(())
+    }
+
+    fn visit_data_metadata_map(
+        &mut self,
+        object_identifier: u64,
+        _has_unknown_fields: bool,
+    ) -> std::result::Result<(), RewriteError> {
+        self.has_data_metadata_map = true;
+        self.maximum_identifier = self.maximum_identifier.max(object_identifier);
+        Ok(())
+    }
+}
 
 pub(crate) fn next_object_identifier(package: &IWorkPackage) -> Result<u64> {
     let mut maximum = 0u64;
@@ -32,66 +94,31 @@ pub(crate) fn next_object_identifier(package: &IWorkPackage) -> Result<u64> {
             Ok(())
         })?;
     }
-    if let Some(metadata_maximum) = with_package_metadata(package, |metadata| {
-        Ok(package_metadata_object_identifier_maximum(metadata))
-    })? {
-        maximum = maximum.max(metadata_maximum);
+    let mut visitor = MetadataRootVisitor::default();
+    if let Some(inspection) = inspect_package_metadata(package, &mut visitor)? {
+        maximum = maximum
+            .max(inspection.last_object_identifier())
+            .max(visitor.maximum_identifier);
     }
     maximum
         .checked_add(1)
         .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))
 }
 
-fn package_metadata_object_identifier_maximum(
-    metadata: &crate::protobuf::tsp::PackageMetadata,
-) -> u64 {
-    let mut maximum = metadata.last_object_identifier;
-    if let Some(reference) = &metadata.data_metadata_map {
-        maximum = maximum.max(reference.identifier);
-    }
-    for component in metadata
-        .components
-        .iter()
-        .chain(&metadata.versioned_components)
-    {
-        maximum = maximum.max(component.identifier);
-        for entry in &component.object_uuid_map_entries {
-            maximum = maximum.max(entry.identifier);
-        }
-        for reference in component
-            .external_references
-            .iter()
-            .chain(&component.versioned_external_references)
-        {
-            if let Some(identifier) = reference.object_identifier {
-                maximum = maximum.max(identifier);
-            }
-        }
-        for reference in &component.data_references {
-            for object in &reference.object_reference_list {
-                maximum = maximum.max(object.object_identifier);
-            }
-        }
-        for &identifier in &component.ambiguous_object_identifiers {
-            maximum = maximum.max(identifier);
-        }
-    }
-    maximum
-}
-
 pub(crate) fn package_last_object_identifier(package: &IWorkPackage) -> Result<Option<u64>> {
-    with_package_metadata(package, |metadata| Ok(metadata.last_object_identifier))
+    inspect_package_metadata(package, &mut MetadataRootVisitor::default())
+        .map(|inspection| inspection.map(PackageMetadataInspection::last_object_identifier))
 }
 
 pub(crate) fn package_save_token(package: &IWorkPackage) -> Result<Option<u64>> {
-    with_package_metadata(package, |metadata| Ok(metadata.save_token)).map(|value| value.flatten())
+    inspect_package_metadata(package, &mut MetadataRootVisitor::default())
+        .map(|inspection| inspection.and_then(PackageMetadataInspection::save_token))
 }
 
 pub(crate) fn package_has_data_metadata_map(package: &IWorkPackage) -> Result<bool> {
-    Ok(
-        with_package_metadata(package, |metadata| Ok(metadata.data_metadata_map.is_some()))?
-            .unwrap_or(false),
-    )
+    let mut visitor = MetadataRootVisitor::default();
+    let _inspection = inspect_package_metadata(package, &mut visitor)?;
+    Ok(visitor.has_data_metadata_map)
 }
 
 pub(crate) fn set_package_last_object_identifier(
@@ -884,6 +911,20 @@ fn inspect_package_metadata_payload<V: PackageMetadataVisitor>(
         .map_err(package_metadata_inspection_error)
 }
 
+fn inspect_package_metadata<V: PackageMetadataVisitor>(
+    package: &IWorkPackage,
+    visitor: &mut V,
+) -> Result<Option<PackageMetadataInspection>> {
+    with_package_metadata_payload(package, |source| {
+        inspect_package_metadata_with_visitor(
+            source,
+            package_metadata_read_options(package),
+            visitor,
+        )
+        .map_err(package_metadata_inspection_error)
+    })
+}
+
 fn package_metadata_inspection_error(error: RewriteError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
@@ -1060,24 +1101,6 @@ impl PackageMetadataVisitor for ComponentUuidVisitor {
         }
         Ok(())
     }
-}
-
-fn with_package_metadata<T, F>(package: &IWorkPackage, read: F) -> Result<Option<T>>
-where
-    F: FnOnce(&crate::protobuf::tsp::PackageMetadata) -> Result<T>,
-{
-    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
-        return Ok(None);
-    }
-    package.with_parsed_archive(PACKAGE_METADATA_ENTRY, |archive| {
-        let (object_index, message_index) = package_metadata_location(archive)?;
-        let metadata = crate::protobuf::tsp::PackageMetadata::decode(
-            archive.objects[object_index].messages[message_index]
-                .data
-                .as_slice(),
-        )?;
-        read(&metadata).map(Some)
-    })
 }
 
 fn fresh_unique_uuid(existing: &mut HashSet<(u64, u64)>) -> crate::protobuf::tsp::Uuid {
@@ -1321,7 +1344,8 @@ mod tests {
     use super::*;
     use crate::archive::ArchiveObject;
     use crate::protobuf::tsp::{
-        ComponentExternalReference, ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Uuid,
+        ComponentDataReference, ComponentExternalReference, ComponentInfo, ObjectUuidMapEntry,
+        PackageMetadata, Reference, Uuid, component_data_reference,
     };
 
     fn package_with_metadata(metadata: PackageMetadata) -> IWorkPackage {
@@ -1352,6 +1376,119 @@ mod tests {
         assert!(component_identifier_for_entry(package, "Index/One.iwa").is_err());
         assert!(component_identifier_for_object_uuid(package, 1).is_err());
         assert!(component_uuid_identifiers(package, 1).is_err());
+    }
+
+    #[test]
+    fn metadata_scalar_reads_stream_every_identifier_namespace() {
+        let metadata = PackageMetadata {
+            last_object_identifier: 10,
+            save_token: Some(42),
+            data_metadata_map: Some(Reference {
+                identifier: 90,
+                ..Default::default()
+            }),
+            components: vec![ComponentInfo {
+                identifier: 11,
+                preferred_locator: "Document".to_owned(),
+                object_uuid_map_entries: vec![ObjectUuidMapEntry {
+                    identifier: 40,
+                    uuid: Uuid { lower: 1, upper: 2 },
+                }],
+                external_references: vec![ComponentExternalReference {
+                    component_identifier: 12,
+                    object_identifier: Some(50),
+                    is_weak: None,
+                }],
+                data_references: vec![ComponentDataReference {
+                    data_identifier: 70,
+                    object_reference_list: vec![component_data_reference::ObjectReference {
+                        object_identifier: 95,
+                        count: 1,
+                    }],
+                }],
+                ambiguous_object_identifiers: vec![80],
+                ..Default::default()
+            }],
+            versioned_components: vec![ComponentInfo {
+                identifier: 97,
+                preferred_locator: "Versioned".to_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let source = metadata.encode_to_vec();
+        let package = package_with_metadata_data(source.clone());
+
+        assert_eq!(package_last_object_identifier(&package).unwrap(), Some(10));
+        assert_eq!(package_save_token(&package).unwrap(), Some(42));
+        assert!(package_has_data_metadata_map(&package).unwrap());
+        assert_eq!(next_object_identifier(&package).unwrap(), 98);
+        assert_eq!(
+            package
+                .archive(PACKAGE_METADATA_ENTRY)
+                .unwrap()
+                .object(10)
+                .unwrap()
+                .messages[0]
+                .data,
+            source
+        );
+    }
+
+    #[test]
+    fn metadata_scalar_reads_preserve_absence_and_reject_duplicate_tokens() {
+        let empty = IWorkPackage::new();
+        assert_eq!(package_last_object_identifier(&empty).unwrap(), None);
+        assert_eq!(package_save_token(&empty).unwrap(), None);
+        assert!(!package_has_data_metadata_map(&empty).unwrap());
+
+        let package = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            ..Default::default()
+        });
+        assert_eq!(package_save_token(&package).unwrap(), None);
+        assert!(!package_has_data_metadata_map(&package).unwrap());
+
+        let explicit_zero = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            save_token: Some(0),
+            ..Default::default()
+        });
+        assert_eq!(package_save_token(&explicit_zero).unwrap(), Some(0));
+
+        let mut unknown_scalar = PackageMetadata {
+            last_object_identifier: 10,
+            save_token: Some(9),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        unknown_scalar.extend_from_slice(&[0xd0, 0x05, 0x07]);
+        let unknown = package_with_metadata_data(unknown_scalar.clone());
+        assert_eq!(package_last_object_identifier(&unknown).unwrap(), Some(10));
+        assert_eq!(package_save_token(&unknown).unwrap(), Some(9));
+        assert_eq!(
+            unknown
+                .archive(PACKAGE_METADATA_ENTRY)
+                .unwrap()
+                .object(10)
+                .unwrap()
+                .messages[0]
+                .data,
+            unknown_scalar
+        );
+
+        let mut duplicate_token = PackageMetadata {
+            last_object_identifier: 10,
+            save_token: Some(7),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        duplicate_token.extend_from_slice(&[0x40, 0x08]);
+        let malformed = package_with_metadata_data(duplicate_token);
+        assert!(package_last_object_identifier(&malformed).is_err());
+        assert!(package_save_token(&malformed).is_err());
+        assert!(package_has_data_metadata_map(&malformed).is_err());
+        assert!(next_object_identifier(&malformed).is_err());
     }
 
     #[test]
