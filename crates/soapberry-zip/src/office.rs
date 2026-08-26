@@ -34,11 +34,15 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+use crate::accounting::{
+    AccountingReadKind, AccountingWriteKind, CountingReader, accounting_overflow, usize_to_u64,
+};
 use crate::crc::crc32_chunk;
 use crate::path::{RawPath, ZipFilePath};
 use crate::{
     CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
-    ZipArchive, ZipArchiveWriter, ZipLocator, ZipSliceArchive, ZipVerification,
+    ZipArchive, ZipArchiveWriter, ZipLocator, ZipOperationAccounting, ZipSliceArchive,
+    ZipVerification,
 };
 use flate2::Compression;
 use flate2::read::DeflateDecoder;
@@ -810,6 +814,16 @@ impl<'data> ArchiveReader<'data> {
     /// Returns the decompressed contents of the file. Supports both stored
     /// (uncompressed) and deflated entries.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_with_accounting(name, &mut accounting)
+    }
+
+    /// Read and decompress a file while recording actual payload work.
+    pub fn read_with_accounting(
+        &self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
         let lookup = lookup_member_name(name);
 
         let info = self
@@ -825,11 +839,32 @@ impl<'data> ArchiveReader<'data> {
             CompressionMethod::Store => {
                 // Stored (uncompressed) - verify and return directly
                 let verifier = entry.claim_verifier();
-                verifier.valid(ZipVerification {
+                let verification = verifier.valid(ZipVerification {
                     crc: crate::crc32(data),
-                    uncompressed_size: data.len() as u64,
+                    uncompressed_size: usize_to_u64(data.len(), "stored payload length")?,
+                });
+                let accounting_result = accounting.add_stored_payload_bytes_read(usize_to_u64(
+                    data.len(),
+                    "stored payload bytes read",
+                )?);
+                if let Err(error) = verification {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
+                let mut output = Vec::new();
+                output.try_reserve_exact(data.len()).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "archive entry output",
+                        source,
+                    })
                 })?;
-                Ok(data.to_vec())
+                output.extend_from_slice(data);
+                accounting.add_stored_payload_bytes_accepted(usize_to_u64(
+                    output.len(),
+                    "stored payload bytes accepted",
+                )?)?;
+                Ok(output)
             },
             CompressionMethod::Deflate => {
                 let size = usize::try_from(info.uncompressed_size).map_err(|_| {
@@ -847,14 +882,36 @@ impl<'data> ArchiveReader<'data> {
                     })
                 })?;
 
-                let decoder = entry.verifying_reader(DeflateDecoder::new(data));
-                decoder
-                    .take(info.uncompressed_size.saturating_add(1))
-                    .read_to_end(&mut decompressed)?;
+                let (result, compressed_read, produced) = {
+                    let mut compressed = CountingReader::new(data);
+                    let mut decoder = DeflateDecoder::new(&mut compressed);
+                    let (result, produced_count) = {
+                        let mut produced_reader = CountingReader::new(&mut decoder);
+                        let verifier = entry.verifying_reader(&mut produced_reader);
+                        let result = verifier
+                            .take(info.uncompressed_size.saturating_add(1))
+                            .read_to_end(&mut decompressed)
+                            .map_err(Error::from);
+                        let produced_count = produced_reader.count();
+                        (result, produced_count)
+                    };
+                    drop(decoder);
+                    (result, compressed.count(), produced_count)
+                };
+                let accepted = usize_to_u64(decompressed.len(), "decompressed ZIP bytes accepted")?;
+                let accounting_result = accounting
+                    .add_compressed_deflate_payload_bytes_read(compressed_read)
+                    .and_then(|()| accounting.add_deflate_bytes_produced(produced))
+                    .and_then(|()| accounting.add_deflate_bytes_accepted(accepted));
+                if let Err(error) = result {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
                 if decompressed.len() != size {
                     return Err(ErrorKind::InvalidSize {
                         expected: info.uncompressed_size,
-                        actual: decompressed.len() as u64,
+                        actual: usize_to_u64(decompressed.len(), "decompressed ZIP bytes")?,
                     }
                     .into());
                 }
@@ -881,6 +938,20 @@ impl<'data> ArchiveReader<'data> {
     /// can be called. Since this method does not allocate payload storage, it
     /// does not create a separate materialization budget charge.
     pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_stored_borrowed_with_accounting(name, &mut accounting)
+    }
+
+    /// Borrow and verify a stored member without charging payload work.
+    ///
+    /// Borrowed Store access intentionally has zero accounting work because it
+    /// publishes the source slice directly and does not materialize or stream
+    /// a payload.
+    pub fn read_stored_borrowed_with_accounting(
+        &self,
+        name: &str,
+        _accounting: &mut ZipOperationAccounting,
+    ) -> Result<Option<&'data [u8]>, Error> {
         let lookup = lookup_member_name(name);
 
         let info = self
@@ -913,6 +984,18 @@ impl<'data> ArchiveReader<'data> {
     /// is the number of bytes accepted by the sink on success. Archive entry
     /// limits are checked while constructing this reader.
     pub fn read_to<W: Write>(&self, name: &str, sink: &mut W) -> Result<u64, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_to_with_accounting(name, sink, &mut accounting)
+    }
+
+    /// Decompress and verify one member into a sink while recording actual
+    /// source traversal and Deflate destination acceptance.
+    pub fn read_to_with_accounting<W: Write>(
+        &self,
+        name: &str,
+        sink: &mut W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<u64, Error> {
         let lookup = lookup_member_name(name);
         let info = self
             .index
@@ -923,9 +1006,50 @@ impl<'data> ArchiveReader<'data> {
         let entry = self.archive.get_entry(info.wayfinder)?;
         let verifier = entry.claim_verifier();
         match info.compression_method {
-            CompressionMethod::Store => stream_verified(entry.data(), verifier, sink),
+            CompressionMethod::Store => {
+                let mut source = CountingReader::new(entry.data());
+                let result = stream_verified_with_accounting(
+                    &mut source,
+                    verifier,
+                    sink,
+                    accounting,
+                    AccountingReadKind::Stored,
+                );
+                let accounting_result = accounting.add_stored_payload_bytes_read(source.count());
+                match result {
+                    Err(error) => {
+                        drop(accounting_result);
+                        Err(error)
+                    },
+                    Ok(bytes) => {
+                        accounting_result?;
+                        Ok(bytes)
+                    },
+                }
+            },
             CompressionMethod::Deflate => {
-                stream_verified(DeflateDecoder::new(entry.data()), verifier, sink)
+                let mut source = CountingReader::new(entry.data());
+                let mut decoder = DeflateDecoder::new(&mut source);
+                let result = stream_verified_with_accounting(
+                    &mut decoder,
+                    verifier,
+                    sink,
+                    accounting,
+                    AccountingReadKind::Deflate,
+                );
+                drop(decoder);
+                let accounting_result =
+                    accounting.add_compressed_deflate_payload_bytes_read(source.count());
+                match result {
+                    Err(error) => {
+                        drop(accounting_result);
+                        Err(error)
+                    },
+                    Ok(bytes) => {
+                        accounting_result?;
+                        Ok(bytes)
+                    },
+                }
             },
             other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
                 other.as_id().as_u16(),
@@ -1392,10 +1516,20 @@ where
 
     /// Read and verify one member by name.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_with_accounting(name, &mut accounting)
+    }
+
+    /// Read and verify one member while recording actual payload work.
+    pub fn read_with_accounting(
+        &self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
         let entry_id = self
             .entry_id(name)
             .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
-        self.read_entry(entry_id)
+        self.read_entry_with_accounting(entry_id, accounting)
     }
 
     /// Read and verify one member by its stable opaque entry ID.
@@ -1403,6 +1537,16 @@ where
     /// ZIP local-header, data-descriptor, decompressed-size, and CRC checks are
     /// intentionally deferred until this method is called.
     pub fn read_entry(&self, entry_id: EntryId) -> Result<Vec<u8>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_entry_with_accounting(entry_id, &mut accounting)
+    }
+
+    /// Read and verify one indexed member while recording actual payload work.
+    pub fn read_entry_with_accounting(
+        &self,
+        entry_id: EntryId,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
         let indexed = self.indexed_entry(entry_id)?;
         let entry = self.archive.get_entry(indexed.info.wayfinder)?;
         let size = usize::try_from(indexed.info.uncompressed_size).map_err(|_| {
@@ -1423,17 +1567,57 @@ where
 
         match indexed.info.compression_method {
             CompressionMethod::Store => {
-                let reader = entry.verifying_reader(entry.reader());
-                reader
+                let mut source = CountingReader::new(entry.reader());
+                let result = entry
+                    .verifying_reader(&mut source)
                     .take(indexed.info.uncompressed_size.saturating_add(1))
-                    .read_to_end(&mut output)?;
+                    .read_to_end(&mut output)
+                    .map_err(Error::from);
+                let accounting_result = accounting
+                    .add_stored_payload_bytes_read(source.count())
+                    .and_then(|()| {
+                        accounting.add_stored_payload_bytes_accepted(usize_to_u64(
+                            output.len(),
+                            "stored payload bytes accepted",
+                        )?)
+                    });
+                if let Err(error) = result {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
             },
             CompressionMethod::Deflate => {
-                let decoder = DeflateDecoder::new(entry.reader());
-                let reader = entry.verifying_reader(decoder);
-                reader
-                    .take(indexed.info.uncompressed_size.saturating_add(1))
-                    .read_to_end(&mut output)?;
+                let (result, compressed_read, produced) = {
+                    let mut source = CountingReader::new(entry.reader());
+                    let mut decoder = DeflateDecoder::new(&mut source);
+                    let (result, produced_count) = {
+                        let mut produced_reader = CountingReader::new(&mut decoder);
+                        let result = entry
+                            .verifying_reader(&mut produced_reader)
+                            .take(indexed.info.uncompressed_size.saturating_add(1))
+                            .read_to_end(&mut output)
+                            .map_err(Error::from);
+                        let produced_count = produced_reader.count();
+                        (result, produced_count)
+                    };
+                    drop(decoder);
+                    (result, source.count(), produced_count)
+                };
+                let accounting_result = accounting
+                    .add_compressed_deflate_payload_bytes_read(compressed_read)
+                    .and_then(|()| accounting.add_deflate_bytes_produced(produced))
+                    .and_then(|()| {
+                        accounting.add_deflate_bytes_accepted(usize_to_u64(
+                            output.len(),
+                            "decompressed Deflate bytes accepted",
+                        )?)
+                    });
+                if let Err(error) = result {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
             },
             other => {
                 return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
@@ -1445,7 +1629,7 @@ where
         if output.len() != size {
             return Err(ErrorKind::InvalidSize {
                 expected: indexed.info.uncompressed_size,
-                actual: output.len() as u64,
+                actual: usize_to_u64(output.len(), "decompressed ZIP bytes")?,
             }
             .into());
         }
@@ -1460,13 +1644,66 @@ where
     /// accepted by the sink. Entry limits were checked while constructing the
     /// index.
     pub fn read_entry_to<W: Write>(&self, entry_id: EntryId, sink: &mut W) -> Result<u64, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_entry_to_with_accounting(entry_id, sink, &mut accounting)
+    }
+
+    /// Decompress and verify one indexed member into a sink while recording
+    /// actual source traversal and Deflate destination acceptance.
+    pub fn read_entry_to_with_accounting<W: Write>(
+        &self,
+        entry_id: EntryId,
+        sink: &mut W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<u64, Error> {
         let indexed = self.indexed_entry(entry_id)?;
         let entry = self.archive.get_entry(indexed.info.wayfinder)?;
         let verifier = entry.reader().claim_verifier()?;
         match indexed.info.compression_method {
-            CompressionMethod::Store => stream_verified(entry.reader(), verifier, sink),
+            CompressionMethod::Store => {
+                let mut source = CountingReader::new(entry.reader());
+                let result = stream_verified_with_accounting(
+                    &mut source,
+                    verifier,
+                    sink,
+                    accounting,
+                    AccountingReadKind::Stored,
+                );
+                let accounting_result = accounting.add_stored_payload_bytes_read(source.count());
+                match result {
+                    Err(error) => {
+                        drop(accounting_result);
+                        Err(error)
+                    },
+                    Ok(bytes) => {
+                        accounting_result?;
+                        Ok(bytes)
+                    },
+                }
+            },
             CompressionMethod::Deflate => {
-                stream_verified(DeflateDecoder::new(entry.reader()), verifier, sink)
+                let mut source = CountingReader::new(entry.reader());
+                let mut decoder = DeflateDecoder::new(&mut source);
+                let result = stream_verified_with_accounting(
+                    &mut decoder,
+                    verifier,
+                    sink,
+                    accounting,
+                    AccountingReadKind::Deflate,
+                );
+                drop(decoder);
+                let accounting_result =
+                    accounting.add_compressed_deflate_payload_bytes_read(source.count());
+                match result {
+                    Err(error) => {
+                        drop(accounting_result);
+                        Err(error)
+                    },
+                    Ok(bytes) => {
+                        accounting_result?;
+                        Ok(bytes)
+                    },
+                }
             },
             other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
                 other.as_id().as_u16(),
@@ -1480,10 +1717,22 @@ where
     /// This is the positional-source counterpart to [`Self::read_to`]. The
     /// sink may contain a valid prefix when an error is returned.
     pub fn read_to<W: Write>(&self, name: &str, sink: &mut W) -> Result<u64, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_to_with_accounting(name, sink, &mut accounting)
+    }
+
+    /// Decompress and verify one indexed member by name into a sink while
+    /// recording actual source traversal and Deflate destination acceptance.
+    pub fn read_to_with_accounting<W: Write>(
+        &self,
+        name: &str,
+        sink: &mut W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<u64, Error> {
         let entry_id = self
             .entry_id(name)
             .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
-        self.read_entry_to(entry_id, sink)
+        self.read_entry_to_with_accounting(entry_id, sink, accounting)
     }
 
     /// Reads multiple members through an explicit local [`ParallelReadSession`].
@@ -1704,16 +1953,18 @@ fn cancelled_error() -> Error {
     ErrorKind::Cancelled.into()
 }
 
-/// Copy a verified decompressed member to a sink using bounded scratch space.
-///
-/// The one-byte probe after the declared size detects an overlong logical
-/// stream without publishing bytes beyond the central-directory claim. CRC
-/// verification is performed only after the complete declared payload has
-/// been accepted by the sink.
-fn stream_verified<D, W>(
+/// Copy a verified member to a sink using bounded scratch space while
+/// recording destination acceptance. The one-byte probe after the declared
+/// size detects an overlong logical stream without publishing bytes beyond
+/// the central-directory claim. CRC verification is performed only after the
+/// complete declared payload has been accepted by the sink. Deflate calls also
+/// record decoder output; Store calls only record logical payload acceptance.
+fn stream_verified_with_accounting<D, W>(
     mut reader: D,
     verifier: ZipVerification,
     sink: &mut W,
+    accounting: &mut ZipOperationAccounting,
+    accounting_kind: AccountingReadKind,
 ) -> Result<u64, Error>
 where
     D: Read,
@@ -1722,14 +1973,20 @@ where
     let expected_size = verifier.size();
     let mut copied = 0_u64;
     let mut crc = 0_u32;
-    let mut buffer = [0_u8; STREAM_COPY_BUFFER_SIZE];
+    let mut buffer = [0u8; STREAM_COPY_BUFFER_SIZE];
 
     while copied < expected_size {
         let remaining = expected_size - copied;
         let request = usize::try_from(remaining)
             .unwrap_or(STREAM_COPY_BUFFER_SIZE)
             .min(buffer.len());
-        let read = reader.read(&mut buffer[..request]).map_err(Error::from)?;
+        let read = loop {
+            match reader.read(&mut buffer[..request]) {
+                Ok(read) => break read,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(error.into()),
+            }
+        };
         if read == 0 {
             return Err(ErrorKind::InvalidSize {
                 expected: expected_size,
@@ -1737,19 +1994,68 @@ where
             }
             .into());
         }
-        sink.write_all(&buffer[..read]).map_err(Error::from)?;
+        if matches!(accounting_kind, AccountingReadKind::Deflate) {
+            accounting.add_deflate_bytes_produced(usize_to_u64(
+                read,
+                "decompressed Deflate bytes produced",
+            )?)?;
+        }
+
+        let mut accepted = 0;
+        while accepted < read {
+            let written = loop {
+                match sink.write(&buffer[accepted..read]) {
+                    Ok(written) => break written,
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            };
+            if written == 0 {
+                return Err(Error::from(std::io::Error::new(
+                    std::io::ErrorKind::WriteZero,
+                    "failed to write decompressed ZIP output",
+                )));
+            }
+            if written > read - accepted {
+                return Err(ErrorKind::InvalidInput {
+                    msg: "ZIP output sink returned more bytes than requested".to_string(),
+                }
+                .into());
+            }
+            let written_u64 = usize_to_u64(written, "decompressed ZIP bytes accepted")?;
+            match accounting_kind {
+                AccountingReadKind::Stored => {
+                    accounting.add_stored_payload_bytes_accepted(written_u64)?;
+                },
+                AccountingReadKind::Deflate => {
+                    accounting.add_deflate_bytes_accepted(written_u64)?;
+                },
+            }
+            accepted += written;
+        }
         crc = crc32_chunk(&buffer[..read], crc);
-        copied = copied.checked_add(read as u64).ok_or_else(|| {
-            Error::from(ErrorKind::InvalidInput {
-                msg: "decompressed ZIP byte count overflows u64".to_string(),
-            })
-        })?;
+        copied = copied
+            .checked_add(usize_to_u64(read, "ZIP logical payload bytes copied")?)
+            .ok_or_else(|| accounting_overflow("ZIP logical payload bytes copied"))?;
     }
 
     let mut probe = [0_u8; 1];
-    let extra = reader.read(&mut probe).map_err(Error::from)?;
+    let extra = loop {
+        match reader.read(&mut probe) {
+            Ok(extra) => break extra,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error.into()),
+        }
+    };
     if extra != 0 {
-        let actual = copied.saturating_add(extra as u64);
+        if matches!(accounting_kind, AccountingReadKind::Deflate) {
+            accounting.add_deflate_bytes_produced(usize_to_u64(
+                extra,
+                "decompressed Deflate bytes produced",
+            )?)?;
+        }
+        let actual =
+            copied.saturating_add(usize_to_u64(extra, "ZIP logical payload bytes probed")?);
         return Err(ErrorKind::InvalidSize {
             expected: expected_size,
             actual,
@@ -2132,7 +2438,8 @@ impl<W: Write> Write for BoundedOutput<W> {
         if buffer.is_empty() {
             return Ok(0);
         }
-        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let requested = usize_to_u64(buffer.len(), "streaming ZIP output bytes requested")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
         let remaining = self.maximum.saturating_sub(self.accepted);
         if requested > remaining {
             return Err(streaming_limit_io_error(
@@ -2142,7 +2449,20 @@ impl<W: Write> Write for BoundedOutput<W> {
             ));
         }
         let written = self.writer.write(buffer)?;
-        self.accepted = self.accepted.saturating_add(written as u64);
+        if written > buffer.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "ZIP output sink returned more bytes than requested",
+            ));
+        }
+        let written_u64 = usize_to_u64(written, "streaming ZIP output bytes accepted")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+        self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "streaming ZIP output byte count overflow",
+            )
+        })?;
         self.counter.store(self.accepted, Ordering::Release);
         Ok(written)
     }
@@ -2154,17 +2474,26 @@ impl<W: Write> Write for BoundedOutput<W> {
 
 /// A ZIP entry sink that bounds compressed payload bytes before forwarding
 /// them to the archive writer.
-struct LimitedEntryWriter<'entry, 'archive, W> {
+struct LimitedEntryWriter<'entry, 'archive, 'accounting, W> {
     inner: &'entry mut crate::ZipEntryWriter<'archive, BoundedOutput<W>>,
     maximum: u64,
+    accounting: &'accounting mut ZipOperationAccounting,
+    accounting_kind: AccountingWriteKind,
 }
 
-impl<'entry, 'archive, W> LimitedEntryWriter<'entry, 'archive, W> {
+impl<'entry, 'archive, 'accounting, W> LimitedEntryWriter<'entry, 'archive, 'accounting, W> {
     fn new(
         inner: &'entry mut crate::ZipEntryWriter<'archive, BoundedOutput<W>>,
         maximum: u64,
+        accounting: &'accounting mut ZipOperationAccounting,
+        accounting_kind: AccountingWriteKind,
     ) -> Self {
-        Self { inner, maximum }
+        Self {
+            inner,
+            maximum,
+            accounting,
+            accounting_kind,
+        }
     }
 
     fn compressed_bytes(&self) -> u64 {
@@ -2185,9 +2514,10 @@ impl<'entry, 'archive, W> LimitedEntryWriter<'entry, 'archive, W> {
     }
 }
 
-impl<W: Write> Write for LimitedEntryWriter<'_, '_, W> {
+impl<W: Write> Write for LimitedEntryWriter<'_, '_, '_, W> {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let requested = usize_to_u64(buffer.len(), "generated ZIP payload bytes requested")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
         let compressed = self.compressed_bytes();
         let remaining = self.maximum.saturating_sub(compressed);
         if requested > remaining {
@@ -2197,7 +2527,17 @@ impl<W: Write> Write for LimitedEntryWriter<'_, '_, W> {
                 self.maximum,
             ));
         }
-        self.inner.write(buffer)
+        let written = self.inner.write(buffer)?;
+        if written != 0 {
+            self.accounting_kind
+                .add(
+                    self.accounting,
+                    usize_to_u64(written, "generated ZIP payload bytes accepted")
+                        .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?,
+                )
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+        }
+        Ok(written)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -2223,8 +2563,10 @@ impl<'a> CompressedScratch<'a> {
 
 impl Write for CompressedScratch<'_> {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        let written = u64::try_from(self.inner.len()).unwrap_or(u64::MAX);
-        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let written = usize_to_u64(self.inner.len(), "compressed scratch bytes")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
+        let requested = usize_to_u64(buffer.len(), "compressed scratch bytes requested")
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))?;
         let remaining = self.maximum.saturating_sub(written);
         if requested > remaining {
             return Err(streaming_limit_io_error(
@@ -2818,8 +3160,8 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 }
                 .into());
             }
-            let read = u64::try_from(read).unwrap_or(u64::MAX);
-            let next_entry = accepted_uncompressed.saturating_add(read);
+            let read_bytes = usize_to_u64(read, "stream source bytes read")?;
+            let next_entry = accepted_uncompressed.saturating_add(read_bytes);
             if next_entry > max_entry_size {
                 return Err(limit_error(
                     LimitResource::EntrySize,
@@ -2829,7 +3171,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             }
             let next_total = committed_total
                 .saturating_add(accepted_uncompressed)
-                .saturating_add(read);
+                .saturating_add(read_bytes);
             if next_total > max_total_size {
                 return Err(limit_error(
                     LimitResource::TotalSize,
@@ -2837,7 +3179,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
                     max_total_size,
                 ));
             }
-            output.write_all(&buffer[..usize::try_from(read).unwrap_or(usize::MAX)])?;
+            output.write_all(&buffer[..read])?;
             accepted_uncompressed = next_entry;
         }
     }
@@ -2845,8 +3187,19 @@ impl<W: Write> StreamingArchiveWriter<W> {
     fn write_reader<R: Read>(
         &mut self,
         name: &str,
+        reader: R,
+        compression_method: CompressionMethod,
+    ) -> Result<(), Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_reader_with_accounting(name, reader, compression_method, &mut accounting)
+    }
+
+    fn write_reader_with_accounting<R: Read>(
+        &mut self,
+        name: &str,
         mut reader: R,
         compression_method: CompressionMethod,
+        accounting: &mut ZipOperationAccounting,
     ) -> Result<(), Error> {
         let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
         self.reserve_streaming_entry()?;
@@ -2868,8 +3221,12 @@ impl<W: Write> StreamingArchiveWriter<W> {
         let result = match compression_method {
             CompressionMethod::Store => (|| {
                 let (accepted, descriptor) = {
-                    let mut limited_entry =
-                        LimitedEntryWriter::new(&mut entry, max_compressed_size);
+                    let mut limited_entry = LimitedEntryWriter::new(
+                        &mut entry,
+                        max_compressed_size,
+                        accounting,
+                        AccountingWriteKind::Stored,
+                    );
                     let mut data_writer = config.wrap(&mut limited_entry);
                     let accepted = Self::copy_stream(
                         &mut reader,
@@ -2887,8 +3244,12 @@ impl<W: Write> StreamingArchiveWriter<W> {
             })(),
             CompressionMethod::Deflate => (|| {
                 let (accepted, descriptor) = {
-                    let mut limited_entry =
-                        LimitedEntryWriter::new(&mut entry, max_compressed_size);
+                    let mut limited_entry = LimitedEntryWriter::new(
+                        &mut entry,
+                        max_compressed_size,
+                        accounting,
+                        AccountingWriteKind::GeneratedDeflate,
+                    );
                     let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
                     let mut data_writer = config.wrap(encoder);
                     let accepted = Self::copy_stream(
@@ -3022,7 +3383,19 @@ impl<W: Write> StreamingArchiveWriter<W> {
 
     /// Write a file without compression (stored).
     pub fn write_stored(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
-        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_stored_with_accounting(name, data, &mut accounting)
+    }
+
+    /// Write a stored file while recording payload bytes accepted by the
+    /// archive sink. ZIP framing bytes are excluded from the counter.
+    pub fn write_stored_with_accounting(
+        &mut self,
+        name: &str,
+        data: &[u8],
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        let data_bytes = usize_to_u64(data.len(), "stored payload length")?;
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
         self.reserve_streaming_entry()?;
         if data_bytes > self.limits.max_compressed_size {
@@ -3032,7 +3405,10 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 self.limits.max_compressed_size,
             ));
         }
-        match self.archive.write_stored_file(&normalized_name, data) {
+        match self
+            .archive
+            .write_stored_file_with_accounting(&normalized_name, data, accounting)
+        {
             Ok(()) => {
                 self.total_uncompressed_bytes =
                     self.total_uncompressed_bytes.saturating_add(data_bytes);
@@ -3051,7 +3427,19 @@ impl<W: Write> StreamingArchiveWriter<W> {
     /// payload and need a canonical local header with upfront CRC-32 and
     /// sizes can use [`Self::write_deflated_sized`] instead.
     pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
-        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_deflated_with_accounting(name, data, &mut accounting)
+    }
+
+    /// Write a Deflate-compressed file while recording generated payload bytes
+    /// accepted by the archive sink. ZIP framing bytes are excluded.
+    pub fn write_deflated_with_accounting(
+        &mut self,
+        name: &str,
+        data: &[u8],
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        let data_bytes = usize_to_u64(data.len(), "Deflate payload length")?;
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
         self.reserve_streaming_entry()?;
         let started = self
@@ -3062,8 +3450,12 @@ impl<W: Write> StreamingArchiveWriter<W> {
         let result = match started {
             Ok((mut entry, config)) => (|| {
                 let descriptor = {
-                    let mut limited_entry =
-                        LimitedEntryWriter::new(&mut entry, self.limits.max_compressed_size);
+                    let mut limited_entry = LimitedEntryWriter::new(
+                        &mut entry,
+                        self.limits.max_compressed_size,
+                        accounting,
+                        AccountingWriteKind::GeneratedDeflate,
+                    );
                     let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
                     let mut writer = config.wrap(encoder);
                     writer.write_all(data)?;
@@ -3096,7 +3488,20 @@ impl<W: Write> StreamingArchiveWriter<W> {
     /// [`Self::write_deflated`] when the produced archive should be probeable
     /// from its central directory alone.
     pub fn write_deflated_sized(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
-        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_deflated_sized_with_accounting(name, data, &mut accounting)
+    }
+
+    /// Write a sized Deflate member while recording generated compressed
+    /// payload bytes accepted by the archive sink. ZIP framing bytes are
+    /// excluded.
+    pub fn write_deflated_sized_with_accounting(
+        &mut self,
+        name: &str,
+        data: &[u8],
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        let data_bytes = usize_to_u64(data.len(), "Deflate payload length")?;
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
         self.reserve_streaming_entry()?;
         let mut compressed = Vec::new();
@@ -3130,12 +3535,12 @@ impl<W: Write> StreamingArchiveWriter<W> {
             });
         }
         let crc32 = crate::crc32(data);
-        match self.archive.write_precompressed_file(
+        match self.archive.write_generated_deflate_file_with_accounting(
             &normalized_name,
-            CompressionMethod::Deflate,
             crc32,
             data_bytes,
             &compressed,
+            accounting,
         ) {
             Ok(()) => {
                 self.total_uncompressed_bytes =
@@ -3157,6 +3562,17 @@ impl<W: Write> StreamingArchiveWriter<W> {
         self.write_reader(name, reader, CompressionMethod::Store)
     }
 
+    /// Consume a reader into a stored ZIP member while recording stored
+    /// payload bytes accepted by the archive sink.
+    pub fn write_stored_stream_with_accounting<R: Read>(
+        &mut self,
+        name: &str,
+        reader: R,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        self.write_reader_with_accounting(name, reader, CompressionMethod::Store, accounting)
+    }
+
     /// Consume a reader value into a Deflate-compressed ZIP member.
     ///
     /// The source is read incrementally and is not retained after this method
@@ -3165,6 +3581,17 @@ impl<W: Write> StreamingArchiveWriter<W> {
     /// archive.
     pub fn write_deflated_stream<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
         self.write_reader(name, reader, CompressionMethod::Deflate)
+    }
+
+    /// Consume a reader into a Deflate-compressed ZIP member while recording
+    /// generated payload bytes accepted by the archive sink.
+    pub fn write_deflated_stream_with_accounting<R: Read>(
+        &mut self,
+        name: &str,
+        reader: R,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        self.write_reader_with_accounting(name, reader, CompressionMethod::Deflate, accounting)
     }
 
     /// Consume a reader value with one of the supported Office ZIP methods.
@@ -3189,14 +3616,56 @@ impl<W: Write> StreamingArchiveWriter<W> {
         self.write_reader(name, reader, compression_method)
     }
 
+    /// Consume a reader with one of the supported Office ZIP methods while
+    /// recording payload bytes accepted by the archive sink.
+    pub fn write_stream_with_accounting<R: Read>(
+        &mut self,
+        name: &str,
+        reader: R,
+        compression_method: CompressionMethod,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        if !matches!(
+            compression_method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                compression_method.as_id().as_u16(),
+            )));
+        }
+        self.write_reader_with_accounting(name, reader, compression_method, accounting)
+    }
+
     /// Alias for [`Self::write_stored_stream`] using reader-oriented naming.
     pub fn write_stored_reader<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
-        self.write_stored_stream(name, reader)
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_stored_reader_with_accounting(name, reader, &mut accounting)
+    }
+
+    /// Alias for [`Self::write_stored_stream_with_accounting`].
+    pub fn write_stored_reader_with_accounting<R: Read>(
+        &mut self,
+        name: &str,
+        reader: R,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        self.write_stored_stream_with_accounting(name, reader, accounting)
     }
 
     /// Alias for [`Self::write_deflated_stream`] using reader-oriented naming.
     pub fn write_deflated_reader<R: Read>(&mut self, name: &str, reader: R) -> Result<(), Error> {
-        self.write_deflated_stream(name, reader)
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_deflated_reader_with_accounting(name, reader, &mut accounting)
+    }
+
+    /// Alias for [`Self::write_deflated_stream_with_accounting`].
+    pub fn write_deflated_reader_with_accounting<R: Read>(
+        &mut self,
+        name: &str,
+        reader: R,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        self.write_deflated_stream_with_accounting(name, reader, accounting)
     }
 
     /// Finish writing the archive.
@@ -3714,7 +4183,18 @@ impl<'data> LazyArchiveReader<'data> {
     /// Returns a cloned Vec for API compatibility. For zero-copy access,
     /// use `read_shared()` which returns an Arc.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
-        self.read_shared(name).map(|arc| (*arc).clone())
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_with_accounting(name, &mut accounting)
+    }
+
+    /// Read and decompress a file while recording actual payload work.
+    pub fn read_with_accounting(
+        &self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
+        self.read_shared_with_accounting(name, accounting)
+            .map(|arc| (*arc).clone())
     }
 
     /// Borrow and verify a stored member without populating the lazy cache.
@@ -3725,6 +4205,17 @@ impl<'data> LazyArchiveReader<'data> {
     /// tied to the source bytes borrowed by this reader.
     #[inline]
     pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_stored_borrowed_with_accounting(name, &mut accounting)
+    }
+
+    /// Borrow and verify a stored member without charging payload work.
+    #[inline]
+    pub fn read_stored_borrowed_with_accounting(
+        &self,
+        name: &str,
+        _accounting: &mut ZipOperationAccounting,
+    ) -> Result<Option<&'data [u8]>, Error> {
         self.inner.read_stored_borrowed(name)
     }
 
@@ -3733,6 +4224,19 @@ impl<'data> LazyArchiveReader<'data> {
     /// This is more efficient than `read()` when the same file is accessed
     /// multiple times, as it avoids cloning the decompressed data.
     pub fn read_shared(&self, name: &str) -> Result<std::sync::Arc<Vec<u8>>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_shared_with_accounting(name, &mut accounting)
+    }
+
+    /// Read and decompress a file while recording actual payload work.
+    ///
+    /// Cache hits and waiters that receive a completed flight do not charge any
+    /// payload bytes. Only the cold-flight loader charges the supplied value.
+    pub fn read_shared_with_accounting(
+        &self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<std::sync::Arc<Vec<u8>>, Error> {
         if name.len() > self.cache_limits.max_flight_key_bytes() {
             return Err(lazy_flight_key_limit_error(
                 name.len(),
@@ -3799,7 +4303,12 @@ impl<'data> LazyArchiveReader<'data> {
 
             match cache_lookup {
                 LazyCacheLookup::Hit(data) => return Ok(data),
-                LazyCacheLookup::Bypass => return self.inner.read(&normalized).map(Arc::new),
+                LazyCacheLookup::Bypass => {
+                    return self
+                        .inner
+                        .read_with_accounting(&normalized, accounting)
+                        .map(Arc::new);
+                },
                 LazyCacheLookup::Wait(flight) => {
                     // A failed flight carries no Error: the original owner
                     // returns its original error, while waiters retry and
@@ -3809,7 +4318,10 @@ impl<'data> LazyArchiveReader<'data> {
                     }
                 },
                 LazyCacheLookup::Load(flight) => {
-                    let result = self.inner.read(&normalized).map(Arc::new);
+                    let result = self
+                        .inner
+                        .read_with_accounting(&normalized, accounting)
+                        .map(Arc::new);
                     match result {
                         Ok(data) => {
                             let mut cache = lock_lazy_cache(&self.cache);
@@ -3847,7 +4359,20 @@ impl<'data> LazyArchiveReader<'data> {
     /// I/O, checksum, or size error is returned.
     #[inline]
     pub fn read_to<W: Write>(&self, name: &str, sink: &mut W) -> Result<u64, Error> {
-        self.inner.read_to(name, sink)
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_to_with_accounting(name, sink, &mut accounting)
+    }
+
+    /// Decompress and verify one member into a sink while recording actual
+    /// source traversal and Deflate destination acceptance.
+    #[inline]
+    pub fn read_to_with_accounting<W: Write>(
+        &self,
+        name: &str,
+        sink: &mut W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<u64, Error> {
+        self.inner.read_to_with_accounting(name, sink, accounting)
     }
 
     /// Reads multiple members through an explicit session without populating the cache.
@@ -4208,6 +4733,77 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct InterruptingWriter {
+        bytes: Vec<u8>,
+        interrupted: bool,
+    }
+
+    impl Write for InterruptingWriter {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            if !self.interrupted {
+                self.interrupted = true;
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "try again"));
+            }
+            self.bytes.extend_from_slice(buffer);
+            Ok(buffer.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct OverreportingWriter;
+
+    impl Write for OverreportingWriter {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            Ok(buffer.len().saturating_add(1))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn bounded_output_rejects_sink_overreport_before_progress_accounting() {
+        let counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let mut output = BoundedOutput::new(OverreportingWriter, 64, counter.clone());
+        let error = output.write(b"payload").unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(output.accepted, 0);
+        assert_eq!(counter.load(Ordering::Acquire), 0);
+    }
+
+    #[test]
+    fn accounted_stream_retries_interrupted_source_and_sink() {
+        let payload = b"retry payload";
+        let mut source =
+            ScriptedReader::new([ReadStep::Interrupted, ReadStep::Bytes(payload.to_vec())]);
+        let mut sink = InterruptingWriter {
+            bytes: Vec::new(),
+            interrupted: false,
+        };
+        let mut accounting = ZipOperationAccounting::default();
+        let copied = stream_verified_with_accounting(
+            &mut source,
+            ZipVerification {
+                crc: crate::crc32(payload),
+                uncompressed_size: payload.len() as u64,
+            },
+            &mut sink,
+            &mut accounting,
+            AccountingReadKind::Deflate,
+        )
+        .unwrap();
+        assert_eq!(copied, payload.len() as u64);
+        assert_eq!(sink.bytes, payload);
+        assert_eq!(accounting.deflate_bytes_produced(), payload.len() as u64);
+        assert_eq!(accounting.deflate_bytes_accepted(), payload.len() as u64);
+    }
+
     #[test]
     fn test_round_trip_stored() {
         let mut writer = StreamingArchiveWriter::new();
@@ -4256,6 +4852,251 @@ mod tests {
             payload.len() as u64
         );
         assert_eq!(deflated.bytes, payload);
+    }
+
+    #[test]
+    fn accounting_distinguishes_store_deflate_and_lazy_cache_work() {
+        let stored_payload = b"stored payload";
+        let deflated_payload = b"deflated payload with enough bytes to exercise accounting";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", stored_payload).unwrap();
+        writer
+            .write_deflated("deflated.bin", deflated_payload)
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut stored_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            reader
+                .read_with_accounting("stored.bin", &mut stored_accounting)
+                .unwrap(),
+            stored_payload
+        );
+        assert_eq!(
+            stored_accounting.stored_payload_bytes_read(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(stored_accounting.compressed_deflate_payload_bytes_read(), 0);
+        assert_eq!(stored_accounting.deflate_bytes_produced(), 0);
+
+        let mut deflated_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            reader
+                .read_with_accounting("deflated.bin", &mut deflated_accounting)
+                .unwrap(),
+            deflated_payload
+        );
+        assert!(deflated_accounting.compressed_deflate_payload_bytes_read() > 0);
+        assert_eq!(
+            deflated_accounting.deflate_bytes_produced(),
+            deflated_payload.len() as u64
+        );
+        assert_eq!(
+            deflated_accounting.deflate_bytes_accepted(),
+            deflated_payload.len() as u64
+        );
+
+        let mut sink = ShortWriter::new(3);
+        let mut streamed_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            reader
+                .read_to_with_accounting("deflated.bin", &mut sink, &mut streamed_accounting,)
+                .unwrap(),
+            deflated_payload.len() as u64
+        );
+        assert_eq!(sink.bytes, deflated_payload);
+        assert_eq!(
+            streamed_accounting.deflate_bytes_accepted(),
+            deflated_payload.len() as u64
+        );
+
+        let mut stored_sink = FailingWriter::new(5);
+        let mut stored_stream_accounting = ZipOperationAccounting::default();
+        let error = reader
+            .read_to_with_accounting(
+                "stored.bin",
+                &mut stored_sink,
+                &mut stored_stream_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(
+            stored_stream_accounting.stored_payload_bytes_read(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(stored_stream_accounting.stored_payload_bytes_accepted(), 5);
+
+        let lazy = LazyArchiveReader::new(&bytes).unwrap();
+        assert_eq!(lazy.cache_size(), 0);
+        let mut cold = ZipOperationAccounting::default();
+        lazy.read_with_accounting("deflated.bin", &mut cold)
+            .unwrap();
+        assert!(cold.compressed_deflate_payload_bytes_read() > 0);
+        assert_eq!(lazy.cache_size(), 1);
+        assert_eq!(lazy.cache_bytes(), deflated_payload.len());
+        let mut hit = ZipOperationAccounting::default();
+        lazy.read_with_accounting("deflated.bin", &mut hit).unwrap();
+        assert_eq!(hit, ZipOperationAccounting::default());
+        lazy.clear_cache();
+        assert_eq!(lazy.cache_size(), 0);
+        let mut after_clear = ZipOperationAccounting::default();
+        lazy.read_with_accounting("deflated.bin", &mut after_clear)
+            .unwrap();
+        assert!(after_clear.compressed_deflate_payload_bytes_read() > 0);
+
+        let bypass_limits = LazyArchiveCacheLimits::new(1, 1).unwrap();
+        let bypass = LazyArchiveReader::new_with_cache_limits(&bytes, bypass_limits).unwrap();
+        let mut bypass_accounting = ZipOperationAccounting::default();
+        bypass
+            .read_with_accounting("deflated.bin", &mut bypass_accounting)
+            .unwrap();
+        let bypass_compressed_read = bypass_accounting.compressed_deflate_payload_bytes_read();
+        assert!(bypass_compressed_read > 0);
+        assert_eq!(bypass.cache_size(), 0);
+        assert_eq!(bypass.cache_bytes(), 0);
+        assert_eq!(
+            bypass.cold_loads.load(std::sync::atomic::Ordering::SeqCst),
+            1
+        );
+        let mut bypass_again_accounting = ZipOperationAccounting::default();
+        bypass
+            .read_with_accounting("deflated.bin", &mut bypass_again_accounting)
+            .unwrap();
+        assert_eq!(
+            bypass_again_accounting.compressed_deflate_payload_bytes_read(),
+            bypass_compressed_read
+        );
+        assert_eq!(bypass.cache_size(), 0);
+        assert_eq!(bypass.cache_bytes(), 0);
+        assert_eq!(
+            bypass.cold_loads.load(std::sync::atomic::Ordering::SeqCst),
+            2
+        );
+
+        let indexed = indexed_archive(bytes.clone());
+        let indexed_id = indexed.entry_id("deflated.bin").unwrap();
+        let mut indexed_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            indexed
+                .read_entry_with_accounting(indexed_id, &mut indexed_accounting)
+                .unwrap(),
+            deflated_payload
+        );
+        assert!(indexed_accounting.compressed_deflate_payload_bytes_read() > 0);
+        let mut indexed_sink = ShortWriter::new(4);
+        let mut indexed_stream_accounting = ZipOperationAccounting::default();
+        indexed
+            .read_entry_to_with_accounting(
+                indexed_id,
+                &mut indexed_sink,
+                &mut indexed_stream_accounting,
+            )
+            .unwrap();
+        assert_eq!(indexed_sink.bytes, deflated_payload);
+        assert_eq!(
+            indexed_stream_accounting.deflate_bytes_accepted(),
+            deflated_payload.len() as u64
+        );
+
+        let indexed_stored_id = indexed.entry_id("stored.bin").unwrap();
+        let mut indexed_stored_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            indexed
+                .read_entry_with_accounting(indexed_stored_id, &mut indexed_stored_accounting)
+                .unwrap(),
+            stored_payload
+        );
+        assert_eq!(
+            indexed_stored_accounting.stored_payload_bytes_read(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(
+            indexed_stored_accounting.stored_payload_bytes_accepted(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(
+            indexed_stored_accounting.compressed_deflate_payload_bytes_read(),
+            0
+        );
+        let mut indexed_stored_sink = ShortWriter::new(2);
+        let mut indexed_stored_stream_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            indexed
+                .read_entry_to_with_accounting(
+                    indexed_stored_id,
+                    &mut indexed_stored_sink,
+                    &mut indexed_stored_stream_accounting,
+                )
+                .unwrap(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(indexed_stored_sink.bytes, stored_payload);
+        assert_eq!(
+            indexed_stored_stream_accounting.stored_payload_bytes_read(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(
+            indexed_stored_stream_accounting.stored_payload_bytes_accepted(),
+            stored_payload.len() as u64
+        );
+        assert_eq!(
+            indexed_stored_stream_accounting.compressed_deflate_payload_bytes_read(),
+            0
+        );
+
+        let mut borrowed = ZipOperationAccounting::default();
+        assert_eq!(
+            reader
+                .read_stored_borrowed_with_accounting("stored.bin", &mut borrowed)
+                .unwrap(),
+            Some(&stored_payload[..])
+        );
+        assert_eq!(borrowed, ZipOperationAccounting::default());
+
+        let mut writing = StreamingArchiveWriter::new();
+        let mut writing_accounting = ZipOperationAccounting::default();
+        writing
+            .write_stored_with_accounting("stored.bin", stored_payload, &mut writing_accounting)
+            .unwrap();
+        writing
+            .write_deflated_with_accounting(
+                "deflated.bin",
+                deflated_payload,
+                &mut writing_accounting,
+            )
+            .unwrap();
+        writing
+            .write_deflated_sized_with_accounting(
+                "sized.bin",
+                deflated_payload,
+                &mut writing_accounting,
+            )
+            .unwrap();
+        writing.finish_to_bytes().unwrap();
+        assert_eq!(
+            writing_accounting.stored_payload_bytes_emitted(),
+            stored_payload.len() as u64
+        );
+        assert!(writing_accounting.generated_deflate_payload_bytes_emitted() > 0);
+        assert_eq!(writing_accounting.precompressed_payload_bytes_emitted(), 0);
+    }
+
+    #[test]
+    fn accounting_preserves_partial_deflate_sink_progress() {
+        let payload = vec![b'x'; STREAM_COPY_BUFFER_SIZE + 17];
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("payload.bin", &payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut sink = FailingWriter::new(19);
+        let mut accounting = ZipOperationAccounting::default();
+        let error = reader
+            .read_to_with_accounting("payload.bin", &mut sink, &mut accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(accounting.deflate_bytes_accepted(), sink.bytes.len() as u64);
+        assert!(accounting.deflate_bytes_produced() >= accounting.deflate_bytes_accepted());
     }
 
     #[test]
