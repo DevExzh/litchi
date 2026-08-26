@@ -4434,6 +4434,36 @@ pub struct ControlCellSpecTableReferenceEdit {
     replacement_identifier: u64,
 }
 
+/// Exact precondition for inserting or replacing DataStore field 19
+/// (`comment_storage_table`).
+pub type CommentStorageTableReferenceEdit = ControlCellSpecTableReferenceEdit;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DataStoreReferenceRoute {
+    CommentStorageTable,
+    ControlCellSpecTable,
+}
+
+impl DataStoreReferenceRoute {
+    const fn field_number(self) -> u32 {
+        match self {
+            Self::CommentStorageTable => 19,
+            Self::ControlCellSpecTable => 21,
+        }
+    }
+
+    fn snapshot_identifier(self, snapshot: DataStoreSnapshot<'_>) -> Option<u64> {
+        match self {
+            Self::CommentStorageTable => snapshot
+                .comment_storage_table()
+                .map(ReferenceSnapshot::identifier),
+            Self::ControlCellSpecTable => snapshot
+                .control_cell_spec_table()
+                .map(ReferenceSnapshot::identifier),
+        }
+    }
+}
+
 impl ControlCellSpecTableReferenceEdit {
     #[must_use]
     pub const fn insert(identifier: u64) -> Self {
@@ -4619,6 +4649,7 @@ pub struct PreparedDataStoreControlCellSpecTableRewrite<'source> {
     source: &'source [u8],
     options: DecodeOptions,
     edit: ControlCellSpecTableReferenceEdit,
+    route: DataStoreReferenceRoute,
     field: Option<(usize, usize, &'source [u8])>,
     requirements: StorageReferenceRewriteRequirements,
 }
@@ -4655,18 +4686,14 @@ impl PreparedDataStoreControlCellSpecTableRewrite<'_> {
             &mut output,
             self.source,
             self.field.map(|(start, end, _raw)| (start, end)),
-            21,
+            self.route.field_number(),
             self.edit.replacement_identifier,
         )?;
         if output.len() != self.requirements.output_bytes {
             return Err(DecodeError::invalid());
         }
         let (snapshot, result) = decode_data_store_with_report(&output, self.options)?;
-        if snapshot
-            .control_cell_spec_table()
-            .map(ReferenceSnapshot::identifier)
-            != Some(self.edit.replacement_identifier)
-        {
+        if self.route.snapshot_identifier(snapshot) != Some(self.edit.replacement_identifier) {
             return Err(DecodeError::invalid());
         }
         let verification = result;
@@ -4691,9 +4718,24 @@ pub fn prepare_data_store_control_cell_spec_table_rewrite<'source>(
     edit: ControlCellSpecTableReferenceEdit,
     options: DecodeOptions,
 ) -> Result<PreparedDataStoreControlCellSpecTableRewrite<'source>, DecodeError> {
+    prepare_data_store_reference_rewrite(
+        source,
+        edit,
+        options,
+        DataStoreReferenceRoute::ControlCellSpecTable,
+    )
+}
+
+fn prepare_data_store_reference_rewrite<'source>(
+    source: &'source [u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+    route: DataStoreReferenceRoute,
+) -> Result<PreparedDataStoreControlCellSpecTableRewrite<'source>, DecodeError> {
     validate_reference_edit(edit)?;
     let (_snapshot, source_report) = decode_data_store_with_report(source, options)?;
-    let field = unique_reference_field(source, 21, options)?;
+    let field_number = route.field_number();
+    let field = unique_reference_field(source, field_number, options)?;
     match (edit.expected_identifier, field) {
         (None, Some((_start, _end, raw))) => {
             let mut budget = Budget::new(raw, options)?;
@@ -4719,7 +4761,7 @@ pub fn prepare_data_store_control_cell_spec_table_rewrite<'source>(
                 .len()
                 .checked_sub(end - start)
                 .and_then(|length| {
-                    append_length_delimited_field_length(21, replacement_len)
+                    append_length_delimited_field_length(field_number, replacement_len)
                         .ok()
                         .and_then(|field_len| length.checked_add(field_len))
                 })
@@ -4728,7 +4770,7 @@ pub fn prepare_data_store_control_cell_spec_table_rewrite<'source>(
         None => source
             .len()
             .checked_add(append_length_delimited_field_length(
-                21,
+                field_number,
                 canonical_reference_payload_length(edit.replacement_identifier)?,
             )?)
             .ok_or_else(DecodeError::invalid)?,
@@ -4758,6 +4800,7 @@ pub fn prepare_data_store_control_cell_spec_table_rewrite<'source>(
         source,
         options,
         edit,
+        route,
         field,
         requirements: StorageReferenceRewriteRequirements {
             source: source_report,
@@ -4805,6 +4848,33 @@ pub fn rewrite_data_store_control_cell_spec_table_reference(
     rewrite_data_store_control_cell_spec_table(source, edit, options)
 }
 
+/// Prepared DataStore field-19 insertion/replacement.
+pub type PreparedDataStoreCommentStorageTableRewrite<'source> =
+    PreparedDataStoreControlCellSpecTableRewrite<'source>;
+
+pub fn prepare_data_store_comment_storage_table_rewrite<'source>(
+    source: &'source [u8],
+    edit: CommentStorageTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<PreparedDataStoreCommentStorageTableRewrite<'source>, DecodeError> {
+    prepare_data_store_reference_rewrite(
+        source,
+        edit,
+        options,
+        DataStoreReferenceRoute::CommentStorageTable,
+    )
+}
+
+pub fn rewrite_data_store_comment_storage_table(
+    source: &[u8],
+    edit: CommentStorageTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+    let plan = prepare_data_store_comment_storage_table_rewrite(source, edit, options)?;
+    let limits = plan.requirements().exact_limits();
+    plan.execute(limits)
+}
+
 /// Prepared TableModel field-4/DataStore field-21 rewrite.
 pub struct PreparedTableModelControlCellSpecTableRewrite<'source> {
     source: &'source [u8],
@@ -4840,6 +4910,7 @@ impl PreparedTableModelControlCellSpecTableRewrite<'_> {
     ) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
         enforce_storage_reference_limits(self.requirements, limits)?;
         let expected_identifier = self.data_store.edit.replacement_identifier;
+        let route = self.data_store.route;
         let nested_limits = StorageReferenceRewriteExecutionLimits::new(
             self.data_store.requirements().output_bytes,
             self.data_store.requirements().fields,
@@ -4867,11 +4938,7 @@ impl PreparedTableModelControlCellSpecTableRewrite<'_> {
         let (snapshot, result) = decode_table_model_with_report(&output, self.options)?;
         let (store, verification) =
             decode_data_store_with_report(snapshot.base_data_store(), self.options)?;
-        if store
-            .control_cell_spec_table()
-            .map(ReferenceSnapshot::identifier)
-            != Some(expected_identifier)
-        {
+        if route.snapshot_identifier(store) != Some(expected_identifier) {
             return Err(DecodeError::invalid());
         }
         Ok((
@@ -4894,13 +4961,26 @@ pub fn prepare_table_model_control_cell_spec_table_rewrite<'source>(
     edit: ControlCellSpecTableReferenceEdit,
     options: DecodeOptions,
 ) -> Result<PreparedTableModelControlCellSpecTableRewrite<'source>, DecodeError> {
+    prepare_table_model_reference_rewrite(
+        source,
+        edit,
+        options,
+        DataStoreReferenceRoute::ControlCellSpecTable,
+    )
+}
+
+fn prepare_table_model_reference_rewrite<'source>(
+    source: &'source [u8],
+    edit: ControlCellSpecTableReferenceEdit,
+    options: DecodeOptions,
+    route: DataStoreReferenceRoute,
+) -> Result<PreparedTableModelControlCellSpecTableRewrite<'source>, DecodeError> {
     validate_reference_edit(edit)?;
     let (_model, source_report) = decode_table_model_with_report(source, options)?;
     let model_field =
         unique_length_delimited_field(source, 4, options)?.ok_or_else(DecodeError::invalid)?;
     let nested_source = model_field.2;
-    let data_store =
-        prepare_data_store_control_cell_spec_table_rewrite(nested_source, edit, options)?;
+    let data_store = prepare_data_store_reference_rewrite(nested_source, edit, options, route)?;
     let data_store_requirements = data_store.requirements();
     let output_bytes = source
         .len()
@@ -4991,6 +5071,33 @@ pub fn rewrite_table_model_control_cell_spec_table_reference(
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
     rewrite_table_model_control_cell_spec_table(source, edit, options)
+}
+
+/// Prepared TableModel field-4/DataStore field-19 insertion/replacement.
+pub type PreparedTableModelCommentStorageTableRewrite<'source> =
+    PreparedTableModelControlCellSpecTableRewrite<'source>;
+
+pub fn prepare_table_model_comment_storage_table_rewrite<'source>(
+    source: &'source [u8],
+    edit: CommentStorageTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<PreparedTableModelCommentStorageTableRewrite<'source>, DecodeError> {
+    prepare_table_model_reference_rewrite(
+        source,
+        edit,
+        options,
+        DataStoreReferenceRoute::CommentStorageTable,
+    )
+}
+
+pub fn rewrite_table_model_comment_storage_table(
+    source: &[u8],
+    edit: CommentStorageTableReferenceEdit,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
+    let plan = prepare_table_model_comment_storage_table_rewrite(source, edit, options)?;
+    let limits = plan.requirements().exact_limits();
+    plan.execute(limits)
 }
 
 fn validate_reference_edit(edit: ControlCellSpecTableReferenceEdit) -> Result<(), DecodeError> {
@@ -9400,5 +9507,110 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.resource_limit(), None);
+    }
+
+    #[test]
+    fn prepared_comment_storage_reference_rewrites_data_store_and_nested_model() {
+        let source = minimal_store();
+        let rewrite_options = DecodeOptions::new(
+            source.len().saturating_add(64),
+            1_000_000,
+            source.len().saturating_add(64).saturating_mul(20),
+            64,
+            20_000,
+            1_000_000,
+        );
+        let plan = prepare_data_store_comment_storage_table_rewrite(
+            &source,
+            CommentStorageTableReferenceEdit::insert(41),
+            rewrite_options,
+        )
+        .expect("comment-storage DataStore plan");
+        let requirements = plan.requirements();
+        let (candidate, report) = plan
+            .execute(requirements.exact_limits())
+            .expect("comment-storage DataStore execute");
+        let (snapshot, _) = decode_data_store_with_report(&candidate, options(&candidate))
+            .expect("comment-storage DataStore readback");
+        assert_eq!(
+            snapshot
+                .comment_storage_table()
+                .map(ReferenceSnapshot::identifier),
+            Some(41)
+        );
+        assert_eq!(snapshot.control_cell_spec_table(), None);
+        assert_eq!(report.output_bytes(), candidate.len());
+
+        let replaced = rewrite_data_store_comment_storage_table(
+            &candidate,
+            CommentStorageTableReferenceEdit::replace(41, 42),
+            DecodeOptions::new(
+                candidate.len().saturating_add(64),
+                1_000_000,
+                candidate.len().saturating_add(64).saturating_mul(20),
+                64,
+                20_000,
+                1_000_000,
+            ),
+        )
+        .expect("comment-storage DataStore replacement")
+        .0;
+        assert_eq!(
+            decode_data_store_with_report(&replaced, options(&replaced))
+                .expect("replacement readback")
+                .0
+                .comment_storage_table()
+                .map(ReferenceSnapshot::identifier),
+            Some(42)
+        );
+        assert!(
+            prepare_data_store_comment_storage_table_rewrite(
+                &candidate,
+                CommentStorageTableReferenceEdit::replace(99, 42),
+                DecodeOptions::new(
+                    candidate.len().saturating_add(64),
+                    1_000_000,
+                    candidate.len().saturating_add(64).saturating_mul(20),
+                    64,
+                    20_000,
+                    1_000_000,
+                ),
+            )
+            .is_err()
+        );
+
+        let model = strict_model(Some(b"Table"));
+        let model_rewrite_options = DecodeOptions::new(
+            model.len().saturating_add(64),
+            1_000_000,
+            model.len().saturating_add(64).saturating_mul(32),
+            64,
+            20_000,
+            1_000_000,
+        );
+        let plan = prepare_table_model_comment_storage_table_rewrite(
+            &model,
+            CommentStorageTableReferenceEdit::insert(51),
+            model_rewrite_options,
+        )
+        .expect("comment-storage model plan");
+        let requirements = plan.requirements();
+        let (candidate, report) = plan
+            .execute(requirements.exact_limits())
+            .expect("comment-storage model execute");
+        let (model_snapshot, _) =
+            decode_table_model_with_report(&candidate, options(&candidate)).unwrap();
+        let (store_snapshot, _) = decode_data_store_with_report(
+            model_snapshot.base_data_store(),
+            options(model_snapshot.base_data_store()),
+        )
+        .unwrap();
+        assert_eq!(
+            store_snapshot
+                .comment_storage_table()
+                .map(ReferenceSnapshot::identifier),
+            Some(51)
+        );
+        assert_eq!(report.output_bytes(), candidate.len());
     }
 }
