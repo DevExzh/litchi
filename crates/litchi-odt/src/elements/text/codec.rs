@@ -7,7 +7,10 @@
 
 use super::model::Block;
 use super::{Heading, Paragraph, parse_paragraph_at, parse_text_block_texts, parse_text_blocks};
-use litchi_core::{Error, Result};
+use litchi_core::{
+    Error, Result, SequentialTextWriter, TextOutputError, TextOutputOptions, TextOutputReport,
+};
+use std::io::Write;
 
 /// Collection of typed text-element codec operations.
 pub struct Elements;
@@ -94,5 +97,24 @@ impl Elements {
             output.push_str(&text);
         }
         Ok(output)
+    }
+
+    /// Write visible text blocks directly to a bounded sequential sink.
+    pub(crate) fn write_text_to<W: Write + ?Sized>(
+        xml_content: &str,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        let mut writer = SequentialTextWriter::new(output, options);
+        Self::write_text_to_with_writer(xml_content, &mut writer)?;
+        Ok(writer.finish())
+    }
+
+    /// Feed visible text blocks into an already-progressing sink writer.
+    pub(crate) fn write_text_to_with_writer<'options, 'output, W: Write + ?Sized>(
+        xml_content: &str,
+        writer: &mut SequentialTextWriter<'options, 'output, W>,
+    ) -> std::result::Result<(), TextOutputError<Error>> {
+        super::write_text_blocks_to_writer(xml_content, writer)
     }
 }

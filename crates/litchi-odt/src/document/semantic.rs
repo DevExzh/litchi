@@ -12,6 +12,7 @@ use crate::page_sequence::{Sequence, parse_page_sequence};
 
 use super::codec::{parse_bookmark_names, parse_hyperlinks, parse_image_references};
 use super::model::Document;
+use std::io::Write;
 
 impl Document {
     crate::package::scripts::script_facade_methods!();
@@ -42,6 +43,30 @@ impl Document {
     /// ```
     pub fn text(&self) -> Result<String> {
         TextElements::extract_text(self.content.xml_content())
+    }
+
+    /// Write visible paragraphs and headings as bounded UTF-8 text to a
+    /// caller-owned sequential, non-seek sink.
+    ///
+    /// Headings are paragraph-like objects. Formatting is omitted, inline
+    /// `text:line-break` controls remain `\n`, and separators come from
+    /// `options`. Tracked-change definitions, note bodies, and ruby
+    /// pronunciation runs are excluded from visible text. The ODT parser
+    /// applies a hard 64 MiB decoded-text ceiling in addition to the shared
+    /// output limits in `options`.
+    ///
+    /// Output may be partial when parsing, a resource limit, or the sink
+    /// fails. This method never flushes or rolls back the caller-owned sink,
+    /// and it has no cancellation hook.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> std::result::Result<
+        litchi_core::TextOutputReport,
+        litchi_core::TextOutputError<litchi_core::Error>,
+    > {
+        TextElements::write_text_to(self.content.xml_content(), output, options)
     }
 
     /// Get the number of paragraphs in the document.

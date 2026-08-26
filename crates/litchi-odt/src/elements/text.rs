@@ -9,13 +9,14 @@ mod validation;
 
 use super::element::{Element, ElementBase, try_owned_string, try_prefixed_name};
 use crate::binding_tracker::BindingTracker;
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Result, SequentialTextWriter, TextObjectKind, TextOutputError};
 use memchr::memmem;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{LocalName, Namespace, QName, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
+use std::{collections::VecDeque, io::Write};
 
 pub use codec::Elements;
 pub use model::{Block, Kind, LinkActuate, LinkShow};
@@ -1666,6 +1667,486 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
         })?;
     output.extend(blocks.into_iter().flatten());
     Ok(output)
+}
+
+/// Bounded decoded-text accounting for the one-pass sink parser.
+///
+/// Unlike the retained extraction path, this budget is charged while text is
+/// still distributed among nested active blocks. That prevents a deeply
+/// nested document from obtaining one full text ceiling per active string.
+struct SinkTextBudget {
+    decoded_bytes: usize,
+}
+
+impl SinkTextBudget {
+    fn charge(&mut self, additional: usize) -> Result<()> {
+        self.decoded_bytes = self
+            .decoded_bytes
+            .checked_add(additional)
+            .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+        if self.decoded_bytes > MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// Return the exact UTF-8 byte length produced by XML 1.0 EOL
+/// normalization, without allocating the normalized string.
+///
+/// The sink parser uses `Reader::from_str`, so event bytes are UTF-8. Keeping
+/// the validation here makes the precharge fallible and preserves the decoder
+/// error boundary before `xml_content` is asked to materialize a normalized
+/// value. XML 1.0 changes `CRLF` to one `LF`; a lone `CR` and every other
+/// UTF-8 byte keep their length.
+fn normalized_xml10_decoded_len(raw: &[u8], context: &str) -> Result<usize> {
+    std::str::from_utf8(raw)
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODF {context}: {error}")))?;
+    let mut length = raw.len();
+    let mut index = 0;
+    while index < raw.len() {
+        if raw[index] == b'\r' {
+            if raw.get(index + 1) == Some(&b'\n') {
+                length = length
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+                index += 2;
+            } else {
+                index += 1;
+            }
+        } else {
+            index += 1;
+        }
+    }
+    Ok(length)
+}
+
+/// Start-order slots for blocks that have completed out of order.
+///
+/// A nested block can close before its containing paragraph. Completed slots
+/// remain bounded and are emitted as soon as the contiguous start-order
+/// frontier advances. The queue therefore never requires a retained document
+/// projection, while preserving the existing nested-block ordering contract.
+struct PendingSinkBlocks {
+    pending: VecDeque<Option<String>>,
+    next_slot: usize,
+    next_emit: usize,
+    block_count: usize,
+}
+
+impl PendingSinkBlocks {
+    fn new() -> Self {
+        Self {
+            pending: VecDeque::new(),
+            next_slot: 0,
+            next_emit: 0,
+            block_count: 0,
+        }
+    }
+
+    fn reserve(&mut self) -> Result<usize> {
+        if self.block_count >= MAX_TEXT_BLOCKS {
+            return Err(Error::InvalidFormat(format!(
+                "ODF text exceeds {MAX_TEXT_BLOCKS} paragraphs and headings"
+            )));
+        }
+        self.pending
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODT pending text-block frontier",
+                source,
+            })?;
+        let slot = self.next_slot;
+        self.next_slot = self
+            .next_slot
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("ODF text block slot overflow".to_string()))?;
+        self.block_count += 1;
+        self.pending.push_back(None);
+        Ok(slot)
+    }
+
+    fn complete<'options, 'output, W: Write + ?Sized>(
+        &mut self,
+        slot: usize,
+        text: String,
+        writer: &mut SequentialTextWriter<'options, 'output, W>,
+    ) -> std::result::Result<(), TextOutputError<Error>> {
+        let index = slot
+            .checked_sub(self.next_emit)
+            .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))
+            .map_err(|error| writer.document_error(error))?;
+        let target = self
+            .pending
+            .get_mut(index)
+            .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))
+            .map_err(|error| writer.document_error(error))?;
+        if target.is_some() {
+            return Err(writer.document_error(Error::InvalidFormat(BLOCK_STACK_ERROR.to_string())));
+        }
+        *target = Some(text);
+
+        while matches!(self.pending.front(), Some(Some(_))) {
+            let value = self
+                .pending
+                .pop_front()
+                .and_then(|value| value)
+                .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))
+                .map_err(|error| writer.document_error(error))?;
+            writer.write_object(TextObjectKind::Paragraph, &value)?;
+            self.next_emit = self
+                .next_emit
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("ODF text block slot overflow".to_string()))
+                .map_err(|error| writer.document_error(error))?;
+        }
+        Ok(())
+    }
+}
+
+fn append_sink_checked(
+    budget: &mut SinkTextBudget,
+    output: &mut String,
+    value: &str,
+) -> Result<()> {
+    budget.charge(value.len())?;
+    append_sink_precharged(output, value, value.len())
+}
+
+/// Append a decoded fragment after its exact byte length has been charged.
+fn append_sink_precharged(output: &mut String, value: &str, charged_len: usize) -> Result<()> {
+    if value.len() != charged_len {
+        return Err(Error::InvalidFormat(
+            "ODF sink text precharge mismatch".to_string(),
+        ));
+    }
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT sink text-block content",
+            source,
+        })?;
+    output.push_str(value);
+    Ok(())
+}
+
+fn append_sink_spaces(
+    budget: &mut SinkTextBudget,
+    output: &mut String,
+    count: usize,
+) -> Result<()> {
+    budget.charge(count)?;
+    output
+        .try_reserve(count)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT sink text-block content",
+            source,
+        })?;
+    output.extend(std::iter::repeat_n(' ', count));
+    Ok(())
+}
+
+fn append_sink_text_control<R: TextAttributeResolver + ?Sized>(
+    resolver: &R,
+    text_namespace: bool,
+    element: &BytesStart<'_>,
+    output: &mut String,
+    budget: &mut SinkTextBudget,
+) -> Result<()> {
+    if !text_namespace {
+        return Ok(());
+    }
+    match element.local_name().as_ref() {
+        b"s" => {
+            let count = text_space_count(resolver, element)?.unwrap_or(1);
+            if count > MAX_SPACE_COUNT {
+                return Err(Error::InvalidFormat(format!(
+                    "text:s count exceeds {MAX_SPACE_COUNT}"
+                )));
+            }
+            append_sink_spaces(budget, output, count)?;
+        },
+        b"tab" => append_sink_checked(budget, output, "\t")?,
+        b"line-break" => append_sink_checked(budget, output, "\n")?,
+        _ => {},
+    }
+    Ok(())
+}
+
+/// Decode and append one general reference without allocating an owned
+/// intermediate string on the sink path.
+fn append_sink_reference(
+    reference: &BytesRef<'_>,
+    budget: &mut SinkTextBudget,
+    output: &mut String,
+) -> Result<()> {
+    if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid ODF text character reference: {error}"))
+    })? {
+        let mut encoded = [0_u8; 4];
+        let value = character.encode_utf8(&mut encoded);
+        budget.charge(value.len())?;
+        return append_sink_precharged(output, value, value.len());
+    }
+
+    let name = reference
+        .decode()
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODF text entity: {error}")))?;
+    let value = match name.as_ref() {
+        "amp" => "&",
+        "lt" => "<",
+        "gt" => ">",
+        "quot" => "\"",
+        "apos" => "'",
+        _ => {
+            return Err(Error::InvalidFormat(format!(
+                "unsupported ODF text entity '&{name};'"
+            )));
+        },
+    };
+    budget.charge(value.len())?;
+    append_sink_precharged(output, value, value.len())
+}
+
+/// Parse visible ODT text once and feed completed blocks to a shared sink.
+///
+/// This intentionally remains a dedicated parser rather than adding a mode to
+/// the retained hot paths. It keeps only active block strings and the bounded
+/// start-order frontier, and applies the same namespace, suppression,
+/// attribute, control, and structural-limit rules as the established parser.
+pub(crate) fn write_text_blocks_to_writer<'options, 'output, W: Write + ?Sized>(
+    xml_content: &str,
+    writer: &mut SequentialTextWriter<'options, 'output, W>,
+) -> std::result::Result<(), TextOutputError<Error>> {
+    macro_rules! parse {
+        ($expression:expr) => {
+            $expression.map_err(|error| writer.document_error(error))?
+        };
+    }
+
+    let mut reader = Reader::from_str(xml_content);
+    let decoder = reader.decoder();
+    let mut tracker = BindingTracker::new();
+    let mut pending_pop = false;
+    let mut active: Vec<ActiveTextBlockText> = Vec::new();
+    let mut pending = PendingSinkBlocks::new();
+    let mut document_depth = 0usize;
+    let mut tracked_changes_depth = 0usize;
+    let mut skipped_depth = 0usize;
+    let mut budget = SinkTextBudget { decoded_bytes: 0 };
+    let mut memo = TextNamespaceMemo::new();
+    let mut content_version = 0u64;
+    let mut declared_stack: Vec<bool> = Vec::new();
+    let mut pop_removed_bindings = false;
+
+    loop {
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
+        let event = parse!(
+            reader
+                .read_event()
+                .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))
+        );
+        if pop_removed_bindings {
+            content_version += 1;
+            pop_removed_bindings = false;
+        }
+        let text_namespace = match event {
+            Event::Start(ref element) => {
+                parse!(tracker.push(element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
+                }));
+                let declares = may_declare_namespace(element);
+                parse!(try_push(
+                    &mut declared_stack,
+                    declares,
+                    "ODT namespace-declaration stack",
+                ));
+                if declares {
+                    content_version += 1;
+                }
+                parse!(memo.is_text_namespace(&tracker, content_version, element))
+            },
+            Event::Empty(ref element) => {
+                parse!(tracker.push(element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
+                }));
+                pending_pop = true;
+                if may_declare_namespace(element) {
+                    content_version += 1;
+                    pop_removed_bindings = true;
+                }
+                parse!(memo.is_text_namespace(&tracker, content_version, element))
+            },
+            _ => false,
+        };
+
+        match event {
+            Event::Start(ref element) => {
+                document_depth = parse!(document_depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text nesting depth overflow".to_string())
+                }));
+                if document_depth > MAX_TEXT_DEPTH {
+                    return Err(writer.document_error(Error::InvalidFormat(format!(
+                        "ODF text nesting exceeds {MAX_TEXT_DEPTH} levels"
+                    ))));
+                }
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth += 1;
+                    continue;
+                }
+                if is_text_element(text_namespace, element, b"tracked-changes") {
+                    tracked_changes_depth = 1;
+                    continue;
+                }
+
+                let starts_block = skipped_depth == 0 && is_text_block(text_namespace, element);
+                if !starts_block && let Some(current) = active.last_mut() {
+                    current.depth += 1;
+                }
+                if starts_block {
+                    parse!(active.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "ODT active text-block stack",
+                        source,
+                    }));
+                    parse!(validate_text_block_attributes(
+                        &tracked_attributes(&tracker, decoder),
+                        element,
+                    ));
+                    let slot = parse!(pending.reserve());
+                    active.push(ActiveTextBlockText {
+                        depth: 1,
+                        text: String::new(),
+                        slot,
+                    });
+                } else if skipped_depth > 0 {
+                    skipped_depth += 1;
+                } else if let Some(current) = active.last_mut() {
+                    if is_text_element(text_namespace, element, b"note-body")
+                        || is_text_element(text_namespace, element, b"ruby-text")
+                    {
+                        skipped_depth = 1;
+                    } else {
+                        parse!(append_sink_text_control(
+                            &tracked_attributes(&tracker, decoder),
+                            text_namespace,
+                            element,
+                            &mut current.text,
+                            &mut budget,
+                        ));
+                    }
+                }
+            },
+            Event::Empty(ref element) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if is_text_element(text_namespace, element, b"note-body")
+                    || is_text_element(text_namespace, element, b"ruby-text")
+                {
+                    // An empty suppressed run contributes nothing.
+                } else if is_text_block(text_namespace, element) {
+                    let slot = parse!(pending.reserve());
+                    parse!(validate_text_block_attributes(
+                        &tracked_attributes(&tracker, decoder),
+                        element,
+                    ));
+                    pending.complete(slot, String::new(), writer)?;
+                } else if let Some(current) = active.last_mut() {
+                    parse!(append_sink_text_control(
+                        &tracked_attributes(&tracker, decoder),
+                        text_namespace,
+                        element,
+                        &mut current.text,
+                        &mut budget,
+                    ));
+                }
+            },
+            Event::Text(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded_len =
+                        parse!(normalized_xml10_decoded_len(value.as_ref(), "text content",));
+                    parse!(budget.charge(decoded_len));
+                    let decoded =
+                        parse!(value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text content: {error}"))
+                        }));
+                    parse!(append_sink_precharged(
+                        &mut current.text,
+                        &decoded,
+                        decoded_len,
+                    ));
+                }
+            },
+            Event::CData(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded_len =
+                        parse!(normalized_xml10_decoded_len(value.as_ref(), "text CDATA",));
+                    parse!(budget.charge(decoded_len));
+                    let decoded =
+                        parse!(value.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text CDATA: {error}"))
+                        }));
+                    parse!(append_sink_precharged(
+                        &mut current.text,
+                        &decoded,
+                        decoded_len,
+                    ));
+                }
+            },
+            Event::GeneralRef(ref reference)
+                if tracked_changes_depth == 0 && skipped_depth == 0 =>
+            {
+                if let Some(current) = active.last_mut() {
+                    parse!(append_sink_reference(
+                        reference,
+                        &mut budget,
+                        &mut current.text,
+                    ));
+                }
+            },
+            Event::End(_) => {
+                pending_pop = true;
+                if declared_stack.pop().unwrap_or(true) {
+                    pop_removed_bindings = true;
+                }
+                document_depth = parse!(document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text element stack underflow".to_string())
+                }));
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth -= 1;
+                    continue;
+                }
+                skipped_depth = skipped_depth.saturating_sub(1);
+                if let Some(current) = active.last_mut() {
+                    current.depth = parse!(current.depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF text block stack underflow".to_string())
+                    }));
+                    if current.depth == 0 {
+                        let current = active
+                            .pop()
+                            .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))
+                            .map_err(|error| writer.document_error(error))?;
+                        pending.complete(current.slot, current.text, writer)?;
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if !active.is_empty() || tracked_changes_depth != 0 || skipped_depth != 0 || document_depth != 0
+    {
+        return Err(writer.document_error(Error::InvalidFormat(
+            "incomplete ODF text XML structure".to_string(),
+        )));
+    }
+    if !pending.pending.is_empty() {
+        return Err(writer.document_error(Error::InvalidFormat(BLOCK_STACK_ERROR.to_string())));
+    }
+    Ok(())
 }
 
 fn parse_selected_paragraph(xml_content: &str, output: &mut ParagraphOutput) -> Result<()> {
