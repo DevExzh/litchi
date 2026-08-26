@@ -279,3 +279,23 @@ fn parses_libreoffice_associated_character_fixture() {
             && associated.language == LanguageId::new(1025).ok()
     }));
 }
+#[test]
+fn body_associated_baseline_changes_split_text_runs() {
+    let document = RtfDocument::parse(r#"{\rtf1 A\aup2 B\aup4 C}"#)
+        .expect("body associated-baseline source should parse");
+    let blocks = document.blocks();
+
+    assert_eq!(blocks.len(), 3);
+    assert_eq!(blocks[0].text, "A");
+    assert_eq!(blocks[0].formatting.associated.baseline, None);
+    assert_eq!(blocks[1].text, "B");
+    assert_eq!(
+        blocks[1].formatting.associated.baseline,
+        Some(AssociatedCharacterBaseline::RaisedHalfPoints(2))
+    );
+    assert_eq!(blocks[2].text, "C");
+    assert_eq!(
+        blocks[2].formatting.associated.baseline,
+        Some(AssociatedCharacterBaseline::RaisedHalfPoints(4))
+    );
+}
