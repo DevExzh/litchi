@@ -13,8 +13,8 @@ pub use slide::{SlideLayoutPart, SlideMasterPart, SlidePart};
 use std::borrow::Cow;
 
 use litchi_ooxml_common::mce::process_part;
-use litchi_opc::constants::content_type as ct;
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use quick_xml::events::BytesStart;
 use quick_xml::reader::NsReader;
 
@@ -84,35 +84,6 @@ pub(crate) fn is_relationship_type(actual: &str, transitional: &str, local: &str
         || actual == format!("http://purl.oclc.org/ooxml/officeDocument/relationships/{local}")
 }
 
-pub(crate) fn find_related_part<'a>(
-    package: &'a OpcPackage,
-    source: &dyn Part,
-    relationship_id: &str,
-    relationship_type: &str,
-    local_type: &str,
-    content_type: &str,
-) -> Result<&'a dyn Part> {
-    let relationship = source
-        .rels()
-        .get(relationship_id)
-        .ok_or_else(|| Error::Relationship(format!("missing relationship '{relationship_id}'")))?;
-    if relationship.is_external() {
-        return Err(Error::Relationship(format!(
-            "relationship '{relationship_id}' must be internal"
-        )));
-    }
-    if !is_relationship_type(relationship.reltype(), relationship_type, local_type) {
-        return Err(Error::Relationship(format!(
-            "relationship '{relationship_id}' has unexpected type '{}'",
-            relationship.reltype()
-        )));
-    }
-    let target = relationship.target_partname()?;
-    let part = package.get_part(&target)?;
-    validate_content_type(part, content_type)?;
-    Ok(part)
-}
-
 pub(crate) fn related_part_by_type<'a>(
     package: &'a OpcPackage,
     source: &dyn Part,
@@ -153,4 +124,38 @@ pub(crate) fn expected_main_content_type(content_type: &str) -> bool {
             | ct::PML_SLIDESHOW_MACRO_MAIN
             | ct::PML_TEMPLATE_MACRO_MAIN
     )
+}
+
+pub(crate) fn validate_slide_relationship<'a, T>(
+    relationship: Option<&'a Relationship>,
+    relationship_id: &str,
+    resolve_target: impl FnOnce(&PackURI) -> Result<T>,
+    content_type: impl FnOnce(&T) -> &str,
+) -> Result<(&'a Relationship, PackURI, T)> {
+    let relationship = relationship.ok_or_else(|| {
+        Error::Relationship(format!(
+            "presentation slide reference is missing relationship '{relationship_id}'"
+        ))
+    })?;
+    if relationship.is_external() {
+        return Err(Error::Relationship(format!(
+            "slide relationship '{relationship_id}' must be internal"
+        )));
+    }
+    if !is_relationship_type(relationship.reltype(), rt::SLIDE, "slide") {
+        return Err(Error::Relationship(format!(
+            "relationship '{relationship_id}' has unexpected type '{}'",
+            relationship.reltype()
+        )));
+    }
+    let target = relationship.target_partname()?;
+    let part = resolve_target(&target)?;
+    let actual = content_type(&part);
+    if actual != ct::PML_SLIDE {
+        return Err(Error::ContentType {
+            expected: ct::PML_SLIDE.to_string(),
+            actual: actual.to_string(),
+        });
+    }
+    Ok((relationship, target, part))
 }

@@ -42,7 +42,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_references(&self) -> Result<Vec<SlideReference>> {
-        package::slide_references(&self.part)
+        package::slide_references(self.package, &self.part)
     }
 
     /// Number of slides in the ordered presentation graph.
@@ -51,7 +51,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_count(&self) -> Result<usize> {
-        package::slide_count(&self.part)
+        package::slide_count(self.package, &self.part)
     }
 
     /// Presentation slide size in EMUs.

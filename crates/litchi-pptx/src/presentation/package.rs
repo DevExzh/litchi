@@ -13,12 +13,33 @@ use crate::{Error, Result};
 use super::codec;
 use super::embedded;
 
-pub(super) fn slide_references(part: &PresentationPart<'_>) -> Result<Vec<SlideReference>> {
-    part.slide_references()
+pub(super) fn slide_references(
+    package: &OpcPackage,
+    part: &PresentationPart<'_>,
+) -> Result<Vec<SlideReference>> {
+    let references = part.slide_references()?;
+    validate_slide_catalog(package, part, &references)?;
+    Ok(references)
 }
 
-pub(super) fn slide_count(part: &PresentationPart<'_>) -> Result<usize> {
-    Ok(part.slide_references()?.len())
+pub(super) fn validate_slide_catalog(
+    package: &OpcPackage,
+    presentation: &PresentationPart<'_>,
+    references: &[SlideReference],
+) -> Result<()> {
+    for reference in references {
+        crate::parts::validate_slide_relationship(
+            presentation.part().rels().get(reference.relationship_id()),
+            reference.relationship_id(),
+            |target| Ok(package.get_part(target)?),
+            |part| part.content_type(),
+        )?;
+    }
+    Ok(())
+}
+
+pub(super) fn slide_count(package: &OpcPackage, part: &PresentationPart<'_>) -> Result<usize> {
+    Ok(slide_references(package, part)?.len())
 }
 
 pub(super) fn slide_size(part: &PresentationPart<'_>) -> Result<(i64, i64)> {
@@ -228,13 +249,11 @@ fn slide_part<'a>(
     presentation: &PresentationPart<'a>,
     reference: &SlideReference,
 ) -> Result<SlidePart<'a>> {
-    let part = crate::parts::find_related_part(
-        package,
-        presentation.part(),
+    let (_, _, part) = crate::parts::validate_slide_relationship(
+        presentation.part().rels().get(reference.relationship_id()),
         reference.relationship_id(),
-        rt::SLIDE,
-        "slide",
-        ct::PML_SLIDE,
+        |target| Ok(package.get_part(target)?),
+        |part| part.content_type(),
     )?;
     SlidePart::from_part(part)
 }

@@ -41,4 +41,6 @@ mod types;
 
 // Re-exports
 pub use prs::Presentation;
+#[cfg(feature = "pptx")]
+pub use prs::SlideDescriptor;
 pub use slide::Slide;

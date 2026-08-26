@@ -14,6 +14,65 @@ use litchi_ole_common::property_set::PropertySetReader;
 use std::path::Path;
 use std::sync::OnceLock;
 
+/// Detached point-in-time snapshot of one PPTX slide's catalog metadata.
+///
+/// The position is zero-based and the slide ID is the producer-visible
+/// `p:sldId@id` value retained by the source catalog. Constructing a
+/// descriptor never reads slide XML or related media payloads.
+#[cfg(feature = "pptx")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlideDescriptor {
+    position: usize,
+    slide_id: u32,
+}
+
+#[cfg(feature = "pptx")]
+impl SlideDescriptor {
+    fn new(position: usize, slide_id: u32) -> Self {
+        Self { position, slide_id }
+    }
+
+    /// Zero-based position in the presentation's ordered slide list.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Stable producer-visible `p:sldId@id` value.
+    #[must_use]
+    pub const fn slide_id(&self) -> u32 {
+        self.slide_id
+    }
+}
+
+#[cfg(feature = "pptx")]
+fn map_pptx_catalog_error(error: crate::pptx::Error) -> Error {
+    match error {
+        crate::pptx::Error::Opc(crate::opc::OpcError::SourceChanged { expected, actual }) => {
+            Error::SourceChanged {
+                expected,
+                observed: actual,
+            }
+        },
+        crate::pptx::Error::Opc(crate::opc::OpcError::Cancelled) => {
+            Error::Other("PPTX source operation cancelled".to_owned())
+        },
+        other => crate::map_ooxml_error(other),
+    }
+}
+
+#[cfg(feature = "pptx")]
+fn reserve_slide_catalog(capacity: usize) -> Result<Vec<SlideDescriptor>> {
+    let mut descriptors = Vec::new();
+    descriptors
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "PPTX slide descriptors",
+            source,
+        })?;
+    Ok(descriptors)
+}
+
 /// A PowerPoint presentation.
 ///
 /// This is the main entry point for working with PowerPoint presentations.
@@ -883,6 +942,68 @@ impl Presentation {
             PresentationImpl::OdpSource(presentation) => presentation
                 .slide_count()
                 .map_err(|error| map_odp_error(error, "get ODP slide count")),
+        }
+    }
+
+    /// Return a detached point-in-time snapshot of the validated PPTX slide catalog.
+    ///
+    /// The returned descriptors contain each slide's zero-based position and
+    /// stable `p:sldId@id`. Source-backed PPTX presentations use the retained
+    /// source catalog metadata and lazy slide handles, so this method does not
+    /// read slide XML or media payloads. Existing [`Self::slides`] behavior
+    /// remains the eager text-bearing projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source-change error or the existing facade cancellation
+    /// error when a source-backed presentation is no longer current. Non-PPTX
+    /// variants are unsupported because they do not expose a PPTX slide ID.
+    #[cfg(feature = "pptx")]
+    pub fn slide_catalog(&self) -> Result<Vec<SlideDescriptor>> {
+        match &self.inner {
+            PresentationImpl::Pptx(package) => {
+                let presentation = package.presentation().map_err(crate::map_ooxml_error)?;
+                let references = presentation
+                    .slide_references()
+                    .map_err(crate::map_ooxml_error)?;
+                let mut descriptors = reserve_slide_catalog(references.len())?;
+                for (position, reference) in references.into_iter().enumerate() {
+                    descriptors.push(SlideDescriptor::new(position, reference.id()));
+                }
+                Ok(descriptors)
+            },
+            PresentationImpl::PptxSource(presentation) => {
+                presentation
+                    .check_source()
+                    .map_err(map_pptx_catalog_error)?;
+                let mut descriptors = reserve_slide_catalog(presentation.slide_count())?;
+                for slide in presentation.slides() {
+                    presentation
+                        .check_source()
+                        .map_err(map_pptx_catalog_error)?;
+                    descriptors.push(SlideDescriptor::new(slide.position(), slide.slide_id()));
+                }
+                presentation
+                    .check_source()
+                    .map_err(map_pptx_catalog_error)?;
+                Ok(descriptors)
+            },
+            #[cfg(feature = "ppt")]
+            PresentationImpl::Ppt(_) => Err(Error::Unsupported(
+                "PPT slide catalog requires the PPTX owner".to_owned(),
+            )),
+            #[cfg(feature = "keynote")]
+            PresentationImpl::Keynote(_) => Err(Error::Unsupported(
+                "slide catalog exposes PPTX slide IDs only".to_owned(),
+            )),
+            #[cfg(feature = "odp")]
+            PresentationImpl::Odp(_) => Err(Error::Unsupported(
+                "slide catalog exposes PPTX slide IDs only".to_owned(),
+            )),
+            #[cfg(all(feature = "odp", any(unix, windows)))]
+            PresentationImpl::OdpSource(_) => Err(Error::Unsupported(
+                "slide catalog exposes PPTX slide IDs only".to_owned(),
+            )),
         }
     }
 
@@ -1769,6 +1890,110 @@ mod source_pptx_path_tests {
     }
 
     #[test]
+    fn source_slide_catalog_is_ordered_metadata_only_and_defers_bad_slide() {
+        let bytes = corrupt_unselected_slide_package();
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), &bytes).expect("write PPTX fixture");
+
+        let presentation = Presentation::open(temporary.path()).expect("source-backed PPTX");
+        let before = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("filesystem PPTX must retain source owner"),
+        };
+
+        let catalog = presentation
+            .slide_catalog()
+            .expect("catalog must not materialize slide XML");
+        assert_eq!(
+            catalog
+                .iter()
+                .map(|slide| (slide.position(), slide.slide_id()))
+                .collect::<Vec<_>>(),
+            [(0, 256), (1, 257)]
+        );
+        let after = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("filesystem PPTX must retain source owner"),
+        };
+        assert_eq!(after.cold_loads, before.cold_loads);
+
+        assert!(presentation.slide(1).is_err());
+    }
+
+    #[test]
+    fn eager_slide_catalog_rejects_wrong_slide_target_like_source_catalog() {
+        let input = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX input");
+        std::fs::write(input.path(), corrupt_unselected_slide_package())
+            .expect("write PPTX fixture");
+
+        let mut package = crate::pptx::Package::open(input.path()).expect("eager package");
+        let second_relationship_id = package
+            .presentation()
+            .expect("presentation root")
+            .slide_references()
+            .expect("slide references")
+            .get(1)
+            .expect("second slide reference")
+            .relationship_id()
+            .to_owned();
+        package
+            .edit_opc(|opc| {
+                let presentation =
+                    opc.get_part_mut(&crate::opc::PackURI::new("/ppt/presentation.xml").unwrap())?;
+                presentation
+                    .rels_mut()
+                    .retarget(&second_relationship_id, "../docProps/core.xml".to_owned())?;
+                Ok(())
+            })
+            .expect("retarget slide relationship");
+
+        let output = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX output");
+        package.save(output.path()).expect("save edited PPTX");
+        let output_bytes = std::fs::read(output.path()).expect("read edited PPTX");
+        let eager_package = crate::opc::OpcPackage::from_bytes(&output_bytes)
+            .expect("reopen edited OPC package");
+        let presentation = Presentation::from_detected(
+            crate::detection_smart::DetectedFormat::Pptx(eager_package),
+        )
+        .expect("eager PPTX facade");
+
+        assert!(presentation.slide_count().is_err());
+        assert!(presentation.slide_catalog().is_err());
+    }
+
+    #[test]
+    fn source_slide_catalog_reports_typed_stale_source() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary PPTX path");
+        std::fs::write(temporary.path(), corrupt_unselected_slide_package())
+            .expect("write PPTX fixture");
+        let presentation = Presentation::open(temporary.path()).expect("source-backed PPTX");
+
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen PPTX for mutation");
+        file.write_all(b"source mutation")
+            .expect("mutate PPTX source");
+
+        assert!(matches!(
+            presentation.slide_catalog(),
+            Err(litchi_core::Error::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
     fn path_source_routes_to_private_owner_and_defers_corrupt_slide() {
         let bytes = corrupt_unselected_slide_package();
         let temporary = tempfile::Builder::new()
@@ -2027,6 +2252,12 @@ mod source_pptx_path_tests {
         assert!(presentation.metadata().unwrap().is_some());
 
         cancellation_source.cancel();
+        assert!(matches!(
+            presentation
+                .slide_catalog()
+                .expect_err("cancelled source catalog must fail"),
+            litchi_core::Error::Other(message) if message.contains("cancel")
+        ));
         let error = presentation
             .metadata()
             .expect_err("cached metadata must honor cancellation");
