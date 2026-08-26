@@ -146,6 +146,14 @@ pub enum OpcError {
         reason: String,
     },
 
+    /// A caller-owned OPC operation report could not represent another
+    /// accepted or observed byte count without overflowing.
+    #[error("OPC operation accounting overflow: {counter}")]
+    OperationAccountingOverflow {
+        /// Counter whose checked merge or update overflowed.
+        counter: &'static str,
+    },
+
     /// A source-backed Part change would invalidate an existing signature
     /// without an explicit strip-or-resign policy.
     #[error("signed OPC source requires an explicit signature edit policy")]
@@ -295,6 +303,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::UnsupportedExecutionAffinity
             | OpcError::ManagedPartDataArcEscape
             | OpcError::ManagedPackageMaterialization
+            | OpcError::OperationAccountingOverflow { .. }
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)
@@ -346,5 +355,15 @@ mod tests {
                 litchi_core::Error::Unsupported(_)
             ));
         }
+    }
+
+    #[test]
+    fn accounting_overflow_is_not_misclassified_as_unsupported() {
+        assert!(matches!(
+            litchi_core::Error::from(OpcError::OperationAccountingOverflow {
+                counter: "OPC output bytes accepted"
+            }),
+            litchi_core::Error::Other(message) if message.contains("accounting overflow")
+        ));
     }
 }
