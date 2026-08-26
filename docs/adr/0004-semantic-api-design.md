@@ -3228,3 +3228,29 @@ captions/titles/playback/builds, own generic drawable geometry, repair
 cross-component graphs, mutate Metadata/UUIDs, or expose a native graph API.
 Malformed, non-file, aliased, cross-component, ambiguous, or otherwise
 unproven movie graphs fail closed before publication.
+
+## 2026-08-26 amendment: Wave88 Numbers split cell-control write semantics
+
+Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
+retains the Wave85 selector-first facade and turns the Wave86 split-graph
+read/no-op boundary into a bounded scalar-control write owner. Admitted
+Checkbox, Star Rating, Slider, and Stepper values can be replaced across
+current split components; empty scalar-control routes can be created, and
+reset/clear can decrement exact references and cull the final unreferenced
+entry. Commits expose conflict-checked patches, exact inverses, redacted
+diagnostics, and typed resource failures.
+
+The selected model, tile, format list, and control list must have unique
+current physical owners and consistent effective locators. Exact metadata
+UUID ownership, non-weak external edges, aggregate/FieldInfo references,
+BNC cell references, list keys, and refcounts are proved before publication.
+Changed current component tokens and the root save token advance together;
+reserved, versioned, ambiguous, data-owner, root-map, aliased, locked,
+segmented, malformed, or opaque-inbound graphs fail closed. Unknown admitted
+framing and every unselected object/member remain source-authoritative.
+
+The supported cross-component write values are the four scalar controls only.
+Cross-component Pop-Up Menu changes remain `UnsupportedDependency`, preserve
+the source exactly, and do not enter the popup model lifecycle. This amendment
+does not own general scalar formatting, arbitrary table storage, table
+topology, Pages/Keynote controls, graph repair, or a public native graph API.
