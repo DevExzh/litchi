@@ -99,6 +99,8 @@ pub enum Error {
     Drawing(litchi_drawingml::Error),
     /// Shared host-neutral OOXML package-service error.
     Common(litchi_ooxml_common::Error),
+    /// Deferred OPC package, source-freshness, or resource-limit error.
+    Opc(litchi_opc::OpcError),
     /// Bounded, inert VBA parsing or authoring error.
     #[cfg(feature = "vba-inspection")]
     Vba(litchi_vba::Error),
@@ -176,6 +178,7 @@ impl fmt::Display for Error {
             },
             Error::Drawing(error) => write!(f, "DrawingML error: {error}"),
             Error::Common(error) => write!(f, "shared OOXML error: {error}"),
+            Error::Opc(error) => write!(f, "OPC source error: {error}"),
             #[cfg(feature = "vba-inspection")]
             Error::Vba(error) => write!(f, "VBA error: {error}"),
             Error::WideStringLength { expected, actual } => {
@@ -208,6 +211,7 @@ impl std::error::Error for Error {
             Error::Allocation { source, .. } => Some(source),
             Error::Drawing(e) => Some(e),
             Error::Common(e) => Some(e),
+            Error::Opc(e) => Some(e),
             #[cfg(feature = "vba-inspection")]
             Error::Vba(e) => Some(e),
             Error::InvalidRecordType(_)
@@ -383,7 +387,7 @@ impl From<litchi_vba::Error> for Error {
 
 impl From<litchi_opc::error::OpcError> for Error {
     fn from(err: litchi_opc::error::OpcError) -> Self {
-        Error::Encoding(format!("OPC error: {}", err))
+        Error::Opc(err)
     }
 }
 

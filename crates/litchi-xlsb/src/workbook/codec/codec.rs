@@ -193,7 +193,7 @@ impl Workbook {
         Ok(())
     }
 
-    fn read_worksheet(
+    pub(in crate::workbook) fn read_worksheet(
         cursor: Cursor<&[u8]>,
         name: String,
         shared_strings: &[SharedString],

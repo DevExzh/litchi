@@ -6,8 +6,10 @@
 mod codec;
 mod model;
 mod package;
+mod source;
 
 #[cfg(test)]
 mod tests;
 
 pub use model::{Workbook, WorksheetIterator};
+pub use source::{SourceBackedWorkbook, SourceBackedWorksheet};
