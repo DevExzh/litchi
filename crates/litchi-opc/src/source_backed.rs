@@ -93,6 +93,39 @@ impl SourceRelationshipTarget {
     }
 }
 
+fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '\"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length
+            .checked_add(encoded)
+            .ok_or_else(|| overlay_unavailable("escaped XML attribute length overflows usize"))
+    })
+}
+
+fn relationship_xml_event_count(xml: &[u8], limits: ReadLimits) -> Result<u64> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = true;
+    let mut events = 0_u64;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("relationship XML event count overflows u64"))?;
+        limits.check(
+            ReadResource::XmlEvents,
+            events,
+            limits.max_xml_events() as u64,
+        )?;
+        if matches!(reader.read_event()?, Event::Eof) {
+            return Ok(events);
+        }
+    }
+}
+
 #[derive(Debug)]
 enum TopologyRelationshipOperation {
     Add {
@@ -2921,6 +2954,11 @@ impl SourceBackedPackage {
                         }
                         let (target_ref, target_mode) =
                             Self::topology_relationship_target_ref(target, &owner_base)?;
+                        self.validate_topology_relationship_field_limits(
+                            &relationship.r_id,
+                            reltype,
+                            &target_ref,
+                        )?;
                         owner_relationships.try_add_relationship(
                             reltype.clone(),
                             target_ref,
@@ -2949,6 +2987,11 @@ impl SourceBackedPackage {
                         }
                         let (target_ref, target_mode) =
                             Self::topology_relationship_target_ref(target, &owner_base)?;
+                        self.validate_topology_relationship_field_limits(
+                            &relationship.r_id,
+                            reltype,
+                            &target_ref,
+                        )?;
                         if existing.reltype() == reltype
                             && existing.target_ref() == target_ref
                             && existing.target_mode() == target_mode
@@ -2992,6 +3035,11 @@ impl SourceBackedPackage {
             let relationship_count = owner_relationships.len();
             let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
             let member_name = relationship_uri.membername().to_owned();
+            self.limits.check(
+                ReadResource::ArchiveMemberNameBytes,
+                member_name.len() as u64,
+                self.limits.max_archive_member_name_bytes(),
+            )?;
             if additions.iter().any(|addition| {
                 addition
                     .partname
@@ -3348,6 +3396,31 @@ impl SourceBackedPackage {
             SourceRelationshipTarget::External(target) => target.clone(),
         };
         Ok((target_ref, target.mode()))
+    }
+
+    fn validate_topology_relationship_field_limits(
+        &self,
+        r_id: &str,
+        reltype: &str,
+        target_ref: &str,
+    ) -> Result<()> {
+        for value in [r_id, reltype, target_ref] {
+            self.limits.check(
+                ReadResource::XmlAttributeBytes,
+                value.len() as u64,
+                self.limits.max_xml_attribute_bytes() as u64,
+            )?;
+            self.limits.check(
+                ReadResource::XmlAttributeBytes,
+                escaped_xml_attribute_len(value)? as u64,
+                self.limits.max_xml_attribute_bytes() as u64,
+            )?;
+        }
+        self.limits.check(
+            ReadResource::RelationshipTargetBytes,
+            target_ref.len() as u64,
+            self.limits.max_relationship_target_bytes() as u64,
+        )
     }
 
     /// Replace one existing ordinary Part and publish to a sequential stream.
@@ -4227,6 +4300,14 @@ impl SourceBackedPackage {
         let mut part_total = 0_u64;
         let mut archive_total = 0_u64;
         let mut relationship_total = 0_u64;
+        let mut relationship_event_total = 0_u64;
+        let mut source_relationship_events = HashMap::new();
+        source_relationship_events
+            .try_reserve(relationship_publications.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology relationship event counts",
+                source,
+            })?;
         for (index, name) in self.archive.file_names().enumerate() {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
@@ -4245,6 +4326,31 @@ impl SourceBackedPackage {
                     ReadResource::TotalRelationshipXmlBytes,
                     self.limits.max_total_relationship_xml_bytes() as u64,
                 )?;
+                let entry = self
+                    .archive
+                    .entry_id(name)
+                    .ok_or_else(|| OpcError::PartNotFound(name.to_string()))?;
+                let xml = self.archive.read_entry(entry).map_err(|error| {
+                    if let Some(execution) = take_source_execution_failure(&self.source) {
+                        map_execution_error(execution)
+                    } else {
+                        OpcError::from(error)
+                    }
+                })?;
+                self.source.ensure_current()?;
+                let events = relationship_xml_event_count(&xml, self.limits)?;
+                relationship_event_total = checked_overlay_total(
+                    relationship_event_total,
+                    events,
+                    ReadResource::TotalRelationshipXmlEvents,
+                    self.limits.max_total_relationship_xml_events() as u64,
+                )?;
+                if relationship_publications
+                    .iter()
+                    .any(|publication| publication.existing_entry == Some(entry))
+                {
+                    source_relationship_events.insert(entry, events);
+                }
             }
         }
         for (index, part) in self.parts.iter().enumerate() {
@@ -4301,6 +4407,11 @@ impl SourceBackedPackage {
             }
             let bytes = u64::try_from(addition.payload.len())
                 .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?;
+            self.limits.check(
+                ReadResource::ArchiveMemberNameBytes,
+                addition.partname.membername().len() as u64,
+                self.limits.max_archive_member_name_bytes(),
+            )?;
             self.limits
                 .check(ReadResource::PartBytes, bytes, self.limits.max_part_bytes())?;
             self.limits.check(
@@ -4354,6 +4465,12 @@ impl SourceBackedPackage {
             let bytes = u64::try_from(publication.xml.len())
                 .map_err(|_| overlay_unavailable("relationship XML length overflows u64"))?;
             self.limits.check(
+                ReadResource::ArchiveMemberNameBytes,
+                publication.member_name.len() as u64,
+                self.limits.max_archive_member_name_bytes(),
+            )?;
+            let events = relationship_xml_event_count(&publication.xml, self.limits)?;
+            self.limits.check(
                 ReadResource::RelationshipXmlBytes,
                 bytes,
                 self.limits.max_relationship_xml_bytes() as u64,
@@ -4379,6 +4496,16 @@ impl SourceBackedPackage {
                     ReadResource::TotalRelationshipXmlBytes,
                     self.limits.max_total_relationship_xml_bytes() as u64,
                 )?;
+                let original_events = source_relationship_events.get(&entry).ok_or_else(|| {
+                    overlay_unavailable("source relationship event count is unavailable")
+                })?;
+                relationship_event_total = adjusted_overlay_total(
+                    relationship_event_total,
+                    *original_events,
+                    events,
+                    ReadResource::TotalRelationshipXmlEvents,
+                    self.limits.max_total_relationship_xml_events() as u64,
+                )?;
             } else {
                 archive_total = checked_overlay_total(
                     archive_total,
@@ -4391,6 +4518,12 @@ impl SourceBackedPackage {
                     bytes,
                     ReadResource::TotalRelationshipXmlBytes,
                     self.limits.max_total_relationship_xml_bytes() as u64,
+                )?;
+                relationship_event_total = checked_overlay_total(
+                    relationship_event_total,
+                    events,
+                    ReadResource::TotalRelationshipXmlEvents,
+                    self.limits.max_total_relationship_xml_events() as u64,
                 )?;
             }
         }
@@ -4408,6 +4541,11 @@ impl SourceBackedPackage {
             ReadResource::TotalRelationshipXmlBytes,
             relationship_total,
             self.limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        self.limits.check(
+            ReadResource::TotalRelationshipXmlEvents,
+            relationship_event_total,
+            self.limits.max_total_relationship_xml_events() as u64,
         )?;
 
         let mut output_bound = self.source.length;
@@ -6625,6 +6763,139 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, OpcError::InvalidRelationship(_)));
         assert!(mismatch_output.is_empty());
+    }
+
+    #[test]
+    fn topology_relationship_publication_honors_configured_reopen_limits() {
+        const HYPERLINK: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+        let relationships = canonical_document_relationships(&[]);
+        let source = topology_relationship_archive(&relationships);
+        let owner = PackURI::new("/word/document.xml").unwrap();
+
+        let target_limits = ReadLimits::builder()
+            .max_relationship_target_bytes(24)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source.clone())),
+            target_limits,
+        )
+        .unwrap();
+        let mut target_plan = SourceTopologyPlan::new();
+        target_plan
+            .try_add_external_relationship(
+                owner.clone(),
+                "rTargetLimit",
+                HYPERLINK,
+                "https://example.invalid/too-long",
+            )
+            .unwrap();
+        let mut target_output = Vec::new();
+        assert!(matches!(
+            package.write_topology_to_stream(&mut target_output, target_plan),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipTargetBytes,
+                ..
+            })
+        ));
+        assert!(target_output.is_empty());
+
+        let attribute_limits = ReadLimits::builder()
+            .max_xml_attribute_bytes(128)
+            .unwrap()
+            .max_relationship_target_bytes(128)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source.clone())),
+            attribute_limits,
+        )
+        .unwrap();
+        let mut attribute_plan = SourceTopologyPlan::new();
+        attribute_plan
+            .try_add_external_relationship(
+                owner.clone(),
+                "rAttributeLimit",
+                HYPERLINK,
+                format!("https://example.invalid/?{}", "&".repeat(30)),
+            )
+            .unwrap();
+        let mut attribute_output = Vec::new();
+        assert!(matches!(
+            package.write_topology_to_stream(&mut attribute_output, attribute_plan),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlAttributeBytes,
+                ..
+            })
+        ));
+        assert!(attribute_output.is_empty());
+
+        let name_limits = ReadLimits::builder()
+            .max_archive_member_name_bytes(32)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source.clone())),
+            name_limits,
+        )
+        .unwrap();
+        let mut name_plan = SourceTopologyPlan::new();
+        name_plan
+            .try_add_part(
+                PackURI::new(&format!("/custom/{}.xml", "x".repeat(40))).unwrap(),
+                "application/xml",
+                b"<new/>".to_vec(),
+            )
+            .unwrap();
+        let mut name_output = Vec::new();
+        assert!(matches!(
+            package.write_topology_to_stream(&mut name_output, name_plan),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveMemberNameBytes,
+                ..
+            })
+        ));
+        assert!(name_output.is_empty());
+
+        let default_limits = ReadLimits::default();
+        let source_events = relationship_xml_event_count(root_relationships(), default_limits)
+            .unwrap()
+            .checked_add(relationship_xml_event_count(&relationships, default_limits).unwrap())
+            .unwrap();
+        let event_limits = ReadLimits::builder()
+            .max_xml_events(5)
+            .unwrap()
+            .max_total_relationship_xml_events(source_events as usize)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source)),
+            event_limits,
+        )
+        .unwrap();
+        let mut event_plan = SourceTopologyPlan::new();
+        event_plan
+            .try_add_external_relationship(
+                owner,
+                "rEventLimit",
+                HYPERLINK,
+                "https://example.invalid/",
+            )
+            .unwrap();
+        let mut event_output = Vec::new();
+        assert!(matches!(
+            package.write_topology_to_stream(&mut event_output, event_plan),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlEvents,
+                ..
+            })
+        ));
+        assert!(event_output.is_empty());
     }
 
     fn relationship_batch(prefix: &str, count: usize) -> (Vec<String>, Vec<u8>) {
