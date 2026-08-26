@@ -1,14 +1,75 @@
 //! Table-data storage, rich-text, dependency, and tile wire updates.
 
-use super::*;
-use litchi_iwa_protos::numbers_table_cell_storage_codec as table_cell_storage_codec;
+use super::table_model_projection::ProbeBudget;
+use super::{model, *};
+use litchi_iwa_common::wire::parse_wire_view;
+use litchi_iwa_protos::{
+    numbers_table_cell_storage_codec as table_cell_storage_codec, table_info_codec,
+};
 
 const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6011;
+const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
 const TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 const TABLE_CELL_STORAGE_MAX_FIELDS: usize = litchi_iwa_common::WireLimits::MAX_FIELDS;
 const TABLE_CELL_STORAGE_MAX_WORK: usize = litchi_iwa_common::WireLimits::MAX_REWRITE_WORK;
 const TABLE_CELL_STORAGE_MAX_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
 const TABLE_CELL_STORAGE_MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
+
+fn table_info_model_identifier(message: &RawMessage, drawable_id: u64) -> Result<u64> {
+    let mut compatibility = Vec::new();
+    let source = if message.type_ == 6_003 {
+        // Historical type-6003 fixtures can omit the required DrawableArchive
+        // envelope. Preserve only that exact compatibility: if field 1 is
+        // present at all, the strict codec must validate it in place.
+        let view = parse_wire_view(message.data.as_slice()).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Numbers drawable object {drawable_id} contains malformed table-info payload: {error}"
+            ))
+        })?;
+        if view.fields().any(|field| field.number() == 1) {
+            message.data.as_slice()
+        } else {
+            let capacity = message.data.len().checked_add(2).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers drawable object {drawable_id} table-info size overflowed"
+                ))
+            })?;
+            compatibility
+                .try_reserve_exact(capacity)
+                .map_err(|_error| {
+                    Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                        resource: "Numbers legacy table-info compatibility source",
+                        amount: capacity,
+                    })
+                })?;
+            compatibility.extend_from_slice(&[0x0a, 0x00]);
+            compatibility.extend_from_slice(message.data.as_slice());
+            compatibility.as_slice()
+        }
+    } else {
+        message.data.as_slice()
+    };
+    let work = source.len().checked_mul(4).ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Numbers drawable object {drawable_id} table-info work size overflowed"
+        ))
+    })?;
+    table_info_codec::decode_table_model_reference(
+        source,
+        table_info_codec::DecodeOptions::new(
+            source.len().max(1),
+            litchi_iwa_common::WireLimits::MAX_FIELDS,
+            work.max(1),
+            2,
+        ),
+    )
+    .map(|reference| reference.identifier().get())
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Numbers drawable object {drawable_id} contains malformed table-info payload: {error}"
+        ))
+    })
+}
 
 /// Give the generated-free table-cell projection the same finite profile used
 /// by the other Numbers readers.  This helper is intentionally local to the
@@ -3385,6 +3446,7 @@ pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor
     let locations = object_locations(package)?;
     let mut result = Vec::new();
     let mut seen = HashSet::new();
+    let mut model_budget = ProbeBudget::new();
     for sheet_reference in document.sheets {
         let sheet_id = sheet_reference.identifier;
         let sheet_archive_name = locations.get(&sheet_id).ok_or_else(|| {
@@ -3406,34 +3468,51 @@ pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor
             let drawable_object = drawable_archive.object(drawable_id).ok_or_else(|| {
                 Error::InvalidFormat(format!("Numbers drawable object {drawable_id} is missing"))
             })?;
-            // TST type numbers differ between archive generations. Resolve a
-            // candidate only when its table-model reference actually lands on
-            // a decodable TableModelArchive, which also avoids protobuf's
-            // permissive decoding of unrelated drawable payloads.
+            // TST type numbers differ between archive generations, but both
+            // admitted TableInfo aliases are explicit. Do not let arbitrary
+            // drawable payloads exploit Prost's permissive cross-message
+            // decoding to claim a table model.
             let mut resolved_model = None;
-            for message in &drawable_object.messages {
-                let Ok(table_info) = tst::TableInfoArchive::decode(message.data.as_slice()) else {
-                    continue;
-                };
-                let candidate_id = table_info.table_model.identifier;
+            for message in drawable_object
+                .messages
+                .iter()
+                .filter(|message| TABLE_INFO_MESSAGE_TYPES.contains(&message.type_))
+            {
+                let candidate_id = table_info_model_identifier(message, drawable_id)?;
+                if candidate_id == drawable_id {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers drawable object {drawable_id} cannot also own its table-model payload"
+                    )));
+                }
                 let Some(model_archive_name) = locations.get(&candidate_id) else {
-                    continue;
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers drawable object {drawable_id} references missing table model {candidate_id}"
+                    )));
                 };
                 let model_archive = package.archive(model_archive_name)?;
                 let Some(model_object) = model_archive.object(candidate_id) else {
-                    continue;
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers drawable object {drawable_id} references missing table model {candidate_id}"
+                    )));
                 };
-                let Some(model) = model_object.messages.iter().find_map(|message| {
-                    (message.type_ == 6000 || message.type_ == 6001)
-                        .then(|| TableModelArchive::decode(message.data.as_slice()).ok())
-                        .flatten()
-                }) else {
-                    continue;
+                let Some(model) = model::decode_attached_table_model_with_budget(
+                    model_object.messages.as_slice(),
+                    candidate_id,
+                    &mut model_budget,
+                )?
+                else {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers drawable object {drawable_id} references object {candidate_id} without a table-model payload"
+                    )));
                 };
-                resolved_model = Some((candidate_id, model));
-                break;
+                if resolved_model.replace((candidate_id, model)).is_some() {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers drawable object {drawable_id} contains multiple table-info payloads"
+                    )));
+                }
             }
             let Some((object_id, model)) = resolved_model else {
+                // Non-table drawables intentionally have no TableInfo alias.
                 continue;
             };
             if !seen.insert(object_id) {

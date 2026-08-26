@@ -125,7 +125,7 @@ impl ShapeScanner {
     }
 }
 
-/// Aggregate finite ledger for every candidate in one model object.
+/// Aggregate finite ledger for every candidate in one discovery operation.
 ///
 /// Historical Numbers fixtures rely on generated proto2 defaults, so this
 /// narrow probe deliberately uses the codec's compatibility envelope. It is
@@ -452,42 +452,51 @@ fn parse_shape_field<'source>(
     })
 }
 
-fn has_nonzero_reference_identifier(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReferenceIdentifierShape {
+    Default,
+    Nonzero,
+    Malformed,
+}
+
+fn classify_reference_identifier(
     source: &[u8],
     depth: usize,
     scanner: &mut ShapeScanner,
-) -> litchi_iwa_common::Result<bool> {
+) -> litchi_iwa_common::Result<ReferenceIdentifierShape> {
+    if source.is_empty() {
+        return Ok(ReferenceIdentifierShape::Default);
+    }
     scanner.charge_message(source.len(), depth)?;
     let mut offset = 0;
+    let mut identifier = None;
+    let mut has_extra_fields = false;
     while offset < source.len() {
-        let field = match parse_shape_field(source, offset, depth, scanner) {
-            Ok(field) => field,
-            Err(error @ litchi_iwa_common::Error::LimitExceeded { .. })
-            | Err(error @ litchi_iwa_common::Error::Allocation { .. })
-            | Err(error @ litchi_iwa_common::Error::InvalidLimit { .. }) => return Err(error),
-            // Sparse compatibility deliberately leaves unselected metadata
-            // references opaque. A malformed or unknown-only payload cannot
-            // prove the nonzero route needed to classify the store as dense.
-            Err(litchi_iwa_common::Error::InvalidFormat(_)) => return Ok(false),
-        };
+        let field = parse_shape_field(source, offset, depth, scanner)?;
         offset = field.end;
         if field.number != 1 {
+            has_extra_fields = true;
             continue;
         }
         if field.wire_type != 0 || !field.canonical_key {
-            return Ok(false);
+            return Ok(ReferenceIdentifierShape::Malformed);
         }
         let Ok((value, width)) = litchi_iwa_common::decode_varint_from_bytes(field.payload) else {
-            return Ok(false);
+            return Ok(ReferenceIdentifierShape::Malformed);
         };
-        if width != field.payload.len() || width != litchi_iwa_common::varint::encoded_len(value) {
-            return Ok(false);
-        }
-        if value != 0 {
-            return Ok(true);
+        if width != field.payload.len()
+            || width != litchi_iwa_common::varint::encoded_len(value)
+            || identifier.replace(value).is_some()
+        {
+            return Ok(ReferenceIdentifierShape::Malformed);
         }
     }
-    Ok(false)
+    Ok(match identifier {
+        Some(0) if !has_extra_fields => ReferenceIdentifierShape::Default,
+        Some(0) => ReferenceIdentifierShape::Malformed,
+        Some(_) => ReferenceIdentifierShape::Nonzero,
+        None => ReferenceIdentifierShape::Malformed,
+    })
 }
 
 fn classify_candidate(
@@ -558,6 +567,7 @@ fn classify_candidate(
             } else if field.number == 4 {
                 scanner.charge_message(field.payload.len(), 1)?;
                 let mut nested_offset = 0;
+                let mut seen_metadata_references = 0_u8;
                 while nested_offset < field.payload.len() {
                     let nested = parse_shape_field(field.payload, nested_offset, 1, &mut scanner)?;
                     nested_offset = nested.end;
@@ -566,11 +576,20 @@ fn classify_candidate(
                     // becomes dense only when a selected metadata route proves
                     // a canonical nonzero identifier; mere field presence must
                     // not silently upgrade sparse historical models.
-                    if matches!(nested.number, 2 | 5)
-                        && nested.wire_type == 2
-                        && has_nonzero_reference_identifier(nested.payload, 2, &mut scanner)?
-                    {
-                        dense_data_store = true;
+                    let bit = match nested.number {
+                        2 => 1,
+                        5 => 2,
+                        _ => continue,
+                    };
+                    if nested.wire_type != 2 || seen_metadata_references & bit != 0 {
+                        invalid_selected = true;
+                        continue;
+                    }
+                    seen_metadata_references |= bit;
+                    match classify_reference_identifier(nested.payload, 2, &mut scanner)? {
+                        ReferenceIdentifierShape::Default => {},
+                        ReferenceIdentifierShape::Nonzero => dense_data_store = true,
+                        ReferenceIdentifierShape::Malformed => invalid_selected = true,
                     }
                 }
             }
@@ -741,6 +760,41 @@ pub(super) fn probe_candidate(
     }
 }
 
+/// Select one bounded table-model candidate from an archive object.
+///
+/// Type 6000 is shared with modern `TableInfoArchive`. A canonical type-6001
+/// payload is therefore authoritative whenever it is present. Legacy aliases
+/// are considered only when the object has no canonical message, and only
+/// after their exact model signature passes the generated-free projection.
+pub(super) fn select_candidate(
+    messages: &[RawMessage],
+    budget: &mut ProbeBudget,
+    error: impl Fn(&str) -> Error,
+) -> Result<Option<usize>> {
+    const LEGACY_MODEL_TYPE: u32 = 6_000;
+    const CANONICAL_MODEL_TYPE: u32 = 6_001;
+
+    let has_canonical = messages
+        .iter()
+        .any(|message| message.type_ == CANONICAL_MODEL_TYPE);
+    let mut selected = None;
+    for (index, message) in messages.iter().enumerate().filter(|(_, message)| {
+        message.type_ == CANONICAL_MODEL_TYPE
+            || (!has_canonical && message.type_ == LEGACY_MODEL_TYPE)
+    }) {
+        match probe_candidate(message.type_, message.data.as_slice(), budget)? {
+            CandidateProbe::Valid if selected.replace(index).is_some() => {
+                return Err(error("has multiple Numbers table model payloads"));
+            },
+            CandidateProbe::Valid | CandidateProbe::NotModel => {},
+            CandidateProbe::Malformed => {
+                return Err(error("contains a malformed Numbers table model payload"));
+            },
+        }
+    }
+    Ok(selected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -820,6 +874,26 @@ mod tests {
             probe_candidate(6_001, model.as_slice(), &mut budget).unwrap(),
             CandidateProbe::Valid
         );
+    }
+
+    #[test]
+    fn malformed_sparse_metadata_references_do_not_bypass_strict_admission() {
+        for store in [
+            vec![0x10, 0x00],             // selected column-header field has the wrong wire type
+            vec![0x12, 0x00, 0x12, 0x00], // duplicate selected reference
+            vec![0x12, 0x01, 0x80],       // malformed nested reference
+            vec![0x12, 0x04, 0x08, 0x00, 0x10, 0x01], // zero identifier plus trailing data
+        ] {
+            let mut model = vec![0x22, u8::try_from(store.len()).unwrap()];
+            model.extend_from_slice(&store);
+            model.extend_from_slice(&[0x30, 0x00, 0x38, 0x00, 0x42, 0x00]);
+
+            let mut budget = ProbeBudget::new();
+            assert_eq!(
+                probe_candidate(6_001, model.as_slice(), &mut budget).unwrap(),
+                CandidateProbe::Malformed
+            );
+        }
     }
 
     #[test]
