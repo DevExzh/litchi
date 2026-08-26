@@ -5,7 +5,9 @@ use std::sync::Arc;
 use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{append_length_delimited_field, append_varint_field},
+    wire::{
+        append_length_delimited_field, append_repeated_length_delimited_field, append_varint_field,
+    },
 };
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
@@ -33,6 +35,16 @@ use super::{
 
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const COMMENT_LIST_TYPE: i32 = 10;
+const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
+const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
+const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
+
+#[derive(Clone, Copy)]
+struct CreationGraph {
+    list: MessageRoute,
+    author_identifier: u64,
+    author_storage: Option<MessageRoute>,
+}
 
 pub(super) fn create_root_comment(
     source: &Package,
@@ -54,8 +66,12 @@ pub(super) fn create_root_comment(
         .as_ref()
         .cloned()
         .ok_or(Error::UnsupportedDependency { path })?;
-    let (list, author_identifier) = creation_graph(source, path)?;
-    if list.component_index != tile.component_index {
+    let graph = creation_graph(source, path)?;
+    if graph.list.component_index != tile.component_index
+        || graph
+            .author_storage
+            .is_some_and(|route| route.component_index != tile.component_index)
+    {
         return Err(Error::UnsupportedDependency { path });
     }
     let physical = physical_source(source)?;
@@ -64,7 +80,8 @@ pub(super) fn create_root_comment(
     }
     let metadata_source =
         comments_metadata::strict_source(source).map_err(|_| Error::InvalidSource { path })?;
-    let metadata_options = metadata_options(metadata_source.payload().len(), 1);
+    let allocation_count = 1 + usize::from(graph.author_storage.is_some());
+    let metadata_options = metadata_options(metadata_source.payload().len(), allocation_count);
     let registry = comments_metadata::inspect(source, metadata_options)
         .map_err(|_| Error::InvalidSource { path })?;
     comments_metadata::reject_unknown_archive_metadata(
@@ -75,24 +92,30 @@ pub(super) fn create_root_comment(
             .map_err(|_| Error::InvalidSource { path })?,
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    registry
-        .current_uuid_if_registered(list.component_index, author_identifier)
-        .map_err(|_| Error::InvalidSource { path })?;
+    if graph.author_storage.is_none() {
+        registry
+            .current_uuid_if_registered(graph.list.component_index, graph.author_identifier)
+            .map_err(|_| Error::InvalidSource { path })?;
+    }
     let fresh = registry
-        .allocate_identifiers(1)
-        .map_err(|_| Error::UnsupportedDependency { path })?
-        .into_iter()
-        .next()
-        .ok_or(Error::Verification)?;
-    let list_source = message_at_route(source, list, path)?.data.as_slice();
-    let (key, list_data) = append_comment_entry(source, list_source, path, fresh.identifier)?;
-    let storage_data = canonical_storage(source, after.text(), author_identifier, fresh, path)?;
+        .allocate_identifiers(allocation_count)
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let comment_fresh = fresh.first().copied().ok_or(Error::Verification)?;
+    let author_fresh = fresh.get(1).copied();
+    let author_identifier = author_fresh
+        .map(|fresh| fresh.identifier)
+        .unwrap_or(graph.author_identifier);
+    let list_source = message_at_route(source, graph.list, path)?.data.as_slice();
+    let (key, list_data) =
+        append_comment_entry(source, list_source, path, comment_fresh.identifier)?;
+    let storage_data =
+        canonical_storage(source, after.text(), author_identifier, comment_fresh, path)?;
     let archive_limits = physical
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let storage_object = storage_object(
-        fresh.identifier,
+        comment_fresh.identifier,
         storage_data,
         author_identifier,
         archive_limits,
@@ -104,7 +127,7 @@ pub(super) fn create_root_comment(
         .state
         .components
         .catalog()
-        .get_index(list.component_index)
+        .get_index(graph.list.component_index)
         .ok_or(Error::InvalidSource { path })?;
     let entry = physical
         .package()
@@ -126,10 +149,10 @@ pub(super) fn create_root_comment(
         .map_err(|_| Error::InvalidSource { path })?;
     replace_list_with_transition(
         &mut archive,
-        list,
+        graph.list,
         list_data,
         key,
-        fresh.identifier,
+        comment_fresh.identifier,
         archive_limits,
         path,
     )?;
@@ -142,10 +165,26 @@ pub(super) fn create_root_comment(
         archive_limits,
         path,
     )?;
-    archive
-        .objects
-        .try_reserve(1)
-        .map_err(|_| Error::Allocation { amount: 1, path })?;
+    if let (Some(route), Some(fresh)) = (graph.author_storage, author_fresh) {
+        append_author_storage(
+            &mut archive,
+            source,
+            route,
+            fresh.identifier,
+            archive_limits,
+            path,
+        )?;
+        archive
+            .objects
+            .try_reserve(2)
+            .map_err(|_| Error::Allocation { amount: 2, path })?;
+        archive.objects.push(author_object(fresh.identifier, path)?);
+    } else {
+        archive
+            .objects
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation { amount: 1, path })?;
+    }
     archive.objects.push(storage_object);
     archive
         .objects
@@ -156,15 +195,31 @@ pub(super) fn create_root_comment(
     let member_compressed =
         SnappyStream::compress(&member_bytes).map_err(|_| Error::InvalidSource { path })?;
 
-    let additions = [registry
-        .uuid_addition(list.component_index, fresh)
-        .map_err(|_| Error::UnsupportedDependency { path })?];
+    let mut additions = Vec::new();
+    additions
+        .try_reserve_exact(allocation_count)
+        .map_err(|_| Error::Allocation {
+            amount: allocation_count,
+            path,
+        })?;
+    additions.push(
+        registry
+            .uuid_addition(graph.list.component_index, comment_fresh)
+            .map_err(|_| Error::UnsupportedDependency { path })?,
+    );
+    if let Some(fresh) = author_fresh {
+        additions.push(
+            registry
+                .uuid_addition(graph.list.component_index, fresh)
+                .map_err(|_| Error::UnsupportedDependency { path })?,
+        );
+    }
     let selectors = registry
-        .touched_selectors(&[list.component_index])
+        .touched_selectors(&[graph.list.component_index])
         .map_err(|_| Error::UnsupportedDependency { path })?;
     let transition = CombinedBatch::new(
         registry.last_object_identifier(),
-        fresh.identifier,
+        fresh.last().ok_or(Error::Verification)?.identifier,
         &additions,
         &[],
         &[],
@@ -222,12 +277,11 @@ pub(super) fn create_root_comment(
     })
 }
 
-fn creation_graph(source: &Package, path: Path) -> Result<(MessageRoute, u64), Error> {
+fn creation_graph(source: &Package, path: Path) -> Result<CreationGraph, Error> {
     let census = super::census_comment_ownership(source, path)?;
     if census.comment_list_ids.len() != 1 || !census.rooted_segment_ids.is_empty() {
         return Err(Error::UnsupportedDependency { path });
     }
-    super::validate_comment_authors(source, &census, path)?;
     let table_id = census.comment_list_ids[0];
     let resolved = source
         .state
@@ -255,21 +309,143 @@ fn creation_graph(source: &Package, path: Path) -> Result<(MessageRoute, u64), E
         }
     }
     let message_index = message_index.ok_or(Error::InvalidSource { path })?;
-    let mut authors = census.author_ids;
+    let mut authors = census.author_ids.clone();
     authors.sort_unstable();
     authors.dedup();
-    if authors.len() != 1 {
+    let list = MessageRoute {
+        component_index: resolved.component_index,
+        object_index: resolved.object_index,
+        message_index,
+        message_type: resolved.messages[message_index].type_,
+    };
+    if authors.len() == 1 {
+        super::validate_comment_authors(source, &census, path)?;
+        return Ok(CreationGraph {
+            list,
+            author_identifier: authors[0],
+            author_storage: None,
+        });
+    }
+    if !authors.is_empty() {
         return Err(Error::UnsupportedDependency { path });
     }
-    Ok((
-        MessageRoute {
-            component_index: resolved.component_index,
-            object_index: resolved.object_index,
-            message_index,
-            message_type: resolved.messages[message_index].type_,
-        },
-        authors[0],
-    ))
+    let author_storage = empty_author_storage(source, path)?;
+    Ok(CreationGraph {
+        list,
+        author_identifier: 0,
+        author_storage: Some(author_storage),
+    })
+}
+
+fn empty_author_storage(source: &Package, path: Path) -> Result<MessageRoute, Error> {
+    let mut found = None;
+    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for (object_index, object) in component.archive().objects.iter().enumerate() {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE {
+                    continue;
+                }
+                let fields = litchi_iwa_common::wire::WireView::parse(message.data.as_slice())
+                    .map_err(|_| Error::InvalidSource { path })?;
+                if fields.fields().any(|field| field.number() == 1) {
+                    return Err(Error::UnsupportedDependency { path });
+                }
+                if found
+                    .replace(MessageRoute {
+                        component_index,
+                        object_index,
+                        message_index,
+                        message_type: message.type_,
+                    })
+                    .is_some()
+                {
+                    return Err(Error::InvalidSource { path });
+                }
+            }
+        }
+    }
+    found.ok_or(Error::UnsupportedDependency { path })
+}
+
+fn canonical_reference(identifier: u64, path: Path) -> Result<Vec<u8>, Error> {
+    let mut reference = Vec::new();
+    append_varint_field(&mut reference, 1, identifier)
+        .map_err(|_| Error::InvalidSource { path })?;
+    Ok(reference)
+}
+
+fn append_author_storage(
+    archive: &mut Archive,
+    source: &Package,
+    route: MessageRoute,
+    identifier: u64,
+    limits: litchi_iwa_core::Limits,
+    path: Path,
+) -> Result<(), Error> {
+    let message = message_at_route(source, route, path)?;
+    let reference = canonical_reference(identifier, path)?;
+    let data = append_repeated_length_delimited_field(message.data.as_slice(), 1, &reference)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let object = archive
+        .objects
+        .get_mut(route.object_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get(route.message_index)
+        .ok_or(Error::InvalidSource { path })?
+        .clone();
+    if !info.object_references.is_empty() || !info.field_infos.is_empty() {
+        return Err(Error::InvalidSource { path });
+    }
+    object
+        .replace_message_transitioning_object_references_preserving_header_with_limits(
+            route.message_index,
+            RawMessage {
+                type_: route.message_type,
+                data,
+            },
+            ObjectReferenceTransition {
+                aggregate_before: &[],
+                aggregate_after: &[identifier],
+                fields: &[],
+            },
+            limits,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get_mut(route.message_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let mut field = FieldInfo::new(vec![1]);
+    field.r#type = Some(FieldType::ObjectReference);
+    field.object_references = vec![identifier];
+    info.field_infos.push(field);
+    Ok(())
+}
+
+fn author_object(identifier: u64, path: Path) -> Result<ArchiveObject, Error> {
+    let mut payload = Vec::new();
+    append_length_delimited_field(&mut payload, 1, GENERATED_AUTHOR_NAME.as_bytes())
+        .map_err(|_| Error::InvalidSource { path })?;
+    append_varint_field(&mut payload, 4, 0).map_err(|_| Error::InvalidSource { path })?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
+            data: payload,
+        }],
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let info = object
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or(Error::InvalidSource { path })?;
+    info.field_infos.push(FieldInfo::new(vec![4]));
+    Ok(object)
 }
 
 fn append_comment_entry(
