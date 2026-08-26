@@ -1,0 +1,131 @@
+#![cfg(feature = "xlsb")]
+
+use std::io::{Cursor, Write};
+
+use litchi::opc::{OpcPackage, PackURI};
+use litchi::sheet::{Workbook, WorkbookTrait};
+use litchi::xlsb;
+
+fn fixture_bytes() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/Simple.xlsb"
+    ))
+    .unwrap()
+}
+
+fn fixture_file(bytes: &[u8]) -> tempfile::NamedTempFile {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), bytes).unwrap();
+    file
+}
+
+fn malformed_second_sheet() -> Vec<u8> {
+    let mut package = OpcPackage::from_reader(Cursor::new(fixture_bytes())).unwrap();
+    let sheet = PackURI::new("/xl/worksheets/sheet2.bin").unwrap();
+    package
+        .get_part_mut(&sheet)
+        .unwrap()
+        .set_blob(vec![0xff; 8]);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
+fn assert_source_changed<T>(result: litchi::sheet::Result<T>) {
+    let error = match result {
+        Ok(_) => panic!("stale source operation unexpectedly succeeded"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.downcast_ref::<litchi_core::Error>(),
+        Some(litchi_core::Error::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn path_facade_defers_malformed_unselected_worksheet() {
+    let malformed = malformed_second_sheet();
+    let file = fixture_file(&malformed);
+    let workbook = Workbook::open(file.path()).expect("lazy XLSB facade open");
+
+    let names = workbook
+        .worksheet_names()
+        .expect("catalog names should not read worksheet payloads");
+    assert_eq!(workbook.worksheet_count().unwrap(), names.len());
+    assert!(names.len() >= 2);
+
+    // The first worksheet remains a valid readable source; the malformed
+    // second stream is only observed when the facade walks into it.
+    let valid = Workbook::open(fixture_file(&fixture_bytes()).path())
+        .expect("valid XLSB facade open")
+        .text()
+        .expect("valid first worksheet should be readable");
+    assert!(!valid.is_empty());
+    assert!(workbook.text().is_err());
+}
+
+#[test]
+fn owned_bytes_facade_defers_malformed_unselected_worksheet() {
+    let valid = Workbook::from_bytes(fixture_bytes()).expect("valid XLSB bytes open");
+    assert!(
+        !valid
+            .text()
+            .expect("valid first worksheet should be readable")
+            .is_empty()
+    );
+
+    let malformed = Workbook::from_bytes(malformed_second_sheet())
+        .expect("owned bytes catalog should defer worksheet parsing");
+    let names = malformed
+        .worksheet_names()
+        .expect("owned bytes catalog names");
+    assert_eq!(malformed.worksheet_count().unwrap(), names.len());
+    assert!(names.len() >= 2);
+    assert!(malformed.text().is_err());
+}
+
+#[test]
+fn path_facade_reports_typed_source_change_for_catalog_and_reads() {
+    let file = fixture_file(&fixture_bytes());
+    let workbook = Workbook::open(file.path()).expect("lazy XLSB facade open");
+    let _ = workbook
+        .text()
+        .expect("materialize the retained worksheet source");
+
+    let mut changed = std::fs::OpenOptions::new()
+        .append(true)
+        .open(file.path())
+        .unwrap();
+    changed.write_all(b"source mutation").unwrap();
+    changed.flush().unwrap();
+
+    assert_source_changed(workbook.worksheet_names());
+    assert_source_changed(workbook.worksheet_count());
+    assert_source_changed(workbook.text());
+}
+
+#[test]
+fn lazy_facade_catalog_matches_eager_xlsb_tabs_and_date_system() {
+    let bytes = fixture_bytes();
+    let file = fixture_file(&bytes);
+    let lazy = Workbook::open(file.path()).expect("lazy XLSB facade open");
+    let eager = xlsb::Workbook::new(Cursor::new(bytes)).expect("eager XLSB open");
+    let eager_dyn = litchi::sheet::open_xlsb_workbook_dyn(file.path())
+        .expect("eager XLSB facade entrypoint open");
+
+    assert_eq!(lazy.worksheet_names().unwrap(), eager.worksheet_names());
+    assert_eq!(lazy.worksheet_count().unwrap(), eager.worksheet_count());
+    assert_eq!(eager_dyn.is_1904_date_system(), eager.is_1904_date_system());
+}
+
+#[test]
+fn eager_xlsb_byte_entrypoint_rejects_malformed_sheet_while_lazy_facade_opens() {
+    let malformed = malformed_second_sheet();
+    let file = fixture_file(&malformed);
+    let lazy = Workbook::open(file.path()).expect("lazy facade should open catalog");
+    assert!(lazy.worksheet_names().is_ok());
+
+    assert!(xlsb::Workbook::new(Cursor::new(malformed.clone())).is_err());
+    assert!(litchi::sheet::open_xlsb_workbook_from_bytes(&malformed).is_err());
+}

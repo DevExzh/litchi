@@ -38,20 +38,32 @@ const XLSB_MACROSHEET_RELATIONSHIP: &str =
 const XLSB_INTL_MACROSHEET_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SheetKind {
+    Worksheet,
+    Chart,
+    Dialog,
+    Macro,
+    IntlMacro,
+}
+
 #[derive(Debug)]
-struct WorksheetMetadata {
+struct SheetMetadata {
     name: String,
     workbook_position: usize,
     partname: PackURI,
+    kind: SheetKind,
 }
 
 struct SourceInner {
     package: SourceBackedPackage,
-    worksheets: Vec<WorksheetMetadata>,
+    sheets: Vec<SheetMetadata>,
+    worksheet_positions: Vec<usize>,
     formula_context: Context,
     shared_strings_part: Option<PackURI>,
     styles_part: Option<PackURI>,
     incomplete_formula_context: bool,
+    is_1904_date_system: bool,
     shared_strings: Mutex<Option<Arc<Vec<SharedString>>>>,
     styles: Mutex<Option<Arc<StylesTable>>>,
 }
@@ -68,10 +80,11 @@ pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
 }
 
-/// A source-bound handle for one worksheet in an XLSB workbook.
+/// A source-bound handle for one sheet in an XLSB workbook.
 ///
 /// The handle contains only catalog metadata. Calling [`Self::materialize`]
-/// reads the selected BIFF12 worksheet body and its shared-string/style inputs.
+/// reads the selected BIFF12 worksheet body and its shared-string/style inputs;
+/// non-worksheet handles return a typed capability error.
 #[derive(Clone)]
 pub struct SourceBackedWorksheet {
     inner: Arc<SourceInner>,
@@ -179,15 +192,22 @@ impl SourceBackedWorkbook {
             "styles",
         )?;
 
-        let mut worksheets = Vec::new();
-        worksheets
+        let mut sheets = Vec::new();
+        sheets
+            .try_reserve_exact(info.worksheet_names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB sheet catalog",
+                source,
+            })?;
+        let mut worksheet_positions = Vec::new();
+        worksheet_positions
             .try_reserve_exact(info.worksheet_names.len())
             .map_err(|source| Error::Allocation {
                 resource: "source-backed XLSB worksheet catalog",
                 source,
             })?;
-        let mut worksheet_targets = Vec::new();
-        worksheet_targets
+        let mut sheet_targets = Vec::new();
+        sheet_targets
             .try_reserve_exact(info.worksheet_names.len())
             .map_err(|source| Error::Allocation {
                 resource: "source-backed XLSB worksheet target validation",
@@ -217,14 +237,14 @@ impl SourceBackedWorkbook {
                 )));
             }
             let partname = relationship.target_partname()?;
-            if worksheet_targets.contains(&partname) {
+            if sheet_targets.contains(&partname) {
                 return Err(Error::InvalidRelationship(format!(
-                    "multiple XLSB worksheets resolve to {partname}"
+                    "multiple XLSB sheets resolve to {partname}"
                 )));
             }
-            worksheet_targets.push(partname.clone());
+            sheet_targets.push(partname.clone());
             let sheet_part = package.part(&partname)?;
-            if matches!(
+            let sheet_kind = if matches!(
                 relationship.reltype(),
                 relationship_type::WORKSHEET | relationship_type::STRICT_WORKSHEET
             ) {
@@ -238,19 +258,24 @@ impl SourceBackedWorkbook {
                             | relationship_type::STRICT_PIVOT_TABLE
                     )
                 });
+                SheetKind::Worksheet
             } else {
                 match relationship.reltype() {
                     XLSB_CHARTSHEET_RELATIONSHIP | XLSB_STRICT_CHARTSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_CHARTSHEET_CONTENT_TYPE)?;
+                        SheetKind::Chart
                     },
                     XLSB_DIALOGSHEET_RELATIONSHIP | XLSB_STRICT_DIALOGSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_DIALOGSHEET_CONTENT_TYPE)?;
+                        SheetKind::Dialog
                     },
                     XLSB_MACROSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_MACROSHEET_CONTENT_TYPE)?;
+                        SheetKind::Macro
                     },
                     XLSB_INTL_MACROSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_INTL_MACROSHEET_CONTENT_TYPE)?;
+                        SheetKind::IntlMacro
                     },
                     _ => {
                         return Err(Error::InvalidRelationship(format!(
@@ -259,13 +284,17 @@ impl SourceBackedWorkbook {
                         )));
                     },
                 }
-                continue;
-            }
-            worksheets.push(WorksheetMetadata {
+            };
+            let catalog_position = sheets.len();
+            sheets.push(SheetMetadata {
                 name: name.clone(),
                 workbook_position,
                 partname,
+                kind: sheet_kind,
             });
+            if matches!(sheet_kind, SheetKind::Worksheet) {
+                worksheet_positions.push(catalog_position);
+            }
         }
 
         if let Some(partname) = shared_strings_part.as_ref() {
@@ -277,6 +306,7 @@ impl SourceBackedWorkbook {
             require_content_type(&part, XLSB_STYLES_CONTENT_TYPE)?;
         }
 
+        let is_1904_date_system = info.is_1904;
         let formula_context = Context {
             worksheet_names: info.worksheet_names.into(),
             supporting_links: info.supporting_links.into(),
@@ -294,21 +324,85 @@ impl SourceBackedWorkbook {
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
-                worksheets,
+                sheets,
+                worksheet_positions,
                 formula_context,
                 shared_strings_part,
                 styles_part,
                 incomplete_formula_context,
+                is_1904_date_system,
                 shared_strings: Mutex::new(None),
                 styles: Mutex::new(None),
             }),
         })
     }
 
+    /// Return the number of workbook tabs after checking source freshness.
+    pub fn sheet_count(&self) -> Result<usize> {
+        self.inner.package.source_version()?;
+        Ok(self.inner.sheets.len())
+    }
+
+    /// Snapshot all workbook tab names in workbook order after checking source freshness.
+    pub fn sheet_names(&self) -> Result<Vec<String>> {
+        self.inner.package.source_version()?;
+        let mut names = Vec::new();
+        names
+            .try_reserve_exact(self.inner.sheets.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB sheet-name snapshot",
+                source,
+            })?;
+        names.extend(self.inner.sheets.iter().map(|sheet| sheet.name.clone()));
+        Ok(names)
+    }
+
+    /// Snapshot all checked workbook tab handles in workbook order.
+    pub fn sheets(&self) -> Result<Vec<SourceBackedWorksheet>> {
+        self.inner.package.source_version()?;
+        let mut sheets = Vec::new();
+        sheets
+            .try_reserve_exact(self.inner.sheets.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB sheet-handle snapshot",
+                source,
+            })?;
+        sheets.extend(
+            (0..self.inner.sheets.len()).map(|catalog_position| SourceBackedWorksheet {
+                inner: Arc::clone(&self.inner),
+                catalog_position,
+            }),
+        );
+        Ok(sheets)
+    }
+
+    /// Select a workbook tab by zero-based position in complete workbook order.
+    pub fn sheet_by_index(&self, index: usize) -> Result<Option<SourceBackedWorksheet>> {
+        self.inner.package.source_version()?;
+        Ok(self.inner.sheets.get(index).map(|_| SourceBackedWorksheet {
+            inner: Arc::clone(&self.inner),
+            catalog_position: index,
+        }))
+    }
+
+    /// Select a workbook tab by its exact workbook name.
+    pub fn sheet_by_name(&self, name: &str) -> Result<Option<SourceBackedWorksheet>> {
+        self.inner.package.source_version()?;
+        Ok(self
+            .inner
+            .sheets
+            .iter()
+            .position(|sheet| sheet.name == name)
+            .map(|catalog_position| SourceBackedWorksheet {
+                inner: Arc::clone(&self.inner),
+                catalog_position,
+            }))
+    }
+
     /// Return the number of worksheet owners after checking source freshness.
     pub fn worksheet_count(&self) -> Result<usize> {
         self.inner.package.source_version()?;
-        Ok(self.inner.worksheets.len())
+        Ok(self.inner.worksheet_positions.len())
     }
 
     /// Snapshot worksheet names in workbook order after checking source freshness.
@@ -316,16 +410,16 @@ impl SourceBackedWorkbook {
         self.inner.package.source_version()?;
         let mut names = Vec::new();
         names
-            .try_reserve_exact(self.inner.worksheets.len())
+            .try_reserve_exact(self.inner.worksheet_positions.len())
             .map_err(|source| Error::Allocation {
                 resource: "source-backed XLSB worksheet-name snapshot",
                 source,
             })?;
         names.extend(
             self.inner
-                .worksheets
+                .worksheet_positions
                 .iter()
-                .map(|worksheet| worksheet.name.clone()),
+                .map(|&catalog_position| self.inner.sheets[catalog_position].name.clone()),
         );
         Ok(names)
     }
@@ -335,17 +429,21 @@ impl SourceBackedWorkbook {
         self.inner.package.source_version()?;
         let mut worksheets = Vec::new();
         worksheets
-            .try_reserve_exact(self.inner.worksheets.len())
+            .try_reserve_exact(self.inner.worksheet_positions.len())
             .map_err(|source| Error::Allocation {
                 resource: "source-backed XLSB worksheet-handle snapshot",
                 source,
             })?;
-        worksheets.extend((0..self.inner.worksheets.len()).map(|catalog_position| {
-            SourceBackedWorksheet {
-                inner: Arc::clone(&self.inner),
-                catalog_position,
-            }
-        }));
+        worksheets.extend(
+            self.inner
+                .worksheet_positions
+                .iter()
+                .copied()
+                .map(|catalog_position| SourceBackedWorksheet {
+                    inner: Arc::clone(&self.inner),
+                    catalog_position,
+                }),
+        );
         Ok(worksheets)
     }
 
@@ -354,11 +452,12 @@ impl SourceBackedWorkbook {
         self.inner.package.source_version()?;
         Ok(self
             .inner
-            .worksheets
+            .worksheet_positions
             .get(index)
-            .map(|_| SourceBackedWorksheet {
+            .copied()
+            .map(|catalog_position| SourceBackedWorksheet {
                 inner: Arc::clone(&self.inner),
-                catalog_position: index,
+                catalog_position,
             }))
     }
 
@@ -367,9 +466,10 @@ impl SourceBackedWorkbook {
         self.inner.package.source_version()?;
         Ok(self
             .inner
-            .worksheets
+            .worksheet_positions
             .iter()
-            .position(|worksheet| worksheet.name == name)
+            .copied()
+            .find(|&catalog_position| self.inner.sheets[catalog_position].name == name)
             .map(|catalog_position| SourceBackedWorksheet {
                 inner: Arc::clone(&self.inner),
                 catalog_position,
@@ -381,6 +481,12 @@ impl SourceBackedWorkbook {
         self.inner.package.source_version().map_err(Into::into)
     }
 
+    /// Return whether this workbook uses Excel's 1904 date system.
+    pub fn is_1904_date_system(&self) -> Result<bool> {
+        self.inner.package.source_version()?;
+        Ok(self.inner.is_1904_date_system)
+    }
+
     /// Return content-free deferred-Part cache diagnostics.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
@@ -389,13 +495,13 @@ impl SourceBackedWorkbook {
 }
 
 impl SourceBackedWorksheet {
-    /// Return this worksheet's name after checking source freshness.
+    /// Return this sheet's name after checking source freshness.
     pub fn name(&self) -> Result<&str> {
         self.inner.package.source_version()?;
         Ok(&self.metadata().name)
     }
 
-    /// Return this worksheet's zero-based position in the complete workbook sheet order.
+    /// Return this sheet's zero-based position in the complete workbook sheet order.
     pub fn workbook_position(&self) -> Result<usize> {
         self.inner.package.source_version()?;
         Ok(self.metadata().workbook_position)
@@ -409,13 +515,18 @@ impl SourceBackedWorksheet {
     pub fn materialize(&self) -> Result<Worksheet> {
         self.inner.package.check_execution()?;
         self.inner.package.source_version()?;
+        let metadata = self.metadata();
+        if !matches!(metadata.kind, SheetKind::Worksheet) {
+            return Err(Error::UnsupportedFeature(
+                "source-backed XLSB non-worksheet materialization is not supported".to_string(),
+            ));
+        }
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
                 "source-backed XLSB worksheet materialization requires deferred external, table, or PivotTable formula owners"
                     .to_string(),
             ));
         }
-        let metadata = self.metadata();
         let worksheet_part = self.inner.package.part(&metadata.partname)?;
         if worksheet_part.rels().iter().any(|relationship| {
             relationship.reltype().contains("/slicer")
@@ -473,8 +584,8 @@ impl SourceBackedWorksheet {
         Ok(worksheet)
     }
 
-    fn metadata(&self) -> &WorksheetMetadata {
-        &self.inner.worksheets[self.catalog_position]
+    fn metadata(&self) -> &SheetMetadata {
+        &self.inner.sheets[self.catalog_position]
     }
 }
 
