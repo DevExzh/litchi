@@ -4144,6 +4144,9 @@ NUMBERS_INDEX_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "index.rs"
 NUMBERS_CORE_ARCHIVE_SOURCE = Path("crates/litchi-iwa-core/src/archive.rs")
 NUMBERS_PACKAGE_MANIFEST = Path("crates/litchi-numbers/Cargo.toml")
 NUMBERS_EXTRACTOR_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "extractor.rs"
+IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/table_extractor.rs"
+)
 NUMBERS_NAMES_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "names.rs"
 NUMBERS_INDEX_SEMANTIC_ALIAS_WORD = re.compile(
     r"\b(?:alias\w*|coalesc\w*|dedup\w*|equivalent|unique|canonical)\b",
@@ -4206,6 +4209,22 @@ NUMBERS_EXTRACTOR_NO_EAGER_TILE_SOURCE_PATTERNS = (
             r"(?<![A-Za-z0-9_#])TileRowInfo[ \t\r\n]*::[ \t\r\n]*decode\b"
         ),
     ),
+)
+IWA_NUMBERS_TABLE_EXTRACTOR_NO_EAGER_MODEL_TILE_PATTERNS = (
+    (
+        "TableModelArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])TableModelArchive[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+    *NUMBERS_EXTRACTOR_NO_EAGER_TILE_SOURCE_PATTERNS,
+)
+IWA_NUMBERS_TABLE_EXTRACTOR_REQUIRED_MARKERS = (
+    "select_candidate",
+    "decode_table_model_compatibility_with_data_store_and_visitor",
+    "decode_tile_storage_with_visitor",
+    "decode_tile_with_visitor",
 )
 NUMBERS_EXTRACTOR_NO_EAGER_TABLE_DATA_LIST_SOURCE_PATTERNS = (
     (
@@ -20518,6 +20537,41 @@ def audit_numbers_extractor_no_eager_tile_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_table_extractor_model_tile_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the legacy host extractor on borrowed model and tile projections.
+
+    This ratchet is deliberately limited to the model/DataStore/Tile graph.
+    Formula ASTs, rich-text compatibility payloads, and rooted package
+    ownership remain separate migration boundaries. Test-only generated
+    builders and differential oracles are masked.
+    """
+
+    violations: list[str] = []
+    source_path = root / IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+    if not source_path.is_file():
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+    for marker in IWA_NUMBERS_TABLE_EXTRACTOR_REQUIRED_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", production_code) is None:
+            violations.append(
+                "legacy iwa Numbers table extractor is missing bounded "
+                f"{marker} route: {IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE}"
+            )
+    for label, pattern in IWA_NUMBERS_TABLE_EXTRACTOR_NO_EAGER_MODEL_TILE_PATTERNS:
+        for match in pattern.finditer(production_code):
+            line_number = production_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "legacy iwa Numbers table extractor production source uses "
+                f"{label}: {IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_extractor_no_eager_table_data_list_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -28292,6 +28346,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_package_no_eager_prost_source_topology()
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()
+        + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_iwa_numbers_table_cell_storage_source_topology()
         + audit_iwa_package_metadata_read_source_topology()

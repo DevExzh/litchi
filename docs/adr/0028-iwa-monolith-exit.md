@@ -5883,3 +5883,50 @@ generated or outside this slice. The ledger is aggregate for one rooted
 catalog operation, not a package-wide extraction or publication budget. This
 amendment makes no full model-codec ownership, TableInfo retirement, zero-copy,
 performance/RSS, dependency-edge, debt, crate-exit, or monolith-exit claim.
+
+## 2026-08-27 amendment: Numbers table-extractor borrowed model and tile graph (not a monolith-exit gate)
+
+The cross-application legacy table extractor no longer materializes generated
+`TableModelArchive`, nested `DataStore`/`TileStorage`, `Tile`, or `TileRowInfo`
+values while projecting a semantic table. Candidate admission reuses the
+bounded selector established by the preceding amendment: canonical type 6001
+is authoritative, historical type 6000 must prove the legacy model signature,
+malformed canonical input cannot fall back, duplicate candidates fail closed,
+and TableInfo-shaped decoys are not promoted by permissive generated decoding.
+An additive strict codec result now returns the borrowed model and DataStore
+snapshots from the same traversal. The adapter separately streams primitive
+tile routes and stages owned semantic cells from borrowed row buffers; a tile
+is published only after the complete strict handwritten/Buffa parity pass
+succeeds. The finite candidate ledger continues across the selected replay,
+TileStorage, and every tile report for that table.
+
+The tracked `basic.numbers` regression proves one canonical 22×7 Table 1 with
+materialized cells through this model/DataStore/tile route. Focused extractor
+coverage passes 33/33 and the additive codec regression passes 1/1. The source
+topology checker now requires the selector plus combined model/DataStore,
+TileStorage, and Tile visitor routes in the legacy extractor while rejecting
+production `TableModelArchive::decode`, `Tile::decode`, and
+`TileRowInfo::decode`; its focused matrix passes 4/4. The existing model
+selector suites continue to cover canonical/legacy precedence, TableInfo
+decoys, malformed and duplicate candidates, unknown groups, and finite
+field/work refusal.
+
+A SHA-identical temporary copy of the tracked 136,357-byte source (SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`)
+opened read-only in Numbers 14.4 without a repair dialog. The application
+reported Table 1 as 22 rows by 7 columns and rendered the expected
+`Litchi native Numbers fixture` text and `42` value. The copy was not saved or
+normalized, so this is reopen evidence only and not native mutation evidence.
+
+This remains an unrooted compatibility extractor shared by Numbers, Pages,
+and Keynote; it does not claim Numbers Document→Sheet→TableInfo ownership or
+reject detached compatibility models. Formula ASTs, formula-owner/category
+discovery, rich-text compatibility payloads, sidecar semantic values, BNC
+cell interpretation, comments, metadata, and native writers retain their
+existing owners. Sidecar budgets and materialized-cell ceilings remain
+table/list local rather than one package-wide allocation ledger. No native
+mutation was performed by this read-only extraction slice, and no zero-copy,
+allocation-free, throughput, or RSS claim follows. The migration host,
+dependency edges, debt 010, debt 015, every other current migration debt, and
+the monolith deletion gate remain unchanged; no crate, generated-schema owner,
+host adapter, debt item, or edge is retired.

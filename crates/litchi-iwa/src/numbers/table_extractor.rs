@@ -33,6 +33,7 @@ use super::bnc::{BncCellView, CachedScalar, StoredValue};
 #[cfg(test)]
 use super::bnc::{decimal128_le, read_decimal128_le};
 use super::cell::CellValue;
+use super::editor::table_model_projection::{ProbeBudget, map_resource_error, select_candidate};
 use super::table::NumbersTable;
 use crate::bundle::Bundle;
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
@@ -42,6 +43,7 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
 use litchi_iwa_protos::comment_storage_codec;
+use litchi_iwa_protos::numbers_names_codec;
 use litchi_iwa_protos::numbers_table_cell_storage_codec;
 use litchi_numbers::cell::FiniteF64;
 use litchi_numbers::table::Dimensions;
@@ -276,6 +278,18 @@ fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::Decod
     )
 }
 
+fn table_name_decode_options(source: &[u8]) -> numbers_names_codec::DecodeOptions {
+    numbers_names_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(4)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX),
+    )
+}
+
 fn comment_storage_allocation_error(resource: &'static str, amount: usize) -> Error {
     Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
 }
@@ -366,6 +380,117 @@ struct ParsedCell {
     comment_identifier: Option<u32>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct TileRoute {
+    tile_id: u32,
+    object_identifier: u64,
+}
+
+#[derive(Default)]
+struct TileRoutes {
+    routes: Vec<TileRoute>,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for TileRoutes {
+    fn visit_tile_reference(
+        &mut self,
+        record: numbers_table_cell_storage_codec::TileReferenceRecord<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.routes.try_reserve(1).map_err(|_| {
+            numbers_table_cell_storage_codec::DecodeError::allocation(
+                self.routes.len().saturating_add(1),
+            )
+        })?;
+        self.routes.push(TileRoute {
+            tile_id: record.tile_id(),
+            object_identifier: record.reference().identifier(),
+        });
+        Ok(())
+    }
+}
+
+struct StagedTableCell {
+    row: usize,
+    column: usize,
+    parsed: ParsedCell,
+}
+
+struct TileRowStage<'context, 'tables> {
+    row_origin: usize,
+    tile_size: usize,
+    dimensions: Dimensions,
+    budget: &'context mut CellBudget,
+    cell_tables: &'context CellTables<'tables>,
+    rows: HashSet<u32>,
+    cells: Vec<StagedTableCell>,
+    semantic_error: Option<Error>,
+}
+
+impl<'context, 'tables> TileRowStage<'context, 'tables> {
+    fn new(
+        row_origin: usize,
+        tile_size: usize,
+        dimensions: Dimensions,
+        budget: &'context mut CellBudget,
+        cell_tables: &'context CellTables<'tables>,
+    ) -> Self {
+        Self {
+            row_origin,
+            tile_size,
+            dimensions,
+            budget,
+            cell_tables,
+            rows: HashSet::new(),
+            cells: Vec::new(),
+            semantic_error: None,
+        }
+    }
+
+    fn finish(self) -> Result<Vec<StagedTableCell>> {
+        match self.semantic_error {
+            Some(error) => Err(error),
+            None => Ok(self.cells),
+        }
+    }
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for TileRowStage<'_, '_> {
+    fn visit_tile_row(
+        &mut self,
+        row: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        if self.semantic_error.is_some() {
+            return Ok(());
+        }
+        if self.rows.try_reserve(1).is_err() {
+            self.semantic_error = Some(allocation_error(
+                "Numbers tile row keys",
+                self.rows.len().saturating_add(1),
+            ));
+            return Ok(());
+        }
+        if !self.rows.insert(row.tile_row_index()) {
+            self.semantic_error = Some(Error::InvalidFormat(format!(
+                "Numbers tile repeats row {}",
+                row.tile_row_index()
+            )));
+            return Ok(());
+        }
+        if let Err(error) = stage_tile_row(
+            row,
+            self.row_origin,
+            self.tile_size,
+            self.dimensions,
+            self.budget,
+            self.cell_tables,
+            &mut self.cells,
+        ) {
+            self.semantic_error = Some(error);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 struct CellBudget {
     remaining: usize,
@@ -396,6 +521,81 @@ impl CellBudget {
         self.remaining -= materialized;
         Ok(())
     }
+}
+
+fn stage_tile_row(
+    row_info: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
+    row_origin: usize,
+    tile_size: usize,
+    dimensions: Dimensions,
+    budget: &mut CellBudget,
+    cell_tables: &CellTables<'_>,
+    staged: &mut Vec<StagedTableCell>,
+) -> Result<()> {
+    let tile_row_index = usize::try_from(row_info.tile_row_index()).map_err(|_| {
+        Error::InvalidFormat("Numbers tile row index does not fit the host usize".to_owned())
+    })?;
+    if tile_row_index >= tile_size {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers tile row {} is outside tile size {tile_size}",
+            row_info.tile_row_index()
+        )));
+    }
+    let row_index = row_origin
+        .checked_add(tile_row_index)
+        .ok_or_else(|| Error::ParseError("Numbers tile row index overflow".to_owned()))?;
+    dimensions.check_row(row_index).map_err(|_| {
+        Error::InvalidFormat(format!(
+            "Numbers tile row {row_index} is outside the declared table height {}",
+            dimensions.rows()
+        ))
+    })?;
+
+    let (cell_storage, cell_offsets) =
+        match (row_info.cell_storage_buffer(), row_info.cell_offsets()) {
+            (Some(storage), Some(offsets)) => (storage, offsets),
+            _ => (
+                row_info.cell_storage_buffer_pre_bnc(),
+                row_info.cell_offsets_pre_bnc(),
+            ),
+        };
+
+    let expected_cells = usize::try_from(row_info.cell_count()).map_err(|_| {
+        Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
+    })?;
+    budget.check(expected_cells)?;
+    let cells = TableDataExtractor::parse_cell_offsets(
+        cell_offsets,
+        cell_storage.len(),
+        row_info.has_wide_offsets().unwrap_or(false),
+        expected_cells,
+        dimensions.columns() as usize,
+    )?;
+    budget.consume(cells.len())?;
+    staged
+        .try_reserve(cells.len())
+        .map_err(|_| allocation_error("Numbers staged tile cells", staged.len() + cells.len()))?;
+
+    for (column_index, range) in cells {
+        dimensions.check_column(column_index).map_err(|_| {
+            Error::InvalidFormat(format!(
+                "Numbers cell column {column_index} is outside the declared table width {}",
+                dimensions.columns()
+            ))
+        })?;
+        let parsed = TableDataExtractor::parse_cell_storage(
+            &cell_storage[range],
+            cell_tables,
+            row_index,
+            column_index,
+        )?;
+        staged.push(StagedTableCell {
+            row: row_index,
+            column: column_index,
+            parsed,
+        });
+    }
+    Ok(())
 }
 
 fn allocation_error(resource: &'static str, amount: usize) -> Error {
@@ -871,68 +1071,70 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         object: &ResolvedObjectRef<'_>,
     ) -> Result<Option<NumbersTable>> {
-        // Prefer the typed TableModelArchive message in real packages.
-        if let Some(message) = object
-            .messages
-            .iter()
-            .find(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
-        {
-            let table_model = tst::TableModelArchive::decode(&*message.data).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Numbers table-model message {} is malformed: {error}",
-                    message.type_
-                ))
-            })?;
-            return self.parse_table_model(table_model).map(Some);
-        }
+        let mut projection_budget = ProbeBudget::new();
+        let selected = select_candidate(object.messages, &mut projection_budget, |message| {
+            Error::InvalidFormat(format!("Object {:?} {message}", object.id()))
+        })?;
+        let Some(selected) = selected else {
+            return Ok(None);
+        };
+        let source = object.messages[selected].data.as_slice();
 
-        // Protobuf is permissive, and legacy fixtures used 6000 for a model.
-        // Only return that fallback after the complete table extraction
-        // succeeds; a genuine TableInfoArchive has no cell data stores and is
-        // therefore skipped safely.
-        for message in object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 6_000)
-        {
-            let Ok(table_model) = tst::TableModelArchive::decode(&*message.data) else {
-                continue;
-            };
-            if let Ok(table) = self.parse_table_model(table_model) {
-                return Ok(Some(table));
-            }
-        }
-
-        Ok(None)
+        // Candidate admission above proves whether the selected source uses
+        // the strict or historical sparse envelope. Replaying the selected
+        // source through the compatibility projection is therefore only a
+        // borrowed extraction adapter: no unvalidated candidate can reach
+        // this path, and the strict selector remains the authority for modern
+        // known fields and framing.
+        let decoded =
+            numbers_table_cell_storage_codec::decode_table_model_compatibility_with_data_store_and_visitor(
+                source,
+                projection_budget.options(source),
+                &mut (),
+            );
+        let (projection, report) = match decoded {
+            Ok(decoded) => decoded,
+            Err(error) => return Err(map_resource_error(error, projection_budget)?),
+        };
+        projection_budget.charge_report(report)?;
+        self.parse_table_model_projection(
+            projection.model(),
+            projection.data_store(),
+            &mut projection_budget,
+        )
+        .map(Some)
     }
 
-    /// Parse a TableModelArchive protobuf message
-    fn parse_table_model(&self, table_model: tst::TableModelArchive) -> Result<NumbersTable> {
-        let (row_count, column_count) =
-            checked_table_dimensions(table_model.number_of_rows, table_model.number_of_columns)?;
+    /// Parse one strictly admitted borrowed model/DataStore projection.
+    fn parse_table_model_projection(
+        &self,
+        table_model: numbers_table_cell_storage_codec::TableModelSnapshot<'_>,
+        data_store: numbers_table_cell_storage_codec::DataStoreSnapshot<'_>,
+        projection_budget: &mut ProbeBudget,
+    ) -> Result<NumbersTable> {
+        let (row_count, column_count) = checked_table_dimensions(
+            table_model.number_of_rows(),
+            table_model.number_of_columns(),
+        )?;
         let mut table =
-            NumbersTable::with_dimensions(table_model.table_name, row_count, column_count)?;
+            NumbersTable::with_dimensions(table_model.table_name(), row_count, column_count)?;
 
         // Extract string table for cell text values
-        // string_table is a required field, not Optional
-        let string_table =
-            self.load_string_table(table_model.base_data_store.string_table.identifier)?;
+        let string_table = self.load_string_table(data_store.string_table().identifier())?;
 
         // Extract formula table for formula cells
-        // formula_table is a required field, not Optional
-        let formula_table =
-            self.load_formula_table(table_model.base_data_store.formula_table.identifier)?;
-        let formula_error_table = match table_model.base_data_store.formula_error_table {
-            Some(reference) => self.load_formula_error_table(reference.identifier)?,
+        let formula_table = self.load_formula_table(data_store.formula_table().identifier())?;
+        let formula_error_table = match data_store.formula_error_table() {
+            Some(reference) => self.load_formula_error_table(reference.identifier())?,
             None => Box::default(),
         };
 
-        let rich_text_table = match table_model.base_data_store.rich_text_table {
-            Some(reference) => self.load_rich_text_table(reference.identifier)?,
+        let rich_text_table = match data_store.rich_text_table() {
+            Some(reference) => self.load_rich_text_table(reference.identifier())?,
             None => Box::default(),
         };
-        let comment_table = match table_model.base_data_store.comment_storage_table {
-            Some(reference) => self.load_comment_table(reference.identifier)?,
+        let comment_table = match data_store.comment_storage_table() {
+            Some(reference) => self.load_comment_table(reference.identifier())?,
             None => Box::default(),
         };
 
@@ -945,7 +1147,12 @@ impl<'a> TableDataExtractor<'a> {
             comments: &comment_table,
             formula_references: &self.formula_references,
         };
-        self.parse_tiles(&table_model.base_data_store.tiles, &cell_tables, &mut table)?;
+        self.parse_tiles(
+            data_store.tiles(),
+            projection_budget,
+            &cell_tables,
+            &mut table,
+        )?;
 
         Ok(table)
     }
@@ -1523,11 +1730,24 @@ impl<'a> TableDataExtractor<'a> {
     /// Parse tile storage to extract cells
     fn parse_tiles(
         &self,
-        tile_storage: &tst::TileStorage,
+        tile_storage_source: &[u8],
+        projection_budget: &mut ProbeBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
-        let tile_size = usize::try_from(tile_storage.tile_size.unwrap_or(256)).map_err(|_| {
+        let mut tile_routes = TileRoutes::default();
+        let decoded = numbers_table_cell_storage_codec::decode_tile_storage_with_visitor(
+            tile_storage_source,
+            projection_budget.options(tile_storage_source),
+            &mut tile_routes,
+        );
+        let (tile_storage, report) = match decoded {
+            Ok(decoded) => decoded,
+            Err(error) => return Err(map_resource_error(error, *projection_budget)?),
+        };
+        projection_budget.charge_report(report)?;
+
+        let tile_size = usize::try_from(tile_storage.tile_size().unwrap_or(256)).map_err(|_| {
             Error::InvalidFormat("Numbers tile size does not fit the host usize".to_owned())
         })?;
         if tile_size == 0 {
@@ -1544,12 +1764,12 @@ impl<'a> TableDataExtractor<'a> {
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut seen_tile_ids = HashSet::new();
         seen_tile_ids
-            .try_reserve(tile_storage.tiles.len())
-            .map_err(|_| allocation_error("Numbers tile keys", tile_storage.tiles.len()))?;
+            .try_reserve(tile_routes.routes.len())
+            .map_err(|_| allocation_error("Numbers tile keys", tile_routes.routes.len()))?;
         let mut budget = CellBudget::new();
         // Resolve each tile reference and parse its contents
-        for tile_ref in &tile_storage.tiles {
-            let tile_key = usize::try_from(tile_ref.tileid).map_err(|_| {
+        for tile_route in tile_routes.routes {
+            let tile_key = usize::try_from(tile_route.tile_id).map_err(|_| {
                 Error::InvalidFormat("Numbers tile key does not fit the host usize".to_owned())
             })?;
             if tile_key >= tile_count {
@@ -1558,7 +1778,7 @@ impl<'a> TableDataExtractor<'a> {
                     table.row_count()
                 )));
             }
-            if !seen_tile_ids.insert(tile_ref.tileid) {
+            if !seen_tile_ids.insert(tile_route.tile_id) {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers table repeats tile key {tile_key}"
                 )));
@@ -1566,14 +1786,13 @@ impl<'a> TableDataExtractor<'a> {
             let row_origin = tile_key
                 .checked_mul(tile_size)
                 .ok_or_else(|| Error::ParseError("Numbers tile row origin overflow".to_owned()))?;
-            // tile is a required field, not Optional
-            let tile_reference = &tile_ref.tile;
             self.parse_tile(
-                tile_reference.identifier,
+                tile_route.object_identifier,
                 row_origin,
                 tile_size,
                 dimensions,
                 &mut budget,
+                projection_budget,
                 cell_tables,
                 table,
             )?;
@@ -1590,6 +1809,7 @@ impl<'a> TableDataExtractor<'a> {
         tile_size: usize,
         dimensions: Dimensions,
         budget: &mut CellBudget,
+        projection_budget: &mut ProbeBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
@@ -1601,146 +1821,45 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers tile object {tile_id} referenced by table is missing"
                 ))
             })?;
-        let mut decoded = false;
+        let mut selected = None;
         for msg in resolved.messages {
             if msg.type_ != TILE_MESSAGE_TYPE {
                 continue;
             }
-            if decoded {
+            if selected.replace(msg).is_some() {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers tile object {tile_id} contains multiple tile payloads"
                 )));
             }
-            let tile = tst::Tile::decode(&*msg.data).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Numbers tile object {tile_id} has a malformed tile payload: {error}"
-                ))
-            })?;
-            self.parse_tile_rows(
-                &tile,
-                row_origin,
-                tile_size,
-                dimensions,
-                budget,
-                cell_tables,
-                table,
-            )?;
-            decoded = true;
         }
-
-        if !decoded {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers tile object {tile_id} has no tile payload"
-            )));
-        }
-
-        Ok(())
-    }
-
-    /// Parse rows within a tile
-    fn parse_tile_rows(
-        &self,
-        tile: &tst::Tile,
-        row_origin: usize,
-        tile_size: usize,
-        dimensions: Dimensions,
-        budget: &mut CellBudget,
-        cell_tables: &CellTables<'_>,
-        table: &mut NumbersTable,
-    ) -> Result<()> {
-        for row_info in &tile.row_infos {
-            self.parse_tile_row(
-                row_info,
-                row_origin,
-                tile_size,
-                dimensions,
-                budget,
-                cell_tables,
-                table,
-            )?;
-        }
-
-        Ok(())
-    }
-
-    /// Parse a single tile row
-    fn parse_tile_row(
-        &self,
-        row_info: &tst::TileRowInfo,
-        row_origin: usize,
-        tile_size: usize,
-        dimensions: Dimensions,
-        budget: &mut CellBudget,
-        cell_tables: &CellTables<'_>,
-        table: &mut NumbersTable,
-    ) -> Result<()> {
-        let tile_row_index = usize::try_from(row_info.tile_row_index).map_err(|_| {
-            Error::InvalidFormat("Numbers tile row index does not fit the host usize".to_owned())
-        })?;
-        if tile_row_index >= tile_size {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers tile row {} is outside tile size {tile_size}",
-                row_info.tile_row_index
-            )));
-        }
-        let row_index = row_origin
-            .checked_add(tile_row_index)
-            .ok_or_else(|| Error::ParseError("Numbers tile row index overflow".to_owned()))?;
-        dimensions.check_row(row_index).map_err(|_| {
-            Error::InvalidFormat(format!(
-                "Numbers tile row {row_index} is outside the declared table height {}",
-                dimensions.rows()
-            ))
-        })?;
-
-        // The cell_storage_buffer contains serialized Cell messages
-        // The cell_offsets buffer contains the byte offsets for each cell
-
-        let (cell_storage, cell_offsets) = match (
-            row_info.cell_storage_buffer.as_deref(),
-            row_info.cell_offsets.as_deref(),
-        ) {
-            (Some(storage), Some(offsets)) => (storage, offsets),
-            _ => (
-                row_info.cell_storage_buffer_pre_bnc.as_slice(),
-                row_info.cell_offsets_pre_bnc.as_slice(),
-            ),
+        let source = selected
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("Numbers tile object {tile_id} has no tile payload"))
+            })?
+            .data
+            .as_slice();
+        let mut stage = TileRowStage::new(row_origin, tile_size, dimensions, budget, cell_tables);
+        let decoded = numbers_table_cell_storage_codec::decode_tile_with_visitor(
+            source,
+            projection_budget.options(source),
+            &mut stage,
+        );
+        let (_tile, report) = match decoded {
+            Ok(decoded) => decoded,
+            Err(error) => return Err(map_resource_error(error, *projection_budget)?),
         };
+        projection_budget.charge_report(report)?;
 
-        let expected_cells = usize::try_from(row_info.cell_count).map_err(|_| {
-            Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
-        })?;
-        budget.check(expected_cells)?;
-        let cells = Self::parse_cell_offsets(
-            cell_offsets,
-            cell_storage.len(),
-            row_info.has_wide_offsets.unwrap_or(false),
-            expected_cells,
-            dimensions.columns() as usize,
-        )?;
-        budget.consume(cells.len())?;
-
-        for (column_index, range) in cells {
-            dimensions.check_column(column_index).map_err(|_| {
-                Error::InvalidFormat(format!(
-                    "Numbers cell column {column_index} is outside the declared table width {}",
-                    dimensions.columns()
-                ))
-            })?;
-            let parsed = Self::parse_cell_storage(
-                &cell_storage[range],
-                cell_tables,
-                row_index,
-                column_index,
-            )?;
-            table.try_set_cell(row_index, column_index, parsed.value)?;
-            if let Some(identifier) = parsed.comment_identifier {
+        for cell in stage.finish()? {
+            table.try_set_cell(cell.row, cell.column, cell.parsed.value)?;
+            if let Some(identifier) = cell.parsed.comment_identifier {
                 let comment = compact_table_get(cell_tables.comments, identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
-                        "Numbers comment table has no entry {identifier} referenced by cell ({row_index}, {column_index})"
+                        "Numbers comment table has no entry {identifier} referenced by cell ({}, {})",
+                        cell.row, cell.column
                     ))
                 })?;
-                table.try_set_comment(row_index, column_index, comment.clone())?;
+                table.try_set_comment(cell.row, cell.column, comment.clone())?;
             }
         }
 
@@ -1766,9 +1885,14 @@ impl<'a> TableDataExtractor<'a> {
 
         let slot_count = offsets_buffer.len() / 2;
         if slot_count > column_count {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers row has {slot_count} offset slots but table width is {column_count}"
-            )));
+            let populated_outside_width = offsets_buffer[column_count.saturating_mul(2)..]
+                .chunks_exact(2)
+                .any(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]) != u16::MAX);
+            if populated_outside_width {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers row has a populated offset slot outside table width {column_count}"
+                )));
+            }
         }
         if expected_cells > slot_count {
             return Err(Error::ParseError(format!(
@@ -2581,9 +2705,15 @@ fn build_formula_reference_maps(bundle: &Bundle) -> FormulaReferenceMaps {
                         find_bundle_object(bundle, table_info.table_model.identifier)?;
                     model_object.messages.iter().find_map(|message| {
                         (message.type_ == 6000 || message.type_ == 6001)
-                            .then(|| tst::TableModelArchive::decode(message.data.as_slice()).ok())
+                            .then(|| {
+                                numbers_names_codec::decode_table_names(
+                                    message.data.as_slice(),
+                                    table_name_decode_options(message.data.as_slice()),
+                                )
+                                .ok()
+                            })
                             .flatten()
-                            .map(|model| model.table_name)
+                            .map(|model| model.table_name().to_owned())
                     })
                 });
                 if let Some(table) = table_name {
@@ -2987,6 +3117,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn tracked_native_numbers_fixture_streams_model_store_and_tiles() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/basic.numbers");
+        let bundle = Bundle::open(path).unwrap();
+        let index = ObjectIndex::from_bundle(&bundle).unwrap();
+        let tables = TableDataExtractor::new(&bundle, &index)
+            .extract_all_tables()
+            .unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].name(), "Table 1");
+        assert_eq!(tables[0].dimensions(), (22, 7));
+        assert!(tables[0].cell_count() > 0);
+    }
+
+    #[test]
     fn formula_stack_helpers_reject_underflow() {
         let mut stack = vec!["1".to_owned()];
         assert!(pop_binary_operands(&mut stack, "addition").is_err());
@@ -3290,9 +3435,11 @@ mod tests {
             TableDataExtractor::parse_cell_offsets(&[], 0, false, usize::MAX, 0).unwrap_err();
         assert!(matches!(error, Error::ParseError(message) if message.contains("offset slots")));
 
-        let offsets = [0, 0, 0xff, 0xff];
+        let offsets = [0, 0, 1, 0];
         let error = TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1).unwrap_err();
-        assert!(matches!(error, Error::InvalidFormat(message) if message.contains("offset slots")));
+        assert!(
+            matches!(error, Error::InvalidFormat(message) if message.contains("outside table width"))
+        );
     }
 
     #[test]
