@@ -339,6 +339,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
             changes: changes.into_boxed_slice(),
             package_changes: Box::new([]),
             parts: parts.into_boxed_slice(),
+            relationships: Box::new([]),
             graph: graph.into_boxed_slice(),
             web: None,
             style_guard: None,

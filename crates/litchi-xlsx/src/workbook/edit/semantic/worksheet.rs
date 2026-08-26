@@ -133,6 +133,31 @@ impl WorksheetEdit<'_> {
         Ok(self.edit.web_bindings(self.position)?.clear())
     }
 
+    /// Insert or replace one typed worksheet hyperlink by its checked range.
+    ///
+    /// External targets are inert strings. The worksheet XML and its external
+    /// relationship are staged together and published atomically at commit.
+    pub fn put_hyperlink(&mut self, hyperlink: crate::hyperlinks::Hyperlink) -> Result<&mut Self> {
+        self.edit.put_hyperlink_at(self.position, hyperlink)?;
+        Ok(self)
+    }
+
+    /// Alias for [`Self::put_hyperlink`] emphasizing replacement semantics.
+    pub fn replace_hyperlink(
+        &mut self,
+        hyperlink: crate::hyperlinks::Hyperlink,
+    ) -> Result<&mut Self> {
+        self.put_hyperlink(hyperlink)
+    }
+
+    /// Remove one hyperlink selected by its checked cell or range reference.
+    pub fn remove_hyperlink(
+        &mut self,
+        reference: crate::hyperlinks::HyperlinkReference,
+    ) -> Result<Option<crate::hyperlinks::Hyperlink>> {
+        self.edit.remove_hyperlink_at(self.position, reference)
+    }
+
     /// Borrow the worksheet-wide grid-default editor.
     pub fn defaults(&mut self) -> DefaultsEdit<'_> {
         DefaultsEdit {

@@ -5,11 +5,11 @@ mod guard;
 mod order;
 mod snapshot;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, btree_map::Entry};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
 use std::sync::Arc;
 
 use litchi_ooxml_common::web as common_web;
-use litchi_opc::Part;
+use litchi_opc::{Part, Relationship, Relationships, TargetMode};
 use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
@@ -33,12 +33,12 @@ use crate::style::StyleLineage;
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
-    PartChange, PatchAuthority, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts,
-    project_merges,
+    PartChange, PatchAuthority, RelationshipChange, StyleGuard, defaults_after, ensure_merge_area,
+    merge_conflicts, project_merges,
 };
 use super::super::validation::{
-    Added, FinalOrder, MergeIntent, OptionalAction, OrderPlan, PanesAction, Placement,
-    SheetActions, TabAction, Target, pending_merge,
+    Added, FinalOrder, HyperlinkAction, MergeIntent, OptionalAction, OrderPlan, PanesAction,
+    Placement, SheetActions, TabAction, Target, pending_merge,
 };
 use super::super::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
@@ -53,6 +53,7 @@ const MAX_CELL_TRANSFER: u64 = 65_536;
 const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
 const MAX_VALIDATED_STORE_HANDOFF_CELLS: usize = 4_096;
 const MAX_VALIDATED_STORE_HANDOFF_BYTES: usize = 1_048_576;
+const MAX_HYPERLINK_EDITS: usize = 4_096;
 
 #[derive(Clone, Copy)]
 enum CellTransfer {
@@ -525,6 +526,33 @@ impl Edit {
         Ok(Some(self))
     }
 
+    /// Insert or replace one typed worksheet hyperlink by its checked range.
+    pub fn put_hyperlink<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+        hyperlink: crate::hyperlinks::Hyperlink,
+    ) -> Result<Option<&mut Self>> {
+        guard::no_removal(self, "hyperlink")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.put_hyperlink_at(sheet.position(), hyperlink)?;
+        Ok(Some(self))
+    }
+
+    /// Remove one typed worksheet hyperlink by its checked range.
+    pub fn remove_hyperlink<'a>(
+        &mut self,
+        sheet: impl Into<Selector<'a>>,
+        reference: crate::hyperlinks::HyperlinkReference,
+    ) -> Result<Option<crate::hyperlinks::Hyperlink>> {
+        guard::no_removal(self, "hyperlink")?;
+        let Some(sheet) = Snapshot::new(&self.base).worksheet(sheet)? else {
+            return Ok(None);
+        };
+        self.remove_hyperlink_at(sheet.position(), reference)
+    }
+
     /// Copy exact typed print options between two worksheets.
     pub fn copy_print_options<'source, 'target>(
         &mut self,
@@ -830,6 +858,7 @@ impl Edit {
                 .saturating_add(usize::from(added.actions.page_margins.is_some()))
                 .saturating_add(usize::from(added.actions.page_setup.is_some()))
                 .saturating_add(usize::from(added.actions.print_options.is_some()))
+                .saturating_add(added.actions.hyperlinks.len())
         })
     }
 
@@ -980,6 +1009,7 @@ impl Edit {
                     if accepted.print_options.is_none() {
                         accepted.print_options = actions.print_options;
                     }
+                    accepted.hyperlinks.extend(actions.hyperlinks);
                 },
             }
         }
@@ -1028,6 +1058,7 @@ impl Edit {
         let mut changes = Vec::new();
         let mut package_changes = Vec::new();
         let mut parts = Vec::new();
+        let mut relationship_changes = Vec::new();
         let mut validated_worksheet_stores = Vec::new();
         let mut needs_recalculation = false;
         let mut drawing_graph = Vec::new();
@@ -1303,6 +1334,7 @@ impl Edit {
                 page_margins,
                 page_setup,
                 print_options,
+                hyperlinks,
             } = requested;
             if defaults.is_none()
                 && web.is_none()
@@ -1314,6 +1346,7 @@ impl Edit {
                 && page_margins.is_none()
                 && page_setup.is_none()
                 && print_options.is_none()
+                && hyperlinks.is_empty()
                 && drawing.is_none()
             {
                 continue;
@@ -1329,6 +1362,17 @@ impl Edit {
             };
             let store = sheet.store()?;
             let change_start = changes.len();
+            let part = base.inner.package.get_part(&data.part_uri)?;
+            let before = part.blob_arc();
+            let effective_hyperlinks = project_hyperlink_actions(
+                &data.name,
+                &data.part_uri,
+                &before,
+                part.rels(),
+                hyperlinks,
+                &mut changes,
+                &mut relationship_changes,
+            )?;
             let effective_page_breaks = match page_breaks {
                 Some(after) => {
                     let before = sheet.page_breaks()?;
@@ -1507,13 +1551,12 @@ impl Edit {
                 && effective_page_margins.is_none()
                 && effective_page_setup.is_none()
                 && effective_print_options.is_none()
+                && effective_hyperlinks.is_none()
                 && drawing.is_none()
             {
                 continue;
             }
 
-            let part = base.inner.package.get_part(&data.part_uri)?;
-            let before = part.blob_arc();
             let MergePlan { add, remove } = merge_projection.plan;
             let has_merge_removes = !remove.is_empty();
             let mut after = if !has_merge_removes {
@@ -1584,6 +1627,30 @@ impl Edit {
                     input,
                     print_options.as_option(),
                 )?);
+            }
+            if let Some(hyperlinks) = &effective_hyperlinks {
+                let input = after.as_deref().unwrap_or(&before);
+                let relationship_ids = hyperlinks
+                    .relationship_ids
+                    .iter()
+                    .map(Option::as_deref)
+                    .collect::<Vec<_>>();
+                let rewritten = crate::hyperlinks::codec::rewrite_hyperlinks(
+                    input,
+                    &hyperlinks.values,
+                    &relationship_ids,
+                )?;
+                let parsed = crate::hyperlinks::codec::parse(
+                    &rewritten,
+                    &hyperlinks.verification_relationships,
+                )?;
+                if parsed != hyperlinks.values {
+                    return Err(invalid(format!(
+                        "worksheet hyperlink verification failed at {}",
+                        data.name
+                    )));
+                }
+                after = Some(rewritten);
             }
             if let Some(drawing) = drawing {
                 let input = after.as_deref().unwrap_or(&before);
@@ -1750,6 +1817,7 @@ impl Edit {
                             )));
                         }
                     },
+                    Change::Hyperlink { .. } => {},
                 }
             }
             let after = Arc::new(after);
@@ -2413,6 +2481,7 @@ impl Edit {
         if changes.is_empty()
             && package_changes.is_empty()
             && parts.is_empty()
+            && relationship_changes.is_empty()
             && graph.is_empty()
             && web_patch.is_none()
         {
@@ -2427,10 +2496,16 @@ impl Edit {
             });
         }
         let mut package = base.inner.package.clone();
+        for change in &relationship_changes {
+            change.validate(&package)?;
+        }
         for part in &parts {
             package
                 .get_part_mut(&part.uri)?
                 .set_blob_shared(Arc::clone(&part.after));
+        }
+        for change in &relationship_changes {
+            change.apply(&mut package)?;
         }
         for change in &graph {
             change.validate(&package)?;
@@ -2472,6 +2547,7 @@ impl Edit {
                 changes: changes.into_boxed_slice(),
                 package_changes: package_changes.into_boxed_slice(),
                 parts: parts.into_boxed_slice(),
+                relationships: relationship_changes.into_boxed_slice(),
                 graph: graph.into_boxed_slice(),
                 web: web_patch,
                 style_guard,
@@ -2577,6 +2653,96 @@ impl Edit {
             .get_mut(&position)
             .and_then(|actions| actions.web.as_mut())
             .ok_or_else(|| invalid("web-binding edit initialization failed"))
+    }
+
+    pub(super) fn put_hyperlink_at(
+        &mut self,
+        position: usize,
+        hyperlink: crate::hyperlinks::Hyperlink,
+    ) -> Result<()> {
+        let key = crate::hyperlinks::model::reference_key(hyperlink.reference().range());
+        let source = self.source_hyperlink(position, key)?;
+        let actions = &mut self.sheets.entry(position).or_default().hyperlinks;
+        if source.as_ref() == Some(&hyperlink) {
+            actions.remove(&key);
+        } else {
+            if !actions.contains_key(&key) && actions.len() >= MAX_HYPERLINK_EDITS {
+                return Err(invalid(format!(
+                    "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
+                )));
+            }
+            actions.insert(key, HyperlinkAction::Put(hyperlink));
+        }
+        Ok(())
+    }
+
+    pub(super) fn remove_hyperlink_at(
+        &mut self,
+        position: usize,
+        reference: crate::hyperlinks::HyperlinkReference,
+    ) -> Result<Option<crate::hyperlinks::Hyperlink>> {
+        let key = crate::hyperlinks::model::reference_key(reference.range());
+        let current = self.pending_hyperlink(position, key)?;
+        let Some(current) = current else {
+            return Ok(None);
+        };
+        let source = self.source_hyperlink(position, key)?;
+        let actions = &mut self.sheets.entry(position).or_default().hyperlinks;
+        if source.is_none() {
+            actions.remove(&key);
+        } else {
+            if !actions.contains_key(&key) && actions.len() >= MAX_HYPERLINK_EDITS {
+                return Err(invalid(format!(
+                    "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
+                )));
+            }
+            actions.insert(key, HyperlinkAction::Remove(reference));
+        }
+        Ok(Some(current))
+    }
+
+    fn pending_hyperlink(
+        &self,
+        position: usize,
+        key: (u32, u32, u32, u32),
+    ) -> Result<Option<crate::hyperlinks::Hyperlink>> {
+        if let Some(action) = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.hyperlinks.get(&key))
+        {
+            return Ok(match action {
+                HyperlinkAction::Put(value) => Some(value.clone()),
+                HyperlinkAction::Remove(_) => None,
+            });
+        }
+        self.source_hyperlink(position, key)
+    }
+
+    fn source_hyperlink(
+        &self,
+        position: usize,
+        key: (u32, u32, u32, u32),
+    ) -> Result<Option<crate::hyperlinks::Hyperlink>> {
+        let data = self
+            .base
+            .inner
+            .sheets
+            .get(position)
+            .cloned()
+            .ok_or_else(|| invalid("hyperlink target disappeared"))?;
+        if data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: data.name.clone(),
+            });
+        }
+        let sheet = Worksheet {
+            owner: Arc::clone(&self.base.inner),
+            data,
+        };
+        Ok(sheet.hyperlinks()?.into_iter().find(|value| {
+            crate::hyperlinks::model::reference_key(value.reference().range()) == key
+        }))
     }
 
     fn pending_page_breaks(&self, sheet: &Worksheet) -> Result<crate::page_breaks::PageBreaks> {
@@ -2841,6 +3007,22 @@ impl Edit {
                     position: *position,
                 });
             }
+            let hyperlink_references = left
+                .hyperlinks
+                .iter()
+                .filter(|&(key, _)| right.hyperlinks.contains_key(key))
+                .map(|(_, action)| match action {
+                    HyperlinkAction::Put(value) => value.reference().range(),
+                    HyperlinkAction::Remove(reference) => reference.range(),
+                })
+                .collect::<Vec<_>>();
+            if !hyperlink_references.is_empty() {
+                conflicts.push(Conflict::Hyperlinks {
+                    sheet: sheet.into(),
+                    position: *position,
+                    references: hyperlink_references.into_boxed_slice(),
+                });
+            }
             if let (Some(left), Some(right)) = (left.defaults, right.defaults) {
                 let fields = left.fields() & right.fields();
                 if left.overlaps(right) {
@@ -2954,6 +3136,191 @@ impl Edit {
             reason,
         }
     }
+}
+
+struct HyperlinkRewrite {
+    values: Vec<crate::hyperlinks::Hyperlink>,
+    relationship_ids: Vec<Option<String>>,
+    verification_relationships: Relationships,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn project_hyperlink_actions(
+    sheet: &str,
+    owner: &litchi_opc::PackURI,
+    xml: &[u8],
+    source_relationships: &Relationships,
+    actions: BTreeMap<(u32, u32, u32, u32), HyperlinkAction>,
+    changes: &mut Vec<Change>,
+    relationship_changes: &mut Vec<RelationshipChange>,
+) -> Result<Option<HyperlinkRewrite>> {
+    if actions.is_empty() {
+        return Ok(None);
+    }
+    let mut staged =
+        crate::hyperlinks::codec::parse_with_relationship_ids(xml, source_relationships)?;
+    let relationship_type = crate::hyperlinks::codec::relationship_type(xml)?;
+    let mut used_relationship_ids = HashSet::new();
+    used_relationship_ids
+        .try_reserve(source_relationships.len().saturating_add(actions.len()))
+        .map_err(|source| allocation("worksheet hyperlink relationship-ID index", source))?;
+    used_relationship_ids.extend(
+        source_relationships
+            .iter()
+            .map(|relationship| relationship.r_id().to_owned()),
+    );
+    let mut next_relationship_id = 1_u32;
+    let mut semantic_changes = Vec::new();
+    semantic_changes
+        .try_reserve(actions.len())
+        .map_err(|source| allocation("worksheet hyperlink semantic changes", source))?;
+    let mut physical_changes = Vec::new();
+    physical_changes
+        .try_reserve(actions.len())
+        .map_err(|source| allocation("worksheet hyperlink relationship changes", source))?;
+    let mut verification_relationships = source_relationships.clone();
+
+    for (key, action) in actions {
+        let existing_index = staged.iter().position(|candidate| {
+            crate::hyperlinks::model::reference_key(candidate.value.reference().range()) == key
+        });
+        let before = existing_index.map(|index| staged[index].value.clone());
+        let previous_relationship_id =
+            existing_index.and_then(|index| staged[index].relationship_id.clone());
+        let (reference, after) = match action {
+            HyperlinkAction::Put(value) => (value.reference().clone(), Some(value)),
+            HyperlinkAction::Remove(reference) => (reference, None),
+        };
+        if before == after {
+            continue;
+        }
+
+        let next_relationship = match after.as_ref().and_then(|value| value.external_target()) {
+            Some(target) => {
+                let relationship_id = previous_relationship_id.clone().map_or_else(
+                    || {
+                        allocate_hyperlink_relationship_id(
+                            &mut used_relationship_ids,
+                            &mut next_relationship_id,
+                        )
+                    },
+                    Ok,
+                )?;
+                Some(Relationship::new_with_mode(
+                    relationship_id,
+                    relationship_type.to_owned(),
+                    target.to_owned(),
+                    owner.base_uri().to_owned(),
+                    TargetMode::External,
+                ))
+            },
+            None => None,
+        };
+        let previous_relationship = previous_relationship_id
+            .as_deref()
+            .and_then(|relationship_id| source_relationships.get(relationship_id))
+            .cloned();
+        let staged_relationship_id = next_relationship
+            .as_ref()
+            .map(|relationship| relationship.r_id().to_owned());
+        if !same_hyperlink_relationship(previous_relationship.as_ref(), next_relationship.as_ref())
+        {
+            let delta = RelationshipChange {
+                owner: owner.clone(),
+                before: previous_relationship,
+                after: next_relationship,
+            };
+            apply_relationship_change_to_collection(&mut verification_relationships, &delta)?;
+            physical_changes.push(delta);
+        }
+
+        match (existing_index, after.clone()) {
+            (Some(index), Some(value)) => {
+                staged[index] = crate::hyperlinks::codec::ParsedHyperlink {
+                    value,
+                    relationship_id: staged_relationship_id,
+                };
+            },
+            (Some(index), None) => {
+                staged.remove(index);
+            },
+            (None, Some(value)) => staged.push(crate::hyperlinks::codec::ParsedHyperlink {
+                value,
+                relationship_id: staged_relationship_id,
+            }),
+            (None, None) => {},
+        }
+        semantic_changes.push(Change::Hyperlink {
+            sheet: sheet.into(),
+            reference,
+            before,
+            after,
+        });
+    }
+    if semantic_changes.is_empty() {
+        return Ok(None);
+    }
+    changes.extend(semantic_changes);
+    relationship_changes.extend(physical_changes);
+    Ok(Some(HyperlinkRewrite {
+        values: staged.iter().map(|value| value.value.clone()).collect(),
+        relationship_ids: staged
+            .into_iter()
+            .map(|value| value.relationship_id)
+            .collect(),
+        verification_relationships,
+    }))
+}
+
+fn allocate_hyperlink_relationship_id(
+    used: &mut HashSet<String>,
+    next: &mut u32,
+) -> Result<String> {
+    loop {
+        let candidate = format!("rId{next}");
+        *next = (*next)
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet hyperlink relationship-ID space is exhausted"))?;
+        if used.insert(candidate.clone()) {
+            return Ok(candidate);
+        }
+    }
+}
+
+fn same_hyperlink_relationship(left: Option<&Relationship>, right: Option<&Relationship>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => {
+            left.r_id() == right.r_id()
+                && left.reltype() == right.reltype()
+                && left.target_ref() == right.target_ref()
+                && left.target_mode() == right.target_mode()
+        },
+        (None, Some(_)) | (Some(_), None) => false,
+    }
+}
+
+fn apply_relationship_change_to_collection(
+    relationships: &mut Relationships,
+    change: &RelationshipChange,
+) -> Result<()> {
+    let relationship_id = change
+        .after
+        .as_ref()
+        .or(change.before.as_ref())
+        .map(Relationship::r_id)
+        .ok_or_else(|| invalid("worksheet hyperlink relationship delta has no identity"))?
+        .to_owned();
+    relationships.remove(&relationship_id);
+    if let Some(after) = &change.after {
+        relationships.try_add_relationship(
+            after.reltype().to_owned(),
+            after.target_ref().to_owned(),
+            relationship_id,
+            after.target_mode(),
+        )?;
+    }
+    Ok(())
 }
 
 fn take_effective_renames(

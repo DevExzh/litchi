@@ -221,6 +221,13 @@ fn effects(edit: &Edit) -> (Vec<String>, Vec<String>) {
         if actions.print_options.is_some() {
             writes.push(format!("sheet/{position}/print-options"));
         }
+        writes.extend(actions.hyperlinks.keys().map(
+            |(start_row, start_column, end_row, end_column)| {
+                format!(
+                    "sheet/{position}/hyperlink/{start_row}:{start_column}:{end_row}:{end_column}"
+                )
+            },
+        ));
         writes.extend(
             actions
                 .cells
