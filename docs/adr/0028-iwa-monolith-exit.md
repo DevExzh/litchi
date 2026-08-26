@@ -5624,3 +5624,20 @@ arbitrary author-registry repair, native Numbers UI acceptance, a single
 global allocation-free resource preflight, performance/RSS evidence, debt or
 dependency-edge retirement, normal Prost/Buffa ownership, and monolith exit
 remain withheld.
+
+## 2026-08-26 amendment: Numbers sparse comment-slot creation (not a monolith-exit gate)
+
+The focused root-comment transaction now admits a canonical missing BNC slot
+inside an existing same-member tile row. The comment owner composes with the
+prepared tile-local encoder through a typed `CommentSet` transition, so the
+new empty cell slot gains only its comment-list key while sibling values and
+references remain byte-authoritative. The transaction retains strict list,
+author, UUID, save-token, preview, candidate-reopen, conflict, and exact
+inverse guarantees. Extractor regressions separately prove that in-width
+missing offsets are accepted while false occupied-cell counts are rejected.
+
+This does not allocate a missing row, tile, row-header bucket, or table extent;
+it does not admit segmented or cross-component comment graphs. Native Numbers
+UI acceptance, performance/RSS evidence, a single global allocation-free
+resource preflight, debt or dependency-edge retirement, normal Prost/Buffa
+ownership, and monolith exit remain withheld.

@@ -25,7 +25,7 @@ use litchi_iwa_protos::{
 
 use crate::{SheetSelector, TableSelector};
 
-use crate::package::{comments_metadata, metadata, table_cell_pop_up_menu_native};
+use crate::package::{comments_metadata, metadata, table_cell_edit::tile};
 
 use super::{
     Comment, Commit, Diagnostics, Error, Located, MessageRoute, Package, Patch, Path,
@@ -63,11 +63,7 @@ pub(super) fn create_root_comment(
         return Err(Error::InvalidSource { path });
     }
     let tile = located.tile.ok_or(Error::UnsupportedDependency { path })?;
-    let source_cell = located
-        .cell_bytes
-        .as_ref()
-        .cloned()
-        .ok_or(Error::UnsupportedDependency { path })?;
+    let source_cell = located.cell_bytes.as_ref().cloned().unwrap_or_default();
     let graph = creation_graph(source, located, path)?;
     let owner_component_index = graph
         .list
@@ -148,7 +144,6 @@ pub(super) fn create_root_comment(
         archive_limits,
         path,
     )?;
-    let target_cell = attach_comment_cell(located, key, path)?;
 
     let component = source
         .state
@@ -206,7 +201,7 @@ pub(super) fn create_root_comment(
             path,
         )?);
     }
-    replace_tile(
+    let target_cell = replace_tile(
         &mut archive,
         source,
         tile,
@@ -881,19 +876,6 @@ fn replace_list_with_transition(
     Ok(())
 }
 
-fn attach_comment_cell(located: &Located, key: u32, path: Path) -> Result<Vec<u8>, Error> {
-    let mut cell = litchi_numbers_wire::BncCell::parse(
-        located
-            .cell_bytes
-            .as_deref()
-            .ok_or(Error::UnsupportedDependency { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
-    cell.set_comment_identifier(Some(key));
-    cell.try_encode_with_limit(WireLimits::MAX_OUTPUT_BYTES)
-        .map_err(|_| Error::InvalidSource { path })
-}
-
 fn replace_tile(
     archive: &mut Archive,
     source: &Package,
@@ -902,17 +884,43 @@ fn replace_tile(
     key: u32,
     limits: litchi_iwa_core::Limits,
     path: Path,
-) -> Result<(), Error> {
+) -> Result<Vec<u8>, Error> {
     let tile_source = message_at_route(source, route, path)?.data.as_slice();
-    let target = attach_comment_cell(located, key, path)?;
-    let rewritten = table_cell_pop_up_menu_native::patch_tile_cell(
-        tile_source,
-        u32::try_from(located.target.row % located.target.tile_size)
+    let change = tile::TileChange {
+        row: u32::try_from(located.target.row % located.target.tile_size)
             .map_err(|_| Error::InvalidSource { path })?,
-        u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
-        &target,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
+        column: u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
+        change: tile::BncChange::CommentSet { identifier: key },
+    };
+    let bytes = tile_source.len().max(1);
+    let prepared = tile::prepare_tile(tile::TileRewriteRequest {
+        source: tile_source,
+        columns: located.target.native.columns,
+        changes: &[change],
+        limits: tile::TileLimits::new(
+            bytes,
+            WireLimits::MAX_OUTPUT_BYTES,
+            WireLimits::MAX_FIELDS,
+            u64::try_from(WireLimits::MAX_REWRITE_WORK).unwrap_or(u64::MAX),
+            located.target.tile_size,
+            located.target.tile_size.saturating_mul(
+                usize::try_from(located.target.native.columns)
+                    .map_err(|_| Error::InvalidSource { path })?,
+            ),
+        ),
+    })
+    .map_err(|error| map_tile_error(error, path))?;
+    let requirements = prepared.execution_requirements();
+    let outcome = prepared
+        .execute(requirements.exact_limits())
+        .map_err(|error| map_tile_error(error, path))?;
+    if outcome.transitions.len() != 1
+        || outcome.transitions[0].after_references.comment != Some(key)
+    {
+        return Err(Error::Verification);
+    }
+    let rewritten = outcome.payload.ok_or(Error::Verification)?;
+    let target_cell = extract_tile_cell(rewritten.as_slice(), change.row, change.column, path)?;
     archive
         .objects
         .get_mut(route.object_index)
@@ -926,7 +934,82 @@ fn replace_tile(
             limits,
         )
         .map_err(|_| Error::InvalidSource { path })?;
-    Ok(())
+    Ok(target_cell)
+}
+
+fn extract_tile_cell(source: &[u8], row: u32, column: u32, path: Path) -> Result<Vec<u8>, Error> {
+    let view = litchi_iwa_common::wire::WireView::parse(source)
+        .map_err(|_| Error::InvalidSource { path })?;
+    for field in view.fields().filter(|field| field.number() == 5) {
+        let row_view = litchi_iwa_common::wire::WireView::parse(field.payload())
+            .map_err(|_| Error::InvalidSource { path })?;
+        let row_index = row_view
+            .fields()
+            .find(|field| field.number() == 1)
+            .and_then(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+            .and_then(|(value, _)| u32::try_from(value).ok());
+        if row_index != Some(row) {
+            continue;
+        }
+        let storage = row_view
+            .fields()
+            .find(|field| field.number() == 6)
+            .ok_or(Error::InvalidSource { path })?
+            .payload();
+        let offsets = row_view
+            .fields()
+            .find(|field| field.number() == 7)
+            .ok_or(Error::InvalidSource { path })?
+            .payload();
+        let wide = row_view
+            .fields()
+            .find(|field| field.number() == 8)
+            .map(|field| {
+                litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                    .map(|(value, _)| value != 0)
+                    .map_err(|_| Error::InvalidSource { path })
+            })
+            .transpose()?
+            .unwrap_or(false);
+        let ranges = super::cell_ranges(
+            offsets,
+            storage.len(),
+            row_view
+                .fields()
+                .find(|field| field.number() == 2)
+                .and_then(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+                .and_then(|(value, _)| usize::try_from(value).ok())
+                .ok_or(Error::InvalidSource { path })?,
+            wide,
+            offsets.len() / 2,
+            path,
+            &mut 0,
+        )?;
+        let range = ranges
+            .get(usize::try_from(column).map_err(|_| Error::InvalidSource { path })?)
+            .and_then(Clone::clone)
+            .ok_or(Error::Verification)?;
+        return Ok(storage[range].to_vec());
+    }
+    Err(Error::InvalidSource { path })
+}
+
+fn map_tile_error(error: tile::TileError, path: Path) -> Error {
+    match error {
+        tile::TileError::NeedSparse { .. }
+        | tile::TileError::UnsupportedSource { .. }
+        | tile::TileError::UnsupportedValue { .. } => Error::UnsupportedDependency { path },
+        tile::TileError::LimitExceeded { observed, maximum } => Error::LimitExceeded {
+            kind: super::LimitKind::WireWork,
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
+        },
+        tile::TileError::Allocation { amount } => Error::Allocation { amount, path },
+        tile::TileError::InvalidSource
+        | tile::TileError::DuplicateOrUnsortedChange { .. }
+        | tile::TileError::OutOfBounds { .. } => Error::InvalidSource { path },
+    }
 }
 
 fn metadata_options(bytes: usize, additions: usize) -> MetadataRewriteOptions {

@@ -79,6 +79,9 @@ pub(crate) enum BncChange {
     CommentClear {
         expected_identifier: u32,
     },
+    CommentSet {
+        identifier: u32,
+    },
 }
 
 /// The cache subset admitted by the formula planner and raw BNC writer.
@@ -2742,6 +2745,15 @@ fn planned_transition(
             after_references.comment = None;
             before
         },
+        BncChange::CommentSet { identifier } => {
+            after_references = before_references;
+            after_references.comment = Some(identifier);
+            if previous.is_some() {
+                before
+            } else {
+                CellValue::Empty
+            }
+        },
     };
     Ok(Some(CellTransition {
         row,
@@ -2939,6 +2951,16 @@ fn plan_cell_mutation(previous: Option<&[u8]>, change: BncChange) -> Result<Opti
                 .map(|bytes| Some(bytes.len()))
                 .map_err(map_bnc_error);
         },
+        BncChange::CommentSet { identifier } => {
+            let mut cell =
+                litchi_numbers_wire::BncCell::parse(previous.unwrap_or(&MINIMAL_BNC_CELL))
+                    .map_err(map_bnc_error)?;
+            cell.set_comment_identifier(Some(identifier));
+            return cell
+                .try_encode_with_limit(usize::MAX)
+                .map(|bytes| Some(bytes.len()))
+                .map_err(map_bnc_error);
+        },
     }
     .map_err(map_bnc_error)?;
     Ok(plan.output_len())
@@ -2953,6 +2975,14 @@ fn mutate_cell(
         return match change {
             BncChange::Clear | BncChange::FormulaClear | BncChange::CommentClear { .. } => {
                 Ok(CellMutation::Unchanged)
+            },
+            BncChange::CommentSet { identifier } => {
+                let mut cell = litchi_numbers_wire::BncCell::parse(&MINIMAL_BNC_CELL)
+                    .map_err(|_| TileError::InvalidSource)?;
+                cell.set_comment_identifier(Some(identifier));
+                cell.try_encode_with_limit(max_output_bytes)
+                    .map(CellMutation::Replace)
+                    .map_err(map_bnc_error)
             },
             BncChange::Set(input) => {
                 let view =
@@ -3012,6 +3042,14 @@ fn mutate_cell(
             .clear_comment_with_limit(expected_identifier, max_output_bytes)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
+        BncChange::CommentSet { identifier } => {
+            let mut cell = litchi_numbers_wire::BncCell::parse(previous)
+                .map_err(|_| TileError::InvalidSource)?;
+            cell.set_comment_identifier(Some(identifier));
+            cell.try_encode_with_limit(max_output_bytes)
+                .map(CellMutation::Replace)
+                .map_err(map_bnc_error)
+        },
     }
 }
 
@@ -3177,6 +3215,7 @@ pub(crate) fn bnc_change_is_noop(cell: Option<&[u8]>, change: BncChange) -> Resu
         },
         BncChange::FormulaCache(input) => view.formula_cache_equals(input.as_wire()),
         BncChange::CommentClear { .. } => view.comment_identifier().is_none(),
+        BncChange::CommentSet { identifier } => view.comment_identifier() == Some(identifier),
     })
 }
 
@@ -4414,6 +4453,51 @@ mod tests {
                 limits: limits(),
             })
             .is_err()
+        );
+    }
+
+    #[test]
+    fn comment_set_materializes_a_missing_slot_and_preserves_siblings() {
+        let mut sibling = BncCell::minimal();
+        sibling.set_number(42.0).unwrap();
+        let sibling = sibling.encode();
+        let source = one_row_tile(0, &[Some(sibling.clone()), None]);
+        let changes = [TileChange {
+            row: 0,
+            column: 1,
+            change: BncChange::CommentSet { identifier: 7 },
+        }];
+
+        let prepared = prepare_tile(TileRewriteRequest {
+            source: &source,
+            columns: 2,
+            changes: &changes,
+            limits: limits(),
+        })
+        .expect("missing comment slot prepares");
+        let requirements = prepared.execution_requirements();
+        let outcome = prepared
+            .execute(requirements.exact_limits())
+            .expect("missing comment slot executes");
+        let payload = outcome.payload.as_deref().expect("tile replacement");
+        let (_, rows) = decode_rows(payload);
+        let row = &rows.values[0];
+        assert_eq!(row_cell(row, 0), sibling);
+        assert_eq!(
+            BncCellView::parse(row_cell(row, 1))
+                .unwrap()
+                .comment_identifier(),
+            Some(7)
+        );
+        assert_eq!(outcome.transitions.len(), 1);
+        assert_eq!(outcome.transitions[0].before, CellValue::Missing);
+        assert_eq!(outcome.transitions[0].after_references.comment, Some(7));
+        assert_eq!(
+            outcome.final_rows,
+            [RowCellCount {
+                row: 0,
+                cell_count: 2
+            }]
         );
     }
 
