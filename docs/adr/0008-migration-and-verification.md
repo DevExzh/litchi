@@ -14146,7 +14146,7 @@ claim that every workspace target is green.
 
 ## 2026-08-26 amendment: Wave91 Numbers comment-reply read verification record
 
-Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` was checked
+Implementation base `e8749ca9e5320c5bf99c17967bf850f7c6e14d6c` was checked
 with the following focused gates:
 
 - `cargo test -p litchi-numbers --test table_data_list_reader_integration
@@ -14180,3 +14180,47 @@ Numbers UI run was performed for this slice.
 These are scoped verification facts, not native open/save/reopen, Rust/native
 byte parity, performance/RSS, full-workspace, host/debt/edge, publication, or
 monolith-exit claims.
+
+## 2026-08-26 amendment: Wave92 comment-reply rewrite primitive verification record
+
+Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
+was checked with the following scoped gates:
+
+- focused `comment_storage_codec` unit tests passed 19/19, covering ordered
+  append/replace/remove, stale and duplicate identity refusal, exact canonical
+  inverses, unknown overlong scalar/length/key and balanced-group retention,
+  strict known framing, typed depth and Buffa hard-size refusal, candidate
+  report replay, and exact/max-minus-one execution ceilings;
+- the complete `litchi-iwa-protos` library test target passed 531/531;
+- `cargo check -p litchi-iwa-protos --all-targets` and strict library/test
+  Clippy passed with only the recorded `needless_borrow` baseline allowance;
+- the isolated `comment_storage_reply_codec` fuzz target compiled, its 13
+  checked-in corpus recipes and manifest/README inventory were present, and
+  Rust 2024 formatting plus scoped diff checks passed;
+- Python compilation and the complete boundary unittest passed 550/550;
+- the live boundary checker reported only the three known user-owned,
+  untracked Pages table-lock findings (`body_table_lock_state`,
+  `set_body_table_lock_state`, and the returned `tables/lock.rs` source), with
+  no Wave92 reply-codec finding.
+
+The repository-wide pre-commit sweep was not green: it encountered unrelated
+user-owned Rust formatting differences, existing Numbers deprecation and
+`manual_contains` lints, and an unrelated non-exhaustive semantic-value test.
+The implementation commit therefore records the focused gates above, not a
+full-workspace-green claim.
+
+A bounded Numbers 14.4 UI probe created a native root comment at B2 and saved
+`/private/tmp/wave92-native-comment-reply/root-only.numbers` at 135,223 bytes
+with SHA-256
+`42fe23e9351ed53323b1d5aa71fc9c08dceb01e86e46ce9d02be8a53ca66814c`.
+An exact copy opened without a repair/recovery dialog and rendered the root
+comment, but the visible Reply control was absent from accessibility state and
+remained inert under fresh coordinate, keyboard, menu, and toolbar attempts.
+The copy remained byte-identical to the source; no direct replies, changed
+candidate, inverse, post-edit save/reopen, or strict package reread were
+produced. Native direct-reply acceptance is therefore explicitly withheld.
+
+These facts establish a strict private codec primitive only. They do not
+establish package reply mutation, host retirement, native reply persistence,
+Rust/native byte parity, performance/RSS, publication, dependency/debt exit,
+or a monolith-exit gate.
