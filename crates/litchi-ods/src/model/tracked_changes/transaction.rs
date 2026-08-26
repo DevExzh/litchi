@@ -1911,6 +1911,23 @@ fn reserve_one<T>(values: &mut Vec<T>, label: &str) -> Result<()> {
         .map_err(|_error| allocation_error(label))
 }
 
+fn try_owned_string(value: &str, label: &str) -> Result<String> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|_error| allocation_error(label))?;
+    owned.push_str(value);
+    Ok(owned)
+}
+
+fn allocation_error(label: &str) -> Error {
+    Error::InvalidFormat(format!("unable to allocate bounded {label}"))
+}
+
+fn invalid<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidFormat(message.into()))
+}
+
 #[cfg(test)]
 mod cache_regressions {
     #![allow(
@@ -2081,21 +2098,4 @@ mod cache_regressions {
         }
         assert!(transaction.inbound.is_empty());
     }
-}
-
-fn try_owned_string(value: &str, label: &str) -> Result<String> {
-    let mut owned = String::new();
-    owned
-        .try_reserve_exact(value.len())
-        .map_err(|_error| allocation_error(label))?;
-    owned.push_str(value);
-    Ok(owned)
-}
-
-fn allocation_error(label: &str) -> Error {
-    Error::InvalidFormat(format!("unable to allocate bounded {label}"))
-}
-
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::InvalidFormat(message.into()))
 }
