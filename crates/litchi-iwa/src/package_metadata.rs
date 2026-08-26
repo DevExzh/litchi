@@ -12,10 +12,11 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::package_metadata_codec::{
-    ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
+    Batch, ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
     ExternalReferenceDescriptor, ObjectUuidDescriptor, PackageMetadataInspection,
     PackageMetadataVisitor, RewriteError, RewriteLimit, RewriteOptions, SaveTokenBatch,
-    inspect_package_metadata_with_visitor, prepare_package_metadata_save_tokens,
+    inspect_package_metadata_with_visitor, prepare_package_metadata_rewrite,
+    prepare_package_metadata_save_tokens,
 };
 
 pub(crate) const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
@@ -129,13 +130,46 @@ pub(crate) fn set_package_last_object_identifier(
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
         return Ok(());
     }
+
+    let options = package_metadata_read_options(package);
+    let current = package_last_object_identifier(package)?.ok_or_else(|| {
+        Error::InvalidFormat(
+            "PackageMetadata payload is missing from Index/Metadata.iwa".to_owned(),
+        )
+    })?;
+    if identifier == current {
+        return Ok(());
+    }
+
     package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
         let (object_index, message_index) = package_metadata_location(archive)?;
         let object = &mut archive.objects[object_index];
         let original = &object.messages[message_index];
+
+        if identifier > current {
+            let batch = Batch::new(current, identifier, &[], &[]);
+            let prepared =
+                prepare_package_metadata_rewrite(original.data.as_slice(), batch, options)
+                    .map_err(package_metadata_inspection_error)?;
+            let execution_limits = prepared.execution_requirements().exact_limits();
+            let data = prepared
+                .execute(execution_limits)
+                .map_err(package_metadata_inspection_error)?
+                .into_bytes();
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            return Ok(());
+        }
+
         let data = patch_varint_field(original.data.as_slice(), 1, true, Some(identifier))?;
-        let verified = crate::protobuf::tsp::PackageMetadata::decode(data.as_slice())?;
-        if verified.last_object_identifier != identifier {
+        let mut visitor = MetadataRootVisitor::default();
+        let verified = inspect_package_metadata_source(data.as_slice(), options, &mut visitor)?;
+        if verified.last_object_identifier() != identifier {
             return Err(Error::InvalidFormat(
                 "PackageMetadata last object identifier patch failed validation".to_owned(),
             ));
@@ -1425,6 +1459,78 @@ mod tests {
             .messages[0]
             .data
             .clone()
+    }
+
+    #[test]
+    fn set_package_last_identifier_uses_strict_increase_and_preserves_unknown_raw() {
+        let mut source = PackageMetadata {
+            last_object_identifier: 10,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        source.extend_from_slice(&[0xd0, 0x05, 0x07]);
+        let mut package = package_with_metadata_data(source.clone());
+
+        set_package_last_object_identifier(&mut package, 11).unwrap();
+
+        let updated = metadata_payload(&package);
+        assert_eq!(package_last_object_identifier(&package).unwrap(), Some(11));
+        assert!(updated.ends_with(&[0xd0, 0x05, 0x07]));
+        assert_ne!(updated, source);
+    }
+
+    #[test]
+    fn set_package_last_identifier_equal_is_strict_noop_and_decrease_preserves_raw() {
+        let mut source = PackageMetadata {
+            last_object_identifier: 10,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        source.extend_from_slice(&[0xd0, 0x05, 0x07]);
+        let mut package = package_with_metadata_data(source);
+
+        set_package_last_object_identifier(&mut package, 10).unwrap();
+        let equal_payload = metadata_payload(&package);
+        let equal_revision = package.mutation_revision();
+        set_package_last_object_identifier(&mut package, 10).unwrap();
+        assert_eq!(metadata_payload(&package), equal_payload);
+        assert_eq!(package.mutation_revision(), equal_revision);
+
+        set_package_last_object_identifier(&mut package, 7).unwrap();
+        let decreased = metadata_payload(&package);
+        assert_eq!(package_last_object_identifier(&package).unwrap(), Some(7));
+        assert!(decreased.ends_with(&[0xd0, 0x05, 0x07]));
+    }
+
+    #[test]
+    fn set_package_last_identifier_rejects_malformed_source_atomically() {
+        for source in [
+            vec![0x08, 0x0a, 0x08, 0x0b],
+            vec![0x0a, 0x01, 0x0a],
+            vec![0x08, 0x8a, 0x00],
+        ] {
+            let mut package = package_with_metadata_data(source);
+            let before = package.entry(PACKAGE_METADATA_ENTRY).unwrap().to_vec();
+            let revision = package.mutation_revision();
+
+            assert!(set_package_last_object_identifier(&mut package, 11).is_err());
+            assert_eq!(
+                package.entry(PACKAGE_METADATA_ENTRY),
+                Some(before.as_slice())
+            );
+            assert_eq!(package.mutation_revision(), revision);
+        }
+    }
+
+    #[test]
+    fn set_package_last_identifier_without_metadata_is_a_noop() {
+        let mut package = IWorkPackage::new();
+        let revision = package.mutation_revision();
+
+        set_package_last_object_identifier(&mut package, 11).unwrap();
+
+        assert_eq!(package.entry_names().count(), 0);
+        assert_eq!(package.mutation_revision(), revision);
     }
 
     fn assert_component_queries_fail(package: &IWorkPackage) {

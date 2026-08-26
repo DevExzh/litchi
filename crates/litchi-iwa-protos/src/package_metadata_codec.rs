@@ -2532,6 +2532,231 @@ mod tests {
         assert_eq!(output.report().allocations(), requirements.allocations());
     }
 
+    #[test]
+    fn empty_batch_watermark_rewrite_preserves_unknown_raw_records_and_is_forward_only() {
+        let mut current = component(1, "a.iwa", None, &[], &[]);
+        let unknown_component_scalar = [0xd0, 0x03, 0x07];
+        current.extend_from_slice(&unknown_component_scalar);
+        let mut unknown_component_group = Vec::new();
+        put_key(&mut unknown_component_group, 53, 3);
+        put_varint_field(&mut unknown_component_group, 1, 7);
+        put_key(&mut unknown_component_group, 53, 4);
+        current.extend_from_slice(&unknown_component_group);
+
+        let versioned = component(8, "old.iwa", None, &[], &[]);
+        let mut source = metadata(10, &[current], &[versioned]);
+        let unknown_scalar = [0xa0, 0x03, 0x81, 0x00];
+        source.extend_from_slice(&unknown_scalar);
+        let mut unknown_group = Vec::new();
+        put_key(&mut unknown_group, 54, 3);
+        put_varint_field(&mut unknown_group, 1, 9);
+        put_key(&mut unknown_group, 54, 4);
+        source.extend_from_slice(&unknown_group);
+
+        let batch = Batch::new(10, 11, &[], &[]);
+        let allocations_before = output_allocations();
+        let prepared = prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+        assert_eq!(prepared.prepare_report().output_bytes(), 0);
+        assert_eq!(prepared.prepare_report().retained_bytes(), 0);
+        assert_eq!(prepared.execution_requirements().allocations(), 1);
+        assert_eq!(output_allocations(), allocations_before);
+
+        let requirements = prepared.execution_requirements();
+        let output = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(output_allocations(), allocations_before + 1);
+        assert_eq!(output.report().output_bytes(), output.bytes().len());
+        assert_eq!(output.report().retained_bytes(), output.bytes().len());
+        assert_eq!(output.report().allocations(), 1);
+        assert_eq!(output.report().additions(), 0);
+        assert!(
+            output
+                .bytes()
+                .windows(unknown_component_scalar.len())
+                .any(|window| window == unknown_component_scalar)
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(unknown_component_group.len())
+                .any(|window| window == unknown_component_group)
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(unknown_scalar.len())
+                .any(|window| window == unknown_scalar)
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(unknown_group.len())
+                .any(|window| window == unknown_group)
+        );
+        let mut facts = Facts::default();
+        assert_eq!(
+            inspect_package_metadata_with_visitor(
+                output.bytes(),
+                options(output.bytes()),
+                &mut facts,
+            )
+            .unwrap()
+            .last_object_identifier(),
+            11
+        );
+
+        // Batch's watermark contract is deliberately monotonic. A second
+        // forward transition is valid, but it is not an inverse of 10 -> 11.
+        let first_bytes = output.into_bytes();
+        let second = prepare_package_metadata_rewrite(
+            &first_bytes,
+            Batch::new(11, 12, &[], &[]),
+            options(&first_bytes),
+        )
+        .unwrap();
+        let second_requirements = second.execution_requirements();
+        let second_before = output_allocations();
+        let second_output = second.execute(second_requirements.exact_limits()).unwrap();
+        assert_eq!(output_allocations(), second_before + 1);
+        assert!(
+            second_output
+                .bytes()
+                .windows(unknown_scalar.len())
+                .any(|window| window == unknown_scalar)
+        );
+        assert_eq!(
+            inspect_package_metadata_with_visitor(
+                second_output.bytes(),
+                options(second_output.bytes()),
+                &mut Facts::default(),
+            )
+            .unwrap()
+            .last_object_identifier(),
+            12
+        );
+
+        for (expected, new) in [(11, 10), (11, 11)] {
+            let error = match prepare_package_metadata_rewrite(
+                &first_bytes,
+                Batch::new(expected, new, &[], &[]),
+                options(&first_bytes),
+            ) {
+                Ok(_) => panic!("non-monotonic watermark transition was accepted"),
+                Err(error) => error,
+            };
+            assert_eq!(reason(error), InvalidReason::LastIdentifierNotIncreasing);
+        }
+    }
+
+    #[test]
+    fn empty_batch_watermark_execute_limits_precede_exactly_one_output_allocation() {
+        let source = metadata(
+            10,
+            &[
+                component(1, "a.iwa", None, &[], &[]),
+                component(2, "b.iwa", None, &[], &[]),
+            ],
+            &[],
+        );
+        let batch = Batch::new(10, 11, &[], &[]);
+        let baseline = prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+        let requirements = baseline.execution_requirements();
+        assert!(requirements.output_bytes() > 0);
+        assert!(requirements.fields() > 0);
+        assert!(requirements.work_bytes() > 0);
+        assert!(requirements.components() > 0);
+        assert!(requirements.allocations() > 0);
+        assert!(requirements.retained_bytes() > 0);
+        assert!(requirements.scratch_bytes() > 0);
+
+        let mut limited = requirements.exact_limits();
+        limited.max_output_bytes -= 1;
+        let before = output_allocations();
+        let error = match baseline.execute(limited) {
+            Ok(_) => panic!("output limit was not enforced"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.resource_limit(),
+            Some(RewriteLimit::OutputBytes {
+                observed: requirements.output_bytes(),
+                maximum: requirements.output_bytes() - 1,
+            })
+        );
+        assert_eq!(output_allocations(), before);
+
+        let limits = [
+            ("fields", 0),
+            ("work", 1),
+            ("components", 2),
+            ("allocations", 3),
+            ("retained", 4),
+            ("scratch", 5),
+        ];
+        for (label, axis) in limits {
+            let prepared =
+                prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+            let requirements = prepared.execution_requirements();
+            let mut limited = requirements.exact_limits();
+            match axis {
+                0 => limited.max_fields -= 1,
+                1 => limited.max_work_bytes -= 1,
+                2 => limited.max_components -= 1,
+                3 => limited.max_allocations -= 1,
+                4 => limited.max_retained_bytes -= 1,
+                _ => limited.max_scratch_bytes -= 1,
+            }
+            let before = output_allocations();
+            let error = match prepared.execute(limited) {
+                Ok(_) => panic!("{label} limit was not enforced"),
+                Err(error) => error,
+            };
+            assert!(
+                error.resource_limit().is_some() || error.allocation_request().is_some(),
+                "missing {label} limit"
+            );
+            assert_eq!(
+                output_allocations(),
+                before,
+                "{label} reached output allocation"
+            );
+        }
+
+        let prepared = prepare_package_metadata_rewrite(&source, batch, options(&source)).unwrap();
+        let requirements = prepared.execution_requirements();
+        let before = output_allocations();
+        let output = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(output_allocations(), before + 1);
+        assert_eq!(output.report().allocations(), 1);
+        assert_eq!(output.report().output_bytes(), requirements.output_bytes());
+        assert_eq!(
+            output.report().retained_bytes(),
+            requirements.retained_bytes()
+        );
+    }
+
+    #[test]
+    fn empty_batch_watermark_rejects_duplicate_and_noncanonical_root_fields_atomically() {
+        let mut duplicate = metadata(10, &[], &[]);
+        put_varint_field(&mut duplicate, 1, 10);
+        let mut noncanonical = metadata(10, &[], &[]);
+        let root_tag = noncanonical.iter().position(|byte| *byte == 0x08).unwrap();
+        noncanonical.splice(root_tag..=root_tag + 1, [0x08, 0x8a, 0x00]);
+
+        for source in [duplicate, noncanonical] {
+            let before = output_allocations();
+            let error = match prepare_package_metadata_rewrite(
+                &source,
+                Batch::new(10, 11, &[], &[]),
+                options(&source),
+            ) {
+                Ok(_) => panic!("malformed source was accepted"),
+                Err(error) => error,
+            };
+            assert_eq!(reason(error), InvalidReason::MalformedWire);
+            assert_eq!(output_allocations(), before);
+        }
+    }
+
     #[derive(Default)]
     struct CallbackCount(usize);
 
