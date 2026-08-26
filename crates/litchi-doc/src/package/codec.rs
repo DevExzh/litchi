@@ -74,9 +74,9 @@ impl<R: Read + Seek> Package<R> {
 
     /// Validate a source length before entering the public DOC-reader gate.
     ///
-    /// Callers that already own the source bytes can perform this check after
-    /// a strict format owner has validated the same source and before handing
-    /// its parsed OLE context to the public reader.
+    /// Callers that already own the source bytes can perform this check before
+    /// a strict format owner parses the same source and before handing a
+    /// parsed OLE context to the public reader.
     pub(crate) fn validate_source_len(source_len: usize, limits: Limits) -> Result<()> {
         let source_len = u64::try_from(source_len).unwrap_or(u64::MAX);
         validate_package_size(source_len, limits)

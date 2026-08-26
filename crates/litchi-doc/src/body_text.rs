@@ -31,6 +31,8 @@ use litchi_core::patch::{
     Reversible, ReversibleOperation, SubEdit,
 };
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
+#[cfg(feature = "performance-diagnostics")]
+pub use litchi_ole_common::object::{CfbParseEvent, CfbParseOutcome};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
@@ -571,13 +573,13 @@ impl Snapshot {
         transaction_limits: TransactionLimits,
     ) -> Result<Self> {
         let bytes = input.into();
-        let (_strict_editor, mut ole) =
-            RevisionEditor::open_with_ole_file(bytes.clone(), limits).map_err(Error::Invalid)?;
         crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
             bytes.len(),
             crate::package::Limits::default(),
         )
         .map_err(Error::Invalid)?;
+        let (_strict_editor, mut ole) =
+            RevisionEditor::open_with_ole_file(bytes.clone(), limits).map_err(Error::Invalid)?;
         crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
             .map_err(Error::Invalid)?;
         Ok(Self {
@@ -592,10 +594,11 @@ impl Snapshot {
     /// boundaries to an external observer.
     ///
     /// This is an opt-in profiling equivalent of [`Self::open_bounded`]. It
-    /// performs the same strict-owner validation, complete public-reader
-    /// validation, and exact-source retention in the same order. The
-    /// observer receives no document content or physical identifiers, and no
-    /// clock or other ambient runtime state is consulted.
+    /// performs package-size preflight, strict-owner validation (including
+    /// one nested top-level in-memory CFB parse), complete public-reader
+    /// validation, and exact-source retention in the same order. The observer
+    /// receives no document content or physical identifiers, and no clock or
+    /// other ambient runtime state is consulted.
     ///
     /// # Errors
     ///
@@ -607,31 +610,83 @@ impl Snapshot {
         input: impl Into<Vec<u8>>,
         limits: Limits,
         transaction_limits: TransactionLimits,
+        observer: impl FnMut(DiagnosticEvent),
+    ) -> Result<Self> {
+        Self::open_bounded_profiled_with_cfb_observer(
+            input,
+            limits,
+            transaction_limits,
+            observer,
+            |_| {},
+        )
+    }
+
+    /// Opens an owned DOC source while reporting both semantic phases and the
+    /// operation-local top-level in-memory CFB parse separately.
+    ///
+    /// The [`DiagnosticEvent`] stream has the same fixed phase sequence as
+    /// [`Self::open_bounded_profiled`]. The separate [`CfbParseEvent`]
+    /// observer receives one balanced pair around the strict owner's single
+    /// top-level `OleFile::open` when source-length preflight and strict-owner
+    /// input validation permit parsing. Preflight itself is intentionally
+    /// silent in the high-level stream.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate. Event balancing is guaranteed only when
+    /// both observers return normally from every callback.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same error as [`Self::open_bounded`]. Failed phases and
+    /// physical parses close their respective observer events before the
+    /// error is returned.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn open_bounded_profiled_with_cfb_observer(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+        observer: impl FnMut(DiagnosticEvent),
+        cfb_observer: impl FnMut(CfbParseEvent),
+    ) -> Result<Self> {
+        Self::open_bounded_profiled_with_package_limits(
+            input,
+            limits,
+            transaction_limits,
+            crate::package::Limits::default(),
+            observer,
+            cfb_observer,
+        )
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    fn open_bounded_profiled_with_package_limits(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+        package_limits: crate::package::Limits,
         mut observer: impl FnMut(DiagnosticEvent),
+        mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
         let bytes = input.into();
+        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), package_limits)
+            .map_err(Error::Invalid)?;
         let mut ole = observe_phase(
             &mut observer,
             DiagnosticPhase::StrictOwnerValidation,
             || {
                 let (_strict_editor, ole) =
-                    RevisionEditor::open_with_ole_file(bytes.clone(), limits)
-                        .map_err(Error::Invalid)?;
+                    RevisionEditor::open_with_ole_file_profiled(bytes.clone(), limits, |event| {
+                        cfb_observer(event);
+                    })
+                    .map_err(Error::Invalid)?;
                 Ok(ole)
             },
         )?;
         observe_phase(
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
-            || {
-                crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
-                    bytes.len(),
-                    crate::package::Limits::default(),
-                )
-                .map_err(Error::Invalid)?;
-                crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
-                    .map_err(Error::Invalid)
-            },
+            || crate::Package::validate_ole_file(&mut ole, package_limits).map_err(Error::Invalid),
         )?;
         let source = observe_phase(&mut observer, DiagnosticPhase::SourceRetention, || {
             Ok(Arc::from(bytes.into_boxed_slice()))
@@ -1609,10 +1664,12 @@ impl Edit {
     ///
     /// This is an opt-in profiling equivalent of [`Self::commit`]. Changed
     /// candidates report editor finish, strict-owner validation, complete
-    /// public-reader validation, source retention, and patch construction. An
-    /// exact byte-for-byte no-op reports finish, the no-op decision, and patch
-    /// construction; it shares the source allocation and does not reopen or
-    /// retain a new candidate.
+    /// public-reader validation, source retention, and patch construction. A
+    /// separate CFB observer is available through
+    /// [`Self::commit_profiled_with_cfb_observer`]. An exact byte-for-byte
+    /// no-op reports finish, the no-op decision, and patch construction; it
+    /// shares the source allocation and does not reopen or retain a new
+    /// candidate.
     ///
     /// The safe public edit verbs do not provide a raw WordDocument/table
     /// injection path: each binary mutation validates its candidate before it
@@ -1631,6 +1688,36 @@ impl Edit {
     /// before the error is returned.
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
+        self.commit_profiled_with_cfb_observer(&mut observer, |_| {})
+    }
+
+    /// Publishes a profiled commit with separate semantic and in-memory CFB
+    /// observers.
+    ///
+    /// The semantic observer receives the same fixed phase stream as
+    /// [`Self::commit_profiled`]. The separate CFB observer receives the
+    /// operation-local parse events emitted while a changed candidate is
+    /// reopened. Exact no-op commits do not reopen a CFB and therefore emit
+    /// no new CFB events during that commit call; earlier edit staging is
+    /// outside this observer window.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate. Event balancing is guaranteed only when
+    /// both observers return normally from every callback.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same error as [`Self::commit`]. Failed phases and physical
+    /// parses close their respective observer events before the error is
+    /// returned.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled_with_cfb_observer(
+        self,
+        observer: impl FnMut(DiagnosticEvent),
+        mut cfb_observer: impl FnMut(CfbParseEvent),
+    ) -> Result<Commit> {
+        let mut observer = observer;
         let bytes = observe_phase(&mut observer, DiagnosticPhase::Finish, || {
             self.editor.finish().map_err(Error::Invalid)
         })?;
@@ -1639,11 +1726,12 @@ impl Edit {
                 Ok(self.source.clone())
             })?
         } else {
-            Snapshot::open_bounded_profiled(
+            Snapshot::open_bounded_profiled_with_cfb_observer(
                 bytes,
                 self.source.limits,
                 self.source.transaction_limits,
                 &mut observer,
+                &mut cfb_observer,
             )?
         };
         let patch = observe_phase(&mut observer, DiagnosticPhase::Patch, || {
@@ -3816,12 +3904,15 @@ mod tests {
         reason = "unit-test fixtures use contextual fail-fast assertions"
     )]
 
+    #[cfg(feature = "performance-diagnostics")]
+    use super::{
+        CfbParseEvent, CfbParseOutcome, DiagnosticEvent, DiagnosticOutcome, DiagnosticPhase,
+        observe_phase,
+    };
     use super::{
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
         Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
     };
-    #[cfg(feature = "performance-diagnostics")]
-    use super::{DiagnosticEvent, DiagnosticOutcome, DiagnosticPhase, observe_phase};
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
         CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
@@ -4054,14 +4145,25 @@ mod tests {
         let bytes = doc(&["alpha", "bravo"]);
         let ordinary = Snapshot::open(bytes.clone(), Limits::default()).expect("ordinary open");
         let mut events = Vec::new();
-        let profiled = Snapshot::open_bounded_profiled(
+        let mut cfb_events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled_with_cfb_observer(
             bytes,
             Limits::default(),
             TransactionLimits::default(),
             |event| events.push(event),
+            |event| cfb_events.push(event),
         )
         .expect("profiled open");
 
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Success,
+                },
+            ]
+        );
         assert_eq!(profiled, ordinary);
         assert_eq!(
             events,
@@ -4098,13 +4200,24 @@ mod tests {
         let ordinary =
             Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
         let mut events = Vec::new();
-        let profiled = Snapshot::open_bounded_profiled(
+        let mut cfb_events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled_with_cfb_observer(
             bytes,
             Limits::default(),
             TransactionLimits::default(),
             |event| events.push(event),
+            |event| cfb_events.push(event),
         );
 
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Error,
+                },
+            ]
+        );
         assert!(matches!(profiled, Err(Error::Invalid(_))));
         assert_eq!(profiled.map_err(|error| error.to_string()), ordinary);
         assert_eq!(
@@ -4123,20 +4236,53 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     #[test]
+    fn profiled_open_preflights_source_before_any_cfb_parse() {
+        let package_limits = crate::package::Limits::default()
+            .with_max_package_bytes(0)
+            .expect("zero package limit is within the safety ceiling");
+        let mut events = Vec::new();
+        let mut cfb_events = Vec::new();
+        let result = Snapshot::open_bounded_profiled_with_package_limits(
+            doc(&["alpha"]),
+            Limits::default(),
+            TransactionLimits::default(),
+            package_limits,
+            |event| events.push(event),
+            |event| cfb_events.push(event),
+        );
+
+        assert!(cfb_events.is_empty());
+        assert!(matches!(result, Err(Error::Invalid(_))));
+        assert!(events.is_empty());
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
     fn profiled_open_public_reader_error_closes_only_public_phase() {
         let bytes = public_reader_failure_doc();
         assert!(RevisionEditor::open(bytes.clone(), Limits::default()).is_ok());
         let ordinary =
             Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
         let mut events = Vec::new();
-        let profiled = Snapshot::open_bounded_profiled(
+        let mut cfb_events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled_with_cfb_observer(
             bytes,
             Limits::default(),
             TransactionLimits::default(),
             |event| events.push(event),
+            |event| cfb_events.push(event),
         )
         .map_err(|error| error.to_string());
 
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Success,
+                },
+            ]
+        );
         assert_eq!(profiled, ordinary);
         assert!(profiled.is_err());
         assert_eq!(
@@ -4167,14 +4313,25 @@ mod tests {
         let ordinary =
             Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
         let mut events = Vec::new();
-        let profiled = Snapshot::open_bounded_profiled(
+        let mut cfb_events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled_with_cfb_observer(
             bytes,
             Limits::default(),
             TransactionLimits::default(),
             |event| events.push(event),
+            |event| cfb_events.push(event),
         )
         .map_err(|error| error.to_string());
 
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Success,
+                },
+            ]
+        );
         assert_eq!(profiled, ordinary);
         assert!(profiled.is_err());
         assert_eq!(
@@ -4237,10 +4394,23 @@ mod tests {
             .replace_paragraph(Position::new(0), "omega")
             .expect("profiled replacement");
         let mut events = Vec::new();
+        let mut cfb_events = Vec::new();
         let profiled = profiled_edit
-            .commit_profiled(|event| events.push(event))
+            .commit_profiled_with_cfb_observer(
+                |event| events.push(event),
+                |event| cfb_events.push(event),
+            )
             .expect("profiled commit");
 
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Success,
+                },
+            ]
+        );
         assert_eq!(profiled, ordinary);
         assert_eq!(
             events,
@@ -4301,10 +4471,15 @@ mod tests {
             .replace_paragraph(Position::new(0), "alpha")
             .expect("same text replacement");
         let mut events = Vec::new();
+        let mut cfb_events = Vec::new();
         let profiled = profiled_edit
-            .commit_profiled(|event| events.push(event))
+            .commit_profiled_with_cfb_observer(
+                |event| events.push(event),
+                |event| cfb_events.push(event),
+            )
             .expect("profiled no-op commit");
 
+        assert!(cfb_events.is_empty());
         assert_eq!(profiled, ordinary);
         assert!(!profiled.changed());
         assert_eq!(

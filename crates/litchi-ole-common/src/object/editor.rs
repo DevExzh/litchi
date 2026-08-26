@@ -15,6 +15,48 @@ use std::sync::Arc;
 /// Maximum number of stream selectors accepted by one removal publication.
 pub const MAX_STREAM_REMOVALS: usize = 1_024;
 
+/// Result class attached to a completed top-level in-memory CFB parse.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CfbParseOutcome {
+    /// The top-level `OleFile::open` call returned a parsed container.
+    Success,
+    /// The top-level `OleFile::open` call returned an error.
+    Error,
+}
+
+/// Content-free events emitted around one operation-local top-level in-memory
+/// CFB parse.
+///
+/// The observer is called synchronously and is owned by the caller. The
+/// library does not retain it, consult ambient runtime state, or expose source
+/// content, offsets, stream names, or physical identifiers.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CfbParseEvent {
+    /// The top-level `OleFile::open` call is about to begin.
+    Started,
+    /// The top-level `OleFile::open` call has returned.
+    Finished { outcome: CfbParseOutcome },
+}
+
+#[cfg(feature = "performance-diagnostics")]
+fn observe_cfb_parse<T>(
+    observer: &mut impl FnMut(CfbParseEvent),
+    operation: impl FnOnce() -> Result<T, OleError>,
+) -> Result<T, OleError> {
+    observer(CfbParseEvent::Started);
+    let result = operation();
+    observer(CfbParseEvent::Finished {
+        outcome: if result.is_ok() {
+            CfbParseOutcome::Success
+        } else {
+            CfbParseOutcome::Error
+        },
+    });
+    result
+}
+
 /// Transactional editor for target-selected OLE storages.
 #[derive(Debug, Clone)]
 pub struct Editor {
@@ -56,6 +98,39 @@ impl Editor {
         Self::validate_open_inputs(&targets, limits)?;
         let original = Arc::new(bytes);
         let mut ole = OleFile::open(Cursor::new(original.as_ref().clone()))?;
+        let editor = Self::open_from_parsed_ole(Arc::clone(&original), &mut ole, targets, limits)?;
+        Ok((editor, ole))
+    }
+
+    /// Opens a package and reports the operation-local top-level in-memory CFB
+    /// parse.
+    ///
+    /// This is the feature-gated equivalent of [`Self::open_with_ole_file`].
+    /// When strict-owner input validation permits parsing, the observer
+    /// receives exactly one balanced pair around the top-level
+    /// `OleFile::open`. Semantic target/package failures occur after a
+    /// successful parse and are not folded into the parse result.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate. Event balancing is guaranteed only when the
+    /// observer returns normally from every callback.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::open_with_ole_file`].
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn open_with_ole_file_profiled(
+        bytes: Vec<u8>,
+        targets: Targets,
+        limits: Limits,
+        mut observer: impl FnMut(CfbParseEvent),
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
+        Self::validate_open_inputs(&targets, limits)?;
+        let original = Arc::new(bytes);
+        let mut ole = observe_cfb_parse(&mut observer, || {
+            OleFile::open(Cursor::new(original.as_ref().clone()))
+        })?;
         let editor = Self::open_from_parsed_ole(Arc::clone(&original), &mut ole, targets, limits)?;
         Ok((editor, ole))
     }

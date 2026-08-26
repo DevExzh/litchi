@@ -25,6 +25,8 @@ use crate::sprm_operations::{
 };
 use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::OleFile;
+#[cfg(feature = "performance-diagnostics")]
+use litchi_ole_common::object::CfbParseEvent;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 use smallvec::SmallVec;
 use std::io::Cursor;
@@ -910,6 +912,19 @@ impl RevisionEditor {
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
         let (package, ole) = ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
             .map_err(PackageError::from)?;
+        let editor = Self::open_from_package(package)?;
+        Ok((editor, ole))
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    pub(crate) fn open_with_ole_file_profiled(
+        bytes: Vec<u8>,
+        limits: Limits,
+        observer: impl FnMut(CfbParseEvent),
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
+        let (package, ole) =
+            ObjectEditor::open_with_ole_file_profiled(bytes, Targets::default(), limits, observer)
+                .map_err(PackageError::from)?;
         let editor = Self::open_from_package(package)?;
         Ok((editor, ole))
     }
