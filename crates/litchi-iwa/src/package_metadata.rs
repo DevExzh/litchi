@@ -12,9 +12,10 @@ use crate::wire::{
 use crate::{Error, IWorkPackage, Result};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::package_metadata_codec::{
-    ComponentDescriptor, DataReferenceOwnerDescriptor, ExternalReferenceDescriptor,
-    ObjectUuidDescriptor, PackageMetadataInspection, PackageMetadataVisitor, RewriteError,
-    RewriteLimit, RewriteOptions, inspect_package_metadata_with_visitor,
+    ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
+    ExternalReferenceDescriptor, ObjectUuidDescriptor, PackageMetadataInspection,
+    PackageMetadataVisitor, RewriteError, RewriteLimit, RewriteOptions, SaveTokenBatch,
+    inspect_package_metadata_with_visitor, prepare_package_metadata_save_tokens,
 };
 
 pub(crate) const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
@@ -543,52 +544,51 @@ pub(crate) fn advance_package_save_token_for_components(
             "save-token update requested duplicate component identifiers".to_owned(),
         ));
     }
+    let options = package_metadata_read_options(package);
     package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
         let (object_index, message_index) = package_metadata_location(archive)?;
         let object = &mut archive.objects[object_index];
         let original = &object.messages[message_index];
-        let metadata = crate::protobuf::tsp::PackageMetadata::decode(original.data.as_slice())?;
-        let save_token = metadata
-            .save_token
-            .unwrap_or_default()
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("package save token overflow".to_owned()))?;
-        let mut matched = HashSet::new();
-        let data = transform_length_delimited_fields_at_path(
-            original.data.as_slice(),
-            &[3],
-            |component_data| {
-                let component = crate::protobuf::tsp::ComponentInfo::decode(component_data)?;
-                if !requested.contains(&component.identifier) {
-                    return Ok(component_data.to_vec());
-                }
-                matched.insert(component.identifier);
-                patch_varint_field(
-                    component_data,
-                    12,
-                    component.save_token.is_some(),
-                    Some(save_token),
-                )
-            },
-        )?;
-        if matched != requested {
+        let mut visitor = SaveTokenSelectorVisitor {
+            requested: &requested,
+            selectors: Vec::new(),
+            duplicate_component: false,
+        };
+        inspect_package_metadata_source(original.data.as_slice(), options, &mut visitor)?;
+        if visitor.duplicate_component {
+            return Err(Error::InvalidFormat(
+                "PackageMetadata contains duplicate current components requested for save-token update"
+                    .to_owned(),
+            ));
+        }
+        if visitor.selectors.len() != requested.len() {
             return Err(Error::InvalidFormat(
                 "PackageMetadata is missing a component requested for save-token update".to_owned(),
             ));
         }
-        let data = patch_varint_field(&data, 8, metadata.save_token.is_some(), Some(save_token))?;
-        let verified = crate::protobuf::tsp::PackageMetadata::decode(data.as_slice())?;
-        if verified.save_token != Some(save_token)
-            || verified
-                .components
+        let mut selectors = Vec::new();
+        selectors
+            .try_reserve_exact(visitor.selectors.len())
+            .map_err(|_error| {
+                package_metadata_inspection_error(RewriteError::allocation(visitor.selectors.len()))
+            })?;
+        selectors.extend(
+            visitor
+                .selectors
                 .iter()
-                .filter(|component| requested.contains(&component.identifier))
-                .any(|component| component.save_token != Some(save_token))
-        {
-            return Err(Error::InvalidFormat(
-                "package save-token update failed validation".to_owned(),
-            ));
-        }
+                .map(|(identifier, locator)| ComponentSelector::new(*identifier, locator)),
+        );
+        let prepared = prepare_package_metadata_save_tokens(
+            original.data.as_slice(),
+            SaveTokenBatch::new(&selectors),
+            options,
+        )
+        .map_err(package_metadata_inspection_error)?;
+        let requirements = prepared.execution_requirements();
+        let data = prepared
+            .execute(requirements.exact_limits())
+            .map_err(package_metadata_inspection_error)?
+            .into_bytes();
         object.replace_message(
             message_index,
             RawMessage {
@@ -598,6 +598,47 @@ pub(crate) fn advance_package_save_token_for_components(
         )?;
         Ok(())
     })
+}
+
+struct SaveTokenSelectorVisitor<'requested> {
+    requested: &'requested HashSet<u64>,
+    selectors: Vec<(u64, String)>,
+    duplicate_component: bool,
+}
+
+impl PackageMetadataVisitor for SaveTokenSelectorVisitor<'_> {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if !component.is_current() || !self.requested.contains(&component.identifier()) {
+            return Ok(());
+        }
+        if self
+            .selectors
+            .iter()
+            .any(|(identifier, _locator)| *identifier == component.identifier())
+        {
+            self.duplicate_component = true;
+            return Ok(());
+        }
+        let requested = self
+            .selectors
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+        self.selectors
+            .try_reserve(1)
+            .map_err(|_error| RewriteError::allocation(requested))?;
+        let locator = component.effective_locator();
+        let mut owned_locator = String::new();
+        owned_locator
+            .try_reserve_exact(locator.len())
+            .map_err(|_error| RewriteError::allocation(locator.len()))?;
+        owned_locator.push_str(locator);
+        self.selectors.push((component.identifier(), owned_locator));
+        Ok(())
+    }
 }
 
 pub(crate) fn add_component_external_reference(
@@ -1375,6 +1416,17 @@ mod tests {
         package
     }
 
+    fn metadata_payload(package: &IWorkPackage) -> Vec<u8> {
+        package
+            .archive(PACKAGE_METADATA_ENTRY)
+            .unwrap()
+            .object(10)
+            .unwrap()
+            .messages[0]
+            .data
+            .clone()
+    }
+
     fn assert_component_queries_fail(package: &IWorkPackage) {
         assert!(component_identifier_for_entry(package, "Index/One.iwa").is_err());
         assert!(component_identifier_for_object_uuid(package, 1).is_err());
@@ -1492,6 +1544,152 @@ mod tests {
         assert!(package_save_token(&malformed).is_err());
         assert!(package_has_data_metadata_map(&malformed).is_err());
         assert!(next_object_identifier(&malformed).is_err());
+    }
+
+    #[test]
+    fn save_token_advancement_uses_exact_current_selectors_and_preserves_raw_fields() {
+        let mut source = PackageMetadata {
+            last_object_identifier: 10,
+            save_token: Some(7),
+            components: vec![
+                ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "Preferred-One".to_owned(),
+                    locator: Some("Actual-One".to_owned()),
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 2,
+                    preferred_locator: "Two".to_owned(),
+                    save_token: Some(3),
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 3,
+                    preferred_locator: "Unselected".to_owned(),
+                    save_token: Some(4),
+                    ..Default::default()
+                },
+            ],
+            versioned_components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Versioned-One".to_owned(),
+                save_token: Some(5),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let unknown_suffix = [0xd0, 0x05, 0x07];
+        source.extend_from_slice(&unknown_suffix);
+        let mut package = package_with_metadata_data(source);
+
+        advance_package_save_token_for_components(&mut package, &[1, 2]).unwrap();
+
+        let candidate = metadata_payload(&package);
+        assert!(candidate.ends_with(&unknown_suffix));
+        let metadata = PackageMetadata::decode(candidate.as_slice()).unwrap();
+        assert_eq!(metadata.save_token, Some(8));
+        assert_eq!(metadata.components[0].save_token, Some(8));
+        assert_eq!(metadata.components[1].save_token, Some(8));
+        assert_eq!(metadata.components[2].save_token, Some(4));
+        assert_eq!(metadata.versioned_components[0].save_token, Some(5));
+
+        let mut absent_tokens = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "One".to_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        advance_package_save_token_for_components(&mut absent_tokens, &[1]).unwrap();
+        let metadata =
+            PackageMetadata::decode(metadata_payload(&absent_tokens).as_slice()).unwrap();
+        assert_eq!(metadata.save_token, Some(1));
+        assert_eq!(metadata.components[0].save_token, Some(1));
+    }
+
+    #[test]
+    fn save_token_advancement_rejects_ambiguous_or_stale_sources_atomically() {
+        let cases = [
+            PackageMetadata {
+                last_object_identifier: 10,
+                save_token: Some(7),
+                components: vec![ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "One".to_owned(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            PackageMetadata {
+                last_object_identifier: 10,
+                save_token: Some(7),
+                components: vec![
+                    ComponentInfo {
+                        identifier: 1,
+                        preferred_locator: "One".to_owned(),
+                        ..Default::default()
+                    },
+                    ComponentInfo {
+                        identifier: 1,
+                        preferred_locator: "Duplicate".to_owned(),
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            },
+            PackageMetadata {
+                last_object_identifier: 10,
+                save_token: Some(3),
+                components: vec![ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "One".to_owned(),
+                    save_token: Some(4),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+        ];
+
+        for (index, metadata) in cases.into_iter().enumerate() {
+            let mut package = package_with_metadata(metadata);
+            let source = metadata_payload(&package);
+            let requested = if index == 0 { &[2][..] } else { &[1][..] };
+            assert!(advance_package_save_token_for_components(&mut package, requested).is_err());
+            assert_eq!(metadata_payload(&package), source);
+        }
+
+        let mut duplicate_root = PackageMetadata {
+            last_object_identifier: 10,
+            save_token: Some(7),
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "One".to_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        duplicate_root.extend_from_slice(&[0x40, 0x08]);
+        let mut package = package_with_metadata_data(duplicate_root.clone());
+        assert!(advance_package_save_token_for_components(&mut package, &[1]).is_err());
+        assert_eq!(metadata_payload(&package), duplicate_root);
+
+        let mut package = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "One".to_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let source = metadata_payload(&package);
+        assert!(advance_package_save_token_for_components(&mut package, &[1, 1]).is_err());
+        assert_eq!(metadata_payload(&package), source);
     }
 
     #[test]
