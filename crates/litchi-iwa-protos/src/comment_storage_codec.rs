@@ -1316,6 +1316,182 @@ pub enum CommentStorageReplyRewrite {
     },
 }
 
+/// A checked replacement of the text field on one direct comment-storage
+/// leaf.
+///
+/// The expectation is deliberately part of the request rather than an
+/// implicit read-modify-write operation.  A package owner may use the
+/// borrowed text projection when it has one, or use [`Self::with_fingerprint`]
+/// when it retained only a source fingerprint.  The prepared value keeps the
+/// replacement borrowed until execution; it never materializes a generated
+/// `CommentStorageArchive`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CommentStorageLeafTextRewrite<'text> {
+    expected_text: Option<&'text str>,
+    expected_fingerprint: Option<u64>,
+    replacement_text: &'text str,
+}
+
+impl<'text> CommentStorageLeafTextRewrite<'text> {
+    /// Expect the source's canonical text to match `expected_text`.
+    #[must_use]
+    pub const fn new(expected_text: &'text str, replacement_text: &'text str) -> Self {
+        Self {
+            expected_text: Some(expected_text),
+            expected_fingerprint: None,
+            replacement_text,
+        }
+    }
+
+    /// Expect the complete source payload to have the supplied stable
+    /// fingerprint.  The fingerprint is the value returned by
+    /// [`comment_storage_source_fingerprint`].
+    #[must_use]
+    pub const fn with_fingerprint(expected_fingerprint: u64, replacement_text: &'text str) -> Self {
+        Self {
+            expected_text: None,
+            expected_fingerprint: Some(expected_fingerprint),
+            replacement_text,
+        }
+    }
+
+    /// Build a request with an optional text expectation.  `None` is useful
+    /// when the caller already checked a complete source fingerprint.
+    #[must_use]
+    pub const fn with_optional_text(
+        expected_text: Option<&'text str>,
+        replacement_text: &'text str,
+    ) -> Self {
+        Self {
+            expected_text,
+            expected_fingerprint: None,
+            replacement_text,
+        }
+    }
+
+    /// Add a complete-source fingerprint expectation.
+    #[must_use]
+    pub const fn expecting_fingerprint(mut self, fingerprint: u64) -> Self {
+        self.expected_fingerprint = Some(fingerprint);
+        self
+    }
+
+    /// Borrow the expected text, if one was supplied.
+    #[must_use]
+    pub const fn expected_text(self) -> Option<&'text str> {
+        self.expected_text
+    }
+
+    /// Return the expected complete-source fingerprint, if supplied.
+    #[must_use]
+    pub const fn expected_fingerprint(self) -> Option<u64> {
+        self.expected_fingerprint
+    }
+
+    /// Borrow the replacement text.
+    #[must_use]
+    pub const fn replacement_text(self) -> &'text str {
+        self.replacement_text
+    }
+}
+
+/// Compatibility spelling for callers that name the operation after its
+/// direct leaf rather than its changed field.
+pub type CommentStorageLeafRewrite<'text> = CommentStorageLeafTextRewrite<'text>;
+/// Compatibility spelling used by the package owner.
+pub type CommentStorageTextRewrite<'text> = CommentStorageLeafTextRewrite<'text>;
+
+/// Canonical values for a newly created direct comment-storage leaf.
+///
+/// A leaf created by this codec has text, creation date, author, and storage
+/// UUID fields, and no replies.  Object ownership, UUID collision checks, and
+/// package metadata remain the package transaction's responsibility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CommentStorageLeafWrite<'text> {
+    text: &'text str,
+    creation_date: DateSnapshot,
+    author_identifier: u64,
+    storage_uuid: UuidSnapshot,
+}
+
+impl<'text> CommentStorageLeafWrite<'text> {
+    /// Build a canonical direct leaf from already bounded semantic values.
+    #[must_use]
+    pub const fn new(
+        text: &'text str,
+        creation_date: DateSnapshot,
+        author_identifier: u64,
+        storage_uuid: UuidSnapshot,
+    ) -> Self {
+        Self {
+            text,
+            creation_date,
+            author_identifier,
+            storage_uuid,
+        }
+    }
+
+    /// Build a canonical direct leaf from raw IEEE-754 seconds bits.
+    #[must_use]
+    pub const fn from_seconds_bits(
+        text: &'text str,
+        creation_date_seconds_bits: u64,
+        author_identifier: u64,
+        storage_uuid: UuidSnapshot,
+    ) -> Self {
+        Self::new(
+            text,
+            DateSnapshot::from_bits(creation_date_seconds_bits),
+            author_identifier,
+            storage_uuid,
+        )
+    }
+
+    /// Build a canonical direct leaf from a floating-point date value.
+    #[must_use]
+    pub fn from_seconds(
+        text: &'text str,
+        creation_date_seconds: f64,
+        author_identifier: u64,
+        storage_uuid: UuidSnapshot,
+    ) -> Self {
+        Self::from_seconds_bits(
+            text,
+            creation_date_seconds.to_bits(),
+            author_identifier,
+            storage_uuid,
+        )
+    }
+
+    #[must_use]
+    pub const fn text(self) -> &'text str {
+        self.text
+    }
+
+    #[must_use]
+    pub const fn creation_date(self) -> DateSnapshot {
+        self.creation_date
+    }
+
+    #[must_use]
+    pub const fn creation_date_seconds_bits(self) -> u64 {
+        self.creation_date.seconds_bits()
+    }
+
+    #[must_use]
+    pub const fn author_identifier(self) -> u64 {
+        self.author_identifier
+    }
+
+    #[must_use]
+    pub const fn storage_uuid(self) -> UuidSnapshot {
+        self.storage_uuid
+    }
+}
+
+/// Compatibility spelling for a canonical direct storage write.
+pub type CommentStorageLeaf<'text> = CommentStorageLeafWrite<'text>;
+
 impl CommentStorageReplyRewrite {
     /// Construct an append operation.
     #[must_use]
@@ -1522,6 +1698,7 @@ pub struct RewriteReport {
     allocations: usize,
     scratch_bytes: usize,
     retained_bytes: usize,
+    changed: bool,
 }
 
 impl RewriteReport {
@@ -1576,6 +1753,12 @@ impl RewriteReport {
     #[must_use]
     pub const fn retained_bytes(self) -> usize {
         self.retained_bytes
+    }
+
+    /// Whether execution changed any source byte.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
     }
 }
 
@@ -1654,6 +1837,8 @@ struct RawReferenceFacts {
     identifier: u64,
     identifier_field: RawField,
     fields: usize,
+    deprecated_type: Option<i32>,
+    deprecated_is_external: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -1662,6 +1847,12 @@ struct RawScanSummary {
     reply_ids: Vec<u64>,
     target: Option<RawField>,
     target_reference: Option<RawReferenceFacts>,
+    text: Option<RawField>,
+    creation_date: Option<RawField>,
+    author: Option<RawField>,
+    author_reference: Option<RawReferenceFacts>,
+    storage_uuid: Option<RawField>,
+    storage_uuid_value: Option<UuidSnapshot>,
     max_group_depth: u32,
 }
 
@@ -1916,6 +2107,7 @@ impl<'source> PreparedCommentStorageReplyRewrite<'source> {
             allocations: self.requirements.allocations,
             scratch_bytes: self.requirements.scratch_bytes,
             retained_bytes: self.requirements.retained_bytes,
+            changed: output.as_slice() != self.source,
         };
         let _ = self.source_group_depth;
         Ok(RewriteOutput {
@@ -1923,6 +2115,816 @@ impl<'source> PreparedCommentStorageReplyRewrite<'source> {
             report,
         })
     }
+}
+
+/// Prepared replacement of the text in a direct comment-storage leaf.
+///
+/// The source payload is borrowed and all non-text spans are copied verbatim
+/// at execution.  Preparation validates the complete leaf, including the
+/// required date/author/UUID records, and rejects known replies so a nested
+/// comment graph cannot be smuggled through this scalar operation.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedCommentStorageLeafTextRewrite<'source, 'text> {
+    source: &'source [u8],
+    replacement_text: &'text str,
+    text_field: RawField,
+    source_report: DecodeReport,
+    candidate_report: DecodeReport,
+    requirements: RewriteExecutionRequirements,
+}
+
+impl<'source, 'text> PreparedCommentStorageLeafTextRewrite<'source, 'text> {
+    /// Return strict accounting for the source validation pass.
+    #[must_use]
+    pub const fn prepare_report(&self) -> DecodeReport {
+        self.source_report
+    }
+
+    /// Return aggregate requirements for candidate emission and verification.
+    #[must_use]
+    pub const fn execution_requirements(&self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Compatibility alias used by package transaction owners.
+    #[must_use]
+    pub const fn requirements(&self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Execute after the enclosing transaction has charged all requirements.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_rewrite_limits(self.requirements, limits)?;
+        let replacement_field_len = canonical_text_field_len(self.replacement_text.as_bytes())?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_error| {
+                DecodeError::resource(DecodeLimit::Allocations {
+                    observed: self.requirements.allocations,
+                    maximum: limits.allocations,
+                })
+            })?;
+        emit_leaf_text_rewrite(
+            &mut output,
+            self.source,
+            self.text_field,
+            self.replacement_text.as_bytes(),
+            replacement_field_len,
+            self.requirements.output_bytes,
+        )?;
+        let candidate_options = DecodeOptions::new(
+            output.len().max(1),
+            self.candidate_report.fields.max(1),
+            self.candidate_report.work_bytes.max(1),
+            self.candidate_report.max_depth.max(1),
+            self.candidate_report.references.max(1),
+            self.candidate_report.text_bytes.max(1),
+        );
+        let candidate = scan_comment_storage_raw(&output, candidate_options, None)?;
+        if candidate.report != self.candidate_report || !candidate.reply_ids.is_empty() {
+            return Err(DecodeError::invalid());
+        }
+        let candidate_text_field = candidate.text.ok_or_else(DecodeError::invalid)?;
+        let candidate_text = str::from_utf8(
+            &output[candidate_text_field.payload_start..candidate_text_field.payload_end],
+        )
+        .map_err(|_error| DecodeError::utf8("TSD.CommentStorageArchive.text"))?;
+        if candidate_text != self.replacement_text {
+            return Err(DecodeError::invalid());
+        }
+        let report = RewriteReport {
+            source: self.source_report,
+            result: candidate.report,
+            input_bytes: self.source.len(),
+            output_bytes: output.len(),
+            fields: self.requirements.fields,
+            work_bytes: self.requirements.work_bytes,
+            max_depth: self.requirements.max_depth,
+            references: self.requirements.references,
+            replies: self.requirements.replies,
+            reference_bytes: self.requirements.reference_bytes,
+            allocations: self.requirements.allocations,
+            scratch_bytes: self.requirements.scratch_bytes,
+            retained_bytes: self.requirements.retained_bytes,
+            changed: output.as_slice() != self.source,
+        };
+        Ok(RewriteOutput {
+            bytes: output,
+            report,
+        })
+    }
+}
+
+/// Compatibility spelling for a prepared direct-leaf text rewrite.
+pub type PreparedCommentStorageTextRewrite<'source, 'text> =
+    PreparedCommentStorageLeafTextRewrite<'source, 'text>;
+/// Compatibility spelling used by the reply owner.
+pub type PreparedCommentStorageLeafRewrite<'source, 'text> =
+    PreparedCommentStorageLeafTextRewrite<'source, 'text>;
+
+/// Prepare an exact raw-preserving text replacement for one direct leaf.
+pub fn prepare_comment_storage_leaf_text_rewrite<'source, 'text>(
+    source: &'source [u8],
+    rewrite: CommentStorageLeafTextRewrite<'text>,
+    options: DecodeOptions,
+) -> Result<PreparedCommentStorageLeafTextRewrite<'source, 'text>, DecodeError> {
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Bytes {
+            observed: source.len(),
+            maximum: options.max_message_bytes,
+        }));
+    }
+    let source_scan = scan_comment_storage_raw(source, options, None)?;
+    let text_field = source_scan
+        .text
+        .ok_or_else(|| DecodeError::missing("TSD.CommentStorageArchive.text"))?;
+    if !source_scan.reply_ids.is_empty()
+        || source_scan.creation_date.is_none()
+        || source_scan.author.is_none()
+        || source_scan.author_reference.is_none()
+        || source_scan.storage_uuid.is_none()
+        || source_scan.storage_uuid_value.is_none()
+    {
+        return Err(DecodeError::invalid());
+    }
+    let author = source_scan
+        .author_reference
+        .ok_or_else(DecodeError::invalid)?;
+    if author.deprecated_type.is_some() || author.deprecated_is_external.is_some() {
+        return Err(DecodeError::invalid());
+    }
+    let uuid = source_scan
+        .storage_uuid_value
+        .ok_or_else(DecodeError::invalid)?;
+    if uuid.lower() == 0 && uuid.upper() == 0 {
+        return Err(DecodeError::invalid());
+    }
+    let source_text = str::from_utf8(&source[text_field.payload_start..text_field.payload_end])
+        .map_err(|_error| DecodeError::utf8("TSD.CommentStorageArchive.text"))?;
+    if rewrite.expected_text.is_none() && rewrite.expected_fingerprint.is_none() {
+        return Err(DecodeError::invalid());
+    }
+    if rewrite
+        .expected_text
+        .is_some_and(|expected| expected != source_text)
+        || rewrite
+            .expected_fingerprint
+            .is_some_and(|expected| expected != comment_storage_source_fingerprint(source))
+    {
+        return Err(DecodeError::invalid());
+    }
+    if rewrite.replacement_text.len() > options.max_text_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Text {
+            observed: rewrite.replacement_text.len(),
+            maximum: options.max_text_bytes,
+        }));
+    }
+    let replacement_field_len = canonical_text_field_len(rewrite.replacement_text.as_bytes())?;
+    let output_bytes = source
+        .len()
+        .checked_sub(text_field.raw_len()?)
+        .and_then(|length| length.checked_add(replacement_field_len))
+        .ok_or_else(DecodeError::invalid)?;
+    let hard_bytes =
+        usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_error| DecodeError::invalid())?;
+    if output_bytes > hard_bytes {
+        return Err(DecodeError::resource(DecodeLimit::OutputBytes {
+            observed: output_bytes,
+            maximum: hard_bytes,
+        }));
+    }
+    if output_bytes > options.max_message_bytes {
+        return Err(DecodeError::resource(DecodeLimit::OutputBytes {
+            observed: output_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    let candidate_report = measure_leaf_text_report(
+        source_scan.report,
+        source.len(),
+        output_bytes,
+        rewrite.replacement_text.len(),
+    )?;
+    ensure_leaf_report_limits(candidate_report, options)?;
+    let fields = source_scan
+        .report
+        .fields
+        .checked_add(candidate_report.fields)
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source_scan
+        .report
+        .work_bytes
+        .checked_add(candidate_report.work_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let references = source_scan
+        .report
+        .references
+        .checked_add(candidate_report.references)
+        .ok_or_else(DecodeError::invalid)?;
+    let replies = source_scan
+        .report
+        .replies
+        .checked_add(candidate_report.replies)
+        .ok_or_else(DecodeError::invalid)?;
+    let reference_bytes = source_scan
+        .report
+        .reference_bytes
+        .checked_add(candidate_report.reference_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let text_scratch = source_scan
+        .report
+        .text_bytes
+        .checked_add(rewrite.replacement_text.len())
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        input_bytes: source.len(),
+        output_bytes,
+        fields,
+        work_bytes,
+        max_depth: source_scan.report.max_depth.max(candidate_report.max_depth),
+        references,
+        replies,
+        reference_bytes,
+        allocations: 1,
+        scratch_bytes: text_scratch,
+        retained_bytes: output_bytes,
+    };
+    ensure_rewrite_requirements_limits(requirements, options)?;
+    Ok(PreparedCommentStorageLeafTextRewrite {
+        source,
+        replacement_text: rewrite.replacement_text,
+        text_field,
+        source_report: source_scan.report,
+        candidate_report,
+        requirements,
+    })
+}
+
+/// Prepare a text replacement using a complete-source fingerprint.
+pub fn prepare_comment_storage_leaf_text_rewrite_with_fingerprint<'source, 'text>(
+    source: &'source [u8],
+    expected_fingerprint: u64,
+    replacement_text: &'text str,
+    options: DecodeOptions,
+) -> Result<PreparedCommentStorageLeafTextRewrite<'source, 'text>, DecodeError> {
+    prepare_comment_storage_leaf_text_rewrite(
+        source,
+        CommentStorageLeafTextRewrite::with_fingerprint(expected_fingerprint, replacement_text),
+        options,
+    )
+}
+
+/// One-shot exact raw-preserving text replacement.
+pub fn rewrite_comment_storage_leaf_text(
+    source: &[u8],
+    rewrite: CommentStorageLeafTextRewrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_comment_storage_leaf_text_rewrite(source, rewrite, options)?;
+    prepared.execute(prepared.execution_requirements().exact())
+}
+
+/// Compatibility spelling for the package owner.
+pub fn prepare_comment_storage_text_rewrite<'source, 'text>(
+    source: &'source [u8],
+    rewrite: CommentStorageTextRewrite<'text>,
+    options: DecodeOptions,
+) -> Result<PreparedCommentStorageTextRewrite<'source, 'text>, DecodeError> {
+    prepare_comment_storage_leaf_text_rewrite(source, rewrite, options)
+}
+
+/// Compatibility spelling for the package owner.
+pub fn rewrite_comment_storage_text(
+    source: &[u8],
+    rewrite: CommentStorageTextRewrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    rewrite_comment_storage_leaf_text(source, rewrite, options)
+}
+
+/// Prepared canonical construction of a new direct comment-storage leaf.
+///
+/// This constructor deliberately has no source argument: it creates the
+/// four-field direct-leaf shape used for newly allocated replies.  The
+/// package transaction remains responsible for selecting fresh object IDs,
+/// registering the UUID, and publishing the object in its owning archive.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedCommentStorageLeafWrite<'text> {
+    write: CommentStorageLeafWrite<'text>,
+    report: DecodeReport,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl<'text> PreparedCommentStorageLeafWrite<'text> {
+    /// Return the candidate accounting calculated during preparation.
+    #[must_use]
+    pub const fn prepare_report(self) -> DecodeReport {
+        self.report
+    }
+
+    /// Return exact candidate execution requirements.
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Compatibility alias used by package transaction owners.
+    #[must_use]
+    pub const fn requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Emit and strictly rescan the canonical leaf after checking ceilings.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_rewrite_limits(self.requirements, limits)?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_error| {
+                DecodeError::resource(DecodeLimit::Allocations {
+                    observed: self.requirements.allocations,
+                    maximum: limits.allocations,
+                })
+            })?;
+        emit_comment_storage_leaf(&mut output, self.write)?;
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let candidate = scan_comment_storage_raw(&output, self.verify_options, None)?;
+        if candidate.report != self.report
+            || !candidate.reply_ids.is_empty()
+            || candidate
+                .author_reference
+                .is_none_or(|reference| reference.identifier != self.write.author_identifier)
+            || candidate.storage_uuid_value != Some(self.write.storage_uuid)
+        {
+            return Err(DecodeError::invalid());
+        }
+        let candidate_text = candidate
+            .text
+            .ok_or_else(|| DecodeError::missing("TSD.CommentStorageArchive.text"))?;
+        let candidate_text =
+            str::from_utf8(&output[candidate_text.payload_start..candidate_text.payload_end])
+                .map_err(|_error| DecodeError::utf8("TSD.CommentStorageArchive.text"))?;
+        if candidate_text != self.write.text {
+            return Err(DecodeError::invalid());
+        }
+        let report = RewriteReport {
+            source: DecodeReport {
+                source_bytes: 0,
+                fields: 0,
+                work_bytes: 0,
+                max_depth: 0,
+                references: 0,
+                replies: 0,
+                reference_bytes: 0,
+                text_bytes: 0,
+            },
+            result: candidate.report,
+            input_bytes: 0,
+            output_bytes: output.len(),
+            fields: self.requirements.fields,
+            work_bytes: self.requirements.work_bytes,
+            max_depth: self.requirements.max_depth,
+            references: self.requirements.references,
+            replies: self.requirements.replies,
+            reference_bytes: self.requirements.reference_bytes,
+            allocations: self.requirements.allocations,
+            scratch_bytes: self.requirements.scratch_bytes,
+            retained_bytes: self.requirements.retained_bytes,
+            changed: true,
+        };
+        Ok(RewriteOutput {
+            bytes: output,
+            report,
+        })
+    }
+}
+
+/// Compatibility spelling for a prepared canonical direct leaf.
+pub type PreparedCommentStorageLeaf<'text> = PreparedCommentStorageLeafWrite<'text>;
+/// Compatibility spelling used by reply-owner code.
+pub type PreparedCommentStorageWrite<'text> = PreparedCommentStorageLeafWrite<'text>;
+
+/// Prepare a canonical direct comment-storage leaf from bounded semantic
+/// values.  No output allocation occurs before all wire and resource checks
+/// have completed.
+pub fn prepare_comment_storage_leaf_write<'text>(
+    write: CommentStorageLeafWrite<'text>,
+    options: DecodeOptions,
+) -> Result<PreparedCommentStorageLeafWrite<'text>, DecodeError> {
+    validate_leaf_write_options(options)?;
+    if write.text.len() > options.max_text_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Text {
+            observed: write.text.len(),
+            maximum: options.max_text_bytes,
+        }));
+    }
+    if write.author_identifier == 0 {
+        return Err(DecodeError::invalid());
+    }
+    if write.storage_uuid.lower == 0 && write.storage_uuid.upper == 0 {
+        return Err(DecodeError::invalid());
+    }
+    let output_bytes = comment_storage_leaf_output_len(write)?;
+    let hard_bytes =
+        usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_error| DecodeError::invalid())?;
+    if output_bytes > hard_bytes {
+        return Err(DecodeError::resource(DecodeLimit::OutputBytes {
+            observed: output_bytes,
+            maximum: hard_bytes,
+        }));
+    }
+    if output_bytes > options.max_message_bytes {
+        return Err(DecodeError::resource(DecodeLimit::OutputBytes {
+            observed: output_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    let report = comment_storage_leaf_report(write, output_bytes)?;
+    ensure_leaf_report_limits(report, options)?;
+    let requirements = RewriteExecutionRequirements {
+        input_bytes: 0,
+        output_bytes,
+        fields: report.fields,
+        work_bytes: report.work_bytes,
+        max_depth: report.max_depth,
+        references: report.references,
+        replies: report.replies,
+        reference_bytes: report.reference_bytes,
+        allocations: 1,
+        scratch_bytes: write.text.len(),
+        retained_bytes: output_bytes,
+    };
+    ensure_rewrite_requirements_limits(requirements, options)?;
+    Ok(PreparedCommentStorageLeafWrite {
+        write,
+        report,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// One-shot canonical direct comment-storage leaf construction.
+pub fn canonical_comment_storage_leaf(
+    write: CommentStorageLeafWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_comment_storage_leaf_write(write, options)?;
+    prepared.execute(prepared.execution_requirements().exact())
+}
+
+/// Compatibility spelling for canonical direct-leaf construction.
+pub fn rewrite_comment_storage_leaf(
+    write: CommentStorageLeafWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    canonical_comment_storage_leaf(write, options)
+}
+
+/// Canonical direct-leaf construction using raw IEEE-754 date bits.
+pub fn canonical_comment_storage_leaf_from_values(
+    text: &str,
+    creation_date_seconds_bits: u64,
+    author_identifier: u64,
+    storage_uuid: UuidSnapshot,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    canonical_comment_storage_leaf(
+        CommentStorageLeafWrite::from_seconds_bits(
+            text,
+            creation_date_seconds_bits,
+            author_identifier,
+            storage_uuid,
+        ),
+        options,
+    )
+}
+
+/// Stable allocation-free fingerprint for an entire source payload.
+///
+/// This is the 64-bit FNV-1a byte fingerprint.  It is an optimistic
+/// concurrency check only; callers that need cryptographic identity should
+/// retain their own digest alongside the payload.
+#[must_use]
+pub fn comment_storage_source_fingerprint(source: &[u8]) -> u64 {
+    let mut fingerprint = 14_695_981_039_346_656_037u64;
+    for byte in source {
+        fingerprint ^= u64::from(*byte);
+        fingerprint = fingerprint.wrapping_mul(1_099_511_628_211u64);
+    }
+    fingerprint
+}
+
+/// Compatibility spelling for the leaf rewrite expectation.
+#[must_use]
+pub fn comment_storage_fingerprint(source: &[u8]) -> u64 {
+    comment_storage_source_fingerprint(source)
+}
+
+fn validate_leaf_write_options(options: DecodeOptions) -> Result<(), DecodeError> {
+    let hard_bytes =
+        usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_error| DecodeError::invalid())?;
+    if options.max_message_bytes > hard_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Bytes {
+            observed: options.max_message_bytes,
+            maximum: hard_bytes,
+        }));
+    }
+    if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION_LIMIT {
+        return Err(DecodeError::resource(DecodeLimit::Nesting {
+            observed: options.recursion_limit,
+            maximum: MAX_RECURSION_LIMIT,
+        }));
+    }
+    Ok(())
+}
+
+fn canonical_text_field_len(text: &[u8]) -> Result<usize, DecodeError> {
+    1usize
+        .checked_add(encoded_varint_len(
+            u64::try_from(text.len()).map_err(|_error| DecodeError::invalid())?,
+        ))
+        .and_then(|length| length.checked_add(text.len()))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn canonical_varint_field_len(number: u32, value: u64) -> Result<usize, DecodeError> {
+    encoded_varint_len(u64::from(number) << 3)
+        .checked_add(encoded_varint_len(value))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn canonical_fixed64_field_len(number: u32) -> Result<usize, DecodeError> {
+    encoded_varint_len((u64::from(number) << 3) | 1)
+        .checked_add(8)
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn canonical_bytes_field_len(number: u32, payload_len: usize) -> Result<usize, DecodeError> {
+    encoded_varint_len((u64::from(number) << 3) | 2)
+        .checked_add(encoded_varint_len(
+            u64::try_from(payload_len).map_err(|_error| DecodeError::invalid())?,
+        ))
+        .and_then(|length| length.checked_add(payload_len))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn canonical_reference_payload_len(identifier: u64) -> Result<usize, DecodeError> {
+    canonical_varint_field_len(REFERENCE_IDENTIFIER_FIELD, identifier)
+}
+
+fn canonical_uuid_payload_len(uuid: UuidSnapshot) -> Result<usize, DecodeError> {
+    canonical_varint_field_len(UUID_LOWER_FIELD, uuid.lower).and_then(|length| {
+        canonical_varint_field_len(UUID_UPPER_FIELD, uuid.upper)
+            .and_then(|upper| length.checked_add(upper).ok_or_else(DecodeError::invalid))
+    })
+}
+
+fn comment_storage_leaf_output_len(
+    write: CommentStorageLeafWrite<'_>,
+) -> Result<usize, DecodeError> {
+    let date_payload = canonical_fixed64_field_len(DATE_SECONDS_FIELD)?;
+    let author_payload = canonical_reference_payload_len(write.author_identifier)?;
+    let uuid_payload = canonical_uuid_payload_len(write.storage_uuid)?;
+    let mut total = canonical_text_field_len(write.text.as_bytes())?;
+    total = total
+        .checked_add(canonical_bytes_field_len(
+            CREATION_DATE_FIELD,
+            date_payload,
+        )?)
+        .ok_or_else(DecodeError::invalid)?;
+    total = total
+        .checked_add(canonical_bytes_field_len(AUTHOR_FIELD, author_payload)?)
+        .ok_or_else(DecodeError::invalid)?;
+    total = total
+        .checked_add(canonical_bytes_field_len(STORAGE_UUID_FIELD, uuid_payload)?)
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(total)
+}
+
+fn comment_storage_leaf_report(
+    write: CommentStorageLeafWrite<'_>,
+    output_bytes: usize,
+) -> Result<DecodeReport, DecodeError> {
+    let date_payload = canonical_fixed64_field_len(DATE_SECONDS_FIELD)?;
+    let author_payload = canonical_reference_payload_len(write.author_identifier)?;
+    let uuid_payload = canonical_uuid_payload_len(write.storage_uuid)?;
+    let work_bytes = output_bytes
+        .checked_add(date_payload)
+        .and_then(|work| work.checked_add(author_payload))
+        .and_then(|work| work.checked_add(uuid_payload))
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(DecodeReport {
+        source_bytes: output_bytes,
+        fields: 8,
+        work_bytes,
+        max_depth: 2,
+        references: 1,
+        replies: 0,
+        reference_bytes: author_payload,
+        text_bytes: write.text.len(),
+    })
+}
+
+fn emit_comment_storage_leaf(
+    output: &mut Vec<u8>,
+    write: CommentStorageLeafWrite<'_>,
+) -> Result<(), DecodeError> {
+    output.push(0x0a);
+    append_varint(
+        output,
+        u64::try_from(write.text.len()).map_err(|_error| DecodeError::invalid())?,
+    );
+    output.extend_from_slice(write.text.as_bytes());
+
+    let date_payload_len = canonical_fixed64_field_len(DATE_SECONDS_FIELD)?;
+    output.push(0x12);
+    append_varint(
+        output,
+        u64::try_from(date_payload_len).map_err(|_error| DecodeError::invalid())?,
+    );
+    output.push(0x09);
+    output.extend_from_slice(&write.creation_date.seconds_bits.to_le_bytes());
+
+    let author_payload_len = canonical_reference_payload_len(write.author_identifier)?;
+    output.push(0x1a);
+    append_varint(
+        output,
+        u64::try_from(author_payload_len).map_err(|_error| DecodeError::invalid())?,
+    );
+    output.push(0x08);
+    append_varint(output, write.author_identifier);
+
+    let uuid_payload_len = canonical_uuid_payload_len(write.storage_uuid)?;
+    output.push(0x2a);
+    append_varint(
+        output,
+        u64::try_from(uuid_payload_len).map_err(|_error| DecodeError::invalid())?,
+    );
+    output.push(0x08);
+    append_varint(output, write.storage_uuid.lower);
+    output.push(0x10);
+    append_varint(output, write.storage_uuid.upper);
+    Ok(())
+}
+
+fn measure_leaf_text_report(
+    source_report: DecodeReport,
+    source_len: usize,
+    output_len: usize,
+    replacement_text_len: usize,
+) -> Result<DecodeReport, DecodeError> {
+    let work_bytes = source_report
+        .work_bytes
+        .checked_sub(source_len)
+        .and_then(|work| work.checked_add(output_len))
+        .ok_or_else(DecodeError::invalid)?;
+    Ok(DecodeReport {
+        source_bytes: output_len,
+        fields: source_report.fields,
+        work_bytes,
+        max_depth: source_report.max_depth,
+        references: source_report.references,
+        replies: source_report.replies,
+        reference_bytes: source_report.reference_bytes,
+        text_bytes: replacement_text_len,
+    })
+}
+
+fn emit_leaf_text_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    text_field: RawField,
+    replacement: &[u8],
+    replacement_field_len: usize,
+    expected_length: usize,
+) -> Result<(), DecodeError> {
+    let source_text = source
+        .get(text_field.payload_start..text_field.payload_end)
+        .ok_or_else(DecodeError::invalid)?;
+    if source_text == replacement {
+        output.extend_from_slice(source);
+        return if output.len() == expected_length {
+            Ok(())
+        } else {
+            Err(DecodeError::invalid())
+        };
+    }
+    output.extend_from_slice(
+        source
+            .get(..text_field.start)
+            .ok_or_else(DecodeError::invalid)?,
+    );
+    output.push(0x0a);
+    append_varint(
+        output,
+        u64::try_from(replacement.len()).map_err(|_error| DecodeError::invalid())?,
+    );
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(
+        source
+            .get(text_field.end..)
+            .ok_or_else(DecodeError::invalid)?,
+    );
+    if replacement_field_len
+        != canonical_text_field_len(replacement).map_err(|_error| DecodeError::invalid())?
+    {
+        return Err(DecodeError::invalid());
+    }
+    if output.len() == expected_length {
+        Ok(())
+    } else {
+        Err(DecodeError::invalid())
+    }
+}
+
+fn ensure_leaf_report_limits(
+    report: DecodeReport,
+    options: DecodeOptions,
+) -> Result<(), DecodeError> {
+    if report.source_bytes > options.max_message_bytes {
+        return Err(DecodeError::resource(DecodeLimit::OutputBytes {
+            observed: report.source_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    if report.fields > options.max_fields {
+        return Err(DecodeError::resource(DecodeLimit::Fields {
+            observed: report.fields,
+            maximum: options.max_fields,
+        }));
+    }
+    if report.work_bytes > options.max_work_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Work {
+            observed: report.work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    if report.max_depth > options.recursion_limit {
+        return Err(DecodeError::resource(DecodeLimit::Nesting {
+            observed: report.max_depth,
+            maximum: options.recursion_limit,
+        }));
+    }
+    if report.references > options.max_references {
+        return Err(DecodeError::resource(DecodeLimit::References {
+            observed: report.references,
+            maximum: options.max_references,
+        }));
+    }
+    if report.text_bytes > options.max_text_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Text {
+            observed: report.text_bytes,
+            maximum: options.max_text_bytes,
+        }));
+    }
+    Ok(())
+}
+
+fn ensure_rewrite_requirements_limits(
+    requirements: RewriteExecutionRequirements,
+    options: DecodeOptions,
+) -> Result<(), DecodeError> {
+    if requirements.input_bytes > options.max_message_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Bytes {
+            observed: requirements.input_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    if requirements.output_bytes > options.max_message_bytes {
+        return Err(DecodeError::resource(DecodeLimit::OutputBytes {
+            observed: requirements.output_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+    if requirements.fields > options.max_fields {
+        return Err(DecodeError::resource(DecodeLimit::Fields {
+            observed: requirements.fields,
+            maximum: options.max_fields,
+        }));
+    }
+    if requirements.work_bytes > options.max_work_bytes {
+        return Err(DecodeError::resource(DecodeLimit::Work {
+            observed: requirements.work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    if requirements.max_depth > options.recursion_limit {
+        return Err(DecodeError::resource(DecodeLimit::Nesting {
+            observed: requirements.max_depth,
+            maximum: options.recursion_limit,
+        }));
+    }
+    if requirements.references > options.max_references {
+        return Err(DecodeError::resource(DecodeLimit::References {
+            observed: requirements.references,
+            maximum: options.max_references,
+        }));
+    }
+    Ok(())
 }
 
 /// Prepare an ordered comment-reply mutation without allocating candidate bytes.
@@ -2411,8 +3413,8 @@ fn validate_raw_reference(
     let mut offset = 0;
     let mut identifier = None;
     let mut identifier_field = None;
-    let mut deprecated_type = false;
-    let mut deprecated_external = false;
+    let mut deprecated_type = None;
+    let mut deprecated_external = None;
     while let Some((field, _group_depth)) =
         next_raw_field(source, &mut offset, source.len(), budget, depth)?
     {
@@ -2431,17 +3433,16 @@ fn validate_raw_reference(
                 identifier_field = Some(field);
             },
             REFERENCE_DEPRECATED_TYPE_FIELD => {
-                if deprecated_type {
+                if deprecated_type.is_some() {
                     return Err(DecodeError::duplicate("TSP.Reference.deprecated_type"));
                 }
                 require_known_field(field, 0, "TSP.Reference.deprecated_type")?;
                 let (value, _length, _canonical) =
                     raw_varint(source, field.value_start, field.payload_end)?;
-                canonical_int32(value)?;
-                deprecated_type = true;
+                deprecated_type = Some(canonical_int32(value)?);
             },
             REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
-                if deprecated_external {
+                if deprecated_external.is_some() {
                     return Err(DecodeError::duplicate(
                         "TSP.Reference.deprecated_is_external",
                     ));
@@ -2449,8 +3450,7 @@ fn validate_raw_reference(
                 require_known_field(field, 0, "TSP.Reference.deprecated_is_external")?;
                 let (value, _length, _canonical) =
                     raw_varint(source, field.value_start, field.payload_end)?;
-                canonical_bool(value)?;
-                deprecated_external = true;
+                deprecated_external = Some(canonical_bool(value)?);
             },
             _ => {},
         }
@@ -2462,6 +3462,8 @@ fn validate_raw_reference(
             .fields
             .checked_sub(before)
             .ok_or_else(DecodeError::invalid)?,
+        deprecated_type,
+        deprecated_is_external: deprecated_external,
     })
 }
 
@@ -2469,39 +3471,40 @@ fn validate_raw_uuid(
     source: &[u8],
     budget: &mut RewriteScanBudget,
     depth: u32,
-) -> Result<(), DecodeError> {
+) -> Result<UuidSnapshot, DecodeError> {
     budget.message(source, depth)?;
     let mut offset = 0;
-    let mut lower = false;
-    let mut upper = false;
+    let mut lower = None;
+    let mut upper = None;
     while let Some((field, _group_depth)) =
         next_raw_field(source, &mut offset, source.len(), budget, depth)?
     {
         match field.number {
             UUID_LOWER_FIELD => {
-                if lower {
+                if lower.is_some() {
                     return Err(DecodeError::duplicate("TSP.UUID.lower"));
                 }
                 require_known_field(field, 0, "TSP.UUID.lower")?;
-                lower = true;
+                let (value, _length, _canonical) =
+                    raw_varint(source, field.value_start, field.payload_end)?;
+                lower = Some(value);
             },
             UUID_UPPER_FIELD => {
-                if upper {
+                if upper.is_some() {
                     return Err(DecodeError::duplicate("TSP.UUID.upper"));
                 }
                 require_known_field(field, 0, "TSP.UUID.upper")?;
-                upper = true;
+                let (value, _length, _canonical) =
+                    raw_varint(source, field.value_start, field.payload_end)?;
+                upper = Some(value);
             },
             _ => {},
         }
     }
-    if lower && upper {
-        Ok(())
-    } else if !lower {
-        Err(DecodeError::missing("TSP.UUID.lower"))
-    } else {
-        Err(DecodeError::missing("TSP.UUID.upper"))
-    }
+    Ok(UuidSnapshot::from_parts(
+        lower.ok_or_else(|| DecodeError::missing("TSP.UUID.lower"))?,
+        upper.ok_or_else(|| DecodeError::missing("TSP.UUID.upper"))?,
+    ))
 }
 
 fn scan_comment_storage_raw(
@@ -2519,6 +3522,12 @@ fn scan_comment_storage_raw(
     let mut reply_ids = Vec::new();
     let mut target = None;
     let mut target_reference = None;
+    let mut text_field = None;
+    let mut creation_date_field = None;
+    let mut author_field = None;
+    let mut author_reference = None;
+    let mut storage_uuid_field = None;
+    let mut storage_uuid_value = None;
     let mut max_group_depth = 0;
     while let Some((field, group_depth)) =
         next_raw_field(source, &mut offset, source.len(), &mut budget, 1)?
@@ -2534,6 +3543,7 @@ fn scan_comment_storage_raw(
                     .map_err(|_error| DecodeError::utf8("TSD.CommentStorageArchive.text"))?;
                 budget.text(field.payload_len()?)?;
                 text_seen = true;
+                text_field = Some(field);
             },
             CREATION_DATE_FIELD => {
                 if date_seen {
@@ -2548,6 +3558,7 @@ fn scan_comment_storage_raw(
                     2,
                 )?;
                 date_seen = true;
+                creation_date_field = Some(field);
             },
             AUTHOR_FIELD => {
                 if author_seen {
@@ -2555,9 +3566,11 @@ fn scan_comment_storage_raw(
                 }
                 require_known_field(field, 2, "TSD.CommentStorageArchive.author")?;
                 let raw = &source[field.payload_start..field.payload_end];
-                let _facts = validate_raw_reference(raw, &mut budget, 2)?;
+                let facts = validate_raw_reference(raw, &mut budget, 2)?;
                 budget.reference(raw.len(), false)?;
                 author_seen = true;
+                author_field = Some(field);
+                author_reference = Some(facts);
             },
             REPLIES_FIELD => {
                 require_known_field(field, 2, "TSD.CommentStorageArchive.replies")?;
@@ -2585,12 +3598,14 @@ fn scan_comment_storage_raw(
                     ));
                 }
                 require_known_field(field, 2, "TSD.CommentStorageArchive.storage_uuid")?;
-                validate_raw_uuid(
+                let value = validate_raw_uuid(
                     &source[field.payload_start..field.payload_end],
                     &mut budget,
                     2,
                 )?;
                 uuid_seen = true;
+                storage_uuid_field = Some(field);
+                storage_uuid_value = Some(value);
             },
             _ => {},
         }
@@ -2600,6 +3615,12 @@ fn scan_comment_storage_raw(
         reply_ids,
         target,
         target_reference,
+        text: text_field,
+        creation_date: creation_date_field,
+        author: author_field,
+        author_reference,
+        storage_uuid: storage_uuid_field,
+        storage_uuid_value,
         max_group_depth,
     })
 }
@@ -3075,6 +4096,18 @@ mod tests {
             STORAGE_UUID_FIELD,
             &uuid(0x0102_0304_0506_0708, 0x1112_1314_1516_1718),
         );
+        output
+    }
+
+    fn direct_leaf_fixture() -> Vec<u8> {
+        let write = CommentStorageLeafWrite::new(
+            "comment",
+            DateSnapshot::from_bits(0x8000_0000_0000_0000),
+            11,
+            UuidSnapshot::from_parts(0x0102_0304_0506_0708, 0x1112_1314_1516_1718),
+        );
+        let mut output = Vec::new();
+        emit_comment_storage_leaf(&mut output, write).unwrap();
         output
     }
 
@@ -3850,6 +4883,212 @@ mod tests {
                 observed: requirements.retained_bytes,
                 maximum: requirements.retained_bytes - 1,
             },
+        );
+    }
+
+    #[test]
+    fn canonical_direct_leaf_is_strict_and_replays_exact_requirements() {
+        let write = CommentStorageLeafWrite::new(
+            "new reply",
+            DateSnapshot::from_bits(0x3ff0_0000_0000_0000),
+            73,
+            UuidSnapshot::from_parts(901, 902),
+        );
+        let options = DecodeOptions::new(4096, 64, 32_768, 8, 8, 4096);
+        let prepared = prepare_comment_storage_leaf_write(write, options).unwrap();
+        let prepare_report = prepared.prepare_report();
+        assert_eq!(prepare_report.fields(), 8);
+        assert_eq!(prepare_report.references(), 1);
+        assert_eq!(prepare_report.replies(), 0);
+        assert_eq!(prepare_report.text_bytes(), write.text().len());
+        let requirements = prepared.execution_requirements();
+        let output = prepared.execute(requirements.exact()).unwrap();
+        let report = output.report();
+        assert_eq!(report.result(), prepare_report);
+        assert_eq!(report.output_bytes(), requirements.output_bytes);
+        assert_eq!(report.fields(), requirements.fields);
+        assert_eq!(report.work_bytes(), requirements.work_bytes);
+        assert!(report.changed());
+        let snapshot = decode_comment_storage_archive(output.bytes(), options).unwrap();
+        assert_eq!(snapshot.text(), Some("new reply"));
+        assert_eq!(
+            snapshot.creation_date().map(DateSnapshot::seconds_bits),
+            Some(write.creation_date_seconds_bits())
+        );
+        assert_eq!(
+            snapshot.author().map(ReferenceSnapshot::identifier),
+            Some(write.author_identifier())
+        );
+        assert_eq!(snapshot.storage_uuid(), Some(write.storage_uuid()));
+        assert!(
+            decode_comment_storage_archive(output.bytes(), options)
+                .unwrap()
+                .author()
+                .is_some_and(|author| {
+                    author.deprecated_type().is_none() && author.deprecated_is_external().is_none()
+                })
+        );
+    }
+
+    #[test]
+    fn canonical_direct_leaf_rejects_zero_author_uuid_and_tight_limits() {
+        let options = DecodeOptions::new(4096, 64, 32_768, 8, 8, 4096);
+        let zero_author = CommentStorageLeafWrite::new(
+            "reply",
+            DateSnapshot::from_bits(1),
+            0,
+            UuidSnapshot::from_parts(1, 2),
+        );
+        assert!(prepare_comment_storage_leaf_write(zero_author, options).is_err());
+        let zero_uuid = CommentStorageLeafWrite::new(
+            "reply",
+            DateSnapshot::from_bits(1),
+            1,
+            UuidSnapshot::from_parts(0, 0),
+        );
+        assert!(prepare_comment_storage_leaf_write(zero_uuid, options).is_err());
+
+        let write = CommentStorageLeafWrite::new(
+            "reply",
+            DateSnapshot::from_bits(1),
+            1,
+            UuidSnapshot::from_parts(1, 2),
+        );
+        let prepared = prepare_comment_storage_leaf_write(write, options).unwrap();
+        let requirements = prepared.execution_requirements();
+        let below_fields = DecodeOptions::new(
+            options.max_message_bytes,
+            requirements.fields - 1,
+            options.max_work_bytes,
+            options.recursion_limit,
+            options.max_references,
+            options.max_text_bytes,
+        );
+        let fields = prepare_comment_storage_leaf_write(write, below_fields).unwrap_err();
+        assert_eq!(
+            fields.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: requirements.fields,
+                maximum: requirements.fields - 1,
+            })
+        );
+        let below_work = DecodeOptions::new(
+            options.max_message_bytes,
+            options.max_fields,
+            requirements.work_bytes - 1,
+            options.recursion_limit,
+            options.max_references,
+            options.max_text_bytes,
+        );
+        let work = prepare_comment_storage_leaf_write(write, below_work).unwrap_err();
+        assert!(matches!(
+            work.resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+        let output = prepared
+            .execute(
+                requirements
+                    .exact()
+                    .with_output_bytes(requirements.output_bytes - 1),
+            )
+            .unwrap_err();
+        assert_eq!(
+            output.resource_limit(),
+            Some(DecodeLimit::OutputBytes {
+                observed: requirements.output_bytes,
+                maximum: requirements.output_bytes - 1,
+            })
+        );
+    }
+
+    #[test]
+    fn direct_leaf_text_rewrite_is_noop_checked_and_raw_preserving() {
+        let source = direct_leaf_fixture();
+        let options = DecodeOptions::new(4096, 128, 32_768, 8, 8, 4096);
+        let noop = rewrite_comment_storage_leaf_text(
+            &source,
+            CommentStorageLeafTextRewrite::new("comment", "comment"),
+            options,
+        )
+        .unwrap();
+        assert_eq!(noop.bytes(), source.as_slice());
+        assert!(!noop.report().changed());
+
+        let prepared = prepare_comment_storage_leaf_text_rewrite(
+            &source,
+            CommentStorageLeafTextRewrite::new("comment", "replacement"),
+            options,
+        )
+        .unwrap();
+        let requirements = prepared.execution_requirements();
+        let output = prepared.execute(requirements.exact()).unwrap();
+        assert_eq!(output.report().source(), prepared.prepare_report());
+        assert!(output.report().changed());
+        assert_eq!(
+            decode_comment_storage_archive(output.bytes(), options)
+                .unwrap()
+                .text(),
+            Some("replacement")
+        );
+
+        let stale = prepare_comment_storage_leaf_text_rewrite(
+            &source,
+            CommentStorageLeafTextRewrite::new("stale", "replacement"),
+            options,
+        )
+        .unwrap_err();
+        assert!(stale.resource_limit().is_none());
+        let fingerprint = comment_storage_source_fingerprint(&source);
+        let fingerprint_output = rewrite_comment_storage_leaf_text(
+            &source,
+            CommentStorageLeafTextRewrite::with_fingerprint(fingerprint, "replacement"),
+            options,
+        )
+        .unwrap();
+        assert_eq!(fingerprint_output.bytes(), output.bytes());
+    }
+
+    #[test]
+    fn direct_leaf_text_rewrite_preserves_unknown_overlong_and_group_bytes() {
+        let mut prefix = vec![0x98, 0x86, 0x00, 0x01];
+        key(&mut prefix, 99, 3);
+        field_varint(&mut prefix, 100, 8);
+        key(&mut prefix, 99, 4);
+        let mut source = prefix.clone();
+        source.extend_from_slice(&direct_leaf_fixture());
+        let mut suffix = vec![0xa0, 0x06, 0x81, 0x00];
+        source.append(&mut suffix);
+        let options = DecodeOptions::new(4096, 128, 32_768, 8, 8, 4096);
+        let prepared = prepare_comment_storage_leaf_text_rewrite(
+            &source,
+            CommentStorageLeafTextRewrite::new("comment", "changed"),
+            options,
+        )
+        .unwrap();
+        let output = prepared
+            .execute(prepared.execution_requirements().exact())
+            .unwrap();
+        assert!(output.bytes().starts_with(&prefix));
+        assert!(output.bytes().ends_with(&[0xa0, 0x06, 0x81, 0x00]));
+        assert_eq!(
+            decode_comment_storage_archive(output.bytes(), options)
+                .unwrap()
+                .text(),
+            Some("changed")
+        );
+    }
+
+    #[test]
+    fn direct_leaf_text_rewrite_rejects_reply_bearing_or_deprecated_author() {
+        let source = fixture();
+        let options = DecodeOptions::new(4096, 128, 32_768, 8, 8, 4096);
+        assert!(
+            prepare_comment_storage_leaf_text_rewrite(
+                &source,
+                CommentStorageLeafTextRewrite::new("comment", "changed"),
+                options,
+            )
+            .is_err()
         );
     }
 }

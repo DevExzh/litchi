@@ -2083,12 +2083,24 @@ fn production_codec_has_forbidden_public_function(
             .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
             .next()
             .unwrap_or_default();
-        // The comment-storage reply transaction deliberately exposes the
-        // canonical `..._rewrite` preparation name.  It is a strict,
-        // fallible source-preserving codec operation, not an unreviewed
-        // generated encoder.  Keep the historical broad `write` ratchet for
-        // every other public codec entry point.
-        if name == "prepare_comment_storage_reply_rewrite" {
+        // These comment-storage leaf operations are reviewed, strict,
+        // fallible codec boundaries.  The canonical constructor is bounded
+        // and generated-free; the text operations preserve source spans.
+        // Keep the historical broad `write` ratchet for every other public
+        // codec entry point.
+        if matches!(
+            name,
+            "prepare_comment_storage_reply_rewrite"
+                | "prepare_comment_storage_leaf_text_rewrite"
+                | "prepare_comment_storage_leaf_text_rewrite_with_fingerprint"
+                | "prepare_comment_storage_text_rewrite"
+                | "rewrite_comment_storage_leaf_text"
+                | "rewrite_comment_storage_text"
+                | "prepare_comment_storage_leaf_write"
+                | "canonical_comment_storage_leaf"
+                | "rewrite_comment_storage_leaf"
+                | "canonical_comment_storage_leaf_from_values"
+        ) {
             return false;
         }
         forbidden_name_fragments

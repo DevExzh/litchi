@@ -1450,6 +1450,16 @@ impl<'source> DataReferenceOwnerDescriptor<'source> {
 ///
 /// Callers must discard observations if inspection returns an error.
 pub trait PackageMetadataVisitor {
+    /// Observe a field outside the strict PackageMetadata projection.
+    ///
+    /// The default is deliberately a no-op so existing visitors remain
+    /// source-compatible.  Strict ownership consumers can override this
+    /// callback and fail closed while the codec continues to preserve such
+    /// bytes in untouched records during rewrites.
+    fn visit_unknown_field(&mut self) -> Result<(), RewriteError> {
+        Ok(())
+    }
+
     fn visit_component(&mut self, _component: ComponentDescriptor<'_>) -> Result<(), RewriteError> {
         Ok(())
     }
@@ -1839,9 +1849,15 @@ mod tests {
         data_owners: Vec<(u64, u64, u64, u32, bool, bool)>,
         ambiguous: Vec<(u64, u64, bool)>,
         root_maps: Vec<(u64, bool)>,
+        unknown_fields: usize,
     }
 
     impl PackageMetadataVisitor for Facts {
+        fn visit_unknown_field(&mut self) -> Result<(), RewriteError> {
+            self.unknown_fields += 1;
+            Ok(())
+        }
+
         fn visit_component(
             &mut self,
             component: ComponentDescriptor<'_>,
@@ -1977,6 +1993,59 @@ mod tests {
             vec![(1, 81, true), (1, 82, true), (1, 83, true)]
         );
         assert_eq!(facts.root_maps, vec![(90, true)]);
+    }
+
+    #[test]
+    fn inspection_notifies_unknown_root_component_and_nested_metadata_fields() {
+        let mut current = component(1, "preferred-a", Some("effective-a"), &[], &[]);
+        // Unknown component-header field.
+        put_varint_field(&mut current, 50, 7);
+
+        // Unknown field inside an external-reference record.
+        let mut external = external_reference(2, Some(5), Some(0));
+        put_varint_field(&mut external, 4, 9);
+        bytes_field(&mut current, 6, &external);
+
+        // Unknown field inside an object-UUID record and its nested UUID.
+        let mut uuid = Vec::new();
+        put_varint_field(&mut uuid, 1, 1);
+        let mut uuid_value = Vec::new();
+        put_varint_field(&mut uuid_value, 1, 2);
+        put_varint_field(&mut uuid_value, 2, 3);
+        put_varint_field(&mut uuid_value, 4, 9);
+        bytes_field(&mut uuid, 2, &uuid_value);
+        bytes_field(&mut current, 11, &uuid);
+
+        // Unknown fields in both the data-reference and owner records.
+        let mut data_reference = Vec::new();
+        put_varint_field(&mut data_reference, 1, 70);
+        put_varint_field(&mut data_reference, 30, 9);
+        let mut owner = Vec::new();
+        put_varint_field(&mut owner, 1, 5);
+        put_varint_field(&mut owner, 2, 2);
+        put_varint_field(&mut owner, 3, 9);
+        bytes_field(&mut data_reference, 2, &owner);
+        bytes_field(&mut current, 7, &data_reference);
+
+        let mut source = Vec::new();
+        put_varint_field(&mut source, 1, 10);
+        bytes_field(&mut source, 3, &current);
+        // Unknown root field.
+        put_varint_field(&mut source, 50, 7);
+        // Unknown field inside the root data-metadata-map reference.
+        bytes_field(
+            &mut source,
+            10,
+            &root_data_metadata_reference(90, None, None, true),
+        );
+
+        let mut facts = Facts::default();
+        inspect_package_metadata_with_visitor(&source, options(&source), &mut facts).unwrap();
+        // Seven deliberately unknown fields are distributed across root,
+        // component, reference, UUID, data-reference, owner, and root-map
+        // records.  The exact count proves each projection branch reports
+        // unknown data without treating known component records as unknown.
+        assert_eq!(facts.unknown_fields, 7);
     }
 
     #[test]
@@ -7969,9 +8038,12 @@ fn inspect_metadata_pass<V: PackageMetadataVisitor>(
             3 | 11 => inspect_component(field.bytes()?, field.number == 3, budget, visitor, 2)?,
             10 => {
                 let reference = decode_root_data_metadata_map(field.bytes()?, budget, 2)?;
+                if reference.unknown_fields {
+                    visitor.visit_unknown_field()?;
+                }
                 visitor.visit_data_metadata_map(reference.identifier, reference.unknown_fields)?;
             },
-            _ => {},
+            _ => visitor.visit_unknown_field()?,
         }
     }
     let last = last
@@ -8009,7 +8081,11 @@ fn inspect_component<V: PackageMetadataVisitor>(
             1 => set_once(&mut identifier, field.varint()?)?,
             2 => set_once(&mut preferred_locator, strict_utf8(field.bytes()?)?)?,
             3 => set_once(&mut locator, strict_utf8(field.bytes()?)?)?,
-            _ => {},
+            // The first pass only decodes ComponentInfo's own header.  The
+            // remaining fields are known component-level records handled by
+            // the second pass below, not unknown fields.
+            6 | 7 | 11 | 18 | 20 => {},
+            _ => visitor.visit_unknown_field()?,
         }
     }
     let descriptor = ComponentDescriptor {
@@ -8043,6 +8119,9 @@ fn inspect_component<V: PackageMetadataVisitor>(
         match field.number {
             6 | 18 => {
                 let reference = decode_external_reference(field.bytes()?, budget, child_depth)?;
+                if reference.unknown_fields {
+                    visitor.visit_unknown_field()?;
+                }
                 visitor.visit_external_reference(ExternalReferenceDescriptor {
                     source: descriptor,
                     target_component_identifier: reference.target,
@@ -8053,6 +8132,9 @@ fn inspect_component<V: PackageMetadataVisitor>(
             },
             11 => {
                 let binding = decode_object_uuid(field.bytes()?, budget, child_depth)?;
+                if binding.unknown_fields {
+                    visitor.visit_unknown_field()?;
+                }
                 visitor.visit_object_uuid(ObjectUuidDescriptor {
                     component: descriptor,
                     object_identifier: binding.object,
@@ -8061,6 +8143,9 @@ fn inspect_component<V: PackageMetadataVisitor>(
             },
             7 => inspect_data_reference(field.bytes()?, descriptor, budget, visitor, child_depth)?,
             20 => inspect_ambiguous_identifiers(field, descriptor, budget, visitor)?,
+            // Component-level unknown fields were already reported by the
+            // header pass above.  Avoid reporting them again while dispatching
+            // the known nested records in this second pass.
             _ => {},
         }
     }
@@ -8084,7 +8169,7 @@ fn inspect_data_reference<V: PackageMetadataVisitor>(
         match field.number {
             1 => set_once(&mut data_identifier, field.varint()?)?,
             2 => {},
-            _ => {},
+            _ => visitor.visit_unknown_field()?,
         }
     }
     let data_identifier = data_identifier
@@ -8097,6 +8182,9 @@ fn inspect_data_reference<V: PackageMetadataVisitor>(
         }
         let (object_identifier, count, unknown_fields) =
             decode_data_owner(field.bytes()?, budget, child_depth)?;
+        if unknown_fields {
+            visitor.visit_unknown_field()?;
+        }
         visitor.visit_data_reference_owner(DataReferenceOwnerDescriptor {
             component,
             data_identifier,
