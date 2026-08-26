@@ -236,6 +236,7 @@ mod table_duplicate;
 mod table_formula;
 mod table_headers;
 mod table_hidden_axes;
+mod table_model_projection;
 mod table_move;
 mod table_sort;
 mod table_sparse_storage;

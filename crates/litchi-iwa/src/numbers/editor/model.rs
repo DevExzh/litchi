@@ -1,5 +1,6 @@
 //! Sheet, table, cell, formula, and comment model operations.
 
+use super::table_model_projection::{CandidateProbe, ProbeBudget, probe_candidate};
 use super::*;
 use crate::application::Application;
 use crate::application_detection::detect;
@@ -8,7 +9,11 @@ use litchi_iwa_protos::comment_storage_codec;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
-const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+const LEGACY_TABLE_MODEL_MESSAGE_TYPE: u32 = 6_000;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+#[cfg(test)]
+const TABLE_MODEL_MESSAGE_TYPES: &[u32] =
+    &[LEGACY_TABLE_MODEL_MESSAGE_TYPE, TABLE_MODEL_MESSAGE_TYPE];
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 
@@ -2018,19 +2023,29 @@ pub(super) fn decode_table_info(object: &ArchiveObject) -> Result<(usize, tst::T
 }
 
 pub(super) fn find_table_model_message(object: &ArchiveObject) -> Result<usize> {
-    object
-        .messages
-        .iter()
-        .position(|message| {
-            (message.type_ == 6000 || message.type_ == 6001)
-                && TableModelArchive::decode(message.data.as_slice()).is_ok()
-        })
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Object {:?} has no Numbers table model payload",
-                object.archive_info.identifier
-            ))
-        })
+    let mut budget = ProbeBudget::new();
+    let index = select_table_model_message(object.messages.as_slice(), &mut budget, |reason| {
+        Error::InvalidFormat(format!(
+            "Object {:?} {reason}",
+            object.archive_info.identifier
+        ))
+    })?
+    .ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {:?} has no Numbers table model payload",
+            object.archive_info.identifier
+        ))
+    })?;
+    // The projection above is the bounded admission and disambiguation pass,
+    // not complete-state authority. Preserve the existing owned model decode
+    // exactly once for the selected message before any caller mutates it.
+    TableModelArchive::decode(object.messages[index].data.as_slice()).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Object {:?} contains a malformed selected Numbers table model payload: {error}",
+            object.archive_info.identifier
+        ))
+    })?;
+    Ok(index)
 }
 
 pub(super) fn take_identifier(next: &mut u64) -> Result<u64> {
@@ -3306,12 +3321,12 @@ pub(super) fn attached_table_descriptor(
     let model_object = model_archive.object(table_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
     })?;
-    let models = decode_attached_table_models(model_object.messages.iter(), table_id)?;
-    let [model] = models.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "iWork table model {table_id} must contain exactly one table-model payload"
-        )));
-    };
+    let model = decode_attached_table_model(model_object.messages.as_slice(), table_id)?
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork table model {table_id} must contain exactly one table-model payload"
+            ))
+        })?;
 
     let mut table_info_id = None;
     let archive_names = locations.values().collect::<HashSet<_>>();
@@ -3342,7 +3357,7 @@ pub(super) fn attached_table_descriptor(
                 "iWork table model {table_id} has no table-info owner"
             ))
         })?,
-        model: model.clone(),
+        model,
     })
 }
 
@@ -3370,8 +3385,9 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
                 let Some(model_object) = model_archive.object(model_id) else {
                     continue;
                 };
-                let models = decode_attached_table_models(model_object.messages.iter(), model_id)?;
-                let [model] = models.as_slice() else {
+                let Some(model) =
+                    decode_attached_table_model(model_object.messages.as_slice(), model_id)?
+                else {
                     continue;
                 };
                 if !owned_models.insert(model_id) {
@@ -3380,7 +3396,7 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
                 let descriptor = TableDescriptor {
                     object_id: model_id,
                     table_info_id,
-                    model: model.clone(),
+                    model,
                 };
                 if descriptors.insert(model_id, descriptor).is_some() {
                     return Err(Error::InvalidFormat(format!(
@@ -3394,20 +3410,55 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
     Ok(descriptors.into_values().collect())
 }
 
-fn decode_attached_table_models<'a>(
-    messages: impl Iterator<Item = &'a RawMessage>,
+fn select_table_model_message(
+    messages: &[RawMessage],
+    budget: &mut ProbeBudget,
+    error: impl Fn(&str) -> Error,
+) -> Result<Option<usize>> {
+    // Type 6000 is shared with modern TableInfoArchive. A canonical type-6001
+    // payload is therefore authoritative whenever present; legacy candidates
+    // are considered only when no canonical message exists, and the probe
+    // admits them only after the exact legacy model wire signature is proven.
+    let has_canonical = messages
+        .iter()
+        .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE);
+    let mut selected = None;
+    for (index, message) in messages.iter().enumerate().filter(|(_, message)| {
+        message.type_ == TABLE_MODEL_MESSAGE_TYPE
+            || (!has_canonical && message.type_ == LEGACY_TABLE_MODEL_MESSAGE_TYPE)
+    }) {
+        match probe_candidate(message.type_, message.data.as_slice(), budget)? {
+            CandidateProbe::Valid if selected.replace(index).is_some() => {
+                return Err(error("has multiple Numbers table model payloads"));
+            },
+            CandidateProbe::Valid | CandidateProbe::NotModel => {},
+            CandidateProbe::Malformed => {
+                return Err(error("contains a malformed Numbers table model payload"));
+            },
+        }
+    }
+    Ok(selected)
+}
+
+fn decode_attached_table_model(
+    messages: &[RawMessage],
     table_id: u64,
-) -> Result<Vec<TableModelArchive>> {
-    messages
-        .filter(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
-        .map(|message| {
-            TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "iWork table model {table_id} contains malformed table-model payload: {error}"
-                ))
-            })
+) -> Result<Option<TableModelArchive>> {
+    let mut budget = ProbeBudget::new();
+    let Some(index) = select_table_model_message(messages, &mut budget, |reason| {
+        Error::InvalidFormat(format!("iWork table model {table_id} {reason}"))
+    })?
+    else {
+        return Ok(None);
+    };
+    let message = &messages[index];
+    TableModelArchive::decode(message.data.as_slice())
+        .map(Some)
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "iWork table model {table_id} contains malformed table-model payload: {error}"
+            ))
         })
-        .collect()
 }
 
 pub(super) fn rename_attached_table_in_package(
@@ -3425,18 +3476,7 @@ pub(super) fn rename_attached_table_in_package(
         let object = archive.object_mut(table_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
         })?;
-        let message_index = object
-            .messages
-            .iter()
-            .position(|message| {
-                (message.type_ == 6000 || message.type_ == 6001)
-                    && TableModelArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Object {table_id} has no iWork table-model payload"
-                ))
-            })?;
+        let message_index = find_table_model_message(object)?;
         let message_type = object.messages[message_index].type_;
         let data = patch_length_delimited_field(
             object.messages[message_index].data.as_slice(),
@@ -3511,18 +3551,7 @@ pub(super) fn resize_attached_table_in_package(
         let object = archive.object_mut(table_id).ok_or_else(|| {
             Error::InvalidFormat(format!("iWork table model object {table_id} is missing"))
         })?;
-        let message_index = object
-            .messages
-            .iter()
-            .position(|message| {
-                (message.type_ == 6000 || message.type_ == 6001)
-                    && TableModelArchive::decode(message.data.as_slice()).is_ok()
-            })
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Object {table_id} has no iWork table-model payload"
-                ))
-            })?;
+        let message_index = find_table_model_message(object)?;
         let message_type = object.messages[message_index].type_;
         let original = object.messages[message_index].data.as_slice();
         let mut data = patch_varint_field(original, 6, true, Some(u64::from(rows_u32)))?;
@@ -5318,20 +5347,22 @@ pub(super) fn cleanup_removed_cell_comment_graph(
 mod tests {
     use super::*;
 
+    const SPARSE_TABLE_MODEL: &[u8] = &[0x22, 0x00, 0x30, 0x00, 0x38, 0x00, 0x42, 0x00];
+
     #[test]
     fn malformed_attached_table_model_payload_is_reported() {
         let messages = [RawMessage {
-            type_: TABLE_MODEL_MESSAGE_TYPES[0],
+            type_: TABLE_MODEL_MESSAGE_TYPE,
             data: vec![0x80],
         }];
 
-        let error = decode_attached_table_models(messages.iter(), 41)
+        let error = decode_attached_table_model(messages.as_slice(), 41)
             .expect_err("malformed table model payload");
         assert!(matches!(
             error,
             Error::InvalidFormat(message)
                 if message.contains("iWork table model 41")
-                    && message.contains("malformed table-model payload")
+                    && message.contains("malformed Numbers table model payload")
         ));
     }
 
@@ -5343,9 +5374,165 @@ mod tests {
         }];
 
         assert!(
-            decode_attached_table_models(messages.iter(), 41)
+            decode_attached_table_model(messages.as_slice(), 41)
                 .expect("unrelated messages are ignored")
-                .is_empty()
+                .is_none()
         );
+    }
+
+    #[test]
+    fn legacy_and_modern_sparse_table_models_are_selected_without_probe_materialization() {
+        for message_type in TABLE_MODEL_MESSAGE_TYPES {
+            let messages = [RawMessage {
+                type_: *message_type,
+                data: SPARSE_TABLE_MODEL.to_vec(),
+            }];
+            let model = decode_attached_table_model(messages.as_slice(), 41)
+                .expect("sparse compatibility model")
+                .expect("typed model candidate");
+            assert_eq!(model.number_of_rows, 0);
+            assert_eq!(model.number_of_columns, 0);
+        }
+    }
+
+    #[test]
+    fn canonical_model_precedes_a_legacy_alias() {
+        let messages = [
+            RawMessage {
+                type_: LEGACY_TABLE_MODEL_MESSAGE_TYPE,
+                data: SPARSE_TABLE_MODEL.to_vec(),
+            },
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: SPARSE_TABLE_MODEL.to_vec(),
+            },
+        ];
+
+        assert!(
+            decode_attached_table_model(messages.as_slice(), 41)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn malformed_canonical_model_does_not_fall_back_to_legacy() {
+        let object = ArchiveObject::new(
+            41,
+            vec![
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: vec![0x80],
+                },
+                RawMessage {
+                    type_: LEGACY_TABLE_MODEL_MESSAGE_TYPE,
+                    data: SPARSE_TABLE_MODEL.to_vec(),
+                },
+            ],
+        )
+        .unwrap();
+
+        let error = find_table_model_message(&object).expect_err("malformed recognized payload");
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message) if message.contains("malformed Numbers table model")
+        ));
+    }
+
+    #[test]
+    fn malformed_legacy_alias_does_not_hide_a_canonical_model() {
+        let object = ArchiveObject::new(
+            41,
+            vec![
+                RawMessage {
+                    type_: LEGACY_TABLE_MODEL_MESSAGE_TYPE,
+                    data: vec![0x80],
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: SPARSE_TABLE_MODEL.to_vec(),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(find_table_model_message(&object).unwrap(), 1);
+    }
+
+    #[test]
+    fn duplicate_canonical_table_models_are_rejected() {
+        let object = ArchiveObject::new(
+            41,
+            vec![
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: SPARSE_TABLE_MODEL.to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: SPARSE_TABLE_MODEL.to_vec(),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert!(find_table_model_message(&object).is_err());
+    }
+
+    #[test]
+    fn table_info_payload_does_not_masquerade_as_a_legacy_model() {
+        let table_info = tst::TableInfoArchive {
+            table_model: tsp::Reference {
+                identifier: 41,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let messages = [RawMessage {
+            type_: LEGACY_TABLE_MODEL_MESSAGE_TYPE,
+            data: table_info,
+        }];
+
+        assert!(
+            decode_attached_table_model(messages.as_slice(), 41)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn unrelated_malformed_message_does_not_hide_a_valid_model() {
+        let object = ArchiveObject::new(
+            41,
+            vec![
+                RawMessage {
+                    type_: 9_999,
+                    data: vec![0x80],
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: SPARSE_TABLE_MODEL.to_vec(),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(find_table_model_message(&object).unwrap(), 1);
+    }
+
+    #[test]
+    fn noncanonical_selected_scalar_is_not_a_model_candidate() {
+        let object = ArchiveObject::new(
+            41,
+            vec![RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                // field 6 encoded as a deliberately overlong varint.
+                data: vec![0x30, 0x81, 0x00],
+            }],
+        )
+        .unwrap();
+
+        assert!(find_table_model_message(&object).is_err());
     }
 }

@@ -5819,3 +5819,53 @@ suffix-release budgeting, and surrounding operation-level transaction budgets
 remain in `litchi-iwa`. This slice therefore makes no full generated-schema
 retirement, inverse/native byte-parity, zero-copy, allocation-free,
 throughput/RSS, dependency-edge, debt, crate-exit, or monolith-exit claim.
+
+## 2026-08-26 amendment: Numbers TableModel candidate projection (not a monolith-exit gate)
+
+The legacy Numbers editor no longer constructs a generated `TableModelArchive`
+for every candidate merely to decide which message is the table model. A
+private generated-free projection now type-gates candidates, validates the
+known root wire envelope, and runs the selected-field strict table-cell
+storage projection under one finite object-local
+input/field/work/reference/text ledger. Balanced unknown groups remain opaque
+and source-authoritative. Historical
+sparse models retain a narrowly classified compatibility route, but must carry
+the exact selected DataStore/dimension/name signature. Type 6000 is shared by
+legacy table models and modern `TableInfoArchive`; a type-6000 payload is
+therefore ignored unless it proves that legacy signature. Canonical type 6001
+has explicit precedence, malformed canonical candidates do not fall back to a
+legacy alias, and duplicate canonical candidates fail closed. After admission,
+the one selected complete model still receives the pre-existing owned Prost
+decode before mutation or publication.
+
+Direct projection coverage passes 9/9 and the affected model-discovery module
+passes 10/10, including TableInfo/model type confusion, missing selected
+fields, wrong-wire known fields, duplicate selected fields, canonical/legacy
+precedence, malformed fallback, unrelated messages, and aggregate resource
+failure atomicity. The tracked native focused edit/read regression passes, as
+do the affected library check and scoped strict Clippy. Two older synthetic
+resize/duplicate regressions remain blocked before this seam by their focused
+catalog selector resolving to `usize::MAX`; they are not counted as green.
+
+Native acceptance used the tracked Numbers source
+`test-data/iwork/numbers/basic.numbers`, 136,357 bytes with SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+The Rust resize changed Table 1 from 22×7 to 23×8. Its 136,363-byte candidate
+had SHA-256
+`49bef89a5d85cc19f711f7d33efe5a61463ee96ae46091c81216be5cd8021350`;
+the Rust inverse was byte-identical to the source. Numbers 14.4 opened the
+candidate without repair, exposed 23 rows and 8 columns, retained B2 text
+`Litchi native Numbers fixture` and B3 value `42`, saved it, closed it, and
+reopened the exact path without repair. The 137,015-byte native-normalized
+artifact had SHA-256
+`7f53bf5204afb49fb0494f4b90e5cf38d80dab84e0f77867f525341f1bde5df7`;
+strict Rust reread still reported Table 1 as 23×8 with two materialized cells.
+
+This is only generated-free candidate admission in the legacy model editor.
+Complete `TableDescriptor` state, the selected mutation value, broad
+TableInfo/table-model ownership discovery, public storage enumeration, archive
+reference authority, and other editor selectors remain generated or outside
+this slice. The ledger is aggregate per model object rather than per package.
+This amendment makes no full model-codec ownership, TableInfo retirement,
+zero-copy, performance/RSS, dependency-edge, debt, crate-exit, or monolith-exit
+claim.
