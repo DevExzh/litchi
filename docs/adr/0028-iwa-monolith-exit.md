@@ -5529,3 +5529,20 @@ authoritative inventory stays at 64 packages, 239 internal dependency
 declarations, and 13 ordered migration debts. No crate, edge, debt item,
 production manifest dependency, compatibility host, generated-schema owner,
 normal Prost/Buffa owner, or monolith gate is retired by Wave93.
+
+## 2026-08-26 amendment: Numbers raw-ID comment-clear retirement (not a monolith-exit gate)
+
+Commit `4f7f2c16c` deletes one deprecated raw-ID mutation and its
+fallback bridge from `litchi-iwa`: table-cell comment clear is now exercised
+through `litchi_numbers::Package`, semantic sheet/table selectors, and checked
+cell positions. The low-level cleanup helper is restricted to host regression
+tests, and the migrated example no longer imports `NumbersEditor` or accepts a
+native table identifier.
+
+This is a real host-surface reduction but not a crate or edge exit. The raw-ID
+comment read/replacement compatibility surface, reply compatibility, other
+Numbers graph operations, Pages/Keynote hosts, debt 015, the
+`litchi-iwa -> litchi-numbers` edge, remaining debts, normal generated/Prost/
+Buffa owners, and the IWA monolith remain. Native, resource/performance,
+package-count, dependency-count, debt-exit, and monolith-exit claims are
+withheld beyond the recorded scoped gates.

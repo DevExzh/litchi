@@ -14268,3 +14268,31 @@ No native direct reply, changed candidate, inverse, normalized artifact, or
 post-edit reopen exists. Native direct-reply acceptance, Rust/native byte
 parity, durable native publication, performance/RSS, debt/edge exit, and
 monolith-exit claims are explicitly withheld.
+
+## 2026-08-26 amendment: Numbers raw-ID cell-comment clear host retirement
+
+Implementation commit `4f7f2c16c` removes the deprecated
+`NumbersEditor::clear_cell_comment(table_id, row, column)` method and its
+focused/legacy fallback bridge. The remaining low-level clear helper is
+compiled only for migration-host regression tests. The
+`edit_numbers_comment` example now opens `litchi_numbers::Package`, accepts
+checked sheet/table indices plus `CellPosition`, calls
+`clear_table_cell_comment` or `set_table_cell_comment`, streams the committed
+package to the caller-owned output file, reopens it, and verifies through the
+selector-first package read.
+
+The retirement ratchet rejects restoration of either production host route
+and rejects raw-ID clear calls or missing selector markers in the example.
+Current focused evidence is the 16/16 table-cell comment-reply lifecycle suite,
+the exact lossy-metadata clear rejection, four private legacy-clear regressions
+including a sparse tile boundary, example/library compilation, scoped Clippy,
+the complete boundary unittest, and an empty live retirement audit. Three
+older positive binary/synthetic comment fixtures remain rejected by the
+current strict source-authority reader; they are not cited as positive clear
+evidence and production validation was not weakened to admit them.
+
+This removes one public raw-ID mutation seam only. Root-comment creation and
+the deprecated raw-ID root replacement/read compatibility methods remain, as
+do reply compatibility fallback, Pages/Keynote comments, debt 015, the
+`litchi-iwa -> litchi-numbers` edge, and the IWA monolith. No native,
+performance/RSS, manifest-edge, debt-exit, or monolith-exit claim is made.

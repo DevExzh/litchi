@@ -2739,3 +2739,20 @@ declarations, and 13 ordered migration debts. Debt 015 and the
 hosts, generated-schema/normal Prost/Buffa owners, and the IWA monolith. No
 crate, edge, debt, manifest dependency, compatibility host, or monolith owner
 is retired by Wave93.
+
+## 2026-08-26 amendment: Numbers cell-comment clear host cut
+
+Commit `4f7f2c16c` retires the public raw-ID
+`NumbersEditor::clear_cell_comment` route and its migration-host fallback.
+The supported operation now appears only on the selector-first
+`litchi_numbers::Package` facade and in the migrated package-based example;
+the old native helper is test-only for preservation of unsupported legacy
+fixture behavior. A boundary ratchet enforces that topology.
+
+This does not retire all Numbers comment compatibility: raw-ID comment read
+and root replacement, reply-native identity fallback, root creation, and
+unsupported graph cleanup remain migration-host responsibilities. The
+inventory remains 64 packages, 239 internal dependency declarations, and 13
+ordered migration debts. Debt 015, the `litchi-iwa -> litchi-numbers` edge,
+other hosts, generated-schema/normal Prost/Buffa owners, and the IWA monolith
+remain.
