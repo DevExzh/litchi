@@ -112,6 +112,7 @@ enum Corruption {
     UnknownMetadata,
     Locked,
     MissingAuthor,
+    MissingCommentList,
 }
 
 fn reference(identifier: u64) -> tsp::Reference {
@@ -328,6 +329,10 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
             },
         ),
     ];
+    if matches!(corruption, Some(Corruption::MissingCommentList)) {
+        messages.pop();
+        return Ok(ArchiveObject::new(SIDECAR_ID, messages)?);
+    }
     if matches!(corruption, Some(Corruption::DuplicateListKey)) {
         messages.push(messages[3].clone());
     }
@@ -385,7 +390,7 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
     Ok(result)
 }
 
-fn table_model() -> tst::TableModelArchive {
+fn table_model(comment_list: bool) -> tst::TableModelArchive {
     tst::TableModelArchive {
         table_id: "reply-fixture-table-id".to_owned(),
         table_name: TABLE_NAME.to_owned(),
@@ -420,7 +425,7 @@ fn table_model() -> tst::TableModelArchive {
             formula_error_table: Some(reference(SIDECAR_ID)),
             format_table_pre_bnc: reference(SIDECAR_ID),
             format_table: Some(reference(SIDECAR_ID)),
-            comment_storage_table: Some(reference(SIDECAR_ID)),
+            comment_storage_table: comment_list.then(|| reference(SIDECAR_ID)),
             next_row_strip_id: 1,
             next_column_strip_id: 1,
             row_tile_tree: tst::TableRbTree::default(),
@@ -829,11 +834,14 @@ fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<
     let mut model = object(
         TABLE_MODEL_ID,
         TABLE_MODEL_TYPE,
-        table_model().encode_to_vec(),
+        table_model(!matches!(corruption, Some(Corruption::MissingCommentList))).encode_to_vec(),
     )?;
     set_message_info(&mut model, &[SIDECAR_ID, TILE_ID])?;
     set_field_info(&mut model, vec![25], &[SIDECAR_ID])?;
     set_field_info(&mut model, vec![26], &[TILE_ID])?;
+    if !matches!(corruption, Some(Corruption::MissingCommentList)) {
+        set_field_info(&mut model, vec![4, 19], &[SIDECAR_ID])?;
+    }
 
     let mut tile = object(TILE_ID, TILE_TYPE, tile(mode)?.encode_to_vec())?;
     set_message_info(&mut tile, &[])?;
@@ -1071,6 +1079,97 @@ fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestR
         .ok_or_else(|| io::Error::other("package metadata is missing"))?;
     let metadata = tsp::PackageMetadata::decode(metadata_payload.data.as_slice())?;
     assert_eq!(metadata.last_object_identifier, WATERMARK + 2);
+    let document = metadata
+        .components
+        .iter()
+        .find(|component| component.identifier == 100)
+        .ok_or_else(|| io::Error::other("Document metadata component is missing"))?;
+    for identifier in &fresh_ids {
+        assert!(
+            document
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == *identifier),
+            "fresh object {identifier} is missing current UUID ownership"
+        );
+    }
+    let restored = commit
+        .package()
+        .apply_table_cell_comment(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_creation_builds_a_missing_comment_list_atomically() -> TestResult {
+    let source = fixture(FixtureMode::Rootless, Some(Corruption::MissingCommentList))?;
+    let package = load_package(&source)?;
+    let commit = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(1, 0),
+        "new root with generated list",
+    )?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 0),
+            )?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("new root with generated list"),
+    );
+    let candidate = exact_bytes(commit.package())?;
+    let archive = member_archive(&candidate, DOCUMENT_MEMBER)?;
+    let comment_lists = archive
+        .objects
+        .iter()
+        .filter(|object| {
+            object.messages.iter().any(|message| {
+                message.type_ == TABLE_DATA_LIST_TYPE
+                    && tst::TableDataList::decode(message.data.as_slice())
+                        .map(|list| {
+                            list.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                        })
+                        .unwrap_or(false)
+            })
+        })
+        .count();
+    assert_eq!(comment_lists, 1);
+    let model = archive
+        .object(TABLE_MODEL_ID)
+        .ok_or_else(|| io::Error::other("table model is missing"))?;
+    let decoded = tst::TableModelArchive::decode(model.messages[0].data.as_slice())?;
+    let list_identifier = decoded
+        .base_data_store
+        .comment_storage_table
+        .ok_or_else(|| io::Error::other("comment-list reference is missing"))?
+        .identifier;
+    assert!(list_identifier > WATERMARK);
+    let model_info = &model.archive_info.message_infos[0];
+    assert!(model_info.object_references.contains(&list_identifier));
+    assert!(model_info.field_infos.iter().any(|field| {
+        field.path.as_slice() == [4, 19] && field.object_references == [list_identifier]
+    }));
+    let fresh_ids = archive
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .filter(|identifier| *identifier > WATERMARK)
+        .collect::<Vec<_>>();
+    assert_eq!(fresh_ids.len(), 3);
+    let metadata_archive = member_archive(&candidate, METADATA_MEMBER)?;
+    let metadata_payload = metadata_archive
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .find(|message| message.type_ == METADATA_TYPE)
+        .ok_or_else(|| io::Error::other("package metadata is missing"))?;
+    let metadata = tsp::PackageMetadata::decode(metadata_payload.data.as_slice())?;
+    assert_eq!(metadata.last_object_identifier, WATERMARK + 3);
     let document = metadata
         .components
         .iter()

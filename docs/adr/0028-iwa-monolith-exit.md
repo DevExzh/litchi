@@ -5587,3 +5587,22 @@ blank/generated-table topologies. Native Numbers UI acceptance, a single
 global allocation-free resource preflight, performance/RSS, crate/dependency
 edge/debt retirement, normal Prost/Buffa ownership, and monolith exit remain
 withheld.
+
+## 2026-08-26 amendment: Numbers missing comment-list creation (not a monolith-exit gate)
+
+The focused root-comment owner now also admits a rooted same-member table with
+an existing physical target cell and canonical empty author registry but no
+comment-list object or DataStore field-19 reference. A prepared lazy codec
+inserts the nested `comment_storage_table` reference without re-encoding the
+TableModel/DataStore envelope. The owner allocates list, comment, and author
+identifiers together; creates the type-6005 list with exact `[3,key]`
+ArchiveInfo, appends the model `[4,19]` authority edge, registers all three
+UUIDs, advances one component token and the root watermark/save token, reopens
+the candidate, and retains exact inverse restoration.
+
+The slice still requires a canonical type-213 author storage, existing tile,
+row, and BNC cell slot. Sparse-cell/tile creation, missing author-storage
+creation, segmented/cross-component graphs, arbitrary repair, and native UI
+acceptance remain unsupported. The raw-ID compatibility host, debt 015,
+remaining dependency edges/debts, performance/RSS and single-global-preflight
+claims, normal Prost/Buffa owners, and monolith exit remain.
