@@ -20,6 +20,7 @@ use quick_xml::{
 const MAX_SPANS: usize = 1_048_576;
 const OFFICE_NAMESPACE: &str = codec::OFFICE_NAMESPACE;
 const TABLE_NAMESPACE: &str = codec::TABLE_NAMESPACE;
+const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 
 #[derive(Clone, Debug)]
 struct Span {
@@ -42,9 +43,10 @@ struct RowEdit {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RowRewriteMode {
+pub(crate) enum RowRewriteMode {
     Owned,
     SourceBacked,
+    SourceBackedHyperlinks,
 }
 
 /// One row-local result retaining both assembled content and its exact source
@@ -378,12 +380,14 @@ pub(crate) fn replace_changed_rows(
 /// (see [`replace_changed_rows_from_content_xml_retaining_layout`]); the
 /// per-call gates still run before the layout is consulted, in the same order
 /// as the scanning variant.
-pub(crate) fn replace_changed_rows_from_content_xml_with_layout(
+/// Rewrite changed source-backed rows with an explicit row-shape policy.
+pub(crate) fn replace_changed_rows_from_content_xml_with_layout_mode(
     xml: &str,
     layout: &ContentLayout,
     original: &[Sheet],
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
+    mode: RowRewriteMode,
 ) -> Result<Option<String>> {
     let (edits, _layout) = changed_row_edits(
         xml,
@@ -391,7 +395,7 @@ pub(crate) fn replace_changed_rows_from_content_xml_with_layout(
         original,
         candidate,
         max_output_bytes,
-        RowRewriteMode::SourceBacked,
+        mode,
         true,
     )?;
     edits
@@ -406,21 +410,17 @@ pub(crate) fn replace_changed_rows_from_content_xml_with_layout(
 /// The layout is returned only when the scan actually ran and succeeded; a
 /// gate refusal before the scan returns `(None, None)` and a scan failure
 /// propagates the error without a layout, so errors are never cached.
-pub(crate) fn replace_changed_rows_from_content_xml_retaining_layout(
+/// Rewrite changed source-backed rows and retain the layout under an explicit
+/// row-shape policy.
+pub(crate) fn replace_changed_rows_from_content_xml_retaining_layout_mode(
     xml: &str,
     original: &[Sheet],
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
+    mode: RowRewriteMode,
 ) -> Result<(Option<String>, Option<ContentLayout>)> {
-    let (edits, layout) = changed_row_edits(
-        xml,
-        None,
-        original,
-        candidate,
-        max_output_bytes,
-        RowRewriteMode::SourceBacked,
-        true,
-    )?;
+    let (edits, layout) =
+        changed_row_edits(xml, None, original, candidate, max_output_bytes, mode, true)?;
     let content = edits
         .map(|edits| apply_edits_bounded(xml, edits, max_output_bytes))
         .transpose()?;
@@ -501,7 +501,10 @@ fn changed_row_edits(
     for sheet in candidate.iter().flatten() {
         validation::validate_sheet(sheet)?;
     }
-    if matches!(mode, RowRewriteMode::Owned) {
+    if matches!(
+        mode,
+        RowRewriteMode::Owned | RowRewriteMode::SourceBackedHyperlinks
+    ) {
         validate_owned_link_delta_partial(original, candidate)?;
     }
     if original.len() != candidate.len() {
@@ -772,7 +775,7 @@ fn validate_rewritable_row(
         let parent = spans
             .get(parent_index)
             .ok_or_else(|| invalid("flat ODS row descendant parent is invalid"))?;
-        if matches!(mode, RowRewriteMode::Owned)
+        if allows_direct_hyperlinks(mode)
             && is_element(child, codec::TEXT_NAMESPACE, "a")
             && is_element(parent, codec::TEXT_NAMESPACE, "p")
             && parent.parent.is_some_and(|cell_index| {
@@ -919,8 +922,8 @@ fn validate_rewritable_row(
                     ));
                 }
             },
-            Event::CData(_)
-                if row_depth > 0 && matches!(mode, RowRewriteMode::Owned) && in_paragraph => {},
+            Event::CData(_) if row_depth > 0 && allows_direct_hyperlinks(mode) && in_paragraph => {
+            },
             Event::CData(_) | Event::GeneralRef(_) if row_depth > 0 => {
                 return Err(invalid(
                     "flat ODS edit would discard unsupported cell text markup",
@@ -966,7 +969,14 @@ fn is_modeled_row_element(namespace: Option<&str>, local: &str, mode: RowRewrite
     (namespace == Some(TABLE_NAMESPACE)
         && matches!(local, "table-row" | "table-cell" | "covered-table-cell"))
         || (namespace == Some(codec::TEXT_NAMESPACE)
-            && (local == "p" || (matches!(mode, RowRewriteMode::Owned) && local == "a")))
+            && (local == "p" || (allows_direct_hyperlinks(mode) && local == "a")))
+}
+
+fn allows_direct_hyperlinks(mode: RowRewriteMode) -> bool {
+    matches!(
+        mode,
+        RowRewriteMode::Owned | RowRewriteMode::SourceBackedHyperlinks
+    )
 }
 
 fn validate_modeled_attributes(
@@ -1017,9 +1027,10 @@ fn validate_modeled_attributes(
                         | "currency"
                 )
             },
+            (Some(codec::TEXT_NAMESPACE), "p", Some(XML_NAMESPACE)) => attribute_local == "space",
             (Some(codec::TEXT_NAMESPACE), "p", _) => false,
             (Some(codec::TEXT_NAMESPACE), "a", Some(codec::XLINK_NAMESPACE))
-                if matches!(mode, RowRewriteMode::Owned) =>
+                if allows_direct_hyperlinks(mode) =>
             {
                 matches!(
                     attribute_local.as_str(),
@@ -1027,7 +1038,7 @@ fn validate_modeled_attributes(
                 )
             },
             (Some(codec::TEXT_NAMESPACE), "a", Some(OFFICE_NAMESPACE))
-                if matches!(mode, RowRewriteMode::Owned) =>
+                if allows_direct_hyperlinks(mode) =>
             {
                 matches!(
                     attribute_local.as_str(),
@@ -1035,7 +1046,7 @@ fn validate_modeled_attributes(
                 )
             },
             (Some(codec::TEXT_NAMESPACE), "a", Some(codec::TEXT_NAMESPACE))
-                if matches!(mode, RowRewriteMode::Owned) =>
+                if allows_direct_hyperlinks(mode) =>
             {
                 matches!(
                     attribute_local.as_str(),
@@ -1049,7 +1060,7 @@ fn validate_modeled_attributes(
                 "flat ODS edit would discard unmodeled attribute '{attribute_local}'"
             )));
         }
-        if matches!(mode, RowRewriteMode::Owned)
+        if allows_direct_hyperlinks(mode)
             && element_namespace == Some(codec::TEXT_NAMESPACE)
             && local == "a"
             && namespace.as_deref() == Some(codec::XLINK_NAMESPACE)
@@ -1075,6 +1086,28 @@ fn validate_modeled_attributes(
             if value != "simple" {
                 return Err(Error::InvalidFormat(
                     "ODS text:a requires xlink:type='simple'".to_string(),
+                ));
+            }
+        }
+        if element_namespace == Some(codec::TEXT_NAMESPACE)
+            && local == "p"
+            && namespace.as_deref() == Some(XML_NAMESPACE)
+            && attribute_local == "space"
+        {
+            if attribute.value.len() > validation::MAX_TEXT_BYTES {
+                return Err(Error::InvalidFormat(
+                    "ODS text:p xml:space value exceeds the worksheet text safety limit"
+                        .to_string(),
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS text:p xml:space value: {error}"))
+                })?;
+            if !matches!(value.as_ref(), "default" | "preserve") {
+                return Err(Error::InvalidFormat(
+                    "ODS text:p xml:space must be 'default' or 'preserve'".to_string(),
                 ));
             }
         }

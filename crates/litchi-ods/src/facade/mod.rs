@@ -20,8 +20,8 @@ pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceReadMetrics};
 pub use source::{ReadLimits, SourceBackedSpreadsheet};
 pub use source_edit::{
-    FormulaChange, SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
-    SourceCellSnapshot,
+    FormulaChange, HyperlinkChange, HyperlinkOperation, SourceCellCommit, SourceCellEdit,
+    SourceCellPatch, SourceCellPublicationReport, SourceCellSnapshot,
 };
 
 /// Maximum number of positional cell selectors accepted by one lookup batch.
