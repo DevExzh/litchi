@@ -2756,3 +2756,29 @@ inventory remains 64 packages, 239 internal dependency declarations, and 13
 ordered migration debts. Debt 015, the `litchi-iwa -> litchi-numbers` edge,
 other hosts, generated-schema/normal Prost/Buffa owners, and the IWA monolith
 remain.
+
+## 2026-08-27 amendment: Wave98 current-topology Keynote slide-table title cut
+
+`litchi-keynote` is now the selector-first owner of lossless title visibility
+and outline settings for an existing canonical type-6001 slide table. The
+public boundary is `SlideSelector` plus an archive-free `TableSelector` and
+the shared semantic table-title `Settings`; exact edit, patch, inverse, and
+apply types remain Keynote-prefixed. The private resolver may follow the
+slide, TableInfo, model, and title-style graph across physical members, while
+a changed transaction rewrites only the selected model member.
+
+Strict generated-free title and TableInfo projections, canonical known-field
+validation, raw-preserving scalar replacement, one conservative operation
+budget, prepared ZIP publication, preview invalidation when previews exist,
+candidate reopen, and object/member locality are part of the owner boundary.
+Locked tables, legacy type-6000 models, ambiguous ownership, invalid style
+prerequisites, and unsupported compatibility graphs remain fail-closed or in
+the legacy host. Metadata and save tokens remain byte-identical because this
+in-place scalar slice allocates no native objects.
+
+The inventory remains 64 workspace packages, 239 internal dependency
+declarations, and 13 ordered migration debts. The raw Keynote compatibility
+host, debt 014, debt 016, the `litchi-iwa -> litchi-keynote` edge, other
+migration hosts, generated-schema/normal Prost/Buffa owners, and the IWA
+monolith remain. No crate, edge, debt, manifest dependency, compatibility
+adapter, or monolith owner is retired by Wave98.

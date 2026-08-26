@@ -5930,3 +5930,66 @@ allocation-free, throughput, or RSS claim follows. The migration host,
 dependency edges, debt 010, debt 015, every other current migration debt, and
 the monolith deletion gate remain unchanged; no crate, generated-schema owner,
 host adapter, debt item, or edge is retired.
+
+## 2026-08-27 amendment: Keynote slide-table title settings owner (not a monolith-exit gate)
+
+`litchi-keynote::Package` now owns selector-first reads and exact transactions
+for the visibility and outline settings of an existing canonical type-6001
+slide table. `SlideSelector` and the new checked z-order `TableSelector`
+resolve a uniquely owned slide→TableInfo→model graph without exposing native
+identifiers. Resolution may cross physical members, but a changed transaction
+rewrites only fields 22 and 37 in the selected model member. The semantic
+value is the neutral archive-free table-title `Settings` already shared by
+iWork table owners.
+
+The owner routes through the strict generated-free table-title and TableInfo
+codecs. It rejects duplicate, wrong-wire, noncanonical, legacy type-6000,
+ambiguous, locked, or invalid visible-title style graphs. Batched nested-field
+replacement preserves unrelated and unknown model bytes; visible titles
+require distinct nonzero paragraph- and shape-style references with unique
+type-2022 and type-2025 targets. Publication uses a conservative
+operation-local input/output/wire/reference/allocation/scratch envelope,
+prepared ZIP reassembly, root-preview deletion when present, full candidate
+reopen and semantic readback, exact object/member locality, conflict-checked
+patch application, and byte-exact inverse artifacts. This is not exact
+allocator telemetry or a package-wide Keynote resource ledger.
+
+Focused lifecycle coverage passes 4/4, including no-op, all nine optional
+visibility/outline presence combinations, unknown-field preservation, preview
+deletion, lock and selector refusal, duplicate-known-field atomic rejection,
+locality, conflict, apply, and exact inverse. The shared title codec passes
+9/9, the shared TableInfo codec passes 13/13, and the boundary suite passes
+568/568. All-target Keynote Clippy passes with only the crate's two existing
+deprecated test calls allowed. The full Keynote all-target run passes 152 of
+153 library tests before the unrelated pre-existing soundtrack-order ZIP
+central-record assertion fails; this amendment therefore makes no full-crate
+green claim.
+
+Native acceptance used the private 10,975-byte Keynote 14.4 source
+`/private/tmp/litchi-wave58-comment.yUGpYq/table-comments.key`, SHA-256
+`d611b677666f82099a41dc5a317fd97788ddf949ffd9dcea4199cfd8fae9f4a4`.
+The source graph placed the selected slide in `Index/Slide-14.iwa`, both
+TableInfo/model pairs in `Index/Document.iwa`, and title styles in
+`Index/DocumentStylesheet.iwa`. The Rust transaction changed the first
+table's settings from visible `false` with absent outline to visible `true`
+and outlined `true`. Its 10,980-byte candidate had SHA-256
+`705f2f19a4d3a4c8d8f0dd1f6151c7ff07e5a750d376fd4b0ceecad790be8825`;
+diagnostics reported one touched component, zero deleted previews because the
+source had no root previews, and a full semantic reparse. The 10,975-byte
+Rust inverse had the source SHA and was byte-identical to the source.
+
+Keynote 14.4 opened the exact candidate without repair or recovery, rendered
+the selected table and its title, and exposed both the `Title` and `Outline
+Table Title` checkboxes as enabled in the Table inspector. The candidate was
+not saved or normalized in Keynote, so this is native no-repair semantic
+acceptance rather than native-normalized byte evidence.
+
+Legacy type-6000 tables, table creation/deletion, rows, columns, cells,
+formulas, sorting, appearance, general drawable topology, metadata UUID or
+save-token transitions, and broader Keynote table compatibility remain with
+their existing owners. The raw compatibility host is intentionally retained.
+Debt 014, debt 016, the `litchi-iwa -> litchi-keynote` dependency, all other
+current migration debts, and the monolith deletion gate remain unchanged.
+This amendment makes no zero-copy, allocation-free, throughput/RSS,
+dependency-edge, debt, crate-exit, generated-schema retirement, or
+monolith-exit claim.

@@ -1449,6 +1449,99 @@ IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES = (
     Path("crates/litchi-iwa/examples/edit_keynote_movie_geometry.rs"),
 )
 
+# Wave98 moves existing canonical Keynote slide-table title settings behind a
+# selector-first package facade.  The strict Buffa projections remain shared
+# iWork codecs; this ratchet owns only the semantic facade and the bounded
+# Keynote transaction.  Legacy/split compatibility remains in litchi-iwa.
+KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "table" / "title.rs"
+)
+KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table.rs"
+KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_title.rs"
+)
+KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES = frozenset(
+    {
+        "SlideTableTitleCommit",
+        "SlideTableTitleDiagnostics",
+        "SlideTableTitleEdit",
+        "SlideTableTitleError",
+        "SlideTableTitleLimitKind",
+        "SlideTableTitlePatch",
+    }
+)
+KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_TYPES = frozenset({"Settings"})
+KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_TYPES = frozenset({"SlideSelector", "TableSelector"})
+KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_METHODS = frozenset(
+    {
+        "slide_table_title_settings",
+        "edit_slide_table_title",
+        "apply_slide_table_title",
+    }
+)
+KEYNOTE_SLIDE_TABLE_TITLE_EDIT_METHODS = frozenset({"set", "commit"})
+KEYNOTE_SLIDE_TABLE_TITLE_FLAT_ALIASES = frozenset(
+    {
+        "TableTitleCommit",
+        "TableTitleDiagnostics",
+        "TableTitleEdit",
+        "TableTitleError",
+        "TableTitleLimitKind",
+        "TableTitlePatch",
+        "TitleCommit",
+        "TitleDiagnostics",
+        "TitleEdit",
+        "TitleError",
+        "TitleLimitKind",
+        "TitlePatch",
+    }
+)
+KEYNOTE_SLIDE_TABLE_TITLE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_SLIDE_TABLE_TITLE_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TABLE_TITLE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsp", "tsd", "tst", "litchi_iwa_protos"}
+)
+KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS = {
+    "aggregate transaction budget": ("TitleBudget",),
+    "strict Buffa projections": ("numbers_table_title_codec", "table_info_codec"),
+    "raw-preserving rewrite": (
+        "patch_nested_fields_batched_with_limits",
+        "NestedFieldReplacement",
+    ),
+    "exact artifacts and inverse": ("ExactArtifacts", "inverse"),
+    "prepared reassembly": ("prepare_reassembly_with_deletions",),
+    "preview invalidation": ("root_preview_deletions",),
+    "candidate reopen": ("candidate.validate",),
+    "object/member locality": ("verify_locality",),
+}
+
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -25513,6 +25606,197 @@ def audit_keynote_movie_geometry_resource_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_table_title_owner_present(root: Path) -> bool:
+    """Return whether the Wave98 slide-table title owner is active."""
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        r"(?m)^mod[ \t]+slide_table_title\s*;", package_source
+    ) is not None
+
+
+def audit_keynote_slide_table_title_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free slide-table title boundary."""
+
+    if not _keynote_slide_table_title_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[1]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+slide_table_title\b",
+        code[package_path] + code[lib_path],
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table title owner module must remain private: "
+            f"{KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]}"
+        )
+    if re.search(r"(?m)^mod[ \t]+slide_table_title\s*;", code[package_path]) is None:
+        violations.append(
+            "focused litchi-keynote slide-table title owner module is missing: "
+            f"{KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table title public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_TYPES - semantic_exports):
+        violations.append(
+            "focused litchi-keynote slide-table title semantic API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE}"
+        )
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote slide-table title public API is missing selector "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[1]}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-table title Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_table_title":
+            for selector in ("SlideSelector", "TableSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-table title Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE}"
+                    )
+
+    edit_impl = re.search(
+        r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
+        r"(?:'[^ ]+[ \t\r\n]+)?SlideTableTitleEdit\b",
+        code[owner_path],
+    )
+    edit_body = code[owner_path] if edit_impl is None else code[owner_path][edit_impl.end() :]
+    for name in sorted(KEYNOTE_SLIDE_TABLE_TITLE_EDIT_METHODS):
+        if not re.search(rf"\bpub[ \t]+fn[ \t]+{re.escape(name)}\b", edit_body):
+            violations.append(
+                "focused litchi-keynote slide-table title edit is missing "
+                f"{name}: {KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE}"
+            )
+
+    facade_names = (
+        KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_TABLE_TITLE_FLAT_ALIASES
+    )
+    for path in paths:
+        dedicated = path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
+            if not dedicated and not identifiers.intersection(facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier == "litchi_iwa_common":
+                    reason = None
+                elif identifier in KEYNOTE_SLIDE_TABLE_TITLE_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_SLIDE_TABLE_TITLE_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_SLIDE_TABLE_TITLE_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote slide-table title public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_SLIDE_TABLE_TITLE_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote slide-table title public API retains flat alias "
+                        f"{identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote slide-table title public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_MOVIE_GEOMETRY_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote slide-table title public API exposes raw identifier "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-table title public API retains a glob re-export: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_table_title_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require bounded projection, exact artifacts, locality, and reopen markers."""
+
+    if not _keynote_slide_table_title_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    for label, markers in KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS.items():
+        if not all(marker in owner for marker in markers):
+            violations.append(
+                "focused litchi-keynote slide-table title owner is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_movie_geometry_source_topology(root: Path = ROOT) -> list[str]:
     """Require a typed bridge while retaining the legacy geometry fallback.
 
@@ -28341,6 +28625,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_movie_geometry_source_topology()
         + audit_keynote_movie_geometry_facade_source_topology()
         + audit_keynote_movie_geometry_resource_source_topology()
+        + audit_keynote_slide_table_title_facade_source_topology()
+        + audit_keynote_slide_table_title_resource_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

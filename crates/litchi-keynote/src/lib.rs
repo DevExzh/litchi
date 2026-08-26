@@ -346,12 +346,15 @@ pub use package::{
     SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
-    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch, Stats, TextStorageFailure, WriteError,
+    SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
+    SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit, SlideTextDiagnostics,
+    SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure,
+    WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
+pub use slide::table::TableSelector;
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
 pub(crate) use transition::Effect;
