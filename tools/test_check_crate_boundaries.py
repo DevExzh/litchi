@@ -1117,6 +1117,61 @@ def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text("pub struct Settings;\n", encoding="utf-8")
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub mod title;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector { pub fn index(index: usize) -> Self { let _ = index; Self } }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES
+        )
+        + "struct TitleBudget;\n"
+        + "fn strict_projections() { numbers_table_title_codec; table_info_codec; }\n"
+        + "fn raw_preserving() { patch_nested_fields_batched_with_limits; NestedFieldReplacement; }\n"
+        + "fn exact() { ExactArtifacts; inverse; }\n"
+        + "fn publish() { prepare_reassembly_with_deletions; root_preview_deletions; }\n"
+        + "fn verify() { candidate.validate; verify_locality; }\n"
+        + "impl Package {\n"
+        + "pub fn slide_table_title_settings<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Settings, SlideTableTitleError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_title<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableTitleEdit, SlideTableTitleError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_title(&self, patch: &SlideTableTitlePatch) -> Result<SlideTableTitleCommit, SlideTableTitleError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableTitleEdit { pub fn set(self, settings: Settings) -> Self { let _ = settings; self } pub fn commit(self) -> Result<SlideTableTitleCommit, SlideTableTitleError> { todo!() } }\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_title;\n"
+        "pub use slide_table_title::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n"
+        "pub use slide::table::title::Settings;\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -12598,6 +12653,71 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_keynote_movie_geometry_source_topology()",
             "+ audit_keynote_movie_geometry_facade_source_topology()",
             "+ audit_keynote_movie_geometry_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_title_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_title_facade_source_topology(root),
+                [],
+            )
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_title_facade_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_title(bytes: &[u8], table_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_title_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+
+    def test_keynote_slide_table_title_masks_cfg_test_and_rejects_flat_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\npub fn decoy(table_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::SlideTableTitleEdit as TitleEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_title_facade_source_topology(root)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_title_resource_markers_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_title_resource_source_topology(root),
+                [],
+            )
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS[
+                "strict Buffa projections"
+            ]:
+                source = source.replace(marker, "")
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_title_resource_source_topology(root)
+            self.assertTrue(any("strict Buffa projections" in item for item in violations), violations)
+
+    def test_keynote_slide_table_title_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_title_facade_source_topology()",
+            "+ audit_keynote_slide_table_title_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 
