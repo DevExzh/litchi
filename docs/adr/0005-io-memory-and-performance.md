@@ -1746,3 +1746,30 @@ serialization, Snappy and ZIP output, reassembly, candidate reopen/locality,
 patch artifacts, and publication. There is no one-global-pass,
 allocation-free, single-allocation, zero-copy, package peak-memory/RSS,
 latency, throughput, or performance claim.
+
+## 2026-08-26 amendment: Wave93 Numbers comment-reply lifecycle resource record
+
+Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
+carries one operation-local `TransactionBudget` through exact source/catalog
+inventory, comment list/storage/tile/reference censuses, strict Metadata and
+ArchiveInfo inspection, native root/list/tile COW, prepared reply-reference
+rewrite, archive/Snappy output envelopes, prepared ZIP reassembly, candidate
+reopen, semantic reread, and exact patch artifacts. Checked arithmetic,
+fallible reservations, typed semantic/physical ceilings, encoded-length
+precharges, and source-atomic failure tests cover the admitted same-member
+route.
+
+The native archive, metadata payload, compression output, and final ZIP are
+staged as private candidates before verified publication. Comment-storage and
+metadata codecs still receive conservative source-sized/full option profiles
+where the shared budget exposes no residual adapter; preparation can allocate
+private plan storage before execution requirements are returned. This record
+therefore does not claim a single global allocation-free preflight, a single
+allocation, exact allocator telemetry, zero-copy behavior, package-wide peak
+memory or RSS, latency, throughput, or general performance.
+
+Cross-member graphs, segmented lists, shared reply leaves, author creation,
+and graph repair are refused before publication and have no successful-route
+resource claim. The record is scoped to the tested direct-leaf lifecycle and
+does not change production dependency ownership or normal generated-schema,
+Prost, or Buffa responsibilities.
