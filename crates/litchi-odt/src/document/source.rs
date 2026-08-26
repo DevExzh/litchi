@@ -8,6 +8,7 @@
 
 use std::{
     fmt,
+    io::Write,
     sync::{
         Arc, OnceLock,
         atomic::{AtomicUsize, Ordering},
@@ -385,6 +386,43 @@ impl SourceBackedDocument {
         }
         retained.push_str(text);
         let _ = self.text_cache.set(Some(retained));
+    }
+
+    /// Write visible paragraphs and headings as bounded UTF-8 text to a
+    /// caller-owned sequential, non-seek sink without using the text cache.
+    ///
+    /// Headings are paragraph-like objects. Formatting is omitted, inline
+    /// `text:line-break` controls remain `\n`, and separators come from
+    /// `options`. Tracked-change definitions, note bodies, and ruby
+    /// pronunciation runs are excluded from visible text. The ODT parser
+    /// applies a hard 64 MiB decoded-text ceiling in addition to the shared
+    /// output limits in `options`.
+    ///
+    /// Output may be partial when parsing, a resource limit, or the sink
+    /// fails. This method never flushes or rolls back the caller-owned sink,
+    /// and it has no cancellation hook. A source revision observed before or
+    /// after parsing takes precedence over another failure while preserving
+    /// the sink progress accumulated so far.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> std::result::Result<
+        litchi_core::TextOutputReport,
+        litchi_core::TextOutputError<Error>,
+    > {
+        let mut writer = litchi_core::SequentialTextWriter::new(output, options);
+        let parse_result = match self.check_source() {
+            Ok(()) => {
+                TextElements::write_text_to_with_writer(self.content.xml_content(), &mut writer)
+            },
+            Err(error) => Err(writer.document_error(error)),
+        };
+
+        match self.check_source() {
+            Err(error) => Err(writer.document_error(error)),
+            Ok(()) => parse_result.map(|()| writer.finish()),
+        }
     }
 
     /// Return the number of paragraphs in document order.

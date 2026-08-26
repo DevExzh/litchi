@@ -1245,6 +1245,7 @@ enum Case {
     OdtSemanticListParagraphs,
     OdtSemanticOneParagraph,
     OdtSemanticFullText,
+    OdtSemanticTextToSink,
     OdtSemanticCreateSmall,
     OdtSemanticNoopEditSave,
     OdtSemanticOneEditSave,
@@ -1789,6 +1790,7 @@ impl Case {
             Self::OdtSemanticListParagraphs => "odt_semantic_list_paragraphs",
             Self::OdtSemanticOneParagraph => "odt_semantic_one_paragraph",
             Self::OdtSemanticFullText => "odt_semantic_full_text",
+            Self::OdtSemanticTextToSink => "odt_semantic_text_to_sink",
             Self::OdtSemanticCreateSmall => "odt_semantic_create_small",
             Self::OdtSemanticNoopEditSave => "odt_semantic_noop_edit_save",
             Self::OdtSemanticOneEditSave => "odt_semantic_one_edit_save",
@@ -2252,6 +2254,7 @@ impl Case {
                 | Self::OdtSemanticListParagraphs
                 | Self::OdtSemanticOneParagraph
                 | Self::OdtSemanticFullText
+                | Self::OdtSemanticTextToSink
                 | Self::OdtSemanticCreateSmall
                 | Self::OdtSemanticNoopEditSave
                 | Self::OdtSemanticOneEditSave
@@ -10321,6 +10324,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_semantic_list_paragraphs" => Some(Case::OdtSemanticListParagraphs),
         "odt_semantic_one_paragraph" => Some(Case::OdtSemanticOneParagraph),
         "odt_semantic_full_text" => Some(Case::OdtSemanticFullText),
+        "odt_semantic_text_to_sink" => Some(Case::OdtSemanticTextToSink),
         "odt_semantic_create_small" => Some(Case::OdtSemanticCreateSmall),
         "odt_semantic_noop_edit_save" => Some(Case::OdtSemanticNoopEditSave),
         "odt_semantic_one_edit_save" => Some(Case::OdtSemanticOneEditSave),
@@ -10746,6 +10750,7 @@ fn usage_text() -> String {
                                        pptx_numeric_repeated_edit_save,\n\
                                        odt_semantic_open,odt_semantic_list_paragraphs,\n\
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
+                                       odt_semantic_text_to_sink,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
@@ -19393,6 +19398,7 @@ fn run_case_with_config(
         | Case::OdtSemanticListParagraphs
         | Case::OdtSemanticOneParagraph
         | Case::OdtSemanticFullText
+        | Case::OdtSemanticTextToSink
         | Case::OdtSemanticCreateSmall
         | Case::OdtSemanticNoopEditSave
         | Case::OdtSemanticOneEditSave
@@ -27876,6 +27882,9 @@ fn run_semantic_odt(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    if case == Case::OdtSemanticTextToSink {
+        return run_semantic_odt_text_to_sink(corpus, warmup_iterations, samples);
+    }
     let shape = semantic_shape(corpus)?;
     let index = shape.docx_paragraphs() / 2;
     let updates = semantic_update_indices(shape.docx_paragraphs())?;
@@ -27973,6 +27982,63 @@ fn run_semantic_odt(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_odt_text_to_sink(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let paragraph_count = shape.docx_paragraphs();
+    let expected_text = (0..paragraph_count)
+        .map(|index| semantic_odt_text(index, false))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let expected_bytes = u64::try_from(expected_text.len())?;
+    let expected_objects = u64::try_from(paragraph_count)?;
+    let expected_digest = sha256_hex(expected_text.as_bytes());
+    let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+
+    verify_semantic_odt(&document, shape, &[])?;
+    if document.text()? != expected_text {
+        return Err("semantic ODT sink oracle differs from full-text semantics".into());
+    }
+    let options = litchi_core::TextOutputOptions::new("\n", "", expected_bytes, expected_objects);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = HashingDiscardSink::without_authoring_window(expected_bytes);
+        let started = Instant::now();
+        let report = document.write_text_to(&mut sink, options)?;
+        let duration = started.elapsed();
+        let (summary, digest) = sink.finish();
+        if report.bytes_written() != expected_bytes
+            || report.objects_written() != expected_objects
+            || summary.accepted_bytes != expected_bytes
+            || digest != expected_digest
+        {
+            return Err("semantic ODT text sink evidence differs from expected semantics".into());
+        }
+        if summary.retained_output_bytes != Some(0)
+            || summary.write_calls == 0
+            || summary.largest_write == 0
+        {
+            return Err("semantic ODT text sink did not expose bounded write evidence".into());
+        }
+        std::hint::black_box(report);
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "semantic ODT sequential output")?;
+    if sink.retained_output_bytes != Some(0) || sink.write_calls == 0 || sink.largest_write == 0 {
+        return Err("semantic ODT text sink summary is incomplete".into());
+    }
+    let mut result = result(Case::OdtSemanticTextToSink, corpus, elapsed, Some(sink));
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
 }
 
 fn execute_odt_mixed_scalar(
@@ -52668,6 +52734,33 @@ mod tests {
         let watermark =
             build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Watermark).unwrap();
         assert!(run_case(Case::RtfSemanticTextToSink, &watermark, 0, 1).is_err());
+    }
+
+    #[test]
+    fn semantic_odt_text_sink_is_opt_in_and_deterministic() {
+        let case = Case::OdtSemanticTextToSink;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert!(!Case::DEFAULT.contains(&case));
+
+        let corpus = build_semantic_odt_corpus(SemanticShape::Tiny).unwrap();
+        let result = run_case(case, &corpus, 0, 1).unwrap();
+        assert_eq!(result.case, "odt_semantic_text_to_sink");
+        assert_eq!(result.elapsed_ns.samples.len(), 1);
+        let expected_text = (0..SemanticShape::Tiny.docx_paragraphs())
+            .map(|index| super::semantic_odt_text(index, false))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let expected_digest = super::sha256_hex(expected_text.as_bytes());
+        assert_eq!(
+            result.output_sha256.as_deref(),
+            Some(expected_digest.as_str())
+        );
+
+        let sink = result.sink.expect("ODT semantic text sink summary");
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert!(sink.accepted_bytes > 0);
+        assert!(sink.write_calls > 0);
+        assert!(sink.largest_write <= sink.accepted_bytes);
     }
 
     #[test]
