@@ -697,6 +697,12 @@ impl<'a> Format<'a> {
         self.raw.all_caps
     }
 
+    /// Whether outline formatting is active.
+    #[must_use]
+    pub const fn outline(self) -> bool {
+        self.raw.outline
+    }
+
     /// Explicit local text direction, if authored.
     #[must_use]
     pub const fn direction(self) -> Option<TextDirection> {

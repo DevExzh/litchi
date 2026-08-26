@@ -949,6 +949,11 @@ enum Operation {
         before: bool,
         after: bool,
     },
+    Outline {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
     InsertParagraph {
         position: usize,
         span: TextSpan,
@@ -1058,6 +1063,7 @@ impl Operation {
             | Self::Hidden { .. }
             | Self::SmallCaps { .. }
             | Self::AllCaps { .. }
+            | Self::Outline { .. }
             | Self::FontSize { .. }
             | Self::Baseline { .. } => 0,
         }
@@ -1117,6 +1123,12 @@ impl Operation {
                     span.start, span.end
                 )]
             },
+            Self::Outline { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:outline",
+                    span.start, span.end
+                )]
+            },
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
@@ -1149,6 +1161,7 @@ impl Operation {
             | Self::Hidden { span, .. }
             | Self::SmallCaps { span, .. }
             | Self::AllCaps { span, .. }
+            | Self::Outline { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
@@ -1181,6 +1194,7 @@ impl Operation {
                 | Self::Hidden { .. }
                 | Self::SmallCaps { .. }
                 | Self::AllCaps { .. }
+                | Self::Outline { .. }
         )
     }
 
@@ -2137,6 +2151,68 @@ impl Edit {
         Ok(self)
     }
 
+    /// Stages one exact outline state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw outline state. This
+    /// operates only on ordinary body runs and preserves every unrelated
+    /// character-formatting facet.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_outline(&mut self, span: TextSpan, outline: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "outline edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = outline_for_span(&self.source, span)?;
+        self.operations.push(Operation::Outline {
+            span,
+            before,
+            after: outline,
+        });
+        Ok(self)
+    }
+
     /// Inserts one ordinary paragraph immediately after a checked paragraph.
     ///
     /// This is the transaction's explicit structural class. The inserted text
@@ -2643,6 +2719,7 @@ impl Edit {
                     | Operation::Hidden { .. }
                     | Operation::SmallCaps { .. }
                     | Operation::AllCaps { .. }
+                    | Operation::Outline { .. }
                     | Operation::InsertParagraph { .. }
             )
         }) {
@@ -3064,6 +3141,7 @@ impl Edit {
                     | Operation::Hidden { .. }
                     | Operation::SmallCaps { .. }
                     | Operation::AllCaps { .. }
+                    | Operation::Outline { .. }
                     | Operation::FontSize { .. }
                     | Operation::Baseline { .. }
             )
@@ -3125,6 +3203,11 @@ impl Edit {
         } else {
             false
         };
+        let base_outline = if property_operation && !layout_operation {
+            base_outline_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
         let base_baseline = if property_operation && !layout_operation {
             base_baseline_for_edit(&self.source, &self.operations)?
         } else {
@@ -3145,6 +3228,7 @@ impl Edit {
         baseline.hidden = base_hidden;
         baseline.smallcaps = base_small_caps;
         baseline.all_caps = base_all_caps;
+        baseline.outline = base_outline;
         baseline.character_positioning.baseline = base_baseline;
         baseline.superscript = matches!(base_baseline, CharacterBaseline::Superscript);
         baseline.subscript = matches!(base_baseline, CharacterBaseline::Subscript);
@@ -3157,6 +3241,7 @@ impl Edit {
         let mut projected_hidden_ranges = Vec::new();
         let mut projected_small_caps_ranges = Vec::new();
         let mut projected_all_caps_ranges = Vec::new();
+        let mut projected_outline_ranges = Vec::new();
         let mut projected_baseline_ranges = Vec::new();
         let mut paragraph_properties = if layout_operation {
             source_paragraph_properties(&self.source)?
@@ -3238,6 +3323,10 @@ impl Edit {
                     projected_all_caps_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::Outline { span, after, .. } => {
+                    projected_outline_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Baseline { span, after, .. } => {
                     projected_baseline_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
@@ -3291,6 +3380,9 @@ impl Edit {
         let has_all_caps_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::AllCaps { before, after, .. } if before != after)
         });
+        let has_outline_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Outline { before, after, .. } if before != after)
+        });
         let has_baseline_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Baseline { before, after, .. } if before != after)
         });
@@ -3309,6 +3401,7 @@ impl Edit {
             || has_hidden_delta
             || has_small_caps_delta
             || has_all_caps_delta
+            || has_outline_delta
             || has_baseline_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
@@ -3363,6 +3456,10 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::AllCaps { .. }));
+        let has_outline_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Outline { .. }));
         let has_baseline_operation = self
             .operations
             .iter()
@@ -3407,6 +3504,11 @@ impl Edit {
                 "all-caps edits refuse non-ASCII transport encodings",
             ));
         }
+        if has_outline_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "outline edits refuse non-ASCII transport encodings",
+            ));
+        }
         if has_baseline_operation && !source_bytes.is_ascii() {
             return Err(Error::UnsupportedSource(
                 "baseline edits refuse non-ASCII transport encodings",
@@ -3426,6 +3528,7 @@ impl Edit {
             || has_hidden_operation
             || has_small_caps_operation
             || has_all_caps_operation
+            || has_outline_operation
             || has_baseline_operation
         {
             if has_bold_operation
@@ -3437,6 +3540,7 @@ impl Edit {
                 && !has_hidden_operation
                 && !has_small_caps_operation
                 && !has_all_caps_operation
+                && !has_outline_operation
                 && !has_baseline_operation
             {
                 self.source
@@ -3455,6 +3559,7 @@ impl Edit {
                     has_hidden_operation,
                     has_small_caps_operation,
                     has_all_caps_operation,
+                    has_outline_operation,
                     has_baseline_operation,
                 )
                 .map_err(Error::UnsupportedSource)?;
@@ -3477,6 +3582,7 @@ impl Edit {
                 || has_hidden_operation
                 || has_small_caps_operation
                 || has_all_caps_operation
+                || has_outline_operation
                 || has_baseline_operation
             {
                 return Err(Error::ParagraphLayoutTextConflict);
@@ -3511,6 +3617,8 @@ impl Edit {
                     small_caps_changes: &projected_small_caps_ranges,
                     base_all_caps,
                     all_caps_changes: &projected_all_caps_ranges,
+                    base_outline,
+                    outline_changes: &projected_outline_ranges,
                     base_baseline,
                     baseline_changes: &projected_baseline_ranges,
                 },
@@ -3538,6 +3646,22 @@ impl Edit {
                     "candidate paragraph properties did not survive RTF validation",
                 ));
             }
+        }
+        if property_operation && !layout_operation {
+            let mut expected = source_paragraph_properties(&self.source)?;
+            if expected.len() != alignments.len() {
+                return Err(Error::StructuralPropertyConflict);
+            }
+            for (paragraph, alignment) in expected.iter_mut().zip(&alignments) {
+                paragraph.alignment = *alignment;
+            }
+            if source_paragraph_properties(&snapshot)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate paragraph properties did not survive character publication",
+                ));
+            }
+        }
+        if layout_operation {
             if !same_source_runs(&snapshot, &self.source) {
                 return Err(Error::UnsupportedSource(
                     "candidate character runs did not survive paragraph-layout publication",
@@ -3597,6 +3721,13 @@ impl Edit {
             if all_caps_for_span(&snapshot, all_caps_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate all-caps property did not survive RTF validation",
+                ));
+            }
+        }
+        for (outline_span, expected) in projected_outline_ranges {
+            if outline_for_span(&snapshot, outline_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate outline property did not survive RTF validation",
                 ));
             }
         }
@@ -3921,6 +4052,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -4004,6 +4136,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -4662,6 +4795,7 @@ fn project_text(
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::RemoveParagraph { .. }
@@ -4809,6 +4943,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::Hidden { .. }
         | Operation::SmallCaps { .. }
         | Operation::AllCaps { .. }
+        | Operation::Outline { .. }
         | Operation::FontSize { .. }
         | Operation::Baseline { .. }
         | Operation::InsertParagraph { .. }
@@ -4965,6 +5100,7 @@ fn plain_body_character_editability(
     allow_mixed_hidden: bool,
     allow_mixed_small_caps: bool,
     allow_mixed_all_caps: bool,
+    allow_mixed_outline: bool,
     allow_mixed_baseline: bool,
 ) -> Result<(), &'static str> {
     source.model().local_paragraph_property_editability()?;
@@ -5005,6 +5141,9 @@ fn plain_body_character_editability(
             if allow_mixed_all_caps {
                 raw_character.all_caps = false;
             }
+            if allow_mixed_outline {
+                raw_character.outline = false;
+            }
             if allow_mixed_baseline {
                 raw_character.character_positioning.baseline = CharacterBaseline::Normal;
                 raw_character.superscript = false;
@@ -5043,6 +5182,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5101,6 +5241,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -5149,6 +5290,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5207,6 +5349,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -5258,6 +5401,7 @@ fn base_underline_for_edit(
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5316,6 +5460,7 @@ fn base_underline_for_edit(
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -5368,6 +5513,7 @@ fn base_font_size_for_edit(
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
@@ -5427,6 +5573,7 @@ fn base_font_size_for_edit(
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5504,6 +5651,7 @@ fn base_baseline_for_edit(
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5562,6 +5710,7 @@ fn base_baseline_for_edit(
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5622,6 +5771,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5680,6 +5830,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -5714,6 +5865,7 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5772,6 +5924,7 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -5820,6 +5973,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::DoubleStrike { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5878,6 +6032,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::DoubleStrike { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -5926,6 +6081,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
             | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -5984,6 +6140,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
                 | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -6032,6 +6189,7 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
             | Operation::DoubleStrike { .. }
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
@@ -6090,6 +6248,7 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
                 | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
+                | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
@@ -6104,6 +6263,108 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_)
                 | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_outline(source: &Snapshot) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let outline = run.format().raw().outline;
+        if value.is_some_and(|existing| existing != outline) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(outline);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn operation_changes_semantics(operation: &Operation) -> bool {
+    match operation {
+        Operation::Text { before, after, .. }
+        | Operation::TableCellText { before, after, .. }
+        | Operation::HeaderFooterText { before, after, .. }
+        | Operation::AnnotationText { before, after, .. }
+        | Operation::NoteText { before, after, .. }
+        | Operation::ShapeText { before, after, .. } => before != after,
+        Operation::Alignment { before, after, .. } => before != after,
+        Operation::ParagraphLayout { before, after, .. } => before != after,
+        Operation::Bold { before, after, .. }
+        | Operation::Italic { before, after, .. }
+        | Operation::Strike { before, after, .. }
+        | Operation::DoubleStrike { before, after, .. }
+        | Operation::Hidden { before, after, .. }
+        | Operation::SmallCaps { before, after, .. }
+        | Operation::AllCaps { before, after, .. }
+        | Operation::Outline { before, after, .. } => before != after,
+        Operation::Underline { before, after, .. } => before != after,
+        Operation::FontSize { before, after, .. } => before != after,
+        Operation::Baseline { before, after, .. } => before != after,
+        Operation::MoveParagraph {
+            position,
+            final_position,
+            ..
+        } => position != final_position,
+        Operation::RootTransfer { before, after, .. } => before != after,
+        Operation::InsertParagraph { .. }
+        | Operation::RemoveParagraph { .. }
+        | Operation::RestoreParagraph { .. }
+        | Operation::PicturePayload(_)
+        | Operation::PictureRemoval(_) => true,
+    }
+}
+
+fn base_outline_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<bool, Error> {
+    if !operations.iter().any(operation_changes_semantics) {
+        return Ok(source
+            .body()
+            .runs()
+            .next()
+            .is_some_and(|run| run.format().raw().outline));
+    }
+    let outline_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Outline { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if outline_spans.is_empty() {
+        return uniform_body_outline(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &outline_spans) {
+                let value = run.format().raw().outline;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed outline state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Outline { after, .. } => Some(*after),
+                _ => None,
             })
             .unwrap_or(false)
     }))
@@ -6485,6 +6746,43 @@ fn all_caps_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
     ))
 }
 
+fn outline_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let outline = run.format().raw().outline;
+                if value.is_some_and(|existing| existing != outline) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed outline state",
+                    ));
+                }
+                value = Some(outline);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected character span has no text run",
+    ))
+}
+
 fn formatting_for_span(
     source: &Snapshot,
     span: TextSpan,
@@ -6550,6 +6848,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::RemoveParagraph { .. }
@@ -6754,6 +7053,7 @@ enum CharacterPropertyChange {
     Hidden(bool),
     SmallCaps(bool),
     AllCaps(bool),
+    Outline(bool),
 }
 
 struct CharacterPropertyOverlays<'a> {
@@ -6777,6 +7077,8 @@ struct CharacterPropertyOverlays<'a> {
     small_caps_changes: &'a [(TextSpan, bool)],
     base_all_caps: bool,
     all_caps_changes: &'a [(TextSpan, bool)],
+    base_outline: bool,
+    outline_changes: &'a [(TextSpan, bool)],
 }
 
 fn encoded_body_with_properties(
@@ -6801,6 +7103,7 @@ fn encoded_body_with_properties(
         .and_then(|bytes| bytes.checked_add(overlays.hidden_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(overlays.small_caps_changes.len().saturating_mul(8)))
         .and_then(|bytes| bytes.checked_add(overlays.all_caps_changes.len().saturating_mul(6)))
+        .and_then(|bytes| bytes.checked_add(overlays.outline_changes.len().saturating_mul(6)))
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: limits.max_source_bytes(),
@@ -6831,11 +7134,15 @@ fn encoded_body_with_properties(
         if paragraph_start == text.len() && text.ends_with('\n') {
             break;
         }
+        let alignment = alignments
+            .get(paragraph)
+            .copied()
+            .ok_or(Error::StructuralPropertyConflict)?;
         output.extend_from_slice(br"\plain ");
         RtfWriter::new(&mut output)
             .write_formatting(&baseline)
             .map_err(|error| Error::Write(error.to_string()))?;
-        write_alignment(&mut output, alignments.get(paragraph).copied())?;
+        write_alignment(&mut output, Some(alignment))?;
         let mut cursor = paragraph_start;
         let mut paragraph_changes = overlays
             .bold_changes
@@ -6914,6 +7221,14 @@ fn encoded_body_with_properties(
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::AllCaps(value))),
+            )
+            .chain(
+                overlays
+                    .outline_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Outline(value))),
             )
             .collect::<Vec<_>>();
         paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
@@ -7013,6 +7328,16 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold);
                     write_all_caps(&mut output, overlays.base_all_caps);
+                },
+                CharacterPropertyChange::Outline(value) => {
+                    // Outline controls are local character state. Reassert
+                    // bold around the fragment to force a stable run boundary
+                    // while preserving every unrelated character facet.
+                    write_bold(&mut output, overlays.base_bold);
+                    write_outline(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold);
+                    write_outline(&mut output, overlays.base_outline);
                 },
             }
             cursor = span.end;
@@ -7310,6 +7635,14 @@ fn write_all_caps(output: &mut Vec<u8>, all_caps: bool) {
     }
 }
 
+fn write_outline(output: &mut Vec<u8>, outline: bool) {
+    if outline {
+        output.extend_from_slice(br"\outl ");
+    } else {
+        output.extend_from_slice(br"\outl0 ");
+    }
+}
+
 fn write_baseline(output: &mut Vec<u8>, baseline: CharacterBaseline) {
     match baseline {
         CharacterBaseline::Normal => output.extend_from_slice(br"\nosupersub "),
@@ -7456,6 +7789,12 @@ enum Change {
         after: bool,
     },
     AllCaps {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Outline {
         span: TextSpan,
         after_span: TextSpan,
         before: bool,
@@ -7671,6 +8010,17 @@ impl Change {
                 before,
                 after,
             } => Self::AllCaps {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Outline {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Outline {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -7955,6 +8305,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::Outline {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Outline {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::InsertParagraph {
                 position,
                 span,
@@ -8097,6 +8457,7 @@ fn semantic_changes(
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
             | Operation::MoveParagraph { .. }
@@ -8417,6 +8778,21 @@ fn durable_operation(
             litchi_core::patch::PatchOperation::new(
                 limits,
                 "character-all-caps.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Outline {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("outline".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-outline.set",
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Bool(*after),
@@ -9005,6 +9381,23 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("all-caps value must be Boolean".to_string())
                 })?;
                 edit.set_text_all_caps(span, replacement)?;
+            },
+            "character-outline.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("outline")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing outline precondition".to_string())
+                    })?;
+                if outline_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character outline state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("outline value must be Boolean".to_string())
+                })?;
+                edit.set_text_outline(span, replacement)?;
             },
             "paragraph.insert-after" => {
                 let position = parse_paragraph_target(&operation.target)?;

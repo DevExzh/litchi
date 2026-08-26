@@ -330,6 +330,7 @@ impl<'a> Parser<'a> {
                         | ControlWord::NoSuperSub
                         | ControlWord::BaselineUp(_)
                         | ControlWord::BaselineDown(_)
+                        | ControlWord::Outline(_)
                 ) && !text_buffer.is_empty()
                 {
                     self.flush_text_buffer(text_buffer)?;
