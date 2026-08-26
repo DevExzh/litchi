@@ -191,6 +191,94 @@ fn package_metadata(package: &IWorkPackage) -> tsp::PackageMetadata {
     tsp::PackageMetadata::decode(message.data.as_slice()).unwrap()
 }
 
+fn detached_keynote_comment_package(metadata: tsp::PackageMetadata) -> IWorkPackage {
+    let mut package = keynote_package(false);
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let drawable = archive.object_mut(5).unwrap();
+            let mut value = kn::PlaceholderArchive::decode(drawable.messages[0].data.as_slice())?;
+            value.super_.super_.super_.comment = None;
+            drawable.replace_message(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: value.encode_to_vec(),
+                },
+            )?;
+            drawable.archive_info.message_infos[0]
+                .object_references
+                .clear();
+            Ok(())
+        })
+        .unwrap();
+    package
+        .replace_archive(
+            "Index/Metadata.iwa",
+            &Archive {
+                objects: vec![object(
+                    100,
+                    crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE,
+                    metadata,
+                )],
+            },
+        )
+        .unwrap();
+    package
+}
+
+fn comment_metadata_component() -> tsp::ComponentInfo {
+    tsp::ComponentInfo {
+        identifier: 1,
+        preferred_locator: "Document".to_owned(),
+        ..Default::default()
+    }
+}
+
+fn decode_test_varint(source: &[u8]) -> (usize, usize) {
+    let mut value = 0usize;
+    let mut shift = 0usize;
+    for (index, byte) in source.iter().copied().enumerate() {
+        value |= usize::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return (value, index + 1);
+        }
+        shift += 7;
+    }
+    panic!("truncated test varint")
+}
+
+fn inject_unknown_archive_info(package: &mut IWorkPackage, member: &str, object_identifier: u64) {
+    let compressed = package.entry(member).unwrap();
+    let source = crate::snappy::SnappyStream::decompress(compressed)
+        .unwrap()
+        .into_bytes();
+    let archive = Archive::parse(&source).unwrap();
+    let object = archive.object(object_identifier).unwrap();
+    let object_start = usize::try_from(object.header_offset).unwrap();
+    let (header_length, prefix_length) = decode_test_varint(&source[object_start..]);
+    let header_start = object_start + prefix_length;
+    let header_end = usize::try_from(object.data_offset).unwrap();
+    assert_eq!(header_end - header_start, header_length);
+
+    let mut unknown = Vec::new();
+    append_unknown_varint(&mut unknown, 90, 900);
+    let rewritten_header_length = header_length + unknown.len();
+    let mut rewritten = Vec::with_capacity(source.len() + unknown.len());
+    rewritten.extend_from_slice(&source[..object_start]);
+    rewritten.extend(litchi_iwa_common::varint::encode_varint(
+        u64::try_from(rewritten_header_length).unwrap(),
+    ));
+    rewritten.extend_from_slice(&source[header_start..header_end]);
+    rewritten.extend_from_slice(&unknown);
+    rewritten.extend_from_slice(&source[header_end..]);
+    package
+        .insert_entry(
+            member,
+            crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
+        )
+        .unwrap();
+}
+
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> Vec<u8> {
     let mut field = litchi_iwa_common::varint::encode_varint(u64::from(field_number) << 3);
     field.extend(litchi_iwa_common::varint::encode_varint(value));
@@ -509,6 +597,199 @@ fn duplicate_author_component_reference_fails_transactionally() {
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_comment(drawable(6), "Rejected").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn comment_cull_streams_every_metadata_ownership_namespace() {
+    let mut external = comment_metadata_component();
+    external.external_references = vec![tsp::ComponentExternalReference {
+        component_identifier: 2,
+        object_identifier: Some(20),
+        is_weak: None,
+    }];
+
+    let mut versioned_external = comment_metadata_component();
+    versioned_external.versioned_external_references = vec![tsp::ComponentExternalReference {
+        component_identifier: 2,
+        object_identifier: Some(20),
+        is_weak: Some(true),
+    }];
+
+    let mut data_owner = comment_metadata_component();
+    data_owner.data_references = vec![tsp::ComponentDataReference {
+        data_identifier: 70,
+        object_reference_list: vec![tsp::component_data_reference::ObjectReference {
+            object_identifier: 20,
+            count: 1,
+        }],
+    }];
+
+    let mut uuid = comment_metadata_component();
+    uuid.object_uuid_map_entries = vec![tsp::ObjectUuidMapEntry {
+        identifier: 20,
+        uuid: fixture_comment_storage_uuid(20),
+    }];
+
+    let mut ambiguous = comment_metadata_component();
+    ambiguous.ambiguous_object_identifiers = vec![20];
+
+    let cases = [
+        tsp::PackageMetadata {
+            last_object_identifier: 100,
+            data_metadata_map: Some(reference(20)),
+            ..Default::default()
+        },
+        tsp::PackageMetadata {
+            last_object_identifier: 100,
+            components: vec![external],
+            ..Default::default()
+        },
+        tsp::PackageMetadata {
+            last_object_identifier: 100,
+            versioned_components: vec![versioned_external],
+            ..Default::default()
+        },
+        tsp::PackageMetadata {
+            last_object_identifier: 100,
+            components: vec![data_owner],
+            ..Default::default()
+        },
+        tsp::PackageMetadata {
+            last_object_identifier: 100,
+            components: vec![uuid],
+            ..Default::default()
+        },
+        tsp::PackageMetadata {
+            last_object_identifier: 100,
+            components: vec![ambiguous],
+            ..Default::default()
+        },
+    ];
+
+    for metadata in cases {
+        let mut package = detached_keynote_comment_package(metadata);
+        let before = package.to_bytes().unwrap();
+        let removed =
+            remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).unwrap();
+        assert!(removed.object_ids.is_empty());
+        assert_eq!(package.to_bytes().unwrap(), before);
+        let document = package.archive("Index/Document.iwa").unwrap();
+        assert!(document.object(20).is_some());
+        assert!(document.object(21).is_some());
+    }
+
+    let mut package = detached_keynote_comment_package(tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![comment_metadata_component()],
+        ..Default::default()
+    });
+    let mut removed =
+        remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).unwrap();
+    removed.object_ids.sort_unstable();
+    assert_eq!(removed.object_ids, [20, 21]);
+    let document = package.archive("Index/Document.iwa").unwrap();
+    assert!(document.object(20).is_none());
+    assert!(document.object(21).is_none());
+}
+
+#[test]
+fn comment_cull_rejects_unknown_or_ambiguous_metadata_atomically() {
+    let metadata = tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![comment_metadata_component()],
+        ..Default::default()
+    };
+    let mut package = detached_keynote_comment_package(metadata.clone());
+    package
+        .update_archive("Index/Metadata.iwa", |archive| {
+            let object = archive.object_mut(100).unwrap();
+            let mut data = object.messages[0].data.clone();
+            append_unknown_varint(&mut data, 90, 900);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    assert!(remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).is_err());
+    assert_eq!(package.to_bytes().unwrap(), before);
+
+    let mut package = detached_keynote_comment_package(metadata);
+    package
+        .update_archive("Index/Metadata.iwa", |archive| {
+            let mut duplicate = archive.object(100).unwrap().clone();
+            duplicate.archive_info.identifier = Some(101);
+            archive.objects.push(duplicate);
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    assert!(remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).is_err());
+    assert_eq!(package.to_bytes().unwrap(), before);
+
+    let mut package = detached_keynote_comment_package(tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![comment_metadata_component()],
+        ..Default::default()
+    });
+    inject_unknown_archive_info(&mut package, "Index/Document.iwa", 1);
+    let before = package.to_bytes().unwrap();
+    assert!(remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).is_err());
+    assert_eq!(package.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn comment_cull_streams_archive_data_references() {
+    let mut package = detached_keynote_comment_package(tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![comment_metadata_component()],
+        ..Default::default()
+    });
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive.object_mut(1).unwrap().archive_info.message_infos[0]
+                .data_references
+                .push(20);
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    let removed =
+        remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).unwrap();
+    assert!(removed.object_ids.is_empty());
+    assert_eq!(package.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn comment_cull_failure_after_root_removal_is_atomic() {
+    let mut package = detached_keynote_comment_package(tsp::PackageMetadata {
+        last_object_identifier: 100,
+        components: vec![comment_metadata_component()],
+        ..Default::default()
+    });
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive.object_mut(21).unwrap().replace_message(
+                0,
+                RawMessage {
+                    type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                    data: vec![0x80],
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    assert!(remove_unreferenced_comment_graph(&mut package, Application::Keynote, 20).is_err());
+    assert_eq!(package.to_bytes().unwrap(), before);
+    let document = package.archive("Index/Document.iwa").unwrap();
+    assert!(document.object(20).is_some());
+    assert!(document.object(21).is_some());
 }
 
 #[test]

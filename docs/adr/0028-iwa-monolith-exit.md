@@ -5724,3 +5724,47 @@ discovery, and surrounding operation-level budgets remain in `litchi-iwa`.
 Selector strings and caller staging are fallible but are not one package-wide
 allocation-free preflight, and this slice makes no throughput/RSS, full Prost
 retirement, dependency-edge, debt, crate-exit, or monolith-exit claim.
+
+## 2026-08-26 amendment: Drawable-comment cull metadata census (not a monolith-exit gate)
+
+The legacy cross-application drawable-comment cull no longer materializes a
+generated Prost `PackageMetadata` merely to decide whether a comment-storage
+object remains owned. A strict raw visitor now completes the current and
+versioned metadata scan across external references, data-reference owners,
+UUID registrations, ambiguous identifiers, and the root data-metadata map.
+When Metadata.iwa exists, deletion requires exactly one canonical type-11006
+payload in `Index/Metadata.iwa`; duplicate, misplaced, malformed, or unknown
+metadata fails closed. Every physical `ArchiveInfo` is also inspected under
+the core `RejectUnknownMetadata` policy, so aggregate and FieldInfo object or
+data references conservatively retain the target. The removal loop runs on a
+private package candidate and publishes only after all reachable comment
+children decode successfully.
+
+The focused regressions cover all six metadata ownership namespaces, physical
+data references, unknown raw PackageMetadata and ArchiveInfo fields, duplicate
+metadata payloads, byte-identical retained packages, and rollback after a
+late malformed-child failure. The surrounding comment suite passes 29/29 and
+the strict package-metadata codec suite passes 41/41; the litchi-iwa all-target
+check, scoped strict Clippy, formatting, and the 560-test boundary suite are
+green. The live boundary audit still reports only the unrelated untracked
+Pages table-lock baseline.
+
+A fresh Keynote 14.4 source created through the native UI stored `Wave94 native
+drawable comment` on drawable 2652607 through storage object 2652642. The
+56-member source was 462,287 bytes with SHA-256
+`9a4d3f7d1412075a1646ddfff3ec169a9fcc1e131e30fac88c80d61dfd85f065`.
+The Rust clear candidate was 462,172 bytes with SHA-256
+`6c756da127ed475087c86193d1bb85445dbce0e96ee47cf9e59153d04fd9db09`;
+only `Index/Slide-2652150.iwa` and `Index/Metadata.iwa` changed, and strict
+Rust reread found no comment. Keynote opened it without repair, showed the
+square without a comment, saved it, and reopened the exact path with the
+comment still absent. The native-normalized file was 462,208 bytes with
+SHA-256 `9f5ead255175f8125888dfd488a6458bb12ed961abc6ede5dfb1399f087587be`
+and passed the same strict reread.
+
+This is bounded root drawable-comment clear/cull evidence. It does not prove
+an exact inverse, direct-reply mutation, arbitrary/shared/segmented comment
+graphs, Numbers table-cell refcount correctness, global list-key ownership,
+one operation-wide resource budget, performance/RSS behavior, dependency-edge
+or debt retirement, normal generated-schema ownership, crate exit, or monolith
+exit.

@@ -8,16 +8,25 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use litchi_iwa_common::comment::{
     AuthorId, Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, Uuid,
 };
+use litchi_iwa_core::{
+    ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceVisitor,
+};
 use litchi_iwa_protos::comment_storage_codec;
+use litchi_iwa_protos::package_metadata_codec::{
+    DataReferenceOwnerDescriptor, ExternalReferenceDescriptor, ObjectUuidDescriptor,
+    PackageMetadataVisitor, RewriteError,
+};
 use prost::Message;
 
 use crate::application::Application;
 use crate::application_detection::detect;
 use crate::archive::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
 use crate::package_metadata::{
-    add_component_external_reference, advance_package_save_token_for_components,
-    component_identifier_for_entry, next_object_identifier, release_package_identifier_suffix,
-    remove_component_external_references_to_object, set_package_last_object_identifier,
+    PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE, add_component_external_reference,
+    advance_package_save_token_for_components, component_identifier_for_entry,
+    inspect_package_metadata_source, next_object_identifier, package_metadata_read_options,
+    release_package_identifier_suffix, remove_component_external_references_to_object,
+    set_package_last_object_identifier,
 };
 #[cfg(test)]
 use crate::protobuf::{kn, tn, tp, tsch, tst, tswp};
@@ -2507,6 +2516,17 @@ fn remove_unreferenced_comment_graph(
     application: Application,
     root: u64,
 ) -> Result<RemovedCommentGraph> {
+    let mut candidate = package.clone();
+    let removed = remove_unreferenced_comment_graph_in_place(&mut candidate, application, root)?;
+    *package = candidate;
+    Ok(removed)
+}
+
+fn remove_unreferenced_comment_graph_in_place(
+    package: &mut IWorkPackage,
+    application: Application,
+    root: u64,
+) -> Result<RemovedCommentGraph> {
     let mut pending = vec![root];
     let mut visited = HashSet::new();
     let mut removed = RemovedCommentGraph::default();
@@ -2559,51 +2579,58 @@ fn comment_object_is_referenced(
     application: Application,
     identifier: u64,
 ) -> Result<bool> {
-    if drawable_locations(package, application)?
+    let mut referenced = drawable_locations(package, application)?
         .values()
-        .any(|drawable| drawable.comment_storage_object_id == Some(identifier))
-    {
-        return Ok(true);
-    }
+        .any(|drawable| drawable.comment_storage_object_id == Some(identifier));
+    let metadata_expected = package.contains_entry(PACKAGE_METADATA_ENTRY);
+    let metadata_options = package_metadata_read_options(package);
+    let archive_limits = package.limits().effective_archive_limits()?;
+    let mut metadata_payloads = 0usize;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
         for object in &archive.objects {
+            let mut archive_visitor = CommentArchiveReferenceVisitor {
+                identifier,
+                referenced: false,
+            };
+            object.inspect_references_with_policy_and_limits(
+                &mut archive_visitor,
+                ArchiveReferencePolicy::RejectUnknownMetadata,
+                archive_limits,
+            )?;
+            referenced |= archive_visitor.referenced;
             for message in &object.messages {
-                if message.type_ == crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE {
-                    let metadata = tsp::PackageMetadata::decode(message.data.as_slice())?;
-                    let metadata_edge = metadata
-                        .data_metadata_map
-                        .as_ref()
-                        .is_some_and(|reference| reference.identifier == identifier);
-                    let component_edge = metadata
-                        .components
-                        .iter()
-                        .chain(&metadata.versioned_components)
-                        .any(|component| {
-                            component
-                                .external_references
-                                .iter()
-                                .chain(&component.versioned_external_references)
-                                .any(|reference| reference.object_identifier == Some(identifier))
-                                || component.data_references.iter().any(|data| {
-                                    data.object_reference_list
-                                        .iter()
-                                        .any(|reference| reference.object_identifier == identifier)
-                                })
-                                // Registrations are not dereferenceable edges,
-                                // but removing an object while its identity is
-                                // registered would leave stale package state.
-                                // Treat both registries as ownership for this
-                                // narrow fail-closed census.
-                                || component
-                                    .object_uuid_map_entries
-                                    .iter()
-                                    .any(|entry| entry.identifier == identifier)
-                                || component.ambiguous_object_identifiers.contains(&identifier)
-                        });
-                    if metadata_edge || component_edge {
-                        return Ok(true);
+                if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE {
+                    if name != PACKAGE_METADATA_ENTRY {
+                        return Err(Error::InvalidFormat(format!(
+                            "PackageMetadata payload is stored in unexpected member {name}"
+                        )));
                     }
+                    metadata_payloads = metadata_payloads.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("PackageMetadata payload count overflow".to_owned())
+                    })?;
+                    if metadata_payloads != 1 {
+                        return Err(Error::InvalidFormat(
+                            "Package contains multiple PackageMetadata payloads".to_owned(),
+                        ));
+                    }
+                    let mut visitor = CommentMetadataReferenceVisitor {
+                        identifier,
+                        referenced: false,
+                        unknown_fields: false,
+                    };
+                    inspect_package_metadata_source(
+                        message.data.as_slice(),
+                        metadata_options,
+                        &mut visitor,
+                    )?;
+                    if visitor.unknown_fields {
+                        return Err(Error::InvalidFormat(
+                            "PackageMetadata contains an unknown field that may own a comment object"
+                                .to_owned(),
+                        ));
+                    }
+                    referenced |= visitor.referenced;
                 }
                 if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE {
                     let object_id = object.archive_info.identifier.ok_or_else(|| {
@@ -2611,23 +2638,88 @@ fn comment_object_is_referenced(
                     })?;
                     let (_, reply_ids) =
                         decode_comment_storage_payload(object_id, message.data.as_slice())?;
-                    if reply_ids.contains(&identifier) {
-                        return Ok(true);
-                    }
+                    referenced |= reply_ids.contains(&identifier);
                 }
-            }
-            if object.archive_info.message_infos.iter().any(|info| {
-                info.object_references.contains(&identifier)
-                    || info
-                        .field_infos
-                        .iter()
-                        .any(|field| field.object_references.contains(&identifier))
-            }) {
-                return Ok(true);
             }
         }
     }
-    Ok(false)
+    if metadata_expected && metadata_payloads != 1 {
+        return Err(Error::InvalidFormat(
+            "PackageMetadata payload is missing from Index/Metadata.iwa".to_owned(),
+        ));
+    }
+    Ok(referenced)
+}
+
+struct CommentArchiveReferenceVisitor {
+    identifier: u64,
+    referenced: bool,
+}
+
+impl ArchiveReferenceVisitor for CommentArchiveReferenceVisitor {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        self.referenced |= occurrence.referenced_identifier == self.identifier;
+        Ok(())
+    }
+}
+
+struct CommentMetadataReferenceVisitor {
+    identifier: u64,
+    referenced: bool,
+    unknown_fields: bool,
+}
+
+impl PackageMetadataVisitor for CommentMetadataReferenceVisitor {
+    fn visit_unknown_field(&mut self) -> std::result::Result<(), RewriteError> {
+        self.unknown_fields = true;
+        Ok(())
+    }
+
+    fn visit_object_uuid(
+        &mut self,
+        binding: ObjectUuidDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.referenced |= binding.object_identifier() == self.identifier;
+        Ok(())
+    }
+
+    fn visit_external_reference(
+        &mut self,
+        reference: ExternalReferenceDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.referenced |= reference.object_identifier() == Some(self.identifier);
+        Ok(())
+    }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.referenced |= owner.object_identifier() == self.identifier;
+        Ok(())
+    }
+
+    fn visit_ambiguous_object_identifier(
+        &mut self,
+        _component: litchi_iwa_protos::package_metadata_codec::ComponentDescriptor<'_>,
+        identifier: u64,
+    ) -> std::result::Result<(), RewriteError> {
+        self.referenced |= identifier == self.identifier;
+        Ok(())
+    }
+
+    fn visit_data_metadata_map(
+        &mut self,
+        object_identifier: u64,
+        has_unknown_fields: bool,
+    ) -> std::result::Result<(), RewriteError> {
+        self.referenced |= object_identifier == self.identifier;
+        self.unknown_fields |= has_unknown_fields;
+        Ok(())
+    }
 }
 
 /// Prove that a direct drawable edge is the only known owner of a comment
