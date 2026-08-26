@@ -3,6 +3,15 @@ use crate::error::{Result, invalid};
 
 pub(crate) const MAX_HYPERLINK_TEXT_BYTES: usize = 16 * 1024 * 1024;
 
+pub(crate) const fn reference_key(value: Rect) -> (u32, u32, u32, u32) {
+    (
+        value.start().row().get(),
+        value.start().column().get(),
+        value.end().0,
+        value.end().1,
+    )
+}
+
 /// One checked worksheet cell or rectangular range retained with its source
 /// A1 spelling.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -12,6 +21,11 @@ pub struct HyperlinkReference {
 }
 
 impl HyperlinkReference {
+    /// Construct a checked worksheet cell or rectangular range reference.
+    pub fn new(value: impl AsRef<str>) -> Result<Self> {
+        Self::parse(value.as_ref())
+    }
+
     pub(crate) fn parse(value: &str) -> Result<Self> {
         validate_text(value, "hyperlink reference")?;
         let range =
@@ -49,6 +63,31 @@ pub struct Hyperlink {
 }
 
 impl Hyperlink {
+    /// Construct one typed worksheet hyperlink.
+    ///
+    /// The internal location and external target are deliberately independent:
+    /// SpreadsheetML permits both on one hyperlink. External targets remain
+    /// inert strings and are never resolved or opened.
+    pub fn new(
+        reference: HyperlinkReference,
+        location: Option<String>,
+        external_target: Option<String>,
+        display: Option<String>,
+        tooltip: Option<String>,
+    ) -> Result<Self> {
+        Self::from_parts(reference, location, external_target, display, tooltip)
+    }
+
+    /// Construct an internal-only hyperlink.
+    pub fn internal(reference: HyperlinkReference, location: impl Into<String>) -> Result<Self> {
+        Self::from_parts(reference, Some(location.into()), None, None, None)
+    }
+
+    /// Construct an inert external-only hyperlink.
+    pub fn external(reference: HyperlinkReference, target: impl Into<String>) -> Result<Self> {
+        Self::from_parts(reference, None, Some(target.into()), None, None)
+    }
+
     pub(crate) fn from_parts(
         reference: HyperlinkReference,
         location: Option<String>,
@@ -120,12 +159,9 @@ pub(crate) fn validate_text(value: &str, label: &str) -> Result<()> {
             "XLSX {label} exceeds the {MAX_HYPERLINK_TEXT_BYTES} byte safety limit"
         )));
     }
-    if value
-        .bytes()
-        .any(|byte| byte < 0x20 && !matches!(byte, b'\t' | b'\n' | b'\r'))
-    {
+    if value.bytes().any(|byte| byte < 0x20) {
         return Err(invalid(format!(
-            "XLSX {label} contains an XML-forbidden control character"
+            "XLSX {label} contains a non-stable XML whitespace or control character"
         )));
     }
     Ok(())

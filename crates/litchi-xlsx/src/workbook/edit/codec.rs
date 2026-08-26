@@ -267,7 +267,13 @@ pub(super) fn create_sheets(
             page_margins,
             page_setup,
             print_options,
+            hyperlinks,
         } = actions;
+        if !hyperlinks.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "hyperlink actions on newly created worksheets",
+            });
+        }
         let change_start = changes.len();
         if let Some(after) = &web
             && !after.is_empty()
@@ -553,7 +559,8 @@ pub(super) fn create_sheets(
                 | Change::Rename { .. }
                 | Change::Move { .. }
                 | Change::Active { .. }
-                | Change::Visibility { .. } => {},
+                | Change::Visibility { .. }
+                | Change::Hyperlink { .. } => {},
             }
         }
 

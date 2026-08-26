@@ -700,6 +700,13 @@ pub enum Change {
         before: Option<crate::print_options::PrintOptions>,
         after: Option<crate::print_options::PrintOptions>,
     },
+    /// One typed worksheet hyperlink was added, replaced, or removed.
+    Hyperlink {
+        sheet: Box<str>,
+        reference: crate::hyperlinks::HyperlinkReference,
+        before: Option<crate::hyperlinks::Hyperlink>,
+        after: Option<crate::hyperlinks::Hyperlink>,
+    },
 }
 
 impl Change {
@@ -720,7 +727,8 @@ impl Change {
             | Self::PageBreaks { sheet, .. }
             | Self::PageMargins { sheet, .. }
             | Self::PageSetup { sheet, .. }
-            | Self::PrintOptions { sheet, .. } => sheet,
+            | Self::PrintOptions { sheet, .. }
+            | Self::Hyperlink { sheet, .. } => sheet,
         }
     }
 
@@ -743,7 +751,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -770,7 +779,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -793,7 +803,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -821,7 +832,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -844,7 +856,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -867,7 +880,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -890,7 +904,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -918,7 +933,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -943,7 +959,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -971,7 +988,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -996,7 +1014,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -1021,7 +1040,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -1049,7 +1069,8 @@ impl Change {
             | Self::Column { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -1077,7 +1098,8 @@ impl Change {
             | Self::Column { .. }
             | Self::PageBreaks { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -1105,7 +1127,8 @@ impl Change {
             | Self::Column { .. }
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -1133,7 +1156,8 @@ impl Change {
             | Self::Column { .. }
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
-            | Self::PageSetup { .. } => None,
+            | Self::PageSetup { .. }
+            | Self::Hyperlink { .. } => None,
         }
     }
 
@@ -1282,6 +1306,17 @@ impl Change {
                 before: *after,
                 after: *before,
             },
+            Self::Hyperlink {
+                sheet,
+                reference,
+                before,
+                after,
+            } => Self::Hyperlink {
+                sheet: sheet.clone(),
+                reference: reference.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
         }
     }
 
@@ -1311,7 +1346,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => {},
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => {},
         }
     }
 
@@ -1338,7 +1374,8 @@ impl Change {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => false,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => false,
         }
     }
 }
@@ -1416,6 +1453,12 @@ pub enum Conflict {
         sheet: Box<str>,
         position: usize,
     },
+    /// Both branches edit the same checked hyperlink ranges.
+    Hyperlinks {
+        sheet: Box<str>,
+        position: usize,
+        references: Box<[Rect]>,
+    },
 }
 
 impl Conflict {
@@ -1437,7 +1480,8 @@ impl Conflict {
             | Self::PageBreaks { sheet, .. }
             | Self::PageMargins { sheet, .. }
             | Self::PageSetup { sheet, .. }
-            | Self::PrintOptions { sheet, .. } => sheet,
+            | Self::PrintOptions { sheet, .. }
+            | Self::Hyperlinks { sheet, .. } => sheet,
         }
     }
 
@@ -1459,7 +1503,8 @@ impl Conflict {
             | Self::PageBreaks { position, .. }
             | Self::PageMargins { position, .. }
             | Self::PageSetup { position, .. }
-            | Self::PrintOptions { position, .. } => *position,
+            | Self::PrintOptions { position, .. }
+            | Self::Hyperlinks { position, .. } => *position,
         }
     }
 
@@ -1511,7 +1556,8 @@ impl Conflict {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
         }
     }
 
@@ -1545,6 +1591,35 @@ impl Conflict {
         matches!(self, Self::PrintOptions { .. })
     }
 
+    /// Whether both edits touch overlapping typed hyperlink ranges.
+    #[must_use]
+    pub const fn is_hyperlinks(&self) -> bool {
+        matches!(self, Self::Hyperlinks { .. })
+    }
+
+    /// Overlapping typed hyperlink ranges, when applicable.
+    #[must_use]
+    pub fn hyperlinks(&self) -> Option<&[Rect]> {
+        match self {
+            Self::Hyperlinks { references, .. } => Some(references),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
+        }
+    }
+
     /// Structurally overlapping merged ranges, when applicable.
     #[must_use]
     pub fn merges(&self) -> Option<&[Rect]> {
@@ -1563,7 +1638,8 @@ impl Conflict {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
         }
     }
 
@@ -1585,7 +1661,8 @@ impl Conflict {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
         }
     }
 
@@ -1607,7 +1684,8 @@ impl Conflict {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
         }
     }
 
@@ -1630,7 +1708,8 @@ impl Conflict {
             | Self::PageBreaks { .. }
             | Self::PageMargins { .. }
             | Self::PageSetup { .. }
-            | Self::PrintOptions { .. } => None,
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
         }
     }
 
@@ -1651,6 +1730,7 @@ impl Conflict {
             Self::Cells { addresses, .. } => addresses.len(),
             Self::Rows { rows, .. } => rows.len(),
             Self::Columns { columns, .. } => columns.len(),
+            Self::Hyperlinks { references, .. } => references.len(),
         }
     }
 }
@@ -1861,6 +1941,59 @@ pub(super) struct PartChange {
     pub(super) after: Arc<Vec<u8>>,
 }
 
+/// One source-checked worksheet relationship transition.
+///
+/// Relationship IDs remain private implementation data. Public semantic
+/// changes carry only checked hyperlink values; this delta is retained solely
+/// so patch application can validate and mutate the OPC graph atomically with
+/// the worksheet XML Part.
+#[derive(Debug, Clone)]
+pub(super) struct RelationshipChange {
+    pub(super) owner: PackURI,
+    pub(super) before: Option<Relationship>,
+    pub(super) after: Option<Relationship>,
+}
+
+impl RelationshipChange {
+    fn relationship_id(&self) -> Result<&str> {
+        self.after
+            .as_ref()
+            .or(self.before.as_ref())
+            .map(Relationship::r_id)
+            .ok_or_else(|| invalid("relationship delta has no relationship identity"))
+    }
+
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        let current = package
+            .get_part(&self.owner)?
+            .rels()
+            .get(self.relationship_id()?)
+            .cloned();
+        match (&self.before, current) {
+            (None, None) => Ok(()),
+            (Some(expected), Some(actual)) if same_relationship(expected, &actual) => Ok(()),
+            _ => Err(Error::PatchConflict {
+                part: self.owner.to_string(),
+            }),
+        }
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        let relationship_id = self.relationship_id()?.to_owned();
+        let relationships = package.get_part_mut(&self.owner)?.rels_mut();
+        relationships.remove(&relationship_id);
+        if let Some(after) = &self.after {
+            relationships.try_add_relationship(
+                after.reltype().to_owned(),
+                after.target_ref().to_owned(),
+                relationship_id,
+                after.target_mode(),
+            )?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) struct StyleGuard {
     pub(super) uri: PackURI,
@@ -1922,6 +2055,7 @@ pub struct Patch {
     pub(super) changes: Box<[Change]>,
     pub(super) package_changes: Box<[PackageChange]>,
     pub(super) parts: Box<[PartChange]>,
+    pub(super) relationships: Box<[RelationshipChange]>,
     pub(super) graph: Box<[GraphChange]>,
     pub(super) web: Option<common_web::Patch>,
     pub(super) style_guard: Option<StyleGuard>,
@@ -1996,7 +2130,12 @@ impl Patch {
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.changes.is_empty() && self.package_changes.is_empty()
+        self.changes.is_empty()
+            && self.package_changes.is_empty()
+            && self.parts.is_empty()
+            && self.relationships.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
     }
 
     /// Build the inverse without copying part payloads.
@@ -2025,6 +2164,17 @@ impl Patch {
                     uri: part.uri.clone(),
                     before: Arc::clone(&part.after),
                     after: Arc::clone(&part.before),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            relationships: self
+                .relationships
+                .iter()
+                .rev()
+                .map(|change| RelationshipChange {
+                    owner: change.owner.clone(),
+                    before: change.after.clone(),
+                    after: change.before.clone(),
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
@@ -2071,7 +2221,11 @@ impl Patch {
         if let Some(guard) = &self.style_guard {
             guard.validate(workbook)?;
         }
-        if self.parts.is_empty() && self.graph.is_empty() && self.web.is_none() {
+        if self.parts.is_empty()
+            && self.relationships.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
+        {
             let mut patch = self.clone();
             patch.source = Some(workbook.clone());
             patch.target = Some(workbook.clone());
@@ -2095,10 +2249,16 @@ impl Patch {
                 });
             }
         }
+        for change in &self.relationships {
+            change.validate(&package)?;
+        }
         for change in &self.parts {
             package
                 .get_part_mut(&change.uri)?
                 .set_blob_shared(Arc::clone(&change.after));
+        }
+        for change in &self.relationships {
+            change.apply(&mut package)?;
         }
         for change in &self.graph {
             change.validate(&package)?;

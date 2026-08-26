@@ -30,6 +30,13 @@ pub(super) struct SheetActions {
     pub(super) page_margins: Option<OptionalAction<crate::page_margins::Margins>>,
     pub(super) page_setup: Option<OptionalAction<crate::page_setup::Setup>>,
     pub(super) print_options: Option<OptionalAction<crate::print_options::PrintOptions>>,
+    pub(super) hyperlinks: BTreeMap<(u32, u32, u32, u32), HyperlinkAction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum HyperlinkAction {
+    Put(crate::hyperlinks::Hyperlink),
+    Remove(crate::hyperlinks::HyperlinkReference),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +72,7 @@ impl SheetActions {
             .saturating_add(usize::from(self.page_margins.is_some()))
             .saturating_add(usize::from(self.page_setup.is_some()))
             .saturating_add(usize::from(self.print_options.is_some()))
+            .saturating_add(self.hyperlinks.len())
     }
 
     pub(super) fn is_empty(&self) -> bool {
@@ -80,6 +88,7 @@ impl SheetActions {
             && self.page_margins.is_none()
             && self.page_setup.is_none()
             && self.print_options.is_none()
+            && self.hyperlinks.is_empty()
     }
 }
 

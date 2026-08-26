@@ -1,14 +1,14 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use litchi_opc::Relationships;
 use litchi_opc::constants::relationship_type as rt;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::reader::{NsReader, Reader};
 
 use super::model::{Hyperlink, HyperlinkReference, validate_text};
-use crate::error::{Result, invalid};
+use crate::error::{Result, allocation, invalid};
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -53,6 +53,37 @@ impl Conformance {
 
 pub(crate) fn parse(xml: &[u8], relationships: &Relationships) -> Result<Vec<Hyperlink>> {
     parse_with_event_limit(xml, relationships, MAX_XML_EVENTS)
+}
+
+/// One parsed hyperlink together with its private relationship identity.
+/// Relationship IDs are needed only while staging a package mutation and do
+/// not cross the public semantic boundary.
+#[derive(Debug, Clone)]
+pub(crate) struct ParsedHyperlink {
+    pub(crate) value: Hyperlink,
+    pub(crate) relationship_id: Option<String>,
+}
+
+pub(crate) fn parse_with_relationship_ids(
+    xml: &[u8],
+    relationships: &Relationships,
+) -> Result<Vec<ParsedHyperlink>> {
+    let values = parse(xml, relationships)?;
+    let ids = relationship_ids(xml)?;
+    if values.len() != ids.len() {
+        return Err(invalid(
+            "XLSX hyperlink relationship projection is inconsistent",
+        ));
+    }
+    validate_exclusive_relationship_references(xml, &ids)?;
+    Ok(values
+        .into_iter()
+        .zip(ids)
+        .map(|(value, relationship_id)| ParsedHyperlink {
+            value,
+            relationship_id,
+        })
+        .collect())
 }
 
 fn parse_with_event_limit(
@@ -133,7 +164,7 @@ fn parse_with_event_limit(
                         &mut hyperlinks,
                     )?;
                     open_hyperlink_depth = Some(depth + 1);
-                } else if container_depth.is_some() {
+                } else if container_depth.is_some() && depth > container_depth.unwrap_or(0) {
                     return Err(invalid(
                         "XLSX hyperlink owner contains unsupported child markup",
                     ));
@@ -311,9 +342,9 @@ fn parse_with_event_limit(
 
 fn parse_root(namespace: Option<&str>, local: &str) -> Result<Conformance> {
     if local != "worksheet" {
-        return Err(invalid(
-            "XLSX hyperlink projection requires a worksheet root",
-        ));
+        return Err(invalid(format!(
+            "XLSX hyperlink projection requires a worksheet root, found '{local}'"
+        )));
     }
     match namespace {
         Some(TRANSITIONAL_MAIN) => Ok(Conformance::Transitional),
@@ -391,6 +422,16 @@ fn push_hyperlink(
                 "XLSX hyperlink attribute exceeds the {} byte safety limit",
                 super::model::MAX_HYPERLINK_TEXT_BYTES
             )));
+        }
+        if attribute
+            .value
+            .as_ref()
+            .iter()
+            .any(|byte| matches!(byte, b'\t' | b'\n' | b'\r'))
+        {
+            return Err(invalid(
+                "XLSX hyperlink attribute contains non-stable XML whitespace",
+            ));
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -494,13 +535,620 @@ fn decode(bytes: &[u8], label: &str) -> Result<String> {
         .map_err(|_error| invalid(format!("XLSX hyperlink {label} is not valid UTF-8")))
 }
 
+fn relationship_ids(xml: &[u8]) -> Result<Vec<Option<String>>> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = false;
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut in_container = false;
+    let mut ids = Vec::new();
+    let mut root_namespace = None;
+    let mut open_names = Vec::<Box<[u8]>>::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid XLSX worksheet hyperlink XML: {error}")))?;
+        match event {
+            Event::Start(element) => {
+                let local = decode_element_local(&element)?;
+                let resolved = resolve_namespace(&namespace)?;
+                if depth == 0 {
+                    root_namespace = resolved;
+                } else if depth == 1 && local == "hyperlinks" {
+                    if resolved
+                        .as_deref()
+                        .is_none_or(|value| !matches!(value, TRANSITIONAL_MAIN | STRICT_MAIN))
+                    {
+                        return Err(invalid(
+                            "XLSX hyperlink container uses an unsupported namespace",
+                        ));
+                    }
+                    in_container = true;
+                } else if in_container && depth == 2 {
+                    let conformance = match root_namespace.as_deref() {
+                        Some(TRANSITIONAL_MAIN) => Conformance::Transitional,
+                        Some(STRICT_MAIN) => Conformance::Strict,
+                        _ => return Err(invalid("XLSX worksheet uses an unsupported namespace")),
+                    };
+                    require_name(resolved.as_deref(), &local, conformance, "hyperlink")?;
+                    ids.push(read_relationship_id(&reader, &element, conformance)?);
+                }
+                open_names.push(element.name().as_ref().to_vec().into_boxed_slice());
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XLSX worksheet hyperlink XML depth overflows usize"))?;
+            },
+            Event::Empty(element) => {
+                let local = decode_element_local(&element)?;
+                let resolved = resolve_namespace(&namespace)?;
+                if depth == 0 {
+                    root_namespace = resolved;
+                } else if depth == 1 && local == "hyperlinks" {
+                    in_container = false;
+                } else if in_container && depth == 2 {
+                    let conformance = match root_namespace.as_deref() {
+                        Some(TRANSITIONAL_MAIN) => Conformance::Transitional,
+                        Some(STRICT_MAIN) => Conformance::Strict,
+                        _ => return Err(invalid("XLSX worksheet uses an unsupported namespace")),
+                    };
+                    require_name(resolved.as_deref(), &local, conformance, "hyperlink")?;
+                    ids.push(read_relationship_id(&reader, &element, conformance)?);
+                }
+            },
+            Event::End(element) => {
+                let expected = open_names
+                    .pop()
+                    .ok_or_else(|| invalid("XLSX worksheet hyperlink XML is not balanced"))?;
+                if expected.as_ref() != element.name().as_ref() {
+                    return Err(invalid("XLSX worksheet start and end element names differ"));
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    invalid("XLSX worksheet hyperlink XML depth underflows usize")
+                })?;
+                if depth == 1 && in_container {
+                    in_container = false;
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if root_namespace
+        .as_deref()
+        .is_none_or(|value| !matches!(value, TRANSITIONAL_MAIN | STRICT_MAIN))
+    {
+        return Err(invalid("XLSX worksheet uses an unsupported namespace"));
+    }
+    Ok(ids)
+}
+
+fn validate_exclusive_relationship_references(
+    xml: &[u8],
+    hyperlink_ids: &[Option<String>],
+) -> Result<()> {
+    let mut counts = HashMap::<&str, usize>::new();
+    counts
+        .try_reserve(hyperlink_ids.len())
+        .map_err(|source| allocation("worksheet hyperlink relationship reference index", source))?;
+    for relationship_id in hyperlink_ids.iter().filter_map(Option::as_deref) {
+        if counts.insert(relationship_id, 0).is_some() {
+            return Err(invalid(
+                "XLSX hyperlink relationship ID is shared by multiple hyperlinks",
+            ));
+        }
+    }
+    if counts.is_empty() {
+        return Ok(());
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().check_end_names = false;
+    reader.config_mut().trim_text(false);
+    loop {
+        let (_namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(format!("invalid XLSX worksheet hyperlink XML: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(|error| {
+                        invalid(format!(
+                            "invalid XLSX worksheet relationship attribute: {error}"
+                        ))
+                    })?;
+                    validate_raw_name(
+                        attribute.key.as_ref(),
+                        "worksheet relationship attribute name",
+                    )?;
+                    let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+                    let namespace = resolve_namespace(&namespace)?;
+                    if local.as_ref() != b"id"
+                        || namespace.as_deref().is_none_or(|namespace| {
+                            !matches!(namespace, TRANSITIONAL_REL | STRICT_REL)
+                        })
+                    {
+                        continue;
+                    }
+                    if attribute.value.as_ref().len() > MAX_RELATIONSHIP_ID_BYTES {
+                        return Err(invalid(format!(
+                            "XLSX worksheet relationship ID exceeds the {MAX_RELATIONSHIP_ID_BYTES} byte limit"
+                        )));
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                        .map_err(|error| {
+                            invalid(format!("invalid XLSX worksheet relationship ID: {error}"))
+                        })?;
+                    if let Some(count) = counts.get_mut(value.as_ref()) {
+                        *count = count.checked_add(1).ok_or_else(|| {
+                            invalid("XLSX worksheet relationship reference count overflows usize")
+                        })?;
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if counts.values().any(|count| *count != 1) {
+        return Err(invalid(
+            "XLSX hyperlink relationship ID is also used by unsupported worksheet markup",
+        ));
+    }
+    Ok(())
+}
+
+fn read_relationship_id(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    conformance: Conformance,
+) -> Result<Option<String>> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute
+            .map_err(|error| invalid(format!("invalid XLSX hyperlink attribute: {error}")))?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let namespace = resolve_namespace(&namespace)?;
+        if namespace.as_deref() == Some(conformance.relationship_namespace())
+            && decode(local.as_ref(), "hyperlink relationship attribute")? == "id"
+        {
+            return Ok(Some(
+                attribute
+                    .normalized_value(XmlVersion::Implicit1_0)
+                    .map_err(|error| {
+                        invalid(format!("invalid XLSX hyperlink relationship ID: {error}"))
+                    })?
+                    .into_owned(),
+            ));
+        }
+    }
+    Ok(None)
+}
+
+/// Rewrite only the direct worksheet hyperlink owner. Other worksheet bytes,
+/// including unsupported producer markup, remain byte-identical. Unsupported
+/// content inside the hyperlink owner is refused rather than approximated.
+pub(crate) fn rewrite_hyperlinks(
+    xml: &[u8],
+    values: &[Hyperlink],
+    relationship_ids: &[Option<&str>],
+) -> Result<Vec<u8>> {
+    if values.len() != relationship_ids.len() {
+        return Err(invalid(
+            "XLSX hyperlink rewrite values and relationships differ",
+        ));
+    }
+    if values.len() > MAX_HYPERLINKS {
+        return Err(invalid(format!(
+            "XLSX worksheet exceeds the {MAX_HYPERLINKS} hyperlink safety limit"
+        )));
+    }
+    if values.is_empty() && scan_rewrite_layout(xml)?.container_span.is_none() {
+        return Ok(xml.to_vec());
+    }
+    let layout = scan_rewrite_layout(xml)?;
+    let replacement = write_hyperlinks(
+        layout.element_prefix.as_deref().unwrap_or(""),
+        layout.relationship_namespace,
+        values,
+        relationship_ids,
+    )?;
+    if let Some(span) = layout.container_span {
+        return replace_span(xml, span, &replacement);
+    }
+    if layout.root_empty {
+        let root = &xml[layout.root_start..layout.root_end];
+        let close = root
+            .iter()
+            .rposition(|byte| *byte == b'/')
+            .ok_or_else(|| invalid("XLSX worksheet root is malformed"))?;
+        let mut output = Vec::new();
+        reserve_output(
+            &mut output,
+            xml.len()
+                .saturating_add(replacement.len())
+                .saturating_add(32),
+        )?;
+        output.extend_from_slice(&xml[..layout.root_start]);
+        output.extend_from_slice(&root[..close]);
+        output.push(b'>');
+        output.extend_from_slice(&replacement);
+        output.extend_from_slice(b"</");
+        output.extend_from_slice(&layout.root_name);
+        output.push(b'>');
+        output.extend_from_slice(&xml[layout.root_end..]);
+        return Ok(output);
+    }
+    let insertion = layout
+        .successor_start
+        .or(layout.root_close_start)
+        .ok_or_else(|| invalid("XLSX worksheet root is malformed"))?;
+    if insertion < layout.root_end
+        || layout
+            .root_close_start
+            .is_some_and(|root_close| insertion > root_close)
+    {
+        return Err(invalid(format!(
+            "XLSX hyperlink insertion offset {insertion} is outside worksheet root bounds {}..{}",
+            layout.root_end,
+            layout.root_close_start.unwrap_or(xml.len())
+        )));
+    }
+    let mut output = Vec::new();
+    reserve_output(&mut output, xml.len().saturating_add(replacement.len()))?;
+    output.extend_from_slice(&xml[..insertion]);
+    output.extend_from_slice(&replacement);
+    output.extend_from_slice(&xml[insertion..]);
+    Ok(output)
+}
+
+pub(crate) fn relationship_type(xml: &[u8]) -> Result<&'static str> {
+    match scan_rewrite_layout(xml)?.relationship_namespace {
+        TRANSITIONAL_REL => Ok(rt::HYPERLINK),
+        STRICT_REL => Ok(rt::STRICT_HYPERLINK),
+        _ => Err(invalid(
+            "XLSX worksheet relationship namespace is unsupported",
+        )),
+    }
+}
+
+#[derive(Debug)]
+struct RewriteLayout {
+    root_start: usize,
+    root_end: usize,
+    root_empty: bool,
+    root_name: Box<[u8]>,
+    root_close_start: Option<usize>,
+    container_span: Option<(usize, usize)>,
+    successor_start: Option<usize>,
+    element_prefix: Option<String>,
+    relationship_namespace: &'static str,
+}
+
+fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
+    if xml.len() > MAX_WORKSHEET_XML_BYTES {
+        return Err(invalid(format!(
+            "XLSX worksheet XML exceeds the {MAX_WORKSHEET_XML_BYTES} byte safety limit"
+        )));
+    }
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().check_end_names = false;
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut root = None;
+    let mut root_close_start = None;
+    let mut container_start = None;
+    let mut container_end = None;
+    let mut successor_start = None;
+    let mut stack = Vec::<(Box<[u8]>, usize, usize)>::new();
+    let mut container_depth = None;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(format!("invalid XLSX worksheet hyperlink XML: {error}")))?;
+        let end = usize::try_from(reader.buffer_position())
+            .map_err(|_| invalid("XLSX worksheet XML position overflows usize"))?;
+        match event {
+            Event::Start(element) => {
+                let start = event_start(xml, end)?;
+                let name = element.name().as_ref().to_vec().into_boxed_slice();
+                let local = local_name(&name);
+                if depth == 0 {
+                    let namespace = root_namespace(&element)?;
+                    let relationship_namespace = match namespace {
+                        TRANSITIONAL_MAIN => TRANSITIONAL_REL,
+                        STRICT_MAIN => STRICT_REL,
+                        _ => return Err(invalid("XLSX worksheet uses an unsupported namespace")),
+                    };
+                    if local != "worksheet" {
+                        return Err(invalid("XLSX hyperlink rewrite requires a worksheet root"));
+                    }
+                    root = Some((
+                        start,
+                        end,
+                        false,
+                        name.clone(),
+                        element_prefix(&name),
+                        relationship_namespace,
+                    ));
+                } else if depth == 1 && local == "hyperlinks" {
+                    if container_start.is_some() {
+                        return Err(invalid(
+                            "XLSX worksheet has duplicate hyperlinks containers",
+                        ));
+                    }
+                    container_start = Some(start);
+                    container_depth = Some(depth + 1);
+                } else if depth == 1 && successor_start.is_none() && is_hyperlink_successor(local) {
+                    successor_start = Some(start);
+                } else if container_depth == Some(depth) && local != "hyperlink" {
+                    return Err(invalid(
+                        "XLSX hyperlink owner contains unsupported child markup",
+                    ));
+                } else if container_depth.is_some() && depth > container_depth.unwrap_or(0) {
+                    return Err(invalid(
+                        "XLSX hyperlink owner contains unsupported child markup",
+                    ));
+                }
+                stack.push((name, start, end));
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("XLSX worksheet XML depth overflows usize"))?;
+            },
+            Event::Empty(element) => {
+                let start = event_start(xml, end)?;
+                let name = element.name().as_ref().to_vec();
+                let local = local_name(&name);
+                if depth == 0 {
+                    let namespace = root_namespace(&element)?;
+                    let relationship_namespace = match namespace {
+                        TRANSITIONAL_MAIN => TRANSITIONAL_REL,
+                        STRICT_MAIN => STRICT_REL,
+                        _ => return Err(invalid("XLSX worksheet uses an unsupported namespace")),
+                    };
+                    if local != "worksheet" {
+                        return Err(invalid("XLSX hyperlink rewrite requires a worksheet root"));
+                    }
+                    root = Some((
+                        start,
+                        end,
+                        true,
+                        name.clone().into_boxed_slice(),
+                        element_prefix(&name),
+                        relationship_namespace,
+                    ));
+                } else if depth == 1 && local == "hyperlinks" {
+                    if container_start.is_some() {
+                        return Err(invalid(
+                            "XLSX worksheet has duplicate hyperlinks containers",
+                        ));
+                    }
+                    container_start = Some(start);
+                    container_end = Some(end);
+                } else if depth == 1 && successor_start.is_none() && is_hyperlink_successor(local) {
+                    successor_start = Some(start);
+                } else if container_depth == Some(depth) && local != "hyperlink" {
+                    return Err(invalid(
+                        "XLSX hyperlink owner contains unsupported child markup",
+                    ));
+                } else if container_depth.is_some() && depth > container_depth.unwrap_or(0) {
+                    return Err(invalid(
+                        "XLSX hyperlink owner contains unsupported child markup",
+                    ));
+                }
+            },
+            Event::End(element) => {
+                let (name, _, _) = stack
+                    .pop()
+                    .ok_or_else(|| invalid("XLSX worksheet XML is not balanced"))?;
+                if name.as_ref() != element.name().as_ref() {
+                    return Err(invalid("XLSX worksheet start and end element names differ"));
+                }
+                if depth == 1 {
+                    root_close_start = Some(event_start(xml, end)?);
+                }
+                if container_depth == Some(depth) {
+                    container_end = Some(end);
+                    container_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("XLSX worksheet XML depth underflows usize"))?;
+            },
+            Event::Text(text)
+                if container_depth.is_some()
+                    && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(invalid(
+                    "XLSX hyperlink owner contains unsupported text content",
+                ));
+            },
+            Event::Comment(_) | Event::PI(_) | Event::CData(_) | Event::GeneralRef(_)
+                if container_depth.is_some() =>
+            {
+                return Err(invalid(
+                    "XLSX hyperlink owner contains unsupported opaque markup",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    let (root_start, root_end, root_empty, root_name, element_prefix, relationship_namespace) =
+        root.ok_or_else(|| invalid("XLSX worksheet root is missing"))?;
+    if !root_empty && (depth != 0 || !stack.is_empty()) {
+        return Err(invalid("XLSX worksheet hyperlink XML is not balanced"));
+    }
+    Ok(RewriteLayout {
+        root_start,
+        root_end,
+        root_empty,
+        root_name,
+        root_close_start,
+        container_span: container_start.zip(container_end),
+        successor_start,
+        element_prefix,
+        relationship_namespace,
+    })
+}
+
+fn is_hyperlink_successor(local: &str) -> bool {
+    matches!(
+        local,
+        "printOptions"
+            | "pageMargins"
+            | "pageSetup"
+            | "headerFooter"
+            | "rowBreaks"
+            | "colBreaks"
+            | "customProperties"
+            | "cellWatches"
+            | "ignoredErrors"
+            | "smartTags"
+            | "drawing"
+            | "legacyDrawing"
+            | "legacyDrawingHF"
+            | "picture"
+            | "oleObjects"
+            | "controls"
+            | "webPublishItems"
+            | "tableParts"
+            | "extLst"
+    )
+}
+
+fn write_hyperlinks(
+    prefix: &str,
+    relationship_namespace: &str,
+    values: &[Hyperlink],
+    relationship_ids: &[Option<&str>],
+) -> Result<Vec<u8>> {
+    if values.is_empty() {
+        return Ok(Vec::new());
+    }
+    let qualified_container = format!("{prefix}hyperlinks");
+    let qualified_link = format!("{prefix}hyperlink");
+    let has_external = relationship_ids.iter().any(Option::is_some);
+    let mut output = Vec::new();
+    output
+        .try_reserve(values.len().saturating_mul(128).saturating_add(64))
+        .map_err(|source| allocation("XLSX hyperlink XML", source))?;
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(qualified_container.as_bytes());
+    if has_external {
+        output.extend_from_slice(b" xmlns:r=\"");
+        output.extend_from_slice(relationship_namespace.as_bytes());
+        output.extend_from_slice(b"\"");
+    }
+    output.extend_from_slice(b">");
+    for (value, relationship_id) in values.iter().zip(relationship_ids) {
+        output.extend_from_slice(b"<");
+        output.extend_from_slice(qualified_link.as_bytes());
+        write_attribute(&mut output, "ref", value.reference().as_str());
+        if let Some(location) = value.location() {
+            write_attribute(&mut output, "location", location);
+        }
+        if let Some(display) = value.display() {
+            write_attribute(&mut output, "display", display);
+        }
+        if let Some(tooltip) = value.tooltip() {
+            write_attribute(&mut output, "tooltip", tooltip);
+        }
+        if let Some(relationship_id) = relationship_id {
+            write_attribute(&mut output, "r:id", relationship_id);
+        }
+        output.extend_from_slice(b"/>");
+    }
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(qualified_container.as_bytes());
+    output.push(b'>');
+    Ok(output)
+}
+
+fn write_attribute(output: &mut Vec<u8>, name: &str, value: &str) {
+    output.push(b' ');
+    output.extend_from_slice(name.as_bytes());
+    output.extend_from_slice(b"=\"");
+    output.extend_from_slice(litchi_core::xml::escape_xml(value).as_bytes());
+    output.push(b'\"');
+}
+
+fn replace_span(xml: &[u8], span: (usize, usize), replacement: &[u8]) -> Result<Vec<u8>> {
+    let (start, end) = span;
+    if start > end || end > xml.len() {
+        return Err(invalid("XLSX hyperlink replacement span is invalid"));
+    }
+    let size = xml
+        .len()
+        .checked_sub(end - start)
+        .and_then(|size| size.checked_add(replacement.len()))
+        .ok_or_else(|| invalid("XLSX hyperlink output size overflows usize"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(size)
+        .map_err(|source| allocation("XLSX hyperlink output", source))?;
+    output.extend_from_slice(&xml[..start]);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(&xml[end..]);
+    Ok(output)
+}
+
+fn reserve_output(output: &mut Vec<u8>, size: usize) -> Result<()> {
+    output
+        .try_reserve_exact(size)
+        .map_err(|source| allocation("XLSX hyperlink output", source))
+}
+
+fn event_start(xml: &[u8], end: usize) -> Result<usize> {
+    xml.get(..end)
+        .and_then(|bytes| bytes.iter().rposition(|byte| *byte == b'<'))
+        .ok_or_else(|| invalid("XLSX worksheet XML event has no start offset"))
+}
+
+fn local_name(name: &[u8]) -> &str {
+    let name = name.split(|byte| *byte == b':').next_back().unwrap_or(name);
+    std::str::from_utf8(name).unwrap_or("")
+}
+
+fn element_prefix(name: &[u8]) -> Option<String> {
+    let colon = name.iter().position(|byte| *byte == b':')?;
+    Some(String::from_utf8_lossy(&name[..=colon]).into_owned())
+}
+
+fn root_namespace(element: &BytesStart<'_>) -> Result<&'static str> {
+    let element_name = element.name();
+    let prefix = element_name
+        .as_ref()
+        .split(|byte| *byte == b':')
+        .next()
+        .unwrap_or_default();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute
+            .map_err(|error| invalid(format!("invalid XLSX worksheet root attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns"
+            || (!prefix.is_empty()
+                && attribute.key.as_ref().starts_with(b"xmlns:")
+                && attribute.key.as_ref().get(6..) == Some(prefix))
+        {
+            let value = attribute
+                .normalized_value(XmlVersion::Implicit1_0)
+                .map_err(|error| invalid(format!("invalid XLSX worksheet namespace: {error}")))?;
+            return match value.as_ref() {
+                TRANSITIONAL_MAIN => Ok(TRANSITIONAL_MAIN),
+                STRICT_MAIN => Ok(STRICT_MAIN),
+                _ => Err(invalid("XLSX worksheet uses an unsupported namespace")),
+            };
+        }
+    }
+    Err(invalid("XLSX worksheet default namespace is missing"))
+}
+
 #[cfg(test)]
 mod tests {
     use litchi_opc::{Relationships, TargetMode};
 
     use super::{
         MAX_XML_NAME_BYTES, STRICT_MAIN, STRICT_REL, TRANSITIONAL_MAIN, TRANSITIONAL_REL, parse,
-        parse_with_event_limit,
+        parse_with_event_limit, parse_with_relationship_ids,
     };
     use litchi_opc::constants::relationship_type as rt;
 
@@ -543,6 +1191,20 @@ mod tests {
             );
             assert_eq!(values[1].tooltip(), Some("tip & more"));
         }
+    }
+
+    #[test]
+    fn hyperlink_relationship_ids_are_exclusively_owned() {
+        let relationships = relationships(rt::HYPERLINK, TargetMode::External);
+        let shared = format!(
+            r#"<worksheet xmlns="{TRANSITIONAL_MAIN}" xmlns:r="{TRANSITIONAL_REL}"><sheetData/><hyperlinks><hyperlink ref="A1" r:id="rIdHyperlink1"/><hyperlink ref="B2" r:id="rIdHyperlink1"/></hyperlinks></worksheet>"#
+        );
+        assert!(parse_with_relationship_ids(shared.as_bytes(), &relationships).is_err());
+
+        let opaque = format!(
+            r#"<worksheet xmlns="{TRANSITIONAL_MAIN}" xmlns:r="{TRANSITIONAL_REL}"><sheetData/><drawing r:id="rIdHyperlink1"/><hyperlinks><hyperlink ref="A1" r:id="rIdHyperlink1"/></hyperlinks></worksheet>"#
+        );
+        assert!(parse_with_relationship_ids(opaque.as_bytes(), &relationships).is_err());
     }
 
     #[test]
