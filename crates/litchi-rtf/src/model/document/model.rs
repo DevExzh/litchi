@@ -416,6 +416,32 @@ impl<'a> RtfDocument<'a> {
         Self::parse_internal(input, limits)
     }
 
+    /// Parse an owned RTF transport allocation and retain it without copying.
+    ///
+    /// The detached model still parses and validates the transport before the
+    /// caller-owned allocation is moved into the exact-source preservation
+    /// slot. Compressed input keeps its original frame while the decompressed
+    /// parser input remains temporary.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is
+    /// exceeded.
+    pub fn from_owned_bytes(bytes: Vec<u8>) -> RtfResult<RtfDocument<'static>> {
+        Self::from_owned_bytes_with_limits(bytes, ParseLimits::default())
+    }
+
+    /// Parse an owned RTF transport allocation with an explicit finite profile.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is
+    /// exceeded.
+    pub fn from_owned_bytes_with_limits(
+        bytes: Vec<u8>,
+        limits: ParseLimits,
+    ) -> RtfResult<RtfDocument<'static>> {
+        Self::parse_internal_owned(bytes, limits)
+    }
+
     /// Parse the transport bytes into a detached model without retaining the
     /// original transport allocation.
     ///
@@ -6037,7 +6063,7 @@ mod source_tests {
         let source = br"{\rtf1\ansi owned allocation}".to_vec();
         let pointer = source.as_ptr();
         let capacity = source.capacity();
-        let document = RtfDocument::parse_internal_owned(source, ParseLimits::default())
+        let document = RtfDocument::from_owned_bytes_with_limits(source, ParseLimits::default())
             .expect("parse owned RTF");
         let retained = document
             .preserved_source
@@ -6045,6 +6071,21 @@ mod source_tests {
             .expect("owned source retained");
         assert_eq!(retained.as_ptr(), pointer);
         assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[test]
+    fn owned_byte_parsing_preserves_supported_transport_forms() {
+        let plain = br"{\rtf1\ansi\pard plain owned\par}".to_vec();
+        let mut cp1252 = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
+        cp1252.extend_from_slice(&[0xe9, b'}']);
+        let lzfu = crate::compress(&plain, true).expect("compress LZFu RTF");
+        let mela = crate::compress(&plain, false).expect("compress MELA RTF");
+
+        for source in [plain, cp1252, lzfu, mela] {
+            let expected = source.clone();
+            let document = RtfDocument::from_owned_bytes(source).expect("parse owned RTF");
+            assert_eq!(document.preserved_source(), Some(expected.as_slice()));
+        }
     }
 
     #[test]

@@ -88,6 +88,29 @@ impl Document {
             .map(|model| Self::from_model(model, limits))
     }
 
+    /// Parse an owned RTF transport allocation and retain it without copying.
+    ///
+    /// This is the consuming counterpart to [`Self::from_bytes`]. It is
+    /// useful when the input already belongs to the caller and must remain
+    /// available for exact-source serialization.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is
+    /// exceeded.
+    pub fn from_owned_bytes(input: Vec<u8>) -> RtfResult<Self> {
+        Self::from_owned_bytes_with_limits(input, ParseLimits::default())
+    }
+
+    /// Parse an owned RTF transport allocation with an explicit finite profile.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is
+    /// exceeded.
+    pub fn from_owned_bytes_with_limits(input: Vec<u8>, limits: ParseLimits) -> RtfResult<Self> {
+        RtfDocument::from_owned_bytes_with_limits(input, limits)
+            .map(|model| Self::from_model(model, limits))
+    }
+
     /// Open an RTF file with the production-safe resource profile.
     ///
     /// # Errors
