@@ -5695,3 +5695,32 @@ also retain legacy collection staging rather than one operation-wide
 transaction budget. This amendment therefore makes no full Prost retirement,
 zero-copy, allocation-free, performance/RSS, dependency-edge, debt, crate-exit,
 or monolith-exit claim.
+
+## 2026-08-26 amendment: PackageMetadata save-token prepared publication (not a monolith-exit gate)
+
+The legacy `litchi-iwa` save-token helper no longer decodes and verifies a
+generated Prost `PackageMetadata`/`ComponentInfo` graph. It now derives exact
+current component selectors through strict raw inspection, including effective
+locator precedence, and publishes the root plus selected component token
+transition through the prepared source-preserving metadata codec at its exact
+execution limits. Missing, duplicate, versioned-only, stale-ahead, malformed,
+and duplicate-token sources fail before the archive message is replaced;
+unselected and versioned component records plus unknown raw fields remain
+source-authoritative.
+
+A token-only native oracle used the Numbers 14.4 source
+`/private/tmp/wave92-native-comment-reply/root-only.numbers`, 135,223 bytes with
+SHA-256 `42fe23e9351ed53323b1d5aa71fc9c08dceb01e86e46ce9d02be8a53ca66814c`.
+The prepared writer advanced root token 538 to 539 for current components 1
+(`Document`) and 904481 (`Tables/Tile`). The 135,239-byte candidate had SHA-256
+`ce25476907da295f5f633d2024b62cfc25f6f7844ecab1d7cc3ef0d65a6bdd66`;
+`Index/Metadata.iwa` was the only changed ZIP member. Numbers reopened the
+candidate by exact path without a repair dialog and retained the visible B2
+comment. This is native validity evidence for the isolated metadata
+transition, not acceptance of a broader semantic edit.
+
+Component registration, UUID and external-reference writers, metadata archive
+discovery, and surrounding operation-level budgets remain in `litchi-iwa`.
+Selector strings and caller staging are fallible but are not one package-wide
+allocation-free preflight, and this slice makes no throughput/RSS, full Prost
+retirement, dependency-edge, debt, crate-exit, or monolith-exit claim.
