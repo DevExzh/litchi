@@ -85,15 +85,13 @@ fn applies_defaults_and_rejects_malformed_change_graphs() {
 fn rejects_wrong_host_and_odf_child_order() {
     let info = "<office:change-info><dc:creator>A</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info>";
     for fragment in [
-        format!(
-            r#"<table:tracked-changes><table:movement table:id="m"><office:change-info><dc:creator>A</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info><table:source-range-address table:table="0" table:column="0" table:row="0"/><table:target-range-address table:table="0" table:column="1" table:row="1"/></table:movement></table:tracked-changes>"#
-        ),
+        r#"<table:tracked-changes><table:movement table:id="m"><office:change-info><dc:creator>A</dc:creator><dc:date>2026-07-17T00:00:00Z</dc:date></office:change-info><table:source-range-address table:table="0" table:column="0" table:row="0"/><table:target-range-address table:table="0" table:column="1" table:row="1"/></table:movement></table:tracked-changes>"#
+            .to_string(),
         format!(
             r#"<table:tracked-changes><table:cell-content-change table:id="c">{info}<table:cell-address table:table="0" table:column="0" table:row="0"/><table:previous><table:change-track-table-cell/></table:previous></table:cell-content-change></table:tracked-changes>"#
         ),
-        format!(
-            r#"<table:tracked-changes><table:insertion table:id="i" table:type="row" table:position="0"><office:change-info><dc:date>2026-07-17T00:00:00Z</dc:date><dc:creator>A</dc:creator></office:change-info></table:insertion></table:tracked-changes>"#
-        ),
+        r#"<table:tracked-changes><table:insertion table:id="i" table:type="row" table:position="0"><office:change-info><dc:date>2026-07-17T00:00:00Z</dc:date><dc:creator>A</dc:creator></office:change-info></table:insertion></table:tracked-changes>"#
+            .to_string(),
     ] {
         assert!(parse(&fragment).is_err(), "accepted {fragment}");
     }
