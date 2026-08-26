@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Alignment, Document, HeaderFooterType, TableCellPath, UnderlineStyle,
+    Alignment, CharacterBaseline, Document, HeaderFooterType, TableCellPath, UnderlineStyle,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
         HistoryLimits, Limits, MergePlan, MergeResolution, TextSpan, TransferPlan,
@@ -2342,5 +2342,295 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
         Err(Error::StalePrecondition(
             "character font-size state differs"
         ))
+    ));
+}
+
+#[test]
+fn baseline_property_covers_all_states_reopen_noop_and_inverse() {
+    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let states = [
+        CharacterBaseline::Normal,
+        CharacterBaseline::Superscript,
+        CharacterBaseline::Subscript,
+        CharacterBaseline::RaisedHalfPoints(8),
+        CharacterBaseline::RaisedHalfPoints(31_680),
+        CharacterBaseline::LoweredHalfPoints(6),
+    ];
+
+    for baseline in states {
+        let mut edit = source.edit();
+        edit.set_text_baseline(TextSpan::new(0, 5).unwrap(), baseline)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(
+            commit
+                .snapshot()
+                .body()
+                .runs()
+                .next()
+                .unwrap()
+                .format()
+                .baseline(),
+            baseline
+        );
+        assert_eq!(commit.snapshot().text(), source.text());
+
+        if baseline == CharacterBaseline::Normal {
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.snapshot().same_snapshot(&source));
+        } else {
+            assert!(commit.diagnostics().changed());
+        }
+
+        let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened.body().runs().next().unwrap().format().baseline(),
+            baseline
+        );
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+    }
+}
+
+#[test]
+fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
+    let cases = [
+        (
+            "super",
+            CharacterBaseline::Superscript,
+            CharacterBaseline::Normal,
+        ),
+        (
+            "sub",
+            CharacterBaseline::Subscript,
+            CharacterBaseline::RaisedHalfPoints(8),
+        ),
+    ];
+
+    for (control, initial, target) in cases {
+        let source = Document::parse(&format!(r"{{\rtf1\ansi Alpha\{control} Beta}}"))
+            .unwrap();
+        let mut runs = source.body().runs();
+        let alpha = runs.next().unwrap();
+        let beta = runs.next().unwrap();
+        assert_eq!(alpha.text(), "Alpha");
+        assert_eq!(alpha.format().baseline(), CharacterBaseline::Normal);
+        assert_eq!(beta.text(), "Beta");
+        assert_eq!(beta.format().baseline(), initial);
+
+        let mut edit = source.edit();
+        edit.set_text_baseline(TextSpan::new(5, 9).unwrap(), target)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+        assert_eq!(
+            reopened
+                .body()
+                .runs()
+                .find(|run| run.text() == "Beta")
+                .unwrap()
+                .format()
+                .baseline(),
+            target
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            source.to_bytes().unwrap()
+        );
+    }
+}
+
+#[test]
+fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_or_opaque() {
+    let source =
+        Document::parse(r"{\rtf1\ansi\b\expndtw20\charscalex120\kerning8 Alpha Beta}")
+            .unwrap();
+    let mut edit = source.edit();
+    edit.set_text_baseline(TextSpan::new(6, 10).unwrap(), CharacterBaseline::Subscript)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let alpha = reopened
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Alpha"))
+        .unwrap();
+    let beta = reopened
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Beta"))
+        .unwrap();
+    assert!(alpha.format().bold());
+    assert_eq!(alpha.format().baseline(), CharacterBaseline::Normal);
+    assert!(beta.format().bold());
+    assert_eq!(beta.format().baseline(), CharacterBaseline::Subscript);
+    let committed_bytes = commit.snapshot().to_bytes().unwrap();
+    assert!(committed_bytes.windows(b"\\expndtw20".len()).any(|value| value == b"\\expndtw20"));
+    assert!(committed_bytes.windows(b"\\charscalex120".len()).any(|value| value == b"\\charscalex120"));
+    assert!(committed_bytes.windows(b"\\kerning8".len()).any(|value| value == b"\\kerning8"));
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source.to_bytes().unwrap()
+    );
+
+    let mixed = Document::parse(r"{\rtf1\ansi {\super Alpha} Beta}").unwrap();
+    let mut mixed_edit = mixed.edit();
+    assert!(matches!(
+        mixed_edit.set_text_baseline(TextSpan::new(0, 10).unwrap(), CharacterBaseline::Normal),
+        Err(Error::UnsupportedSource(_))
+    ));
+
+    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut paragraph_edit = paragraph.edit();
+    assert!(matches!(
+        paragraph_edit
+            .set_text_baseline(TextSpan::new(0, 6).unwrap(), CharacterBaseline::Superscript,),
+        Err(Error::UnsupportedSource(_))
+    ));
+
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let mut cp1252_edit = cp1252.edit();
+    cp1252_edit
+        .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
+        .unwrap();
+    assert!(matches!(
+        cp1252_edit.commit(),
+        Err(Error::UnsupportedSource(
+            "baseline edits refuse non-ASCII transport encodings"
+        ))
+    ));
+
+    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let mut opaque_edit = opaque.edit();
+    opaque_edit
+        .set_text_baseline(
+            TextSpan::new(0, 5).unwrap(),
+            CharacterBaseline::RaisedHalfPoints(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        opaque_edit.commit(),
+        Err(Error::UnsupportedSource(_))
+    ));
+}
+
+#[test]
+fn baseline_property_has_durable_schema_replay_stale_and_malformed_value_guards() {
+    use litchi_core::patch::Patch;
+    use serde_json::Value;
+
+    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_baseline(
+        TextSpan::new(0, 5).unwrap(),
+        CharacterBaseline::RaisedHalfPoints(8),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
+    let operation = &durable.operations()[0];
+    assert_eq!(operation.op, "character-baseline.set");
+    assert_eq!(operation.target, "body:utf8:0-5");
+    assert!(operation.preconditions.contains_key("baseline"));
+    assert_ne!(operation.value, Value::Null);
+
+    let encoded = durable.to_deterministic_json().unwrap();
+    let decoded = Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+        &encoded,
+        durable_limits(1),
+    )
+    .unwrap();
+    let applied = source.apply_durable(&decoded).unwrap();
+    assert_eq!(
+        applied.body().runs().next().unwrap().format().baseline(),
+        CharacterBaseline::RaisedHalfPoints(8)
+    );
+    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    assert_eq!(
+        restored.body().runs().next().unwrap().format().baseline(),
+        CharacterBaseline::Normal
+    );
+
+    let stale_source = {
+        let mut stale_edit = source.edit();
+        stale_edit
+            .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Subscript)
+            .unwrap();
+        stale_edit.commit().unwrap().into_snapshot()
+    };
+    let stale_bytes = stale_source.to_bytes().unwrap();
+    let mut stale_json: Value = serde_json::from_slice(&encoded).unwrap();
+    stale_json["operations"][0]["forward"]["preconditions"]["artifact_sha256"] =
+        Value::String(litchi_core::patch::BlobId::of(&stale_bytes).as_hex());
+    let stale_encoded = serde_json::to_vec(&stale_json).unwrap();
+    let stale = Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+        &stale_encoded,
+        durable_limits(1),
+    )
+    .unwrap();
+    assert!(matches!(
+        stale_source.apply_durable(&stale),
+        Err(Error::StalePrecondition(_))
+    ));
+
+    let mut malformed_value: Value = serde_json::from_slice(&encoded).unwrap();
+    malformed_value["operations"][0]["forward"]["value"] = Value::Null;
+    let malformed_value = serde_json::to_vec(&malformed_value).unwrap();
+    let malformed_value = Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+        &malformed_value,
+        durable_limits(1),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed_value),
+        Err(Error::DurablePatch(_))
+    ));
+
+    for malformed in [
+        "unknown",
+        "raised-half-points:0",
+        "raised-half-points:01",
+        "raised-half-points:31681",
+        "lowered-half-points:0",
+    ] {
+        let mut malformed_value: Value = serde_json::from_slice(&encoded).unwrap();
+        malformed_value["operations"][0]["forward"]["value"] =
+            Value::String(malformed.to_string());
+        let malformed_value = serde_json::to_vec(&malformed_value).unwrap();
+        let malformed_value = Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_value,
+            durable_limits(1),
+        )
+        .unwrap();
+        assert!(matches!(
+            source.apply_durable(&malformed_value),
+            Err(Error::DurablePatch(_))
+        ));
+    }
+
+    let mut malformed_precondition: Value = serde_json::from_slice(&encoded).unwrap();
+    malformed_precondition["operations"][0]["forward"]["preconditions"]["baseline"] = Value::Null;
+    let malformed_precondition = serde_json::to_vec(&malformed_precondition).unwrap();
+    let malformed_precondition = Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+        &malformed_precondition,
+        durable_limits(1),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed_precondition),
+        Err(Error::DurablePatch(_))
     ));
 }

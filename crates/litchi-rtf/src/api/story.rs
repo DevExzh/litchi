@@ -593,6 +593,20 @@ impl<'a> Format<'a> {
         self.raw.font_size
     }
 
+    /// The effective typed character baseline.
+    #[must_use]
+    pub const fn baseline(self) -> crate::CharacterBaseline {
+        match self.raw.character_positioning.baseline {
+            crate::CharacterBaseline::Normal if self.raw.superscript => {
+                crate::CharacterBaseline::Superscript
+            },
+            crate::CharacterBaseline::Normal if self.raw.subscript => {
+                crate::CharacterBaseline::Subscript
+            },
+            baseline => baseline,
+        }
+    }
+
     /// Resolve the run's font definition without exposing its numeric RTF ID.
     ///
     /// `None` means that the retained reference has no corresponding font-table

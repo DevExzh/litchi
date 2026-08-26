@@ -11,7 +11,8 @@
 //! destinations and dependent positioned content.
 
 use crate::{
-    Alignment, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath, UnderlineStyle,
+    Alignment, CharacterBaseline, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath,
+    UnderlineStyle,
 };
 use bumpalo::Bump;
 use serde_json::Value;
@@ -918,6 +919,11 @@ enum Operation {
         before: NonZeroU16,
         after: NonZeroU16,
     },
+    Baseline {
+        span: TextSpan,
+        before: CharacterBaseline,
+        after: CharacterBaseline,
+    },
     Strike {
         span: TextSpan,
         before: bool,
@@ -1052,7 +1058,8 @@ impl Operation {
             | Self::Hidden { .. }
             | Self::SmallCaps { .. }
             | Self::AllCaps { .. }
-            | Self::FontSize { .. } => 0,
+            | Self::FontSize { .. }
+            | Self::Baseline { .. } => 0,
         }
     }
 
@@ -1082,6 +1089,10 @@ impl Operation {
             },
             Self::FontSize { span, .. } => vec![format!(
                 "body:character:{}-{}:font-size",
+                span.start, span.end
+            )],
+            Self::Baseline { span, .. } => vec![format!(
+                "body:character:{}-{}:baseline",
                 span.start, span.end
             )],
             Self::Strike { span, .. } => {
@@ -1132,6 +1143,7 @@ impl Operation {
             | Self::Italic { span, .. }
             | Self::Underline { span, .. }
             | Self::FontSize { span, .. }
+            | Self::Baseline { span, .. }
             | Self::Strike { span, .. }
             | Self::DoubleStrike { span, .. }
             | Self::Hidden { span, .. }
@@ -1163,6 +1175,7 @@ impl Operation {
                 | Self::Italic { .. }
                 | Self::Underline { .. }
                 | Self::FontSize { .. }
+                | Self::Baseline { .. }
                 | Self::Strike { .. }
                 | Self::DoubleStrike { .. }
                 | Self::Hidden { .. }
@@ -1734,6 +1747,70 @@ impl Edit {
             span,
             before,
             after: font_size,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective character baseline on one non-empty paragraph span.
+    ///
+    /// The selected source range must have one effective baseline. The typed
+    /// baseline is kept coherent with the legacy superscript/subscript flags;
+    /// expansion, scale, kerning, and all unrelated character properties are
+    /// preserved.
+    pub fn set_text_baseline(
+        &mut self,
+        span: TextSpan,
+        baseline: CharacterBaseline,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        validate_character_baseline(baseline)?;
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(
+                "baseline edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = baseline_for_span(&self.source, span)?;
+        self.operations.push(Operation::Baseline {
+            span,
+            before,
+            after: baseline,
         });
         Ok(self)
     }
@@ -2560,6 +2637,7 @@ impl Edit {
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
                     | Operation::FontSize { .. }
+                    | Operation::Baseline { .. }
                     | Operation::Strike { .. }
                     | Operation::DoubleStrike { .. }
                     | Operation::Hidden { .. }
@@ -2987,6 +3065,7 @@ impl Edit {
                     | Operation::SmallCaps { .. }
                     | Operation::AllCaps { .. }
                     | Operation::FontSize { .. }
+                    | Operation::Baseline { .. }
             )
         });
         let has_font_size_operation = self
@@ -3046,6 +3125,11 @@ impl Edit {
         } else {
             false
         };
+        let base_baseline = if property_operation && !layout_operation {
+            base_baseline_for_edit(&self.source, &self.operations)?
+        } else {
+            CharacterBaseline::Normal
+        };
         let mut baseline = self
             .source
             .body()
@@ -3061,6 +3145,9 @@ impl Edit {
         baseline.hidden = base_hidden;
         baseline.smallcaps = base_small_caps;
         baseline.all_caps = base_all_caps;
+        baseline.character_positioning.baseline = base_baseline;
+        baseline.superscript = matches!(base_baseline, CharacterBaseline::Superscript);
+        baseline.subscript = matches!(base_baseline, CharacterBaseline::Subscript);
         let mut projected_bold_ranges = Vec::new();
         let mut projected_italic_ranges = Vec::new();
         let mut projected_underline_ranges = Vec::new();
@@ -3070,6 +3157,7 @@ impl Edit {
         let mut projected_hidden_ranges = Vec::new();
         let mut projected_small_caps_ranges = Vec::new();
         let mut projected_all_caps_ranges = Vec::new();
+        let mut projected_baseline_ranges = Vec::new();
         let mut paragraph_properties = if layout_operation {
             source_paragraph_properties(&self.source)?
         } else {
@@ -3150,6 +3238,10 @@ impl Edit {
                     projected_all_caps_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
+                Operation::Baseline { span, after, .. } => {
+                    projected_baseline_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
                 Operation::Text { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
@@ -3199,6 +3291,9 @@ impl Edit {
         let has_all_caps_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::AllCaps { before, after, .. } if before != after)
         });
+        let has_baseline_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Baseline { before, after, .. } if before != after)
+        });
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
@@ -3213,7 +3308,8 @@ impl Edit {
             || has_double_strike_delta
             || has_hidden_delta
             || has_small_caps_delta
-            || has_all_caps_delta;
+            || has_all_caps_delta
+            || has_baseline_delta;
         let semantic_delta = semantic_changes(&self.operations, &projected_spans);
         if !did_change {
             return Ok(Commit::new(
@@ -3267,6 +3363,10 @@ impl Edit {
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::AllCaps { .. }));
+        let has_baseline_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Baseline { .. }));
         if has_italic_operation && !source_bytes.is_ascii() {
             return Err(Error::UnsupportedSource(
                 "italic edits refuse non-ASCII transport encodings",
@@ -3307,6 +3407,11 @@ impl Edit {
                 "all-caps edits refuse non-ASCII transport encodings",
             ));
         }
+        if has_baseline_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "baseline edits refuse non-ASCII transport encodings",
+            ));
+        }
         if layout_operation {
             self.source
                 .model()
@@ -3321,6 +3426,7 @@ impl Edit {
             || has_hidden_operation
             || has_small_caps_operation
             || has_all_caps_operation
+            || has_baseline_operation
         {
             if has_bold_operation
                 && !has_italic_operation
@@ -3331,6 +3437,7 @@ impl Edit {
                 && !has_hidden_operation
                 && !has_small_caps_operation
                 && !has_all_caps_operation
+                && !has_baseline_operation
             {
                 self.source
                     .model()
@@ -3348,6 +3455,7 @@ impl Edit {
                     has_hidden_operation,
                     has_small_caps_operation,
                     has_all_caps_operation,
+                    has_baseline_operation,
                 )
                 .map_err(Error::UnsupportedSource)?;
             }
@@ -3369,6 +3477,7 @@ impl Edit {
                 || has_hidden_operation
                 || has_small_caps_operation
                 || has_all_caps_operation
+                || has_baseline_operation
             {
                 return Err(Error::ParagraphLayoutTextConflict);
             }
@@ -3402,6 +3511,8 @@ impl Edit {
                     small_caps_changes: &projected_small_caps_ranges,
                     base_all_caps,
                     all_caps_changes: &projected_all_caps_ranges,
+                    base_baseline,
+                    baseline_changes: &projected_baseline_ranges,
                 },
                 self.source.limits(),
             )?
@@ -3486,6 +3597,13 @@ impl Edit {
             if all_caps_for_span(&snapshot, all_caps_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate all-caps property did not survive RTF validation",
+                ));
+            }
+        }
+        for (baseline_span, expected) in projected_baseline_ranges {
+            if baseline_for_span(&snapshot, baseline_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate baseline property did not survive RTF validation",
                 ));
             }
         }
@@ -3804,6 +3922,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -3886,6 +4005,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4543,6 +4663,7 @@ fn project_text(
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -4689,6 +4810,7 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::SmallCaps { .. }
         | Operation::AllCaps { .. }
         | Operation::FontSize { .. }
+        | Operation::Baseline { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
@@ -4843,6 +4965,7 @@ fn plain_body_character_editability(
     allow_mixed_hidden: bool,
     allow_mixed_small_caps: bool,
     allow_mixed_all_caps: bool,
+    allow_mixed_baseline: bool,
 ) -> Result<(), &'static str> {
     source.model().local_paragraph_property_editability()?;
     let mut paragraph_format = None;
@@ -4882,6 +5005,11 @@ fn plain_body_character_editability(
             if allow_mixed_all_caps {
                 raw_character.all_caps = false;
             }
+            if allow_mixed_baseline {
+                raw_character.character_positioning.baseline = CharacterBaseline::Normal;
+                raw_character.superscript = false;
+                raw_character.subscript = false;
+            }
             if character_format.is_some_and(|existing| existing != raw_character) {
                 return Err("the body has mixed run or paragraph formatting");
             }
@@ -4916,6 +5044,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -4973,6 +5102,7 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5020,6 +5150,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5077,6 +5208,7 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5127,6 +5259,7 @@ fn base_underline_for_edit(
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5184,6 +5317,7 @@ fn base_underline_for_edit(
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5234,6 +5368,7 @@ fn base_font_size_for_edit(
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5286,6 +5421,7 @@ fn base_font_size_for_edit(
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
+                | Operation::Baseline { .. }
                 | Operation::Strike { .. }
                 | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
@@ -5305,6 +5441,141 @@ fn base_font_size_for_edit(
                 | Operation::RootTransfer { .. } => None,
             })
             .unwrap_or_else(|| crate::types::Formatting::default().font_size)
+    }))
+}
+
+fn validate_character_baseline(baseline: CharacterBaseline) -> Result<(), Error> {
+    match baseline {
+        CharacterBaseline::RaisedHalfPoints(value)
+        | CharacterBaseline::LoweredHalfPoints(value)
+            if value == 0 || i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS =>
+        {
+            Err(Error::UnsupportedSource(
+                "character baseline is out of range",
+            ))
+        },
+        CharacterBaseline::Normal
+        | CharacterBaseline::Superscript
+        | CharacterBaseline::Subscript
+        | CharacterBaseline::RaisedHalfPoints(_)
+        | CharacterBaseline::LoweredHalfPoints(_) => Ok(()),
+    }
+}
+
+fn effective_baseline(formatting: &crate::types::Formatting) -> CharacterBaseline {
+    match formatting.character_positioning.baseline {
+        CharacterBaseline::Normal if formatting.superscript => CharacterBaseline::Superscript,
+        CharacterBaseline::Normal if formatting.subscript => CharacterBaseline::Subscript,
+        baseline => baseline,
+    }
+}
+
+fn uniform_body_baseline(source: &Snapshot) -> Result<CharacterBaseline, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let baseline = effective_baseline(run.format().raw());
+        if value.is_some_and(|existing| existing != baseline) {
+            return Err(Error::UnsupportedSource(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(baseline);
+    }
+    Ok(value.unwrap_or(CharacterBaseline::Normal))
+}
+
+fn base_baseline_for_edit(
+    source: &Snapshot,
+    operations: &[Operation],
+) -> Result<CharacterBaseline, Error> {
+    let baseline_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Baseline { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if baseline_spans.is_empty() {
+        return uniform_body_baseline(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &baseline_spans) {
+                let value = effective_baseline(run.format().raw());
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(
+                        "unselected body text has mixed baseline state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Baseline { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(CharacterBaseline::Normal)
     }))
 }
 
@@ -5352,6 +5623,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5409,6 +5681,7 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5442,6 +5715,7 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5499,6 +5773,7 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5546,6 +5821,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5603,6 +5879,7 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5650,6 +5927,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
             | Operation::Hidden { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5707,6 +5985,7 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
                 | Operation::Hidden { .. }
                 | Operation::AllCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5754,6 +6033,7 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
             | Operation::Hidden { .. }
             | Operation::SmallCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5811,6 +6091,7 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
                 | Operation::Hidden { .. }
                 | Operation::SmallCaps { .. }
                 | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -6127,6 +6408,46 @@ fn font_size_for_span(source: &Snapshot, span: TextSpan) -> Result<NonZeroU16, E
     ))
 }
 
+fn baseline_for_span(source: &Snapshot, span: TextSpan) -> Result<CharacterBaseline, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut value = None;
+    let mut covered = 0usize;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            let start = run_span.start.max(span.start);
+            let end = run_span.end.min(span.end);
+            if start < end {
+                let baseline = effective_baseline(run.format().raw());
+                if value.is_some_and(|existing| existing != baseline) {
+                    return Err(Error::UnsupportedSource(
+                        "the selected character span has mixed baseline state",
+                    ));
+                }
+                value = Some(baseline);
+                covered = covered.saturating_add(end.saturating_sub(start));
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected span is not entirely ordinary body text",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(
+        "the selected span has no character formatting",
+    ))
+}
+
 fn all_caps_for_span(source: &Snapshot, span: TextSpan) -> Result<bool, Error> {
     validate_span(source.text(), span)?;
     let mut body_position = 0usize;
@@ -6230,6 +6551,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -6426,6 +6748,7 @@ enum CharacterPropertyChange {
     Italic(bool),
     Underline(UnderlineStyle),
     FontSize(NonZeroU16),
+    Baseline(CharacterBaseline),
     Strike(bool),
     DoubleStrike(bool),
     Hidden(bool),
@@ -6442,6 +6765,8 @@ struct CharacterPropertyOverlays<'a> {
     underline_changes: &'a [(TextSpan, UnderlineStyle)],
     base_font_size: NonZeroU16,
     font_size_changes: &'a [(TextSpan, NonZeroU16)],
+    base_baseline: CharacterBaseline,
+    baseline_changes: &'a [(TextSpan, CharacterBaseline)],
     base_strike: bool,
     strike_changes: &'a [(TextSpan, bool)],
     base_double_strike: bool,
@@ -6468,6 +6793,7 @@ fn encoded_body_with_properties(
         .and_then(|bytes| bytes.checked_add(overlays.italic_changes.len().saturating_mul(6)))
         .and_then(|bytes| bytes.checked_add(overlays.underline_changes.len().saturating_mul(12)))
         .and_then(|bytes| bytes.checked_add(overlays.font_size_changes.len().saturating_mul(10)))
+        .and_then(|bytes| bytes.checked_add(overlays.baseline_changes.len().saturating_mul(18)))
         .and_then(|bytes| bytes.checked_add(overlays.strike_changes.len().saturating_mul(6)))
         .and_then(|bytes| {
             bytes.checked_add(overlays.double_strike_changes.len().saturating_mul(10))
@@ -6540,6 +6866,14 @@ fn encoded_body_with_properties(
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::FontSize(value))),
+            )
+            .chain(
+                overlays
+                    .baseline_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Baseline(value))),
             )
             .chain(
                 overlays
@@ -6622,6 +6956,13 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold);
                     write_font_size(&mut output, overlays.base_font_size);
+                },
+                CharacterPropertyChange::Baseline(value) => {
+                    write_bold(&mut output, overlays.base_bold);
+                    write_baseline(&mut output, value);
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold);
+                    write_baseline(&mut output, overlays.base_baseline);
                 },
                 CharacterPropertyChange::Strike(value) => {
                     // Strike controls do not by themselves flush all parser
@@ -6969,6 +7310,24 @@ fn write_all_caps(output: &mut Vec<u8>, all_caps: bool) {
     }
 }
 
+fn write_baseline(output: &mut Vec<u8>, baseline: CharacterBaseline) {
+    match baseline {
+        CharacterBaseline::Normal => output.extend_from_slice(br"\nosupersub "),
+        CharacterBaseline::Superscript => output.extend_from_slice(br"\super "),
+        CharacterBaseline::Subscript => output.extend_from_slice(br"\sub "),
+        CharacterBaseline::RaisedHalfPoints(value) => {
+            output.extend_from_slice(br"\up");
+            output.extend_from_slice(value.to_string().as_bytes());
+            output.push(b' ');
+        },
+        CharacterBaseline::LoweredHalfPoints(value) => {
+            output.extend_from_slice(br"\dn");
+            output.extend_from_slice(value.to_string().as_bytes());
+            output.push(b' ');
+        },
+    }
+}
+
 /// Result of an atomically validated RTF edit.
 pub struct Commit {
     snapshot: Snapshot,
@@ -7065,6 +7424,12 @@ enum Change {
         after_span: TextSpan,
         before: NonZeroU16,
         after: NonZeroU16,
+    },
+    Baseline {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: CharacterBaseline,
+        after: CharacterBaseline,
     },
     Strike {
         span: TextSpan,
@@ -7240,6 +7605,17 @@ impl Change {
                 before,
                 after,
             } => Self::FontSize {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Baseline {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Baseline {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -7519,6 +7895,16 @@ fn semantic_changes(
                 before: *before,
                 after: *after,
             }),
+            Operation::Baseline {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Baseline {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::Strike {
                 span,
                 before,
@@ -7712,6 +8098,7 @@ fn semantic_changes(
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
@@ -7940,6 +8327,24 @@ fn durable_operation(
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::Number(serde_json::Number::from(u64::from(after.get()))),
+            )
+        },
+        Change::Baseline {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "baseline".to_string(),
+                Value::String(baseline_name(*before)),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-baseline.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(baseline_name(*after)),
             )
         },
         Change::Strike {
@@ -8487,6 +8892,30 @@ pub(crate) fn apply_durable<Mode>(
                         )
                     })?;
                 edit.set_text_font_size(span, replacement)?;
+            },
+            "character-baseline.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("baseline")
+                    .and_then(Value::as_str)
+                    .and_then(parse_baseline)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "baseline precondition must be a canonical string".to_string(),
+                        )
+                    })?;
+                if baseline_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character baseline state differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_baseline)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("baseline value must be a canonical string".to_string())
+                    })?;
+                edit.set_text_baseline(span, replacement)?;
             },
             "character-strike.set" => {
                 let span = parse_text_target(&operation.target)?;
@@ -9199,6 +9628,51 @@ fn parse_alignment(value: &str) -> Option<Alignment> {
         "center" => Some(Alignment::Center),
         "justify" => Some(Alignment::Justify),
         _ => None,
+    }
+}
+
+fn baseline_name(baseline: CharacterBaseline) -> String {
+    match baseline {
+        CharacterBaseline::Normal => "normal".to_string(),
+        CharacterBaseline::Superscript => "superscript".to_string(),
+        CharacterBaseline::Subscript => "subscript".to_string(),
+        CharacterBaseline::RaisedHalfPoints(value) => format!("raised-half-points:{value}"),
+        CharacterBaseline::LoweredHalfPoints(value) => format!("lowered-half-points:{value}"),
+    }
+}
+
+fn parse_baseline(value: &str) -> Option<CharacterBaseline> {
+    match value {
+        "normal" => Some(CharacterBaseline::Normal),
+        "superscript" => Some(CharacterBaseline::Superscript),
+        "subscript" => Some(CharacterBaseline::Subscript),
+        _ => {
+            let (raised, digits) = value
+                .strip_prefix("raised-half-points:")
+                .map(|digits| (true, digits))
+                .or_else(|| {
+                    value
+                        .strip_prefix("lowered-half-points:")
+                        .map(|digits| (false, digits))
+                })?;
+            if digits.is_empty()
+                || digits.starts_with('0')
+                || !digits.bytes().all(|byte| byte.is_ascii_digit())
+            {
+                return None;
+            }
+            let half_points = digits.parse::<u16>().ok()?;
+            if half_points == 0
+                || i32::from(half_points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
+            {
+                return None;
+            }
+            Some(if raised {
+                CharacterBaseline::RaisedHalfPoints(half_points)
+            } else {
+                CharacterBaseline::LoweredHalfPoints(half_points)
+            })
+        },
     }
 }
 

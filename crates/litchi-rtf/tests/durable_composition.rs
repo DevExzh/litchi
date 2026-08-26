@@ -4,8 +4,10 @@
     reason = "transaction assertions intentionally panic on failure"
 )]
 
-use litchi_rtf::edit::{DurableComposition, DurableMergePlan, Limits, MergeResolution};
-use litchi_rtf::{Alignment, Document, UnderlineStyle, edit::TextSpan};
+use litchi_rtf::edit::{
+    CompositionError, DurableComposition, DurableMergePlan, Limits, MergeResolution,
+};
+use litchi_rtf::{Alignment, CharacterBaseline, Document, UnderlineStyle, edit::TextSpan};
 use std::num::NonZeroU16;
 
 fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
@@ -831,4 +833,126 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
     let mut overlap = DurableComposition::new(&source, limits(8));
     overlap.join(size).unwrap();
     assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
+fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits() {
+    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut baseline_edit = source.edit();
+    baseline_edit
+        .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
+        .unwrap();
+    let baseline = baseline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(baseline.operations()[0].op, "character-baseline.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(baseline.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .baseline(),
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .baseline(),
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().baseline() == CharacterBaseline::Normal)
+    );
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+
+    let mut overlapping_edit = source.edit();
+    overlapping_edit
+        .set_text_baseline(TextSpan::new(0, 4).unwrap(), CharacterBaseline::Subscript)
+        .unwrap();
+    let overlapping = overlapping_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(baseline.clone()).unwrap();
+    assert!(matches!(
+        overlap.join(overlapping),
+        Err(CompositionError::Conflicts(_))
+    ));
+
+    let mut same_span_underline_edit = source.edit();
+    same_span_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let same_span_underline = same_span_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut cross_property_overlap = DurableComposition::new(&source, limits(8));
+    cross_property_overlap.join(baseline).unwrap();
+    assert!(matches!(
+        cross_property_overlap.join(same_span_underline),
+        Err(CompositionError::Conflicts(_))
+    ));
 }

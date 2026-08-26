@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Alignment, Document, ProtectionType,
+    Alignment, CharacterBaseline, Document, ProtectionType,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, Limits, ParagraphLayoutPatch,
         ParagraphLayoutUpdate, TextSpan,
@@ -279,6 +279,27 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
         .unwrap();
     assert!(matches!(
         conflict.join(right.into_sub_edit("right", limits).unwrap()),
+        Err(CompositionError::Conflicts(conflicts)) if !conflicts.is_empty()
+    ));
+
+    let mut paragraph_layout = source.edit();
+    paragraph_layout
+        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(120))
+        .unwrap();
+    let mut character = source.edit();
+    character
+        .set_text_baseline(TextSpan::new(0, 3).unwrap(), CharacterBaseline::Superscript)
+        .unwrap();
+    let mut cross_kind_conflict = Composition::new(&source, limits);
+    cross_kind_conflict
+        .join(
+            paragraph_layout
+                .into_sub_edit("paragraph-layout", limits)
+                .unwrap(),
+        )
+        .unwrap();
+    assert!(matches!(
+        cross_kind_conflict.join(character.into_sub_edit("character", limits).unwrap()),
         Err(CompositionError::Conflicts(conflicts)) if !conflicts.is_empty()
     ));
 }

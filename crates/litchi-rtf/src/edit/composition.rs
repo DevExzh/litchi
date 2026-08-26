@@ -368,6 +368,7 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Italic { .. }
         | Operation::Underline { .. }
         | Operation::FontSize { .. }
+        | Operation::Baseline { .. }
         | Operation::Strike { .. }
         | Operation::DoubleStrike { .. }
         | Operation::Hidden { .. }
@@ -454,6 +455,19 @@ fn body_interval_conflict(left: &[Operation], right: &[Operation]) -> bool {
     // `CompositionLimits`; the durable seam below uses sorted interval
     // sweeps.  Keep this conservative fallback separate from the durable
     // admission path rather than exposing an unbounded last-writer merge.
+    let left_has_paragraph_layout = left
+        .iter()
+        .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }));
+    let right_has_paragraph_layout = right
+        .iter()
+        .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }));
+    if (left_has_paragraph_layout && right.iter().any(|operation| body_span(operation).is_some()))
+        || (right_has_paragraph_layout
+            && left.iter().any(|operation| body_span(operation).is_some()))
+    {
+        return true;
+    }
+
     left.iter().any(|left_operation| {
         let Some(left_span) = body_span(left_operation) else {
             return false;
@@ -472,6 +486,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::Italic { span, .. }
         | Operation::Underline { span, .. }
         | Operation::FontSize { span, .. }
+        | Operation::Baseline { span, .. }
         | Operation::Strike { span, .. }
         | Operation::DoubleStrike { span, .. }
         | Operation::Hidden { span, .. }
@@ -1188,6 +1203,7 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
             | "character-italic.set"
             | "character-underline.set"
             | "character-font-size.set"
+            | "character-baseline.set"
             | "character-strike.set"
             | "character-double-strike.set"
             | "character-hidden.set"
@@ -1578,6 +1594,7 @@ fn durable_inverse_targets_equal(
         | "character-italic.set"
         | "character-underline.set"
         | "character-font-size.set"
+        | "character-baseline.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -1634,6 +1651,7 @@ fn durable_inverse_values_match(forward: &DurableOperation, inverse: &DurableOpe
         "character-italic.set" => "italic",
         "character-underline.set" => "underline",
         "character-font-size.set" => "font_size_half_points",
+        "character-baseline.set" => "baseline",
         "character-strike.set" => "strike",
         "character-double-strike.set" => "double_strike",
         "character-hidden.set" => "hidden",
@@ -1652,6 +1670,7 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
         | ("character-italic.set", "character-italic.set")
         | ("character-underline.set", "character-underline.set")
         | ("character-font-size.set", "character-font-size.set")
+        | ("character-baseline.set", "character-baseline.set")
         | ("character-strike.set", "character-strike.set")
         | ("character-double-strike.set", "character-double-strike.set")
         | ("character-hidden.set", "character-hidden.set")
@@ -1896,6 +1915,27 @@ fn verify_durable_inverse_semantics(
                     ));
                 }
             },
+            "character-baseline.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("baseline")
+                    .and_then(Value::as_str)
+                    .and_then(super::parse_baseline)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing baseline state".to_string(),
+                        )
+                    })?;
+                if super::baseline_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore baseline state".to_string(),
+                    ));
+                }
+            },
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -2029,6 +2069,7 @@ fn validate_durable_operation_shape(
         | "character-italic.set"
         | "character-underline.set"
         | "character-font-size.set"
+        | "character-baseline.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2069,6 +2110,7 @@ fn validate_durable_operation_shape(
         | "character-italic.set"
         | "character-underline.set"
         | "character-font-size.set"
+        | "character-baseline.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2128,6 +2170,7 @@ fn durable_operation_domain(operation: &DurableOperation) -> Option<DurableDomai
         | "character-italic.set"
         | "character-underline.set"
         | "character-font-size.set"
+        | "character-baseline.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2169,6 +2212,7 @@ fn durable_text_span(operation: &DurableOperation) -> Option<super::TextSpan> {
         | "character-italic.set"
         | "character-underline.set"
         | "character-font-size.set"
+        | "character-baseline.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2315,6 +2359,19 @@ fn commit_durable_operations(
                         CompositionError::Durable("invalid font-size value".to_string())
                     })?;
                 edit.set_text_font_size(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-baseline.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation
+                    .value
+                    .as_str()
+                    .and_then(super::parse_baseline)
+                    .ok_or_else(|| {
+                        CompositionError::Durable("invalid baseline value".to_string())
+                    })?;
+                edit.set_text_baseline(span, value)
                     .map_err(CompositionError::Edit)?;
             },
             "character-strike.set" => {

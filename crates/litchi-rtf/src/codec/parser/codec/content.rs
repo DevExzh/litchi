@@ -320,9 +320,18 @@ impl<'a> Parser<'a> {
                 }
             },
             _ => {
-                // Bold takes effect at its lexical position, so preceding
-                // buffered text retains the old state.
-                if matches!(control, ControlWord::Bold(_)) && !text_buffer.is_empty() {
+                // Character formatting takes effect at its lexical position,
+                // so preceding buffered text retains the old state.
+                if matches!(
+                    control,
+                    ControlWord::Bold(_)
+                        | ControlWord::Superscript(_)
+                        | ControlWord::Subscript(_)
+                        | ControlWord::NoSuperSub
+                        | ControlWord::BaselineUp(_)
+                        | ControlWord::BaselineDown(_)
+                ) && !text_buffer.is_empty()
+                {
                     self.flush_text_buffer(text_buffer)?;
                 }
                 self.pos += 1;
