@@ -3287,7 +3287,7 @@ table topology, general data formats, or Pages/Keynote controls.
 
 ## 2026-08-26 amendment: Numbers comment-reply semantic projection
 
-Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` makes
+Implementation base `e8749ca9e5320c5bf99c17967bf850f7c6e14d6c` makes
 source-ordered direct table-cell replies readable through
 `Package::{table_cell_comment_replies,table_cell_comment_replies_a1}`.
 `CommentReply` retains only authored text behind a borrowed `text()` accessor;
@@ -3308,3 +3308,23 @@ removal, author lifecycle, UUID/save-token transition, comment-list mutation,
 candidate publication, repair, or native-ID API. Native direct-reply
 acceptance is withheld because no current app-authored direct-reply artifact
 was available.
+
+## 2026-08-26 amendment: Wave92 Numbers comment-reply rewrite primitive ownership
+
+Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
+introduces no new public Numbers semantic value or package method. It adds the
+private `CommentStorageReplyRewrite` prepared codec contract needed to mutate
+the ordered native reply-reference field without Prost re-encoding the whole
+storage message. Append emits one canonical reference; replace and remove use
+both a checked source ordinal and expected identifier, reject stale or
+duplicate identities, and preserve unrelated source field order and admitted
+unknown scalar, length, and balanced-group bytes.
+
+The public reply API remains the Wave91 ID-free read projection. A later
+selector-first transaction should use sheet and table selectors, a checked
+`CellPosition`, and a semantic reply position; it must not expose storage IDs,
+authors' native IDs, raw bytes, generated messages, Prost, Buffa, archive
+members, or physical locators. This amendment deliberately does not freeze an
+append/set/remove package API because graph census, shared-thread COW,
+refcounts, author/UUID lifecycle, metadata transitions, patch/inverse, and
+native acceptance are not yet proved.

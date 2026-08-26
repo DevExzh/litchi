@@ -2675,7 +2675,7 @@ item, production manifest dependency, or monolith is removed by Wave90.
 
 ## 2026-08-26 amendment: Wave91 current-topology Numbers comment-reply read cut
 
-Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` makes
+Implementation base `e8749ca9e5320c5bf99c17967bf850f7c6e14d6c` makes
 `litchi-numbers` the current selector-first owner of ID-free direct
 table-cell reply reads. The private path owns strict comment-storage decoding,
 recognized comment-graph census, direct source-order projection, alias/cycle/
@@ -2692,3 +2692,25 @@ declarations, and 13 ordered migration debts. Debt 015 and
 `litchi-iwa -> litchi-numbers` remain, together with other migration hosts,
 generated-schema/Prost/Buffa owners, and the IWA monolith. No host, edge, debt,
 manifest dependency, crate, or monolith owner is retired.
+
+## 2026-08-26 amendment: Wave92 current-topology comment-reply rewrite primitive cut
+
+Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
+makes the hidden comment-storage codec the owner of one prepared,
+source-preserving reply-reference mutation primitive. The codec owns strict
+known-field/reference validation, admitted unknown raw framing, checked reply
+ordinal and identity transitions, candidate wire verification, and
+codec-local execution requirements. Its fuzz target and owner-independent
+boundary ratchet are now part of the current source topology.
+
+`litchi-numbers` remains the read-only semantic reply owner from Wave91.
+Reply graph mutation, comment-list and BNC refcounts, author and metadata
+lifecycles, package archives, patches/inverses, candidate publication, and the
+deprecated native-ID compatibility API remain outside this cut. Native direct
+reply acceptance is withheld.
+
+The inventory remains 64 workspace packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debt 015 and
+`litchi-iwa -> litchi-numbers` remain, along with other hosts,
+generated-schema/normal Prost/Buffa owners, and the IWA monolith. No host,
+edge, debt, manifest dependency, crate, or monolith owner is retired.

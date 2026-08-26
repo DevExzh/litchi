@@ -1724,3 +1724,25 @@ zero-copy, peak-memory/RSS, latency, throughput, or performance claim. The
 record is limited to existing package/per-decode ceilings, fallible local
 allocation, linear indexing, typed refusal where surfaced, and immutable
 source bytes.
+
+## 2026-08-26 amendment: Wave92 comment-reply rewrite codec resource record
+
+Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
+adds a codec-local prepare/execute split. Preparation validates the source and
+selected ordinal, checks the Buffa hard message ceiling, computes the exact
+logical candidate length, validates candidate field/work/depth/reference
+bounds, and returns aggregate source-plus-candidate requirements before the
+candidate output vector is allocated. Execution replays input, output, field,
+work, depth, reference, reply, reference-byte, logical-allocation,
+scratch-request, and retained-length ceilings, emits with a fallible reserve,
+and strictly scans the candidate before returning it.
+
+The allocation, scratch, and retained counters are explicitly codec-local
+logical/requested bounds: they are not allocator-call telemetry or capacity
+measurements. Preparation itself retains bounded reply-ID and group-stack
+scratch, and the eventual package owner must separately charge rooted graph
+selection, list/BNC/refcount and metadata scans, archive decompression and
+serialization, Snappy and ZIP output, reassembly, candidate reopen/locality,
+patch artifacts, and publication. There is no one-global-pass,
+allocation-free, single-allocation, zero-copy, package peak-memory/RSS,
+latency, throughput, or performance claim.

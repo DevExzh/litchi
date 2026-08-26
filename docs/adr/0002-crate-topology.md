@@ -3874,7 +3874,7 @@ remaining `litchi-iwa` responsibilities remain open.
 
 ## 2026-08-26 amendment: Wave91 Numbers comment-reply read boundary
 
-Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` adds one
+Implementation base `e8749ca9e5320c5bf99c17967bf850f7c6e14d6c` adds one
 selector-first, read-only direct-reply projection to `litchi-numbers`.
 `Package::{table_cell_comment_replies,table_cell_comment_replies_a1}` accepts
 sheet/table selectors plus a semantic cell position or A1 address and returns
@@ -3896,3 +3896,32 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 `litchi-iwa -> litchi-numbers` edge remain open, as do the remaining hosts,
 generated-schema/Prost/Buffa owners, and the IWA monolith. No crate, edge,
 debt item, production dependency, host, or monolith owner is removed.
+
+## 2026-08-26 amendment: Wave92 Numbers comment-reply rewrite primitive boundary
+
+Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
+adds a private, generated-free prepared rewrite seam to the existing
+`litchi-iwa-protos::comment_storage_codec`. The seam can append, replace, or
+remove one ordered `TSD.CommentStorageArchive.replies` reference using a
+checked source ordinal and expected native identifier. It preserves admitted
+unknown raw framing, rejects malformed or noncanonical known fields and
+references, and exposes prepare/report/requirements/execute accounting for an
+eventual package transaction owner. Native identifiers and wire bytes remain
+inside the hidden codec boundary.
+
+This primitive does not make `litchi-numbers` a reply-mutation owner. The
+selector-first public facade remains read-only, and `litchi-iwa` retains reply
+creation, replacement, removal, comment-list/refcount and author lifecycle,
+metadata UUID/save-token ownership, candidate archive publication, and the
+deprecated native-ID compatibility methods. A future package owner must still
+prove the rooted Document/Sheet/Table/DataStore/Tile/CommentStorage graph,
+BNC comment keys, list refcounts, aggregate and `FieldInfo` references,
+shared-thread copy-on-write, metadata authority, exact locality/inverse,
+candidate reopen, and one aggregate package resource transaction.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, together with the remaining
+hosts, generated-schema/normal Prost/Buffa owners, and the IWA monolith. No
+crate, edge, debt item, production dependency, host, or monolith owner is
+removed by Wave92.

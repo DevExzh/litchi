@@ -5463,7 +5463,7 @@ gate is retired by Wave90. Debts 014, 015, 016, and 017 remain open.
 
 ## 2026-08-26 amendment: Wave91 Numbers comment-reply read bounded owner slice (not a monolith-exit gate)
 
-Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` moves only
+Implementation base `e8749ca9e5320c5bf99c17967bf850f7c6e14d6c` moves only
 the ID-free, selector-first projection of source-ordered direct comment replies
 into the focused Numbers package boundary. The slice validates the recognized
 comment graph with strict codecs and package-wide ownership checks, rejects
@@ -5481,3 +5481,25 @@ This is not a monolith-exit gate. Debt 015, the
 generated-schema/Prost/Buffa owners, and the IWA monolith remain. No crate,
 edge, debt item, production manifest dependency, host, or monolith owner is
 retired by Wave91.
+
+## 2026-08-26 amendment: Wave92 comment-reply rewrite enabling primitive (not a monolith-exit gate)
+
+Implementation commit `65bdac3ece028a997c73dc82c4d49ef7839ff002`
+adds only a private prepared codec primitive for ordered reply-reference
+append, checked replacement, and checked removal. It preserves admitted raw
+source framing and returns bounded codec-local prepare and execution reports.
+No selector-first reply mutation package owner, native graph lifecycle, host
+retirement, or native direct-reply acceptance is added.
+
+The future bounded owner still needs rooted sheet/table/cell selection,
+CommentStorage list and BNC key/refcount census, exact aggregate/FieldInfo and
+global inbound authority, shared-thread COW, author and metadata UUID/token
+transitions, archive/compression/reassembly preflight, candidate reopen and
+locality, patch/inverse artifacts, and native evidence. Until then the
+identity-bearing `litchi-iwa` compatibility mutation surface remains.
+
+This is not a monolith-exit gate. Debt 015, the
+`litchi-iwa -> litchi-numbers` edge, the remaining hosts and debts,
+generated-schema/normal Prost/Buffa owners, and the IWA monolith remain. No
+crate, edge, debt item, production manifest dependency, host, or monolith
+owner is retired by Wave92.
