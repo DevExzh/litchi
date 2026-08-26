@@ -416,8 +416,15 @@ impl<'a> RtfDocument<'a> {
         Self::parse_internal(input, limits)
     }
 
-    /// Parse RTF from bytes (handles both compressed and uncompressed)
-    fn parse_internal(bytes: &[u8], limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
+    /// Parse the transport bytes into a detached model without retaining the
+    /// original transport allocation.
+    ///
+    /// Callers decide separately whether that original allocation is borrowed
+    /// and copied into the model or owned and moved into it.  Keeping this
+    /// phase source-free is important for compressed RTF: the retained source
+    /// must remain the original LZFu/MELA frame while the decompressed bytes
+    /// remain a temporary parser input.
+    fn parse_transport(bytes: &[u8], limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
         if bytes.len() > limits.max_source_bytes() {
             return Err(RtfError::LimitExceeded {
                 resource: "source bytes",
@@ -456,8 +463,15 @@ impl<'a> RtfDocument<'a> {
         };
 
         let retain_ordinary_body_source_span = !is_compressed && bytes.is_ascii();
-        let mut document =
+        let document =
             Self::parse_string(input_str.as_ref(), limits, retain_ordinary_body_source_span)?;
+        Ok(document)
+    }
+
+    /// Parse borrowed transport bytes and retain an independent copy for
+    /// exact-source writing.
+    fn parse_internal(bytes: &[u8], limits: ParseLimits) -> RtfResult<RtfDocument<'static>> {
+        let mut document = Self::parse_transport(bytes, limits)?;
         let mut source = Vec::new();
         source
             .try_reserve(bytes.len())
@@ -467,6 +481,17 @@ impl<'a> RtfDocument<'a> {
             })?;
         source.extend_from_slice(bytes);
         document.preserved_source = Some(source);
+        Ok(document)
+    }
+
+    /// Parse an owned transport allocation and move that exact allocation into
+    /// the retained source after the detached model has been built.
+    fn parse_internal_owned(
+        bytes: Vec<u8>,
+        limits: ParseLimits,
+    ) -> RtfResult<RtfDocument<'static>> {
+        let mut document = Self::parse_transport(&bytes, limits)?;
+        document.preserved_source = Some(bytes);
         Ok(document)
     }
 
@@ -826,7 +851,7 @@ impl<'a> RtfDocument<'a> {
         limits: ParseLimits,
     ) -> RtfResult<RtfDocument<'static>> {
         let bytes = read_file_with_limit(path.as_ref(), limits.max_source_bytes())?;
-        Self::parse_internal(&bytes, limits)
+        Self::parse_internal_owned(bytes, limits)
     }
 
     /// Parse an RTF document from bytes.
@@ -5919,8 +5944,9 @@ impl<'a> RtfDocument<'a> {
 
 #[cfg(test)]
 mod source_tests {
-    use super::{RtfError, read_limited_source};
+    use super::{ParseLimits, RtfDocument, RtfError, read_limited_source};
     use std::io::{self, Read};
+    use std::path::PathBuf;
 
     struct OneByteReader {
         bytes: Vec<u8>,
@@ -5965,6 +5991,127 @@ mod source_tests {
             self.finished = true;
             Ok(self.bytes.len())
         }
+    }
+
+    struct TempRtf {
+        path: PathBuf,
+    }
+
+    impl TempRtf {
+        fn new(label: &str, bytes: &[u8]) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "litchi-rtf-owned-open-{label}-{}.rtf",
+                std::process::id()
+            ));
+            std::fs::write(&path, bytes).expect("write temporary RTF");
+            Self { path }
+        }
+    }
+
+    impl Drop for TempRtf {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+
+    #[test]
+    fn owned_file_open_keeps_the_original_allocation_and_transport_bytes() {
+        let plain = br"{\rtf1\ansi\pard plain\par}".to_vec();
+        let mut cp1252 = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
+        cp1252.extend_from_slice(&[0xe9, b'}']);
+        let lzfu = crate::compress(&plain, true).expect("compress LZFu RTF");
+        let mela = crate::compress(&plain, false).expect("compress MELA RTF");
+
+        for (label, bytes) in [
+            ("plain", plain.as_slice()),
+            ("cp1252", cp1252.as_slice()),
+            ("lzfu", lzfu.as_slice()),
+            ("mela", mela.as_slice()),
+        ] {
+            let file = TempRtf::new(label, bytes);
+            let document = crate::Document::open_with_limits(&file.path, ParseLimits::default())
+                .expect("open RTF");
+            assert_eq!(document.to_bytes().expect("write exact RTF"), bytes);
+        }
+
+        let source = br"{\rtf1\ansi owned allocation}".to_vec();
+        let pointer = source.as_ptr();
+        let capacity = source.capacity();
+        let document = RtfDocument::parse_internal_owned(source, ParseLimits::default())
+            .expect("parse owned RTF");
+        let retained = document
+            .preserved_source
+            .as_ref()
+            .expect("owned source retained");
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[test]
+    fn borrowed_byte_parsing_retains_an_independent_source_copy() {
+        let mut source = br"{\rtf1\ansi borrowed source}".to_vec();
+        let document = RtfDocument::from_bytes(&source).expect("parse borrowed RTF");
+        let retained = document
+            .preserved_source()
+            .expect("borrowed source retained")
+            .to_vec();
+        source[0] = b'X';
+        assert_eq!(document.preserved_source(), Some(retained.as_slice()));
+    }
+
+    #[test]
+    fn owned_open_preserves_source_and_decompression_error_boundaries() {
+        let raw = br"{\rtf1\ansi bounded compressed source}";
+        let compressed = crate::compress(raw, true).expect("compress RTF");
+        let source_limit = compressed.len() - 1;
+        let source_file = TempRtf::new("source-limit", &compressed);
+        assert!(matches!(
+            RtfDocument::open_with_limits(
+                &source_file.path,
+                ParseLimits::default().with_max_source_bytes(source_limit)
+            ),
+            Err(RtfError::LimitExceeded {
+                resource: "source bytes",
+                observed,
+                limit,
+            }) if observed == compressed.len() && limit == source_limit
+        ));
+
+        let decompressed_limit = raw.len() - 1;
+        assert!(matches!(
+            RtfDocument::from_bytes_with_limits(
+                &compressed,
+                ParseLimits::default().with_max_decompressed_bytes(decompressed_limit)
+            ),
+            Err(RtfError::LimitExceeded {
+                resource: "decompressed bytes",
+                observed,
+                limit,
+            }) if observed == raw.len() && limit == decompressed_limit
+        ));
+
+        let malformed = &compressed[..compressed.len() - 1];
+        assert!(RtfDocument::from_bytes(malformed).is_err());
+    }
+
+    #[test]
+    fn non_default_edit_still_uses_the_canonical_writer() {
+        let source = br"{\rtf1\ansi original}";
+        let document = crate::Document::from_bytes(source).expect("parse RTF");
+        let mut edit = document.edit();
+        edit.replace_paragraph_text(0, "changed")
+            .expect("replace paragraph text");
+        let changed = edit
+            .commit()
+            .expect("commit RTF edit")
+            .snapshot()
+            .to_bytes()
+            .expect("write canonical RTF");
+        assert_ne!(changed, source);
+        assert_eq!(
+            crate::Document::from_bytes(&changed).unwrap().text(),
+            "changed"
+        );
     }
 
     #[test]
