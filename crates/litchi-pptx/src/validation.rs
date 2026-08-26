@@ -1778,6 +1778,7 @@ fn is_transient(error: &OpcError) -> bool {
             | OpcError::ParallelRead(_)
             | OpcError::Committed { .. }
             | OpcError::IncompleteOutput { .. }
+            | OpcError::OperationAccountingOverflow { .. }
     )
 }
 
@@ -1803,4 +1804,19 @@ fn check(
     limits: ValidationLimits,
 ) -> Result<ValidationCheck, PptxValidationError> {
     Ok(ValidationCheck::new(id(value, limits)?, status))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accounting_overflow_is_transient_and_not_structural() {
+        let error = OpcError::OperationAccountingOverflow {
+            counter: "output_bytes_accepted",
+        };
+
+        assert!(is_transient(&error));
+        assert!(!is_structural_rejection(&error));
+    }
 }

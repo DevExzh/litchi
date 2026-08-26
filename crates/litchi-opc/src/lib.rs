@@ -36,6 +36,7 @@
 
 pub mod atomic;
 
+pub mod accounting;
 pub mod constants;
 pub mod content_type;
 pub mod error;
@@ -56,6 +57,7 @@ pub mod source_backed;
 pub mod validation;
 
 // Re-export commonly used types
+pub use accounting::OpcOperationAccounting;
 pub use content_type::ContentType;
 pub use error::{OpcError, Result};
 pub use execution::OpenSession;

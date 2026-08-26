@@ -4,6 +4,7 @@
 //! The latter owns mutable parts, while this type keeps ordinary payloads in a
 //! positional source until a caller explicitly asks for one.
 
+use crate::accounting::OpcOperationAccounting;
 use crate::constants::{content_type, relationship_type};
 use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
@@ -24,6 +25,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::ReaderAt as ZipReaderAt;
+use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
 use std::io::Write;
@@ -988,6 +990,26 @@ impl SourceArtifact {
     pub fn write_to_stream<W: Write>(&self, writer: W) -> Result<()> {
         write_exact_snapshot(&self.snapshot, writer, self.snapshot.context.as_ref())
     }
+
+    /// Copy the retained source artifact while recording exact accepted output
+    /// and unchanged-source bytes in a caller-owned report.
+    ///
+    /// The report is updated as the sink accepts bytes, including a partial
+    /// prefix before a source, cancellation, policy, or sink error. The raw
+    /// unchanged counter equals the actual accepted source bytes for this
+    /// exact-copy operation; it is never inferred from the source length.
+    pub fn write_to_stream_with_accounting<W: Write>(
+        &self,
+        writer: W,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        write_exact_snapshot_with_accounting(
+            &self.snapshot,
+            writer,
+            self.snapshot.context.as_ref(),
+            accounting,
+        )
+    }
 }
 
 impl SourceSnapshot {
@@ -1025,6 +1047,61 @@ impl SourceSnapshot {
 struct Counted<'count, W> {
     inner: W,
     written: &'count mut u64,
+    accounting: Option<AccountingCounter<'count>>,
+}
+
+struct AccountingCounter<'count> {
+    report: &'count mut OpcOperationAccounting,
+    error: &'count mut Option<OpcError>,
+    raw_source: bool,
+}
+
+impl AccountingCounter<'_> {
+    fn record(&mut self, bytes: usize) {
+        let Ok(bytes) = u64::try_from(bytes) else {
+            record_accounting_error(
+                self.error,
+                accounting_overflow("accepted output byte count exceeds u64"),
+            );
+            return;
+        };
+        if let Err(error) = self.report.add_output_bytes_accepted(bytes) {
+            record_accounting_error(self.error, error);
+        }
+        if self.raw_source {
+            if let Err(error) = self.report.add_raw_unchanged_source_bytes_accepted(bytes) {
+                record_accounting_error(self.error, error);
+            }
+        }
+    }
+}
+
+impl<'count, W> Counted<'count, W> {
+    fn new(inner: W, written: &'count mut u64) -> Self {
+        Self {
+            inner,
+            written,
+            accounting: None,
+        }
+    }
+
+    fn with_accounting(
+        inner: W,
+        written: &'count mut u64,
+        report: &'count mut OpcOperationAccounting,
+        error: &'count mut Option<OpcError>,
+        raw_source: bool,
+    ) -> Self {
+        Self {
+            inner,
+            written,
+            accounting: Some(AccountingCounter {
+                report,
+                error,
+                raw_source,
+            }),
+        }
+    }
 }
 
 impl<W: Write> Write for Counted<'_, W> {
@@ -1040,6 +1117,9 @@ impl<W: Write> Write for Counted<'_, W> {
             ));
         }
         *self.written = self.written.saturating_add(written as u64);
+        if let Some(accounting) = self.accounting.as_mut() {
+            accounting.record(written);
+        }
         Ok(written)
     }
 
@@ -1287,6 +1367,21 @@ impl PartView<'_> {
     /// Read this part's payload, using the package's bounded cache when able.
     pub fn data(&self) -> Result<PartData> {
         self.package.read_part(self.index)
+    }
+
+    /// Read this part's payload while recording the cold ZIP work in a
+    /// caller-owned report.
+    ///
+    /// Cache hits and same-Part flight waiters return with no counter changes.
+    /// Only the loader or allocation-bypass path that performs the ZIP read
+    /// contributes to the report. A failed cold read retains the counters
+    /// observed before the failure, while a later retry owns its own work.
+    pub fn data_with_accounting(
+        &self,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<PartData> {
+        self.package
+            .read_part_with_accounting(self.index, Some(accounting))
     }
 }
 
@@ -3447,7 +3542,7 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
     ) -> Result<()> {
-        self.write_single_part_overlay_to_stream(writer, partname, replacement, Arc::new)
+        self.write_single_part_overlay_to_stream(writer, partname, replacement, Arc::new, None)
     }
 
     /// Replace one existing ordinary Part with caller-owned shared bytes and
@@ -3470,6 +3565,34 @@ impl SourceBackedPackage {
             partname,
             replacement,
             std::convert::identity,
+            None,
+        )
+    }
+
+    /// Replace one existing ordinary Part and publish it while recording
+    /// cold ZIP work and accepted output in a caller-owned report.
+    ///
+    /// The selected source Part is loaded with [`PartView::data_with_accounting`]
+    /// semantics: cache hits and same-Part flight waiters contribute no ZIP
+    /// counters. Exact payload no-ops use the raw source publication path and
+    /// therefore report the exact accepted source/output bytes. Changed
+    /// payloads use the preservation path and report raw unchanged plus
+    /// generated Store/Deflate payload counters separately from total output.
+    /// Ordinary batch overlays, topology publication, `PartWriter`, eager
+    /// package writes, and parallel paths remain intentionally unaccounted.
+    pub fn write_part_overlay_to_stream_with_accounting<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            Arc::new,
+            Some(accounting),
         )
     }
 
@@ -3487,6 +3610,7 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: P,
         into_shared: F,
+        mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()>
     where
         F: FnOnce(P) -> Arc<Vec<u8>>,
@@ -3502,9 +3626,15 @@ impl SourceBackedPackage {
         // Reading the original before any XML audit preserves the exact
         // no-op contract: malformed but byte-identical source payloads still
         // reproduce the source artifact without being parsed.
-        let original = self.read_part(target)?;
+        let original = match accounting.as_deref_mut() {
+            Some(accounting) => self.read_part_with_accounting(target, Some(accounting))?,
+            None => self.read_part(target)?,
+        };
         if original.as_bytes() == replacement.as_slice() {
-            return self.write_exact_source(writer);
+            return match accounting {
+                Some(accounting) => self.write_exact_source_with_accounting(writer, accounting),
+                None => self.write_exact_source(writer),
+            };
         }
         if self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
@@ -3523,7 +3653,15 @@ impl SourceBackedPackage {
             target: ChangedOverlayTarget::Part(target),
             replacement,
         }];
-        self.write_changed_overlays(writer, &changed)
+        match accounting {
+            Some(accounting) => self.write_changed_overlays_with_appended_accounting(
+                writer,
+                &changed,
+                &[],
+                accounting,
+            ),
+            None => self.write_changed_overlays(writer, &changed),
+        }
     }
 
     /// Replace one ordinary Part while removing a bounded set of external
@@ -4735,6 +4873,14 @@ impl SourceBackedPackage {
         write_exact_snapshot(&self.source, writer, self.cache.context())
     }
 
+    fn write_exact_source_with_accounting<W: Write>(
+        self,
+        writer: W,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        write_exact_snapshot_with_accounting(&self.source, writer, self.cache.context(), accounting)
+    }
+
     fn write_changed_overlays<W: Write>(
         self,
         writer: W,
@@ -4748,6 +4894,31 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
         appended: &[soapberry_zip::RegeneratedEntry],
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(writer, replacements, appended, None)
+    }
+
+    fn write_changed_overlays_with_appended_accounting<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        appended: &[soapberry_zip::RegeneratedEntry],
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            appended,
+            Some(accounting),
+        )
+    }
+
+    fn write_changed_overlays_with_appended_inner<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        appended: &[soapberry_zip::RegeneratedEntry],
+        mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
         self.source.monitor_publication();
         self.source.ensure_current()?;
@@ -4893,6 +5064,9 @@ impl SourceBackedPackage {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         let mut written = 0_u64;
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let mut accounting_error = None;
+        let has_accounting = accounting.is_some();
         let execution_failure = Arc::new(Mutex::new(None));
         let result = if let Some(context) = self.cache.context() {
             let Some(output_reservation_failures) =
@@ -4902,9 +5076,15 @@ impl SourceBackedPackage {
                     "managed source output reservation counter is unavailable",
                 ));
             };
-            let counted = Counted {
-                inner: writer,
-                written: &mut written,
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    writer,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(writer, &mut written),
             };
             let checked = SourceCheckedSink {
                 inner: counted,
@@ -4921,14 +5101,31 @@ impl SourceBackedPackage {
                 failure: Arc::clone(&execution_failure),
                 output_reservation_failures: output_reservation_failures.clone(),
             };
-            match index.write_to(&plan, Chunked { inner: budgeted }) {
-                Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
-                Err(error) => Err(map_preservation_error(error)),
+            if has_accounting {
+                match index.write_to_with_accounting(
+                    &plan,
+                    Chunked { inner: budgeted },
+                    &mut zip_accounting,
+                ) {
+                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                    Err(error) => Err(map_preservation_error(error)),
+                }
+            } else {
+                match index.write_to(&plan, Chunked { inner: budgeted }) {
+                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                    Err(error) => Err(map_preservation_error(error)),
+                }
             }
         } else {
-            let counted = Counted {
-                inner: writer,
-                written: &mut written,
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    writer,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(writer, &mut written),
             };
             let checked = SourceCheckedSink {
                 inner: counted,
@@ -4939,9 +5136,20 @@ impl SourceBackedPackage {
                 context: None,
                 failure: Arc::clone(&execution_failure),
             };
-            match index.write_to(&plan, Chunked { inner: cooperative }) {
-                Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
-                Err(error) => Err(map_preservation_error(error)),
+            if has_accounting {
+                match index.write_to_with_accounting(
+                    &plan,
+                    Chunked { inner: cooperative },
+                    &mut zip_accounting,
+                ) {
+                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                    Err(error) => Err(map_preservation_error(error)),
+                }
+            } else {
+                match index.write_to(&plan, Chunked { inner: cooperative }) {
+                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                    Err(error) => Err(map_preservation_error(error)),
+                }
             }
         };
         let result = execution_failure
@@ -4951,10 +5159,26 @@ impl SourceBackedPackage {
             .map_or(result, |error| Err(map_execution_error(error)));
         let result = take_source_execution_failure(&self.source)
             .map_or(result, |error| Err(map_execution_error(error)));
-        finish_source_publication(result, &self.source, written)
+        let merge_result = accounting.map_or(Ok(()), |report| report.merge_zip(&zip_accounting));
+        // Merge the operation-local ZIP report before the final source
+        // decision. `finish_source_publication` must remain authoritative for
+        // SourceChanged and IncompleteOutput, even when accounting also fails.
+        let result = finish_source_publication(result, &self.source, written);
+        match result {
+            Err(error) => Err(error),
+            Ok(()) => accounting_error.map_or(merge_result, Err),
+        }
     }
 
     fn read_part(&self, index: usize) -> Result<PartData> {
+        self.read_part_with_accounting(index, None)
+    }
+
+    fn read_part_with_accounting(
+        &self,
+        index: usize,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<PartData> {
         self.cache.check_context().map_err(map_execution_error)?;
         let entry_id = self
             .parts
@@ -4998,35 +5222,50 @@ impl SourceBackedPackage {
                     // retained error. This also re-checks source freshness.
                 },
                 CacheAccess::Loader(flight) => {
-                    return self.load_part(index, entry_id, declared_bytes, Some(flight), None);
+                    return self.load_part_with_accounting(
+                        index,
+                        entry_id,
+                        declared_bytes,
+                        Some(flight),
+                        None,
+                        accounting,
+                    );
                 },
                 CacheAccess::Bypass(reservation) => {
-                    return self.load_part(
+                    return self.load_part_with_accounting(
                         index,
                         entry_id,
                         declared_bytes,
                         None,
                         Some(reservation),
+                        accounting,
                     );
                 },
             }
         }
     }
 
-    fn load_part(
+    fn load_part_with_accounting(
         &self,
         index: usize,
         entry_id: EntryId,
         declared_bytes: Option<u64>,
         flight: Option<Arc<LoadFlight>>,
         bypass_resources: Option<LoadResources>,
+        mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<PartData> {
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let result = (|| {
             let part = self
                 .parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
-            let bytes = match self.archive.read_entry(part.entry_id) {
+            let bytes = match match accounting.as_deref_mut() {
+                Some(_) => self
+                    .archive
+                    .read_entry_with_accounting(part.entry_id, &mut zip_accounting),
+                None => self.archive.read_entry(part.entry_id),
+            } {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     if let Some(execution) = take_source_execution_failure(&self.source) {
@@ -5077,6 +5316,7 @@ impl SourceBackedPackage {
                         .map(Arc::clone)
                 })
             });
+        let merge_result = accounting.map_or(Ok(()), |report| report.merge_zip(&zip_accounting));
         match (flight, result) {
             (Some(flight), Ok(bytes)) => {
                 let payload = CachedPayload {
@@ -5084,12 +5324,22 @@ impl SourceBackedPackage {
                     reservation,
                     object_reservation,
                 };
+                // The low-level report has been merged above. Make source
+                // freshness the last decision before a cold value becomes
+                // visible through the cache or its same-Part flight.
+                if let Err(error) = self.source.ensure_current() {
+                    self.cache.complete_failure(entry_id, &flight);
+                    return Err(error);
+                }
                 if let Err(error) = self
                     .cache
                     .complete_success(entry_id, &flight, payload.clone())
                 {
                     self.cache.complete_failure(entry_id, &flight);
                     return Err(map_execution_error(error));
+                }
+                if let Err(error) = merge_result {
+                    return Err(error);
                 }
                 Ok(PartData { payload })
             },
@@ -5103,6 +5353,12 @@ impl SourceBackedPackage {
                     reservation,
                     object_reservation,
                 };
+                // Keep the no-flight path on the same stale-source boundary
+                // as the coordinated cold-loader path.
+                if let Err(error) = self.source.ensure_current() {
+                    self.cache.complete_bypass_failure();
+                    return Err(error);
+                }
                 if let Err(error) = self
                     .cache
                     .complete_bypass_success(entry_id, payload.clone())
@@ -5110,6 +5366,7 @@ impl SourceBackedPackage {
                     self.cache.complete_bypass_failure();
                     return Err(map_execution_error(error));
                 }
+                merge_result?;
                 Ok(PartData { payload })
             },
             (None, Err(error)) => {
@@ -5529,6 +5786,16 @@ fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
     }
 }
 
+fn accounting_overflow(counter: &'static str) -> OpcError {
+    OpcError::OperationAccountingOverflow { counter }
+}
+
+fn record_accounting_error(slot: &mut Option<OpcError>, error: OpcError) {
+    if slot.is_none() {
+        *slot = Some(error);
+    }
+}
+
 fn map_execution_error(error: ExecutionError) -> OpcError {
     match error {
         ExecutionError::Cancelled => OpcError::Cancelled,
@@ -5617,10 +5884,7 @@ fn write_exact_snapshot<W: Write>(
             ));
         };
         let execution_failure = Arc::new(Mutex::new(None));
-        let counted = Counted {
-            inner: writer,
-            written: &mut written,
-        };
+        let counted = Counted::new(writer, &mut written);
         let checked = SourceCheckedSink {
             inner: counted,
             snapshot: source.clone(),
@@ -5671,10 +5935,7 @@ fn write_exact_snapshot<W: Write>(
             .take()
             .map_or(result, |error| Err(map_execution_error(error)))
     } else {
-        let counted = Counted {
-            inner: writer,
-            written: &mut written,
-        };
+        let counted = Counted::new(writer, &mut written);
         let mut sink = SourceCheckedSink {
             inner: counted,
             snapshot: source.clone(),
@@ -5707,6 +5968,138 @@ fn write_exact_snapshot<W: Write>(
         })()
     };
     finish_source_publication(result, source, written)
+}
+
+fn write_exact_snapshot_with_accounting<W: Write>(
+    source: &SourceSnapshot,
+    writer: W,
+    context: Option<&ExecutionContext>,
+    accounting: &mut OpcOperationAccounting,
+) -> Result<()> {
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    source.monitor_publication();
+    source.ensure_current()?;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC publication buffer",
+            source,
+        })?;
+    buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+    let mut written = 0_u64;
+    let mut accounting_error = None;
+    let result = if let Some(context) = context {
+        let Some(output_reservation_failures) = source.output_reservation_failures.as_ref() else {
+            return Err(overlay_unavailable(
+                "managed source output reservation counter is unavailable",
+            ));
+        };
+        let execution_failure = Arc::new(Mutex::new(None));
+        let counted = Counted::with_accounting(
+            writer,
+            &mut written,
+            accounting,
+            &mut accounting_error,
+            true,
+        );
+        let checked = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let cooperative = ContextCheckedSink {
+            inner: checked,
+            context: Some(context.clone()),
+            failure: Arc::clone(&execution_failure),
+        };
+        let mut sink = OutputBudgetedSink {
+            inner: cooperative,
+            context: context.clone(),
+            failure: Arc::clone(&execution_failure),
+            output_reservation_failures: output_reservation_failures.clone(),
+        };
+        let mut offset = 0_u64;
+        let result = (|| {
+            while offset < source.length {
+                context.check().map_err(map_execution_error)?;
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    Some(context),
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                context.check().map_err(map_execution_error)?;
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            context.check().map_err(map_execution_error)?;
+            sink.flush()?;
+            Ok(())
+        })();
+        execution_failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .map_or(result, |error| Err(map_execution_error(error)))
+    } else {
+        let counted = Counted::with_accounting(
+            writer,
+            &mut written,
+            accounting,
+            &mut accounting_error,
+            true,
+        );
+        let mut sink = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let mut offset = 0_u64;
+        (|| {
+            while offset < source.length {
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    None,
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            sink.flush()?;
+            Ok(())
+        })()
+    };
+    let result = take_source_execution_failure(source)
+        .map_or(result, |error| Err(map_execution_error(error)));
+    let result = finish_source_publication(result, source, written);
+    match result {
+        Err(error) => Err(error),
+        Ok(()) => accounting_error.map_or(Ok(()), Err),
+    }
 }
 
 /// Reserve a bounded positional-read window, perform exactly one source read,
@@ -6846,7 +7239,7 @@ mod tests {
         let mut name_plan = SourceTopologyPlan::new();
         name_plan
             .try_add_part(
-                PackURI::new(&format!("/custom/{}.xml", "x".repeat(40))).unwrap(),
+                PackURI::new(format!("/custom/{}.xml", "x".repeat(40))).unwrap(),
                 "application/xml",
                 b"<new/>".to_vec(),
             )
@@ -7779,7 +8172,7 @@ mod tests {
         // cancellation must survive ZIP's std::io::Error conversion.
         cancellation_source.cancel();
         let error = package
-            .load_part(index, entry_id, Some(declared), Some(flight), None)
+            .load_part_with_accounting(index, entry_id, Some(declared), Some(flight), None, None)
             .unwrap_err();
         assert!(matches!(error, OpcError::Cancelled));
         assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
