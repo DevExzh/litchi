@@ -132,8 +132,40 @@ fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
 }
 
 #[test]
-fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
+fn character_edit_refuses_to_drop_real_paragraph_page_break_state() {
     let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let document = Document::from_bytes(&bytes).unwrap();
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end {
+                let span = TextSpan::new(run_position, end).unwrap();
+                let mut edit = document.edit();
+                if let Err(error) = edit.set_text_italic(span, !run.format().italic()) {
+                    assert!(matches!(error, Error::UnsupportedSource(_)));
+                    return;
+                }
+                let Err(error) = edit.commit() else {
+                    panic!("character publication discarded page-break state: {fixture}");
+                };
+                assert!(matches!(error, Error::UnsupportedSource(_)));
+                return;
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("real producer fixture has no editable run: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -167,7 +199,7 @@ fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -206,7 +238,7 @@ fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() 
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -240,7 +272,7 @@ fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -277,7 +309,7 @@ fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -314,7 +346,7 @@ fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds()
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -355,7 +387,7 @@ fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");
@@ -396,7 +428,7 @@ fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_hold
 
 #[test]
 fn one_real_libreoffice_run_accepts_checked_font_size_edit_when_closure_holds() {
-    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
     let bytes = std::fs::read(corpus(fixture)).unwrap();
     let Ok(document) = Document::from_bytes(&bytes) else {
         panic!("real producer fixture was not accepted: {fixture}");

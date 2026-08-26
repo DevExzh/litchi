@@ -48,6 +48,95 @@ fn replace(
 }
 
 #[test]
+fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap() {
+    let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut outline_edit = source.edit();
+    outline_edit
+        .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let outline = outline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(outline.operations()[0].op, "character-outline.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(outline.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    assert!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .outline()
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .outline()
+    );
+
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert!(restored.body().runs().all(|run| !run.format().outline()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut overlapping_edit = source.edit();
+    overlapping_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping = overlapping_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(outline).unwrap();
+    assert!(matches!(
+        overlap.join(overlapping),
+        Err(CompositionError::Conflicts(_))
+    ));
+}
+
+#[test]
 fn disjoint_durable_join_replays_and_derives_combined_inverse() {
     let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
     let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 8);
