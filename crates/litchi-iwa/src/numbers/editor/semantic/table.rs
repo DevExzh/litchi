@@ -2577,7 +2577,7 @@ impl NumbersEditor {
     /// Read the comment attached to a writable BNC cell.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::table_cell_comment with SheetSelector and TableSelector for the focused semantic root-comment read; comment creation and replies remain migration-host scope"
+        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::table_cell_comment with SheetSelector and TableSelector for the focused semantic root-comment read; unsupported graph creation and replies remain migration-host scope"
     )]
     pub fn cell_comment(
         &self,
@@ -2591,7 +2591,7 @@ impl NumbersEditor {
     /// Create or replace a cell comment without changing the cell value or style.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::edit_table_cell_comment or set_table_cell_comment with SheetSelector and TableSelector for supported existing-root replacement; creation and replies remain migration-host scope"
+        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::edit_table_cell_comment or set_table_cell_comment with SheetSelector and TableSelector for supported strict-graph creation and replacement; unsupported graph creation and reply identity remain migration-host scope"
     )]
     pub fn set_cell_comment(
         &mut self,

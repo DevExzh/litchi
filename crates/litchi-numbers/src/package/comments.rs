@@ -6,12 +6,12 @@
 //! semantic value; native object identifiers, table-list keys, protobuf
 //! messages, and archive member names remain private to this adapter.
 //!
-//! The exact-source write seam is intentionally narrow: it can replace or
-//! clear an existing, unshared root comment whose table-list entry and cell
-//! key are globally unique and whose storage has no replies. Clear
-//! publication also requires an exact PackageMetadata sidecar with no
-//! ownership of the deleted storage object. Creating comments remains
-//! unsupported.
+//! The exact-source write seam is intentionally narrow: it can create a root
+//! comment in an already-addressable cell whose strict comment list and
+//! author graph are co-located, and can replace or clear an existing,
+//! unshared root comment whose table-list entry and cell key are globally
+//! unique and whose storage has no replies. Changed publication requires an
+//! exact PackageMetadata sidecar and source-authoritative archive metadata.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -41,6 +41,8 @@ use crate::{SheetSelector, TableSelector, table::CellPosition};
 
 use super::Package;
 
+#[path = "comments_create.rs"]
+mod comments_create;
 #[path = "comments_reply.rs"]
 mod comments_reply;
 pub use comments_reply::{
@@ -840,7 +842,7 @@ impl Package {
         })
     }
 
-    /// Replace one existing selector-first table-cell comment.
+    /// Create or replace one selector-first table-cell comment.
     pub fn set_table_cell_comment<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
@@ -872,7 +874,7 @@ impl Package {
             .commit()
     }
 
-    /// Replace an existing table-cell comment using an A1 address.
+    /// Create or replace a table-cell comment using an A1 address.
     pub fn set_table_cell_comment_a1<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
@@ -916,7 +918,18 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        if patch.before.is_some() {
+        if patch.before.is_none() && patch.after.is_some() {
+            if located.comment.is_some() {
+                return Err(Error::PatchConflict);
+            }
+        } else if patch.before.is_some() && patch.after.is_none() {
+            // An inverse of an exact creation restores the byte-owned source
+            // artifact directly below. Its newly created root is expected to
+            // be metadata-owned, so the ordinary user-facing clear policy is
+            // intentionally not re-applied here. Authorization, selected
+            // semantic state, source-cell bytes, preview counts, and the
+            // target semantic reopen are still checked on both sides.
+        } else if patch.before.is_some() {
             let Some(entry) = located.entry.as_ref() else {
                 return Err(Error::PatchConflict);
             };
@@ -1819,9 +1832,12 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if edit.after.is_some() && located.comment.is_none() {
-        return Err(Error::UnsupportedDependency {
-            path: edit.target.path,
-        });
+        return comments_create::create_root_comment(
+            edit.source,
+            &located,
+            edit.before,
+            edit.after.ok_or(Error::Verification)?,
+        );
     }
     if edit.before.is_some() {
         let Some(entry) = located.entry.as_ref() else {

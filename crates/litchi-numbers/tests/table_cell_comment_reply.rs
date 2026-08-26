@@ -905,6 +905,100 @@ fn read_one(package: &Package, row: usize, index: u32) -> TestResult<String> {
         .to_owned())
 }
 
+#[test]
+fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> TestResult {
+    let source = fixture(FixtureMode::SingleRoot, None)?;
+    let package = load_package(&source)?;
+    assert_eq!(
+        package.table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(1, 0),
+        )?,
+        None,
+    );
+
+    let commit = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(1, 0),
+        "new strict root",
+    )?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 0),
+            )?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("new strict root"),
+    );
+    assert_eq!(read_all(commit.package(), 0)?, ["first reply"]);
+    assert_eq!(commit.diagnostics().deleted_previews(), 3);
+
+    let replay = package.apply_table_cell_comment(commit.patch())?;
+    assert_eq!(
+        replay
+            .package()
+            .table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 0),
+            )?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("new strict root"),
+    );
+    assert!(
+        commit
+            .package()
+            .apply_table_cell_comment(commit.patch())
+            .is_err()
+    );
+
+    let inverse = commit.patch().inverse();
+    assert_eq!(inverse.after(), None);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .inverse()
+            .after()
+            .map(|comment| comment.text()),
+        Some("new strict root")
+    );
+    let restored = commit.package().apply_table_cell_comment(&inverse)?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_creation_fails_closed_on_unsupported_graphs() -> TestResult {
+    for (mode, corruption) in [
+        (FixtureMode::SingleRoot, Some(Corruption::MissingAuthor)),
+        (FixtureMode::SingleRoot, Some(Corruption::UnknownMetadata)),
+        (FixtureMode::CrossComponent, None),
+    ] {
+        let source = fixture(mode, corruption)?;
+        let package = load_package(&source)?;
+        let result = package.set_table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(1, 0),
+            "must not publish",
+        );
+        assert!(
+            result.is_err(),
+            "unsupported root-creation graph was accepted"
+        );
+        assert_eq!(exact_bytes(&package)?, source);
+    }
+    Ok(())
+}
+
 fn member_data(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(source)?;
     Ok(catalog
