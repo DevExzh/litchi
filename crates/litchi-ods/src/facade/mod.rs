@@ -5,8 +5,11 @@ mod selective;
 mod source;
 mod source_edit;
 
-use litchi_core::Result;
+use litchi_core::{
+    Result, SequentialTextWriter, TextOutputError, TextOutputOptions, TextOutputReport,
+};
 use std::{
+    io::Write,
     path::Path,
     sync::{
         Arc, OnceLock,
@@ -268,6 +271,31 @@ impl Spreadsheet {
     /// Returns an error when the bounded projection cannot reserve its output.
     pub fn text(&self) -> Result<String> {
         source::project_text(&self.sheets)
+    }
+
+    /// Write displayed worksheet text to a caller-owned sequential sink.
+    ///
+    /// Each logical worksheet row is a paragraph-like semantic object. Cells
+    /// within a row are separated by tabs, repeated cells and rows are
+    /// expanded in document order, and an empty worksheet is represented by
+    /// an empty object so the default output retains the existing `text()`
+    /// newline projection. The shared output policy controls separators,
+    /// empty-object handling, and caller-selected resource limits.
+    ///
+    /// The conversion does not construct the document-wide `String` returned
+    /// by [`Self::text`]. The existing 64 MiB ODS projected-text safety ceiling
+    /// is charged incrementally before each row object is emitted. Output may
+    /// be partial when a document limit, output limit, or sink failure is
+    /// observed. This method never flushes or rolls back the caller-owned sink
+    /// and has no cancellation hook.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<litchi_core::Error>> {
+        let mut writer = SequentialTextWriter::new(output, options);
+        source::write_text_to_sheets(&self.sheets, &mut writer, options)?;
+        Ok(writer.finish())
     }
 
     #[must_use]

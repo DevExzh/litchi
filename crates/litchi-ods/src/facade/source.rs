@@ -9,6 +9,7 @@
 
 use std::{
     fmt,
+    io::Write,
     sync::{
         Arc, OnceLock,
         atomic::{AtomicUsize, Ordering},
@@ -17,7 +18,10 @@ use std::{
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
-use litchi_core::{Error, Metadata, ReadAt, Result, SourceVersion};
+use litchi_core::{
+    Error, Metadata, ReadAt, Result, SequentialTextWriter, SourceVersion, TextObjectKind,
+    TextOutputError, TextOutputOptions, TextOutputReport,
+};
 use litchi_odf_common::{
     core::{SourceBackedPackage, SourcePackageLimits, validate_content_part},
     package::{is_media_path, resolve_package_path},
@@ -547,6 +551,40 @@ impl SourceBackedSpreadsheet {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Write displayed worksheet text to a caller-owned sequential sink.
+    ///
+    /// Each logical worksheet row is a paragraph-like semantic object. Cells
+    /// within a row are separated by tabs, repeated cells and rows are
+    /// expanded in document order, and an empty worksheet is represented by
+    /// an empty object so the default output retains the existing `text()`
+    /// newline projection. The shared output policy controls separators,
+    /// empty-object handling, and caller-selected resource limits.
+    ///
+    /// The conversion does not construct the document-wide `String` returned
+    /// by [`Self::text`]. The existing 64 MiB ODS projected-text safety ceiling
+    /// is charged incrementally before each row object is emitted. Output may
+    /// be partial when a document limit, output limit, or sink failure is
+    /// observed. This method never flushes or rolls back the caller-owned sink
+    /// and has no cancellation hook. A source revision observed before or
+    /// after conversion takes precedence over another failure while
+    /// preserving the sink progress accumulated so far.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        let mut writer = SequentialTextWriter::new(output, options);
+        let conversion = match self.check_source() {
+            Ok(()) => write_text_to_sheets(&self.sheets, &mut writer, options),
+            Err(error) => Err(writer.document_error(error)),
+        };
+
+        match self.check_source() {
+            Err(error) => Err(writer.document_error(error)),
+            Ok(()) => conversion.map(|()| writer.finish()),
+        }
+    }
+
     /// List package members without reading their payloads.
     pub fn files(&self) -> Result<Vec<String>> {
         self.check_source()?;
@@ -668,6 +706,187 @@ pub(crate) fn project_text(sheets: &[Sheet]) -> Result<String> {
     Ok(output)
 }
 
+/// Stream the established ODS text projection through the shared bounded
+/// writer without constructing one document-wide output string.
+pub(crate) fn write_text_to_sheets<'options, 'output, W: Write + ?Sized>(
+    sheets: &[Sheet],
+    writer: &mut SequentialTextWriter<'options, 'output, W>,
+    options: TextOutputOptions<'options>,
+) -> std::result::Result<(), TextOutputError<Error>> {
+    let mut budget = SinkTextBudget {
+        bytes: 0,
+        logical_rows: 0,
+    };
+
+    for sheet in sheets {
+        if sheet.rows.is_empty() {
+            charge_sink_object(
+                &mut budget,
+                writer,
+                options,
+                0,
+                options.include_empty_objects(),
+            )?;
+            writer.write_object(TextObjectKind::Paragraph, "")?;
+            continue;
+        }
+        for row in &sheet.rows {
+            let value_bytes = row_text_bytes(row).map_err(|error| writer.document_error(error))?;
+            if value_bytes == 0 && !options.include_empty_objects() {
+                budget
+                    .charge_logical_rows(row.repeat())
+                    .map_err(|error| writer.document_error(error))?;
+                continue;
+            }
+            let mut remaining = row.repeat();
+            while remaining != 0 {
+                budget
+                    .charge_logical_rows(1)
+                    .map_err(|error| writer.document_error(error))?;
+                let included = value_bytes != 0 || options.include_empty_objects();
+                charge_sink_object(&mut budget, writer, options, value_bytes, included)?;
+                writer.write_joined_object(
+                    TextObjectKind::Paragraph,
+                    || RowTextFragments::new(row),
+                    "\t",
+                )?;
+                remaining -= 1;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Incremental format-owned output accounting for the established ODS text
+/// projection. The existing text limit is retained, but no document-wide
+/// output buffer is reserved or built on the sink path.
+struct SinkTextBudget {
+    bytes: usize,
+    logical_rows: usize,
+}
+
+impl SinkTextBudget {
+    fn charge(&mut self, additional: usize) -> Result<()> {
+        self.bytes = self
+            .bytes
+            .checked_add(additional)
+            .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+        if self.bytes > crate::worksheet::validation::MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODS source text projection exceeds the safety limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn charge_logical_rows(&mut self, additional: usize) -> Result<()> {
+        self.logical_rows = self.logical_rows.checked_add(additional).ok_or_else(|| {
+            Error::InvalidFormat("ODS logical row count overflows address space".to_string())
+        })?;
+        if self.logical_rows > MAX_STREAM_LOGICAL_ROWS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS semantic text traversal exceeds the {MAX_STREAM_LOGICAL_ROWS} logical-row safety limit"
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// Aggregate logical-row work bound for the sink traversal. It intentionally
+/// matches the existing per-sheet ODS logical-row ceiling so repeated runs
+/// cannot multiply traversal work across the permitted sheet count.
+const MAX_STREAM_LOGICAL_ROWS: usize = crate::worksheet::validation::MAX_LOGICAL_ROWS;
+
+fn charge_sink_object<'options, 'output, W: Write + ?Sized>(
+    budget: &mut SinkTextBudget,
+    writer: &SequentialTextWriter<'options, 'output, W>,
+    options: TextOutputOptions<'options>,
+    value_bytes: usize,
+    included: bool,
+) -> std::result::Result<(), TextOutputError<Error>> {
+    if !included {
+        return Ok(());
+    }
+    let separator_bytes = if writer.progress().objects_written() == 0 {
+        0
+    } else {
+        options.paragraph_separator().len()
+    };
+    let required = separator_bytes
+        .checked_add(value_bytes)
+        .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))
+        .map_err(|error| writer.document_error(error))?;
+    budget
+        .charge(required)
+        .map_err(|error| writer.document_error(error))
+}
+
+fn row_text_bytes(row: &crate::worksheet::Row) -> Result<usize> {
+    let mut fragments = 0usize;
+    let mut bytes = 0usize;
+    for cell in &row.cells {
+        let repeat = cell.repeat();
+        if fragments != 0 {
+            bytes = bytes
+                .checked_add(1)
+                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+        }
+        bytes =
+            bytes
+                .checked_add(cell.text.len().checked_mul(repeat).ok_or_else(|| {
+                    Error::InvalidFormat("ODS source text size overflow".to_string())
+                })?)
+                .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+        bytes = bytes
+            .checked_add(repeat.checked_sub(1).ok_or_else(|| {
+                Error::InvalidFormat("ODS cell repetition must be positive".to_string())
+            })?)
+            .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+        fragments = fragments
+            .checked_add(repeat)
+            .ok_or_else(|| Error::InvalidFormat("ODS source text size overflow".to_string()))?;
+    }
+    Ok(bytes)
+}
+
+/// Replay a physical row's cell text without expanding repeated cells into a
+/// temporary vector. The iterator is recreated for the writer's bounded
+/// preflight and emission passes.
+struct RowTextFragments<'a> {
+    cells: std::slice::Iter<'a, crate::worksheet::Cell>,
+    current: Option<(&'a str, usize)>,
+}
+
+impl<'a> RowTextFragments<'a> {
+    fn new(row: &'a crate::worksheet::Row) -> Self {
+        Self {
+            cells: row.cells.iter(),
+            current: None,
+        }
+    }
+}
+
+impl<'a> Iterator for RowTextFragments<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((text, remaining)) = self.current.take() {
+            if remaining > 1 {
+                self.current = Some((text, remaining - 1));
+            }
+            return Some(text);
+        }
+
+        let cell = self.cells.next()?;
+        let text = cell.text.as_str();
+        let repeat = cell.repeat();
+        if repeat > 1 {
+            self.current = Some((text, repeat - 1));
+        }
+        Some(text)
+    }
+}
+
 fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
     let mut total = 0usize;
     for (sheet_index, sheet) in sheets.iter().enumerate() {
@@ -731,7 +950,7 @@ mod tests {
     use super::{ReadLimits, SourceBackedSpreadsheet, project_text};
     use crate::worksheet::{Cell, CellValue, Row, Sheet};
     use crate::{CellSelector, MAX_CELL_SELECTORS};
-    use litchi_core::{OwnedSource, ReadAt, SourceVersion};
+    use litchi_core::{OwnedSource, ReadAt, SourceVersion, TextOutputOptions};
     use std::io::{Cursor, Read, Write};
     use std::ptr;
     use std::sync::{
@@ -790,6 +1009,21 @@ mod tests {
         assert_eq!(owned.sheets().len(), source.sheet_count().unwrap());
         let materialized = source.materialize().expect("materialize ODS");
         assert_eq!(materialized.sheets(), owned.sheets());
+    }
+
+    #[test]
+    fn source_text_sink_does_not_populate_cell_locator() {
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(package())))
+                .expect("source ODS");
+        assert!(spreadsheet.cell_locator.get().is_none());
+
+        let mut output = Vec::new();
+        spreadsheet
+            .write_text_to(&mut output, TextOutputOptions::default())
+            .expect("source text sink");
+
+        assert!(spreadsheet.cell_locator.get().is_none());
     }
 
     #[test]
