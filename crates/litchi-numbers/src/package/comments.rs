@@ -3777,10 +3777,7 @@ fn census_alias_checks(
             || storage
                 .author_id
                 .is_some_and(|author| reply_ids.contains(&author))
-            || storage
-                .reply_ids
-                .iter()
-                .any(|reply| *reply == storage.object_id)
+            || storage.reply_ids.contains(&storage.object_id)
             || storage.replies != storage.reply_ids.len()
         {
             return Err(Error::InvalidSource { path });

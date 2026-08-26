@@ -265,7 +265,7 @@ impl<'source> MetadataRegistry<'source> {
             .map_err(|_| MetadataError::allocation(component_indices.len()))?;
         for &component_index in component_indices {
             let selector = self.selector(component_index)?;
-            if selectors.iter().any(|item| *item == selector) {
+            if selectors.contains(&selector) {
                 continue;
             }
             selectors.push(selector);
@@ -397,10 +397,7 @@ impl<'source> MetadataRegistry<'source> {
             .try_reserve_exact(owners.len())
             .map_err(|_| MetadataError::allocation(owners.len()))?;
         for (index, &(component_index, object_identifier)) in owners.iter().enumerate() {
-            if owners[..index]
-                .iter()
-                .any(|item| *item == (component_index, object_identifier))
-            {
+            if owners[..index].contains(&(component_index, object_identifier)) {
                 return Err(MetadataError::kind(FailureKind::Conflict));
             }
             let uuid = self.current_uuid_if_registered(component_index, object_identifier)?;

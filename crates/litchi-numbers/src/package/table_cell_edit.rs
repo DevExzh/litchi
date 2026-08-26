@@ -309,13 +309,14 @@ fn prepare_formula_dependency_tiles(
         .len()
         .checked_mul(2)
         .ok_or(Error::InvalidSource { path })?;
+    let object_count = source.state.index.object_count();
     let structural_work = source
         .source_bytes()
         .len()
-        .checked_add(source.object_count())
+        .checked_add(object_count)
         .ok_or(Error::InvalidSource { path })?;
     let structural_usage = budget::Usage {
-        lookups: usize_u64(source.object_count()),
+        lookups: usize_u64(object_count),
         transaction_work: usize_u64(structural_work),
         ..budget::Usage::default()
     };

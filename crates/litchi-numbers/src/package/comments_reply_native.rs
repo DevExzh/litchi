@@ -1340,8 +1340,7 @@ fn validate_reply_graph(
     }
     if root_fact
         .reply_identifiers
-        .iter()
-        .any(|identifier| *identifier == root_fact.object_identifier)
+        .contains(&root_fact.object_identifier)
     {
         return Err(NativeReplyError::UnsupportedDependency);
     }
