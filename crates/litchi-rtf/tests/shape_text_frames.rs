@@ -101,3 +101,17 @@ fn rejects_hostile_shape_text_grammar_and_resource_abuse() {
     shape.set_text(Cow::Owned("x".repeat(16 * 1_048_576 + 1)));
     assert!(document.set_background_shape(shape).is_err());
 }
+#[test]
+fn shape_text_baseline_controls_fail_closed() {
+    for source in [
+        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt \super One\nosupersub Two}}}}"#,
+        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt \up2 One\dn2 Two}}}}"#,
+        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt \aup2 One\aup4 Two}}}}"#,
+        r#"{\rtf1{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}{\shptxt \adn2 One\adn4 Two}}}}"#,
+    ] {
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "shape text baseline controls must be rejected"
+        );
+    }
+}

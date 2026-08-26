@@ -234,6 +234,20 @@ impl Parser<'_> {
                         "RTF annotation body cannot contain active data".to_string(),
                     ));
                 },
+                Some(Token::Control(
+                    ControlWord::Superscript(_)
+                    | ControlWord::Subscript(_)
+                    | ControlWord::NoSuperSub(_)
+                    | ControlWord::BaselineUp(_)
+                    | ControlWord::BaselineDown(_)
+                    | ControlWord::AssociatedBaselineUp(_)
+                    | ControlWord::AssociatedBaselineDown(_),
+                )) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF annotation character baseline formatting cannot be represented losslessly"
+                            .to_string(),
+                    ));
+                },
                 Some(Token::Control(_)) => {
                     self.mark_unknown_syntax()?;
                 },

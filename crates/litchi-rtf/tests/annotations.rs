@@ -99,3 +99,17 @@ fn rejects_conflicts_orphans_active_data_and_invalid_metadata() {
         assert!(RtfDocument::parse(source).is_err(), "{source}");
     }
 }
+#[test]
+fn annotation_baseline_controls_fail_closed() {
+    for source in [
+        r#"{\rtf1{\chatn{\*\annotation\super One\nosupersub Two}}}"#,
+        r#"{\rtf1{\chatn{\*\annotation\up2 One\dn2 Two}}}"#,
+        r#"{\rtf1{\chatn{\*\annotation\aup2 One\aup4 Two}}}"#,
+        r#"{\rtf1{\chatn{\*\annotation\adn2 One\adn4 Two}}}"#,
+    ] {
+        assert!(
+            RtfDocument::parse(source).is_err(),
+            "annotation baseline controls must be rejected"
+        );
+    }
+}

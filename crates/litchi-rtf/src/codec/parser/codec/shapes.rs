@@ -660,6 +660,20 @@ impl<'a> Parser<'a> {
                         "RTF shptxt contains direct binary data".to_string(),
                     ));
                 },
+                Some(Token::Control(
+                    ControlWord::Superscript(_)
+                    | ControlWord::Subscript(_)
+                    | ControlWord::NoSuperSub(_)
+                    | ControlWord::BaselineUp(_)
+                    | ControlWord::BaselineDown(_)
+                    | ControlWord::AssociatedBaselineUp(_)
+                    | ControlWord::AssociatedBaselineDown(_),
+                )) => {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF shape text character baseline formatting cannot be represented losslessly"
+                            .to_string(),
+                    ));
+                },
                 Some(Token::Control(_)) => {
                     // Controls outside the finite shape-text grammar may
                     // introduce active syntax that is not retained here.
