@@ -14,5 +14,6 @@ pub(crate) mod snapshot;
 pub(crate) mod transaction;
 pub(crate) mod validation;
 
+pub use crate::model::hyperlink::{Actuate, Link, Show};
 pub use model::{Cell, CellValue, CellView, Merge, Row, Sheet};
 pub use snapshot::{CellChange, Commit, Edit, MAX_CELL_CHANGES, Patch, Selector, Snapshot};

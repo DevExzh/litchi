@@ -2,6 +2,7 @@
 
 use super::{Cell, CellValue, Row, Sheet};
 use super::{model::Merge, validation};
+use crate::model::hyperlink::{Actuate, Link, Show};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
@@ -15,7 +16,7 @@ use std::num::NonZeroUsize;
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(crate) const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 pub(crate) const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
-const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
+pub(crate) const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const MAX_XML_DEPTH: usize = 1_024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -163,7 +164,7 @@ impl Attributes {
         Ok(result)
     }
 
-    fn cell(self, text: String) -> Result<Cell> {
+    fn cell(self, text: String, hyperlinks: Vec<Link>) -> Result<Cell> {
         let value_type = self.value_type.as_deref();
         let value = match value_type {
             None => {
@@ -207,6 +208,7 @@ impl Attributes {
         let mut cell = Cell::repeated(value, text, self.columns_repeated)?;
         cell.formula = self.formula;
         cell.style_name = self.style_name;
+        cell.hyperlinks = hyperlinks;
         cell.merge = if self.covered {
             Merge::Covered
         } else if self.rows_spanned != 1 || self.columns_spanned != 1 {
@@ -230,7 +232,168 @@ impl Attributes {
 struct OpenCell {
     attributes: Attributes,
     text: String,
+    paragraph_count: usize,
+    paragraph_open: bool,
     text_depth: usize,
+    hyperlinks: Vec<Link>,
+    open_hyperlink: Option<OpenHyperlink>,
+    ignored_anchor_depth: usize,
+}
+
+struct OpenHyperlink {
+    link: Link,
+    start: usize,
+}
+
+impl OpenCell {
+    fn start_text(
+        &mut self,
+        local: &[u8],
+        parent: Option<Kind>,
+        element: &BytesStart<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+    ) -> Result<()> {
+        if local == b"p" {
+            if parent == Some(Kind::Cell) {
+                self.paragraph_count = self.paragraph_count.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODS cell paragraph count overflows usize".to_string())
+                })?;
+                self.paragraph_open = true;
+            } else if self.paragraph_open {
+                return Err(Error::InvalidFormat(
+                    "ODS cell paragraphs cannot be nested".to_string(),
+                ));
+            }
+        } else if local == b"a" {
+            if self.open_hyperlink.is_some() {
+                return Err(Error::InvalidFormat(
+                    "ODS cell hyperlinks must be direct text:p children and cannot nest"
+                        .to_string(),
+                ));
+            }
+            if self.paragraph_open
+                && self.ignored_anchor_depth == 0
+                && parent == Some(Kind::Text)
+                && self.text_depth == 1
+            {
+                let link = parse_link(element, resolver, decoder)?;
+                self.open_hyperlink = Some(OpenHyperlink {
+                    link,
+                    start: self.text.len(),
+                });
+            } else {
+                self.ignored_anchor_depth =
+                    self.ignored_anchor_depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS cell ignored hyperlink nesting overflows usize".to_string(),
+                        )
+                    })?;
+            }
+        } else if self.open_hyperlink.is_some() {
+            return Err(Error::InvalidFormat(
+                "ODS cell hyperlinks may contain character data only".to_string(),
+            ));
+        }
+        self.text_depth = self.text_depth.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("ODS cell inline text depth overflows usize".to_string())
+        })?;
+        Ok(())
+    }
+
+    fn handle_empty_text(
+        &mut self,
+        local: &[u8],
+        parent: Option<Kind>,
+        element: &BytesStart<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+    ) -> Result<()> {
+        self.start_text(local, parent, element, resolver, decoder)?;
+        self.end_text(local)
+    }
+
+    fn append_characters(&mut self, value: &str) -> Result<()> {
+        let next = self.text.len().checked_add(value.len()).ok_or_else(|| {
+            Error::InvalidFormat("ODS cell text length overflows usize".to_string())
+        })?;
+        if next > validation::MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODS cell text exceeds the worksheet text safety limit".to_string(),
+            ));
+        }
+        self.text.try_reserve(value.len()).map_err(|_error| {
+            Error::InvalidFormat("ODS cell text allocation failed".to_string())
+        })?;
+        self.text.push_str(value);
+        if let Some(open) = self.open_hyperlink.as_mut() {
+            open.link.text.try_reserve(value.len()).map_err(|_error| {
+                Error::InvalidFormat("ODS hyperlink text allocation failed".to_string())
+            })?;
+            open.link.text.push_str(value);
+        }
+        Ok(())
+    }
+
+    fn end_text(&mut self, local: &[u8]) -> Result<()> {
+        if local == b"a" {
+            if let Some(mut open) = self.open_hyperlink.take() {
+                let range = open.start..self.text.len();
+                let anchor = self.text.get(range.clone()).ok_or_else(|| {
+                    Error::InvalidFormat("ODS hyperlink range is not valid UTF-8".to_string())
+                })?;
+                if anchor != open.link.text {
+                    return Err(Error::InvalidFormat(
+                        "ODS hyperlink text does not match its cell text range".to_string(),
+                    ));
+                }
+                open.link.set_range(range);
+                open.link.validate_storage()?;
+                if self.hyperlinks.len() >= validation::MAX_PHYSICAL_RUNS {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS cell exceeds the {} hyperlink safety limit",
+                        validation::MAX_PHYSICAL_RUNS
+                    )));
+                }
+                self.hyperlinks.try_reserve(1).map_err(|_error| {
+                    Error::InvalidFormat("ODS cell hyperlink allocation failed".to_string())
+                })?;
+                self.hyperlinks.push(open.link);
+            } else if self.ignored_anchor_depth > 0 {
+                self.ignored_anchor_depth -= 1;
+            }
+        }
+        if self.text_depth == 0 {
+            return Err(Error::InvalidFormat(
+                "ODS cell text element depth underflow".to_string(),
+            ));
+        }
+        self.text_depth -= 1;
+        if local == b"p" && self.paragraph_open {
+            if self.open_hyperlink.is_some() {
+                return Err(Error::InvalidFormat(
+                    "ODS cell paragraph closed while a hyperlink is open".to_string(),
+                ));
+            }
+            self.paragraph_open = false;
+        }
+        Ok(())
+    }
+}
+
+fn reserve_parser_push<T>(
+    collection: &mut Vec<T>,
+    limit: usize,
+    limit_error: String,
+    allocation_error: &str,
+) -> Result<()> {
+    if collection.len() >= limit {
+        return Err(Error::InvalidFormat(limit_error));
+    }
+    collection
+        .try_reserve(1)
+        .map_err(|_| Error::InvalidFormat(allocation_error.to_string()))?;
+    Ok(())
 }
 
 /// Parse all direct spreadsheet tables from an ODS content part.
@@ -275,6 +438,7 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                     )));
                 }
                 let local = element.local_name();
+                let parent = stack.last().copied();
                 let mut kind = classify(namespace, local.as_ref());
                 if dde_cache_depth.is_some() {
                     kind = Kind::Other;
@@ -284,12 +448,28 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                 }
                 match kind {
                     Kind::Root => {},
-                    Kind::Body
-                    | Kind::Spreadsheet
-                    | Kind::DdeLink
-                    | Kind::DdeCache
-                    | Kind::Other
-                    | Kind::Text => {},
+                    Kind::Body | Kind::Spreadsheet | Kind::DdeLink | Kind::DdeCache => {},
+                    Kind::Other => {
+                        if current_cell
+                            .as_ref()
+                            .is_some_and(|cell| cell.open_hyperlink.is_some())
+                        {
+                            return Err(Error::InvalidFormat(
+                                "ODS cell refuses foreign or unsupported markup".to_string(),
+                            ));
+                        }
+                    },
+                    Kind::Text => {
+                        if let Some(cell) = current_cell.as_mut() {
+                            cell.start_text(
+                                local.as_ref(),
+                                parent,
+                                &element,
+                                reader.resolver(),
+                                reader.decoder(),
+                            )?;
+                        }
+                    },
                     Kind::Table => {
                         if stack.last() != Some(&Kind::Spreadsheet) {
                             return Err(Error::InvalidFormat(
@@ -342,15 +522,21 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                                 is_covered(namespace, local.as_ref()),
                             )?,
                             text: String::new(),
+                            paragraph_count: 0,
+                            paragraph_open: false,
                             text_depth: 0,
+                            hyperlinks: Vec::new(),
+                            open_hyperlink: None,
+                            ignored_anchor_depth: 0,
                         });
                     },
                 }
-                if kind == Kind::Text
-                    && let Some(cell) = current_cell.as_mut()
-                {
-                    cell.text_depth += 1;
-                }
+                reserve_parser_push(
+                    &mut stack,
+                    MAX_XML_DEPTH,
+                    format!("ODS worksheet XML nesting exceeds {MAX_XML_DEPTH} elements"),
+                    "ODS worksheet XML stack allocation failed",
+                )?;
                 stack.push(kind);
             },
             Event::Empty(element) => {
@@ -375,11 +561,21 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             ));
                         }
                         let attributes = Attributes::from_element(&element, &reader, false)?;
-                        sheets.push(Sheet {
+                        let sheet = Sheet {
                             name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
                             rows: Vec::new(),
                             style_name: attributes.style_name,
-                        });
+                        };
+                        reserve_parser_push(
+                            &mut sheets,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet sheet allocation failed",
+                        )?;
+                        sheets.push(sheet);
                     },
                     Kind::Row => {
                         let attributes = Attributes::from_element(&element, &reader, false)?;
@@ -388,7 +584,7 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                                 "empty table row is outside a worksheet".to_string(),
                             )
                         })?;
-                        sheet.rows.push(Row {
+                        let row = Row {
                             cells: Vec::new(),
                             style_name: attributes.style_name,
                             default_cell_style_name: attributes.default_cell_style_name,
@@ -399,7 +595,17 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                                     )
                                 },
                             )?,
-                        });
+                        };
+                        reserve_parser_push(
+                            &mut sheet.rows,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet row count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet row allocation failed",
+                        )?;
+                        sheet.rows.push(row);
                     },
                     Kind::Cell => {
                         let row = current_row.as_mut().ok_or_else(|| {
@@ -412,44 +618,62 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                             &reader,
                             is_covered(namespace, local.as_ref()),
                         )?;
-                        row.cells.push(attributes.cell(String::new())?);
+                        let cell = attributes.cell(String::new(), Vec::new())?;
+                        reserve_parser_push(
+                            &mut row.cells,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS row cell count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet cell allocation failed",
+                        )?;
+                        row.cells.push(cell);
                     },
                     Kind::Text if current_cell.is_some() => {
-                        append_empty_text(
-                            &mut current_cell,
-                            namespace,
-                            local.as_ref(),
-                            &element,
-                            &reader,
-                        )?;
+                        let parent = stack.last().copied();
+                        if let Some(cell) = current_cell.as_mut() {
+                            cell.handle_empty_text(
+                                local.as_ref(),
+                                parent,
+                                &element,
+                                reader.resolver(),
+                                reader.decoder(),
+                            )?;
+                        }
+                    },
+                    Kind::Other => {
+                        if current_cell
+                            .as_ref()
+                            .is_some_and(|cell| cell.open_hyperlink.is_some())
+                        {
+                            return Err(Error::InvalidFormat(
+                                "ODS cell refuses foreign or unsupported markup".to_string(),
+                            ));
+                        }
                     },
                     Kind::Root
                     | Kind::Body
                     | Kind::Spreadsheet
                     | Kind::DdeLink
                     | Kind::DdeCache
-                    | Kind::Text
-                    | Kind::Other => {},
+                    | Kind::Text => {},
                 }
             },
             Event::Text(text) => {
-                if let Some(cell) = current_cell.as_mut()
-                    && cell.text_depth > 0
-                {
+                if let Some(cell) = current_cell.as_mut() {
                     let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid ODS cell text: {error}"))
                     })?;
-                    cell.text.push_str(&value);
+                    cell.append_characters(&value)?;
                 }
             },
             Event::CData(text) => {
-                if let Some(cell) = current_cell.as_mut()
-                    && cell.text_depth > 0
-                {
+                if let Some(cell) = current_cell.as_mut() {
                     let value = text.decode().map_err(|error| {
                         Error::InvalidFormat(format!("invalid ODS cell text: {error}"))
                     })?;
-                    cell.text.push_str(&value);
+                    cell.append_characters(&value)?;
                 }
             },
             Event::End(element) => {
@@ -462,7 +686,7 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                 if kind == Kind::Text
                     && let Some(cell) = current_cell.as_mut()
                 {
-                    cell.text_depth = cell.text_depth.saturating_sub(1);
+                    cell.end_text(element.local_name().as_ref())?;
                 }
                 match kind {
                     Kind::Cell => {
@@ -472,24 +696,49 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
                         let row = current_row.as_mut().ok_or_else(|| {
                             Error::InvalidFormat("ODS cell closed outside a row".to_string())
                         })?;
-                        row.cells.push(open.attributes.cell(open.text)?);
+                        let cell = open.attributes.cell(open.text, open.hyperlinks)?;
+                        reserve_parser_push(
+                            &mut row.cells,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS row cell count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet cell allocation failed",
+                        )?;
+                        row.cells.push(cell);
                     },
                     Kind::Row => {
                         let row = current_row.take().ok_or_else(|| {
                             Error::InvalidFormat("ODS row close has no open row".to_string())
                         })?;
-                        current_sheet
-                            .as_mut()
-                            .ok_or_else(|| {
-                                Error::InvalidFormat("ODS row closed outside a sheet".to_string())
-                            })?
-                            .rows
-                            .push(row);
+                        let sheet = current_sheet.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("ODS row closed outside a sheet".to_string())
+                        })?;
+                        reserve_parser_push(
+                            &mut sheet.rows,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet row count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet row allocation failed",
+                        )?;
+                        sheet.rows.push(row);
                     },
                     Kind::Table => {
                         let sheet = current_sheet.take().ok_or_else(|| {
                             Error::InvalidFormat("ODS table close has no open table".to_string())
                         })?;
+                        reserve_parser_push(
+                            &mut sheets,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet sheet allocation failed",
+                        )?;
                         sheets.push(sheet);
                     },
                     Kind::Root
@@ -600,12 +849,29 @@ impl WorksheetHandler {
                 }
                 match kind {
                     Kind::Root => {},
-                    Kind::Body
-                    | Kind::Spreadsheet
-                    | Kind::DdeLink
-                    | Kind::DdeCache
-                    | Kind::Other
-                    | Kind::Text => {},
+                    Kind::Body | Kind::Spreadsheet | Kind::DdeLink | Kind::DdeCache => {},
+                    Kind::Other => {
+                        if self
+                            .current_cell
+                            .as_ref()
+                            .is_some_and(|cell| cell.open_hyperlink.is_some())
+                        {
+                            return Err(Error::InvalidFormat(
+                                "ODS cell refuses foreign or unsupported markup".to_string(),
+                            ));
+                        }
+                    },
+                    Kind::Text => {
+                        if let Some(cell) = self.current_cell.as_mut() {
+                            cell.start_text(
+                                local.as_ref(),
+                                self.stack.last().copied(),
+                                element,
+                                resolver,
+                                decoder,
+                            )?;
+                        }
+                    },
                     Kind::Table => {
                         if self.stack.last() != Some(&Kind::Spreadsheet) {
                             return Err(Error::InvalidFormat(
@@ -661,15 +927,21 @@ impl WorksheetHandler {
                                 is_covered(namespace, local.as_ref()),
                             )?,
                             text: String::new(),
+                            paragraph_count: 0,
+                            paragraph_open: false,
                             text_depth: 0,
+                            hyperlinks: Vec::new(),
+                            open_hyperlink: None,
+                            ignored_anchor_depth: 0,
                         });
                     },
                 }
-                if kind == Kind::Text
-                    && let Some(cell) = self.current_cell.as_mut()
-                {
-                    cell.text_depth += 1;
-                }
+                reserve_parser_push(
+                    &mut self.stack,
+                    MAX_XML_DEPTH,
+                    format!("ODS worksheet XML nesting exceeds {MAX_XML_DEPTH} elements"),
+                    "ODS worksheet XML stack allocation failed",
+                )?;
                 self.stack.push(kind);
             },
             Event::Empty(element) => {
@@ -695,11 +967,21 @@ impl WorksheetHandler {
                         }
                         let attributes =
                             Attributes::from_resolved(element, resolver, decoder, false)?;
-                        self.sheets.push(Sheet {
+                        let sheet = Sheet {
                             name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
                             rows: Vec::new(),
                             style_name: attributes.style_name,
-                        });
+                        };
+                        reserve_parser_push(
+                            &mut self.sheets,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet sheet allocation failed",
+                        )?;
+                        self.sheets.push(sheet);
                     },
                     Kind::Row => {
                         let attributes =
@@ -709,7 +991,7 @@ impl WorksheetHandler {
                                 "empty table row is outside a worksheet".to_string(),
                             )
                         })?;
-                        sheet.rows.push(Row {
+                        let row = Row {
                             cells: Vec::new(),
                             style_name: attributes.style_name,
                             default_cell_style_name: attributes.default_cell_style_name,
@@ -720,7 +1002,17 @@ impl WorksheetHandler {
                                     )
                                 },
                             )?,
-                        });
+                        };
+                        reserve_parser_push(
+                            &mut sheet.rows,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet row count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet row allocation failed",
+                        )?;
+                        sheet.rows.push(row);
                     },
                     Kind::Cell => {
                         let row = self.current_row.as_mut().ok_or_else(|| {
@@ -734,45 +1026,63 @@ impl WorksheetHandler {
                             decoder,
                             is_covered(namespace, local.as_ref()),
                         )?;
-                        row.cells.push(attributes.cell(String::new())?);
+                        let cell = attributes.cell(String::new(), Vec::new())?;
+                        reserve_parser_push(
+                            &mut row.cells,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS row cell count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet cell allocation failed",
+                        )?;
+                        row.cells.push(cell);
                     },
                     Kind::Text if self.current_cell.is_some() => {
-                        append_empty_text_resolved(
-                            &mut self.current_cell,
-                            namespace,
-                            local.as_ref(),
-                            element,
-                            resolver,
-                            decoder,
-                        )?;
+                        let parent = self.stack.last().copied();
+                        if let Some(cell) = self.current_cell.as_mut() {
+                            cell.handle_empty_text(
+                                local.as_ref(),
+                                parent,
+                                element,
+                                resolver,
+                                decoder,
+                            )?;
+                        }
+                    },
+                    Kind::Other => {
+                        if self
+                            .current_cell
+                            .as_ref()
+                            .is_some_and(|cell| cell.open_hyperlink.is_some())
+                        {
+                            return Err(Error::InvalidFormat(
+                                "ODS cell refuses foreign or unsupported markup".to_string(),
+                            ));
+                        }
                     },
                     Kind::Root
                     | Kind::Body
                     | Kind::Spreadsheet
                     | Kind::DdeLink
                     | Kind::DdeCache
-                    | Kind::Text
-                    | Kind::Other => {},
+                    | Kind::Text => {},
                 }
             },
             Event::Text(text) => {
-                if let Some(cell) = self.current_cell.as_mut()
-                    && cell.text_depth > 0
-                {
+                if let Some(cell) = self.current_cell.as_mut() {
                     let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid ODS cell text: {error}"))
                     })?;
-                    cell.text.push_str(&value);
+                    cell.append_characters(&value)?;
                 }
             },
             Event::CData(text) => {
-                if let Some(cell) = self.current_cell.as_mut()
-                    && cell.text_depth > 0
-                {
+                if let Some(cell) = self.current_cell.as_mut() {
                     let value = text.decode().map_err(|error| {
                         Error::InvalidFormat(format!("invalid ODS cell text: {error}"))
                     })?;
-                    cell.text.push_str(&value);
+                    cell.append_characters(&value)?;
                 }
             },
             Event::End(element) => {
@@ -785,7 +1095,7 @@ impl WorksheetHandler {
                 if kind == Kind::Text
                     && let Some(cell) = self.current_cell.as_mut()
                 {
-                    cell.text_depth = cell.text_depth.saturating_sub(1);
+                    cell.end_text(element.local_name().as_ref())?;
                 }
                 match kind {
                     Kind::Cell => {
@@ -795,24 +1105,49 @@ impl WorksheetHandler {
                         let row = self.current_row.as_mut().ok_or_else(|| {
                             Error::InvalidFormat("ODS cell closed outside a row".to_string())
                         })?;
-                        row.cells.push(open.attributes.cell(open.text)?);
+                        let cell = open.attributes.cell(open.text, open.hyperlinks)?;
+                        reserve_parser_push(
+                            &mut row.cells,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS row cell count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet cell allocation failed",
+                        )?;
+                        row.cells.push(cell);
                     },
                     Kind::Row => {
                         let row = self.current_row.take().ok_or_else(|| {
                             Error::InvalidFormat("ODS row close has no open row".to_string())
                         })?;
-                        self.current_sheet
-                            .as_mut()
-                            .ok_or_else(|| {
-                                Error::InvalidFormat("ODS row closed outside a sheet".to_string())
-                            })?
-                            .rows
-                            .push(row);
+                        let sheet = self.current_sheet.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("ODS row closed outside a sheet".to_string())
+                        })?;
+                        reserve_parser_push(
+                            &mut sheet.rows,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet row count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet row allocation failed",
+                        )?;
+                        sheet.rows.push(row);
                     },
                     Kind::Table => {
                         let sheet = self.current_sheet.take().ok_or_else(|| {
                             Error::InvalidFormat("ODS table close has no open table".to_string())
                         })?;
+                        reserve_parser_push(
+                            &mut self.sheets,
+                            validation::MAX_PHYSICAL_RUNS,
+                            format!(
+                                "ODS sheet count exceeds the {} safety limit",
+                                validation::MAX_PHYSICAL_RUNS
+                            ),
+                            "ODS worksheet sheet allocation failed",
+                        )?;
                         self.sheets.push(sheet);
                     },
                     Kind::Root
@@ -1041,71 +1376,136 @@ fn is_covered(namespace: NamespaceKind, local: &[u8]) -> bool {
     namespace == NamespaceKind::Table && local == b"covered-table-cell"
 }
 
-/// Append empty text markup from a standalone reader; used by the historical
-/// inline loop in `parse_impl`, which predates the extracted handler.
-fn append_empty_text(
-    current_cell: &mut Option<OpenCell>,
-    namespace: NamespaceKind,
-    local: &[u8],
-    element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
-) -> Result<()> {
-    append_empty_text_resolved(
-        current_cell,
-        namespace,
-        local,
-        element,
-        reader.resolver(),
-        reader.decoder(),
-    )
-}
-
-fn append_empty_text_resolved(
-    current_cell: &mut Option<OpenCell>,
-    namespace: NamespaceKind,
-    local: &[u8],
+fn parse_link(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
     decoder: Decoder,
-) -> Result<()> {
-    let Some(cell) = current_cell.as_mut() else {
-        return Ok(());
-    };
-    let bound = namespace == NamespaceKind::Text;
-    if !bound {
-        return Ok(());
-    }
-    if local == b"tab" {
-        cell.text.push('\t');
-    } else if local == b"line-break" {
-        cell.text.push('\n');
-    } else if local == b"s" {
-        let mut count = 1usize;
-        for raw in element.attributes().with_checks(true) {
-            let raw = raw.map_err(|error| {
-                Error::InvalidFormat(format!("invalid text:s attribute: {error}"))
-            })?;
-            let (namespace, local_name) = resolver.resolve_attribute(raw.key);
-            let is_count = matches!(namespace, ResolveResult::Bound(Namespace(value))
-                if value == TEXT_NAMESPACE.as_bytes())
-                && local_name.as_ref() == b"c";
-            if is_count {
-                let value = raw
-                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid text:s count: {error}"))
-                    })?;
-                count = positive(&value, "text:s c")?;
-            }
+) -> Result<Link> {
+    let mut href = None;
+    let mut link_type = None;
+    let mut show = None;
+    let mut actuate = None;
+    let mut name = None;
+    let mut title = None;
+    let mut target_frame_name = None;
+    let mut style_name = None;
+    let mut visited_style_name = None;
+
+    for raw in element.attributes().with_checks(true) {
+        let raw = raw.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODS text:a attribute: {error}"))
+        })?;
+        if raw.key.as_ref() == b"xmlns" || raw.key.as_ref().starts_with(b"xmlns:") {
+            continue;
         }
-        if count > validation::MAX_TEXT_BYTES {
+        if raw.value.len() > validation::MAX_TEXT_BYTES {
             return Err(Error::InvalidFormat(
-                "text:s expansion exceeds the worksheet text safety limit".to_string(),
+                "ODS text:a attribute value exceeds the worksheet text safety limit".to_string(),
             ));
         }
-        cell.text.extend(std::iter::repeat_n(' ', count));
+        let value = raw
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODS text:a attribute value: {error}"))
+            })?;
+        if value.len() > validation::MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(
+                "ODS text:a attribute value exceeds the worksheet text safety limit".to_string(),
+            ));
+        }
+        let value = value.into_owned();
+        let (namespace, local) = resolver.resolve_attribute(raw.key);
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(uri)) => uri,
+            ResolveResult::Unbound => {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS text:a attribute '{}' is unbound",
+                    String::from_utf8_lossy(local.as_ref())
+                )));
+            },
+            ResolveResult::Unknown(prefix) => {
+                return Err(Error::InvalidFormat(format!(
+                    "unbound ODS text:a attribute prefix '{}'",
+                    String::from_utf8_lossy(prefix.as_ref())
+                )));
+            },
+        };
+        if namespace == XLINK_NAMESPACE.as_bytes() {
+            match local.as_ref() {
+                b"href" => href = Some(value),
+                b"type" => link_type = Some(value),
+                b"show" => {
+                    show = Some(Show::parse(&value).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS text:a xlink:show must be 'new' or 'replace'".to_string(),
+                        )
+                    })?);
+                },
+                b"actuate" => {
+                    actuate = Some(Actuate::parse(&value).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS text:a xlink:actuate must be 'onRequest'".to_string(),
+                        )
+                    })?);
+                },
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS text:a refuses unknown xlink attribute '{}'",
+                        String::from_utf8_lossy(local.as_ref())
+                    )));
+                },
+            }
+        } else if namespace == OFFICE_NAMESPACE.as_bytes() {
+            match local.as_ref() {
+                b"name" => name = Some(value),
+                b"title" => title = Some(value),
+                b"target-frame-name" => target_frame_name = Some(value),
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS text:a refuses unknown office attribute '{}'",
+                        String::from_utf8_lossy(local.as_ref())
+                    )));
+                },
+            }
+        } else if namespace == TEXT_NAMESPACE.as_bytes() {
+            match local.as_ref() {
+                b"style-name" => style_name = Some(value),
+                b"visited-style-name" => visited_style_name = Some(value),
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS text:a refuses unknown text attribute '{}'",
+                        String::from_utf8_lossy(local.as_ref())
+                    )));
+                },
+            }
+        } else {
+            return Err(Error::InvalidFormat(format!(
+                "ODS text:a refuses unknown attribute '{}'",
+                String::from_utf8_lossy(local.as_ref())
+            )));
+        }
     }
-    Ok(())
+
+    let href =
+        href.ok_or_else(|| Error::InvalidFormat("ODS text:a requires xlink:href".to_string()))?;
+    if link_type
+        .as_deref()
+        .is_some_and(|link_type| link_type != "simple")
+    {
+        return Err(Error::InvalidFormat(
+            "ODS text:a requires xlink:type='simple'".to_string(),
+        ));
+    }
+    let mut link = Link::new(href);
+    link.show = show;
+    link.actuate = actuate;
+    link.name = name;
+    link.title = title;
+    link.target_frame_name = target_frame_name;
+    link.style_name = style_name;
+    link.visited_style_name = visited_style_name;
+    link.validate_storage()?;
+    Ok(link)
 }
 
 fn positive(value: &str, name: &str) -> Result<usize> {
@@ -1148,6 +1548,8 @@ pub(crate) fn write_sheet(sheet: &Sheet) -> Result<String> {
     output.push_str(OFFICE_NAMESPACE);
     output.push_str("\" xmlns:text=\"");
     output.push_str(TEXT_NAMESPACE);
+    output.push_str("\" xmlns:xlink=\"");
+    output.push_str(XLINK_NAMESPACE);
     output.push_str("\" table:name=\"");
     output.push_str(&escape_xml(&sheet.name));
     output.push('"');
@@ -1178,6 +1580,8 @@ pub(crate) fn write_sheet_bounded(sheet: &Sheet, max_bytes: usize) -> Result<Str
     bounded_push(&mut output, OFFICE_NAMESPACE, max_bytes)?;
     bounded_push(&mut output, "\" xmlns:text=\"", max_bytes)?;
     bounded_push(&mut output, TEXT_NAMESPACE, max_bytes)?;
+    bounded_push(&mut output, "\" xmlns:xlink=\"", max_bytes)?;
+    bounded_push(&mut output, XLINK_NAMESPACE, max_bytes)?;
     bounded_push(&mut output, "\" table:name=\"", max_bytes)?;
     bounded_push(&mut output, &escape_xml(&sheet.name), max_bytes)?;
     bounded_push(&mut output, "\"", max_bytes)?;
@@ -1241,6 +1645,8 @@ fn write_row_bounded(
                 "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
                 "\" xmlns:text=\"",
                 "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+                "\" xmlns:xlink=\"",
+                "http://www.w3.org/1999/xlink",
                 "\""
             ),
             max_bytes,
@@ -1308,13 +1714,20 @@ fn write_cell_bounded(output: &mut String, cell: &Cell, max_bytes: usize) -> Res
     if !covered {
         write_value_attributes_bounded(output, &cell.value, max_bytes)?;
     }
-    if cell.text.is_empty() && matches!(cell.value, CellValue::Empty) && cell.formula.is_none() {
+    if cell.text.is_empty()
+        && cell.hyperlinks.is_empty()
+        && matches!(cell.value, CellValue::Empty)
+        && cell.formula.is_none()
+    {
         return bounded_push(output, "/>", max_bytes);
     }
     bounded_push(output, ">", max_bytes)?;
-    if !cell.text.is_empty() || matches!(cell.value, CellValue::Text(_)) {
+    if !cell.text.is_empty()
+        || !cell.hyperlinks.is_empty()
+        || matches!(cell.value, CellValue::Text(_))
+    {
         bounded_push(output, "<text:p>", max_bytes)?;
-        bounded_push(output, &escape_xml(&cell.text), max_bytes)?;
+        write_cell_text_bounded(output, &cell.text, &cell.hyperlinks, max_bytes)?;
         bounded_push(output, "</text:p>", max_bytes)?;
     }
     bounded_push(
@@ -1466,6 +1879,12 @@ fn write_cell_inner(
     bind_namespaces: bool,
 ) -> Result<()> {
     validation::validate_cell(cell)?;
+    if body.is_some() && !cell.hyperlinks.is_empty() {
+        return Err(Error::InvalidFormat(
+            "ODS cell fragment refuses to replace modeled hyperlinks with an external body"
+                .to_string(),
+        ));
+    }
     let covered = matches!(cell.merge, Merge::Covered);
     output.push_str(if covered {
         "<table:covered-table-cell"
@@ -1479,6 +1898,8 @@ fn write_cell_inner(
         output.push_str(OFFICE_NAMESPACE);
         output.push_str("\" xmlns:text=\"");
         output.push_str(TEXT_NAMESPACE);
+        output.push_str("\" xmlns:xlink=\"");
+        output.push_str(XLINK_NAMESPACE);
         output.push('"');
     }
     if cell.repeat() > 1 {
@@ -1508,6 +1929,7 @@ fn write_cell_inner(
     }
     if body.is_none()
         && cell.text.is_empty()
+        && cell.hyperlinks.is_empty()
         && matches!(cell.value, CellValue::Empty)
         && cell.formula.is_none()
     {
@@ -1517,9 +1939,12 @@ fn write_cell_inner(
     output.push('>');
     if let Some(body) = body {
         output.push_str(body);
-    } else if !cell.text.is_empty() || matches!(cell.value, CellValue::Text(_)) {
+    } else if !cell.text.is_empty()
+        || !cell.hyperlinks.is_empty()
+        || matches!(cell.value, CellValue::Text(_))
+    {
         output.push_str("<text:p>");
-        output.push_str(&escape_xml(&cell.text));
+        write_cell_text(output, &cell.text, &cell.hyperlinks);
         output.push_str("</text:p>");
     }
     output.push_str(if covered {
@@ -1528,6 +1953,81 @@ fn write_cell_inner(
         "</table:table-cell>"
     });
     Ok(())
+}
+
+fn write_cell_text(output: &mut String, text: &str, hyperlinks: &[Link]) {
+    let mut cursor = 0usize;
+    for hyperlink in hyperlinks {
+        let range = hyperlink.range();
+        output.push_str(&escape_xml(&text[cursor..range.start]));
+        hyperlink.write_xml(output);
+        cursor = range.end;
+    }
+    output.push_str(&escape_xml(&text[cursor..]));
+}
+
+fn write_cell_text_bounded(
+    output: &mut String,
+    text: &str,
+    hyperlinks: &[Link],
+    max_bytes: usize,
+) -> Result<()> {
+    let mut cursor = 0usize;
+    for hyperlink in hyperlinks {
+        let range = hyperlink.range();
+        bounded_push(output, &escape_xml(&text[cursor..range.start]), max_bytes)?;
+        write_link_bounded(output, hyperlink, max_bytes)?;
+        cursor = range.end;
+    }
+    bounded_push(output, &escape_xml(&text[cursor..]), max_bytes)
+}
+
+fn write_link_bounded(output: &mut String, link: &Link, max_bytes: usize) -> Result<()> {
+    bounded_push(
+        output,
+        "<text:a xlink:type=\"simple\" xlink:href=\"",
+        max_bytes,
+    )?;
+    bounded_push(output, &escape_xml(&link.href), max_bytes)?;
+    bounded_push(output, "\"", max_bytes)?;
+    if let Some(actuate) = link.actuate {
+        bounded_push(output, " xlink:actuate=\"", max_bytes)?;
+        bounded_push(output, actuate.as_str(), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(target_frame_name) = &link.target_frame_name {
+        bounded_push(output, " office:target-frame-name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(target_frame_name), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(show) = link.show {
+        bounded_push(output, " xlink:show=\"", max_bytes)?;
+        bounded_push(output, show.as_str(), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(name) = &link.name {
+        bounded_push(output, " office:name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(name), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(title) = &link.title {
+        bounded_push(output, " office:title=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(title), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(style_name) = &link.style_name {
+        bounded_push(output, " text:style-name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(style_name), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    if let Some(visited_style_name) = &link.visited_style_name {
+        bounded_push(output, " text:visited-style-name=\"", max_bytes)?;
+        bounded_push(output, &escape_xml(visited_style_name), max_bytes)?;
+        bounded_push(output, "\"", max_bytes)?;
+    }
+    bounded_push(output, ">", max_bytes)?;
+    bounded_push(output, &escape_xml(&link.text), max_bytes)?;
+    bounded_push(output, "</text:a>", max_bytes)
 }
 
 fn write_value_attributes(output: &mut String, value: &CellValue) {

@@ -816,6 +816,7 @@ impl Spreadsheet {
 
     /// Publish a validated worksheet snapshot as one package transaction.
     pub(crate) fn publish_sheets(&mut self, sheets: Vec<crate::worksheet::Sheet>) -> Result<()> {
+        crate::worksheet::package::validate_owned_link_delta(&self.sheets, &sheets)?;
         let package = self.package.replace_sheets(&sheets)?;
         self.package = Arc::new(package);
         self.sheets = sheets;

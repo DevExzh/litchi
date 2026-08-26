@@ -90,6 +90,7 @@ pub use flat::{
 pub use litchi_core::Metadata;
 pub use litchi_odf_common::rdf;
 pub use media::Image;
+pub use model::hyperlink::{Actuate, Link, Show};
 pub use model::names;
 pub use model::tracked_changes;
 pub use model::{dde, scenario};

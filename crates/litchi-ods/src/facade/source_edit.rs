@@ -735,6 +735,11 @@ fn validate_existing_changes(sheet: &Sheet, changes: &[CellChange]) -> Result<()
                     "ODS source cell edits refuse rows containing unknown values".to_string(),
                 ));
             }
+            if row.cells.iter().any(|cell| !cell.hyperlinks.is_empty()) {
+                return Err(Error::InvalidFormat(
+                    "ODS source cell edits refuse rows containing hyperlinks".to_string(),
+                ));
+            }
             validated_row = Some(change.row());
         }
         validate_plain_cell(existing, "source")?;
@@ -818,6 +823,11 @@ fn formula_replacements(sheet: &Sheet, changes: &[FormulaChange]) -> Result<Vec<
                 "ODS source formula edits refuse rows containing unknown values".to_string(),
             ));
         }
+        if row.cells.iter().any(|cell| !cell.hyperlinks.is_empty()) {
+            return Err(Error::InvalidFormat(
+                "ODS source formula edits refuse rows containing hyperlinks".to_string(),
+            ));
+        }
         if existing.formula.is_none() {
             return Err(Error::InvalidFormat(
                 "ODS source formula edits require existing formula cells".to_string(),
@@ -850,6 +860,11 @@ fn validate_plain_cell(cell: &Cell, role: &str) -> Result<()> {
     if matches!(cell.value, CellValue::Unknown { .. }) {
         return Err(Error::InvalidFormat(format!(
             "ODS source cell edits refuse {role} unknown values"
+        )));
+    }
+    if !cell.hyperlinks.is_empty() {
+        return Err(Error::InvalidFormat(format!(
+            "ODS source cell edits refuse {role} hyperlinks"
         )));
     }
     Ok(())
