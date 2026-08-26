@@ -6,7 +6,7 @@
 //! the common ODF positional writer so every other ZIP member remains a raw
 //! source copy.
 
-use std::{collections::BTreeMap, fmt, io::Write, sync::Arc};
+use std::{collections::BTreeMap, fmt, io::Write, ops::Range, sync::Arc};
 
 use litchi_core::{Error, Result, SourceVersion};
 use litchi_odf_common::core::{
@@ -15,7 +15,7 @@ use litchi_odf_common::core::{
 
 use super::SourceBackedSpreadsheet;
 use crate::worksheet::Row;
-use crate::worksheet::{Cell, CellChange, CellValue, Merge, Selector, Sheet, validation};
+use crate::worksheet::{Cell, CellChange, CellValue, Link, Merge, Selector, Sheet, validation};
 
 /// One existing formula-cell replacement in a source-backed ODS transaction.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -55,6 +55,163 @@ impl FormulaChange {
     }
 }
 
+/// One ordered mutation of the direct hyperlinks in an existing ODS cell.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HyperlinkOperation {
+    /// Replace the complete displayed cell value with one hyperlink.
+    Set(Link),
+    /// Add one hyperlink around a checked UTF-8 byte range of the cell text.
+    Add {
+        /// UTF-8 byte range occupied by the new link.
+        range: Range<usize>,
+        /// Link metadata and visible text to add.
+        hyperlink: Link,
+    },
+    /// Replace one hyperlink by its document-order index.
+    Replace {
+        /// Document-order hyperlink index.
+        index: usize,
+        /// Replacement link metadata and visible text.
+        hyperlink: Link,
+    },
+    /// Replace the hyperlink occupying an exact UTF-8 byte range.
+    ReplaceAt {
+        /// Exact existing hyperlink range.
+        range: Range<usize>,
+        /// Replacement link metadata and visible text.
+        hyperlink: Link,
+    },
+    /// Remove one hyperlink by its document-order index.
+    Remove {
+        /// Document-order hyperlink index.
+        index: usize,
+    },
+    /// Remove all hyperlinks while retaining the cell text.
+    Clear,
+}
+
+impl HyperlinkOperation {
+    /// Construct [`Self::Set`].
+    #[must_use]
+    pub fn set(hyperlink: Link) -> Self {
+        Self::Set(hyperlink)
+    }
+
+    /// Construct [`Self::Add`].
+    #[must_use]
+    pub fn add(range: Range<usize>, hyperlink: Link) -> Self {
+        Self::Add { range, hyperlink }
+    }
+
+    /// Construct [`Self::Replace`].
+    #[must_use]
+    pub fn replace(index: usize, hyperlink: Link) -> Self {
+        Self::Replace { index, hyperlink }
+    }
+
+    /// Construct [`Self::ReplaceAt`].
+    #[must_use]
+    pub fn replace_at(range: Range<usize>, hyperlink: Link) -> Self {
+        Self::ReplaceAt { range, hyperlink }
+    }
+
+    /// Construct [`Self::Remove`].
+    #[must_use]
+    pub const fn remove(index: usize) -> Self {
+        Self::Remove { index }
+    }
+
+    /// Construct [`Self::Clear`].
+    #[must_use]
+    pub const fn clear() -> Self {
+        Self::Clear
+    }
+}
+
+/// One existing cell and its ordered direct-hyperlink operations.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyperlinkChange {
+    row: usize,
+    column: usize,
+    operations: Vec<HyperlinkOperation>,
+}
+
+impl HyperlinkChange {
+    /// Construct a hyperlink change at a zero-based logical coordinate.
+    #[must_use]
+    pub fn new(row: usize, column: usize, operations: impl Into<Vec<HyperlinkOperation>>) -> Self {
+        Self {
+            row,
+            column,
+            operations: operations.into(),
+        }
+    }
+
+    /// Construct a change containing one operation.
+    #[must_use]
+    pub fn one(row: usize, column: usize, operation: HyperlinkOperation) -> Self {
+        Self::new(row, column, vec![operation])
+    }
+
+    /// Construct a complete-cell [`HyperlinkOperation::Set`] change.
+    #[must_use]
+    pub fn set(row: usize, column: usize, hyperlink: Link) -> Self {
+        Self::one(row, column, HyperlinkOperation::set(hyperlink))
+    }
+
+    /// Construct an [`HyperlinkOperation::Add`] change.
+    #[must_use]
+    pub fn add(row: usize, column: usize, range: Range<usize>, hyperlink: Link) -> Self {
+        Self::one(row, column, HyperlinkOperation::add(range, hyperlink))
+    }
+
+    /// Construct a [`HyperlinkOperation::Replace`] change.
+    #[must_use]
+    pub fn replace(row: usize, column: usize, index: usize, hyperlink: Link) -> Self {
+        Self::one(row, column, HyperlinkOperation::replace(index, hyperlink))
+    }
+
+    /// Construct a [`HyperlinkOperation::ReplaceAt`] change.
+    #[must_use]
+    pub fn replace_at(row: usize, column: usize, range: Range<usize>, hyperlink: Link) -> Self {
+        Self::one(
+            row,
+            column,
+            HyperlinkOperation::replace_at(range, hyperlink),
+        )
+    }
+
+    /// Construct a [`HyperlinkOperation::Remove`] change.
+    #[must_use]
+    pub fn remove(row: usize, column: usize, index: usize) -> Self {
+        Self::one(row, column, HyperlinkOperation::remove(index))
+    }
+
+    /// Construct a [`HyperlinkOperation::Clear`] change.
+    #[must_use]
+    pub fn clear(row: usize, column: usize) -> Self {
+        Self::one(row, column, HyperlinkOperation::clear())
+    }
+
+    /// Zero-based logical row coordinate.
+    #[must_use]
+    pub const fn row(&self) -> usize {
+        self.row
+    }
+
+    /// Zero-based logical column coordinate.
+    #[must_use]
+    pub const fn column(&self) -> usize {
+        self.column
+    }
+
+    /// Ordered operations applied to the cell.
+    #[must_use]
+    pub fn operations(&self) -> &[HyperlinkOperation] {
+        &self.operations
+    }
+}
+
 /// An immutable semantic ODS cell snapshot bound to one positional source.
 ///
 /// The snapshot shares the retained `content.xml` and worksheet projection.
@@ -84,6 +241,7 @@ pub struct SourceCellEdit<'source> {
     before: SourceCellSnapshot<'source>,
     touched: BTreeMap<usize, Sheet>,
     coordinates: Vec<(usize, usize, usize)>,
+    hyperlink_edit: bool,
     structure_protected: bool,
     protected_sheets: Vec<String>,
 }
@@ -238,6 +396,7 @@ impl<'source> SourceCellSnapshot<'source> {
             before: self.clone(),
             touched: BTreeMap::new(),
             coordinates: Vec::new(),
+            hyperlink_edit: false,
             structure_protected,
             protected_sheets,
         })
@@ -305,6 +464,124 @@ impl<'source> SourceCellEdit<'source> {
     ) -> Result<Option<bool>> {
         self.set_formulas(selector, vec![FormulaChange::new(row, column, formula)])
             .map(|selected| selected.map(|changed| changed != 0))
+    }
+
+    /// Atomically apply ordered direct-hyperlink operations to existing cells.
+    ///
+    /// Missing cells, repeated physical rows, merged covered cells, duplicate
+    /// coordinates, and unsupported row shapes are refused.  New or changed
+    /// links are authoring-validated; unchanged parsed links are only required
+    /// to pass storage validation.  Scalar and formula operations retain their
+    /// separate refusal for rows containing hyperlinks.
+    pub fn set_hyperlinks<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        mut changes: Vec<HyperlinkChange>,
+    ) -> Result<Option<usize>> {
+        self.before.check_source()?;
+        validate_hyperlink_changes(&mut changes)?;
+        let Some(sheet_index) =
+            crate::worksheet::snapshot::select(&self.before.sheets, selector.into())?
+        else {
+            self.before.check_source()?;
+            return Ok(None);
+        };
+        let source_sheet = self
+            .touched
+            .get(&sheet_index)
+            .unwrap_or(&self.before.sheets[sheet_index]);
+        for change in &changes {
+            if self
+                .coordinates
+                .iter()
+                .any(|coordinate| *coordinate == (sheet_index, change.row(), change.column()))
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS source cell edit repeats coordinate ({}, {}) on sheet '{}'",
+                    change.row(),
+                    change.column(),
+                    source_sheet.name
+                )));
+            }
+        }
+        let replacements = hyperlink_replacements(source_sheet, &changes)?;
+        let effective =
+            crate::worksheet::snapshot::effective_cell_changes(source_sheet, replacements);
+        if effective.is_empty() {
+            self.before.check_source()?;
+            return Ok(Some(0));
+        }
+        if self.structure_protected
+            || self
+                .protected_sheets
+                .iter()
+                .any(|name| name == &source_sheet.name)
+        {
+            return Err(Error::InvalidFormat(
+                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
+            ));
+        }
+        let attempted = self
+            .coordinates
+            .len()
+            .checked_add(effective.len())
+            .unwrap_or(usize::MAX);
+        if attempted > crate::worksheet::MAX_CELL_CHANGES {
+            return Err(Error::InvalidFormat(format!(
+                "ODS source cell edit exceeds the {} transaction safety limit",
+                crate::worksheet::MAX_CELL_CHANGES
+            )));
+        }
+
+        let mut candidate = source_sheet.clone();
+        candidate.set_cells_prevalidated(
+            effective
+                .iter()
+                .map(|change| (change.row(), change.column(), change.cell().clone()))
+                .collect(),
+        )?;
+        validate_candidate_rows(source_sheet, &candidate, &effective)?;
+        crate::worksheet::package::validate_owned_link_delta(
+            std::slice::from_ref(source_sheet),
+            std::slice::from_ref(&candidate),
+        )?;
+        self.before.check_source()?;
+
+        self.coordinates
+            .try_reserve(effective.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODS source cell coordinates",
+                source,
+            })?;
+        let previous = self.touched.insert(sheet_index, candidate);
+        let old_len = self.coordinates.len();
+        self.coordinates.extend(
+            effective
+                .iter()
+                .map(|change| (sheet_index, change.row(), change.column())),
+        );
+        let previous_hyperlink_edit = self.hyperlink_edit;
+        self.hyperlink_edit = true;
+        if let Err(error) = self.before.check_source() {
+            self.coordinates.truncate(old_len);
+            if let Some(previous) = previous {
+                self.touched.insert(sheet_index, previous);
+            } else {
+                self.touched.remove(&sheet_index);
+            }
+            self.hyperlink_edit = previous_hyperlink_edit;
+            return Err(error);
+        }
+        Ok(Some(effective.len()))
+    }
+
+    /// Alias for [`Self::set_hyperlinks`].
+    pub fn set_links<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        changes: Vec<HyperlinkChange>,
+    ) -> Result<Option<usize>> {
+        self.set_hyperlinks(selector, changes)
     }
 
     /// Atomically replace a bounded batch of existing formula cells.
@@ -547,23 +824,29 @@ impl<'source> SourceCellEdit<'source> {
         // owner's layout must not be reused for that derived snapshot.  A
         // stale layout would splice the second batch at offsets from the
         // original source and could corrupt otherwise valid chained patches.
+        let rewrite_mode = if self.hyperlink_edit {
+            crate::worksheet::package::RowRewriteMode::SourceBackedHyperlinks
+        } else {
+            crate::worksheet::package::RowRewriteMode::SourceBacked
+        };
         let content_xml = if Arc::ptr_eq(&self.before.content_xml, &self.before.owner.content_xml)
             && let Some(layout) = self.before.owner.cached_content_layout()
         {
-            crate::worksheet::package::replace_changed_rows_from_content_xml_with_layout(
+            crate::worksheet::package::replace_changed_rows_from_content_xml_with_layout_mode(
                 &self.before.content_xml,
                 layout,
                 &self.before.sheets,
                 &candidates,
                 validation::MAX_CONTENT_XML_BYTES,
+                rewrite_mode,
             )?
         } else {
-            let (content, layout) =
-                crate::worksheet::package::replace_changed_rows_from_content_xml_retaining_layout(
+            let (content, layout) = crate::worksheet::package::replace_changed_rows_from_content_xml_retaining_layout_mode(
                     &self.before.content_xml,
                     &self.before.sheets,
                     &candidates,
                     validation::MAX_CONTENT_XML_BYTES,
+                    rewrite_mode,
                 )?;
             if let Some(layout) = layout {
                 self.before.owner.cache_content_layout(layout);
@@ -719,6 +1002,150 @@ impl<'source> SourceCellCommit<'source> {
             changed_cells: self.changed_cells,
             content,
         })
+    }
+}
+
+fn validate_hyperlink_changes(changes: &mut [HyperlinkChange]) -> Result<()> {
+    if changes.len() > crate::worksheet::MAX_CELL_CHANGES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS hyperlink batch exceeds the {} operation safety limit",
+            crate::worksheet::MAX_CELL_CHANGES
+        )));
+    }
+    let mut operation_count = 0usize;
+    let mut payload_bytes = 0usize;
+    for change in changes.iter() {
+        if change.row() >= validation::MAX_LOGICAL_ROWS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS hyperlink batch row {} is outside the {}-row logical grid",
+                change.row(),
+                validation::MAX_LOGICAL_ROWS
+            )));
+        }
+        if change.column() >= validation::MAX_LOGICAL_COLUMNS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS hyperlink batch column {} is outside the {}-column logical grid",
+                change.column(),
+                validation::MAX_LOGICAL_COLUMNS
+            )));
+        }
+        operation_count = operation_count
+            .checked_add(change.operations().len())
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODS hyperlink operation count overflows".to_string())
+            })?;
+        if operation_count > crate::worksheet::MAX_CELL_CHANGES {
+            return Err(Error::InvalidFormat(format!(
+                "ODS hyperlink batch exceeds the {} operation safety limit",
+                crate::worksheet::MAX_CELL_CHANGES
+            )));
+        }
+        for operation in change.operations() {
+            let hyperlink = match operation {
+                HyperlinkOperation::Set(hyperlink)
+                | HyperlinkOperation::Add { hyperlink, .. }
+                | HyperlinkOperation::Replace { hyperlink, .. }
+                | HyperlinkOperation::ReplaceAt { hyperlink, .. } => Some(hyperlink),
+                HyperlinkOperation::Remove { .. } | HyperlinkOperation::Clear => None,
+            };
+            if let Some(hyperlink) = hyperlink {
+                hyperlink.validate_storage()?;
+                for value in [
+                    hyperlink.href.len(),
+                    hyperlink.text.len(),
+                    hyperlink.name.as_ref().map_or(0, String::len),
+                    hyperlink.title.as_ref().map_or(0, String::len),
+                    hyperlink.target_frame_name.as_ref().map_or(0, String::len),
+                    hyperlink.style_name.as_ref().map_or(0, String::len),
+                    hyperlink.visited_style_name.as_ref().map_or(0, String::len),
+                ] {
+                    payload_bytes = payload_bytes.checked_add(value).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODS hyperlink batch retained string payload overflows".to_string(),
+                        )
+                    })?;
+                    if payload_bytes > validation::MAX_CONTENT_XML_BYTES {
+                        return Err(Error::InvalidFormat(format!(
+                            "ODS hyperlink batch retained string payload exceeds the {}-byte safety limit",
+                            validation::MAX_CONTENT_XML_BYTES
+                        )));
+                    }
+                }
+            }
+        }
+    }
+    changes.sort_by_key(|change| (change.row(), change.column()));
+    for repeated in changes.windows(2) {
+        if repeated[0].row() == repeated[1].row() && repeated[0].column() == repeated[1].column() {
+            return Err(Error::InvalidFormat(format!(
+                "ODS hyperlink batch repeats logical coordinate ({}, {})",
+                repeated[0].row(),
+                repeated[0].column()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn hyperlink_replacements(sheet: &Sheet, changes: &[HyperlinkChange]) -> Result<Vec<CellChange>> {
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(changes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODS source hyperlink replacements",
+            source,
+        })?;
+    visit_existing_hyperlink_cells(sheet, changes, |_row, existing, change| {
+        if existing.merge == Merge::Covered && !change.operations().is_empty() {
+            return Err(Error::InvalidFormat(
+                "ODS source hyperlink edits refuse covered cells".to_string(),
+            ));
+        }
+        let mut replacement = existing.clone();
+        for operation in change.operations() {
+            apply_hyperlink_operation(&mut replacement, operation)?;
+        }
+        validation::validate_cell(&replacement)?;
+        if !existing.equivalent_run(&replacement) {
+            replacements.push(CellChange::new(change.row(), change.column(), replacement));
+        }
+        Ok(())
+    })?;
+    Ok(replacements)
+}
+
+fn apply_hyperlink_operation(cell: &mut Cell, operation: &HyperlinkOperation) -> Result<()> {
+    match operation {
+        HyperlinkOperation::Set(hyperlink) => cell.set_hyperlink(hyperlink.clone()),
+        HyperlinkOperation::Add { range, hyperlink } => {
+            cell.add_hyperlink(range.clone(), hyperlink.clone())
+        },
+        HyperlinkOperation::Replace { index, hyperlink } => {
+            if cell.hyperlinks().get(*index) == Some(hyperlink) {
+                return Ok(());
+            }
+            cell.replace_hyperlink(*index, hyperlink.clone())?;
+            Ok(())
+        },
+        HyperlinkOperation::ReplaceAt { range, hyperlink } => {
+            if cell
+                .hyperlinks()
+                .iter()
+                .any(|existing| existing.range() == *range && existing == hyperlink)
+            {
+                return Ok(());
+            }
+            cell.replace_hyperlink_at(range.clone(), hyperlink.clone())?;
+            Ok(())
+        },
+        HyperlinkOperation::Remove { index } => {
+            let _removed = cell.remove_hyperlink(*index);
+            Ok(())
+        },
+        HyperlinkOperation::Clear => {
+            let _removed = cell.clear_hyperlinks();
+            Ok(())
+        },
     }
 }
 
@@ -997,6 +1424,58 @@ fn visit_existing_formula_cells(
     Ok(())
 }
 
+fn visit_existing_hyperlink_cells(
+    sheet: &Sheet,
+    changes: &[HyperlinkChange],
+    mut visit: impl FnMut(&Row, &Cell, &HyperlinkChange) -> Result<()>,
+) -> Result<()> {
+    let mut row_index = 0usize;
+    let mut row_start = 0usize;
+    let mut logical_row = None;
+    let mut cell_index = 0usize;
+    let mut cell_start = 0usize;
+    for change in changes {
+        while let Some(row) = sheet.rows.get(row_index) {
+            let row_end = row_start.checked_add(row.repeat()).ok_or_else(|| {
+                Error::InvalidFormat("ODS source row range overflows".to_string())
+            })?;
+            if change.row() < row_end {
+                break;
+            }
+            row_start = row_end;
+            row_index += 1;
+        }
+        let Some(row) = sheet.rows.get(row_index) else {
+            return missing_hyperlink_cell(change);
+        };
+        if row.repeat() != 1 {
+            return Err(Error::InvalidFormat(
+                "ODS source hyperlink edits refuse repeated physical rows".to_string(),
+            ));
+        }
+        if logical_row != Some(change.row()) {
+            logical_row = Some(change.row());
+            cell_index = 0;
+            cell_start = 0;
+        }
+        while let Some(cell) = row.cells.get(cell_index) {
+            let cell_end = cell_start.checked_add(cell.repeat()).ok_or_else(|| {
+                Error::InvalidFormat("ODS source cell range overflows".to_string())
+            })?;
+            if change.column() < cell_end {
+                visit(row, cell, change)?;
+                break;
+            }
+            cell_start = cell_end;
+            cell_index += 1;
+        }
+        if row.cells.get(cell_index).is_none() {
+            return missing_hyperlink_cell(change);
+        }
+    }
+    Ok(())
+}
+
 fn missing_cell(change: &CellChange) -> Result<()> {
     Err(Error::InvalidFormat(format!(
         "ODS source cell ({}, {}) does not exist",
@@ -1008,6 +1487,14 @@ fn missing_cell(change: &CellChange) -> Result<()> {
 fn missing_formula_cell(change: &FormulaChange) -> Result<()> {
     Err(Error::InvalidFormat(format!(
         "ODS source formula cell ({}, {}) does not exist",
+        change.row(),
+        change.column()
+    )))
+}
+
+fn missing_hyperlink_cell(change: &HyperlinkChange) -> Result<()> {
+    Err(Error::InvalidFormat(format!(
+        "ODS source hyperlink cell ({}, {}) does not exist",
         change.row(),
         change.column()
     )))

@@ -1726,7 +1726,15 @@ fn write_cell_bounded(output: &mut String, cell: &Cell, max_bytes: usize) -> Res
         || !cell.hyperlinks.is_empty()
         || matches!(cell.value, CellValue::Text(_))
     {
-        bounded_push(output, "<text:p>", max_bytes)?;
+        bounded_push(
+            output,
+            if requires_xml_space_preserve(&cell.text) {
+                "<text:p xml:space=\"preserve\">"
+            } else {
+                "<text:p>"
+            },
+            max_bytes,
+        )?;
         write_cell_text_bounded(output, &cell.text, &cell.hyperlinks, max_bytes)?;
         bounded_push(output, "</text:p>", max_bytes)?;
     }
@@ -1943,7 +1951,11 @@ fn write_cell_inner(
         || !cell.hyperlinks.is_empty()
         || matches!(cell.value, CellValue::Text(_))
     {
-        output.push_str("<text:p>");
+        output.push_str(if requires_xml_space_preserve(&cell.text) {
+            "<text:p xml:space=\"preserve\">"
+        } else {
+            "<text:p>"
+        });
         write_cell_text(output, &cell.text, &cell.hyperlinks);
         output.push_str("</text:p>");
     }
@@ -1964,6 +1976,11 @@ fn write_cell_text(output: &mut String, text: &str, hyperlinks: &[Link]) {
         cursor = range.end;
     }
     output.push_str(&escape_xml(&text[cursor..]));
+}
+
+fn requires_xml_space_preserve(text: &str) -> bool {
+    text.bytes()
+        .any(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))
 }
 
 fn write_cell_text_bounded(

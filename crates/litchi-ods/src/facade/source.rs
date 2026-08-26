@@ -2,7 +2,8 @@
 //!
 //! [`SourceBackedSpreadsheet`] retains a ZIP index and validated semantic XML
 //! while unrelated package members stay cold until selected. Focused ordinary
-//! existing-cell edits publish through the source-backed `content.xml` path;
+//! existing-cell and direct-hyperlink edits publish through the source-backed
+//! `content.xml` path;
 //! callers explicitly call [`SourceBackedSpreadsheet::materialize`] before
 //! entering the complete owned/mutable [`super::Spreadsheet`] boundary.
 
