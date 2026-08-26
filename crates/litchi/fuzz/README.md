@@ -103,9 +103,18 @@ source admits the rooted control graph it exercises no-op and Some-to-Some
 reads, cross-kind replacement, clear/reset, exact inverse/apply/conflict,
 candidate readback, and source-byte atomicity. It also probes invalid ranges,
 all selector forms, bounded ingress limits, and redacted errors against the
-native Numbers seed. The recipes under
-`corpus/numbers_table_cell_control/` are command bytes only; no native IDs,
-BNC payloads, archive names, or generated values cross this target.
+native Numbers seed. In addition to `basic.numbers`, the target embeds the
+checked-in `split_component_source.numbers` recipe. That source places the
+rooted model, tile, format/control lists, and Pop-Up model in separate current
+members; a successful changed transaction must report every touched member,
+preserve its metadata token/external-edge closure, and replay exact forward,
+inverse, and conflict patches. The split path also probes shared refcount
+clears, physical alias/edge failures supplied by mutated ZIP inputs, and
+required-minus-one ingress limits before candidate publication. Unsupported
+or malformed split ownership is expected to fail closed with the original
+bytes unchanged. The recipes under `corpus/numbers_table_cell_control/` are
+command bytes except for the explicitly named native split source; no native
+IDs, BNC payloads, archive names, or generated values cross this target.
 
 `numbers_table_sort_order` is the focused selector-first persisted table-sort
 configuration target. It offers arbitrary bytes to bounded Numbers ingress
@@ -418,6 +427,11 @@ cargo +nightly fuzz run numbers_table_cell_control \
   corpus/numbers_table_cell_control -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
+
+The `split_component_write_commands.hex` and
+`split_component_clear_refcount.hex` recipes select the multi-member write
+and clear/refcount branches; the native `split_component_source.numbers` is
+embedded by the target and is therefore exercised on every command campaign.
 
 Run the focused Numbers persisted-sort target with its command seeds:
 

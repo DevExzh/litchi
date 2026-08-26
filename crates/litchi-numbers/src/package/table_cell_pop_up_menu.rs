@@ -97,12 +97,24 @@ pub enum LimitKind {
     WireBytes,
     /// Strict codec output bytes.
     WireOutputBytes,
+    /// Strict codec reference-envelope bytes.
+    WireReferenceBytes,
+    /// Strict codec selected-text bytes.
+    WireTextBytes,
     /// Strict codec fields inspected.
     WireFields,
     /// Strict codec nesting depth.
     WireNesting,
     /// Strict codec work.
     WireWork,
+    /// Private codec/reassembly scratch bytes.
+    ScratchBytes,
+    /// Private candidate bytes retained during execution.
+    RetainedBytes,
+    /// Bounded allocation units reserved by a phase.
+    Allocations,
+    /// Compressed physical member bytes.
+    CompressedBytes,
     /// Aggregate transaction work.
     TransactionWork,
 }
@@ -446,8 +458,12 @@ impl Package {
         budget
             .charge_transaction_work(target_owner.as_ref().len().saturating_mul(2), patch.path)?;
         budget.charge_allocations(2, patch.path)?;
+        budget.charge_candidate_input_bytes(target_owner.as_ref().len(), patch.path)?;
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
             .map_err(|_| Error::Verification)?;
+        let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
+            .map_err(|_| Error::Verification)?;
+        budget.charge_candidate_reopen(candidate_catalog, patch.path)?;
         let candidate_target = resolve_cell(
             &candidate,
             SheetSelector::index(sheet),
@@ -506,8 +522,15 @@ pub(super) struct TransactionBudget {
     max_payload_items: usize,
     max_payload_references: usize,
     max_wire_bytes: usize,
+    max_wire_nesting: u32,
+    max_wire_reference_bytes: usize,
+    max_wire_text_bytes: usize,
     max_wire_fields: usize,
     max_wire_work: usize,
+    max_scratch_bytes: usize,
+    max_retained_bytes: usize,
+    max_compressed_bytes: usize,
+    max_candidate_input_bytes: usize,
     max_transaction_work: usize,
     max_allocations: usize,
     remaining_input_bytes: usize,
@@ -521,8 +544,15 @@ pub(super) struct TransactionBudget {
     remaining_payload_items: usize,
     remaining_payload_references: usize,
     remaining_wire_bytes: usize,
+    remaining_wire_nesting: u32,
+    remaining_wire_reference_bytes: usize,
+    remaining_wire_text_bytes: usize,
     remaining_wire_fields: usize,
     remaining_wire_work: usize,
+    remaining_scratch_bytes: usize,
+    remaining_retained_bytes: usize,
+    remaining_compressed_bytes: usize,
+    remaining_candidate_input_bytes: usize,
     remaining_transaction_work: usize,
     remaining_allocations: usize,
 }
@@ -551,8 +581,15 @@ impl TransactionBudget {
         let max_payload_messages = max_payload_objects.saturating_mul(8).max(1);
         let max_payload_items = max_payload_references.saturating_mul(8).max(1);
         let max_wire_bytes = max_payload_bytes;
+        let max_wire_nesting = 64;
+        let max_wire_reference_bytes = max_payload_references.saturating_mul(16).max(1);
+        let max_wire_text_bytes = max_payload_bytes;
         let max_wire_fields = max_wire_bytes.saturating_mul(64).max(1);
         let max_wire_work = max_wire_bytes.saturating_mul(256).max(1);
+        let max_scratch_bytes = max_wire_work;
+        let max_retained_bytes = max_wire_work;
+        let max_compressed_bytes = max_total_entry_bytes;
+        let max_candidate_input_bytes = max_input_bytes;
         let max_transaction_work = max_input_bytes.saturating_mul(64).max(1);
         let max_allocations = source
             .state
@@ -574,8 +611,15 @@ impl TransactionBudget {
             max_payload_items,
             max_payload_references,
             max_wire_bytes,
+            max_wire_nesting,
+            max_wire_reference_bytes,
+            max_wire_text_bytes,
             max_wire_fields,
             max_wire_work,
+            max_scratch_bytes,
+            max_retained_bytes,
+            max_compressed_bytes,
+            max_candidate_input_bytes,
             max_transaction_work,
             max_allocations,
             remaining_input_bytes: max_input_bytes,
@@ -589,8 +633,15 @@ impl TransactionBudget {
             remaining_payload_items: max_payload_items,
             remaining_payload_references: max_payload_references,
             remaining_wire_bytes: max_wire_bytes,
+            remaining_wire_nesting: max_wire_nesting,
+            remaining_wire_reference_bytes: max_wire_reference_bytes,
+            remaining_wire_text_bytes: max_wire_text_bytes,
             remaining_wire_fields: max_wire_fields,
             remaining_wire_work: max_wire_work,
+            remaining_scratch_bytes: max_scratch_bytes,
+            remaining_retained_bytes: max_retained_bytes,
+            remaining_compressed_bytes: max_compressed_bytes,
+            remaining_candidate_input_bytes: max_candidate_input_bytes,
             remaining_transaction_work: max_transaction_work,
             remaining_allocations: max_allocations,
         }
@@ -639,6 +690,24 @@ impl TransactionBudget {
         Self::charge(
             &mut self.remaining_input_bytes,
             self.max_input_bytes,
+            amount,
+            LimitKind::InputBytes,
+            path,
+        )
+    }
+
+    /// Charge bytes consumed by reopening a private candidate.  Candidate
+    /// ingress has its own counter so source catalog bytes and candidate bytes
+    /// are independent traversals rather than an accidental double charge of
+    /// the same input ceiling.
+    pub(super) fn charge_candidate_input_bytes(
+        &mut self,
+        amount: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        Self::charge(
+            &mut self.remaining_candidate_input_bytes,
+            self.max_candidate_input_bytes,
             amount,
             LimitKind::InputBytes,
             path,
@@ -761,6 +830,53 @@ impl TransactionBudget {
         )
     }
 
+    pub(super) fn charge_wire_nesting(&mut self, depth: u32, path: Path) -> Result<(), Error> {
+        let observed = self
+            .max_wire_nesting
+            .saturating_sub(self.remaining_wire_nesting);
+        if depth > self.max_wire_nesting {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(depth),
+                maximum: u64::from(self.max_wire_nesting),
+                path,
+            });
+        }
+        // Nesting is a maximum across independent traversals, not an additive
+        // byte/work counter.  Keep the deepest observed level as the only
+        // debit so a second scan cannot falsely exhaust the depth ceiling.
+        self.remaining_wire_nesting = self.max_wire_nesting.saturating_sub(observed.max(depth));
+        Ok(())
+    }
+
+    pub(super) fn charge_wire_reference_bytes(
+        &mut self,
+        amount: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        Self::charge(
+            &mut self.remaining_wire_reference_bytes,
+            self.max_wire_reference_bytes,
+            amount,
+            LimitKind::WireReferenceBytes,
+            path,
+        )
+    }
+
+    pub(super) fn charge_wire_text_bytes(
+        &mut self,
+        amount: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        Self::charge(
+            &mut self.remaining_wire_text_bytes,
+            self.max_wire_text_bytes,
+            amount,
+            LimitKind::WireTextBytes,
+            path,
+        )
+    }
+
     pub(super) fn charge_wire_fields(&mut self, amount: usize, path: Path) -> Result<(), Error> {
         Self::charge(
             &mut self.remaining_wire_fields,
@@ -777,6 +893,40 @@ impl TransactionBudget {
             self.max_wire_work,
             amount,
             LimitKind::WireWork,
+            path,
+        )
+    }
+
+    pub(super) fn charge_scratch_bytes(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        Self::charge(
+            &mut self.remaining_scratch_bytes,
+            self.max_scratch_bytes,
+            amount,
+            LimitKind::ScratchBytes,
+            path,
+        )
+    }
+
+    pub(super) fn charge_retained_bytes(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        Self::charge(
+            &mut self.remaining_retained_bytes,
+            self.max_retained_bytes,
+            amount,
+            LimitKind::RetainedBytes,
+            path,
+        )
+    }
+
+    pub(super) fn charge_compressed_bytes(
+        &mut self,
+        amount: usize,
+        path: Path,
+    ) -> Result<(), Error> {
+        Self::charge(
+            &mut self.remaining_compressed_bytes,
+            self.max_compressed_bytes,
+            amount,
+            LimitKind::CompressedBytes,
             path,
         )
     }
@@ -800,7 +950,7 @@ impl TransactionBudget {
             &mut self.remaining_allocations,
             self.max_allocations,
             amount,
-            LimitKind::TransactionWork,
+            LimitKind::Allocations,
             path,
         )
     }
@@ -812,13 +962,9 @@ impl TransactionBudget {
     ) -> Result<(), Error> {
         self.charge_output(requirements.output_bytes(), path)?;
         self.charge_allocations(requirements.allocations(), path)?;
-        self.charge_transaction_work(
-            requirements
-                .output_bytes()
-                .saturating_add(requirements.scratch_bytes())
-                .saturating_add(requirements.retained_bytes()),
-            path,
-        )
+        self.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+        self.charge_retained_bytes(requirements.retained_bytes(), path)?;
+        self.charge_transaction_work(requirements.output_bytes(), path)
     }
 
     pub(super) fn charge_package_source(
@@ -834,6 +980,48 @@ impl TransactionBudget {
             total = total.saturating_add(entry.data().len());
         }
         self.charge_total_entry_bytes(total, path)?;
+        Ok(())
+    }
+
+    /// Charge the physical and parsed work performed by reopening a private
+    /// candidate.  Candidate input bytes are precharged separately, before
+    /// ZIP execution; this method accounts the distinct member/component
+    /// scans after the candidate catalog exists and therefore never debits
+    /// that input ceiling a second time.
+    pub(super) fn charge_candidate_reopen(
+        &mut self,
+        catalog: &litchi_iwa_archive::SourceCatalog,
+        path: Path,
+    ) -> Result<(), Error> {
+        let mut total_entry_bytes = 0usize;
+        for entry in catalog.package().iter() {
+            self.charge_entries(1, path)?;
+            self.charge_entry_bytes(entry.data().len(), path)?;
+            self.charge_compressed_bytes(entry.data().len(), path)?;
+            total_entry_bytes = total_entry_bytes.saturating_add(entry.data().len());
+        }
+        self.charge_total_entry_bytes(total_entry_bytes, path)?;
+        for component in catalog.components().iter() {
+            let archive = component.archive();
+            self.charge_payload_objects(archive.objects.len(), path)?;
+            let mut messages = 0usize;
+            let mut references = 0usize;
+            for object in &archive.objects {
+                messages = messages.saturating_add(object.messages.len());
+                for info in &object.archive_info.message_infos {
+                    references = references.saturating_add(info.object_references.len());
+                    references = references.saturating_add(
+                        info.field_infos
+                            .iter()
+                            .map(|field| field.object_references.len())
+                            .sum::<usize>(),
+                    );
+                }
+            }
+            self.charge_payload_messages(messages, path)?;
+            self.charge_payload_references(references, path)?;
+            self.charge_payload_items(messages.saturating_add(archive.objects.len()), path)?;
+        }
         Ok(())
     }
 
@@ -869,9 +1057,64 @@ impl TransactionBudget {
             self.remaining_wire_bytes.min(source.len().max(1)),
             self.remaining_wire_work.max(1),
             self.remaining_wire_fields.max(1),
-            64,
+            self.max_wire_nesting,
             self.remaining_payload_references.max(1),
             self.remaining_payload_references.max(1),
+        )
+    }
+
+    pub(super) fn residual_popup_options(&self, source: &[u8]) -> popup_codec::DecodeOptions {
+        let bytes = source.len().max(1);
+        popup_codec::DecodeOptions::new(
+            self.remaining_wire_bytes.min(bytes),
+            self.remaining_output_bytes
+                .min(bytes.saturating_mul(2).max(1)),
+            self.remaining_wire_fields.max(1),
+            self.remaining_wire_work.max(1),
+            self.max_wire_nesting,
+            self.remaining_payload_references.max(1),
+            self.remaining_payload_items.max(1),
+            self.remaining_wire_text_bytes.min(bytes).max(1),
+        )
+    }
+
+    pub(super) fn charge_storage_decode_report(
+        &mut self,
+        report: storage_codec::DecodeReport,
+        include_input: bool,
+        path: Path,
+    ) -> Result<(), Error> {
+        if include_input {
+            self.charge_wire_bytes(report.source_bytes(), path)?;
+        }
+        self.charge_wire_fields(report.fields(), path)?;
+        self.charge_wire_work(report.work_bytes(), path)?;
+        self.charge_wire_nesting(report.max_depth(), path)?;
+        self.charge_payload_references(report.references(), path)?;
+        self.charge_wire_reference_bytes(report.reference_bytes(), path)?;
+        self.charge_wire_text_bytes(report.text_bytes(), path)
+    }
+
+    pub(super) fn residual_control_options_for_len(
+        &self,
+        source_len: usize,
+    ) -> control_codec::DecodeOptions {
+        let bytes = source_len.max(256);
+        control_codec::DecodeOptions::new(
+            self.remaining_wire_bytes.min(bytes).max(1),
+            self.remaining_output_bytes
+                .min(bytes.saturating_mul(2).max(1))
+                .max(1),
+            self.remaining_wire_fields
+                .min(bytes.saturating_mul(8).max(1)),
+            self.remaining_wire_work
+                .min(bytes.saturating_mul(16).max(1)),
+            self.max_wire_nesting,
+            self.remaining_payload_references
+                .min(bytes.saturating_mul(2).max(1)),
+            self.remaining_payload_items
+                .min(bytes.saturating_mul(2).max(1)),
+            self.remaining_wire_text_bytes.min(bytes).max(1),
         )
     }
 
@@ -885,12 +1128,10 @@ impl TransactionBudget {
     ) -> storage_codec::DecodeOptions {
         let bytes = source.len().max(1).saturating_mul(8);
         storage_codec::DecodeOptions::new(
-            self.remaining_wire_bytes
-                .min(bytes)
-                .max(source.len().max(1)),
+            self.remaining_wire_bytes.min(bytes).max(1),
             self.remaining_wire_work.max(1),
             self.remaining_wire_fields.max(1),
-            64,
+            self.max_wire_nesting,
             self.remaining_payload_references.max(1),
             self.remaining_payload_references.max(1),
         )
@@ -967,6 +1208,7 @@ fn rewrite_transaction(
     let metadata_report = metadata_facts.report();
     budget.charge_wire_fields(metadata_report.fields(), path)?;
     budget.charge_wire_work(metadata_report.work_bytes(), path)?;
+    budget.charge_wire_nesting(metadata_report.max_depth(), path)?;
     budget.charge_payload_items(metadata_report.components_scanned(), path)?;
     budget.charge_payload_references(metadata_report.references_scanned(), path)?;
     budget.charge_transaction_work(
@@ -1015,10 +1257,20 @@ fn rewrite_transaction(
     )?;
     let previews = super::table_headers::rewrite::root_preview_deletions(catalog)
         .map_err(|_| Error::InvalidSource { path })?;
-    let edits = [
-        EntryEdit::new(&native.member_name, &native.member_bytes),
-        EntryEdit::new(super::metadata::ENTRY_NAME, &metadata_bytes),
-    ];
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(native.member_edits.len().saturating_add(1))
+        .map_err(|_| Error::Allocation {
+            amount: native.member_edits.len().saturating_add(1),
+            path,
+        })?;
+    for edit in &native.member_edits {
+        edits.push(EntryEdit::new(
+            edit.member_name.as_str(),
+            edit.member_bytes.as_slice(),
+        ));
+    }
+    edits.push(EntryEdit::new(super::metadata::ENTRY_NAME, &metadata_bytes));
     let prepared = catalog
         .package()
         .prepare_reassembly_with_deletions(&edits, &previews, catalog.limits())
@@ -1036,12 +1288,21 @@ fn rewrite_transaction(
             .saturating_add(source.state.components.catalog().len().saturating_mul(1024)),
         path,
     )?;
+    budget.charge_candidate_input_bytes(requirements.output_bytes(), path)?;
     let bytes = prepared
         .execute(requirements.exact_limits())
         .map_err(|_| Error::Verification)?;
     let candidate = Package::from_owned_bytes_with_options(bytes, source.state.options)
         .map_err(|_| Error::Verification)?;
-    verify_package_locality(source, &candidate, &native.member_name)?;
+    let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
+        .map_err(|_| Error::Verification)?;
+    budget.charge_candidate_reopen(candidate_catalog, path)?;
+    let native_member_names = native
+        .member_edits
+        .iter()
+        .map(|edit| edit.member_name.as_str())
+        .collect::<Vec<_>>();
+    verify_package_locality_for_members(source, &candidate, &native_member_names)?;
     let reread = read_popup_with_budget(
         &candidate,
         resolve_cell(
@@ -1060,9 +1321,13 @@ fn rewrite_transaction(
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
         .__source_owner();
-    let touched_components = usize::from(!native.member_name.is_empty()).saturating_add(
-        usize::from(native.member_name != super::metadata::ENTRY_NAME),
-    );
+    let touched_components = native
+        .member_edits
+        .iter()
+        .map(|edit| edit.component_index)
+        .chain(std::iter::once(metadata_facts.route().component_index))
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
     Ok(Commit {
         package: candidate,
         patch: Patch {
@@ -1080,17 +1345,24 @@ fn rewrite_transaction(
     })
 }
 
-fn verify_package_locality(
+/// Verify package-level locality for a native transaction that rewrites one
+/// or more physical members.  All non-authorized members must remain exact,
+/// including opaque/versioned entries and metadata; preview deletions are
+/// intentionally handled by the caller because their policy is operation
+/// specific.
+pub(super) fn verify_package_locality_for_members(
     source: &Package,
     candidate: &Package,
-    native_member: &str,
+    native_members: &[&str],
 ) -> Result<(), Error> {
     let source_catalog =
         super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
         .map_err(|_| Error::Verification)?;
     let allowed = |name: &str| {
-        name == native_member || name == super::metadata::ENTRY_NAME || name.starts_with("preview")
+        native_members.contains(&name)
+            || name == super::metadata::ENTRY_NAME
+            || name.starts_with("preview")
     };
     for entry in source_catalog.package().iter() {
         if allowed(entry.name()) {
@@ -1122,8 +1394,7 @@ fn verify_package_locality(
 }
 
 struct NativeRewrite {
-    member_name: String,
-    member_bytes: Vec<u8>,
+    member_edits: Vec<popup_native::NativeMemberEdit>,
     added_model: Option<u64>,
     removed_models: Vec<u64>,
 }
@@ -1157,15 +1428,13 @@ fn rewrite_native_entry(
     let (model_snapshot, model_report) =
         storage_codec::decode_table_model_with_report(&model.data, options)
             .map_err(|_| Error::InvalidSource { path })?;
-    budget.charge_wire_fields(model_report.fields(), path)?;
-    budget.charge_wire_work(model_report.work_bytes(), path)?;
-    budget.charge_payload_references(model_report.references(), path)?;
-    let (store, store_report) =
-        storage_codec::decode_data_store_with_report(model_snapshot.base_data_store(), options)
-            .map_err(|_| Error::InvalidSource { path })?;
-    budget.charge_wire_fields(store_report.fields(), path)?;
-    budget.charge_wire_work(store_report.work_bytes(), path)?;
-    budget.charge_payload_references(store_report.references(), path)?;
+    budget.charge_storage_decode_report(model_report, false, path)?;
+    let (store, store_report) = storage_codec::decode_data_store_with_report(
+        model_snapshot.base_data_store(),
+        budget.residual_storage_options(model_snapshot.base_data_store()),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    budget.charge_storage_decode_report(store_report, true, path)?;
     let control_table_identifier = store
         .control_cell_spec_table()
         .map(|reference| reference.identifier())
@@ -1175,12 +1444,13 @@ fn rewrite_native_entry(
         .map(|reference| reference.identifier())
         .ok_or(Error::InvalidSource { path })?;
     let mut tiles = TileCollector::default();
-    let (tile_storage, tile_report) =
-        storage_codec::decode_tile_storage_with_visitor(store.tiles(), options, &mut tiles)
-            .map_err(|_| Error::InvalidSource { path })?;
-    budget.charge_wire_fields(tile_report.fields(), path)?;
-    budget.charge_wire_work(tile_report.work_bytes(), path)?;
-    budget.charge_payload_references(tile_report.references(), path)?;
+    let (tile_storage, tile_report) = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        budget.residual_storage_options(store.tiles()),
+        &mut tiles,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    budget.charge_storage_decode_report(tile_report, true, path)?;
     let tile_size = tile_storage
         .tile_size()
         .ok_or(Error::InvalidSource { path })?;
@@ -1221,6 +1491,7 @@ fn rewrite_native_entry(
         .map_err(|_| Error::InvalidSource { path })?;
     let native_input = popup_native::NativePopUpInput {
         archive,
+        component_index: target.component_index,
         model_identifier: target.model_identifier,
         tile_identifier,
         tile_row: target.position.row(),
@@ -1234,8 +1505,9 @@ fn rewrite_native_entry(
         limits: archive_limits,
         path,
     };
-    let copy_on_write_candidates = popup_native::existing_popup_model_identifiers(native_input)
-        .map_err(|error| map_native_error(error, path))?;
+    let copy_on_write_candidates =
+        popup_native::existing_popup_model_identifiers(native_input, budget, path)
+            .map_err(|error| map_native_error(error, path))?;
     budget.charge_payload_items(copy_on_write_candidates.len().max(1), path)?;
     budget.charge_payload_references(copy_on_write_candidates.len(), path)?;
     budget.charge_transaction_work(
@@ -1285,26 +1557,26 @@ fn rewrite_native_entry(
     }
     let output = popup_native::rewrite_native_popup_menu(native_input, budget)
         .map_err(|error| map_native_error(error, path))?;
-    let maximum_compressed = SnappyStream::maximum_compressed_len(output.archive_bytes.len())
-        .map_err(|_| Error::InvalidSource { path })?;
-    budget.charge_transaction_work(
-        output
-            .archive_bytes
-            .len()
-            .saturating_add(maximum_compressed),
-        path,
-    )?;
-    budget.charge_allocations(2, path)?;
-    let member_bytes =
-        SnappyStream::compress(&output.archive_bytes).map_err(|_| Error::InvalidSource { path })?;
+    let mut member_edits = output.member_edits.edits;
+    budget.charge_allocations(member_edits.len(), path)?;
+    for edit in &mut member_edits {
+        let maximum_compressed = SnappyStream::maximum_compressed_len(edit.member_bytes.len())
+            .map_err(|_| Error::InvalidSource { path })?;
+        budget.charge_compressed_bytes(maximum_compressed, path)?;
+        budget.charge_transaction_work(
+            edit.member_bytes.len().saturating_add(maximum_compressed),
+            path,
+        )?;
+        edit.member_bytes = SnappyStream::compress(&edit.member_bytes)
+            .map_err(|_| Error::InvalidSource { path })?;
+    }
     let added_model = match output.added_object_identifiers.as_slice() {
         [] => None,
         [identifier] => Some(*identifier),
         _ => return Err(Error::UnsupportedDependency { path }),
     };
     Ok(NativeRewrite {
-        member_name: component.name().to_owned(),
-        member_bytes,
+        member_edits,
         added_model,
         removed_models: output.removed_object_identifiers,
     })
@@ -1395,6 +1667,7 @@ fn rewrite_popup_metadata(
         let report = prepared.prepare_report();
         budget.charge_wire_fields(report.fields(), path)?;
         budget.charge_wire_work(report.work_bytes(), path)?;
+        budget.charge_wire_nesting(report.max_depth(), path)?;
         budget.charge_payload_items(report.components_scanned(), path)?;
         budget.charge_payload_references(report.references_scanned(), path)?;
         budget.charge_transaction_work(
@@ -1407,13 +1680,9 @@ fn rewrite_popup_metadata(
         budget.charge_payload_items(requirements.components(), path)?;
         budget.charge_payload_references(requirements.references(), path)?;
         budget.charge_allocations(requirements.allocations(), path)?;
-        budget.charge_transaction_work(
-            requirements
-                .output_bytes()
-                .saturating_add(requirements.retained_bytes())
-                .saturating_add(requirements.scratch_bytes()),
-            path,
-        )?;
+        budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+        budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+        budget.charge_transaction_work(requirements.output_bytes(), path)?;
         let limits = requirements.exact_limits();
         return prepared
             .execute(limits)
@@ -1448,6 +1717,7 @@ fn rewrite_popup_metadata(
         let report = prepared.prepare_report();
         budget.charge_wire_fields(report.fields(), path)?;
         budget.charge_wire_work(report.work_bytes(), path)?;
+        budget.charge_wire_nesting(report.max_depth(), path)?;
         budget.charge_payload_items(report.components_scanned(), path)?;
         budget.charge_payload_references(report.references_scanned(), path)?;
         budget.charge_transaction_work(
@@ -1460,13 +1730,9 @@ fn rewrite_popup_metadata(
         budget.charge_payload_items(requirements.components(), path)?;
         budget.charge_payload_references(requirements.references(), path)?;
         budget.charge_allocations(requirements.allocations(), path)?;
-        budget.charge_transaction_work(
-            requirements
-                .output_bytes()
-                .saturating_add(requirements.retained_bytes())
-                .saturating_add(requirements.scratch_bytes()),
-            path,
-        )?;
+        budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+        budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+        budget.charge_transaction_work(requirements.output_bytes(), path)?;
         let limits = requirements.exact_limits();
         return prepared
             .execute(limits)
@@ -1481,6 +1747,7 @@ fn rewrite_popup_metadata(
     let report = prepared.prepare_report();
     budget.charge_wire_fields(report.fields(), path)?;
     budget.charge_wire_work(report.work_bytes(), path)?;
+    budget.charge_wire_nesting(report.max_depth(), path)?;
     budget.charge_payload_items(report.components_scanned(), path)?;
     budget.charge_payload_references(report.references_scanned(), path)?;
     budget.charge_transaction_work(
@@ -1493,18 +1760,82 @@ fn rewrite_popup_metadata(
     budget.charge_payload_items(requirements.components(), path)?;
     budget.charge_payload_references(requirements.references(), path)?;
     budget.charge_allocations(requirements.allocations(), path)?;
-    budget.charge_transaction_work(
-        requirements
-            .output_bytes()
-            .saturating_add(requirements.retained_bytes())
-            .saturating_add(requirements.scratch_bytes()),
-        path,
-    )?;
+    budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+    budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+    budget.charge_transaction_work(requirements.output_bytes(), path)?;
     let limits = requirements.exact_limits();
     prepared
         .execute(limits)
         .map(|output| output.into_bytes())
         .map_err(|error| map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path))
+}
+
+/// Rewrite only the root and save tokens for an already-validated set of
+/// current native members.  Scalar cell controls do not allocate native
+/// objects, but a split graph still mutates its tile and list members; their
+/// current component tokens must advance atomically with the ZIP edits.
+pub(super) fn rewrite_component_save_tokens(
+    source: &Package,
+    component_indices: &[usize],
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let metadata_source = popup_metadata::strict_source(source)
+        .map_err(|error| map_popup_metadata_error(error, path))?;
+    budget.charge_wire_bytes(metadata_source.payload.len(), path)?;
+    let options = popup_metadata_options(metadata_source.payload.len(), 0, budget);
+    let facts = popup_metadata::inspect(source, options)
+        .map_err(|error| map_popup_metadata_error(error, path))?;
+    let report = facts.report();
+    budget.charge_wire_fields(report.fields(), path)?;
+    budget.charge_wire_work(report.work_bytes(), path)?;
+    budget.charge_wire_nesting(report.max_depth(), path)?;
+    budget.charge_payload_items(report.components_scanned(), path)?;
+    budget.charge_payload_references(report.references_scanned(), path)?;
+    budget.charge_allocations(report.allocations(), path)?;
+    budget.charge_scratch_bytes(report.scratch_bytes(), path)?;
+    budget.charge_retained_bytes(report.retained_bytes(), path)?;
+    budget.charge_transaction_work(
+        report.input_bytes().saturating_add(report.output_bytes()),
+        path,
+    )?;
+    if facts.has_physical_alias() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let selectors = facts
+        .selectors_for_components(component_indices)
+        .map_err(|error| map_popup_metadata_error(error, path))?;
+    let save_tokens = SaveTokenBatch::new(&selectors);
+    let prepared = popup_metadata::prepare_save_tokens(&facts, save_tokens, options)
+        .map_err(|error| map_popup_metadata_error(error, path))?;
+    let prepare_report = prepared.prepare_report();
+    budget.charge_wire_fields(prepare_report.fields(), path)?;
+    budget.charge_wire_work(prepare_report.work_bytes(), path)?;
+    budget.charge_wire_nesting(prepare_report.max_depth(), path)?;
+    budget.charge_payload_items(prepare_report.components_scanned(), path)?;
+    budget.charge_payload_references(prepare_report.references_scanned(), path)?;
+    budget.charge_transaction_work(
+        prepare_report
+            .input_bytes()
+            .saturating_add(prepare_report.output_bytes()),
+        path,
+    )?;
+    let requirements = prepared.execution_requirements();
+    budget.charge_wire_fields(requirements.fields(), path)?;
+    budget.charge_wire_work(requirements.work_bytes(), path)?;
+    budget.charge_payload_items(requirements.components(), path)?;
+    budget.charge_payload_references(requirements.references(), path)?;
+    budget.charge_allocations(requirements.allocations(), path)?;
+    budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+    budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+    budget.charge_transaction_work(requirements.output_bytes(), path)?;
+    let payload = prepared
+        .execute(requirements.exact_limits())
+        .map(|output| output.into_bytes())
+        .map_err(|error| {
+            map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path)
+        })?;
+    pack_metadata_payload(source, metadata_source.route, payload, path, budget)
 }
 
 fn pack_metadata_payload(
@@ -1567,6 +1898,7 @@ fn pack_metadata_payload(
     let maximum_compressed = SnappyStream::maximum_compressed_len(archive_upper_bound)
         .map_err(|_| Error::InvalidSource { path })?;
     budget.charge_payload_bytes(archive_upper_bound, path)?;
+    budget.charge_compressed_bytes(maximum_compressed, path)?;
     budget.charge_transaction_work(archive_upper_bound.saturating_add(maximum_compressed), path)?;
     message.data = payload;
     let archive_bytes = archive
@@ -1691,8 +2023,7 @@ pub(super) fn read_cell_control(
     if let Some(control) = scalar {
         return Ok(Some(control));
     }
-    read_popup_with_policy(source, target, false, &mut authority)
-        .map(|menu| menu.map(CellControl::PopUpMenu))
+    Ok(read_popup_with_policy(source, target, false, &mut authority)?.map(CellControl::PopUpMenu))
 }
 
 fn read_non_popup_control<'source>(
@@ -2783,12 +3114,11 @@ fn resolve_typed_message_any(
     Ok(message)
 }
 
-/// Changed routes remain intentionally single-member until the native writer
-/// can clone and publish every touched sidecar together with one metadata
-/// save-token transition. Keep this guard before native/archive candidate
-/// allocation so a real cross-component graph fails closed with its source
-/// bytes untouched; the read/no-op route above is independently allowed after
-/// exact metadata edge proof.
+/// Pop-Up Menu changed routes remain intentionally single-member until that
+/// graph's model/string/style lifecycle can clone and publish every touched
+/// sidecar together with one metadata transition. Scalar controls use their
+/// separate strict multi-member writer; keep this guard for popup transitions
+/// so an unsupported popup graph fails before native candidate allocation.
 pub(super) fn reject_cross_component_write(
     source: &Package,
     target: CellTarget,
@@ -2908,7 +3238,7 @@ pub(super) fn reject_cross_component_write(
 /// exact current external component edge is the required authority.  Missing
 /// Metadata, a missing/ambiguous effective locator, versioned edges, duplicate
 /// edges, and weak/reference-shape conflicts all fail closed.
-fn prove_cross_component_reference<'source>(
+pub(super) fn prove_cross_component_reference<'source>(
     source: &'source Package,
     authority: &mut Option<popup_metadata::RegistryFacts<'source>>,
     source_component_index: usize,
@@ -2947,7 +3277,7 @@ fn prove_cross_component_reference<'source>(
             source_component_index,
             target_component_index,
             object_identifier,
-            None,
+            Some(false),
         )
         .map_err(|_| Error::UnsupportedDependency { path })
 }

@@ -17,6 +17,7 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldType, Limits, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{
+    numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_pop_up_menu_codec as popup_codec,
     numbers_table_cell_storage_codec as storage_codec,
 };
@@ -57,6 +58,11 @@ pub(super) struct NativePopUpValue<'items> {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct NativePopUpInput<'source> {
     pub(super) archive: &'source Archive,
+    /// Index of the physical component containing `archive`.  Keeping this
+    /// beside the member name makes the private output usable by owners that
+    /// stage more than one sidecar in one transaction; a name alone is not a
+    /// safe component identity when effective locators are involved.
+    pub(super) component_index: usize,
     pub(super) model_identifier: u64,
     pub(super) tile_identifier: u64,
     pub(super) tile_row: u32,
@@ -75,15 +81,109 @@ pub(super) struct NativePopUpInput<'source> {
     pub(super) path: Path,
 }
 
+/// One private physical-member candidate produced by a native owner.
+///
+/// Component index and effective member name are both retained deliberately:
+/// a ZIP member name is only a locator, while the component index is the
+/// identity used for metadata save-token selection.  The two values must
+/// agree with the source catalog before publication.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct NativeMemberEdit {
+    pub(super) component_index: usize,
+    pub(super) member_name: String,
+    pub(super) member_bytes: Vec<u8>,
+}
+
+impl NativeMemberEdit {
+    pub(super) fn new(
+        component_index: usize,
+        member_name: impl Into<String>,
+        member_bytes: Vec<u8>,
+    ) -> Self {
+        Self {
+            component_index,
+            member_name: member_name.into(),
+            member_bytes,
+        }
+    }
+}
+
+/// Deduplicated private native edits for one atomic package transaction.
+///
+/// A component/member may occur at most once.  Identical duplicate edits are
+/// coalesced, but conflicting bytes are rejected rather than letting the ZIP
+/// reassembler's last-write-wins behavior hide an ownership bug.  The same
+/// rule applies to a member name that was resolved to two component indices.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct NativeControlOutput {
+    pub(super) edits: Vec<NativeMemberEdit>,
+}
+
+impl NativeControlOutput {
+    pub(super) fn from_edits(edits: Vec<NativeMemberEdit>) -> Result<Self> {
+        let mut deduplicated: Vec<NativeMemberEdit> = Vec::new();
+        deduplicated
+            .try_reserve_exact(edits.len())
+            .map_err(|_| NativePopUpError::Allocation)?;
+        for edit in edits {
+            if edit.member_name.is_empty() {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            if let Some(existing) = deduplicated
+                .iter()
+                .find(|existing| existing.member_name == edit.member_name)
+            {
+                if existing.component_index != edit.component_index
+                    || existing.member_bytes != edit.member_bytes
+                {
+                    return Err(NativePopUpError::UnsupportedDependency);
+                }
+                continue;
+            }
+            deduplicated.push(edit);
+        }
+        deduplicated.sort_unstable_by(|left, right| {
+            left.component_index
+                .cmp(&right.component_index)
+                .then(left.member_name.cmp(&right.member_name))
+        });
+        if deduplicated.is_empty() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        Ok(Self {
+            edits: deduplicated,
+        })
+    }
+
+    pub(super) fn single(
+        component_index: usize,
+        member_name: impl Into<String>,
+        member_bytes: Vec<u8>,
+    ) -> Result<Self> {
+        Self::from_edits(vec![NativeMemberEdit::new(
+            component_index,
+            member_name,
+            member_bytes,
+        )])
+    }
+
+    pub(super) fn member_names(&self) -> impl Iterator<Item = &str> + '_ {
+        self.edits.iter().map(|edit| edit.member_name.as_str())
+    }
+}
+
 /// Owned native output returned to the package transaction.
 ///
-/// `archive_bytes` is the decompressed IWA candidate. The caller compresses it
-/// and places it in the final private ZIP candidate. `cell_bytes` is exposed
-/// separately so callers can perform an object-level locality assertion for
-/// the selected BNC cell.
+/// Each `member_edits` payload is a decompressed IWA candidate. The caller
+/// compresses each member independently and places the resulting edits in the
+/// final private ZIP candidate. `cell_bytes` is exposed separately so callers
+/// can perform an object-level locality assertion for the selected BNC cell.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct NativePopUpOutput {
-    pub(super) archive_bytes: Vec<u8>,
+    /// Deduplicated physical edits.  The popup owner currently emits exactly
+    /// one edit; the envelope is shared with the scalar-control owner so a
+    /// split format/control graph can stage all changed members atomically.
+    pub(super) member_edits: NativeControlOutput,
     pub(super) cell_bytes: Vec<u8>,
     pub(super) format_identifier: Option<u32>,
     pub(super) control_cell_spec_identifier: Option<u32>,
@@ -165,14 +265,21 @@ pub(super) fn rewrite_native_popup_menu(
     let model_object = unique_object(source, input.model_identifier)?;
     let model_message_index = unique_message_index(model_object, TABLE_MODEL_TYPE)?;
     let model_payload = &model_object.messages[model_message_index].data;
-    let model_options = storage_options(model_payload);
-    let (model, _) = storage_codec::decode_table_model_with_report(model_payload, model_options)
-        .map_err(|_| NativePopUpError::Codec)?;
-    let (store, _) = storage_codec::decode_data_store_with_report(
+    let model_options = budget.residual_storage_options(model_payload);
+    let (model, model_report) =
+        storage_codec::decode_table_model_with_report(model_payload, model_options)
+            .map_err(|_| NativePopUpError::Codec)?;
+    budget
+        .charge_storage_decode_report(model_report, true, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    let (store, store_report) = storage_codec::decode_data_store_with_report(
         model.base_data_store(),
-        storage_options(model.base_data_store()),
+        budget.residual_storage_options(model.base_data_store()),
     )
     .map_err(|_| NativePopUpError::Codec)?;
+    budget
+        .charge_storage_decode_report(store_report, true, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
     if store
         .control_cell_spec_table()
         .map(|reference| reference.identifier())
@@ -187,7 +294,9 @@ pub(super) fn rewrite_native_popup_menu(
         store.tiles(),
         input.tile_identifier,
         input.tile_row,
-        storage_options(store.tiles()),
+        budget.residual_storage_options(store.tiles()),
+        budget,
+        input.path,
     )?;
     if tile_identifier != input.tile_identifier {
         return Err(NativePopUpError::InvalidSource);
@@ -204,10 +313,22 @@ pub(super) fn rewrite_native_popup_menu(
     }
 
     let control_list_object = unique_object(source, input.control_table_identifier)?;
-    let control = unique_list_message(control_list_object, LIST_CONTROL_CELL_SPEC, model_options)?;
+    let control = unique_list_message(
+        control_list_object,
+        LIST_CONTROL_CELL_SPEC,
+        model_options,
+        budget,
+        input.path,
+    )?;
     let format_list_object = unique_object(source, input.format_table_identifier)?;
-    let format = unique_list_message(format_list_object, LIST_FORMAT, model_options)?;
-    let bnc_references = census_bnc_references(source, model_options)?;
+    let format = unique_list_message(
+        format_list_object,
+        LIST_FORMAT,
+        model_options,
+        budget,
+        input.path,
+    )?;
+    let bnc_references = census_bnc_references(source, budget, input.path)?;
     validate_bnc_refcounts(&bnc_references, format.payload, LIST_FORMAT, model_options)?;
     validate_bnc_refcounts(
         &bnc_references,
@@ -230,7 +351,13 @@ pub(super) fn rewrite_native_popup_menu(
     // transition does not need to add a string key. Decode it to reject a
     // duplicate/malformed list owner before any candidate allocation.
     let string_object = unique_object(source, store.string_table().identifier())?;
-    let _ = unique_list_message(string_object, LIST_STRING, model_options)?;
+    let _ = unique_list_message(
+        string_object,
+        LIST_STRING,
+        model_options,
+        budget,
+        input.path,
+    )?;
 
     let old_state = inspect_old_state(
         source,
@@ -253,6 +380,7 @@ pub(super) fn rewrite_native_popup_menu(
             &rooted_popup_identifiers,
             input.new_popup_model_identifier,
             model_options,
+            budget,
         )?),
     };
 
@@ -284,12 +412,16 @@ pub(super) fn rewrite_native_popup_menu(
         desired_state.as_ref().map(|state| state.format_key),
         desired_state.as_ref().map(|_| desired_format_payload),
         model_options,
+        budget,
+        input.path,
     )?;
     let (control_bytes, control_key, desired_popup_identifier) = rewrite_control_list(
         control.payload,
         old_state,
         desired_state.as_ref(),
         model_options,
+        budget,
+        input.path,
     )?;
 
     replace_message_preserving_header(
@@ -411,16 +543,20 @@ pub(super) fn rewrite_native_popup_menu(
     // private graph transition as well.  This catches a stale refcount before
     // the candidate leaves the native owner, including the final-reset/cull
     // branch where the selected list entry disappears.
-    let candidate_bnc_references = census_bnc_references(&candidate, model_options)?;
+    let candidate_bnc_references = census_bnc_references(&candidate, budget, input.path)?;
     let candidate_format = unique_list_message(
         unique_object(&candidate, input.format_table_identifier)?,
         LIST_FORMAT,
         model_options,
+        budget,
+        input.path,
     )?;
     let candidate_control = unique_list_message(
         unique_object(&candidate, input.control_table_identifier)?,
         LIST_CONTROL_CELL_SPEC,
         model_options,
+        budget,
+        input.path,
     )?;
     validate_bnc_refcounts(
         &candidate_bnc_references,
@@ -438,9 +574,11 @@ pub(super) fn rewrite_native_popup_menu(
     let archive_bytes = candidate
         .to_bytes_with_limits(input.limits)
         .map_err(|_| NativePopUpError::Archive)?;
-    let changed_members = vec![input.member_name.to_owned()];
+    let member_edits =
+        NativeControlOutput::single(input.component_index, input.member_name, archive_bytes)?;
+    let changed_members = member_edits.member_names().map(str::to_owned).collect();
     Ok(NativePopUpOutput {
-        archive_bytes,
+        member_edits,
         cell_bytes: bnc_output,
         format_identifier: format_key,
         control_cell_spec_identifier: control_key,
@@ -455,7 +593,11 @@ pub(super) fn rewrite_native_popup_menu(
 /// without cloning or rewriting the archive.  The facade runs this pass
 /// before native candidate allocation so metadata can prove exact current
 /// UUID ownership for every reused model.
-pub(super) fn existing_popup_model_identifiers(input: NativePopUpInput<'_>) -> Result<Vec<u64>> {
+pub(super) fn existing_popup_model_identifiers(
+    input: NativePopUpInput<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u64>> {
     validate_unique_route(input.archive, input.control_table_identifier)?;
     let control_object = unique_object(input.archive, input.control_table_identifier)?;
     let options = control_object
@@ -463,18 +605,36 @@ pub(super) fn existing_popup_model_identifiers(input: NativePopUpInput<'_>) -> R
         .iter()
         .filter(|message| message.type_ == TABLE_DATA_LIST_TYPE)
         .max_by_key(|message| message.data.len())
-        .map(|message| storage_options(&message.data))
+        .map(|message| budget.residual_storage_options(&message.data))
         .ok_or(NativePopUpError::InvalidSource)?;
-    let control = unique_list_message(control_object, LIST_CONTROL_CELL_SPEC, options)?;
+    let control = unique_list_message(
+        control_object,
+        LIST_CONTROL_CELL_SPEC,
+        options,
+        budget,
+        path,
+    )?;
     let identifiers = popup_references_from_list(control.payload)?;
     for &identifier in &identifiers {
         let popup = unique_object(input.archive, identifier)?;
         let message_index = unique_message_index(popup, POPUP_MODEL_TYPE)?;
-        popup_codec::decode_popup_menu_model_with_report(
+        let (_, report) = popup_codec::decode_popup_menu_model_with_report(
             &popup.messages[message_index].data,
-            popup_options_for_bytes(&popup.messages[message_index].data),
+            budget.residual_popup_options(&popup.messages[message_index].data),
         )
         .map_err(|_| NativePopUpError::Codec)?;
+        budget
+            .charge_wire_bytes(report.input_bytes(), path)
+            .and_then(|_| budget.charge_wire_fields(report.fields(), path))
+            .and_then(|_| budget.charge_wire_work(report.work_bytes(), path))
+            .and_then(|_| budget.charge_wire_nesting(report.max_depth(), path))
+            .and_then(|_| budget.charge_payload_references(report.references(), path))
+            .and_then(|_| budget.charge_payload_items(report.items(), path))
+            .and_then(|_| budget.charge_wire_text_bytes(report.text_bytes(), path))
+            .and_then(|_| budget.charge_allocations(report.allocations(), path))
+            .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), path))
+            .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), path))
+            .map_err(|_| NativePopUpError::Limit)?;
     }
     Ok(identifiers)
 }
@@ -509,12 +669,18 @@ fn prepare_desired_state(
     rooted_popup_identifiers: &[u64],
     new_identifier: Option<u64>,
     options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
 ) -> Result<DesiredState> {
     if desired.items.is_empty() {
         return Err(NativePopUpError::InvalidSource);
     }
     let popup_options = popup_options_for_items(desired.items);
-    let canonical = popup_codec::canonical_popup_menu_model(desired.items, popup_options)
+    let prepared = popup_codec::prepare_popup_menu_model_write(desired.items, popup_options)
+        .map_err(|_| NativePopUpError::Codec)?;
+    let requirements = prepared.execution_requirements();
+    charge_popup_write_requirements(budget, requirements, Path::Package)?;
+    let canonical = prepared
+        .execute(popup_codec::RewriteExecutionLimits::exact(requirements))
         .map_err(|_| NativePopUpError::Codec)?
         .into_bytes();
     let mut popup_identifier = None;
@@ -540,11 +706,23 @@ fn prepare_desired_state(
         if !rooted_popup_identifiers.contains(&object_identifier) {
             continue;
         }
-        let (snapshot, _) = popup_codec::decode_popup_menu_model_with_report(
+        let (snapshot, report) = popup_codec::decode_popup_menu_model_with_report(
             &message.data,
-            popup_options_for_bytes(&message.data),
+            budget.residual_popup_options(&message.data),
         )
         .map_err(|_| NativePopUpError::Codec)?;
+        budget
+            .charge_wire_bytes(report.input_bytes(), Path::Package)
+            .and_then(|_| budget.charge_wire_fields(report.fields(), Path::Package))
+            .and_then(|_| budget.charge_wire_work(report.work_bytes(), Path::Package))
+            .and_then(|_| budget.charge_wire_nesting(report.max_depth(), Path::Package))
+            .and_then(|_| budget.charge_payload_references(report.references(), Path::Package))
+            .and_then(|_| budget.charge_payload_items(report.items(), Path::Package))
+            .and_then(|_| budget.charge_wire_text_bytes(report.text_bytes(), Path::Package))
+            .and_then(|_| budget.charge_allocations(report.allocations(), Path::Package))
+            .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), Path::Package))
+            .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), Path::Package))
+            .map_err(|_| NativePopUpError::Limit)?;
         if snapshot
             .items()
             .map(|item| item.value())
@@ -573,12 +751,24 @@ fn prepare_desired_state(
         if entry.ref_count == 0 {
             return Err(NativePopUpError::InvalidSource);
         }
-        let (snapshot, _) = popup_codec::decode_cell_spec_with_report(
+        let (snapshot, report) = control_codec::decode_any_cell_spec_with_report(
             &entry.payload,
-            popup_options_for_bytes(&entry.payload),
+            budget.residual_popup_options(&entry.payload),
         )
         .map_err(|_| NativePopUpError::Codec)?;
-        if snapshot.interaction_type() == 7
+        budget
+            .charge_wire_bytes(report.input_bytes(), Path::Package)
+            .and_then(|_| budget.charge_wire_fields(report.fields(), Path::Package))
+            .and_then(|_| budget.charge_wire_work(report.work_bytes(), Path::Package))
+            .and_then(|_| budget.charge_wire_nesting(report.max_depth(), Path::Package))
+            .and_then(|_| budget.charge_payload_references(report.references(), Path::Package))
+            .and_then(|_| budget.charge_payload_items(report.items(), Path::Package))
+            .and_then(|_| budget.charge_wire_text_bytes(report.text_bytes(), Path::Package))
+            .and_then(|_| budget.charge_allocations(report.allocations(), Path::Package))
+            .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), Path::Package))
+            .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), Path::Package))
+            .map_err(|_| NativePopUpError::Limit)?;
+        if let control_codec::CellSpecSnapshot::Popup(snapshot) = snapshot
             && snapshot.popup_model().identifier() == popup_identifier
             && snapshot.starts_with_first() == desired.starts_with_first
         {
@@ -655,7 +845,8 @@ impl storage_codec::StorageVisitor for BncReferenceVisitor<'_> {
 
 fn census_bnc_references(
     archive: &Archive,
-    _options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
 ) -> Result<BncReferenceCounts> {
     let mut counts = BncReferenceCounts::default();
     for object in &archive.objects {
@@ -673,12 +864,15 @@ fn census_bnc_references(
             counts: &mut counts,
             failed: false,
         };
-        storage_codec::decode_tile_with_visitor(
+        let (_, report) = storage_codec::decode_tile_with_visitor(
             &message.data,
-            storage_options(&message.data),
+            budget.residual_storage_options(&message.data),
             &mut visitor,
         )
         .map_err(|_| NativePopUpError::Codec)?;
+        budget
+            .charge_storage_decode_report(report, true, path)
+            .map_err(|_| NativePopUpError::Limit)?;
         if visitor.failed {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -716,7 +910,11 @@ fn census_bnc_row(
         let start = usize::from(raw)
             .checked_mul(unit)
             .ok_or(NativePopUpError::InvalidSource)?;
-        if start >= storage.len() || previous.is_some_and(|prior| prior >= start) {
+        // A minimal automatic BNC cell has an empty payload, so adjacent
+        // materialized columns may legitimately share the same start offset.
+        // Decreasing offsets remain invalid; equal offsets describe a
+        // zero-length cell and are parsed through `BncCell::parse(&[])`.
+        if start > storage.len() || previous.is_some_and(|prior| prior > start) {
             return Err(NativePopUpError::InvalidSource);
         }
         if let Some(prior) = previous {
@@ -850,6 +1048,8 @@ fn rewrite_list_for_format(
     _desired_key: Option<u32>,
     payload: Option<&[u8]>,
     options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
 ) -> Result<(Vec<u8>, Option<u32>)> {
     let list = decode_list_entries(source, options)?;
     let Some(payload) = payload else {
@@ -878,7 +1078,10 @@ fn rewrite_list_for_format(
                 ),
             )
         };
-        return Ok((apply_list_mutation(source, mutation, options)?, None));
+        return Ok((
+            apply_list_mutation_with_budget(source, mutation, budget, path)?,
+            None,
+        ));
     };
     let mut desired_key = list
         .entries
@@ -916,7 +1119,7 @@ fn rewrite_list_for_format(
                 ),
             )
         };
-        output = apply_list_mutation(&output, mutation, options)?;
+        output = apply_list_mutation_with_budget(&output, mutation, budget, path)?;
     }
     if list.entries.iter().any(|entry| entry.key == desired_key) {
         if old_key != Some(desired_key) {
@@ -925,7 +1128,7 @@ fn rewrite_list_for_format(
                 .iter()
                 .find(|entry| entry.key == desired_key)
                 .ok_or(NativePopUpError::InvalidSource)?;
-            output = apply_list_mutation(
+            output = apply_list_mutation_with_budget(
                 &output,
                 storage_codec::TableDataListEntryMutation::RefCount(
                     storage_codec::TableDataListEntryRefCountEdit::new(
@@ -934,16 +1137,18 @@ fn rewrite_list_for_format(
                         entry.ref_count.saturating_add(1),
                     ),
                 ),
-                options,
+                budget,
+                path,
             )?;
         }
     } else {
-        output = apply_list_mutation(
+        output = apply_list_mutation_with_budget(
             &output,
             storage_codec::TableDataListEntryMutation::Append(
                 storage_codec::TableDataListEntryAppend::format(desired_key, 1, payload),
             ),
-            options,
+            budget,
+            path,
         )?;
     }
     Ok((output, Some(desired_key)))
@@ -954,6 +1159,8 @@ fn rewrite_control_list(
     old: Option<OldState>,
     desired: Option<&DesiredState>,
     options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
 ) -> Result<(Vec<u8>, Option<u32>, Option<u64>)> {
     let original = decode_list_entries(source, options)?;
     let mut output = source.to_owned();
@@ -983,7 +1190,7 @@ fn rewrite_control_list(
                     ),
                 )
             };
-            output = apply_list_mutation(&output, mutation, options)?;
+            output = apply_list_mutation_with_budget(&output, mutation, budget, path)?;
         }
     }
     if let Some(desired) = desired {
@@ -994,7 +1201,7 @@ fn rewrite_control_list(
             .find(|entry| entry.key == desired.control_key)
         {
             if old.map(|old| old.control_key) != Some(desired.control_key) {
-                output = apply_list_mutation(
+                output = apply_list_mutation_with_budget(
                     &output,
                     storage_codec::TableDataListEntryMutation::RefCount(
                         storage_codec::TableDataListEntryRefCountEdit::new(
@@ -1003,19 +1210,25 @@ fn rewrite_control_list(
                             entry.ref_count.saturating_add(1),
                         ),
                     ),
-                    options,
+                    budget,
+                    path,
                 )?;
             }
         } else {
             let popup_identifier = desired_popup.ok_or(NativePopUpError::InvalidSource)?;
-            let spec = popup_codec::canonical_cell_spec(
+            let prepared = popup_codec::prepare_cell_spec_write(
                 popup_identifier,
                 desired.starts_with_first,
                 popup_options_for_bytes(source),
             )
-            .map_err(|_| NativePopUpError::Codec)?
-            .into_bytes();
-            output = apply_list_mutation(
+            .map_err(|_| NativePopUpError::Codec)?;
+            let requirements = prepared.execution_requirements();
+            charge_popup_write_requirements(budget, requirements, path)?;
+            let spec = prepared
+                .execute(popup_codec::RewriteExecutionLimits::exact(requirements))
+                .map_err(|_| NativePopUpError::Codec)?
+                .into_bytes();
+            output = apply_list_mutation_with_budget(
                 &output,
                 storage_codec::TableDataListEntryMutation::Append(
                     storage_codec::TableDataListEntryAppend::control_cell_spec(
@@ -1024,30 +1237,84 @@ fn rewrite_control_list(
                         &spec,
                     ),
                 ),
-                options,
+                budget,
+                path,
             )?;
         }
     }
     Ok((output, desired_key, desired_popup))
 }
 
-pub(super) fn apply_list_mutation(
+fn apply_list_mutation_with_budget(
     source: &[u8],
     mutation: storage_codec::TableDataListEntryMutation<'_>,
-    options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
 ) -> Result<Vec<u8>> {
     let appended_key = match mutation {
         storage_codec::TableDataListEntryMutation::Append(append) => Some(append.key()),
         _ => None,
     };
+    let options = budget.residual_storage_rewrite_options(source);
     let plan = storage_codec::prepare_table_data_list_entry_rewrite(source, mutation, options)
         .map_err(|_| NativePopUpError::Codec)?;
-    let limits = plan.requirements().exact_limits();
-    let (bytes, _) = plan.execute(limits).map_err(|_| NativePopUpError::Codec)?;
+    let preparation = plan.prepare_report();
+    // The prepared requirements already aggregate source, payload, result,
+    // and verification fields/work.  Charge only source-only byte classes
+    // from the preparation report here; charging its fields/work/references
+    // as well would debit the same scan twice.
+    budget
+        .charge_wire_bytes(preparation.source_bytes(), path)
+        .and_then(|_| budget.charge_wire_reference_bytes(preparation.reference_bytes(), path))
+        .and_then(|_| budget.charge_wire_text_bytes(preparation.text_bytes(), path))
+        .map_err(|_| NativePopUpError::Limit)?;
+    let requirements = plan.requirements();
+    budget
+        .charge_wire_fields(requirements.fields(), path)
+        .and_then(|_| budget.charge_wire_work(requirements.work_bytes(), path))
+        .and_then(|_| budget.charge_wire_nesting(requirements.max_depth(), path))
+        .and_then(|_| budget.charge_payload_references(requirements.references(), path))
+        .and_then(|_| budget.charge_scratch_bytes(requirements.scratch_bytes(), path))
+        .and_then(|_| budget.charge_retained_bytes(requirements.retained_bytes(), path))
+        .and_then(|_| budget.charge_allocations(requirements.allocations(), path))
+        .and_then(|_| budget.charge_transaction_work(requirements.output_bytes(), path))
+        .map_err(|_| NativePopUpError::Limit)?;
+    let (bytes, report) = plan
+        .execute(requirements.exact_limits())
+        .map_err(|_| NativePopUpError::Codec)?;
+    if report.output_bytes() != requirements.output_bytes()
+        || report.fields() != requirements.fields()
+        || report.work_bytes() != requirements.work_bytes()
+        || report.references() != requirements.references()
+        || report.scratch_bytes() != requirements.scratch_bytes()
+        || report.allocations() != requirements.allocations()
+        || report.retained_bytes() != requirements.retained_bytes()
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
     match appended_key {
         Some(key) => advance_table_data_list_next_id(&bytes, key),
         None => Ok(bytes),
     }
+}
+
+fn charge_popup_write_requirements(
+    budget: &mut TransactionBudget,
+    requirements: popup_codec::RewriteExecutionRequirements,
+    path: Path,
+) -> Result<()> {
+    budget
+        .charge_wire_fields(requirements.fields(), path)
+        .and_then(|_| budget.charge_wire_work(requirements.work_bytes(), path))
+        .and_then(|_| budget.charge_wire_nesting(requirements.max_depth(), path))
+        .and_then(|_| budget.charge_payload_references(requirements.references(), path))
+        .and_then(|_| budget.charge_payload_items(requirements.items(), path))
+        .and_then(|_| budget.charge_wire_text_bytes(requirements.text_bytes(), path))
+        .and_then(|_| budget.charge_allocations(requirements.allocations(), path))
+        .and_then(|_| budget.charge_scratch_bytes(requirements.scratch_bytes(), path))
+        .and_then(|_| budget.charge_retained_bytes(requirements.retained_bytes(), path))
+        .and_then(|_| budget.charge_transaction_work(requirements.output_bytes(), path))
+        .map_err(|_| NativePopUpError::Limit)
 }
 
 fn table_data_list_type(
@@ -1124,10 +1391,16 @@ struct ListFacts {
     entries: Vec<ListEntry>,
 }
 
-fn decode_list_entries(source: &[u8], _options: storage_codec::DecodeOptions) -> Result<ListFacts> {
-    let options = storage_options(source);
+fn decode_list_entries(source: &[u8], options: storage_codec::DecodeOptions) -> Result<ListFacts> {
+    decode_list_entries_with_report(source, options).map(|(facts, _)| facts)
+}
+
+fn decode_list_entries_with_report(
+    source: &[u8],
+    options: storage_codec::DecodeOptions,
+) -> Result<(ListFacts, storage_codec::DecodeReport)> {
     let mut visitor = ListVisitor::default();
-    let (list, _) =
+    let (list, report) =
         storage_codec::decode_table_data_list_with_visitor(source, options, &mut visitor)
             .map_err(|_| NativePopUpError::Codec)?;
     if list.list_type() != LIST_CONTROL_CELL_SPEC
@@ -1149,10 +1422,13 @@ fn decode_list_entries(source: &[u8], _options: storage_codec::DecodeOptions) ->
     if visitor.segments != 0 {
         return Err(NativePopUpError::UnsupportedDependency);
     }
-    Ok(ListFacts {
-        next_list_id: list.next_list_id(),
-        entries: visitor.entries,
-    })
+    Ok((
+        ListFacts {
+            next_list_id: list.next_list_id(),
+            entries: visitor.entries,
+        },
+        report,
+    ))
 }
 
 #[derive(Default)]
@@ -1199,24 +1475,30 @@ fn unique_list_message<'source>(
     object: &'source ArchiveObject,
     list_type: i32,
     options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
 ) -> Result<ListMessage<'source>> {
     let mut selected = None;
     for (message_index, message) in object.messages.iter().enumerate() {
         if message.type_ != TABLE_DATA_LIST_TYPE {
             continue;
         }
-        // Route by the strict root envelope first.  Unselected formula/style
-        // lists are deliberately left opaque so a popup transition cannot
-        // rewrite or reject unrelated list payloads merely because their
-        // entry schema is outside this route.
-        let message_options = storage_options(&message.data);
-        let (snapshot, _) =
-            storage_codec::decode_table_data_list_type_with_report(&message.data, message_options)
+        // Route by the strict root envelope first so unrelated list schemas
+        // remain opaque.  The selected list receives one full visitor pass;
+        // unselected envelopes are charged only for this small route scan.
+        let (snapshot, root_report) =
+            storage_codec::decode_table_data_list_type_with_report(&message.data, options)
                 .map_err(|_| NativePopUpError::Codec)?;
         if snapshot.list_type() != list_type {
+            budget
+                .charge_storage_decode_report(root_report, true, path)
+                .map_err(|_| NativePopUpError::Limit)?;
             continue;
         }
-        let _list = decode_list_entries(&message.data, options)?;
+        let (_, report) = decode_list_entries_with_report(&message.data, options)?;
+        budget
+            .charge_storage_decode_report(report, true, path)
+            .map_err(|_| NativePopUpError::Limit)?;
         if selected.is_some() {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -1273,16 +1555,17 @@ fn tile_identifier(
     source: &[u8],
     expected: u64,
     row: u32,
-    _options: storage_codec::DecodeOptions,
+    options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
 ) -> Result<u64> {
     let mut visitor = TileReferenceVisitor::default();
-    let storage = storage_codec::decode_tile_storage_with_visitor(
-        source,
-        storage_options(source),
-        &mut visitor,
-    )
-    .map_err(|_| NativePopUpError::Codec)?
-    .0;
+    let (storage, report) =
+        storage_codec::decode_tile_storage_with_visitor(source, options, &mut visitor)
+            .map_err(|_| NativePopUpError::Codec)?;
+    budget
+        .charge_storage_decode_report(report, true, path)
+        .map_err(|_| NativePopUpError::Limit)?;
     let tile_size = storage.tile_size().ok_or(NativePopUpError::InvalidSource)?;
     let tile_id = row / tile_size.max(1);
     let mut matches = visitor
@@ -1409,7 +1692,33 @@ pub(super) fn replace_message_preserving_header(
     Ok(())
 }
 
-fn replace_control_message_with_transition(
+/// Validate a message whose payload transition is not allowed to alter object
+/// references.  The payload is still rewritten with the core raw-header
+/// primitive, but stale aggregate or nested FieldInfo ownership must fail
+/// before a private candidate can be published.
+pub(super) fn validate_message_without_object_references(
+    archive: &Archive,
+    object_identifier: u64,
+    message_index: usize,
+) -> Result<()> {
+    let object = unique_object(archive, object_identifier)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    if !info.object_references.is_empty()
+        || info.field_infos.iter().any(|field| {
+            !field.object_references.is_empty()
+                || field.effective_type() == FieldType::ObjectReference
+        })
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    Ok(())
+}
+
+pub(super) fn replace_control_message_with_transition(
     archive: &mut Archive,
     object_identifier: u64,
     message_index: usize,
@@ -1437,25 +1746,31 @@ fn replace_control_message_with_transition(
     if duplicate_identifiers(&before) || before.contains(&0) {
         return Err(NativePopUpError::InvalidSource);
     }
-    let after = popup_references_from_list(&payload)?;
-    if duplicate_identifiers(&after) || after.contains(&0) {
-        return Err(NativePopUpError::InvalidSource);
-    }
     let before_entries = source_entries
         .entries
         .iter()
         .filter(|entry| entry.payload_kind == PayloadKind::ControlCellSpec)
         .map(|entry| {
             let payload = entry.payload.as_slice();
-            let (spec, _) = popup_codec::decode_cell_spec_with_report(
+            let (spec, _) = control_codec::decode_any_cell_spec_with_report(
                 payload,
                 popup_options_for_bytes(payload),
             )
             .map_err(|_| NativePopUpError::Codec)?;
-            if entry.ref_count == 0 || spec.popup_model().identifier() == 0 {
+            if entry.ref_count == 0 {
                 return Err(NativePopUpError::InvalidSource);
             }
-            Ok((entry.key, spec.popup_model().identifier()))
+            let identifier = match spec {
+                control_codec::CellSpecSnapshot::Popup(spec) => {
+                    let identifier = spec.popup_model().identifier();
+                    if identifier == 0 {
+                        return Err(NativePopUpError::InvalidSource);
+                    }
+                    Some(identifier)
+                },
+                control_codec::CellSpecSnapshot::Control(_) => None,
+            };
+            Ok((entry.key, identifier))
         })
         .collect::<Result<Vec<_>>>()?;
     let after_entries = after_entries
@@ -1464,21 +1779,47 @@ fn replace_control_message_with_transition(
         .filter(|entry| entry.payload_kind == PayloadKind::ControlCellSpec)
         .map(|entry| {
             let payload = entry.payload.as_slice();
-            let (spec, _) = popup_codec::decode_cell_spec_with_report(
+            let (spec, _) = control_codec::decode_any_cell_spec_with_report(
                 payload,
                 popup_options_for_bytes(payload),
             )
             .map_err(|_| NativePopUpError::Codec)?;
-            if entry.ref_count == 0 || spec.popup_model().identifier() == 0 {
+            if entry.ref_count == 0 {
                 return Err(NativePopUpError::InvalidSource);
             }
-            Ok((entry.key, spec.popup_model().identifier()))
+            let identifier = match spec {
+                control_codec::CellSpecSnapshot::Popup(spec) => {
+                    let identifier = spec.popup_model().identifier();
+                    if identifier == 0 {
+                        return Err(NativePopUpError::InvalidSource);
+                    }
+                    Some(identifier)
+                },
+                control_codec::CellSpecSnapshot::Control(_) => None,
+            };
+            Ok((entry.key, identifier))
         })
         .collect::<Result<Vec<_>>>()?;
-    if duplicate_keys(&before_entries) || duplicate_keys(&after_entries) {
+    if duplicate_entry_keys(&before_entries) || duplicate_entry_keys(&after_entries) {
         return Err(NativePopUpError::InvalidSource);
     }
-    let mut expected_before = before_entries.iter().map(|(_, id)| *id).collect::<Vec<_>>();
+    let mut after = after_entries
+        .iter()
+        .filter_map(|(_, identifier)| *identifier)
+        .collect::<Vec<_>>();
+    if after.contains(&0) {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    // Multiple control-list entries may intentionally share one rooted popup
+    // model while differing in initial selection. ArchiveInfo aggregates are
+    // a set-like owner census; keep the per-entry duplicates in FieldInfo but
+    // emit the model identifier only once in the aggregate transition.
+    after.sort_unstable();
+    after.dedup();
+    let mut expected_before = before_entries
+        .iter()
+        .filter_map(|(_, identifier)| *identifier)
+        .collect::<Vec<_>>();
     expected_before.sort_unstable();
     expected_before.dedup();
     let mut sorted_before = before.clone();
@@ -1486,15 +1827,6 @@ fn replace_control_message_with_transition(
     if sorted_before != expected_before {
         return Err(NativePopUpError::InvalidSource);
     }
-    let mut expected_after = after_entries.iter().map(|(_, id)| *id).collect::<Vec<_>>();
-    expected_after.sort_unstable();
-    expected_after.dedup();
-    let mut sorted_after = after.clone();
-    sorted_after.sort_unstable();
-    if sorted_after != expected_after {
-        return Err(NativePopUpError::InvalidSource);
-    }
-
     let info = object
         .archive_info
         .message_infos
@@ -1507,7 +1839,13 @@ fn replace_control_message_with_transition(
     // introduced by this transition. Existing rooted entries must already
     // have an exact [3,key] record; otherwise their aggregate and per-entry
     // ownership cannot be proved. Never invent a broadcast aggregate field.
-    for (key, _) in &after_entries {
+    for (key, identifier) in &after_entries {
+        // Scalar CellSpecs are owned by the BNC/list refcount and do not have
+        // a PopupModel object-reference edge. Their list entries therefore
+        // must not receive a synthetic ObjectReference FieldInfo.
+        if identifier.is_none() {
+            continue;
+        }
         if !info
             .field_infos
             .iter()
@@ -1537,12 +1875,19 @@ fn replace_control_message_with_transition(
         let old_id = before_entries
             .iter()
             .find(|(key, _)| *key == path_key)
-            .map(|(_, id)| *id);
+            .and_then(|(_, id)| *id);
         let new_id = after_entries
             .iter()
             .find(|(key, _)| *key == path_key)
-            .map(|(_, id)| *id);
+            .and_then(|(_, id)| *id);
+        let entry_exists = before_entries
+            .iter()
+            .chain(after_entries.iter())
+            .any(|(key, _)| *key == path_key);
         if old_id.is_none() && new_id.is_none() {
+            if !entry_exists {
+                return Err(NativePopUpError::InvalidSource);
+            }
             if !field.object_references.is_empty()
                 || field.effective_type() == FieldType::ObjectReference
             {
@@ -1568,7 +1913,10 @@ fn replace_control_message_with_transition(
             after: new_id.into_iter().collect(),
         });
     }
-    for (key, _) in &after_entries {
+    for (key, identifier) in &after_entries {
+        if identifier.is_none() {
+            continue;
+        }
         if !field_changes
             .iter()
             .any(|change| change.path.as_slice() == [3, *key])
@@ -1576,7 +1924,10 @@ fn replace_control_message_with_transition(
             return Err(NativePopUpError::InvalidSource);
         }
     }
-    for (key, _) in &before_entries {
+    for (key, identifier) in &before_entries {
+        if identifier.is_none() {
+            continue;
+        }
         if !field_changes
             .iter()
             .any(|change| change.path.as_slice() == [3, *key])
@@ -1637,7 +1988,9 @@ fn replace_control_message_with_transition(
             else {
                 return true;
             };
-            after_entries.iter().any(|(after_key, _)| *after_key == key)
+            after_entries
+                .iter()
+                .any(|(after_key, identifier)| *after_key == key && identifier.is_some())
         });
     }
     let _ = source_payload;
@@ -1659,17 +2012,19 @@ fn popup_references_from_list(source: &[u8]) -> Result<Vec<u64>> {
         if entry.payload_kind != PayloadKind::ControlCellSpec {
             continue;
         }
-        let (spec, _) = popup_codec::decode_cell_spec_with_report(
+        let (spec, _) = control_codec::decode_any_cell_spec_with_report(
             &entry.payload,
             popup_options_for_bytes(&entry.payload),
         )
         .map_err(|_| NativePopUpError::Codec)?;
-        let identifier = spec.popup_model().identifier();
-        if identifier == 0 {
-            return Err(NativePopUpError::InvalidSource);
-        }
-        if !references.contains(&identifier) {
-            references.push(identifier);
+        if let control_codec::CellSpecSnapshot::Popup(spec) = spec {
+            let identifier = spec.popup_model().identifier();
+            if identifier == 0 {
+                return Err(NativePopUpError::InvalidSource);
+            }
+            if !references.contains(&identifier) {
+                references.push(identifier);
+            }
         }
     }
     Ok(references)
@@ -1705,12 +2060,14 @@ pub(super) fn archive_has_popup_reference(archive: &Archive, identifier: u64) ->
                 if entry.payload_kind != PayloadKind::ControlCellSpec {
                     continue;
                 }
-                let (spec, _) = popup_codec::decode_cell_spec_with_report(
+                let (spec, _) = control_codec::decode_any_cell_spec_with_report(
                     &entry.payload,
                     popup_options_for_bytes(&entry.payload),
                 )
                 .map_err(|_| NativePopUpError::Codec)?;
-                if spec.popup_model().identifier() == identifier {
+                if let control_codec::CellSpecSnapshot::Popup(spec) = spec
+                    && spec.popup_model().identifier() == identifier
+                {
                     return Ok(true);
                 }
             }
@@ -1747,6 +2104,43 @@ pub(super) fn archive_has_popup_reference_strict(
     Ok(visitor.found || archive_has_popup_reference(archive, identifier)?)
 }
 
+/// Verify object-level locality for a native rewrite that does not allocate or
+/// cull archive objects. Every object outside `changed_identifiers` must keep
+/// its complete source representation, including raw ArchiveInfo framing,
+/// MessageInfo aggregate/FieldInfo records, unknown fields, and payload bytes.
+/// The candidate may not silently add or remove an unlisted object.
+pub(super) fn verify_archive_object_locality(
+    source: &Archive,
+    candidate: &Archive,
+    changed_identifiers: &[u64],
+) -> Result<()> {
+    for source_object in &source.objects {
+        let identifier = source_object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if changed_identifiers.contains(&identifier) {
+            continue;
+        }
+        let candidate_object = candidate
+            .object(identifier)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if !source_object.same_content_ignoring_offsets(candidate_object) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    for candidate_object in &candidate.objects {
+        let identifier = candidate_object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if source.object(identifier).is_none() {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    Ok(())
+}
+
 struct PopupReferenceVisitor {
     identifier: u64,
     found: bool,
@@ -1773,7 +2167,7 @@ fn duplicate_identifiers(values: &[u64]) -> bool {
         .any(|(index, value)| values[index + 1..].contains(value))
 }
 
-fn duplicate_keys(values: &[(u32, u64)]) -> bool {
+fn duplicate_entry_keys<T>(values: &[(u32, T)]) -> bool {
     values
         .iter()
         .enumerate()
@@ -1963,7 +2357,7 @@ fn select_row_cell<'a>(
         .next()
         .copied()
         .unwrap_or(buffer.len());
-    if start >= end || end > buffer.len() {
+    if start > end || end > buffer.len() {
         return Err(NativePopUpError::InvalidSource);
     }
     Ok(&buffer[start..end])
@@ -1987,7 +2381,10 @@ fn decode_row_offsets(offsets: &[u8], count: usize, unit: usize) -> Result<Vec<O
         let start = usize::from(raw)
             .checked_mul(unit)
             .ok_or(NativePopUpError::InvalidSource)?;
-        if previous.is_some_and(|prior| prior >= start) {
+        // Minimal/automatic cells have an empty BNC payload. Adjacent empty
+        // cells therefore legitimately share the same start offset; only a
+        // decreasing offset would make the packed row ambiguous.
+        if previous.is_some_and(|prior| prior > start) {
             return Err(NativePopUpError::InvalidSource);
         }
         starts.push(Some(start));
@@ -2049,7 +2446,7 @@ fn patch_row_buffer(
         .next()
         .copied()
         .unwrap_or(buffer.len());
-    if start >= end || end > buffer.len() {
+    if start > end || end > buffer.len() {
         return Err(NativePopUpError::InvalidSource);
     }
     let old_len = end - start;

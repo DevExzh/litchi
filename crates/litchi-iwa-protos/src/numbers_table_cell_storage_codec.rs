@@ -4041,7 +4041,7 @@ fn validate_new_entry_payload(
                     value,
                     control_options,
                 )
-                .map_err(|_| DecodeError::invalid())?;
+                .map_err(map_control_codec_error)?;
             Ok(DecodeReport {
                 source_bytes: report.input_bytes(),
                 fields: report.fields(),
@@ -4052,6 +4052,62 @@ fn validate_new_entry_payload(
                 text_bytes: report.text_bytes(),
             })
         },
+    }
+}
+
+/// Preserve the neutral CellSpec codec's typed resource failures while
+/// validating a payload staged through the generic table-storage writer.
+///
+/// The storage seam predates the control codec and has a deliberately smaller
+/// limit vocabulary.  Bytes covers both ingress and candidate-output bounds;
+/// the storage reference ceiling is also the neutral dispatcher ceiling for
+/// popup item counts (the dispatcher derives `max_items` from it).  Scratch is
+/// a fallible staging allocation, so it maps to the storage allocation axis.
+/// Other control failures remain invalid wire/source errors rather than being
+/// silently converted into a successful opaque payload.
+fn map_control_codec_error(
+    error: crate::numbers_table_cell_control_codec::DecodeError,
+) -> DecodeError {
+    match error.resource_limit() {
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::InputBytes {
+            observed,
+            maximum,
+        })
+        | Some(crate::numbers_table_cell_control_codec::DecodeLimit::OutputBytes {
+            observed,
+            maximum,
+        }) => DecodeError::limited(DecodeLimit::Bytes { observed, maximum }),
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::Fields {
+            observed,
+            maximum,
+        }) => DecodeError::limited(DecodeLimit::Fields { observed, maximum }),
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::Work { observed, maximum }) => {
+            DecodeError::limited(DecodeLimit::Work { observed, maximum })
+        },
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::Nesting {
+            observed,
+            maximum,
+        }) => DecodeError::limited(DecodeLimit::Nesting { observed, maximum }),
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::References {
+            observed,
+            maximum,
+        })
+        | Some(crate::numbers_table_cell_control_codec::DecodeLimit::Items { observed, maximum }) => {
+            DecodeError::limited(DecodeLimit::References { observed, maximum })
+        },
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::Text { observed, maximum }) => {
+            DecodeError::limited(DecodeLimit::Text { observed, maximum })
+        },
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::Allocation { requested })
+        | Some(crate::numbers_table_cell_control_codec::DecodeLimit::Scratch {
+            observed: requested,
+            ..
+        }) => DecodeError::limited(DecodeLimit::Allocation { requested }),
+        Some(crate::numbers_table_cell_control_codec::DecodeLimit::Retained {
+            observed,
+            maximum,
+        }) => DecodeError::limited(DecodeLimit::Retained { observed, maximum }),
+        None => DecodeError::invalid(),
     }
 }
 
@@ -9130,6 +9186,41 @@ mod tests {
                 .expect("neutral mixed-cell-spec dispatch");
             assert_eq!(decoded.interaction_type(), interaction);
         }
+    }
+
+    #[test]
+    fn control_payload_limit_is_preserved_through_storage_append_validation() {
+        let mut source = list_minimal();
+        source[1] = 12;
+        let payload = valid_control_cell_spec();
+        let append = TableDataListEntryAppend::control_cell_spec(12, 1, &payload);
+        let options = DecodeOptions::new(
+            source
+                .len()
+                .saturating_add(payload.len())
+                .saturating_add(64),
+            3,
+            source
+                .len()
+                .saturating_add(payload.len())
+                .saturating_mul(32),
+            64,
+            128,
+            1024,
+        );
+        let error = prepare_table_data_list_entry_rewrite(
+            &source,
+            TableDataListEntryMutation::Append(append),
+            options,
+        )
+        .expect_err("control payload must hit the shared field ceiling");
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: 4,
+                maximum: 3
+            })
+        );
     }
 
     #[test]

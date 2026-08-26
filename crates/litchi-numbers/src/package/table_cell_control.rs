@@ -324,8 +324,12 @@ impl Package {
                 .saturating_add(catalog.package().iter().count().saturating_mul(1024)),
             patch.path,
         )?;
+        budget.charge_candidate_input_bytes(target_owner.as_ref().len(), patch.path)?;
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
             .map_err(|_| Error::Verification)?;
+        let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
+            .map_err(|_| Error::Verification)?;
+        budget.charge_candidate_reopen(candidate_catalog, patch.path)?;
         let after = candidate.table_cell_control_format(
             SheetSelector::index(sheet),
             TableSelector::index(table),
@@ -464,7 +468,6 @@ fn rewrite(
         TableSelector::index(table),
         position,
     )?;
-    popup::reject_cross_component_write(source, target, path)?;
     let mut budget = popup::TransactionBudget::for_cell_control(source);
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::UnsupportedSource)?;
@@ -486,18 +489,29 @@ fn rewrite(
         path,
         &mut budget,
     )?;
-    if native_output.archive_bytes.len() > native_bound.archive_bytes
-        || SnappyStream::maximum_compressed_len(native_output.archive_bytes.len())
-            .map_err(|_| Error::Verification)?
-            > native_bound.compressed_bytes
-    {
-        return Err(Error::LimitExceeded {
-            kind: LimitKind::PayloadBytes,
-            observed: u64::try_from(native_output.archive_bytes.len()).unwrap_or(u64::MAX),
-            maximum: u64::try_from(native_bound.archive_bytes).unwrap_or(u64::MAX),
-            path,
-        });
+    for member in &native_output.members {
+        if member.archive_bytes.len() > native_bound.archive_bytes
+            || SnappyStream::maximum_compressed_len(member.archive_bytes.len())
+                .map_err(|_| Error::Verification)?
+                > native_bound.compressed_bytes
+        {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::PayloadBytes,
+                observed: u64::try_from(member.archive_bytes.len()).unwrap_or(u64::MAX),
+                maximum: u64::try_from(native_bound.archive_bytes).unwrap_or(u64::MAX),
+                path,
+            });
+        }
+        let maximum_compressed = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
+            .map_err(|_| Error::Verification)?;
+        budget.charge_compressed_bytes(maximum_compressed, path)?;
     }
+    let metadata_bytes = popup::rewrite_component_save_tokens(
+        source,
+        &native_output.component_indices,
+        path,
+        &mut budget,
+    )?;
     let previews = super::table_headers::rewrite::root_preview_deletions(catalog)
         .map_err(|_| Error::InvalidSource { path })?;
     // Reassembly preparation allocates its plan/index scratch.  Precharge a
@@ -506,9 +520,30 @@ fn rewrite(
     // preparation and before its output buffer is allocated.
     budget.charge_allocations(2, path)?;
     budget.charge_transaction_work(catalog.source_bytes().len().saturating_mul(2), path)?;
-    let compressed =
-        SnappyStream::compress(&native_output.archive_bytes).map_err(|_| Error::Verification)?;
-    let edits = [EntryEdit::new(&native_output.member_name, &compressed)];
+    let compressed_members = native_output
+        .members
+        .iter()
+        .map(|member| {
+            SnappyStream::compress(&member.archive_bytes).map_err(|_| Error::Verification)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut changed_names = native_output
+        .members
+        .iter()
+        .map(|member| member.member_name.clone())
+        .collect::<Vec<_>>();
+    changed_names.push(super::metadata::ENTRY_NAME.to_owned());
+    let mut edit_buffers = native_output
+        .members
+        .iter()
+        .zip(compressed_members)
+        .map(|(member, compressed)| (member.member_name.clone(), compressed))
+        .collect::<Vec<_>>();
+    edit_buffers.push((super::metadata::ENTRY_NAME.to_owned(), metadata_bytes));
+    let edits = edit_buffers
+        .iter()
+        .map(|(name, bytes)| EntryEdit::new(name, bytes))
+        .collect::<Vec<_>>();
     let prepared = catalog
         .package()
         .prepare_reassembly_with_deletions(&edits, &previews, catalog.limits())
@@ -527,9 +562,13 @@ fn rewrite(
         path,
     )?;
     let limits = requirements.exact_limits();
+    budget.charge_candidate_input_bytes(requirements.output_bytes(), path)?;
     let bytes = prepared.execute(limits).map_err(|_| Error::Verification)?;
     let candidate = Package::from_owned_bytes_with_options(bytes, source.state.options)
         .map_err(|_| Error::Verification)?;
+    let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
+        .map_err(|_| Error::Verification)?;
+    budget.charge_candidate_reopen(candidate_catalog, path)?;
     let candidate_value = candidate.table_cell_control_format(
         SheetSelector::index(sheet),
         TableSelector::index(table),
@@ -538,7 +577,13 @@ fn rewrite(
     if candidate_value != after {
         return Err(Error::Verification);
     }
-    verify_scalar_package_locality(source, &candidate, &native_output.member_name, &previews)?;
+    verify_scalar_package_locality(
+        source,
+        &candidate,
+        &changed_names,
+        &previews,
+        &native_output.changed_objects,
+    )?;
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
         .__source_owner();
@@ -552,7 +597,7 @@ fn rewrite(
         },
         diagnostics: Diagnostics {
             changed: true,
-            touched_components: 1,
+            touched_components: changed_names.len(),
             deleted_previews: previews.len(),
             full_reparse_performed: true,
         },
@@ -562,15 +607,19 @@ fn rewrite(
 fn verify_scalar_package_locality(
     source: &Package,
     candidate: &Package,
-    changed_member: &str,
+    changed_members: &[String],
     deleted_previews: &[&str],
+    changed_objects: &[(usize, u64)],
 ) -> Result<(), Error> {
     let source_catalog =
         super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
         .map_err(|_| Error::Verification)?;
     for source_entry in source_catalog.package().iter() {
-        if source_entry.name() == changed_member || deleted_previews.contains(&source_entry.name())
+        if changed_members
+            .iter()
+            .any(|name| name == source_entry.name())
+            || deleted_previews.contains(&source_entry.name())
         {
             continue;
         }
@@ -584,7 +633,10 @@ fn verify_scalar_package_locality(
         }
     }
     for candidate_entry in candidate_catalog.package().iter() {
-        if candidate_entry.name() == changed_member {
+        if changed_members
+            .iter()
+            .any(|name| name == candidate_entry.name())
+        {
             continue;
         }
         let source_entry = source_catalog
@@ -593,6 +645,49 @@ fn verify_scalar_package_locality(
             .find(|entry| entry.name() == candidate_entry.name());
         if source_entry.is_none() && !deleted_previews.contains(&candidate_entry.name()) {
             return Err(Error::Verification);
+        }
+    }
+    for &(component_index, _) in changed_objects {
+        let source_component = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::Verification)?;
+        let candidate_component_index = candidate
+            .state
+            .components
+            .catalog()
+            .iter()
+            .position(|component| component.name() == source_component.name())
+            .ok_or(Error::Verification)?;
+        let candidate_component = candidate
+            .state
+            .components
+            .catalog()
+            .get_index(candidate_component_index)
+            .ok_or(Error::Verification)?;
+        let changed_in_component = changed_objects
+            .iter()
+            .filter_map(|(owner, identifier)| (*owner == component_index).then_some(*identifier))
+            .collect::<Vec<_>>();
+        for source_object in &source_component.archive().objects {
+            let identifier = source_object
+                .archive_info
+                .identifier
+                .ok_or(Error::Verification)?;
+            if changed_in_component.contains(&identifier) {
+                continue;
+            }
+            let candidate_object = candidate_component
+                .archive()
+                .objects
+                .iter()
+                .find(|object| object.archive_info.identifier == Some(identifier))
+                .ok_or(Error::Verification)?;
+            if !source_object.same_content_ignoring_offsets(candidate_object) {
+                return Err(Error::Verification);
+            }
         }
     }
     Ok(())

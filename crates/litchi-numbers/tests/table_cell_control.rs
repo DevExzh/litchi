@@ -109,10 +109,14 @@ enum SplitMetadataCorruption {
     DuplicateCalculationExternal,
     DuplicatePopupExternal,
     ComponentAndObjectFormatExternal,
+    ComponentAndObjectTileExternal,
+    ComponentAndObjectControlExternal,
     VersionedCalculationExternal,
     VersionedPopupExternal,
-    VersionedAnonymousFormatComponent,
+    MissingFormatComponent,
+    DuplicateFormatComponent,
     WrongCalculationLocator,
+    WrongFormatLocator,
     WrongControlLocator,
     OpaquePopupInbound,
 }
@@ -616,10 +620,9 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
 /// Rebuild the synthetic graph with the component split used by the native
 /// Wave85 source: the rooted model lives in CalculationEngine, its tile is a
 /// Tables member, format/control lists are separate list members, and the
-/// popup model is a separate current component.  The source is deliberately
-/// metadata-complete even though the current owner rejects this dependency
-/// shape before mutation; the test below keeps that rejection atomic while
-/// allowing a future cross-component owner to exercise the full transaction.
+/// popup model is a separate current component.  Scalar controls are fully
+/// metadata-owned across those members; the popup model remains a deliberately
+/// unsupported changed dependency for this bounded owner slice.
 fn split_component_fixture() -> TestResult<Vec<u8>> {
     let source = fixture(FixtureMode::Mixed)?;
     let archive = member_archive(&source, DOCUMENT_MEMBER)?;
@@ -744,13 +747,13 @@ fn popup_only_split_fixture() -> TestResult<Vec<u8>> {
             .push(tsp::ComponentExternalReference {
                 component_identifier: POPUP_COMPONENT_ID,
                 object_identifier: Some(CONTROL_MODEL_ID),
-                is_weak: None,
+                is_weak: Some(false),
             });
         metadata.components.push(tsp::ComponentInfo {
             identifier: POPUP_COMPONENT_ID,
             preferred_locator: "Tables/Popup-905753".to_owned(),
             locator: Some("Tables/Popup-905753".to_owned()),
-            save_token: Some(15),
+            save_token: Some(10),
             object_uuid_map_entries: vec![uuid_entry(CONTROL_MODEL_ID)],
             ..Default::default()
         });
@@ -838,12 +841,12 @@ fn split_metadata_payload() -> TestResult<Vec<u8>> {
     let external = |component_identifier, object_identifier| tsp::ComponentExternalReference {
         component_identifier,
         object_identifier: Some(object_identifier),
-        is_weak: None,
+        is_weak: Some(false),
     };
     let external_component = |component_identifier| tsp::ComponentExternalReference {
         component_identifier,
         object_identifier: None,
-        is_weak: None,
+        is_weak: Some(false),
     };
     let document = split_metadata_component(
         100,
@@ -855,27 +858,34 @@ fn split_metadata_payload() -> TestResult<Vec<u8>> {
     let calculation = split_metadata_component(
         CALCULATION_COMPONENT_ID,
         "CalculationEngine",
-        11,
-        &[TABLE_MODEL_ID, SIDECAR_ID],
+        10,
+        &[TABLE_MODEL_ID],
         &[
             external(100, TABLE_INFO_ID),
             external_component(TILE_COMPONENT_ID),
             external_component(FORMAT_COMPONENT_ID),
-            external(CONTROL_COMPONENT_ID, CONTROL_LIST_ID),
+            external_component(CONTROL_COMPONENT_ID),
         ],
     )?;
-    let tile = split_metadata_component(TILE_COMPONENT_ID, "Tables/Tile", 12, &[TILE_ID], &[])?;
+    let tile = split_metadata_component(TILE_COMPONENT_ID, "Tables/Tile", 10, &[], &[])?;
+    let format = split_metadata_component(
+        FORMAT_COMPONENT_ID,
+        "Tables/DataList-904498-2",
+        10,
+        &[],
+        &[],
+    )?;
     let control = split_metadata_component(
         CONTROL_COMPONENT_ID,
         "Tables/DataList-904499-2",
-        14,
-        &[CONTROL_LIST_ID],
+        10,
+        &[],
         &[external(POPUP_COMPONENT_ID, CONTROL_MODEL_ID)],
     )?;
     let popup = split_metadata_component(
         POPUP_COMPONENT_ID,
         "Tables/Popup-905753",
-        15,
+        10,
         &[CONTROL_MODEL_ID],
         &[],
     )?;
@@ -887,10 +897,7 @@ fn split_metadata_payload() -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    // The format-list sidecar deliberately has no ComponentInfo. Native
-    // Numbers packages authorize this producer shape with the current
-    // CalculationEngine component-level external edge above.
-    for component in [document, calculation, tile, control, popup, view] {
+    for component in [document, calculation, tile, format, control, popup, view] {
         append_length_delimited_field(&mut data, 3, &component)?;
     }
     append_length_delimited_field(&mut data, 11, &versioned)?;
@@ -1164,6 +1171,250 @@ fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
     Ok(changed)
 }
 
+fn metadata_payload(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
+    let archive = member_archive(source, METADATA_MEMBER)?;
+    let object = archive
+        .object(METADATA_OBJECT_ID)
+        .ok_or_else(|| io::Error::other("metadata object is missing"))?;
+    let message = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == METADATA_TYPE)
+        .ok_or_else(|| io::Error::other("metadata payload is missing"))?;
+    Ok(tsp::PackageMetadata::decode(message.data.as_slice())?)
+}
+
+fn metadata_external_signature(
+    source: &[u8],
+) -> TestResult<Vec<(u64, u64, Option<u64>, Option<bool>)>> {
+    let mut edges = Vec::new();
+    for component in metadata_payload(source)?.components {
+        for edge in component.external_references {
+            edges.push((
+                component.identifier,
+                edge.component_identifier,
+                edge.object_identifier,
+                edge.is_weak,
+            ));
+        }
+    }
+    edges.sort();
+    Ok(edges)
+}
+
+fn assert_split_native_metadata_shape(source: &[u8]) -> TestResult {
+    let metadata = metadata_payload(source)?;
+    for identifier in [TILE_COMPONENT_ID, FORMAT_COMPONENT_ID, CONTROL_COMPONENT_ID] {
+        let component = metadata
+            .components
+            .iter()
+            .find(|component| component.identifier == identifier)
+            .ok_or_else(|| io::Error::other("required sidecar metadata is missing"))?;
+        assert!(
+            component.object_uuid_map_entries.is_empty(),
+            "native sidecar object IDs must not be treated as UUID-owned: {identifier}"
+        );
+    }
+    let calculation = metadata
+        .components
+        .iter()
+        .find(|component| component.identifier == CALCULATION_COMPONENT_ID)
+        .ok_or_else(|| io::Error::other("CalculationEngine metadata is missing"))?;
+    for identifier in [TILE_COMPONENT_ID, FORMAT_COMPONENT_ID, CONTROL_COMPONENT_ID] {
+        let edges = calculation
+            .external_references
+            .iter()
+            .filter(|edge| edge.component_identifier == identifier)
+            .collect::<Vec<_>>();
+        assert_eq!(edges.len(), 1, "sidecar component edge {identifier}");
+        assert_eq!(edges[0].object_identifier, None);
+        assert_eq!(edges[0].is_weak, Some(false));
+    }
+    Ok(())
+}
+
+fn member_for_metadata_component(identifier: u64) -> Option<&'static str> {
+    match identifier {
+        CALCULATION_COMPONENT_ID => Some(CALCULATION_MEMBER),
+        TILE_COMPONENT_ID => Some(TILE_MEMBER),
+        FORMAT_COMPONENT_ID => Some(FORMAT_MEMBER),
+        CONTROL_COMPONENT_ID => Some(CONTROL_MEMBER),
+        POPUP_COMPONENT_ID => Some(POPUP_MEMBER),
+        300 => Some(VIEW_STATE_MEMBER),
+        _ => None,
+    }
+}
+
+fn assert_split_metadata_transition(
+    source: &[u8],
+    target: &[u8],
+    changed: &[String],
+) -> TestResult {
+    let before = metadata_payload(source)?;
+    let after = metadata_payload(target)?;
+    assert_eq!(
+        after.save_token,
+        before.save_token.and_then(|token| token.checked_add(1)),
+        "the root metadata save token must advance exactly once",
+    );
+    assert_eq!(
+        metadata_external_signature(source)?,
+        metadata_external_signature(target)?,
+        "scalar COW must not fabricate or drop external ownership edges",
+    );
+    for component in &before.components {
+        let candidate = after
+            .components
+            .iter()
+            .find(|other| other.identifier == component.identifier)
+            .ok_or_else(|| io::Error::other("metadata component disappeared"))?;
+        let member = member_for_metadata_component(component.identifier);
+        let changed_member = member.is_some_and(|member| changed.iter().any(|name| name == member));
+        assert_eq!(
+            candidate.save_token,
+            if changed_member {
+                component.save_token.and_then(|token| token.checked_add(1))
+            } else {
+                component.save_token
+            },
+            "unexpected save-token transition for metadata component {}",
+            component.identifier,
+        );
+    }
+    for identifier in [TILE_COMPONENT_ID, FORMAT_COMPONENT_ID, CONTROL_COMPONENT_ID] {
+        let source_component = before
+            .components
+            .iter()
+            .find(|component| component.identifier == identifier)
+            .ok_or_else(|| io::Error::other("required sidecar metadata is missing"))?;
+        let target_component = after
+            .components
+            .iter()
+            .find(|component| component.identifier == identifier)
+            .ok_or_else(|| io::Error::other("required sidecar metadata disappeared"))?;
+        assert_eq!(
+            target_component.save_token,
+            source_component
+                .save_token
+                .and_then(|token| token.checked_add(1)),
+            "sidecar component {identifier} must advance exactly once",
+        );
+    }
+    let source_model = before
+        .components
+        .iter()
+        .find(|component| component.identifier == CALCULATION_COMPONENT_ID)
+        .ok_or_else(|| io::Error::other("CalculationEngine metadata is missing"))?;
+    let target_model = after
+        .components
+        .iter()
+        .find(|component| component.identifier == CALCULATION_COMPONENT_ID)
+        .ok_or_else(|| io::Error::other("CalculationEngine metadata disappeared"))?;
+    assert_eq!(
+        target_model.save_token, source_model.save_token,
+        "the model component token must remain unchanged"
+    );
+    Ok(())
+}
+
+fn assert_split_scalar_locality(source: &[u8], target: &[u8], changed: &[String]) -> TestResult {
+    let allowed = [
+        TILE_MEMBER,
+        FORMAT_MEMBER,
+        CONTROL_MEMBER,
+        METADATA_MEMBER,
+        "preview.jpg",
+        "preview-micro.jpg",
+        "preview-web.jpg",
+    ];
+    assert!(
+        changed
+            .iter()
+            .all(|member| allowed.contains(&member.as_str())),
+        "unexpected split scalar member mutation: {changed:?}",
+    );
+    for required in [TILE_MEMBER, FORMAT_MEMBER, CONTROL_MEMBER, METADATA_MEMBER] {
+        assert!(
+            changed.iter().any(|member| member == required),
+            "split scalar edit did not touch required member {required}"
+        );
+    }
+    let before = Catalog::from_bytes(source)?;
+    let after = Catalog::from_bytes(target)?;
+    for member in [
+        DOCUMENT_MEMBER,
+        CALCULATION_MEMBER,
+        POPUP_MEMBER,
+        VIEW_STATE_MEMBER,
+        "Data/sentinel.bin",
+    ] {
+        let source_entry = before
+            .iter()
+            .find(|entry| entry.name() == member)
+            .ok_or_else(|| io::Error::other(format!("source member {member} is missing")))?;
+        let target_entry = after
+            .iter()
+            .find(|entry| entry.name() == member)
+            .ok_or_else(|| io::Error::other(format!("target member {member} is missing")))?;
+        assert_eq!(
+            source_entry.data(),
+            target_entry.data(),
+            "unselected split member {member} changed"
+        );
+    }
+    Ok(())
+}
+
+fn split_list_entries(
+    source: &[u8],
+    member: &str,
+    object_identifier: u64,
+    list_type: tst::table_data_list::ListType,
+) -> TestResult<Vec<tst::table_data_list::ListEntry>> {
+    let archive = member_archive(source, member)?;
+    let object = archive
+        .object(object_identifier)
+        .ok_or_else(|| io::Error::other("split list object is missing"))?;
+    for message in &object.messages {
+        if message.type_ != TABLE_DATA_LIST_TYPE {
+            continue;
+        }
+        let list = tst::TableDataList::decode(message.data.as_slice())?;
+        if list.list_type == list_type as i32 {
+            return Ok(list.entries);
+        }
+    }
+    Err(io::Error::other("split table-data list is missing").into())
+}
+
+fn rewrite_split_list(
+    source: &[u8],
+    member: &str,
+    object_identifier: u64,
+    list_type: tst::table_data_list::ListType,
+    mut rewrite: impl FnMut(&mut tst::TableDataList) -> TestResult,
+) -> TestResult<Vec<u8>> {
+    rewrite_member(source, member, |archive| {
+        let object = archive
+            .object_mut(object_identifier)
+            .ok_or_else(|| io::Error::other("split list object is missing"))?;
+        let index = object
+            .messages
+            .iter()
+            .position(|message| {
+                message.type_ == TABLE_DATA_LIST_TYPE
+                    && tst::TableDataList::decode(message.data.as_slice())
+                        .map(|list| list.list_type == list_type as i32)
+                        .unwrap_or(false)
+            })
+            .ok_or_else(|| io::Error::other("split table-data list is missing"))?;
+        let mut list = tst::TableDataList::decode(object.messages[index].data.as_slice())?;
+        rewrite(&mut list)?;
+        object.messages[index].data = list.encode_to_vec();
+        Ok(())
+    })
+}
+
 fn assert_previews_invalidated(source: &[u8], target: &[u8]) -> TestResult {
     let before = Catalog::from_bytes(source)?;
     let after = Catalog::from_bytes(target)?;
@@ -1217,7 +1468,10 @@ fn assert_read_rejects(source: &[u8], label: &str) -> TestResult {
 }
 
 fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
-    let package = Package::from_bytes(source)?;
+    let package = match Package::from_bytes(source) {
+        Err(_) => return Ok(()),
+        Ok(package) => package,
+    };
     let before = package.exact_bytes();
     assert!(
         package
@@ -1594,6 +1848,24 @@ fn with_split_metadata_corruption(
                         is_weak: None,
                     });
             },
+            SplitMetadataCorruption::ComponentAndObjectTileExternal => {
+                metadata.components[calculation_index]
+                    .external_references
+                    .push(tsp::ComponentExternalReference {
+                        component_identifier: TILE_COMPONENT_ID,
+                        object_identifier: Some(TILE_ID),
+                        is_weak: Some(false),
+                    });
+            },
+            SplitMetadataCorruption::ComponentAndObjectControlExternal => {
+                metadata.components[calculation_index]
+                    .external_references
+                    .push(tsp::ComponentExternalReference {
+                        component_identifier: CONTROL_COMPONENT_ID,
+                        object_identifier: Some(CONTROL_LIST_ID),
+                        is_weak: Some(false),
+                    });
+            },
             SplitMetadataCorruption::VersionedCalculationExternal => {
                 let reference = metadata.components[calculation_index]
                     .external_references
@@ -1625,20 +1897,34 @@ fn with_split_metadata_corruption(
                     .retain(|candidate| candidate.component_identifier != POPUP_COMPONENT_ID);
                 control.versioned_external_references.push(reference);
             },
-            SplitMetadataCorruption::VersionedAnonymousFormatComponent => {
-                metadata.versioned_components.push(tsp::ComponentInfo {
-                    identifier: FORMAT_COMPONENT_ID,
-                    preferred_locator: "Tables/DataList-904498-2".to_owned(),
-                    locator: Some("Tables/DataList-904498-2".to_owned()),
-                    save_token: Some(1),
-                    ..Default::default()
-                });
+            SplitMetadataCorruption::MissingFormatComponent => {
+                metadata
+                    .components
+                    .retain(|component| component.identifier != FORMAT_COMPONENT_ID);
+            },
+            SplitMetadataCorruption::DuplicateFormatComponent => {
+                let format = metadata
+                    .components
+                    .iter()
+                    .find(|component| component.identifier == FORMAT_COMPONENT_ID)
+                    .cloned()
+                    .ok_or_else(|| io::Error::other("format metadata is missing"))?;
+                metadata.components.push(format);
             },
             SplitMetadataCorruption::WrongCalculationLocator => {
                 metadata.components[calculation_index].preferred_locator =
                     "Wrong/CalculationEngine".to_owned();
                 metadata.components[calculation_index].locator =
                     Some("Wrong/CalculationEngine".to_owned());
+            },
+            SplitMetadataCorruption::WrongFormatLocator => {
+                let format = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == FORMAT_COMPONENT_ID)
+                    .ok_or_else(|| io::Error::other("format metadata is missing"))?;
+                format.preferred_locator = "Wrong/Tables/Format".to_owned();
+                format.locator = Some("Wrong/Tables/Format".to_owned());
             },
             SplitMetadataCorruption::WrongControlLocator => {
                 let control = metadata
@@ -2290,31 +2576,10 @@ fn locked_table_refuses_control_mutation_without_source_changes() -> TestResult 
     Ok(())
 }
 
-fn split_replacements() -> TestResult<[CellControl; 5]> {
-    Ok([
-        CellControl::Checkbox(Checkbox),
-        CellControl::StarRating(StarRating),
-        CellControl::Slider(Slider::new(
-            range(-20.0, 40.0, 5.0),
-            DisplayFormat::Number(Number::default()),
-        )),
-        CellControl::Stepper(Stepper::new(
-            range(2.0, 30.0, 2.0),
-            DisplayFormat::Number(Number::default()),
-        )),
-        CellControl::PopUpMenu(
-            PopUpMenu::new(["Override", "Fallback"])?.with_initial_selection(
-                litchi_numbers::cell::data_format::pop_up_menu::InitialSelection::Blank,
-            ),
-        ),
-    ])
-}
-
-fn assert_split_read_noop_and_write_reject(
+fn assert_split_read_noop(
     source: &[u8],
     position: CellPosition,
     expected_before: CellControl,
-    replacement: CellControl,
 ) -> TestResult {
     let package = Package::from_bytes(source)?;
     let before = package.exact_bytes();
@@ -2332,21 +2597,25 @@ fn assert_split_read_noop_and_write_reject(
     assert!(no_op.patch().is_noop());
     assert_eq!(no_op.package().exact_bytes(), source);
 
-    if replacement == expected_before {
-        return Ok(());
-    }
-    let result = package
-        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
-        .set(replacement)
-        .commit();
-    assert!(result.is_err());
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
 
 #[test]
-fn split_components_read_noop_and_all_control_transitions_are_atomic() -> TestResult {
+fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResult {
     let source = split_component_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    let no_op = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(0, 0),
+        )?
+        .set(controls()?[0].clone())
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().exact_bytes(), source);
+
     let positions = [
         CellPosition::new(0, 0),
         CellPosition::new(1, 0),
@@ -2354,31 +2623,339 @@ fn split_components_read_noop_and_all_control_transitions_are_atomic() -> TestRe
         CellPosition::new(3, 0),
         CellPosition::new(4, 0),
     ];
-    for ((position, expected), replacement) in positions
-        .into_iter()
-        .zip(controls()?)
-        .zip(split_replacements()?)
-    {
-        assert_split_read_noop_and_write_reject(&source, position, expected, replacement)?;
+    for (position, expected) in positions.into_iter().zip(controls()?) {
+        assert_split_read_noop(&source, position, expected)?;
+    }
+    let package = Package::from_bytes(&source)?;
+    let before = package.exact_bytes();
+    assert!(
+        package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(4, 0),
+            )?
+            .set(CellControl::Checkbox(Checkbox))
+            .commit()
+            .is_err()
+    );
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+fn split_scalar_replacements() -> [CellControl; 4] {
+    [
+        CellControl::StarRating(StarRating),
+        CellControl::Slider(Slider::new(
+            range(-20.0, 40.0, 5.0),
+            DisplayFormat::Number(Number::default()),
+        )),
+        CellControl::Stepper(Stepper::new(
+            range(2.0, 30.0, 2.0),
+            DisplayFormat::Number(Number::default()),
+        )),
+        CellControl::Checkbox(Checkbox),
+    ]
+}
+
+#[test]
+fn split_scalar_controls_support_cross_kind_cow_inverse_apply_and_locality() -> TestResult {
+    let source = split_component_fixture()?;
+    assert_split_native_metadata_shape(&source)?;
+    let positions = [
+        CellPosition::new(0, 0),
+        CellPosition::new(1, 0),
+        CellPosition::new(2, 0),
+        CellPosition::new(3, 0),
+    ];
+    for (position, replacement) in positions.into_iter().zip(split_scalar_replacements()) {
+        let package = Package::from_bytes(&source)?;
+        let before = package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?;
+        assert!(before.is_some());
+        let commit = package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )?
+            .set(replacement.clone())
+            .commit()?;
+        assert_eq!(commit.patch().before(), before.as_ref());
+        assert_eq!(commit.patch().after(), Some(&replacement));
+        assert_eq!(
+            commit.package().table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )?,
+            Some(replacement.clone()),
+        );
+        assert!(commit.diagnostics().changed());
+        assert!(commit.diagnostics().full_reparse_performed());
+        let target = commit.package().exact_bytes();
+        let changed = changed_members(&source, &target)?;
+        assert_previews_invalidated(&source, &target)?;
+        assert_split_scalar_locality(&source, &target, &changed)?;
+        assert_split_metadata_transition(&source, &target, &changed)?;
+        assert!(
+            split_list_entries(
+                &target,
+                FORMAT_MEMBER,
+                FORMAT_LIST_ID,
+                tst::table_data_list::ListType::Format
+            )?
+            .iter()
+            .all(|entry| entry.refcount > 0)
+        );
+        assert!(
+            split_list_entries(
+                &target,
+                CONTROL_MEMBER,
+                CONTROL_LIST_ID,
+                tst::table_data_list::ListType::ControlCellSpec,
+            )?
+            .iter()
+            .all(|entry| entry.refcount > 0)
+        );
+
+        let applied =
+            Package::from_bytes(&source)?.apply_table_cell_control_format(commit.patch())?;
+        assert_eq!(applied.package().exact_bytes(), target);
+        assert!(
+            Package::from_bytes(&target)?
+                .apply_table_cell_control_format(commit.patch())
+                .is_err(),
+            "the exact split scalar patch must conflict after publication"
+        );
+        let inverse = Package::from_bytes(&target)?
+            .apply_table_cell_control_format(&commit.patch().inverse())?;
+        assert_eq!(inverse.package().exact_bytes(), source);
     }
     Ok(())
 }
 
 #[test]
-fn split_components_clear_and_inverse_are_fail_closed_until_all_members_are_owned() -> TestResult {
+fn split_scalar_create_reset_culls_entries_and_preserves_inverse() -> TestResult {
+    let source = split_component_fixture()?;
+    assert_split_native_metadata_shape(&source)?;
+    let position = CellPosition::new(0, 1);
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position
+        )?,
+        None
+    );
+    let original_format = split_list_entries(
+        &source,
+        FORMAT_MEMBER,
+        FORMAT_LIST_ID,
+        tst::table_data_list::ListType::Format,
+    )?;
+    let original_control = split_list_entries(
+        &source,
+        CONTROL_MEMBER,
+        CONTROL_LIST_ID,
+        tst::table_data_list::ListType::ControlCellSpec,
+    )?;
+    let create = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .set(CellControl::Checkbox(Checkbox))
+        .commit()?;
+    let created_bytes = create.package().exact_bytes();
+    assert_eq!(
+        create.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        Some(CellControl::Checkbox(Checkbox))
+    );
+    let changed = changed_members(&source, &created_bytes)?;
+    assert_previews_invalidated(&source, &created_bytes)?;
+    assert_split_scalar_locality(&source, &created_bytes, &changed)?;
+    assert_split_metadata_transition(&source, &created_bytes, &changed)?;
+    assert!(
+        split_list_entries(
+            &created_bytes,
+            FORMAT_MEMBER,
+            FORMAT_LIST_ID,
+            tst::table_data_list::ListType::Format,
+        )?
+        .iter()
+        .all(|entry| entry.refcount > 0)
+    );
+    assert!(
+        split_list_entries(
+            &created_bytes,
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )?
+        .iter()
+        .all(|entry| entry.refcount > 0)
+    );
+
+    let reset = create
+        .package()
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .clear()
+        .commit()?;
+    let reset_bytes = reset.package().exact_bytes();
+    assert_eq!(
+        reset.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        None
+    );
+    assert_eq!(
+        split_list_entries(
+            &reset_bytes,
+            FORMAT_MEMBER,
+            FORMAT_LIST_ID,
+            tst::table_data_list::ListType::Format,
+        )?,
+        original_format
+    );
+    assert_eq!(
+        split_list_entries(
+            &reset_bytes,
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )?,
+        original_control
+    );
+    assert!(
+        Package::from_bytes(&reset_bytes)?
+            .apply_table_cell_control_format(&reset.patch().inverse())?
+            .package()
+            .exact_bytes()
+            == created_bytes
+    );
+    assert_eq!(
+        Package::from_bytes(&created_bytes)?
+            .apply_table_cell_control_format(&create.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
+    let source = split_component_fixture()?;
+    for (member, identifier, list_type, label) in [
+        (
+            FORMAT_MEMBER,
+            FORMAT_LIST_ID,
+            tst::table_data_list::ListType::Format,
+            "format",
+        ),
+        (
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+            "control",
+        ),
+    ] {
+        let hostile = rewrite_split_list(&source, member, identifier, list_type, |list| {
+            list.entries
+                .first_mut()
+                .ok_or_else(|| io::Error::other("split list entry is missing"))?
+                .refcount = 0;
+            Ok(())
+        })?;
+        let package = Package::from_bytes(&hostile)?;
+        let before = package.exact_bytes();
+        let result = package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(0, 0),
+            )
+            .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
+        assert!(
+            result.is_err(),
+            "undercounted split {label} list was accepted"
+        );
+        assert_eq!(package.exact_bytes(), before);
+    }
+
+    let locked = with_locked_table(&source)?;
+    let package = Package::from_bytes(&locked)?;
+    let before = package.exact_bytes();
+    assert!(
+        package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(0, 0),
+            )?
+            .set(CellControl::StarRating(StarRating))
+            .commit()
+            .is_err()
+    );
+    assert_eq!(package.exact_bytes(), before);
+
+    let tight = Limits::new(
+        u64::try_from(source.len().saturating_sub(1))?,
+        Limits::MAX_ENTRIES,
+        Limits::MAX_ENTRY_BYTES,
+        Limits::MAX_TOTAL_BYTES,
+        Limits::MAX_IWA_STREAM_BYTES,
+    )?;
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn split_scalar_clear_is_reversible_and_local() -> TestResult {
     let source = split_component_fixture()?;
     let package = Package::from_bytes(&source)?;
-    let before = package.exact_bytes();
-    let result = package
+    let commit = package
         .edit_table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
             CellPosition::new(0, 0),
         )?
         .clear()
-        .commit();
-    assert!(result.is_err());
-    assert_eq!(package.exact_bytes(), before);
+        .commit()?;
+    let target = commit.package().exact_bytes();
+    assert_eq!(
+        commit.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(0, 0),
+        )?,
+        None
+    );
+    let changed = changed_members(&source, &target)?;
+    assert_previews_invalidated(&source, &target)?;
+    assert_split_scalar_locality(&source, &target, &changed)?;
+    assert_split_metadata_transition(&source, &target, &changed)?;
+    assert_eq!(
+        Package::from_bytes(&target)?
+            .apply_table_cell_control_format(&commit.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        source
+    );
     Ok(())
 }
 
@@ -2393,15 +2970,24 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         SplitMetadataCorruption::DuplicateCalculationExternal,
         SplitMetadataCorruption::DuplicatePopupExternal,
         SplitMetadataCorruption::ComponentAndObjectFormatExternal,
+        SplitMetadataCorruption::ComponentAndObjectTileExternal,
+        SplitMetadataCorruption::ComponentAndObjectControlExternal,
         SplitMetadataCorruption::VersionedCalculationExternal,
         SplitMetadataCorruption::VersionedPopupExternal,
-        SplitMetadataCorruption::VersionedAnonymousFormatComponent,
+        SplitMetadataCorruption::DuplicateFormatComponent,
         SplitMetadataCorruption::WrongCalculationLocator,
+        SplitMetadataCorruption::WrongFormatLocator,
         SplitMetadataCorruption::WrongControlLocator,
     ] {
         let hostile = with_split_metadata_corruption(&source, corruption)?;
         assert_split_owner_rejects(&hostile, &format!("split edge {corruption:?}"))?;
     }
+    // Wave86 deliberately admits read-only compatibility for a uniquely
+    // edge-owned sidecar without its own ComponentInfo. Wave88 mutation is
+    // stricter because it cannot advance a missing component save token.
+    let missing_format =
+        with_split_metadata_corruption(&source, SplitMetadataCorruption::MissingFormatComponent)?;
+    assert_changed_edit_rejects(&missing_format, "split edge MissingFormatComponent")?;
     for corruption in [
         SplitModelReferenceCorruption::MissingFormatAggregate,
         SplitModelReferenceCorruption::DuplicateFormatAggregate,
@@ -2449,7 +3035,7 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
 }
 
 #[test]
-fn popup_only_split_reads_but_every_changed_control_route_refuses_atomically() -> TestResult {
+fn popup_only_split_reads_but_popup_changed_route_refuses_atomically() -> TestResult {
     let source = popup_only_split_fixture()?;
     let package = Package::from_bytes(&source)?;
     assert_eq!(
@@ -2468,24 +3054,19 @@ fn popup_only_split_reads_but_every_changed_control_route_refuses_atomically() -
         )?,
         Some(CellControl::PopUpMenu(menu()?)),
     );
-    for (position, desired) in [
-        (CellPosition::new(0, 0), CellControl::StarRating(StarRating)),
-        (CellPosition::new(4, 0), CellControl::Checkbox(Checkbox)),
-    ] {
-        let before = package.exact_bytes();
-        let result = package
-            .edit_table_cell_control_format(
-                SheetSelector::index(0),
-                TableSelector::index(0),
-                position,
-            )?
-            .set(desired)
-            .commit();
-        assert!(matches!(
-            result,
-            Err(ControlError::UnsupportedDependency { .. })
-        ));
-        assert_eq!(package.exact_bytes(), before);
-    }
+    let before = package.exact_bytes();
+    let result = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .set(CellControl::Checkbox(Checkbox))
+        .commit();
+    assert!(matches!(
+        result,
+        Err(ControlError::UnsupportedDependency { .. })
+    ));
+    assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
