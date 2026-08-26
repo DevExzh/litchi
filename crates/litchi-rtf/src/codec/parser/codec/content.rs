@@ -521,6 +521,16 @@ impl<'a> Parser<'a> {
         bytes: &'b [u8],
         resource: &'static str,
     ) -> RtfResult<Cow<'b, str>> {
+        let encoding = self.current_state()?.encoding;
+        self.decode_transport_bytes_bounded_with_encoding(bytes, encoding, resource)
+    }
+
+    pub(super) fn decode_transport_bytes_bounded_with_encoding<'b>(
+        &self,
+        bytes: &'b [u8],
+        encoding: RtfEncoding,
+        resource: &'static str,
+    ) -> RtfResult<Cow<'b, str>> {
         let worst_case = if bytes.is_ascii() {
             bytes.len()
         } else {
@@ -533,7 +543,7 @@ impl<'a> Parser<'a> {
                 limit: MAX_TEXT_INTERMEDIATE_BYTES,
             });
         }
-        let decoded = self.current_state()?.encoding.decode(bytes);
+        let decoded = encoding.decode(bytes);
         if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
             return Err(RtfError::LimitExceeded {
                 resource,
@@ -545,6 +555,40 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn decode_transport_text(&self, text: &str) -> RtfResult<String> {
+        let encoding = self.current_state()?.encoding;
+        self.decode_transport_text_with_encoding(text, encoding)
+    }
+
+    pub(super) fn decode_transport_text_for_current_font(&self, text: &str) -> RtfResult<String> {
+        let encoding = {
+            let state = self.current_state()?;
+            self.effective_text_encoding(state)?
+        };
+        self.decode_transport_text_strict_with_encoding(text, encoding)
+    }
+
+    pub(super) fn decode_transport_text_with_encoding(
+        &self,
+        text: &str,
+        encoding: RtfEncoding,
+    ) -> RtfResult<String> {
+        self.decode_transport_text_with_encoding_mode(text, encoding, false)
+    }
+
+    pub(super) fn decode_transport_text_strict_with_encoding(
+        &self,
+        text: &str,
+        encoding: RtfEncoding,
+    ) -> RtfResult<String> {
+        self.decode_transport_text_with_encoding_mode(text, encoding, true)
+    }
+
+    fn decode_transport_text_with_encoding_mode(
+        &self,
+        text: &str,
+        encoding: RtfEncoding,
+        strict: bool,
+    ) -> RtfResult<String> {
         if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
             return Err(RtfError::LimitExceeded {
                 resource: "RTF transport text",
@@ -560,7 +604,34 @@ impl<'a> Parser<'a> {
                 requested: text.len(),
             })?;
         append_transport_bytes(&mut bytes, text)?;
-        let decoded = self.decode_transport_bytes_bounded(&bytes, "RTF decoded transport text")?;
+        let decoded = if strict {
+            let worst_case = if bytes.is_ascii() {
+                bytes.len()
+            } else {
+                bytes.len().saturating_mul(4)
+            };
+            if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
+                return Err(RtfError::LimitExceeded {
+                    resource: "RTF decoded transport text",
+                    observed: worst_case,
+                    limit: MAX_TEXT_INTERMEDIATE_BYTES,
+                });
+            }
+            encoding.decode_strict(&bytes, "transport text")?
+        } else {
+            self.decode_transport_bytes_bounded_with_encoding(
+                &bytes,
+                encoding,
+                "RTF decoded transport text",
+            )?
+        };
+        if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(RtfError::LimitExceeded {
+                resource: "RTF decoded transport text",
+                observed: decoded.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
         match decoded {
             Cow::Borrowed(value) => {
                 let mut owned = String::new();

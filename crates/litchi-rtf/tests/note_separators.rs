@@ -18,6 +18,10 @@ const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 {\*\aftncn End}
 Body}";
 
+const FONT_SCOPED_SEPARATOR: &str = r"{\rtf1\ansi\ansicpg1252
+{\fonttbl{\f0\fnil\fcharset0 ANSI;}{\f1\fnil\fcharset128 JIS;}}
+{\*\ftnsep\f1\'82\'a0\chftnsep}\'e9 Body}";
+
 #[test]
 fn parses_decodes_and_round_trips_note_separators() {
     let doc = RtfDocument::parse(SYNTHETIC).unwrap();
@@ -123,4 +127,21 @@ fn parses_real_libreoffice_note_separator_fixture() {
             .elements
             .contains(&NoteSeparatorElement::ParagraphBreak)
     );
+}
+
+#[test]
+fn starred_note_separator_font_controls_are_inert_and_do_not_leak_into_body() {
+    let document = RtfDocument::parse(FONT_SCOPED_SEPARATOR).unwrap();
+    let separator = document
+        .note_separators()
+        .get(NoteSeparatorKind::FootnoteSeparator)
+        .unwrap();
+
+    assert!(
+        separator
+            .elements
+            .contains(&NoteSeparatorElement::SeparatorMark)
+    );
+    assert_eq!(separator.text(), "‚ ");
+    assert_eq!(document.text(), "é Body");
 }
