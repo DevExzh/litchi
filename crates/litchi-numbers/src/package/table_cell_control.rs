@@ -1,11 +1,11 @@
 //! Selector-first ownership for all interactive Numbers cell controls.
 //!
 //! This module is the single public transaction boundary for checkbox,
-//! star-rating, slider, stepper, and Pop-Up Menu cells.  The Pop-Up Menu
-//! implementation remains the audited native graph engine; this facade wraps
-//! it for compatibility while the scalar-control native path is kept in the
-//! sibling private module.  No native identifiers or generated messages are
-//! present in the public transaction values.
+//! star-rating, slider, stepper, and menu cells.  The specialized menu graph
+//! implementation remains the audited native owner; this facade wraps it
+//! alongside the scalar-control native path kept in the sibling private
+//! module.  No native identifiers or generated messages are present in the
+//! public transaction values.
 //!
 //! Shared native control entries are updated with copy-on-write semantics;
 //! the exact patch/inverse transaction remains the publication boundary.
@@ -20,7 +20,38 @@ use super::table_cell_control_native as native;
 use super::{Package, table_cell_pop_up_menu as popup};
 use crate::{CellPosition, SheetSelector, TableSelector, cell::data_format::control::CellControl};
 
-pub use popup::{Error, LimitKind, Path};
+/// Content-redacted errors shared by every cell-control transaction.
+///
+/// The historical error variants remain reexported for source compatibility;
+/// their values never contain authored labels, package bytes, or native IDs.
+pub use popup::Error;
+
+/// Resource axes shared by all cell-control transactions.
+pub use popup::LimitKind;
+
+/// Selector path shared by all cell-control transactions.
+pub use popup::Path;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RedactedControlKind {
+    None,
+    Checkbox,
+    StarRating,
+    Slider,
+    Stepper,
+    PopUpMenu,
+}
+
+fn redacted_control_kind(value: Option<&CellControl>) -> RedactedControlKind {
+    match value {
+        None => RedactedControlKind::None,
+        Some(CellControl::Checkbox(_)) => RedactedControlKind::Checkbox,
+        Some(CellControl::StarRating(_)) => RedactedControlKind::StarRating,
+        Some(CellControl::Slider(_)) => RedactedControlKind::Slider,
+        Some(CellControl::Stepper(_)) => RedactedControlKind::Stepper,
+        Some(CellControl::PopUpMenu(_)) => RedactedControlKind::PopUpMenu,
+    }
+}
 
 /// A selector-first edit staged against one exact package snapshot.
 pub struct Edit<'a> {
@@ -35,7 +66,8 @@ impl fmt::Debug for Edit<'_> {
         formatter
             .debug_struct("Edit")
             .field("path", &self.path)
-            .field("after", &self.after)
+            .field("before", &redacted_control_kind(self.before.as_ref()))
+            .field("after", &redacted_control_kind(self.after.as_ref()))
             .finish_non_exhaustive()
     }
 }
@@ -125,8 +157,8 @@ impl fmt::Debug for Patch {
         formatter
             .debug_struct("Patch")
             .field("path", &self.path)
-            .field("before", &self.before)
-            .field("after", &self.after)
+            .field("before", &redacted_control_kind(self.before.as_ref()))
+            .field("after", &redacted_control_kind(self.after.as_ref()))
             .finish_non_exhaustive()
     }
 }
@@ -214,11 +246,20 @@ impl Diagnostics {
 
 /// One validated package publication.
 #[must_use = "a cell-control commit contains the validated package snapshot"]
-#[derive(Debug)]
 pub struct Commit {
     package: Package,
     patch: Patch,
     diagnostics: Diagnostics,
+}
+
+impl fmt::Debug for Commit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Commit")
+            .field("patch", &self.patch)
+            .field("diagnostics", &self.diagnostics)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Commit {
@@ -345,17 +386,7 @@ impl Package {
             target_catalog.source_bytes().len().saturating_mul(2),
             patch.path,
         )?;
-        let touched_components = catalog
-            .package()
-            .iter()
-            .filter(|source_entry| {
-                target_catalog
-                    .package()
-                    .iter()
-                    .find(|target_entry| target_entry.name() == source_entry.name())
-                    .is_none_or(|target_entry| target_entry.data() != source_entry.data())
-            })
-            .count();
+        let touched_components = changed_component_count(self, &candidate)?;
         let deleted_previews = catalog
             .package()
             .iter()
@@ -418,15 +449,69 @@ fn rewrite(
     let source_owner = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::UnsupportedSource)?
         .__source_owner();
-    let (target, popup_before, popup_after) = match (&before, &after) {
-        (Some(CellControl::PopUpMenu(old)), Some(CellControl::PopUpMenu(new))) => {
-            (true, Some(old.clone()), Some(new.clone()))
-        },
-        (Some(CellControl::PopUpMenu(old)), None) => (true, Some(old.clone()), None),
-        (None, Some(CellControl::PopUpMenu(new))) => (true, None, Some(new.clone())),
-        _ => (false, None, None),
+    let target = popup::resolve_cell(
+        source,
+        SheetSelector::index(sheet),
+        TableSelector::index(table),
+        position,
+    )?;
+    // Re-check the complete semantic control at publication time.  The
+    // focused popup transaction only observes the popup projection, so this
+    // guard also protects scalar -> popup transitions from publishing over a
+    // stale scalar edit.
+    if popup::read_cell_control(source, target)? != before {
+        return Err(Error::PatchConflict);
+    }
+    let popup_before = match &before {
+        Some(CellControl::PopUpMenu(value)) => Some(value.clone()),
+        _ => None,
     };
-    if target {
+    let popup_after = match &after {
+        Some(CellControl::PopUpMenu(value)) => Some(value.clone()),
+        _ => None,
+    };
+    if popup_before.is_some() || popup_after.is_some() {
+        // A popup -> scalar transition has two distinct graph owners: first
+        // release the popup model through its focused transaction, then run
+        // the already-audited scalar writer against that private candidate.
+        // Both candidates remain private; the outer patch is built only from
+        // the original source and final package, preserving atomicity and an
+        // exact inverse for the unified facade.
+        if popup_before.is_some() && popup_after.is_none() && after.is_some() {
+            let cleared = source
+                .edit_table_cell_pop_up_menu_format(
+                    SheetSelector::index(sheet),
+                    TableSelector::index(table),
+                    position,
+                )?
+                .clear()
+                .commit()?;
+            let cleared_package = cleared.into_package();
+            let scalar_commit = rewrite(&cleared_package, path, None, after.clone())?;
+            let package = scalar_commit.into_package();
+            if package.table_cell_control_format(
+                SheetSelector::index(sheet),
+                TableSelector::index(table),
+                position,
+            )? != after
+            {
+                return Err(Error::Verification);
+            }
+            let diagnostics = package_diff_diagnostics(source, &package)?;
+            let target_owner = super::table_headers::rewrite::physical_source(&package)
+                .map_err(|_| Error::Verification)?
+                .__source_owner();
+            return Ok(Commit {
+                package,
+                patch: Patch {
+                    artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+                    path,
+                    before,
+                    after,
+                },
+                diagnostics,
+            });
+        }
         let edit = source.edit_table_cell_pop_up_menu_format(
             SheetSelector::index(sheet),
             TableSelector::index(table),
@@ -443,6 +528,14 @@ fn rewrite(
         }
         let diagnostics = *commit.diagnostics();
         let package = commit.into_package();
+        if package.table_cell_control_format(
+            SheetSelector::index(sheet),
+            TableSelector::index(table),
+            position,
+        )? != after
+        {
+            return Err(Error::Verification);
+        }
         let target_owner = super::table_headers::rewrite::physical_source(&package)
             .map_err(|_| Error::Verification)?
             .__source_owner();
@@ -587,6 +680,7 @@ fn rewrite(
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
         .__source_owner();
+    let touched_components = changed_component_count(source, &candidate)?;
     Ok(Commit {
         package: candidate,
         patch: Patch {
@@ -597,7 +691,7 @@ fn rewrite(
         },
         diagnostics: Diagnostics {
             changed: true,
-            touched_components: changed_names.len(),
+            touched_components,
             deleted_previews: previews.len(),
             full_reparse_performed: true,
         },
@@ -691,4 +785,133 @@ fn verify_scalar_package_locality(
         }
     }
     Ok(())
+}
+
+fn package_diff_diagnostics(source: &Package, candidate: &Package) -> Result<Diagnostics, Error> {
+    let source_catalog =
+        super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
+    let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
+        .map_err(|_| Error::Verification)?;
+    let changed_members = changed_member_names(source_catalog, candidate_catalog);
+    let deleted_previews = source_catalog
+        .package()
+        .iter()
+        .filter(|entry| entry.name().starts_with("preview"))
+        .filter(|source_entry| {
+            candidate_catalog
+                .package()
+                .iter()
+                .all(|candidate_entry| candidate_entry.name() != source_entry.name())
+        })
+        .count();
+    Ok(Diagnostics {
+        changed: !changed_members.is_empty() || deleted_previews != 0,
+        touched_components: changed_component_count(source, candidate)?,
+        deleted_previews,
+        full_reparse_performed: true,
+    })
+}
+
+fn changed_member_names(
+    source: &litchi_iwa_archive::SourceCatalog,
+    candidate: &litchi_iwa_archive::SourceCatalog,
+) -> Vec<String> {
+    let mut changed_members = Vec::new();
+    for source_entry in source.package().iter() {
+        let changed = candidate
+            .package()
+            .iter()
+            .find(|candidate_entry| candidate_entry.name() == source_entry.name())
+            .is_none_or(|candidate_entry| candidate_entry.data() != source_entry.data());
+        if changed && !source_entry.name().starts_with("preview") {
+            changed_members.push(source_entry.name().to_owned());
+        }
+    }
+    for candidate_entry in candidate.package().iter() {
+        let added = source
+            .package()
+            .iter()
+            .all(|source_entry| source_entry.name() != candidate_entry.name());
+        if added && !candidate_entry.name().starts_with("preview") {
+            changed_members.push(candidate_entry.name().to_owned());
+        }
+    }
+    changed_members.sort_unstable();
+    changed_members.dedup();
+    changed_members
+}
+
+fn changed_component_count(source: &Package, candidate: &Package) -> Result<usize, Error> {
+    let source_components = source.state.components.catalog();
+    let candidate_components = candidate.state.components.catalog();
+    let mut changed = 0usize;
+    for source_component in source_components.iter() {
+        let candidate_component = candidate_components
+            .iter()
+            .find(|component| component.name() == source_component.name());
+        let differs = candidate_component.is_none_or(|candidate_component| {
+            source_component.archive().objects.len() != candidate_component.archive().objects.len()
+                || source_component
+                    .archive()
+                    .objects
+                    .iter()
+                    .zip(candidate_component.archive().objects.iter())
+                    .any(|(source_object, candidate_object)| {
+                        !source_object.same_content_ignoring_offsets(candidate_object)
+                    })
+        });
+        if differs {
+            changed = changed.saturating_add(1);
+        }
+    }
+    changed = changed.saturating_add(
+        candidate_components
+            .iter()
+            .filter(|candidate_component| {
+                source_components
+                    .iter()
+                    .all(|source_component| source_component.name() != candidate_component.name())
+            })
+            .count(),
+    );
+    // Metadata.iwa is normally part of the parsed component catalog.  Keep a
+    // physical fallback for semantic/legacy sources that retain the metadata
+    // sidecar outside that catalog so its token transition is never omitted
+    // from the diagnostic count.
+    let metadata_in_catalog = source_components
+        .iter()
+        .chain(candidate_components.iter())
+        .any(|component| component.name() == super::metadata::ENTRY_NAME);
+    if !metadata_in_catalog {
+        let source_metadata = super::table_headers::rewrite::physical_source(source)
+            .map_err(|_| Error::Verification)?
+            .package()
+            .iter()
+            .find(|entry| entry.name() == super::metadata::ENTRY_NAME);
+        let candidate_metadata = super::table_headers::rewrite::physical_source(candidate)
+            .map_err(|_| Error::Verification)?
+            .package()
+            .iter()
+            .find(|entry| entry.name() == super::metadata::ENTRY_NAME);
+        if source_metadata.map(|entry| entry.data()) != candidate_metadata.map(|entry| entry.data())
+        {
+            changed = changed.saturating_add(1);
+        }
+    }
+    Ok(changed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cell::data_format::PopUpMenu;
+
+    #[test]
+    fn redacted_control_debug_does_not_include_authored_menu_items() {
+        let menu = PopUpMenu::new(["private-control-label"]).expect("valid menu");
+        let control = CellControl::PopUpMenu(menu);
+        let rendered = format!("{:?}", redacted_control_kind(Some(&control)));
+        assert!(rendered.contains("PopUpMenu"));
+        assert!(!rendered.contains("private-control-label"));
+    }
 }

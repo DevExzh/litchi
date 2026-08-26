@@ -654,6 +654,61 @@ def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
     )
 
 
+def complete_numbers_table_cell_control_popup_split_scaffold(root: Path) -> None:
+    """Upgrade the Wave85 fixture to the positive Wave90 popup contract."""
+
+    add_numbers_table_cell_control_canonical_scaffold(root)
+    owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+    owner_source = owner.read_text(encoding="utf-8")
+    owner_source = owner_source.replace(
+        "fn reject_cross_component_write() {}\n"
+        "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+        "",
+    )
+    owner_source += (
+        "struct NativePopUpGraphInput; struct NativePopUpMember; "
+        "struct NativePopUpObjectRoute; struct NativeMemberEdit;\n"
+        "fn rewrite_native_popup_menu_multi() { NativePopUpGraphInput; member_edits; }\n"
+        "fn member_edit_deduplication() { NativeControlOutput; from_edits; deduplicated; }\n"
+        "fn component_uuid_ownership() { require_current_uuid; uuid_addition; uuid_removal; IdentifierCensus; reserved_identifier; }\n"
+        "fn external_edge_and_save_token_batch() { require_external_edge; prove_cross_component_reference; external_reference; selectors_for_components; SaveTokenBatch; save_tokens; touched_components; }\n"
+        "fn cow_reuse_cull_refcount_census() { copy_on_write; prepare_desired_state; existing_popup_model_identifiers; archive_has_popup_reference; census_bnc_references; validate_bnc_refcounts; refcount; cull; }\n"
+        "fn aggregate_field_info_transition() { ArchiveInfo; FieldInfo; object_references; replace_control_message_with_transition; aggregate; }\n"
+        "fn aggregate_transaction_budget() { TransactionBudget; charge_wire_fields; residual_storage_options; preflight; }\n"
+        "fn prepared_archive_zip_reassembly() { prepare_reassembly; execution_requirements; Prepared; reassembly; }\n"
+        "fn candidate_reopen_object_locality() { candidate; reopen; verify_package_locality; same_content; }\n"
+    )
+    owner.write_text(owner_source, encoding="utf-8")
+
+    integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+    integration.write_text(
+        "#[test]\n"
+        "fn split_popup_menu_lifecycle() {\n"
+        "    split cross_component PopUpMenu read no_op replacement copy_on_write create reuse cull refcount inverse apply conflict member locality exact_bytes metadata uuid save_token external alias opaque versioned atomic budget limit reassembly allocation;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    package_fuzz = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE
+    package_fuzz.write_text(
+        package_fuzz.read_text(encoding="utf-8")
+        + "fn split_popup_fuzz_lifecycle() { split member PopUpMenu create clear reset inverse conflict atomic; }\n",
+        encoding="utf-8",
+    )
+    codec_fuzz = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_SOURCE
+    codec_fuzz.write_text(
+        codec_fuzz.read_text(encoding="utf-8")
+        + "fn prepared_popup_codec_fuzz_replay() { prepare replay unknown limit depth allocation scratch; }\n",
+        encoding="utf-8",
+    )
+    (root / boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_CORPUS / "split_popup.seed").write_bytes(
+        b"split-popup"
+    )
+    (root / boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_CORPUS / "prepared_popup.hex").write_bytes(
+        b"00"
+    )
+
+
 def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -22627,6 +22682,203 @@ fn rewrite_movie_title_operation(
             "split-component no-op exact bytes",
             boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS,
         )
+        self.assertIn(
+            "per-member graph ownership",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_OWNER_REQUIRED_MARKERS,
+        )
+        self.assertIn(
+            "component UUID ownership",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_OWNER_REQUIRED_MARKERS,
+        )
+        self.assertIn(
+            "split PopUpMenu create/reuse/cull/refcount",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_INTEGRATION_MARKERS,
+        )
+        self.assertIn(
+            "package fuzz split lifecycle",
+            boundaries.NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_FUZZ_MARKERS,
+        )
+
+    def test_numbers_table_cell_control_popup_split_lifecycle_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_control_popup_split_owner_requires_each_contract_part(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            marker_tokens = {
+                "per-member graph ownership": (
+                    "NativePopUpGraphInput",
+                    "NativePopUpMember",
+                    "NativePopUpObjectRoute",
+                    "NativeMemberEdit",
+                    "member_edits",
+                ),
+                "multi-member native transition": ("rewrite_native_popup_menu_multi",),
+                "component UUID ownership": (
+                    "require_current_uuid",
+                    "uuid_addition",
+                    "uuid_removal",
+                    "IdentifierCensus",
+                    "reserved_identifier",
+                ),
+                "external edge and save-token batch": (
+                    "require_external_edge",
+                    "prove_cross_component_reference",
+                    "external_reference",
+                    "selectors_for_components",
+                    "SaveTokenBatch",
+                    "save_tokens",
+                    "touched_components",
+                ),
+                "COW reuse cull and refcount census": (
+                    "copy_on_write",
+                    "prepare_desired_state",
+                    "existing_popup_model_identifiers",
+                    "archive_has_popup_reference",
+                    "census_bnc_references",
+                    "validate_bnc_refcounts",
+                    "refcount",
+                    "cull",
+                ),
+                "aggregate and FieldInfo transition": (
+                    "ArchiveInfo",
+                    "FieldInfo",
+                    "object_references",
+                    "replace_control_message_with_transition",
+                    "aggregate",
+                ),
+                "aggregate transaction budget": (
+                    "TransactionBudget",
+                    "charge_wire_fields",
+                    "residual_storage_options",
+                    "preflight",
+                ),
+                "prepared archive and ZIP reassembly": (
+                    "prepare_reassembly",
+                    "execution_requirements",
+                    "Prepared",
+                    "reassembly",
+                ),
+                "candidate reopen and object locality": (
+                    "candidate",
+                    "reopen",
+                    "verify_package_locality",
+                    "same_content",
+                ),
+            }
+            for label, tokens in marker_tokens.items():
+                with self.subTest(marker=label):
+                    owner_source = complete
+                    for token in tokens:
+                        owner_source = owner_source.replace(token, "")
+                    owner.write_text(owner_source, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+            owner.write_text(complete, encoding="utf-8")
+
+    def test_numbers_table_cell_control_popup_split_rejects_refusal_and_cfg_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn reject_cross_component_write() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                root
+            )
+            self.assertTrue(any("cross-component write refusal" in item for item in violations), violations)
+
+            owner_source = owner.read_text(encoding="utf-8").replace(
+                "fn rewrite_native_popup_menu_multi() { NativePopUpGraphInput; member_edits; }\n",
+                "",
+            )
+            owner.write_text(
+                owner_source
+                + "#[cfg(test)]\nfn rewrite_native_popup_menu_multi() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                root
+            )
+            self.assertTrue(any("multi-member native transition" in item for item in violations), violations)
+
+    def test_numbers_table_cell_control_popup_split_requires_integration_and_fuzz_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+            complete = integration.read_text(encoding="utf-8")
+            marker_names = tuple(
+                boundaries.NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_INTEGRATION_MARKERS
+            )
+            for label in marker_names:
+                with self.subTest(integration_marker=label):
+                    # Each marker is represented by a distinct lifecycle token
+                    # in the compact fixture line; remove the token family
+                    # that drives the corresponding regex.
+                    tokens = {
+                        "split PopUpMenu read/no-op": ("read_noop", "read no_op"),
+                        "split PopUpMenu replacement/COW": ("replacement copy_on_write",),
+                        "split PopUpMenu create/reuse/cull/refcount": ("create reuse cull refcount",),
+                        "split PopUpMenu inverse/apply/conflict": ("inverse apply conflict",),
+                        "split PopUpMenu member locality": ("member locality exact_bytes",),
+                        "split PopUpMenu metadata ownership": ("metadata uuid save_token external",),
+                        "split PopUpMenu hostile ownership atomicity": ("alias opaque versioned atomic",),
+                        "split PopUpMenu resource/reassembly": ("budget limit reassembly allocation",),
+                    }[label]
+                    modified = complete
+                    for token in tokens:
+                        modified = modified.replace(token, "")
+                    integration.write_text(modified, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label}" in item for item in violations),
+                        violations,
+                    )
+            integration.write_text(complete, encoding="utf-8")
+
+            package_fuzz = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE
+            package_source = package_fuzz.read_text(encoding="utf-8")
+            package_fuzz.write_text(
+                package_source.replace(
+                    "fn split_popup_fuzz_lifecycle() { split member PopUpMenu create clear reset inverse conflict atomic; }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                root
+            )
+            self.assertTrue(any("package fuzz split lifecycle" in item for item in violations), violations)
 
     def test_focused_numbers_table_cell_control_is_dormant_until_complete_owner(
         self,
@@ -23101,6 +23353,10 @@ fn rewrite_movie_title_operation(
         )
         self.assertIn(
             "+ audit_numbers_table_cell_control_facade_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_numbers_table_cell_control_popup_split_lifecycle_source_topology()",
             main_source,
         )
 

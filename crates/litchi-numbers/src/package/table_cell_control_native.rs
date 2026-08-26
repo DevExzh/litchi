@@ -570,6 +570,7 @@ pub(super) fn rewrite_scalar_control(
         control_payload.as_slice(),
         new_control,
         archive_limits,
+        true,
     )
     .map_err(|_| Error::InvalidSource { path })?;
     popup_native::replace_message_preserving_header(

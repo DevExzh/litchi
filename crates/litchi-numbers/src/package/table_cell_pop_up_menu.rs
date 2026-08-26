@@ -17,8 +17,8 @@ use litchi_iwa_protos::{
     numbers_table_cell_pop_up_menu_codec as popup_codec,
     numbers_table_cell_storage_codec as storage_codec,
     package_metadata_codec::{
-        AdditionSaveTokenBatch, Batch as MetadataBatch, RemovalBatch, RemovalSaveTokenBatch,
-        RewriteOptions as MetadataRewriteOptions, SaveTokenBatch,
+        AdditionSaveTokenBatch, Batch as MetadataBatch, CombinedSaveTokenBatch, RemovalBatch,
+        RemovalSaveTokenBatch, RewriteOptions as MetadataRewriteOptions, SaveTokenBatch,
     },
 };
 use litchi_numbers_wire::BncCell;
@@ -1187,7 +1187,6 @@ fn rewrite_transaction(
     if target.locked {
         return Err(Error::TableLocked { path });
     }
-    reject_cross_component_write(source, target, path)?;
     let mut budget = TransactionBudget::new(source);
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::UnsupportedSource)?;
@@ -1238,13 +1237,30 @@ fn rewrite_transaction(
         &metadata_facts,
         &mut budget,
     )?;
+    let native_component_indices = native
+        .member_edits
+        .iter()
+        .map(|edit| edit.component_index)
+        .collect::<Vec<_>>();
+    let touched_component_indices = metadata_facts
+        .dedupe_touched_components(&native_component_indices)
+        .map_err(|error| map_popup_metadata_error(error, path))?;
+    // Resolve the complete current/effective selector set before staging the
+    // metadata candidate. This is also the source of truth for the one-token
+    // transition across every changed native member.
+    metadata_facts
+        .touched_selectors(&touched_component_indices)
+        .map_err(|error| map_popup_metadata_error(error, path))?;
     let metadata_payload = rewrite_popup_metadata(
         source,
         &metadata_facts,
-        target.component_index,
+        &touched_component_indices,
         fresh,
         native.added_model,
+        native.added_model_component,
+        native.control_component_index,
         &native.removed_models,
+        &native.removed_model_components,
         path,
         &mut budget,
     )?;
@@ -1321,13 +1337,11 @@ fn rewrite_transaction(
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
         .__source_owner();
-    let touched_components = native
-        .member_edits
-        .iter()
-        .map(|edit| edit.component_index)
-        .chain(std::iter::once(metadata_facts.route().component_index))
-        .collect::<std::collections::BTreeSet<_>>()
-        .len();
+    let mut diagnostic_components = touched_component_indices.clone();
+    if !diagnostic_components.contains(&metadata_facts.route().component_index) {
+        diagnostic_components.push(metadata_facts.route().component_index);
+    }
+    let touched_components = diagnostic_components.len();
     Ok(Commit {
         package: candidate,
         patch: Patch {
@@ -1395,8 +1409,11 @@ pub(super) fn verify_package_locality_for_members(
 
 struct NativeRewrite {
     member_edits: Vec<popup_native::NativeMemberEdit>,
+    control_component_index: usize,
     added_model: Option<u64>,
+    added_model_component: Option<usize>,
     removed_models: Vec<u64>,
+    removed_model_components: Vec<(usize, u64)>,
 }
 
 fn rewrite_native_entry(
@@ -1489,6 +1506,29 @@ fn rewrite_native_entry(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
+    let tile_component_index = resolved_component_index(source, tile_identifier, path)?;
+    let control_component_index = resolved_component_index(source, control_table_identifier, path)?;
+    let format_component_index = resolved_component_index(source, format_table_identifier, path)?;
+    let string_table_identifier = store.string_table().identifier();
+    let string_component_index = resolved_component_index(source, string_table_identifier, path)?;
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(source.state.components.catalog().len())
+        .map_err(|_| Error::Allocation {
+            amount: source.state.components.catalog().len(),
+            path,
+        })?;
+    for (component_index, member) in source.state.components.catalog().iter().enumerate() {
+        members.push(popup_native::NativePopUpMember {
+            archive: member.archive(),
+            component_index,
+            member_name: member.name(),
+        });
+    }
+    let same_component = target.component_index == tile_component_index
+        && target.component_index == control_component_index
+        && target.component_index == format_component_index
+        && target.component_index == string_component_index;
     let native_input = popup_native::NativePopUpInput {
         archive,
         component_index: target.component_index,
@@ -1505,9 +1545,36 @@ fn rewrite_native_entry(
         limits: archive_limits,
         path,
     };
-    let copy_on_write_candidates =
+    let graph_input = popup_native::NativePopUpGraphInput {
+        members: &members,
+        model: popup_native::NativePopUpObjectRoute {
+            member_index: target.component_index,
+            identifier: target.model_identifier,
+        },
+        tile: popup_native::NativePopUpObjectRoute {
+            member_index: tile_component_index,
+            identifier: tile_identifier,
+        },
+        control_table_identifier,
+        format_table_identifier,
+        // Place a newly created popup model with the rooted control-list
+        // member. This keeps its owner current and avoids inventing an
+        // unproved external edge solely for creation.
+        creation_member_index: control_component_index,
+        tile_row: target.position.row(),
+        tile_column: target.position.column(),
+        format_payload: POPUP_FORMAT_PAYLOAD,
+        new_popup_model_identifier: Some(fresh_identifier),
+        desired,
+        limits: archive_limits,
+        path,
+    };
+    let copy_on_write_candidates = if same_component {
         popup_native::existing_popup_model_identifiers(native_input, budget, path)
-            .map_err(|error| map_native_error(error, path))?;
+    } else {
+        popup_native::existing_popup_model_identifiers_multi(graph_input, budget)
+    }
+    .map_err(|error| map_native_error(error, path))?;
     budget.charge_payload_items(copy_on_write_candidates.len().max(1), path)?;
     budget.charge_payload_references(copy_on_write_candidates.len(), path)?;
     budget.charge_transaction_work(
@@ -1521,20 +1588,25 @@ fn rewrite_native_entry(
     // ownership is used to decide a cull must have exactly one current UUID
     // owner in this component.  Checking only popup models leaves tile/list
     // aliases and versioned list owners outside the transaction proof.
-    for identifier in [
-        target.model_identifier,
-        tile_identifier,
-        control_table_identifier,
-        format_table_identifier,
-    ] {
-        metadata_facts
-            .require_current_uuid(target.component_index, identifier)
-            .map_err(|error| map_popup_metadata_error(error, path))?;
-    }
+    let mut owners = vec![
+        (target.component_index, target.model_identifier),
+        (tile_component_index, tile_identifier),
+        (control_component_index, control_table_identifier),
+        (format_component_index, format_table_identifier),
+    ];
     for identifier in &copy_on_write_candidates {
-        metadata_facts
-            .require_current_uuid(target.component_index, *identifier)
-            .map_err(|error| map_popup_metadata_error(error, path))?;
+        let popup_component_index = resolved_component_index(source, *identifier, path)?;
+        owners.push((popup_component_index, *identifier));
+        if popup_component_index != control_component_index {
+            metadata_facts
+                .require_external_edge_exact(popup_metadata::ExternalEdge::new(
+                    control_component_index,
+                    popup_component_index,
+                    *identifier,
+                    Some(false),
+                ))
+                .map_err(|error| map_popup_metadata_error(error, path))?;
+        }
         for (component_index, component) in source.state.components.catalog().iter().enumerate() {
             let found = popup_native::archive_has_popup_reference_strict(
                 component.archive(),
@@ -1542,9 +1614,12 @@ fn rewrite_native_entry(
                 archive_limits,
             )
             .map_err(|error| map_native_error(error, path))?;
-            if component_index == target.component_index {
-                // The selected archive necessarily contains the rooted
-                // control edge; only unknown metadata is actionable here.
+            if component_index == control_component_index {
+                // The rooted control list is the selected owner edge for
+                // this popup model.  Other current members must not retain
+                // an opaque inbound reference that would make cull/COW
+                // ambiguous; the popup's own defining object is not an
+                // inbound reference and is covered by native locality.
                 continue;
             }
             if found {
@@ -1555,8 +1630,37 @@ fn rewrite_native_entry(
             }
         }
     }
-    let output = popup_native::rewrite_native_popup_menu(native_input, budget)
-        .map_err(|error| map_native_error(error, path))?;
+    // A native sidecar object may co-locate the string, format, and control
+    // list messages. Those semantic roles resolve to one physical ownership
+    // route and must be proved once, not mistaken for a duplicate UUID owner.
+    owners.sort_unstable();
+    owners.dedup();
+    if same_component {
+        // The focused same-member transaction has always required strict UUID
+        // ownership for every existing object it mutates or culls.  Do not
+        // let the split-native compatibility policy weaken this established
+        // graph boundary.
+        for &(component_index, identifier) in &owners {
+            metadata_facts
+                .require_current_uuid(component_index, identifier)
+                .map_err(|error| map_popup_metadata_error(error, path))?;
+        }
+    } else {
+        // Native split Numbers producers may omit UUID records for rooted
+        // table/list sidecars.  When a UUID binding exists it must still be a
+        // unique current owner; only the genuinely absent binding is admitted
+        // as this cross-component compatibility shape. Versioned, conflicting,
+        // or alternate-registry ownership remains fail-closed.
+        metadata_facts
+            .current_uuids_if_registered(&owners)
+            .map_err(|error| map_popup_metadata_error(error, path))?;
+    }
+    let output = if same_component {
+        popup_native::rewrite_native_popup_menu(native_input, budget)
+    } else {
+        popup_native::rewrite_native_popup_menu_multi(graph_input, budget)
+    }
+    .map_err(|error| map_native_error(error, path))?;
     let mut member_edits = output.member_edits.edits;
     budget.charge_allocations(member_edits.len(), path)?;
     for edit in &mut member_edits {
@@ -1575,10 +1679,35 @@ fn rewrite_native_entry(
         [identifier] => Some(*identifier),
         _ => return Err(Error::UnsupportedDependency { path }),
     };
+    let added_model_component = added_model.map(|_| control_component_index);
+    let mut removed_model_components = Vec::new();
+    removed_model_components
+        .try_reserve_exact(output.removed_object_identifiers.len())
+        .map_err(|_| Error::Allocation {
+            amount: output.removed_object_identifiers.len(),
+            path,
+        })?;
+    for &identifier in &output.removed_object_identifiers {
+        let component_index = resolved_component_index(source, identifier, path)?;
+        if component_index != control_component_index {
+            metadata_facts
+                .require_external_edge_exact(popup_metadata::ExternalEdge::new(
+                    control_component_index,
+                    component_index,
+                    identifier,
+                    Some(false),
+                ))
+                .map_err(|error| map_popup_metadata_error(error, path))?;
+        }
+        removed_model_components.push((component_index, identifier));
+    }
     Ok(NativeRewrite {
         member_edits,
+        control_component_index,
         added_model,
+        added_model_component,
         removed_models: output.removed_object_identifiers,
+        removed_model_components,
     })
 }
 
@@ -1629,35 +1758,146 @@ fn popup_metadata_options(
 fn rewrite_popup_metadata(
     _source: &Package,
     facts: &popup_metadata::RegistryFacts<'_>,
-    component_index: usize,
+    component_indices: &[usize],
     fresh: popup_metadata::FreshIdentifier,
     added_model: Option<u64>,
+    added_model_component: Option<usize>,
+    control_component_index: usize,
     removed_models: &[u64],
+    removed_model_components: &[(usize, u64)],
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
-    if added_model.is_some() && !removed_models.is_empty() {
-        return Err(Error::UnsupportedDependency { path });
-    }
-
     let selectors = facts
-        .selectors_for_components(core::slice::from_ref(&component_index))
+        .touched_selectors(component_indices)
         .map_err(|error| map_popup_metadata_error(error, path))?;
     let save_tokens = SaveTokenBatch::new(&selectors);
-    let options = popup_metadata_options(
-        facts.payload().len(),
-        usize::from(added_model.is_some()),
-        budget,
-    );
+    let registry_operations = usize::from(added_model.is_some())
+        .saturating_add(removed_models.len())
+        .saturating_add(usize::from(
+            added_model_component.is_some_and(|component| component != control_component_index),
+        ))
+        .saturating_add(
+            removed_model_components
+                .iter()
+                .filter(|(component, _)| *component != control_component_index)
+                .count(),
+        );
+    let options = popup_metadata_options(facts.payload().len(), registry_operations, budget);
 
     if let Some(identifier) = added_model {
         if identifier != fresh.identifier {
             return Err(Error::InvalidSource { path });
         }
-        let additions = [facts
-            .uuid_addition(component_index, fresh)
-            .map_err(|error| map_popup_metadata_error(error, path))?];
-        let batch = MetadataBatch::new(facts.last_object_identifier(), identifier, &additions, &[]);
+        let component_index = added_model_component
+            .or_else(|| component_indices.first().copied())
+            .ok_or(Error::InvalidSource { path })?;
+        let additions = facts
+            .uuid_additions(&[(component_index, fresh)])
+            .map_err(|error| map_popup_metadata_error(error, path))?;
+        let external_additions = if component_index != control_component_index {
+            facts
+                .external_additions(&[popup_metadata::ExternalEdge::new(
+                    control_component_index,
+                    component_index,
+                    identifier,
+                    Some(false),
+                )])
+                .map_err(|error| map_popup_metadata_error(error, path))?
+        } else {
+            Vec::new()
+        };
+        if !removed_models.is_empty() {
+            if removed_model_components.len() != removed_models.len() {
+                return Err(Error::InvalidSource { path });
+            }
+            let mut removals = Vec::new();
+            removals
+                .try_reserve_exact(removed_models.len())
+                .map_err(|_| Error::Allocation {
+                    amount: removed_models.len(),
+                    path,
+                })?;
+            for &(removed_component_index, removed_identifier) in removed_model_components {
+                match facts.uuid_removal(removed_component_index, removed_identifier) {
+                    Ok(removal) => removals.push(removal),
+                    // Native-compatible metadata may omit a UUID record for
+                    // a physically unique popup model.  Its cull is still
+                    // safe when the native/global inbound census proved the
+                    // model unreachable; there is simply no UUID registry
+                    // entry to remove.
+                    Err(error) if error.kind == popup_metadata::FailureKind::MissingRoute => {},
+                    Err(error) => return Err(map_popup_metadata_error(error, path)),
+                }
+            }
+            let mut external_edges = Vec::new();
+            external_edges
+                .try_reserve_exact(removed_model_components.len())
+                .map_err(|_| Error::Allocation {
+                    amount: removed_model_components.len(),
+                    path,
+                })?;
+            for &(removed_component_index, removed_identifier) in removed_model_components {
+                if removed_component_index == control_component_index {
+                    continue;
+                }
+                external_edges.push(popup_metadata::ExternalEdge::new(
+                    control_component_index,
+                    removed_component_index,
+                    removed_identifier,
+                    Some(false),
+                ));
+            }
+            let external_removals = facts
+                .external_removals(&external_edges)
+                .map_err(|error| map_popup_metadata_error(error, path))?;
+            let transition = popup_metadata::CombinedTransition::new(
+                facts.last_object_identifier(),
+                identifier,
+                &additions,
+                &external_additions,
+                &removals,
+                &external_removals,
+                &[],
+            );
+            let prepared = popup_metadata::prepare_combined(
+                facts,
+                CombinedSaveTokenBatch::new(transition, save_tokens),
+                options,
+            )
+            .map_err(|error| map_popup_metadata_error(error, path))?;
+            let report = prepared.prepare_report();
+            budget.charge_wire_fields(report.fields(), path)?;
+            budget.charge_wire_work(report.work_bytes(), path)?;
+            budget.charge_wire_nesting(report.max_depth(), path)?;
+            budget.charge_payload_items(report.components_scanned(), path)?;
+            budget.charge_payload_references(report.references_scanned(), path)?;
+            budget.charge_transaction_work(
+                report.input_bytes().saturating_add(report.output_bytes()),
+                path,
+            )?;
+            let requirements = prepared.execution_requirements();
+            budget.charge_wire_fields(requirements.fields(), path)?;
+            budget.charge_wire_work(requirements.work_bytes(), path)?;
+            budget.charge_payload_items(requirements.components(), path)?;
+            budget.charge_payload_references(requirements.references(), path)?;
+            budget.charge_allocations(requirements.allocations(), path)?;
+            budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+            budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+            budget.charge_transaction_work(requirements.output_bytes(), path)?;
+            return prepared
+                .execute(requirements.exact_limits())
+                .map(|output| output.into_bytes())
+                .map_err(|error| {
+                    map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path)
+                });
+        }
+        let batch = MetadataBatch::new(
+            facts.last_object_identifier(),
+            identifier,
+            &additions,
+            &external_additions,
+        );
         let prepared = popup_metadata::prepare_additions(
             facts,
             AdditionSaveTokenBatch::new(batch, save_tokens),
@@ -1700,46 +1940,80 @@ fn rewrite_popup_metadata(
                 amount: removed_models.len(),
                 path,
             })?;
-        for &identifier in removed_models {
-            removals.push(
-                facts
-                    .uuid_removal(component_index, identifier)
-                    .map_err(|error| map_popup_metadata_error(error, path))?,
-            );
+        if removed_model_components.len() != removed_models.len() {
+            return Err(Error::InvalidSource { path });
         }
-        let batch = RemovalBatch::new(facts.last_object_identifier(), &removals, &[], &[]);
-        let prepared = popup_metadata::prepare_removals(
-            facts,
-            RemovalSaveTokenBatch::new(batch, save_tokens),
-            options,
-        )
-        .map_err(|error| map_popup_metadata_error(error, path))?;
-        let report = prepared.prepare_report();
-        budget.charge_wire_fields(report.fields(), path)?;
-        budget.charge_wire_work(report.work_bytes(), path)?;
-        budget.charge_wire_nesting(report.max_depth(), path)?;
-        budget.charge_payload_items(report.components_scanned(), path)?;
-        budget.charge_payload_references(report.references_scanned(), path)?;
-        budget.charge_transaction_work(
-            report.input_bytes().saturating_add(report.output_bytes()),
-            path,
-        )?;
-        let requirements = prepared.execution_requirements();
-        budget.charge_wire_fields(requirements.fields(), path)?;
-        budget.charge_wire_work(requirements.work_bytes(), path)?;
-        budget.charge_payload_items(requirements.components(), path)?;
-        budget.charge_payload_references(requirements.references(), path)?;
-        budget.charge_allocations(requirements.allocations(), path)?;
-        budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
-        budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
-        budget.charge_transaction_work(requirements.output_bytes(), path)?;
-        let limits = requirements.exact_limits();
-        return prepared
-            .execute(limits)
-            .map(|output| output.into_bytes())
-            .map_err(|error| {
-                map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path)
-            });
+        for &(component_index, identifier) in removed_model_components {
+            match facts.uuid_removal(component_index, identifier) {
+                Ok(removal) => removals.push(removal),
+                // See the combined transition above: absent UUID ownership
+                // is admitted only for the strict physical/native route;
+                // versioned or conflicting ownership remains an error.
+                Err(error) if error.kind == popup_metadata::FailureKind::MissingRoute => {},
+                Err(error) => return Err(map_popup_metadata_error(error, path)),
+            }
+        }
+        let mut external_edges = Vec::new();
+        external_edges
+            .try_reserve_exact(removed_model_components.len())
+            .map_err(|_| Error::Allocation {
+                amount: removed_model_components.len(),
+                path,
+            })?;
+        for &(component_index, identifier) in removed_model_components {
+            if component_index == control_component_index {
+                continue;
+            }
+            external_edges.push(popup_metadata::ExternalEdge::new(
+                control_component_index,
+                component_index,
+                identifier,
+                Some(false),
+            ));
+        }
+        let external_removals = facts
+            .external_removals(&external_edges)
+            .map_err(|error| map_popup_metadata_error(error, path))?;
+        if !removals.is_empty() || !external_removals.is_empty() {
+            let batch = RemovalBatch::new(
+                facts.last_object_identifier(),
+                &removals,
+                &external_removals,
+                &[],
+            );
+            let prepared = popup_metadata::prepare_removals(
+                facts,
+                RemovalSaveTokenBatch::new(batch, save_tokens),
+                options,
+            )
+            .map_err(|error| map_popup_metadata_error(error, path))?;
+            let report = prepared.prepare_report();
+            budget.charge_wire_fields(report.fields(), path)?;
+            budget.charge_wire_work(report.work_bytes(), path)?;
+            budget.charge_wire_nesting(report.max_depth(), path)?;
+            budget.charge_payload_items(report.components_scanned(), path)?;
+            budget.charge_payload_references(report.references_scanned(), path)?;
+            budget.charge_transaction_work(
+                report.input_bytes().saturating_add(report.output_bytes()),
+                path,
+            )?;
+            let requirements = prepared.execution_requirements();
+            budget.charge_wire_fields(requirements.fields(), path)?;
+            budget.charge_wire_work(requirements.work_bytes(), path)?;
+            budget.charge_payload_items(requirements.components(), path)?;
+            budget.charge_payload_references(requirements.references(), path)?;
+            budget.charge_allocations(requirements.allocations(), path)?;
+            budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+            budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+            budget.charge_transaction_work(requirements.output_bytes(), path)?;
+            let limits = requirements.exact_limits();
+            return prepared
+                .execute(limits)
+                .map(|output| output.into_bytes())
+                .map_err(|error| {
+                    map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path)
+                });
+        }
     }
 
     let prepared = popup_metadata::prepare_save_tokens(facts, save_tokens, options)
@@ -2755,11 +3029,16 @@ fn read_popup_with_policy<'source>(
                 .get_index(resolved.component_index)
                 .and_then(|component| component.archive().objects.get(resolved.object_index))
                 .ok_or(Error::InvalidSource { path })?;
+            // Native split producers can omit per-entry FieldInfo while
+            // retaining the exact ArchiveInfo aggregate. Preserve strict
+            // same-component reads and admit that producer shape only after
+            // the control list resolves to a distinct current component.
+            let allow_native_aggregate_only = resolved.component_index != target.component_index;
             validate_control_list_metadata(
                 object,
                 message_index,
                 &candidate_entries.entries,
-                allow_missing_control_field_infos,
+                allow_missing_control_field_infos || allow_native_aggregate_only,
                 path,
             )?;
             if selected_entries.replace(candidate_entries).is_some() {
@@ -3112,125 +3391,6 @@ fn resolve_typed_message_any(
         return Err(Error::InvalidSource { path });
     }
     Ok(message)
-}
-
-/// Pop-Up Menu changed routes remain intentionally single-member until that
-/// graph's model/string/style lifecycle can clone and publish every touched
-/// sidecar together with one metadata transition. Scalar controls use their
-/// separate strict multi-member writer; keep this guard for popup transitions
-/// so an unsupported popup graph fails before native candidate allocation.
-pub(super) fn reject_cross_component_write(
-    source: &Package,
-    target: CellTarget,
-    path: Path,
-) -> Result<(), Error> {
-    let model = source
-        .state
-        .components
-        .catalog()
-        .get_index(target.component_index)
-        .and_then(|component| component.archive().objects.get(target.object_index))
-        .and_then(|object| object.messages.get(target.message_index))
-        .ok_or(Error::InvalidSource { path })?;
-    let (model_snapshot, _) =
-        storage_codec::decode_table_model_with_report(&model.data, storage_options(&model.data))
-            .map_err(|_| Error::InvalidSource { path })?;
-    let (store, _) = storage_codec::decode_data_store_with_report(
-        model_snapshot.base_data_store(),
-        storage_options(model_snapshot.base_data_store()),
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
-    let mut tiles = TileCollector::default();
-    let (tile_storage, _) = storage_codec::decode_tile_storage_with_visitor(
-        store.tiles(),
-        storage_options(store.tiles()),
-        &mut tiles,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
-    let tile_id = target.position.row() / tile_storage.tile_size().unwrap_or(1).max(1);
-    let tile_identifier = tiles
-        .tiles
-        .iter()
-        .find(|(id, _)| *id == tile_id)
-        .map(|(_, identifier)| *identifier)
-        .ok_or(Error::CellNotFound)?;
-    let mut identifiers = vec![tile_identifier];
-    if let Some(reference) = store.format_table() {
-        identifiers.push(reference.identifier());
-    }
-    let control_table_identifier = store
-        .control_cell_spec_table()
-        .map(|reference| reference.identifier());
-    if let Some(identifier) = control_table_identifier {
-        identifiers.push(identifier);
-    }
-    for identifier in identifiers {
-        let resolved = source
-            .state
-            .index
-            .resolve_ref_id(&source.state.components, identifier)
-            .map_err(|_| Error::InvalidSource { path })?
-            .ok_or(Error::InvalidSource { path })?;
-        if resolved.component_index != target.component_index {
-            return Err(Error::UnsupportedDependency { path });
-        }
-    }
-    if let Some(identifier) = control_table_identifier {
-        let resolved = source
-            .state
-            .index
-            .resolve_ref_id(&source.state.components, identifier)
-            .map_err(|_| Error::InvalidSource { path })?
-            .ok_or(Error::InvalidSource { path })?;
-        let mut control_list_seen = false;
-        for message in resolved
-            .messages
-            .iter()
-            .filter(|message| message.type_ == 6_005)
-        {
-            let mut entries = ListCollector::default();
-            let (list, _) = storage_codec::decode_table_data_list_with_visitor(
-                &message.data,
-                storage_options(&message.data),
-                &mut entries,
-            )
-            .map_err(|_| Error::InvalidSource { path })?;
-            if list.list_type() != LIST_CONTROL_CELL_SPEC {
-                continue;
-            }
-            if control_list_seen || entries.segments != 0 || duplicate_list_keys(&entries.entries) {
-                return Err(Error::InvalidSource { path });
-            }
-            control_list_seen = true;
-            for entry in &entries.entries {
-                let spec = entry
-                    .cell_spec
-                    .as_deref()
-                    .ok_or(Error::InvalidSource { path })?;
-                let (spec, _) = control_codec::decode_any_cell_spec_with_report(
-                    spec,
-                    control_codec::DecodeOptions::for_source(spec),
-                )
-                .map_err(|_| Error::InvalidSource { path })?;
-                let control_codec::CellSpecSnapshot::Popup(spec) = spec else {
-                    continue;
-                };
-                let popup = source
-                    .state
-                    .index
-                    .resolve_ref_id(&source.state.components, spec.popup_model().identifier())
-                    .map_err(|_| Error::InvalidSource { path })?
-                    .ok_or(Error::InvalidSource { path })?;
-                if popup.component_index != target.component_index {
-                    return Err(Error::UnsupportedDependency { path });
-                }
-            }
-        }
-        if !control_list_seen {
-            return Err(Error::InvalidSource { path });
-        }
-    }
-    Ok(())
 }
 
 /// Validate the metadata ownership edge before a cross-component read is
