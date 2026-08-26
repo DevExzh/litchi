@@ -21462,113 +21462,53 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
-    def _write_iwa_comment_clear_delegation_fixture(
-        self,
-        root: Path,
-        *,
-        host_call: str = "clear_cell_comment_with_focused_owner(self, table_id, row, column)?",
-        focused_arguments: str = "sheet, table, position",
-        metadata_expression: str = 'editor.package().contains_entry("Index/Metadata.iwa")',
-        extra_arm: str = "",
-    ) -> Path:
+    def _write_iwa_comment_clear_retirement_fixture(self, root: Path) -> tuple[Path, Path]:
         table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
         table.parent.mkdir(parents=True, exist_ok=True)
-        table.write_text(
-            "fn clear_cell_comment_with_focused_owner(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Result<Route> {\n"
-            "    let (sheet, table) = focused_table_location(editor, table_id)?;\n"
-            "    let position = CellPosition::try_from_usize(row, column)?;\n"
-            f"    let has_metadata = {metadata_expression};\n"
-            "    if !has_metadata { return Ok(Route::LegacyFallback); }\n"
-            "    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)?;\n"
-            f"    match source.clear_table_cell_comment({focused_arguments}) {{\n"
-            "        Ok(commit) => { let bytes = commit.to_bytes()?; let _ = NumbersEditor::from_bytes(&bytes)?; Ok(Route::Published) },\n"
-            + extra_arm
-            + "        Err(error) => Err(error.into()),\n"
-            "    }\n"
-            "}\n"
-            "impl NumbersEditor {\n"
-            "    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {\n"
-            f"        match {host_call} {{\n"
-            "            Route::Published => Ok(()),\n"
-            "            Route::LegacyFallback => clear_cell_comment_in_package(&mut self.package, table_id, row, column),\n"
-            "        }\n"
-            "    }\n"
-            "}\n",
+        table.write_text("impl NumbersEditor { fn unrelated(&self) {} }\n", encoding="utf-8")
+        example = root / boundaries.IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE
+        example.parent.mkdir(parents=True, exist_ok=True)
+        example.write_text(
+            "use litchi_numbers::{SheetSelector, TableSelector, table::CellPosition};\n"
+            "fn main() { package.clear_table_cell_comment(sheet, table, position); }\n",
             encoding="utf-8",
         )
-        return table
+        return table, example
 
-    def test_iwa_numbers_cell_comment_clear_delegation_requires_metadata_gate(self) -> None:
+    def test_iwa_numbers_cell_comment_clear_retirement_accepts_selector_example(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            table = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
-            table.parent.mkdir(parents=True, exist_ok=True)
-            table.write_text(
-                "fn clear_cell_comment_with_focused_owner(editor: &NumbersEditor, table_id: u64, row: usize, column: usize) -> Result<Route> {\n"
-                "    let (sheet, table) = focused_table_location(editor, table_id)?;\n"
-                "    let position = CellPosition::try_from_usize(row, column)?;\n"
-                "    let has_metadata = editor.package().contains_entry(\"Index/Metadata.iwa\");\n"
-                "    if !has_metadata { return Ok(Route::LegacyFallback); }\n"
-                "    let source = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)?;\n"
-                "    match source.clear_table_cell_comment(sheet, table, position) {\n"
-                "        Ok(commit) => { let bytes = commit.to_bytes()?; let _ = NumbersEditor::from_bytes(&bytes)?; Ok(Route::Published) },\n"
-                "        Err(error) => Err(error.into()),\n"
-                "    }\n"
-                "}\n"
-                "impl NumbersEditor {\n"
-                "    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {\n"
-                "        match clear_cell_comment_with_focused_owner(self, table_id, row, column)? {\n"
-                "            Route::Published => Ok(()),\n"
-                "            Route::LegacyFallback => clear_cell_comment_in_package(&mut self.package, table_id, row, column),\n"
-                "        }\n"
-                "    }\n"
-                "}\n",
-                encoding="utf-8",
-            )
+            self._write_iwa_comment_clear_retirement_fixture(root)
             self.assertEqual(
-                boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root),
+                boundaries.audit_iwa_numbers_cell_comment_clear_retirement_source_topology(root),
                 [],
             )
+
+    def test_iwa_numbers_cell_comment_clear_retirement_rejects_host_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            table, _example = self._write_iwa_comment_clear_retirement_fixture(root)
             table.write_text(
-                table.read_text(encoding="utf-8").replace(
-                    "editor.package().contains_entry(\"Index/Metadata.iwa\")", "false"
-                ),
+                "fn clear_cell_comment_with_focused_owner() {}\n"
+                "impl NumbersEditor { pub fn clear_cell_comment(&mut self, table_id: u64) {} }\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
-            self.assertTrue(any("metadata gate" in item for item in violations), violations)
+            violations = boundaries.audit_iwa_numbers_cell_comment_clear_retirement_source_topology(root)
+            self.assertEqual(len(violations), 2)
+            self.assertTrue(all("retired production route" in item for item in violations))
 
-    def test_iwa_numbers_cell_comment_clear_rejects_disconnected_helper(self) -> None:
+    def test_iwa_numbers_cell_comment_clear_retirement_rejects_legacy_example(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self._write_iwa_comment_clear_delegation_fixture(
-                root,
-                host_call="clear_cell_comment_in_package(&mut self.package, table_id, row, column)?; Route::Published",
+            _table, example = self._write_iwa_comment_clear_retirement_fixture(root)
+            example.write_text(
+                "fn main() { editor.clear_cell_comment(table_id, row, column); }\n",
+                encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
-            self.assertTrue(any("host does not call" in item for item in violations), violations)
-
-    def test_iwa_numbers_cell_comment_clear_rejects_raw_id_focused_call(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self._write_iwa_comment_clear_delegation_fixture(
-                root, focused_arguments="table_id, table_id, position"
-            )
-            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
-            self.assertTrue(any("raw native identifier" in item for item in violations), violations)
-
-    def test_iwa_numbers_cell_comment_clear_rejects_comment_not_found_fallback(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self._write_iwa_comment_clear_delegation_fixture(
-                root,
-                extra_arm=(
-                    "        Err(TableCellCommentError::CommentNotFound { .. }) => "
-                    "Ok(Route::LegacyFallback),\n"
-                ),
-            )
-            violations = boundaries.audit_iwa_numbers_cell_comment_clear_delegation_source_topology(root)
-            self.assertTrue(any("CommentNotFound" in item for item in violations), violations)
+            violations = boundaries.audit_iwa_numbers_cell_comment_clear_retirement_source_topology(root)
+            self.assertTrue(any("retired raw-ID clear" in item for item in violations))
+            for marker in ("SheetSelector", "TableSelector", "CellPosition"):
+                self.assertTrue(any(marker in item for item in violations), violations)
 
     def test_iwa_numbers_table_cell_fixture_helpers_stay_test_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -5598,6 +5598,9 @@ IWA_NUMBERS_CELL_COMMENT_ALLOWED_FALLBACKS = frozenset(
 IWA_NUMBERS_CELL_COMMENT_CLEAR_HOST_METHOD = "clear_cell_comment"
 IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD = "clear_table_cell_comment"
 IWA_NUMBERS_CELL_COMMENT_CLEAR_LEGACY_HELPER = "clear_cell_comment_in_package"
+IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE = (
+    Path("crates/litchi-iwa/examples/edit_numbers_comment.rs")
+)
 RETIRED_IWA_NUMBERS_DOCUMENT_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "document.rs"
 RETIRED_IWA_NUMBERS_DOCUMENT_TYPES = (
     "NumbersDocument",
@@ -16970,115 +16973,53 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
     return sorted(set(violations))
 
 
-def audit_iwa_numbers_cell_comment_clear_delegation_source_topology(
+def audit_iwa_numbers_cell_comment_clear_retirement_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep supported host clears on the focused, metadata-safe owner seam."""
+    """Keep the retired raw-ID comment-clear route out of the Numbers host."""
 
     path = root / IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
-    if not path.is_file():
-        return []
-    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
-    code = _mask_rust_non_code(source)
-
-    def body(name: str) -> str | None:
-        for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
-            if declaration.group(1) != name:
-                continue
-            opening = code.find("{", declaration.end())
-            if opening < 0:
-                continue
-            depth = 1
-            cursor = opening + 1
-            while cursor < len(code) and depth:
-                depth += code[cursor] == "{"
-                depth -= code[cursor] == "}"
-                cursor += 1
-            if depth == 0:
-                return code[opening + 1 : cursor - 1]
-        return None
-
-    host = body(IWA_NUMBERS_CELL_COMMENT_CLEAR_HOST_METHOD)
-    helper = body("clear_cell_comment_with_focused_owner")
     violations: list[str] = []
-    if host is None or helper is None:
-        return [
-            "litchi-iwa Numbers cell-comment clear is missing its focused host route: "
-            f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
-        ]
-    if re.search(r"\bclear_cell_comment_with_focused_owner\s*\(", host) is None:
-        violations.append(
-            "litchi-iwa Numbers cell-comment clear host does not call its focused helper: "
-            f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+    if path.is_file():
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        code = _mask_rust_non_code(source)
+        retired = (
+            IWA_NUMBERS_CELL_COMMENT_CLEAR_HOST_METHOD,
+            "clear_cell_comment_with_focused_owner",
         )
-    route = host + "\n" + helper
-    required = (
-        ("selector mapping", r"\bfocused_table_location\s*\("),
-        ("semantic position", r"\bCellPosition\s*::\s*try_from_usize\b"),
-        ("focused package parse", r"\bFocusedNumbersPackage\s*::\s*from_bytes\s*\("),
-        (
-            "focused clear",
-            rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD)}\s*\(",
-        ),
-        (
-            "legacy fallback",
-            rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_LEGACY_HELPER)}\s*\(",
-        ),
-        (
-            "metadata gate",
-            r"\.contains_entry\s*\(",
-        ),
-        ("verified reopen", r"\bNumbersEditor\s*::\s*from_bytes\s*\("),
-    )
-    for label, pattern in required:
-        if re.search(pattern, route) is None:
+        declarations = {
+            match.group(1) for match in RUST_FUNCTION_DECLARATION.finditer(code)
+        }
+        for name in retired:
+            if name in declarations:
+                violations.append(
+                    "litchi-iwa Numbers cell-comment clear retains retired production "
+                    f"route {name}: {IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+                )
+
+    example_path = root / IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE
+    if example_path.is_file():
+        example = _mask_rust_non_code(example_path.read_text(encoding="utf-8"))
+        if re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_HOST_METHOD)}\s*\(",
+            example,
+        ):
             violations.append(
-                f"litchi-iwa Numbers cell-comment clear is missing {label}: "
-                f"{IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE}"
+                "litchi-iwa Numbers comment example calls retired raw-ID clear: "
+                f"{IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE}"
             )
-    if '"Index/Metadata.iwa"' not in source:
-        violations.append(
-            "litchi-iwa Numbers cell-comment clear metadata gate must target "
-            "Index/Metadata.iwa"
+        required = (
+            "SheetSelector",
+            "TableSelector",
+            "CellPosition",
+            IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD,
         )
-    metadata_fallback = re.search(
-        r"if\s*!\s*has_metadata\s*\{[\s\S]{0,180}LegacyFallback", helper
-    )
-    parse = re.search(r"\bFocusedNumbersPackage\s*::\s*from_bytes\s*\(", helper)
-    if metadata_fallback is None or parse is None or metadata_fallback.start() > parse.start():
-        violations.append(
-            "litchi-iwa Numbers cell-comment clear must choose no-Metadata legacy "
-            "fallback before focused parsing"
-        )
-    if re.search(r"Err\s*\(\s*_\s*\)[\s\S]{0,160}LegacyFallback", helper):
-        violations.append(
-            "litchi-iwa Numbers cell-comment clear must not broadly fall back on focused errors"
-        )
-    if re.search(r"\bCommentNotFound\b[\s\S]{0,180}LegacyFallback", helper):
-        violations.append(
-            "litchi-iwa Numbers cell-comment clear must not treat CommentNotFound "
-            "as legacy-compatible"
-        )
-    focused_call = re.search(
-        rf"\b{re.escape(IWA_NUMBERS_CELL_COMMENT_CLEAR_FOCUSED_METHOD)}\s*\(", helper
-    )
-    if focused_call is not None:
-        cursor = focused_call.end()
-        depth = 1
-        while cursor < len(helper) and depth:
-            depth += helper[cursor] == "("
-            depth -= helper[cursor] == ")"
-            cursor += 1
-        arguments = helper[focused_call.end() : cursor - 1] if depth == 0 else ""
-        raw = re.search(
-            r"\b(?:table_id|native_id|object_id|object_identifier|raw_object_id)\b",
-            arguments,
-        )
-        if raw is not None:
-            violations.append(
-                "litchi-iwa Numbers cell-comment focused clear passes a raw native "
-                f"identifier ({raw.group(0)}) instead of selectors"
-            )
+        for marker in required:
+            if marker not in example:
+                violations.append(
+                    "litchi-iwa Numbers comment example is missing selector-first "
+                    f"clear marker {marker}: {IWA_NUMBERS_CELL_COMMENT_CLEAR_EXAMPLE}"
+                )
     return sorted(set(violations))
 
 
@@ -28387,7 +28328,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_cells_mutation_facade_source_topology()
         + audit_iwa_numbers_table_cell_mutation_source_topology()
         + audit_iwa_numbers_cell_comment_delegation_source_topology()
-        + audit_iwa_numbers_cell_comment_clear_delegation_source_topology()
+        + audit_iwa_numbers_cell_comment_clear_retirement_source_topology()
         + audit_iwa_numbers_cell_comment_reply_mutation_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()

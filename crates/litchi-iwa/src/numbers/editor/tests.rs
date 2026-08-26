@@ -1332,7 +1332,7 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, CellValue::Empty).unwrap();
     assert!(editor.cell_comment(10, 0, 1).unwrap().is_some());
 
-    editor.clear_cell_comment(10, 0, 1).unwrap();
+    clear_cell_comment_in_package(&mut editor.package, 10, 0, 1).unwrap();
     assert!(editor.cell_comment(10, 0, 1).unwrap().is_none());
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     assert!(archive.object(61).is_none());
@@ -1382,26 +1382,6 @@ fn supported_cell_comment_replacement_delegates_to_focused_package_owner() {
         assert!(editor.package().entry(preview).is_none());
     }
     NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-}
-
-#[test]
-fn supported_cell_comment_clear_delegates_to_focused_package_owner() {
-    let source = include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../litchi-numbers/tests/fixtures/comment-edit-root.numbers"
-    ));
-    let mut editor = NumbersEditor::from_bytes(source).unwrap();
-    let table_id = editor.tables().unwrap()[0].native_id();
-    assert!(editor.cell_comment(table_id, 1, 1).unwrap().is_some());
-
-    editor.clear_cell_comment(table_id, 1, 1).unwrap();
-
-    assert!(editor.cell_comment(table_id, 1, 1).unwrap().is_none());
-    for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
-        assert!(editor.package().entry(preview).is_none());
-    }
-    let reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert!(reopened.cell_comment(table_id, 1, 1).unwrap().is_none());
 }
 
 #[test]
@@ -1543,7 +1523,7 @@ fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
         TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
     assert_eq!(root.entries.len(), 1);
 
-    editor.clear_cell_comment(10, 0, 2).unwrap();
+    clear_cell_comment_in_package(&mut editor.package, 10, 0, 2).unwrap();
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let root =
         TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
@@ -1618,7 +1598,7 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
     );
 
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 2, cell_number(42.0)).unwrap();
-    editor.clear_cell_comment(10, 1, 2).unwrap();
+    clear_cell_comment_in_package(&mut editor.package, 10, 1, 2).unwrap();
     assert!(editor.cell_comment(10, 1, 2).unwrap().is_none());
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
@@ -5603,7 +5583,7 @@ fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
             .text,
         "Boundary comment"
     );
-    reopened.clear_cell_comment(table_id, 256, 1).unwrap();
+    clear_cell_comment_in_package(&mut reopened.package, table_id, 256, 1).unwrap();
     assert!(reopened.cell_comment(table_id, 256, 1).unwrap().is_none());
 }
 

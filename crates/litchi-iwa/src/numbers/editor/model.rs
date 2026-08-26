@@ -5153,6 +5153,7 @@ pub(super) fn cell_comment_modified_entries(
     entries
 }
 
+#[cfg(test)]
 pub(super) fn clear_cell_comment_in_package(
     package: &mut IWorkPackage,
     table_id: u64,
