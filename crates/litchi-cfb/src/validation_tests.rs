@@ -304,6 +304,25 @@ fn source_instability_and_io_failure_remain_errors() {
 }
 
 #[test]
+fn directory_byte_limit_is_a_blocked_cfb_validation_ingress() {
+    let bytes = sample_file();
+    let source = Arc::new(MutableSource::new(bytes));
+    let limits = SharedOleFileLimits::new(SharedOleFileLimits::MAX_INPUT_BYTES)
+        .unwrap()
+        .with_max_directory_bytes(511)
+        .unwrap();
+
+    let report = validate_source_with_limits(source, limits, ValidationLimits::default())
+        .expect("directory ceiling should be represented in the report");
+    assert!(!report.is_complete());
+    assert!(!report.has_errors());
+    assert!(matches!(
+        report.checks()[0].status(),
+        CheckStatus::Blocked { .. }
+    ));
+}
+
+#[test]
 fn version_change_between_preflight_and_canonical_ingress_is_an_error() {
     let unstable = Arc::new(ChangingVersionSource {
         bytes: sample_file(),

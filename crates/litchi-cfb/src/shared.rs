@@ -20,11 +20,16 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SharedOleFileLimits {
     max_input_bytes: u64,
+    max_directory_bytes: u64,
 }
 
 impl SharedOleFileLimits {
     /// Largest CFB input accepted by the default shared reader.
     pub const MAX_INPUT_BYTES: u64 = OleFileLimits::MAX_INPUT_BYTES;
+    /// Default directory stream ceiling used by the default shared reader.
+    pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = OleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES;
+    /// Largest directory stream ceiling accepted by the shared reader.
+    pub const MAX_DIRECTORY_BYTES: u64 = OleFileLimits::MAX_DIRECTORY_BYTES;
 
     /// Creates a finite input ceiling for one positional CFB source.
     ///
@@ -36,6 +41,7 @@ impl SharedOleFileLimits {
         let limits = OleFileLimits::new(max_input_bytes)?;
         Ok(Self {
             max_input_bytes: limits.max_input_bytes(),
+            max_directory_bytes: limits.max_directory_bytes(),
         })
     }
 
@@ -44,12 +50,28 @@ impl SharedOleFileLimits {
     pub const fn max_input_bytes(self) -> u64 {
         self.max_input_bytes
     }
+
+    /// Selects the maximum padded directory-stream size accepted while
+    /// parsing one positional CFB source.
+    pub fn with_max_directory_bytes(mut self, max_directory_bytes: u64) -> Result<Self, OleError> {
+        let limits = OleFileLimits::new(self.max_input_bytes)?
+            .with_max_directory_bytes(max_directory_bytes)?;
+        self.max_directory_bytes = limits.max_directory_bytes();
+        Ok(self)
+    }
+
+    /// Maximum padded directory-stream size accepted during parsing.
+    #[must_use]
+    pub const fn max_directory_bytes(self) -> u64 {
+        self.max_directory_bytes
+    }
 }
 
 impl Default for SharedOleFileLimits {
     fn default() -> Self {
         Self {
             max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
         }
     }
 }
@@ -363,6 +385,7 @@ pub struct SharedOleFile {
     pub(crate) source: Arc<dyn ReadAt>,
     pub(crate) expected_version: SourceVersion,
     pub(crate) source_is_owned_immutable: bool,
+    pub(crate) limits: SharedOleFileLimits,
     pub(crate) index: Arc<ParsedOleIndex>,
     /// Serializes only lazy mini-stream initialization. Regular streams never
     /// acquire this lock or any shared cursor lock.
@@ -476,7 +499,8 @@ impl SharedOleFile {
             });
         }
 
-        let parser_limits = OleFileLimits::new(limits.max_input_bytes())?;
+        let parser_limits = OleFileLimits::new(limits.max_input_bytes())?
+            .with_max_directory_bytes(limits.max_directory_bytes())?;
         let parsed = OleFile::open_with_limits(
             ReadAtCursor::new(source.clone(), source_length),
             parser_limits,
@@ -494,6 +518,7 @@ impl SharedOleFile {
             source,
             expected_version,
             source_is_owned_immutable,
+            limits,
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -3138,6 +3163,7 @@ mod tests {
             source: source.clone(),
             expected_version,
             source_is_owned_immutable: false,
+            limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -3270,6 +3296,73 @@ mod tests {
                 value,
                 maximum: OleFileLimits::MAX_INPUT_BYTES,
             }) if value == OleFileLimits::MAX_INPUT_BYTES + 1
+        ));
+        assert_eq!(
+            SharedOleFileLimits::default().max_directory_bytes(),
+            SharedOleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES
+        );
+        assert!(matches!(
+            SharedOleFileLimits::default().with_max_directory_bytes(0),
+            Err(OleError::InvalidLimit {
+                resource: "CFB directory bytes",
+                value: 0,
+                maximum: OleFileLimits::MAX_DIRECTORY_BYTES,
+            })
+        ));
+        assert!(matches!(
+            SharedOleFileLimits::default()
+                .with_max_directory_bytes(SharedOleFileLimits::MAX_DIRECTORY_BYTES + 1),
+            Err(OleError::InvalidLimit {
+                resource: "CFB directory bytes",
+                value,
+                maximum,
+            }) if value == maximum + 1
+        ));
+    }
+
+    #[test]
+    fn shared_open_propagates_directory_byte_limit() {
+        let bytes = sample_bytes();
+        let source: Arc<dyn ReadAt> = Arc::new(TestSource::new(bytes));
+        let limits = SharedOleFileLimits::new(SharedOleFileLimits::MAX_INPUT_BYTES)
+            .unwrap()
+            .with_max_directory_bytes(511)
+            .unwrap();
+
+        assert!(matches!(
+            SharedOleFile::open_with_limits(source, limits),
+            Err(OleError::LimitExceeded {
+                resource: "directory bytes",
+                observed,
+                maximum,
+            }) if maximum == 511 && observed > maximum
+        ));
+    }
+
+    #[test]
+    fn shared_validation_reuses_selected_directory_byte_limit() {
+        let mut writer = OleWriter::new();
+        for name in ["Workbook", "One", "Two", "Three", "Four"] {
+            writer.create_stream(&[name], b"").unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let source = Arc::new(TestSource::new(output.into_inner()));
+        let limits = SharedOleFileLimits::new(SharedOleFileLimits::MAX_INPUT_BYTES)
+            .unwrap()
+            .with_max_directory_bytes(1024)
+            .unwrap();
+        let mut file = SharedOleFile::open_with_limits(source, limits).unwrap();
+        file.limits = file.limits.with_max_directory_bytes(512).unwrap();
+
+        let report = file
+            .validate(litchi_core::ValidationLimits::default())
+            .unwrap();
+        assert!(!report.is_complete());
+        assert!(!report.has_errors());
+        assert!(matches!(
+            report.checks()[0].status(),
+            litchi_core::CheckStatus::Blocked { .. }
         ));
     }
 
@@ -4935,6 +5028,7 @@ mod tests {
             source: source.clone(),
             expected_version,
             source_is_owned_immutable: false,
+            limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -5154,6 +5248,7 @@ mod tests {
             source: source.clone(),
             expected_version,
             source_is_owned_immutable: false,
+            limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -5235,6 +5330,7 @@ mod tests {
             source: source.clone(),
             expected_version,
             source_is_owned_immutable: false,
+            limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -5437,6 +5533,7 @@ mod tests {
             source: source.clone(),
             expected_version,
             source_is_owned_immutable: false,
+            limits: SharedOleFileLimits::default(),
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),

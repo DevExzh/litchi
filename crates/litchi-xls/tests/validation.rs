@@ -616,6 +616,66 @@ fn malformed_cfb_is_structured_and_downstream_is_blocked() {
 }
 
 #[test]
+fn cfb_directory_byte_ceiling_is_blocked_without_validation_errors() {
+    let workbook = minimal_workbook(&[], &[], &bof_payload(0x0010, 16), &[], &[]);
+    let bytes = cfb_with_streams(
+        &[
+            ("Workbook", workbook),
+            ("One", Vec::new()),
+            ("Two", Vec::new()),
+            ("Three", Vec::new()),
+            ("Four", Vec::new()),
+        ],
+        &[],
+    );
+
+    let exact = XlsValidationLimits::default()
+        .with_max_directory_bytes(1024)
+        .expect("two directory sectors fit the exact ceiling");
+    let report = validate_source_with_limits(source(bytes.clone()), exact)
+        .expect("exact directory ceiling should validate");
+    assert!(report.is_complete());
+    assert!(!report.has_errors());
+
+    let limited = XlsValidationLimits::default()
+        .with_max_directory_bytes(512)
+        .expect("one directory sector is a valid configured ceiling");
+    let report = validate_source_with_limits(source(bytes), limited)
+        .expect("directory ceiling should be represented in the report");
+    assert!(!report.is_complete());
+    assert!(!report.has_errors());
+    assert!(matches!(
+        status(&report, "xls.cfb.ingress"),
+        CheckStatus::Blocked { .. }
+    ));
+    assert!(matches!(
+        status(&report, "xls.workbook.stream"),
+        CheckStatus::StoppedBy { .. }
+    ));
+    assert!(report.issues().is_empty());
+}
+
+#[test]
+fn xls_directory_byte_limit_builder_rejects_invalid_values() {
+    assert!(matches!(
+        XlsValidationLimits::default().with_max_directory_bytes(0),
+        Err(XlsValidationError::Ingress(OleError::InvalidLimit {
+            resource: "CFB directory bytes",
+            value: 0,
+            ..
+        }))
+    ));
+    assert!(matches!(
+        XlsValidationLimits::default()
+            .with_max_directory_bytes(litchi_cfb::SharedOleFileLimits::MAX_DIRECTORY_BYTES + 1),
+        Err(XlsValidationError::Ingress(OleError::InvalidLimit {
+            resource: "CFB directory bytes",
+            ..
+        }))
+    ));
+}
+
+#[test]
 fn workbook_byte_ceiling_blocks_before_materialization() {
     let limits = XlsValidationLimits::new(
         2 * 1024 * 1024 * 1024,

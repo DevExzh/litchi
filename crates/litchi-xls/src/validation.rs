@@ -84,6 +84,7 @@ pub struct XlsValidationLimits {
     max_worksheets: usize,
     max_external_records: usize,
     max_directory_entries: usize,
+    max_directory_bytes: u64,
     report: ValidationLimits,
 }
 
@@ -110,6 +111,7 @@ impl XlsValidationLimits {
             max_worksheets,
             max_external_records,
             max_directory_entries,
+            max_directory_bytes: SharedOleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES,
             report,
         }
     }
@@ -150,6 +152,30 @@ impl XlsValidationLimits {
         self.max_directory_entries
     }
 
+    /// Maximum padded CFB directory-stream size inspected during validation.
+    #[must_use]
+    pub const fn max_directory_bytes(self) -> u64 {
+        self.max_directory_bytes
+    }
+
+    /// Selects the maximum padded CFB directory-stream size inspected during
+    /// validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`XlsValidationError::Ingress`] if the value is outside the CFB
+    /// directory limit bounds.
+    pub fn with_max_directory_bytes(
+        mut self,
+        max_directory_bytes: u64,
+    ) -> Result<Self, XlsValidationError> {
+        let limits = SharedOleFileLimits::default()
+            .with_max_directory_bytes(max_directory_bytes)
+            .map_err(XlsValidationError::Ingress)?;
+        self.max_directory_bytes = limits.max_directory_bytes();
+        Ok(self)
+    }
+
     /// Bounds for the retained format-neutral report.
     #[must_use]
     pub const fn report(self) -> ValidationLimits {
@@ -166,6 +192,7 @@ impl Default for XlsValidationLimits {
             max_worksheets: 65_535,
             max_external_records: 65_536,
             max_directory_entries: 100_000,
+            max_directory_bytes: SharedOleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES,
             report: ValidationLimits::default(),
         }
     }
@@ -238,12 +265,12 @@ pub fn validate_source(source: Arc<dyn ReadAt>) -> Result<ValidateReport, XlsVal
 
 /// Validate a positional XLS source under explicit finite bounds.
 ///
-/// A source or stream ceiling produces a blocked capability. A definite CFB or
-/// BIFF grammar rejection produces a completed check with a content-free error
-/// issue; protection and external-link metadata remain blocked when their
-/// presence cannot be established safely. Encrypted semantic regions stop at
-/// the encryption dependency because credentials are intentionally not accepted
-/// by this presence-only API.
+/// A source, directory, or stream ceiling produces a blocked capability. A
+/// definite CFB or BIFF grammar rejection produces a completed check with a
+/// content-free error issue; protection and external-link metadata remain
+/// blocked when their presence cannot be established safely. Encrypted semantic
+/// regions stop at the encryption dependency because credentials are
+/// intentionally not accepted by this presence-only API.
 ///
 /// # Errors
 ///
@@ -274,10 +301,21 @@ pub fn validate_source_with_limits(
         return report;
     }
 
-    let cfb_limits =
-        SharedOleFileLimits::new(input_ceiling).map_err(XlsValidationError::Ingress)?;
+    let directory_ceiling = limits.max_directory_bytes;
+    let cfb_limits = SharedOleFileLimits::new(input_ceiling)
+        .and_then(|cfb_limits| cfb_limits.with_max_directory_bytes(directory_ceiling))
+        .map_err(XlsValidationError::Ingress)?;
     let shared = match SharedOleFile::open_with_limits(source.clone(), cfb_limits) {
         Ok(shared) => shared,
+        Err(error) if is_directory_limit_error(&error) => {
+            let statuses = blocked_ingress_statuses(
+                limits.report,
+                "CFB directory exceeds the configured XLS validation ceiling",
+            )?;
+            let report = finish_report(statuses, Vec::new(), limits.report);
+            require_version(source.as_ref(), expected_version)?;
+            return report;
+        },
         Err(error) if is_structural_cfb_error(&error) => {
             let statuses = cfb_rejection_statuses(limits.report)?;
             let mut issues = Vec::new();
@@ -2489,6 +2527,16 @@ fn is_structural_cfb_error(error: &OleError) -> bool {
             | OleError::NotOleFile
             | OleError::CorruptedFile(_)
             | OleError::StreamNotFound
+    )
+}
+
+fn is_directory_limit_error(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::LimitExceeded {
+            resource: "directory bytes",
+            ..
+        }
     )
 }
 
