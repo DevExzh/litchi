@@ -16,7 +16,7 @@ use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 
 use super::table_cell_pop_up_menu_native::NativePopUpError;
 use super::{
-    Package,
+    Package, table_cell_pop_up_menu as popup,
     table_cell_pop_up_menu::{CellTarget, Error, Path, TransactionBudget},
     table_cell_pop_up_menu_metadata as popup_metadata,
     table_cell_pop_up_menu_native as popup_native,
@@ -42,9 +42,16 @@ pub(super) enum NativeControlKind {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct NativeControlOutput {
+pub(super) struct NativeControlMember {
     pub(super) member_name: String,
     pub(super) archive_bytes: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct NativeControlOutput {
+    pub(super) members: Vec<NativeControlMember>,
+    pub(super) component_indices: Vec<usize>,
+    pub(super) changed_objects: Vec<(usize, u64)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -78,10 +85,39 @@ pub(super) fn preflight_copy_on_write_scalar_control(
         .find(|entry| entry.name() == component.name())
         .ok_or(Error::InvalidSource { path })?;
     let archive = component.archive();
-    budget.charge_archive(archive, member.data().len(), path)?;
+    // `member.data()` is the compressed IWA stream and was already charged by
+    // the outer source-catalog preflight.  Archive accounting must use the
+    // decompressed/native bound, otherwise a highly-compressible member can
+    // bypass the decoded payload ceiling.
+    budget.charge_archive(archive, archive_serialized_bound(archive), path)?;
 
-    let archive_bytes = archive_serialized_bound(archive)
-        .saturating_add(member.data().len())
+    // A split table graph can place the tile and the two DataList archives in
+    // distinct members.  Reserve against the largest touched-member shape;
+    // the native rewrite debits each actual member separately before it is
+    // cloned or serialized.
+    let graph_archive_bound = source
+        .state
+        .components
+        .catalog()
+        .iter()
+        .map(|candidate| archive_serialized_bound(candidate.archive()))
+        .max()
+        .unwrap_or_else(|| archive_serialized_bound(archive));
+    let graph_member_bound = source
+        .state
+        .components
+        .physical()
+        .map(|physical| {
+            physical
+                .package()
+                .iter()
+                .map(|entry| entry.data().len())
+                .max()
+                .unwrap_or(member.data().len())
+        })
+        .unwrap_or_else(|| member.data().len());
+    let archive_bytes = graph_archive_bound
+        .saturating_add(graph_member_bound)
         .saturating_add(64 * 1024);
     let compressed_bytes = SnappyStream::maximum_compressed_len(archive_bytes)
         .map_err(|_| Error::InvalidSource { path })?;
@@ -154,14 +190,14 @@ pub(super) fn rewrite_scalar_control(
     {
         return Err(Error::UnsupportedDependency { path });
     }
-    let component = source
+    let model_component = source
         .state
         .components
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
-    let mut archive = component.archive().clone();
-    let model_object = unique_object(&archive, target.model_identifier, path)?;
+    let model_archive = model_component.archive();
+    let model_object = unique_object(model_archive, target.model_identifier, path)?;
     let model_index = unique_message_index(model_object, 6_001, path)?;
     let model_payload = &model_object.messages[model_index].data;
     let model_options = budget.residual_storage_options(model_payload);
@@ -211,7 +247,15 @@ pub(super) fn rewrite_scalar_control(
     if tile_identifier == target.model_identifier {
         return Err(Error::UnsupportedDependency { path });
     }
-    let tile_object = unique_object(&archive, tile_identifier, path)?;
+    let tile_component_index = resolved_component_index(source, tile_identifier, path)?;
+    let tile_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let tile_object = unique_object(tile_archive, tile_identifier, path)?;
     let tile_message_index = unique_message_index(tile_object, 6_002, path)?;
     let tile_payload = tile_object.messages[tile_message_index].data.clone();
     let cell_source = popup_native::tile_cell(
@@ -236,8 +280,49 @@ pub(super) fn rewrite_scalar_control(
         .control_cell_spec_table()
         .ok_or(Error::InvalidSource { path })?
         .identifier();
-    let format_object = unique_object(&archive, format_table_identifier, path)?;
-    let control_object = unique_object(&archive, control_table_identifier, path)?;
+    let format_component_index = resolved_component_index(source, format_table_identifier, path)?;
+    let format_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(format_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let control_component_index = resolved_component_index(source, control_table_identifier, path)?;
+    let control_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(control_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let mut metadata_authority = None;
+    popup::prove_cross_component_reference(
+        source,
+        &mut metadata_authority,
+        target.component_index,
+        tile_component_index,
+        Some(tile_identifier),
+        path,
+    )?;
+    popup::prove_cross_component_reference(
+        source,
+        &mut metadata_authority,
+        target.component_index,
+        format_component_index,
+        Some(format_table_identifier),
+        path,
+    )?;
+    popup::prove_cross_component_reference(
+        source,
+        &mut metadata_authority,
+        target.component_index,
+        control_component_index,
+        Some(control_table_identifier),
+        path,
+    )?;
+    let format_object = unique_object(format_archive, format_table_identifier, path)?;
+    let control_object = unique_object(control_archive, control_table_identifier, path)?;
     let format_message = unique_list_message(format_object, 2, budget, path)?;
     let control_message = unique_list_message(control_object, 12, budget, path)?;
     let format_message_index = format_message.message_index;
@@ -247,7 +332,7 @@ pub(super) fn rewrite_scalar_control(
     let format_facts = list_facts(&format_payload, budget, path)?;
     let control_facts = list_facts(&control_payload, budget, path)?;
     validate_refcounts(
-        &archive,
+        source,
         &tile_references.tiles,
         format_facts.entries.as_slice(),
         control_facts.entries.as_slice(),
@@ -255,16 +340,17 @@ pub(super) fn rewrite_scalar_control(
         path,
     )?;
     let control_source_len = format_payload.len().max(control_payload.len());
-    let mut owned_identifiers = vec![
-        target.model_identifier,
-        tile_identifier,
-        format_table_identifier,
-        control_table_identifier,
+    let owned_components = [
+        target.component_index,
+        tile_component_index,
+        format_component_index,
+        control_component_index,
     ];
+    let mut popup_ownership = Vec::new();
     for entry in &control_facts.entries {
         let (spec, report) = control_codec::decode_any_cell_spec_with_report(
             &entry.payload,
-            control_codec_options(entry.payload.len()),
+            control_codec_options(entry.payload.len(), budget),
         )
         .map_err(|error| map_control_error(error, path))?;
         charge_control_decode_report(budget, report, path)?;
@@ -272,11 +358,28 @@ pub(super) fn rewrite_scalar_control(
             continue;
         };
         let identifier = spec.popup_model().identifier();
-        let popup = unique_object(&archive, identifier, path)?;
+        let popup_component_index = resolved_component_index(source, identifier, path)?;
+        popup::prove_cross_component_reference(
+            source,
+            &mut metadata_authority,
+            control_component_index,
+            popup_component_index,
+            Some(identifier),
+            path,
+        )?;
+        popup_ownership.push((popup_component_index, identifier));
+        let popup_archive = source
+            .state
+            .components
+            .catalog()
+            .get_index(popup_component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .archive();
+        let popup = unique_object(popup_archive, identifier, path)?;
         let popup_index = unique_message_index(popup, 6_206, path)?;
         let (_, report) = popup_codec::decode_popup_menu_model_with_report(
             &popup.messages[popup_index].data,
-            popup_codec::DecodeOptions::for_source(&popup.messages[popup_index].data),
+            budget.residual_popup_options(&popup.messages[popup_index].data),
         )
         .map_err(|_| Error::InvalidSource { path })?;
         budget.charge_wire_bytes(report.input_bytes(), path)?;
@@ -292,17 +395,14 @@ pub(super) fn rewrite_scalar_control(
             path,
         )?;
         budget.charge_allocations(report.allocations(), path)?;
-        owned_identifiers.push(identifier);
+        let _ = identifier;
     }
-    owned_identifiers.sort_unstable();
-    owned_identifiers.dedup();
-    validate_metadata_ownership(
-        source,
-        target.component_index,
-        &owned_identifiers,
-        budget,
-        path,
-    )?;
+    let metadata_facts = validate_metadata_ownership(source, &owned_components, budget, path)?;
+    for (component_index, identifier) in popup_ownership {
+        metadata_facts
+            .require_current_uuid(component_index, identifier)
+            .map_err(|_| Error::InvalidSource { path })?;
+    }
 
     let (desired_kind, desired_format_payload, desired_spec_payload) = match after {
         Some(CellControl::Checkbox(_)) => (
@@ -397,33 +497,6 @@ pub(super) fn rewrite_scalar_control(
         budget,
         path,
     )?;
-    popup_native::replace_message_preserving_header(
-        &mut archive,
-        format_table_identifier,
-        format_message_index,
-        new_format,
-        source
-            .state
-            .options
-            .archive()
-            .effective_archive_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
-    popup_native::replace_message_preserving_header(
-        &mut archive,
-        control_table_identifier,
-        control_message_index,
-        new_control,
-        source
-            .state
-            .options
-            .archive()
-            .effective_archive_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
-
     let replacement_cell = if let Some(after) = after {
         let (format_key, control_key) = (
             new_format_key.ok_or(Error::InvalidSource { path })?,
@@ -446,40 +519,122 @@ pub(super) fn rewrite_scalar_control(
         &replacement_cell,
     )
     .map_err(|_| Error::InvalidSource { path })?;
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut component_indices = vec![
+        tile_component_index,
+        format_component_index,
+        control_component_index,
+    ];
+    component_indices.sort_unstable();
+    component_indices.dedup();
+    let mut archives = component_indices
+        .iter()
+        .map(|&component_index| {
+            let component = source
+                .state
+                .components
+                .catalog()
+                .get_index(component_index)
+                .ok_or(Error::InvalidSource { path })?;
+            budget.charge_archive(
+                component.archive(),
+                archive_serialized_bound(component.archive()),
+                path,
+            )?;
+            Ok::<_, Error>((component_index, component.archive().clone()))
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    popup_native::validate_message_without_object_references(
+        format_archive,
+        format_table_identifier,
+        format_message_index,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     popup_native::replace_message_preserving_header(
-        &mut archive,
+        archive_for_mut(&mut archives, format_component_index, path)?,
+        format_table_identifier,
+        format_message_index,
+        new_format,
+        archive_limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    popup_native::replace_control_message_with_transition(
+        archive_for_mut(&mut archives, control_component_index, path)?,
+        control_table_identifier,
+        control_message_index,
+        control_payload.as_slice(),
+        new_control,
+        archive_limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    popup_native::replace_message_preserving_header(
+        archive_for_mut(&mut archives, tile_component_index, path)?,
         tile_identifier,
         tile_message_index,
         patched_tile,
-        source
-            .state
-            .options
-            .archive()
-            .effective_archive_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
+        archive_limits,
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    let archive_bytes = archive
-        .to_bytes_with_limits(
+
+    let mut members = Vec::new();
+    for (component_index, archive) in archives {
+        let changed_identifiers = [
+            (tile_component_index, tile_identifier),
+            (format_component_index, format_table_identifier),
+            (control_component_index, control_table_identifier),
+        ]
+        .iter()
+        .filter_map(|(owner, identifier)| (*owner == component_index).then_some(*identifier))
+        .collect::<Vec<_>>();
+        popup_native::verify_archive_object_locality(
             source
                 .state
-                .options
-                .archive()
-                .effective_archive_limits()
-                .map_err(|_| Error::InvalidSource { path })?,
+                .components
+                .catalog()
+                .get_index(component_index)
+                .ok_or(Error::InvalidSource { path })?
+                .archive(),
+            &archive,
+            &changed_identifiers,
         )
-        .map_err(|_| Error::InvalidSource { path })?;
-    budget
-        .charge_payload_bytes(archive_bytes.len(), path)
-        .map_err(|_| Error::LimitExceeded {
-            kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
-            observed: archive_bytes.len() as u64,
-            maximum: u64::MAX,
-            path,
-        })?;
+        .map_err(|_| Error::Verification)?;
+        let archive_bytes = archive
+            .to_bytes_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        budget
+            .charge_payload_bytes(archive_bytes.len(), path)
+            .map_err(|_| Error::LimitExceeded {
+                kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
+                observed: archive_bytes.len() as u64,
+                maximum: u64::MAX,
+                path,
+            })?;
+        let member_name = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .name()
+            .to_owned();
+        members.push(NativeControlMember {
+            member_name,
+            archive_bytes,
+        });
+    }
     Ok(NativeControlOutput {
-        member_name: component.name().to_owned(),
-        archive_bytes,
+        members,
+        component_indices,
+        changed_objects: vec![
+            (tile_component_index, tile_identifier),
+            (format_component_index, format_table_identifier),
+            (control_component_index, control_table_identifier),
+        ],
     })
 }
 
@@ -544,10 +699,6 @@ impl storage_codec::StorageVisitor for BncReferenceCensus {
         let storage = row
             .cell_storage_buffer()
             .unwrap_or_else(|| row.cell_storage_buffer_pre_bnc());
-        if storage.is_empty() && row.cell_count() != 0 {
-            self.invalid = true;
-            return Ok(());
-        }
         let offsets = row
             .cell_offsets()
             .unwrap_or_else(|| row.cell_offsets_pre_bnc());
@@ -592,7 +743,11 @@ impl storage_codec::StorageVisitor for BncReferenceCensus {
                 self.invalid = true;
                 return Ok(());
             };
-            if start >= storage.len() || previous.is_some_and(|prior| prior >= start) {
+            // Automatic/minimal BNC cells have an empty payload. Adjacent
+            // materialized columns may therefore share one offset, including
+            // an offset at the end of the packed buffer. Only decreasing or
+            // out-of-range starts are structurally invalid.
+            if start > storage.len() || previous.is_some_and(|prior| prior > start) {
                 self.invalid = true;
                 return Ok(());
             }
@@ -629,9 +784,11 @@ impl BncReferenceCensus {
         };
         let format = cell.format_identifier();
         let control = cell.control_cell_spec_identifier();
-        if (format.is_none() && control.is_some())
-            || (format.is_some() != control.is_some() && cell.cell_format_kind() == Some(5))
-        {
+        // Ordinary text/number cells legitimately own a format entry without
+        // a control spec. A control key without a format key is the malformed
+        // direction; interactive kind 5 is distinguished later by the strict
+        // selected CellSpec, not merely by the presence of a format key.
+        if format.is_none() && control.is_some() {
             return false;
         }
         if let Some(identifier) = format {
@@ -715,7 +872,7 @@ fn list_facts_with_input(
         storage_codec::decode_table_data_list_with_visitor(source, options, &mut visitor)
             .map_err(|error| map_storage_error(error, path))?;
     if charge_input {
-        charge_storage_report_without_input(budget, report, path)?;
+        charge_storage_report(budget, report, path)?;
     } else {
         charge_storage_report_without_input(budget, report, path)?;
     }
@@ -854,28 +1011,32 @@ fn apply_list_mutation_with_budget(
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<Vec<u8>, Error> {
-    // Preparation owns fallible index/scratch vectors.  Reserve a bounded
-    // private allowance before invoking it, then debit the exact prepared
-    // requirements before its output buffer is allocated.
-    budget.charge_allocations(1, path)?;
-    budget.charge_transaction_work(source.len().saturating_mul(2), path)?;
+    // The scalar native preflight has already reserved a conservative private
+    // staging envelope.  The prepared requirements below are the sole exact
+    // debit for this list plan; do not charge a second source-sized allowance
+    // here, or a source traversal would be counted twice.
     let options = budget.residual_storage_rewrite_options(source);
     let prepared = storage_codec::prepare_table_data_list_entry_rewrite(source, mutation, options)
         .map_err(|error| map_storage_error(error, path))?;
     let preparation_report = prepared.prepare_report();
-    charge_storage_report_without_input(budget, preparation_report, path)?;
+    // The prepared requirements below already aggregate source, payload,
+    // result, and verification fields/work/references.  Charge only the
+    // source-only reference/text byte classes from the preparation report;
+    // charging its fields/work/references here would debit the same source
+    // traversal twice.
+    budget.charge_wire_bytes(preparation_report.source_bytes(), path)?;
+    budget.charge_wire_reference_bytes(preparation_report.reference_bytes(), path)?;
+    budget.charge_wire_text_bytes(preparation_report.text_bytes(), path)?;
     let requirements = prepared.requirements();
     budget.charge_wire_fields(requirements.fields(), path)?;
     budget.charge_wire_work(requirements.work_bytes(), path)?;
+    budget.charge_wire_nesting(requirements.max_depth(), path)?;
     budget.charge_payload_references(requirements.references(), path)?;
     budget.charge_allocations(requirements.allocations(), path)?;
-    budget.charge_transaction_work(
-        requirements
-            .output_bytes()
-            .saturating_add(requirements.scratch_bytes())
-            .saturating_add(requirements.retained_bytes()),
-        path,
-    )?;
+    budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+    budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+    budget.charge_output(requirements.output_bytes(), path)?;
+    budget.charge_transaction_work(requirements.output_bytes(), path)?;
     let exact_limits = requirements.exact_limits();
     let (output, report) = prepared
         .execute(exact_limits)
@@ -909,7 +1070,10 @@ fn charge_storage_report_without_input(
 ) -> Result<(), Error> {
     budget.charge_wire_fields(report.fields(), path)?;
     budget.charge_wire_work(report.work_bytes(), path)?;
+    budget.charge_wire_nesting(report.max_depth(), path)?;
     budget.charge_payload_references(report.references(), path)?;
+    budget.charge_wire_reference_bytes(report.reference_bytes(), path)?;
+    budget.charge_wire_text_bytes(report.text_bytes(), path)?;
     Ok(())
 }
 
@@ -952,13 +1116,13 @@ fn map_storage_error(error: storage_codec::DecodeError, path: Path) -> Error {
             path,
         },
         Some(storage_codec::DecodeLimit::Retained { observed, maximum }) => Error::LimitExceeded {
-            kind: super::table_cell_pop_up_menu::LimitKind::TransactionWork,
+            kind: super::table_cell_pop_up_menu::LimitKind::RetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
         Some(storage_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireWork,
+            kind: super::table_cell_pop_up_menu::LimitKind::WireTextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -974,7 +1138,7 @@ fn canonical_format(
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<Vec<u8>, Error> {
-    let options = control_codec_options(source_len);
+    let options = control_codec_options(source_len, budget);
     match display {
         Some(DisplayFormat::Currency(value)) => {
             // CurrencyCode is a validated, three-byte semantic value. Keep a
@@ -1119,7 +1283,7 @@ fn canonical_spec(
         range.map(|value| value.0),
         range.map(|value| value.1),
         range.map(|value| value.2),
-        control_codec_options(source_len),
+        control_codec_options(source_len, budget),
     )
     .map_err(|error| map_control_error(error, path))?;
     charge_control_requirements(budget, prepared.execution_requirements(), path)?;
@@ -1131,18 +1295,11 @@ fn canonical_spec(
     Ok(output.into_bytes())
 }
 
-fn control_codec_options(source_len: usize) -> control_codec::DecodeOptions {
-    let bytes = source_len.max(256);
-    control_codec::DecodeOptions::new(
-        bytes,
-        bytes.saturating_mul(2),
-        bytes.saturating_mul(8),
-        bytes.saturating_mul(16),
-        64,
-        bytes.saturating_mul(2),
-        bytes.saturating_mul(2),
-        bytes,
-    )
+fn control_codec_options(
+    source_len: usize,
+    budget: &TransactionBudget,
+) -> control_codec::DecodeOptions {
+    budget.residual_control_options_for_len(source_len)
 }
 
 fn charge_control_requirements(
@@ -1152,15 +1309,13 @@ fn charge_control_requirements(
 ) -> Result<(), Error> {
     budget.charge_wire_fields(requirements.fields(), path)?;
     budget.charge_wire_work(requirements.work_bytes(), path)?;
+    budget.charge_wire_nesting(requirements.max_depth(), path)?;
     budget.charge_payload_references(requirements.references(), path)?;
     budget.charge_allocations(requirements.allocations(), path)?;
-    budget.charge_transaction_work(
-        requirements
-            .output_bytes()
-            .saturating_add(requirements.retained_bytes())
-            .saturating_add(requirements.scratch_bytes()),
-        path,
-    )
+    budget.charge_wire_text_bytes(requirements.text_bytes(), path)?;
+    budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+    budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+    budget.charge_transaction_work(requirements.output_bytes(), path)
 }
 
 fn charge_control_decode_report(
@@ -1171,16 +1326,14 @@ fn charge_control_decode_report(
     budget.charge_wire_bytes(report.input_bytes(), path)?;
     budget.charge_wire_fields(report.fields(), path)?;
     budget.charge_wire_work(report.work_bytes(), path)?;
+    budget.charge_wire_nesting(report.max_depth(), path)?;
     budget.charge_payload_references(report.references(), path)?;
     budget.charge_payload_items(report.items(), path)?;
+    budget.charge_wire_text_bytes(report.text_bytes(), path)?;
     budget.charge_allocations(report.allocations(), path)?;
-    budget.charge_transaction_work(
-        report
-            .output_bytes()
-            .saturating_add(report.retained_bytes())
-            .saturating_add(report.scratch_bytes()),
-        path,
-    )
+    budget.charge_scratch_bytes(report.scratch_bytes(), path)?;
+    budget.charge_retained_bytes(report.retained_bytes(), path)?;
+    budget.charge_transaction_work(report.output_bytes(), path)
 }
 
 fn verify_control_report(
@@ -1248,9 +1401,14 @@ fn map_control_error(error: control_codec::DecodeError, path: Path) -> Error {
                 path,
             }
         },
-        Some(control_codec::DecodeLimit::Items { observed, maximum })
-        | Some(control_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
-            kind: super::table_cell_pop_up_menu::LimitKind::WireWork,
+        Some(control_codec::DecodeLimit::Items { observed, maximum }) => Error::LimitExceeded {
+            kind: super::table_cell_pop_up_menu::LimitKind::PayloadItems,
+            observed: observed as u64,
+            maximum: maximum as u64,
+            path,
+        },
+        Some(control_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+            kind: super::table_cell_pop_up_menu::LimitKind::WireTextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -1259,9 +1417,14 @@ fn map_control_error(error: control_codec::DecodeError, path: Path) -> Error {
             amount: requested,
             path,
         },
-        Some(control_codec::DecodeLimit::Retained { observed, maximum })
-        | Some(control_codec::DecodeLimit::Scratch { observed, maximum }) => Error::LimitExceeded {
-            kind: super::table_cell_pop_up_menu::LimitKind::TransactionWork,
+        Some(control_codec::DecodeLimit::Retained { observed, maximum }) => Error::LimitExceeded {
+            kind: super::table_cell_pop_up_menu::LimitKind::RetainedBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+            path,
+        },
+        Some(control_codec::DecodeLimit::Scratch { observed, maximum }) => Error::LimitExceeded {
+            kind: super::table_cell_pop_up_menu::LimitKind::ScratchBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
@@ -1303,13 +1466,12 @@ fn native_kind(value: &CellControl, path: Path) -> Result<(CellDataFormatKind, u
     }
 }
 
-fn validate_metadata_ownership(
-    source: &Package,
-    component_index: usize,
-    identifiers: &[u64],
+fn validate_metadata_ownership<'source>(
+    source: &'source Package,
+    component_indices: &[usize],
     budget: &mut TransactionBudget,
     path: Path,
-) -> Result<(), Error> {
+) -> Result<popup_metadata::RegistryFacts<'source>, Error> {
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::InvalidSource { path })?;
     let bytes = catalog
@@ -1348,12 +1510,15 @@ fn validate_metadata_ownership(
     if facts.has_physical_alias() {
         return Err(Error::InvalidSource { path });
     }
-    for &identifier in identifiers {
+    for (index, &component_index) in component_indices.iter().enumerate() {
+        if component_indices[..index].contains(&component_index) {
+            continue;
+        }
         facts
-            .require_current_uuid(component_index, identifier)
+            .selector(component_index)
             .map_err(|_| Error::InvalidSource { path })?;
     }
-    Ok(())
+    Ok(facts)
 }
 
 fn unique_object(archive: &Archive, identifier: u64, path: Path) -> Result<&ArchiveObject, Error> {
@@ -1382,6 +1547,28 @@ fn unique_message_index(object: &ArchiveObject, type_: u32, path: Path) -> Resul
         return Err(Error::InvalidSource { path });
     }
     Ok(index)
+}
+
+fn archive_for_mut(
+    archives: &mut [(usize, Archive)],
+    component_index: usize,
+    path: Path,
+) -> Result<&mut Archive, Error> {
+    archives
+        .iter_mut()
+        .find(|(index, _)| *index == component_index)
+        .map(|(_, archive)| archive)
+        .ok_or(Error::InvalidSource { path })
+}
+
+fn resolved_component_index(source: &Package, identifier: u64, path: Path) -> Result<usize, Error> {
+    source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .map(|resolved| resolved.component_index)
+        .ok_or(Error::InvalidSource { path })
 }
 
 struct ListMessage<'a> {
@@ -1421,7 +1608,7 @@ fn unique_list_message<'a>(
 }
 
 fn validate_refcounts(
-    archive: &Archive,
+    source: &Package,
     tile_references: &[(u32, u64)],
     formats: &[ListEntry],
     controls: &[ListEntry],
@@ -1430,6 +1617,14 @@ fn validate_refcounts(
 ) -> Result<(), Error> {
     let mut census = BncReferenceCensus::default();
     for (_, tile_identifier) in tile_references {
+        let component_index = resolved_component_index(source, *tile_identifier, path)?;
+        let archive = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .archive();
         let tile = unique_object(archive, *tile_identifier, path)?;
         let message_index = unique_message_index(tile, 6_002, path)?;
         let (_, report) = storage_codec::decode_tile_with_visitor(

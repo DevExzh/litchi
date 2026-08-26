@@ -318,7 +318,7 @@ impl<'source> RegistryFacts<'source> {
         component_index: usize,
         object_identifier: u64,
     ) -> Result<UuidBits> {
-        if self.has_non_uuid_owner(object_identifier) {
+        if self.has_conflicting_non_uuid_owner(object_identifier) {
             return Err(MetadataError::kind(FailureKind::Conflict));
         }
         let mut current = None;
@@ -351,8 +351,10 @@ impl<'source> RegistryFacts<'source> {
     /// authoritative external edge. Native producers use both object-specific
     /// records and component-level records (`object_identifier = None`), so
     /// either shape may cover a requested object. A covering edge must be
-    /// current, unversioned, and have the exact weak/reference shape requested
-    /// by the caller; duplicate or conflicting records fail closed.
+    /// current, unversioned, and have the requested non-weak/reference shape.
+    /// Native producers encode non-weak as either an absent optional value or
+    /// an explicit `false`; those forms are semantically equivalent, while a
+    /// duplicate pair or any `true` record still fails closed.
     pub(super) fn require_external_edge(
         &self,
         source_component_index: usize,
@@ -392,7 +394,11 @@ impl<'source> RegistryFacts<'source> {
             {
                 continue;
             }
-            if !reference.current || reference.versioned || reference.is_weak != is_weak {
+            let weak_matches = match is_weak {
+                Some(false) => reference.is_weak != Some(true),
+                expected => reference.is_weak == expected,
+            };
+            if !reference.current || reference.versioned || !weak_matches {
                 conflicting = true;
                 continue;
             }
@@ -494,7 +500,11 @@ impl<'source> RegistryFacts<'source> {
         self.external_references.iter().any(|reference| {
             reference.object_identifier == Some(identifier)
                 || reference.target_component_identifier == identifier
-        }) || self.data_owners.iter().any(|owner| {
+        }) || self.has_conflicting_non_uuid_owner(identifier)
+    }
+
+    fn has_conflicting_non_uuid_owner(&self, identifier: u64) -> bool {
+        self.data_owners.iter().any(|owner| {
             owner.object_identifier == identifier || owner.data_identifier == identifier
         }) || self.ambiguous_identifiers.contains(&identifier)
             || self.root_data_map_identifier == Some(identifier)

@@ -35,6 +35,11 @@ const PRIVATE_SHEET: &str = "__litchi_private_control_sheet_85__";
 const PRIVATE_TABLE: &str = "__litchi_private_control_table_85__";
 const PRIVATE_INPUT: &[u8] = b"__litchi_private_control_input_85__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
+/// The committed Wave86 split-owner source is retained as the Wave88
+/// multi-member write seed.  Its rooted model, tile, format/control lists,
+/// and Pop-Up model are separate current components with metadata edges.
+const SPLIT_COMPONENT_NUMBERS: &[u8] =
+    include_bytes!("../corpus/numbers_table_cell_control/split_component_source.numbers");
 const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
 
 fuzz_target!(|data: &[u8]| {
@@ -57,6 +62,7 @@ fuzz_target!(|data: &[u8]| {
     {
         exercise_split_component_window(&package, data);
     }
+    exercise_split_component_source(data);
     exercise_constructors(data);
     exercise_selector_errors(native_package(), data);
     exercise_redacted_ingress();
@@ -89,6 +95,21 @@ fn native_package() -> &'static Package {
         Package::from_bytes_with_options(NATIVE_NUMBERS, options())
             .unwrap_or_else(|error| panic!("native Numbers control seed must open: {error}"))
     })
+}
+
+fn split_component_package() -> Option<&'static Package> {
+    static PACKAGE: OnceLock<Option<Package>> = OnceLock::new();
+    PACKAGE
+        .get_or_init(|| {
+            match Package::from_bytes_with_options(SPLIT_COMPONENT_NUMBERS, options()) {
+                Ok(package) => Some(package),
+                Err(error) => {
+                    observe_error(error);
+                    None
+                },
+            }
+        })
+        .as_ref()
 }
 
 fn exercise_package(package: &Package, data: &[u8]) {
@@ -307,11 +328,356 @@ fn exercise_reopened_replay(
     }
 }
 
-/// Probe a bounded region of a file-backed native input.  The Wave85 source
-/// recipe has controls in this window and intentionally exercises the
-/// strict read boundary: the owner admits the metadata-proven split graph but
-/// rejects any changed transaction atomically until multi-member publication
-/// is owned.
+/// Exercise the committed split-component graph independently from mutated
+/// fuzz input.  This is the Wave88 write gate: a successful changed
+/// transaction must rewrite at least two native members, preserve the
+/// metadata external-edge/token closure, reopen the candidate, and support
+/// exact patch/inverse/conflict replay.  Older owners may reject the changed
+/// route; that is still required to be atomic and is deliberately accepted
+/// here so the target remains useful across the migration boundary.
+fn exercise_split_component_source(data: &[u8]) {
+    let Some(package) = split_component_package() else {
+        return;
+    };
+    let positions = [
+        CellPosition::new(0, 0),
+        CellPosition::new(1, 0),
+        CellPosition::new(2, 0),
+        CellPosition::new(3, 0),
+        CellPosition::new(4, 0),
+    ];
+    let mut observed = Vec::new();
+    for (index, position) in positions.into_iter().enumerate() {
+        let Ok(Some(before)) = package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        ) else {
+            continue;
+        };
+        observed.push((position, before.clone()));
+        let desired = control(
+            usize::from(data.get(index.wrapping_add(1)).copied().unwrap_or_default()) % 5,
+            data,
+        );
+        exercise_split_write(package, position, before, desired, data);
+    }
+    exercise_split_shared_refcount(package, &observed, data);
+    exercise_split_component_limits();
+}
+
+/// Run one split-component no-op/change/clear transaction and all exact
+/// source-bound patch invariants.  The metadata UUID/token and external-edge
+/// ownership is intentionally observed through candidate reopen/locality and
+/// the actual touched-member cardinality rather than leaking physical types
+/// into this fuzz boundary.
+fn exercise_split_write(
+    package: &Package,
+    position: CellPosition,
+    before: CellControl,
+    desired: CellControl,
+    data: &[u8],
+) {
+    let source_bytes = package_bytes(package);
+    let no_op = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .and_then(|edit| edit.set(before.clone()).commit());
+    match no_op {
+        Ok(commit) => {
+            assert!(commit.patch().is_noop());
+            assert_eq!(commit.diagnostics().touched_components(), 0);
+            assert_eq!(package_bytes(commit.package()), source_bytes);
+        },
+        Err(error) => observe_error(error),
+    }
+    if before == desired {
+        return;
+    }
+
+    let result = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .and_then(|edit| edit.set(desired.clone()).commit());
+    let Ok(commit) = result else {
+        if let Err(error) = package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )
+            .and_then(|edit| edit.set(desired).commit())
+        {
+            observe_error(error);
+        }
+        assert_eq!(package_bytes(package), source_bytes);
+        return;
+    };
+    let patch = commit.patch().clone();
+    let target_bytes = package_bytes(commit.package());
+    assert_eq!(patch.before(), Some(&before));
+    assert_eq!(patch.after(), Some(&desired));
+    assert!(!patch.is_noop());
+    assert!(
+        commit.diagnostics().touched_components() >= 2,
+        "split control write must report every changed native component"
+    );
+    assert!(commit.diagnostics().full_reparse_performed());
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+            .unwrap_or_else(|error| panic!("split control candidate readback failed: {error}")),
+        Some(desired.clone())
+    );
+    let applied = package
+        .apply_table_cell_control_format(&patch)
+        .unwrap_or_else(|error| panic!("split control patch must apply: {error}"));
+    assert_eq!(package_bytes(applied.package()), target_bytes);
+    assert!(package.apply_table_cell_control_format(&patch).is_err());
+    let restored = commit
+        .package()
+        .apply_table_cell_control_format(&patch.inverse())
+        .unwrap_or_else(|error| panic!("split control inverse must apply: {error}"));
+    assert_eq!(package_bytes(restored.package()), source_bytes);
+    exercise_reopened_replay(
+        &source_bytes,
+        &target_bytes,
+        &patch,
+        position,
+        commit.diagnostics().touched_components(),
+    );
+
+    // A changed Some value is followed by a clear/reset attempt.  When the
+    // format/control refcount census admits it, the clear must remove only
+    // the selected ownership and preserve every sibling; when it is refused,
+    // the candidate remains byte-identical and the fuzz target records the
+    // typed error without treating it as a crash.
+    let clear_result = commit
+        .package()
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .and_then(|edit| {
+            if data.first().copied().unwrap_or_default() & 1 == 0 {
+                edit.clear().commit()
+            } else {
+                edit.reset().commit()
+            }
+        });
+    match clear_result {
+        Ok(clear) => {
+            assert_eq!(clear.patch().after(), None);
+            assert!(clear.diagnostics().touched_components() >= 2);
+            assert_eq!(
+                clear
+                    .package()
+                    .table_cell_control_format(
+                        SheetSelector::index(0),
+                        TableSelector::index(0),
+                        position,
+                    )
+                    .unwrap_or_else(|error| panic!("split clear readback failed: {error}")),
+                None
+            );
+            let clear_source = target_bytes.clone();
+            let clear_target = package_bytes(clear.package());
+            let restored = clear
+                .package()
+                .apply_table_cell_control_format(&clear.patch().inverse())
+                .unwrap_or_else(|error| panic!("split clear inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), clear_source);
+            exercise_reopened_replay(
+                &clear_source,
+                &clear_target,
+                clear.patch(),
+                position,
+                clear.diagnostics().touched_components(),
+            );
+        },
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(commit.package()), target_bytes);
+        },
+    }
+}
+
+/// Find two equal controls in the split source and clear one.  This exercises
+/// the format/control-list refcount path when a native seed shares a model;
+/// if this particular source has no equal pair, the scan is still bounded.
+fn exercise_split_shared_refcount(
+    package: &Package,
+    observed: &[(CellPosition, CellControl)],
+    data: &[u8],
+) {
+    let Some((first, value)) = observed.iter().find_map(|(position, value)| {
+        observed
+            .iter()
+            .find(|(other_position, other)| other_position != position && other == value)
+            .map(|_| (*position, value.clone()))
+    }) else {
+        return;
+    };
+    let Some((sibling, _)) = observed
+        .iter()
+        .find(|(position, other)| *position != first && *other == value)
+    else {
+        return;
+    };
+    let source_bytes = package_bytes(package);
+    let result = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), first)
+        .and_then(|edit| edit.clear().commit());
+    match result {
+        Ok(commit) => {
+            assert!(commit.diagnostics().touched_components() >= 2);
+            assert_eq!(
+                commit
+                    .package()
+                    .table_cell_control_format(
+                        SheetSelector::index(0),
+                        TableSelector::index(0),
+                        *sibling,
+                    )
+                    .unwrap_or_else(|error| panic!("shared control readback failed: {error}")),
+                Some(value.clone())
+            );
+            let target_bytes = package_bytes(commit.package());
+            let restored = commit
+                .package()
+                .apply_table_cell_control_format(&commit.patch().inverse())
+                .unwrap_or_else(|error| panic!("shared control inverse must apply: {error}"));
+            assert_eq!(package_bytes(restored.package()), source_bytes);
+            exercise_reopened_replay(
+                &source_bytes,
+                &target_bytes,
+                commit.patch(),
+                first,
+                commit.diagnostics().touched_components(),
+            );
+        },
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source_bytes);
+        },
+    }
+    black_box(data);
+}
+
+/// Replay exact and required-minus-one physical/semantic ingress profiles for
+/// the split source.  The source must be admitted at its exact byte ceiling,
+/// while every one-byte-tight profile fails before any candidate publication.
+fn exercise_split_component_limits() {
+    static ONCE: OnceLock<()> = OnceLock::new();
+    ONCE.get_or_init(|| {
+        let source_len = u64::try_from(SPLIT_COMPONENT_NUMBERS.len())
+            .unwrap_or_else(|error| panic!("split source length conversion failed: {error}"));
+        let exact_archive = PackageLimits::new(
+            source_len,
+            MAX_ENTRIES,
+            MAX_ENTRY_BYTES,
+            MAX_EXPANDED_BYTES,
+            MAX_IWA_STREAM_BYTES,
+        )
+        .unwrap_or_else(|error| panic!("split exact limits invalid: {error}"));
+        let exact = Package::from_bytes_with_options(
+            SPLIT_COMPONENT_NUMBERS,
+            PackageReadOptions::new(exact_archive, PackageSemanticLimits::default()),
+        )
+        .unwrap_or_else(|error| panic!("split source rejected at exact input ceiling: {error}"));
+        black_box(exact);
+        let tight_archive = PackageLimits::new(
+            source_len.saturating_sub(1),
+            MAX_ENTRIES,
+            MAX_ENTRY_BYTES,
+            MAX_EXPANDED_BYTES,
+            MAX_IWA_STREAM_BYTES,
+        )
+        .unwrap_or_else(|error| panic!("split tight limits invalid: {error}"));
+        let result = Package::from_bytes_with_options(
+            SPLIT_COMPONENT_NUMBERS,
+            PackageReadOptions::new(tight_archive, PackageSemanticLimits::default()),
+        );
+        assert!(
+            result.is_err(),
+            "split source exceeded input-minus-one gate"
+        );
+        black_box(result.err().map(|error| error.to_string()));
+
+        // Exercise the remaining public physical axes with deliberately
+        // tight, checked profiles.  These are required-minus-one style
+        // probes for entries, uncompressed member bytes, aggregate bytes,
+        // and IWA stream bytes; every failure must occur before a write can
+        // publish a split candidate.
+        for (label, limits) in [
+            (
+                "entries",
+                PackageLimits::new(
+                    source_len,
+                    1,
+                    MAX_ENTRY_BYTES,
+                    MAX_EXPANDED_BYTES,
+                    MAX_IWA_STREAM_BYTES,
+                ),
+            ),
+            (
+                "entry-bytes",
+                PackageLimits::new(
+                    source_len,
+                    MAX_ENTRIES,
+                    1,
+                    MAX_EXPANDED_BYTES,
+                    MAX_IWA_STREAM_BYTES,
+                ),
+            ),
+            (
+                "total-bytes",
+                PackageLimits::new(
+                    source_len,
+                    MAX_ENTRIES,
+                    MAX_ENTRY_BYTES,
+                    1,
+                    MAX_IWA_STREAM_BYTES,
+                ),
+            ),
+            (
+                "iwa-stream-bytes",
+                PackageLimits::new(
+                    source_len,
+                    MAX_ENTRIES,
+                    MAX_ENTRY_BYTES,
+                    MAX_EXPANDED_BYTES,
+                    1,
+                ),
+            ),
+        ] {
+            let limits =
+                limits.unwrap_or_else(|error| panic!("split {label} limits invalid: {error}"));
+            let result = Package::from_bytes_with_options(
+                SPLIT_COMPONENT_NUMBERS,
+                PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+            );
+            assert!(
+                result.is_err(),
+                "split {label} limit unexpectedly admitted source"
+            );
+            black_box(result.err().map(|error| error.to_string()));
+        }
+
+        let object_limit = PackageSemanticLimits::new(1, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+            .unwrap_or_else(|error| panic!("split object limit invalid: {error}"));
+        let result = Package::from_bytes_with_options(
+            SPLIT_COMPONENT_NUMBERS,
+            PackageReadOptions::new(PackageLimits::default(), object_limit),
+        );
+        assert!(
+            result.is_err(),
+            "split object-minus-one limit admitted source"
+        );
+        black_box(result.err().map(|error| error.to_string()));
+    });
+}
+
+/// Probe a bounded region of a file-backed fuzz input.  Valid ZIP mutations
+/// may carry split model/list/control members; every admitted changed route
+/// is sent through the same multi-member replay checks, while unsupported or
+/// malformed ownership remains source-atomic.
 fn exercise_split_component_window(package: &Package, data: &[u8]) {
     for row in 0..8 {
         for column in 0..8 {
