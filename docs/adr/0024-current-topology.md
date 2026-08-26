@@ -2645,3 +2645,30 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 the Pages edge, migration hosts, generated-schema and normal Prost/Buffa
 owners, and the IWA monolith. No crate, dependency edge, debt item, production
 manifest dependency, or monolith is removed by Wave88.
+
+## 2026-08-26 amendment: Wave90 current-topology Numbers split Pop-Up Menu lifecycle cut
+
+Implementation base `e867003d80fb9cc9373f2f659e2b51c3264de06b` makes
+`litchi-numbers` the current selector-first owner of the admitted
+split-component Pop-Up Menu lifecycle: read, exact no-op, replacement,
+create/reuse, clear/reset, final cull, patch, inverse, and candidate semantic
+verification. Private native and metadata siblings own member enumeration,
+aggregate merge/split projection, exact-byte changed-member filtering,
+current/effective locator and external-edge proof, UUID/save-token batching,
+and BNC/list refcount and copy-on-write transitions.
+
+The split topology accepts the narrow aggregate-only metadata producer shape
+under those ownership invariants without claiming an exact `FieldInfo` path.
+Prepared reassembly, candidate reopen, semantic readback, and object/member
+locality remain package-owned. Malformed, segmented, versioned, aliased,
+duplicate, conflicting, opaque-inbound, unsupported, or ambiguous graphs
+remain fail-closed. The native acceptance record confirms semantic
+persistence for one admitted fixture; it does not establish native/Rust byte
+parity or general native graph compatibility.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debts 014 and 017,
+the Pages edge, migration hosts, generated-schema and normal Prost/Buffa
+owners, and the IWA monolith. No host method, crate, dependency edge, debt
+item, production manifest dependency, or monolith is removed by Wave90.

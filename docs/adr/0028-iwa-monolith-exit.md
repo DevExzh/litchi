@@ -5432,3 +5432,31 @@ generated-schema, Buffa, and normal Prost owners, migration hosts, and the IWA
 monolith remain. No crate, dependency edge, debt item, production manifest
 dependency, generated-schema owner, normal Prost owner, host-exit, or
 monolith-exit gate is retired by Wave88.
+
+## 2026-08-26 amendment: Wave90 Numbers split Pop-Up Menu bounded owner slice (not a monolith-exit gate)
+
+Implementation base `e867003d80fb9cc9373f2f659e2b51c3264de06b` moves only
+the admitted split-component Pop-Up Menu lifecycle from fail-closed refusal
+to a successful, bounded `litchi-numbers` owner slice. The selector-first
+facade remains archive-free. The private owner proves member ownership,
+current/effective locators, exact external edges, metadata UUID and
+save-token transitions, BNC/list references and refcounts, copy-on-write,
+reuse/create/reset/final-cull behavior, prepared reassembly, candidate
+readback/locality, and exact patch/inverse behavior.
+
+Native acceptance now supplies semantic persistence evidence for the
+admitted fixture: Numbers opened the 78,984-byte Rust candidate without
+repair, displayed `None`, `Wave90-Low`, and `Wave90-High`, and preserved
+the choices across save, close, and exact-path reopen. Strict Rust reread
+accepted the 135,726-byte Numbers-normalized candidate. The 135,226-byte
+source and exact Rust inverse share SHA-256
+`b830e8981cd9cd0ede3f125506b6b7076e33b7cc79110a8a59696270d005afc9`;
+the native-normalized artifact is not Rust/native byte parity.
+
+This is not a monolith-exit gate. The split route remains limited to its
+validated graph shape and does not own arbitrary producer graphs, broad
+Numbers/table formats, table topology, Pages/Keynote controls, native
+identifiers, durable publication, performance/RSS, or general graph repair.
+No host method, crate, dependency edge, debt item, production manifest
+dependency, migration host, generated-schema/Prost/Buffa owner, or monolith
+gate is retired by Wave90. Debts 014, 015, 016, and 017 remain open.

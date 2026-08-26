@@ -3254,3 +3254,33 @@ Cross-component Pop-Up Menu changes remain `UnsupportedDependency`, preserve
 the source exactly, and do not enter the popup model lifecycle. This amendment
 does not own general scalar formatting, arbitrary table storage, table
 topology, Pages/Keynote controls, graph repair, or a public native graph API.
+
+## 2026-08-26 amendment: Wave90 Numbers split Pop-Up Menu lifecycle semantics
+
+Implementation base `e867003d80fb9cc9373f2f659e2b51c3264de06b` extends the
+selector-first Numbers facade to admitted split-component Pop-Up Menu
+transactions. `CellControl::PopUpMenu`, `PopUpMenu`, `Item`, and
+`InitialSelection` remain archive-free semantic values, and sheet/table/cell
+selectors remain the only public route. Reads and exact no-ops retain the
+source semantics; changed routes can replace an existing menu, create or
+reuse a menu, clear/reset it, and cull the final unreferenced entry. Commits
+continue to expose conflict-checked patches, exact inverses, redacted
+diagnostics, and typed resource failures.
+
+The admitted split transition proves current and effective locators, unique
+member ownership, exact non-weak external edges, UUID and save-token
+authority, BNC/list references, and candidate semantic readback before
+publication. Aggregate-only metadata may be accepted on this split route
+when its ownership invariants hold; this is not an exact `FieldInfo` path
+claim. Exact-byte changed-member filtering leaves unselected members
+source-authoritative, while conflicting, aliased, segmented, versioned,
+opaque-inbound, malformed, or ambiguous graphs fail closed.
+
+Native acceptance records semantic persistence for the admitted fixture:
+Numbers displayed the `None`, `Wave90-Low`, and `Wave90-High` popup
+choices after opening the Rust candidate without repair, and the choices
+survived save, close, and exact-path reopen. The normalized artifact was
+accepted by strict Rust reread; this remains semantic persistence evidence,
+not native/Rust byte parity. The amendment does not expose native identifiers
+or physical values and does not broaden ownership to arbitrary graph repair,
+table topology, general data formats, or Pages/Keynote controls.
