@@ -3,13 +3,54 @@
     reason = "focused integration tests use panic-on-failure assertions"
 )]
 
-use litchi_opc::PackURI;
+use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::{PackURI, TargetMode};
 use litchi_xlsx::{Hyperlink, HyperlinkReference, Package, Workbook};
 
 const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
 fn workbook() -> Workbook {
     Package::create().unwrap().into_workbook().unwrap()
+}
+
+fn strict_workbook() -> Workbook {
+    let mut raw = Package::create().unwrap().into_plain_opc();
+    let workbook_uri = raw.main_document_part().unwrap().partname().clone();
+    let strict_workbook_xml = std::str::from_utf8(raw.get_part(&workbook_uri).unwrap().blob())
+        .unwrap()
+        .replace(MAIN, STRICT_MAIN)
+        .replace(REL, STRICT_REL)
+        .replacen(
+            "<workbook ",
+            &format!(r#"<s:workbook xmlns:s="{STRICT_MAIN}" "#),
+            1,
+        )
+        .replace("</workbook>", "</s:workbook>")
+        .into_bytes();
+    let workbook_part = raw.get_part_mut(&workbook_uri).unwrap();
+    workbook_part.set_blob(strict_workbook_xml);
+    workbook_part.rels_mut().remove("rId1").unwrap();
+    workbook_part
+        .rels_mut()
+        .try_add_relationship(
+            rt::STRICT_WORKSHEET.to_owned(),
+            "worksheets/sheet1.xml".to_owned(),
+            "rId1".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    let strict_worksheet_xml = std::str::from_utf8(raw.get_part(&worksheet_uri).unwrap().blob())
+        .unwrap()
+        .replace(MAIN, STRICT_MAIN)
+        .into_bytes();
+    raw.get_part_mut(&worksheet_uri)
+        .unwrap()
+        .set_blob(strict_worksheet_xml);
+    Package::from_opc(raw).unwrap().into_workbook().unwrap()
 }
 
 fn internal(reference: &str, location: &str) -> Hyperlink {
@@ -180,6 +221,89 @@ fn hyperlink_edit_refuses_unknown_owner_markup() {
     let mut edit = base.edit().unwrap();
     let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
     assert!(sheet.put_hyperlink(internal("A1", "Sheet1!C3")).is_err());
+}
+
+#[test]
+fn strict_worksheet_external_hyperlink_commit_reopens_with_strict_relationship() {
+    let base = strict_workbook();
+    let mut edit = base.edit().unwrap();
+    edit.sheet("Sheet1")
+        .unwrap()
+        .unwrap()
+        .put_hyperlink(external("A1", "https://example.test/strict"))
+        .unwrap();
+    let committed = edit.commit().unwrap().into_workbook();
+    let bytes = committed.to_plain_bytes().unwrap();
+    let raw = Package::from_bytes(bytes.clone()).unwrap().into_plain_opc();
+    let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    let relationship = raw
+        .get_part(&worksheet_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| relationship.target_ref() == "https://example.test/strict")
+        .unwrap();
+    assert_eq!(relationship.reltype(), rt::STRICT_HYPERLINK);
+    assert_eq!(relationship.target_mode(), TargetMode::External);
+
+    let reopened = Package::from_bytes(bytes).unwrap().into_workbook().unwrap();
+    let reopened_links = links(&reopened);
+    assert_eq!(reopened_links.len(), 1);
+    assert_eq!(reopened_links[0].reference().as_str(), "A1");
+    assert_eq!(
+        reopened_links[0].external_target(),
+        Some("https://example.test/strict")
+    );
+}
+
+#[test]
+fn hyperlink_patch_rejects_stale_relationship_without_mutating_target() {
+    let base = workbook();
+    let mut edit = base.edit().unwrap();
+    edit.sheet("Sheet1")
+        .unwrap()
+        .unwrap()
+        .put_hyperlink(external("A1", "https://example.test/original"))
+        .unwrap();
+    let (after, patch) = edit.commit().unwrap().into_parts();
+    let after_raw = Package::from_bytes(after.to_plain_bytes().unwrap())
+        .unwrap()
+        .into_plain_opc();
+    let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    let relationship_id = after_raw
+        .get_part(&worksheet_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| relationship.target_ref() == "https://example.test/original")
+        .unwrap()
+        .r_id()
+        .to_owned();
+
+    let mut stale_opc = Package::from_bytes(base.to_plain_bytes().unwrap())
+        .unwrap()
+        .into_plain_opc();
+    stale_opc
+        .get_part_mut(&worksheet_uri)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::HYPERLINK.to_owned(),
+            "https://example.test/stale".to_owned(),
+            relationship_id,
+            TargetMode::External,
+        )
+        .unwrap();
+    let stale = Package::from_opc(stale_opc)
+        .unwrap()
+        .into_workbook()
+        .unwrap();
+    let before = stale.to_plain_bytes().unwrap();
+    assert!(matches!(
+        stale.apply(&patch),
+        Err(litchi_xlsx::Error::PatchConflict { .. })
+    ));
+    assert_eq!(stale.to_plain_bytes().unwrap(), before);
 }
 
 #[test]
