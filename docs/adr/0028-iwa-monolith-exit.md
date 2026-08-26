@@ -5664,3 +5664,34 @@ the monolith, and the allocator's physical-archive scan is not one aggregate
 transaction budget with metadata inspection. This slice therefore makes no
 zero-copy, single-scan, allocation-free, performance/RSS, dependency-edge,
 debt, normal generated-schema ownership, crate-exit, or monolith-exit claim.
+
+## 2026-08-26 amendment: PackageMetadata data-reference lazy ingress (not a monolith-exit gate)
+
+The shared strict metadata visitor now exposes each component data-reference
+record before its object-owner callbacks. The record projection includes the
+component, data identifier, exact owner-field count, and unknown-field
+presence, so callers can distinguish duplicate parent records even when their
+owner sets do not overlap. The legacy `litchi-iwa` data-reference registry now
+uses that bounded raw inspection for component-owner reads and for source and
+candidate verification around its wire-preserving mutations. It no longer
+materializes a generated Prost `PackageMetadata` or returns a generated
+`ComponentInfo` from those read/census paths. Duplicate current/versioned
+component identifiers, parent data identifiers, and per-parent object owners
+fail closed; nonzero empty parent records retain their prior accepted meaning;
+and untouched unknown root records remain byte-authoritative.
+
+The same fresh Numbers 14.4 workbook used by the scalar-ingress slice was
+checked with a temporary generated-message oracle across every native
+data-reference-bearing current or versioned component. The 134,897-byte source
+remained unchanged at SHA-256
+`95f96b436da9fc19f17444cc2b75629e4f817c46f97c99e00fd527fd8728db81`.
+This is read-parity evidence, not a native mutation or tracked-fixture claim.
+
+Nested data-reference and owner payload construction, raw mutation predicates,
+metadata archive discovery, and surrounding media/chart graph owners remain in
+`litchi-iwa`; those writer paths still use generated component records where
+required to preserve their existing transition contract. Clone/remove callers
+also retain legacy collection staging rather than one operation-wide
+transaction budget. This amendment therefore makes no full Prost retirement,
+zero-copy, allocation-free, performance/RSS, dependency-edge, debt, crate-exit,
+or monolith-exit claim.

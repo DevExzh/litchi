@@ -1423,6 +1423,34 @@ pub struct DataReferenceOwnerDescriptor<'source> {
     unknown_fields: bool,
 }
 
+/// Borrowed existing component data-reference record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataReferenceDescriptor<'source> {
+    component: ComponentDescriptor<'source>,
+    data_identifier: u64,
+    owner_count: usize,
+    unknown_fields: bool,
+}
+
+impl<'source> DataReferenceDescriptor<'source> {
+    #[must_use]
+    pub const fn component(self) -> ComponentDescriptor<'source> {
+        self.component
+    }
+    #[must_use]
+    pub const fn data_identifier(self) -> u64 {
+        self.data_identifier
+    }
+    #[must_use]
+    pub const fn owner_count(self) -> usize {
+        self.owner_count
+    }
+    #[must_use]
+    pub const fn has_unknown_fields(self) -> bool {
+        self.unknown_fields
+    }
+}
+
 impl<'source> DataReferenceOwnerDescriptor<'source> {
     #[must_use]
     pub const fn component(self) -> ComponentDescriptor<'source> {
@@ -1474,6 +1502,16 @@ pub trait PackageMetadataVisitor {
     fn visit_external_reference(
         &mut self,
         _reference: ExternalReferenceDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        Ok(())
+    }
+
+    /// Observe one parent data-reference record before its owner callbacks.
+    /// Parent records consume field/work budget; the nested owner callbacks
+    /// remain the units charged to the reference quota.
+    fn visit_data_reference(
+        &mut self,
+        _reference: DataReferenceDescriptor<'_>,
     ) -> Result<(), RewriteError> {
         Ok(())
     }
@@ -1852,6 +1890,7 @@ mod tests {
         components: Vec<(u64, String, String, bool)>,
         uuids: Vec<(u64, u64, UuidBits, bool)>,
         references: Vec<(u64, u64, Option<u64>, Option<bool>, bool)>,
+        data_references: Vec<(u64, u64, usize, bool, bool)>,
         data_owners: Vec<(u64, u64, u64, u32, bool, bool)>,
         ambiguous: Vec<(u64, u64, bool)>,
         root_maps: Vec<(u64, bool)>,
@@ -1904,6 +1943,20 @@ mod tests {
             Ok(())
         }
 
+        fn visit_data_reference(
+            &mut self,
+            reference: DataReferenceDescriptor<'_>,
+        ) -> Result<(), RewriteError> {
+            self.data_references.push((
+                reference.component().identifier(),
+                reference.data_identifier(),
+                reference.owner_count(),
+                reference.component().is_current(),
+                reference.has_unknown_fields(),
+            ));
+            Ok(())
+        }
+
         fn visit_data_reference_owner(
             &mut self,
             owner: DataReferenceOwnerDescriptor<'_>,
@@ -1948,7 +2001,7 @@ mod tests {
             &[(4, UuidBits::new(1, 2))],
             &[(6, 2, Some(5), Some(0)), (18, 2, Some(6), Some(1))],
         );
-        bytes_field(&mut current, 7, &data_reference(70, &[(5, 2)], false));
+        bytes_field(&mut current, 7, &data_reference(70, &[(5, 2)], true));
         put_varint_field(&mut current, 20, 81);
         let mut packed = Vec::new();
         put_varint(&mut packed, 82);
@@ -1991,6 +2044,10 @@ mod tests {
                 (1, 2, Some(5), Some(false), false),
                 (1, 2, Some(6), Some(true), true)
             ]
+        );
+        assert_eq!(
+            facts.data_references,
+            vec![(1, 70, 1, true, true), (9, 71, 1, false, false)]
         );
         assert_eq!(
             facts.data_owners,
@@ -8210,17 +8267,33 @@ fn inspect_data_reference<V: PackageMetadataVisitor>(
         .checked_add(1)
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
     let mut data_identifier = None;
+    let mut owner_count = 0usize;
+    let mut unknown_fields = false;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         match field.number {
             1 => set_once(&mut data_identifier, field.varint()?)?,
-            2 => {},
-            _ => visitor.visit_unknown_field()?,
+            2 => {
+                let _ = field.bytes()?;
+                owner_count = owner_count
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            },
+            _ => {
+                unknown_fields = true;
+                visitor.visit_unknown_field()?;
+            },
         }
     }
     let data_identifier = data_identifier
         .filter(|identifier| *identifier != 0)
         .ok_or_else(|| RewriteError::invalid(InvalidReason::InvalidIdentifier))?;
+    visitor.visit_data_reference(DataReferenceDescriptor {
+        component,
+        data_identifier,
+        owner_count,
+        unknown_fields,
+    })?;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         if field.number != 2 {
