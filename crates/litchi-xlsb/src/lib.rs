@@ -132,8 +132,8 @@ pub mod timeline;
 pub mod workbook;
 pub mod xml_maps;
 
-/// OPC resource limits used by XLSB package and workbook ingress.
-pub use litchi_opc::ReadLimits;
+/// OPC resource limits and diagnostics used by XLSB package and workbook ingress.
+pub use litchi_opc::{ReadLimits, SourceCacheDiagnostics, SourceCacheLimits};
 pub mod writer;
 
 pub use raw::Error;
@@ -141,7 +141,7 @@ pub use raw::Error;
 pub use package::Package;
 pub use package::scenarios;
 pub use sheet::Worksheet;
-pub use workbook::Workbook;
+pub use workbook::{SourceBackedWorkbook, SourceBackedWorksheet, Workbook};
 
 pub use pivot_view::Part;
 
