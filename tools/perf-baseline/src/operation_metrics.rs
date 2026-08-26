@@ -15,6 +15,7 @@ use std::error::Error;
 use serde::Serialize;
 
 use crate::filesystem::{CfbPhaseEvidence, CfbPhaseSample, ReadPattern, SampleEvidence};
+use litchi_opc::OpcOperationAccounting;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -244,6 +245,56 @@ pub(crate) struct AllocationMetrics {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub(crate) struct OpcZipMetrics {
+    pub status: MetricStatus,
+    pub scope: &'static str,
+    pub compressed_deflate_payload_bytes_read: MetricVector,
+    pub stored_payload_bytes_read: MetricVector,
+    pub stored_payload_bytes_accepted: MetricVector,
+    pub deflate_bytes_produced: MetricVector,
+    pub deflate_bytes_accepted: MetricVector,
+    pub generated_deflate_payload_bytes_emitted: MetricVector,
+    pub stored_payload_bytes_emitted: MetricVector,
+    pub precompressed_payload_bytes_emitted: MetricVector,
+    pub raw_unchanged_source_bytes_accepted: MetricVector,
+    pub output_bytes_accepted: MetricVector,
+}
+
+impl OpcZipMetrics {
+    fn measured(samples: &[OpcOperationAccounting]) -> Self {
+        let measured = |value: fn(&OpcOperationAccounting) -> u64| {
+            MetricVector::measured(samples.iter().map(value).collect(), OPC_ZIP_SCOPE)
+        };
+        Self {
+            status: MetricStatus::Measured,
+            scope: OPC_ZIP_SCOPE,
+            compressed_deflate_payload_bytes_read: measured(
+                OpcOperationAccounting::compressed_deflate_payload_bytes_read,
+            ),
+            stored_payload_bytes_read: measured(OpcOperationAccounting::stored_payload_bytes_read),
+            stored_payload_bytes_accepted: measured(
+                OpcOperationAccounting::stored_payload_bytes_accepted,
+            ),
+            deflate_bytes_produced: measured(OpcOperationAccounting::deflate_bytes_produced),
+            deflate_bytes_accepted: measured(OpcOperationAccounting::deflate_bytes_accepted),
+            generated_deflate_payload_bytes_emitted: measured(
+                OpcOperationAccounting::generated_deflate_payload_bytes_emitted,
+            ),
+            stored_payload_bytes_emitted: measured(
+                OpcOperationAccounting::stored_payload_bytes_emitted,
+            ),
+            precompressed_payload_bytes_emitted: measured(
+                OpcOperationAccounting::precompressed_payload_bytes_emitted,
+            ),
+            raw_unchanged_source_bytes_accepted: measured(
+                OpcOperationAccounting::raw_unchanged_source_bytes_accepted,
+            ),
+            output_bytes_accepted: measured(OpcOperationAccounting::output_bytes_accepted),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct OperationMetrics {
     /// Number of values in every measured vector below.
     pub sample_count: usize,
@@ -263,6 +314,8 @@ pub(crate) struct OperationMetrics {
     pub cfb_phases: CfbPhaseMetrics,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allocation: Option<AllocationMetrics>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opc_zip: Option<OpcZipMetrics>,
 }
 
 /// One timed in-process operation and its best-effort process/allocator
@@ -303,6 +356,9 @@ const ALLOCATION_SCOPE: &str = "operation_global_system_allocator";
 const IN_PROCESS_PROCESS_SCOPE: &str =
     "procfs_in_process_operation_delta_including_procfs_probe_overhead";
 const IN_PROCESS_PROC_IO_SCOPE: &str = IN_PROCESS_PROCESS_SCOPE;
+const OPC_ZIP_SCOPE: &str =
+    "opc_source_backed_package_write_part_overlay_to_stream_with_accounting";
+const OPC_ZIP_LATENCY_CLAIM: &str = "evidence_only_opc_source_overlay_accounting";
 
 /// Builds the additive envelope for one warm or cold `CaseResult`.
 ///
@@ -516,6 +572,7 @@ pub(crate) fn aggregate(
         materialization,
         cfb_phases,
         allocation,
+        opc_zip: None,
     })
 }
 
@@ -680,6 +737,7 @@ pub(crate) fn from_sink_observation(
         },
         cfb_phases: absent_cfb_phase_metrics(),
         allocation: None,
+        opc_zip: None,
     })
 }
 
@@ -771,6 +829,39 @@ fn relabel_in_process_scopes(metrics: &mut ProcessMetrics) {
 }
 
 impl OperationMetrics {
+    /// Adds measured OPC ZIP accounting aligned to the elapsed sample order.
+    ///
+    /// The reports are caller-owned and contain only the timed, retained
+    /// samples; warmups are excluded by the caller before this method runs.
+    pub(crate) fn set_opc_zip(
+        &mut self,
+        elapsed: &[u64],
+        reports: &[OpcOperationAccounting],
+    ) -> Result<(), Box<dyn Error>> {
+        if elapsed.is_empty() {
+            return Err("OPC ZIP operation metrics cannot have zero samples".into());
+        }
+        if elapsed.len() != self.sample_count || reports.len() != elapsed.len() {
+            return Err(format!(
+                "OPC ZIP operation metrics sample cardinality {} reports/{} elapsed does not match envelope {}",
+                reports.len(),
+                elapsed.len(),
+                self.sample_count
+            )
+            .into());
+        }
+        let mut order = (0..elapsed.len()).collect::<Vec<_>>();
+        order.sort_unstable_by_key(|&index| (elapsed[index], index));
+        let ordered_reports = order
+            .iter()
+            .map(|&index| reports[index])
+            .collect::<Vec<_>>();
+        self.sample_indices = order;
+        self.latency_claim = OPC_ZIP_LATENCY_CLAIM;
+        self.opc_zip = Some(OpcZipMetrics::measured(&ordered_reports));
+        Ok(())
+    }
+
     /// Adds an already-proven deterministic sink summary without changing the
     /// operation's measured elapsed samples or any existing metric vectors.
     pub(crate) fn set_sink_observation(
@@ -1771,5 +1862,51 @@ mod tests {
         samples[1].cfb_phases = None;
         let error = aggregate(&samples, "warm", &[20, 10]).unwrap_err();
         assert!(error.to_string().contains("cfb_phases"));
+    }
+}
+
+#[cfg(test)]
+mod opc_zip_tests {
+    use super::{SinkObservation, from_sink_observation};
+
+    #[test]
+    fn opc_zip_vectors_follow_elapsed_order_and_preserve_zeroes() {
+        let observation = SinkObservation {
+            accepted_bytes: 0,
+            write_calls: 0,
+            largest_write: 0,
+            bytes_0: 0,
+            bytes_1_to_512: 0,
+            bytes_513_to_4096: 0,
+            bytes_4097_to_16384: 0,
+            bytes_16385_to_65536: 0,
+            bytes_over_65536: 0,
+        };
+        let default_json =
+            serde_json::to_value(from_sink_observation(2, observation).unwrap()).unwrap();
+        assert!(default_json.get("opc_zip").is_none());
+        let mut metrics = from_sink_observation(2, observation).unwrap();
+        let reports = vec![
+            litchi_opc::OpcOperationAccounting::default(),
+            litchi_opc::OpcOperationAccounting::default(),
+        ];
+        metrics.set_opc_zip(&[30, 10], &reports).unwrap();
+        assert_eq!(metrics.sample_indices, vec![1, 0]);
+        let json = serde_json::to_value(metrics).unwrap();
+        assert_eq!(
+            json["opc_zip"]["output_bytes_accepted"]["values"],
+            serde_json::json!([0, 0])
+        );
+        assert!(
+            json["opc_zip"]["output_bytes_accepted"]["values"]
+                .as_array()
+                .is_some()
+        );
+        assert!(
+            from_sink_observation(2, observation)
+                .unwrap()
+                .set_opc_zip(&[10], &reports)
+                .is_err()
+        );
     }
 }

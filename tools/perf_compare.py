@@ -28,8 +28,13 @@ COMPARATOR_VERSION = "1.3.2"
 SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
 EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_filesystem_selector"
+OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_opc_source_overlay_accounting"
 COMPARABLE_LATENCY_CLAIM = "comparable_timed_operation"
 OPERATION_ALIGNMENT = "elapsed_ns.samples_by_elapsed_then_sample_index"
+_EVIDENCE_ONLY_LATENCY_CLAIMS = {
+    EVIDENCE_ONLY_LATENCY_CLAIM,
+    OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM,
+}
 
 _DEFAULT_RESULT_KEY_FIELDS = ("case", "corpus")
 _CACHE_RESULT_KEY_FIELDS = ("case", "corpus", "cache_state")
@@ -1539,6 +1544,23 @@ _ALLOCATION_VECTOR_KEYS = (
     "peak_live_bytes_after",
 )
 _ALLOCATION_METRICS_KEYS = {"status", "scope", *_ALLOCATION_VECTOR_KEYS}
+_OPC_ZIP_VECTOR_KEYS = (
+    "compressed_deflate_payload_bytes_read",
+    "stored_payload_bytes_read",
+    "stored_payload_bytes_accepted",
+    "deflate_bytes_produced",
+    "deflate_bytes_accepted",
+    "generated_deflate_payload_bytes_emitted",
+    "stored_payload_bytes_emitted",
+    "precompressed_payload_bytes_emitted",
+    "raw_unchanged_source_bytes_accepted",
+    "output_bytes_accepted",
+)
+_OPC_ZIP_METRICS_KEYS = {"status", "scope", *_OPC_ZIP_VECTOR_KEYS}
+OPC_ZIP_SCOPE = (
+    "opc_source_backed_package_write_part_overlay_to_stream_with_accounting"
+)
+_OPC_ZIP_SCOPE = OPC_ZIP_SCOPE
 _SOURCE_METRICS_KEYS = {
     "status",
     "counter_scope",
@@ -1692,7 +1714,12 @@ def _validate_metric_vector(
                 f"{path}.values has {len(values)} samples; expected {sample_count}"
             )
         for index, item in enumerate(values):
-            if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, int)
+                or item < 0
+                or item > (1 << 64) - 1
+            ):
                 raise ComparisonInputError(
                     f"{path}.values[{index}] must be a non-negative integer"
                 )
@@ -1800,7 +1827,7 @@ def _validate_operation_metrics(
         )
     operation_keys = _OPERATION_METRICS_KEYS | (
         {"allocation"} if isinstance(value, dict) and "allocation" in value else set()
-    )
+    ) | ({"opc_zip"} if isinstance(value, dict) and "opc_zip" in value else set())
     obj = _require_exact_keys(value, path, operation_keys)
     sample_count = len(elapsed_samples)
     declared_sample_count = obj["sample_count"]
@@ -1847,11 +1874,17 @@ def _validate_operation_metrics(
     latency_claim = obj["latency_claim"]
     if not isinstance(latency_claim, str) or latency_claim not in {
         EVIDENCE_ONLY_LATENCY_CLAIM,
+        OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM,
         COMPARABLE_LATENCY_CLAIM,
     }:
         raise ComparisonInputError(
             f"{path}.latency_claim must be one of "
-            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM]}"
+            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM, OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM]}"
+        )
+    has_opc_zip = "opc_zip" in obj
+    if has_opc_zip != (latency_claim == OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM):
+        raise ComparisonInputError(
+            f"{path}.latency_claim and {path}.opc_zip must be present together"
         )
     elapsed_values = [
         _finite_number(
@@ -1941,7 +1974,43 @@ def _validate_operation_metrics(
                 f"{path}.sample_indices must match elapsed_ns.sample_order"
             )
 
-    if source_status == "measured" and latency_claim != EVIDENCE_ONLY_LATENCY_CLAIM:
+    if has_opc_zip:
+        if (
+            elapsed_sample_order is _METRIC_SAMPLE_ORDER_MISSING
+            or elapsed_sample_order is None
+        ):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order is required for opc_zip metrics"
+            )
+        if not isinstance(elapsed_sample_order, list):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order must be a list"
+            )
+        if len(elapsed_sample_order) != sample_count:
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order has {len(elapsed_sample_order)} "
+                f"samples; expected {sample_count}"
+            )
+        if any(
+            isinstance(index, bool)
+            or not isinstance(index, int)
+            or index < 0
+            for index in elapsed_sample_order
+        ):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order must contain non-negative integers"
+            )
+        if set(elapsed_sample_order) != set(range(sample_count)):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order must be a complete permutation"
+            )
+        if sample_indices != elapsed_sample_order:
+            raise ComparisonInputError(
+                f"{path}.opc_zip sample_indices must match "
+                "elapsed_ns.sample_order"
+            )
+
+    if source_status == "measured" and latency_claim not in _EVIDENCE_ONLY_LATENCY_CLAIMS:
         raise ComparisonInputError(
             f"{path}.measured source metrics require "
             f"latency_claim={EVIDENCE_ONLY_LATENCY_CLAIM!r}"
@@ -2084,6 +2153,31 @@ def _validate_operation_metrics(
                     f"{path}.allocation.status does not match "
                     f"{path}.allocation.{key}.status"
                 )
+    if "opc_zip" in obj:
+        opc_zip = _require_exact_keys(
+            obj["opc_zip"], f"{path}.opc_zip", _OPC_ZIP_METRICS_KEYS
+        )
+        opc_zip_status = _validate_metric_status(
+            opc_zip["status"], f"{path}.opc_zip.status"
+        )
+        if opc_zip["scope"] != _OPC_ZIP_SCOPE:
+            raise ComparisonInputError(
+                f"{path}.opc_zip.scope must be {_OPC_ZIP_SCOPE!r}"
+            )
+        for key in _OPC_ZIP_VECTOR_KEYS:
+            vector = opc_zip[key]
+            vector_status = _validate_metric_vector(
+                vector, f"{path}.opc_zip.{key}", sample_count
+            )
+            if vector.get("scope") != _OPC_ZIP_SCOPE:
+                raise ComparisonInputError(
+                    f"{path}.opc_zip.{key}.scope must be {_OPC_ZIP_SCOPE!r}"
+                )
+            if vector_status != opc_zip_status:
+                raise ComparisonInputError(
+                    f"{path}.opc_zip.status does not match "
+                    f"{path}.opc_zip.{key}.status"
+                )
 
 
 def _unwrap_metric_vector(value: Any, path: str) -> Any:
@@ -2100,7 +2194,7 @@ def _unwrap_metric_vector(value: Any, path: str) -> Any:
     if not isinstance(value, dict):
         return _METRIC_VECTOR_MISSING
     keys = set(value)
-    if keys == _ALLOCATION_METRICS_KEYS:
+    if keys == _ALLOCATION_METRICS_KEYS or keys == _OPC_ZIP_METRICS_KEYS:
         return _METRIC_VECTOR_MISSING
     has_values_or_scope = bool(keys & {"values", "scope"})
     if not has_values_or_scope:
@@ -2928,7 +3022,7 @@ def compare_reports(
                 f"baseline={before_latency_claim!r}, current={after_latency_claim!r}"
             )
         corpus = before_result["corpus"]
-        if before_latency_claim == EVIDENCE_ONLY_LATENCY_CLAIM:
+        if before_latency_claim in _EVIDENCE_ONLY_LATENCY_CLAIMS:
             latency_excluded_results += 1
         else:
             latency_compared_results += 1
