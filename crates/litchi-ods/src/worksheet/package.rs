@@ -5,7 +5,7 @@
 //! replacement unsafe, so the operation rejects them instead of silently
 //! discarding producer data.
 
-use super::{CellValue, Sheet, codec, validation};
+use super::{Cell, CellValue, Sheet, codec, validation};
 use litchi_core::{Error, Result};
 use litchi_odf_common::{
     constants,
@@ -41,6 +41,12 @@ struct RowEdit {
     replacement: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RowRewriteMode {
+    Owned,
+    SourceBacked,
+}
+
 /// One row-local result retaining both assembled content and its exact source
 /// range proofs for package publication.
 pub(crate) struct ChangedRows {
@@ -58,6 +64,15 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
 fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) -> Result<String> {
     validation::validate_content_xml_size(xml)?;
     validation::validate_sheets(sheets)?;
+    if sheets.iter().any(|sheet| {
+        sheet
+            .rows
+            .iter()
+            .any(|row| row.cells.iter().any(|cell| !cell.hyperlinks.is_empty()))
+    }) {
+        let source = codec::parse(xml)?;
+        validate_owned_link_delta(&source, sheets)?;
+    }
     let spans = scan(xml)?;
     let spreadsheet = one_spreadsheet(&spans)?;
     let mut tables = direct_children(&spans, spreadsheet, TABLE_NAMESPACE, "table");
@@ -74,7 +89,7 @@ fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) 
             }
         }
         for row in direct_children(&spans, *table, TABLE_NAMESPACE, "table-row") {
-            validate_rewritable_row(xml, &spans, row)?;
+            validate_rewritable_row(xml, &spans, row, RowRewriteMode::Owned)?;
         }
     }
 
@@ -342,11 +357,17 @@ pub(crate) fn replace_changed_rows(
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
 ) -> Result<String> {
-    let edits = changed_row_edits(xml, None, original, candidate, max_output_bytes, false)?
-        .0
-        .ok_or_else(|| {
-            invalid("flat ODS row transaction is not eligible for row-local publication")
-        })?;
+    let edits = changed_row_edits(
+        xml,
+        None,
+        original,
+        candidate,
+        max_output_bytes,
+        RowRewriteMode::Owned,
+        false,
+    )?
+    .0
+    .ok_or_else(|| invalid("flat ODS row transaction is not eligible for row-local publication"))?;
     apply_edits_bounded(xml, edits, max_output_bytes)
 }
 
@@ -370,6 +391,7 @@ pub(crate) fn replace_changed_rows_from_content_xml_with_layout(
         original,
         candidate,
         max_output_bytes,
+        RowRewriteMode::SourceBacked,
         true,
     )?;
     edits
@@ -390,8 +412,15 @@ pub(crate) fn replace_changed_rows_from_content_xml_retaining_layout(
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
 ) -> Result<(Option<String>, Option<ContentLayout>)> {
-    let (edits, layout) =
-        changed_row_edits(xml, None, original, candidate, max_output_bytes, true)?;
+    let (edits, layout) = changed_row_edits(
+        xml,
+        None,
+        original,
+        candidate,
+        max_output_bytes,
+        RowRewriteMode::SourceBacked,
+        true,
+    )?;
     let content = edits
         .map(|edits| apply_edits_bounded(xml, edits, max_output_bytes))
         .transpose()?;
@@ -417,8 +446,15 @@ pub(crate) fn try_replace_changed_rows_spliced(
         .zip(candidate)
         .map(|(before, after)| (before != after).then_some(after))
         .collect::<Vec<_>>();
-    let (Some(edits), _layout) =
-        changed_row_edits(xml, None, original, &changed, max_output_bytes, true)?
+    let (Some(edits), _layout) = changed_row_edits(
+        xml,
+        None,
+        original,
+        &changed,
+        max_output_bytes,
+        RowRewriteMode::Owned,
+        true,
+    )?
     else {
         return Ok(None);
     };
@@ -452,6 +488,7 @@ fn changed_row_edits(
     original: &[Sheet],
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
+    mode: RowRewriteMode,
     allow_ineligible: bool,
 ) -> Result<(Option<Vec<RowEdit>>, Option<ContentLayout>)> {
     validation::validate_content_xml_size(xml)?;
@@ -463,6 +500,9 @@ fn changed_row_edits(
     }
     for sheet in candidate.iter().flatten() {
         validation::validate_sheet(sheet)?;
+    }
+    if matches!(mode, RowRewriteMode::Owned) {
+        validate_owned_link_delta_partial(original, candidate)?;
     }
     if original.len() != candidate.len() {
         if allow_ineligible {
@@ -543,7 +583,7 @@ fn changed_row_edits(
         }
 
         for row in &rows[prefix..old_end] {
-            validate_rewritable_row(xml, spans, *row)?;
+            validate_rewritable_row(xml, spans, *row, mode)?;
         }
         edits.push(RowEdit {
             start: spans[rows[prefix]].start,
@@ -555,6 +595,80 @@ fn changed_row_edits(
     // `owned_layout` is `Some` exactly when this call ran the scan; cached
     // calls return `None`, matching the established retention contract.
     Ok((Some(edits), owned_layout))
+}
+
+pub(crate) fn validate_owned_link_delta(source: &[Sheet], candidate: &[Sheet]) -> Result<()> {
+    for after in candidate {
+        let before = source.iter().find(|sheet| sheet.name == after.name);
+        validate_owned_sheet_links(before, after)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_owned_link_delta_partial(
+    source: &[Sheet],
+    candidate: &[Option<&Sheet>],
+) -> Result<()> {
+    for after in candidate.iter().flatten() {
+        let before = source.iter().find(|sheet| sheet.name == after.name);
+        validate_owned_sheet_links(before, after)?;
+    }
+    Ok(())
+}
+
+fn validate_owned_sheet_links(before: Option<&Sheet>, after: &Sheet) -> Result<()> {
+    let mut row_start = 0usize;
+    for row in &after.rows {
+        let row_end = row_start.checked_add(row.repeat()).ok_or_else(|| {
+            Error::InvalidFormat("ODS owned link row address overflows".to_string())
+        })?;
+        let mut column_start = 0usize;
+        for cell in &row.cells {
+            let column_end = column_start.checked_add(cell.repeat()).ok_or_else(|| {
+                Error::InvalidFormat("ODS owned link column address overflows".to_string())
+            })?;
+            if !cell.hyperlinks.is_empty() {
+                for logical_row in row_start..row_end {
+                    for logical_column in column_start..column_end {
+                        let source_cell =
+                            before.and_then(|sheet| sheet.cell(logical_row, logical_column));
+                        validate_owned_cell_links(source_cell, cell)?;
+                    }
+                }
+            }
+            column_start = column_end;
+        }
+        row_start = row_end;
+    }
+    Ok(())
+}
+
+fn validate_owned_cell_links(source: Option<&Cell>, candidate: &Cell) -> Result<()> {
+    let mut matched = Vec::new();
+    if let Some(source) = source {
+        matched
+            .try_reserve(source.hyperlinks.len())
+            .map_err(|_| invalid("ODS owned hyperlink delta allocation failed"))?;
+        matched.resize(source.hyperlinks.len(), false);
+    }
+    for link in &candidate.hyperlinks {
+        let source_index = source.and_then(|source| {
+            source
+                .hyperlinks
+                .iter()
+                .enumerate()
+                .find_map(|(index, source_link)| {
+                    (!matched[index] && source_link == link).then_some(index)
+                })
+        });
+        if let Some(source_index) = source_index {
+            matched[source_index] = true;
+            link.validate_storage()?;
+        } else {
+            link.validate_for_authoring()?;
+        }
+    }
+    Ok(())
 }
 
 fn build_layout(spans: Vec<Span>) -> Result<ContentLayout> {
@@ -619,7 +733,12 @@ fn apply_edits_bounded(
     Ok(output)
 }
 
-fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Result<()> {
+fn validate_rewritable_row(
+    xml: &str,
+    spans: &[Span],
+    span_index: usize,
+    mode: RowRewriteMode,
+) -> Result<()> {
     let span = spans
         .get(span_index)
         .ok_or_else(|| invalid("flat ODS row span is invalid"))?;
@@ -629,6 +748,13 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
         .skip(span_index.saturating_add(1))
         .take_while(|child| child.start < span.end)
     {
+        if matches!(mode, RowRewriteMode::SourceBacked)
+            && is_element(child, codec::TEXT_NAMESPACE, "a")
+        {
+            return Err(invalid(
+                "ODS source row edits refuse rows containing hyperlinks",
+            ));
+        }
         if child.parent == Some(span_index) {
             if is_element(child, TABLE_NAMESPACE, "table-cell")
                 || is_element(child, TABLE_NAMESPACE, "covered-table-cell")
@@ -646,6 +772,19 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
         let parent = spans
             .get(parent_index)
             .ok_or_else(|| invalid("flat ODS row descendant parent is invalid"))?;
+        if matches!(mode, RowRewriteMode::Owned)
+            && is_element(child, codec::TEXT_NAMESPACE, "a")
+            && is_element(parent, codec::TEXT_NAMESPACE, "p")
+            && parent.parent.is_some_and(|cell_index| {
+                spans.get(cell_index).is_some_and(|cell| {
+                    cell.parent == Some(span_index)
+                        && (is_element(cell, TABLE_NAMESPACE, "table-cell")
+                            || is_element(cell, TABLE_NAMESPACE, "covered-table-cell"))
+                })
+            })
+        {
+            continue;
+        }
         if parent.parent != Some(span_index)
             || !is_element(child, codec::TEXT_NAMESPACE, "p")
             || paragraph_owner == Some(parent_index)
@@ -713,6 +852,7 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
                             &element,
                             namespace.as_deref(),
                             &local,
+                            mode,
                         )?;
                         row_depth = 1;
                     }
@@ -720,14 +860,21 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
                     continue;
                 }
                 row_depth = row_depth.saturating_add(1);
-                if !is_modeled_row_element(namespace.as_deref(), &local) {
+                if !is_modeled_row_element(namespace.as_deref(), &local, mode) {
                     return Err(Error::InvalidFormat(format!(
                         "flat ODS edit would discard unmodeled row element '{local}'"
                     )));
                 }
-                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
+                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local, mode)?;
                 if is_element_name(namespace.as_deref(), &local, codec::TEXT_NAMESPACE, "p") {
                     in_paragraph = true;
+                }
+                if is_element_name(namespace.as_deref(), &local, codec::TEXT_NAMESPACE, "a")
+                    && !in_paragraph
+                {
+                    return Err(invalid(
+                        "flat ODS hyperlink must be inside a direct text paragraph",
+                    ));
                 }
             },
             Event::Empty(element) => {
@@ -740,17 +887,25 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
                             &element,
                             namespace.as_deref(),
                             &local,
+                            mode,
                         )?;
                     }
                     buffer.clear();
                     continue;
                 }
-                if !is_modeled_row_element(namespace.as_deref(), &local) {
+                if !is_modeled_row_element(namespace.as_deref(), &local, mode) {
                     return Err(Error::InvalidFormat(format!(
                         "flat ODS edit would discard unmodeled row element '{local}'"
                     )));
                 }
-                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
+                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local, mode)?;
+                if is_element_name(namespace.as_deref(), &local, codec::TEXT_NAMESPACE, "a")
+                    && !in_paragraph
+                {
+                    return Err(invalid(
+                        "flat ODS hyperlink must be inside a direct text paragraph",
+                    ));
+                }
             },
             Event::Text(text) if row_depth > 0 => {
                 let bytes: &[u8] = text.as_ref();
@@ -764,6 +919,8 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Resu
                     ));
                 }
             },
+            Event::CData(_)
+                if row_depth > 0 && matches!(mode, RowRewriteMode::Owned) && in_paragraph => {},
             Event::CData(_) | Event::GeneralRef(_) if row_depth > 0 => {
                 return Err(invalid(
                     "flat ODS edit would discard unsupported cell text markup",
@@ -805,10 +962,11 @@ fn is_element_name(
     namespace == Some(expected_namespace) && local == expected_local
 }
 
-fn is_modeled_row_element(namespace: Option<&str>, local: &str) -> bool {
+fn is_modeled_row_element(namespace: Option<&str>, local: &str, mode: RowRewriteMode) -> bool {
     (namespace == Some(TABLE_NAMESPACE)
         && matches!(local, "table-row" | "table-cell" | "covered-table-cell"))
-        || (namespace == Some(codec::TEXT_NAMESPACE) && local == "p")
+        || (namespace == Some(codec::TEXT_NAMESPACE)
+            && (local == "p" || (matches!(mode, RowRewriteMode::Owned) && local == "a")))
 }
 
 fn validate_modeled_attributes(
@@ -816,6 +974,7 @@ fn validate_modeled_attributes(
     element: &quick_xml::events::BytesStart<'_>,
     element_namespace: Option<&str>,
     local: &str,
+    mode: RowRewriteMode,
 ) -> Result<()> {
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| {
@@ -859,12 +1018,65 @@ fn validate_modeled_attributes(
                 )
             },
             (Some(codec::TEXT_NAMESPACE), "p", _) => false,
+            (Some(codec::TEXT_NAMESPACE), "a", Some(codec::XLINK_NAMESPACE))
+                if matches!(mode, RowRewriteMode::Owned) =>
+            {
+                matches!(
+                    attribute_local.as_str(),
+                    "href" | "type" | "show" | "actuate"
+                )
+            },
+            (Some(codec::TEXT_NAMESPACE), "a", Some(OFFICE_NAMESPACE))
+                if matches!(mode, RowRewriteMode::Owned) =>
+            {
+                matches!(
+                    attribute_local.as_str(),
+                    "name" | "title" | "target-frame-name"
+                )
+            },
+            (Some(codec::TEXT_NAMESPACE), "a", Some(codec::TEXT_NAMESPACE))
+                if matches!(mode, RowRewriteMode::Owned) =>
+            {
+                matches!(
+                    attribute_local.as_str(),
+                    "style-name" | "visited-style-name"
+                )
+            },
             _ => false,
         };
         if !modeled {
             return Err(Error::InvalidFormat(format!(
                 "flat ODS edit would discard unmodeled attribute '{attribute_local}'"
             )));
+        }
+        if matches!(mode, RowRewriteMode::Owned)
+            && element_namespace == Some(codec::TEXT_NAMESPACE)
+            && local == "a"
+            && namespace.as_deref() == Some(codec::XLINK_NAMESPACE)
+            && attribute_local == "type"
+        {
+            if attribute.value.len() > validation::MAX_TEXT_BYTES {
+                return Err(Error::InvalidFormat(
+                    "ODS text:a attribute value exceeds the worksheet text safety limit"
+                        .to_string(),
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS text:a attribute value: {error}"))
+                })?;
+            if value.len() > validation::MAX_TEXT_BYTES {
+                return Err(Error::InvalidFormat(
+                    "ODS text:a attribute value exceeds the worksheet text safety limit"
+                        .to_string(),
+                ));
+            }
+            if value != "simple" {
+                return Err(Error::InvalidFormat(
+                    "ODS text:a requires xlink:type='simple'".to_string(),
+                ));
+            }
         }
     }
     Ok(())

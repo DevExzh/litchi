@@ -8,6 +8,8 @@
 use litchi_core::{Error, Result, xml::escape_xml};
 use std::ops::Range;
 
+pub(crate) const MAX_LINK_FIELD_BYTES: usize = 16 * 1024 * 1024;
+
 /// Window behavior requested by an inert cell hyperlink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Show {
@@ -108,7 +110,7 @@ impl Link {
         let mut hyperlink = Self::new(href);
         hyperlink.text = text.into();
         hyperlink.range = 0..hyperlink.text.len();
-        hyperlink.validate()?;
+        hyperlink.validate_for_authoring()?;
         Ok(hyperlink)
     }
 
@@ -143,8 +145,17 @@ impl Link {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
-        validate_href(&self.href)?;
-        validate_xml_string(&self.text, "cell hyperlink text")?;
+        self.validate_for_authoring()
+    }
+
+    /// Validate the representation retained in a worksheet snapshot.
+    ///
+    /// Parsed documents are intentionally allowed to retain legacy or unsafe
+    /// targets.  The worksheet writer never follows such targets, and source
+    /// backed edits refuse their containing rows before publication.
+    pub(crate) fn validate_storage(&self) -> Result<()> {
+        validate_href_storage(&self.href)?;
+        validate_bounded_xml_string(&self.text, "cell hyperlink text")?;
         for (value, label) in [
             (self.name.as_deref(), "cell hyperlink name"),
             (self.title.as_deref(), "cell hyperlink title"),
@@ -159,10 +170,16 @@ impl Link {
             ),
         ] {
             if let Some(value) = value {
-                validate_xml_string(value, label)?;
+                validate_bounded_xml_string(value, label)?;
             }
         }
         Ok(())
+    }
+
+    /// Validate a newly authored target and its serializable metadata.
+    pub(crate) fn validate_for_authoring(&self) -> Result<()> {
+        self.validate_storage()?;
+        validate_href_authoring(&self.href)
     }
 
     /// Serialize this validated hyperlink as inert ODF inline content.
@@ -209,18 +226,52 @@ fn write_attribute(output: &mut String, name: &str, value: &str) {
     output.push('"');
 }
 
-fn validate_href(href: &str) -> Result<()> {
+fn validate_href_storage(href: &str) -> Result<()> {
     if href.is_empty() {
         return Err(Error::InvalidFormat(
             "cell hyperlink href must not be empty".to_string(),
         ));
     }
-    if href.chars().any(char::is_control) {
+    validate_bounded_xml_string(href, "cell hyperlink href")
+}
+
+fn validate_bounded_xml_string(value: &str, label: &str) -> Result<()> {
+    if value.len() > MAX_LINK_FIELD_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{label} exceeds the {MAX_LINK_FIELD_BYTES} byte safety limit"
+        )));
+    }
+    validate_xml_string(value, label)
+}
+
+fn validate_href_authoring(href: &str) -> Result<()> {
+    if href.chars().any(char::is_whitespace) {
         return Err(Error::InvalidFormat(
-            "cell hyperlink href must not contain control characters".to_string(),
+            "cell hyperlink href must not contain whitespace".to_string(),
         ));
     }
-    Ok(())
+    let Some(colon) = href.find(':') else {
+        return Ok(());
+    };
+    let scheme = &href[..colon];
+    if scheme.is_empty()
+        || !scheme.bytes().enumerate().all(|(index, byte)| {
+            byte.is_ascii_alphabetic()
+                || (index > 0 && byte.is_ascii_digit())
+                || (index > 0 && matches!(byte, b'+' | b'-' | b'.'))
+        })
+    {
+        return Ok(());
+    }
+    if scheme.eq_ignore_ascii_case("http")
+        || scheme.eq_ignore_ascii_case("https")
+        || scheme.eq_ignore_ascii_case("mailto")
+    {
+        return Ok(());
+    }
+    Err(Error::InvalidFormat(
+        "cell hyperlink href uses an unsupported or dangerous scheme".to_string(),
+    ))
 }
 
 fn validate_xml_string(value: &str, label: &str) -> Result<()> {

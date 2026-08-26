@@ -5,7 +5,7 @@ use litchi_core::{Error, Result};
 use std::collections::HashSet;
 
 /// Maximum XML/text payload retained by one worksheet field.
-pub(crate) const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_TEXT_BYTES: usize = crate::model::hyperlink::MAX_LINK_FIELD_BYTES;
 /// Maximum number of logical rows accepted by the bounded worksheet facade.
 pub(crate) const MAX_LOGICAL_ROWS: usize = 1_048_576;
 /// Maximum number of logical columns accepted by the bounded worksheet facade.
@@ -114,7 +114,8 @@ fn semantic_cell_footprint(row: &Row) -> Result<usize> {
                     || cell.style_name.is_some()
                     || !matches!(cell.value, CellValue::Empty)
                     || !cell.text.is_empty()
-                    || cell.formula.is_some() =>
+                    || cell.formula.is_some()
+                    || !cell.hyperlinks.is_empty() =>
             {
                 1
             },
@@ -166,6 +167,31 @@ pub(crate) fn validate_cell(cell: &Cell) -> Result<()> {
     if let Some(formula) = &cell.formula {
         validate_non_empty_text(formula, "cell formula")?;
     }
+    if cell.hyperlinks.len() > MAX_PHYSICAL_RUNS {
+        return Err(Error::InvalidFormat(format!(
+            "cell exceeds the {MAX_PHYSICAL_RUNS} hyperlink safety limit"
+        )));
+    }
+    for hyperlink in &cell.hyperlinks {
+        validate_text(&hyperlink.href, "cell hyperlink href")?;
+        validate_text(&hyperlink.text, "cell hyperlink text")?;
+        if let Some(value) = hyperlink.name.as_deref() {
+            validate_text(value, "cell hyperlink name")?;
+        }
+        if let Some(value) = hyperlink.title.as_deref() {
+            validate_text(value, "cell hyperlink title")?;
+        }
+        if let Some(value) = hyperlink.target_frame_name.as_deref() {
+            validate_text(value, "cell hyperlink target frame name")?;
+        }
+        if let Some(value) = hyperlink.style_name.as_deref() {
+            validate_text(value, "cell hyperlink style name")?;
+        }
+        if let Some(value) = hyperlink.visited_style_name.as_deref() {
+            validate_text(value, "cell hyperlink visited style name")?;
+        }
+    }
+    super::model::validate_hyperlink_ranges(&cell.text, &cell.hyperlinks)?;
     match cell.merge {
         Merge::None => {},
         Merge::Span { rows, columns } => {
@@ -179,6 +205,7 @@ pub(crate) fn validate_cell(cell: &Cell) -> Result<()> {
             if !matches!(cell.value, CellValue::Empty)
                 || !cell.text.is_empty()
                 || cell.formula.is_some()
+                || !cell.hyperlinks.is_empty()
             {
                 return Err(Error::InvalidFormat(
                     "ODS covered cells cannot carry a value, text, or formula".to_string(),

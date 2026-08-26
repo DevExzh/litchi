@@ -364,6 +364,7 @@ impl Edit {
     ///
     /// Returns an error when validation, compactness, rebuilding, or readback fails.
     pub fn commit(self) -> Result<Commit> {
+        super::package::validate_owned_link_delta(self.before.sheets(), &self.draft)?;
         validation::validate_sheets(&self.draft)?;
         if self.draft.as_slice() == self.before.sheets() {
             return Ok(Commit::unchanged(self.before));
@@ -421,6 +422,7 @@ impl Edit {
     }
 
     fn publish(&mut self, candidate: Vec<Sheet>) -> Result<()> {
+        super::package::validate_owned_link_delta(self.before.sheets(), &candidate)?;
         validation::validate_sheets(&candidate)?;
         self.draft = candidate;
         Ok(())
@@ -654,6 +656,24 @@ fn validate_aggregate_cell_payload(changes: &[CellChange]) -> Result<()> {
             &mut total,
             change.cell.style_name.as_ref().map_or(0, String::len),
         )?;
+        for hyperlink in &change.cell.hyperlinks {
+            checked_add_payload_bytes(&mut total, hyperlink.href.len())?;
+            checked_add_payload_bytes(&mut total, hyperlink.text.len())?;
+            checked_add_payload_bytes(&mut total, hyperlink.name.as_ref().map_or(0, String::len))?;
+            checked_add_payload_bytes(&mut total, hyperlink.title.as_ref().map_or(0, String::len))?;
+            checked_add_payload_bytes(
+                &mut total,
+                hyperlink.target_frame_name.as_ref().map_or(0, String::len),
+            )?;
+            checked_add_payload_bytes(
+                &mut total,
+                hyperlink.style_name.as_ref().map_or(0, String::len),
+            )?;
+            checked_add_payload_bytes(
+                &mut total,
+                hyperlink.visited_style_name.as_ref().map_or(0, String::len),
+            )?;
+        }
         match &change.cell.value {
             super::CellValue::Text(value)
             | super::CellValue::Date(value)

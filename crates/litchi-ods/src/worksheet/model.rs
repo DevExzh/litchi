@@ -4,6 +4,7 @@
 //! and cells.  A run is still addressable through the logical row/column
 //! accessors, while round trips retain the producer's compact representation.
 
+use crate::model::hyperlink::Link;
 use litchi_core::{Error, Result};
 use std::{num::NonZeroUsize, ops::Range};
 
@@ -105,6 +106,8 @@ pub struct Cell {
     pub formula: Option<String>,
     /// Direct `table:style-name`, if present.
     pub style_name: Option<String>,
+    /// Ordered inert `text:a` links over the cell's canonical UTF-8 text.
+    pub hyperlinks: Vec<Link>,
     /// Merge/covered-cell role for this physical cell run.
     pub merge: Merge,
     /// Number of adjacent logical cells represented by this physical cell.
@@ -119,6 +122,7 @@ impl Cell {
             text: text.into(),
             formula: None,
             style_name: None,
+            hyperlinks: Vec::new(),
             merge: Merge::None,
             repeat: NonZeroUsize::MIN,
         }
@@ -137,6 +141,7 @@ impl Cell {
             text: text.into(),
             formula: None,
             style_name: None,
+            hyperlinks: Vec::new(),
             merge: Merge::None,
             repeat,
         })
@@ -196,6 +201,194 @@ impl Cell {
         self.style_name = None;
     }
 
+    /// Return all direct cell hyperlinks in document order.
+    #[must_use]
+    pub fn hyperlinks(&self) -> &[Link] {
+        &self.hyperlinks
+    }
+
+    /// Alias for [`Self::hyperlinks`].
+    #[must_use]
+    pub fn links(&self) -> &[Link] {
+        self.hyperlinks()
+    }
+
+    /// Return the first hyperlink in document order, if any.
+    #[must_use]
+    pub fn hyperlink(&self) -> Option<&Link> {
+        self.hyperlinks.first()
+    }
+
+    /// Return one hyperlink by document-order index.
+    #[must_use]
+    pub fn hyperlink_at(&self, index: usize) -> Option<&Link> {
+        self.hyperlinks.get(index)
+    }
+
+    /// Alias for [`Self::hyperlink_at`].
+    #[must_use]
+    pub fn link(&self, index: usize) -> Option<&Link> {
+        self.hyperlink_at(index)
+    }
+
+    /// Whether this cell contains one or more direct hyperlinks.
+    #[must_use]
+    pub fn has_hyperlinks(&self) -> bool {
+        !self.hyperlinks.is_empty()
+    }
+
+    /// Alias for [`Self::has_hyperlinks`].
+    #[must_use]
+    pub fn has_links(&self) -> bool {
+        self.has_hyperlinks()
+    }
+
+    /// Add a hyperlink around a checked UTF-8 byte range of the cell text.
+    ///
+    /// The supplied visible text must exactly equal `self.text[range]`.
+    /// Hyperlink targets are inert and are never dereferenced by this crate.
+    pub fn add_hyperlink(&mut self, range: Range<usize>, mut hyperlink: Link) -> Result<()> {
+        if self.merge == Merge::Covered {
+            return Err(Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        hyperlink.validate_for_authoring()?;
+        let Some(anchor) = self.text.get(range.clone()) else {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if hyperlink.text != anchor {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        hyperlink.set_range(range);
+        let mut candidate = self.hyperlinks.clone();
+        candidate.push(hyperlink);
+        candidate.sort_by_key(|link| {
+            let range = link.range();
+            (range.start, range.end)
+        });
+        validate_hyperlink_ranges(&self.text, &candidate)?;
+        let mut checked = self.clone();
+        checked.hyperlinks = candidate.clone();
+        checked.validate()?;
+        self.hyperlinks = candidate;
+        Ok(())
+    }
+
+    /// Alias for [`Self::add_hyperlink`].
+    pub fn add_link(&mut self, range: Range<usize>, hyperlink: Link) -> Result<()> {
+        self.add_hyperlink(range, hyperlink)
+    }
+
+    /// Replace one hyperlink by index while retaining its checked range.
+    pub fn replace_hyperlink(&mut self, index: usize, mut hyperlink: Link) -> Result<Option<Link>> {
+        let Some(existing) = self.hyperlinks.get(index) else {
+            return Ok(None);
+        };
+        let range = existing.range();
+        hyperlink.validate_for_authoring()?;
+        let Some(anchor) = self.text.get(range.clone()) else {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if hyperlink.text != anchor {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        hyperlink.set_range(range);
+        let mut candidate = self.hyperlinks.clone();
+        let previous = std::mem::replace(&mut candidate[index], hyperlink);
+        validate_hyperlink_ranges(&self.text, &candidate)?;
+        let mut checked = self.clone();
+        checked.hyperlinks = candidate.clone();
+        checked.validate()?;
+        self.hyperlinks = candidate;
+        Ok(Some(previous))
+    }
+
+    /// Alias for [`Self::replace_hyperlink`].
+    pub fn replace_link(&mut self, index: usize, hyperlink: Link) -> Result<Option<Link>> {
+        self.replace_hyperlink(index, hyperlink)
+    }
+
+    /// Replace the hyperlink occupying an exact range.
+    pub fn replace_hyperlink_at(
+        &mut self,
+        range: Range<usize>,
+        hyperlink: Link,
+    ) -> Result<Option<Link>> {
+        let Some(index) = self
+            .hyperlinks
+            .iter()
+            .position(|link| link.range() == range)
+        else {
+            return Ok(None);
+        };
+        let mut hyperlink = hyperlink;
+        hyperlink.set_range(range);
+        self.replace_hyperlink(index, hyperlink)
+    }
+
+    /// Alias for [`Self::replace_hyperlink_at`].
+    pub fn replace_link_at(
+        &mut self,
+        range: Range<usize>,
+        hyperlink: Link,
+    ) -> Result<Option<Link>> {
+        self.replace_hyperlink_at(range, hyperlink)
+    }
+
+    /// Replace the complete displayed cell text with one hyperlink.
+    pub fn set_hyperlink(&mut self, mut hyperlink: Link) -> Result<()> {
+        if self.merge == Merge::Covered {
+            return Err(Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        hyperlink.validate_for_authoring()?;
+        let text = hyperlink.text.clone();
+        hyperlink.set_range(0..text.len());
+        let mut candidate = self.clone();
+        candidate.text = text.clone();
+        candidate.value = CellValue::Text(text);
+        candidate.formula = None;
+        candidate.hyperlinks = vec![hyperlink];
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Alias for [`Self::set_hyperlink`].
+    pub fn set_link(&mut self, hyperlink: Link) -> Result<()> {
+        self.set_hyperlink(hyperlink)
+    }
+
+    /// Remove one hyperlink by document-order index.
+    pub fn remove_hyperlink(&mut self, index: usize) -> Option<Link> {
+        (index < self.hyperlinks.len()).then(|| self.hyperlinks.remove(index))
+    }
+
+    /// Alias for [`Self::remove_hyperlink`].
+    pub fn remove_link(&mut self, index: usize) -> Option<Link> {
+        self.remove_hyperlink(index)
+    }
+
+    /// Remove all hyperlinks while retaining the cell text.
+    pub fn clear_hyperlinks(&mut self) -> Vec<Link> {
+        std::mem::take(&mut self.hyperlinks)
+    }
+
+    /// Alias for [`Self::clear_hyperlinks`].
+    pub fn clear_links(&mut self) -> Vec<Link> {
+        self.clear_hyperlinks()
+    }
+
     /// Set a rectangular merge span on this cell.
     ///
     /// # Errors
@@ -240,6 +433,7 @@ impl Cell {
             && self.text == other.text
             && self.formula == other.formula
             && self.style_name == other.style_name
+            && self.hyperlinks == other.hyperlinks
             && self.merge == other.merge
     }
 }
@@ -595,6 +789,38 @@ impl Cell {
     pub(crate) fn validate(&self) -> Result<()> {
         super::validation::validate_cell(self)
     }
+}
+
+pub(crate) fn validate_hyperlink_ranges(text: &str, hyperlinks: &[Link]) -> Result<()> {
+    let mut previous_start = 0usize;
+    let mut previous_end = 0usize;
+    for hyperlink in hyperlinks {
+        hyperlink.validate_storage()?;
+        let range = hyperlink.range();
+        if range.start > range.end {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range starts after it ends".to_string(),
+            ));
+        }
+        if range.start < previous_start || range.start < previous_end {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink ranges must be ordered and non-overlapping".to_string(),
+            ));
+        }
+        let Some(anchor) = text.get(range.clone()) else {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if anchor != hyperlink.text {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        previous_start = range.start;
+        previous_end = range.end;
+    }
+    Ok(())
 }
 
 fn isolate_row(rows: &mut Vec<Row>, target: usize) -> Result<usize> {

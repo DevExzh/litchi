@@ -330,6 +330,7 @@ impl Transaction {
         }
         ensure_compact(&self.base.state.source, self.limits.output_bytes)?;
         let staged = self.staged.iter().map(Option::as_ref).collect::<Vec<_>>();
+        crate::worksheet::package::validate_owned_link_delta_partial(self.base.sheets(), &staged)?;
         let xml = crate::worksheet::package::replace_changed_rows(
             &self.base.state.source,
             self.base.sheets(),

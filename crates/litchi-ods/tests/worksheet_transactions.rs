@@ -11,7 +11,7 @@ const OPAQUE_ROW: &str = concat!(
     r#"</table:table-cell></table:table-row>"#,
 );
 
-const INLINE_LINK_CONTENT: &str = concat!(
+const INLINE_UNSUPPORTED_CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
     r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
     r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
@@ -19,7 +19,7 @@ const INLINE_LINK_CONTENT: &str = concat!(
     r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
     r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
     r#"<table:table-row><table:table-cell office:value-type="string">"#,
-    r#"<text:p><text:a xlink:href="https://example.invalid/never-fetch" xlink:type="simple">linked</text:a></text:p>"#,
+    r#"<text:p><text:span>linked</text:span></text:p>"#,
     r#"</table:table-cell></table:table-row></table:table>"#,
     r#"</office:spreadsheet></office:body></office:document-content>"#,
 );
@@ -47,7 +47,9 @@ const TABLE_ATTRIBUTE_CONTENT: &str = concat!(
 );
 
 fn inline_link_source() -> litchi_core::Result<Vec<u8>> {
-    Builder::new().content_xml(INLINE_LINK_CONTENT).build()
+    Builder::new()
+        .content_xml(INLINE_UNSUPPORTED_CONTENT)
+        .build()
 }
 
 fn row_splice_content() -> String {
@@ -162,8 +164,8 @@ fn structural_fallback_refuses_unsupported_inline_content_without_mutation()
         )
     })?;
     let message = error.to_string();
-    assert!(message.contains("unsupported inline content"), "{message}");
-    assert!(message.contains("text:a"), "{message}");
+    assert!(message.contains("unsupported"), "{message}");
+    assert!(message.contains("text:span"), "{message}");
     assert_eq!(snapshot.as_bytes(), source);
     Ok(())
 }
@@ -171,7 +173,7 @@ fn structural_fallback_refuses_unsupported_inline_content_without_mutation()
 #[test]
 fn builder_set_sheets_refuses_unsupported_inline_content_without_mutation()
 -> litchi_core::Result<()> {
-    let mut builder = Builder::new().content_xml(INLINE_LINK_CONTENT);
+    let mut builder = Builder::new().content_xml(INLINE_UNSUPPORTED_CONTENT);
     let before = builder.clone().build()?;
     let mut sheets = builder.sheets()?;
     sheets.push(Sheet::new("Added")?);
@@ -182,8 +184,8 @@ fn builder_set_sheets_refuses_unsupported_inline_content_without_mutation()
         )
     })?;
     let message = error.to_string();
-    assert!(message.contains("unsupported inline content"), "{message}");
-    assert!(message.contains("text:a"), "{message}");
+    assert!(message.contains("unsupported"), "{message}");
+    assert!(message.contains("text:span"), "{message}");
     assert_eq!(builder.clone().build()?, before);
     Ok(())
 }
