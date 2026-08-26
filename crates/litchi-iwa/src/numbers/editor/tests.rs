@@ -82,6 +82,316 @@ fn cached_scalar_number(value: f64) -> crate::numbers::bnc::CachedScalar {
     )
 }
 
+fn replace_test_table_model_messages(package: &mut IWorkPackage, messages: Vec<RawMessage>) {
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let slot = archive
+                .objects
+                .iter_mut()
+                .find(|object| object.archive_info.identifier == Some(10))
+                .expect("test table model");
+            *slot = ArchiveObject::new(10, messages)?;
+            Ok(())
+        })
+        .unwrap();
+}
+
+fn replace_test_table_info_messages(package: &mut IWorkPackage, messages: Vec<RawMessage>) {
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let slot = archive
+                .objects
+                .iter_mut()
+                .find(|object| object.archive_info.identifier == Some(3))
+                .expect("test table info");
+            *slot = ArchiveObject::new(3, messages)?;
+            Ok(())
+        })
+        .unwrap();
+}
+
+fn test_table_model(package: &IWorkPackage) -> TableModelArchive {
+    let archive = package.archive("Index/Document.iwa").unwrap();
+    let object = archive.object(10).unwrap();
+    TableModelArchive::decode(object.messages[0].data.as_slice()).unwrap()
+}
+
+fn canonical_table_info(model_identifier: u64) -> Vec<u8> {
+    tst::TableInfoArchive {
+        super_: tsd::DrawableArchive::default(),
+        table_model: Reference {
+            identifier: model_identifier,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+    .encode_to_vec()
+}
+
+#[test]
+fn table_model_discovery_prefers_canonical_over_legacy_and_table_info_aliases() {
+    let mut package = test_package();
+    let mut legacy = test_table_model(&package);
+    legacy.table_name = "Legacy".to_owned();
+    let mut canonical = legacy.clone();
+    canonical.table_name = "Canonical".to_owned();
+    let table_info = tst::TableInfoArchive {
+        table_model: Reference {
+            identifier: 10,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    replace_test_table_model_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 6_000,
+                data: table_info.encode_to_vec(),
+            },
+            RawMessage {
+                type_: 6_000,
+                data: legacy.encode_to_vec(),
+            },
+            RawMessage {
+                type_: 6_001,
+                data: canonical.encode_to_vec(),
+            },
+        ],
+    );
+
+    let tables = storage::table_models(&package).unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].object_id, 10);
+    assert_eq!(tables[0].table_info_id, 3);
+    assert_eq!(tables[0].model.table_name, "Canonical");
+}
+
+#[test]
+fn table_model_discovery_ignores_table_info_shaped_legacy_aliases() {
+    let mut package = test_package();
+    let model = test_table_model(&package);
+    let table_info = tst::TableInfoArchive {
+        table_model: Reference {
+            identifier: 10,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    replace_test_table_model_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 6_000,
+                data: table_info.encode_to_vec(),
+            },
+            RawMessage {
+                type_: 6_000,
+                data: model.encode_to_vec(),
+            },
+        ],
+    );
+
+    let tables = storage::table_models(&package).unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].model.table_name, "Table 1");
+}
+
+#[test]
+fn table_model_discovery_ignores_untyped_table_info_shaped_drawables() {
+    let mut package = test_package();
+    let unrelated = tst::TableInfoArchive {
+        table_model: Reference {
+            identifier: 999,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    replace_test_table_info_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 999,
+                data: unrelated.encode_to_vec(),
+            },
+            RawMessage {
+                type_: 6_000,
+                data: canonical_table_info(10),
+            },
+        ],
+    );
+
+    let tables = storage::table_models(&package).unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].object_id, 10);
+}
+
+#[test]
+fn table_model_discovery_rejects_noncanonical_canonical_table_info_transactionally() {
+    for payload in [
+        vec![0x12, 0x02, 0x08, 0x0a], // required DrawableArchive is absent
+        vec![0x0a, 0x00, 0x12, 0x02, 0x08, 0x0a, 0x12, 0x02, 0x08, 0x0a],
+        vec![0x0a, 0x00, 0x12, 0x04, 0x08, 0x0a, 0x08, 0x0a],
+        vec![0x0a, 0x00, 0x10, 0x0a], // table-model field has the wrong wire type
+        vec![0x0a, 0x00, 0x92, 0x00, 0x02, 0x08, 0x0a],
+    ] {
+        let mut package = test_package();
+        replace_test_table_info_messages(
+            &mut package,
+            vec![RawMessage {
+                type_: 6_000,
+                data: payload,
+            }],
+        );
+        let source = package.to_bytes().unwrap();
+
+        let error = storage::table_models(&package).expect_err("strict table-info owner");
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message) if message.contains("malformed table-info payload")
+        ));
+        assert_eq!(package.to_bytes().unwrap(), source);
+    }
+}
+
+#[test]
+fn table_model_discovery_rejects_table_info_model_role_alias_transactionally() {
+    let mut package = test_package();
+    let model = test_table_model(&package);
+    replace_test_table_info_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 6_000,
+                data: canonical_table_info(3),
+            },
+            RawMessage {
+                type_: 6_001,
+                data: model.encode_to_vec(),
+            },
+        ],
+    );
+    let source = package.to_bytes().unwrap();
+
+    let error = storage::table_models(&package).expect_err("TableInfo/model role alias");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message.contains("cannot also own")
+    ));
+    assert_eq!(package.to_bytes().unwrap(), source);
+}
+
+#[test]
+fn table_model_discovery_rejects_ambiguous_table_info_owners_transactionally() {
+    let mut package = test_package();
+    let table_info = tst::TableInfoArchive {
+        table_model: Reference {
+            identifier: 10,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+    .encode_to_vec();
+    replace_test_table_info_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 6_000,
+                data: table_info.clone(),
+            },
+            RawMessage {
+                type_: 6_003,
+                data: table_info,
+            },
+        ],
+    );
+    let source = package.to_bytes().unwrap();
+
+    let error = storage::table_models(&package).expect_err("duplicate table-info owners");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message.contains("multiple table-info payloads")
+    ));
+    assert_eq!(package.to_bytes().unwrap(), source);
+}
+
+#[test]
+fn table_model_discovery_rejects_malformed_typed_table_info_transactionally() {
+    let mut package = test_package();
+    replace_test_table_info_messages(
+        &mut package,
+        vec![RawMessage {
+            type_: 6_003,
+            data: vec![0x80],
+        }],
+    );
+    let source = package.to_bytes().unwrap();
+
+    let error = storage::table_models(&package).expect_err("malformed table-info payload");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message.contains("malformed table-info payload")
+    ));
+    assert_eq!(package.to_bytes().unwrap(), source);
+}
+
+#[test]
+fn table_model_discovery_rejects_malformed_canonical_without_legacy_fallback() {
+    let mut package = test_package();
+    let model = test_table_model(&package);
+    replace_test_table_model_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 6_000,
+                data: model.encode_to_vec(),
+            },
+            RawMessage {
+                type_: 6_001,
+                data: vec![0x80],
+            },
+        ],
+    );
+    let source = package.to_bytes().unwrap();
+
+    let error = storage::table_models(&package).expect_err("malformed canonical model");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message)
+            if message.contains("malformed Numbers table model payload")
+    ));
+    assert_eq!(package.to_bytes().unwrap(), source);
+}
+
+#[test]
+fn table_model_discovery_rejects_duplicate_canonical_models_transactionally() {
+    let mut package = test_package();
+    let model = test_table_model(&package);
+    let payload = model.encode_to_vec();
+    replace_test_table_model_messages(
+        &mut package,
+        vec![
+            RawMessage {
+                type_: 6_001,
+                data: payload.clone(),
+            },
+            RawMessage {
+                type_: 6_001,
+                data: payload,
+            },
+        ],
+    );
+    let source = package.to_bytes().unwrap();
+
+    let error = storage::table_models(&package).expect_err("duplicate canonical models");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message)
+            if message.contains("multiple Numbers table model payloads")
+    ));
+    assert_eq!(package.to_bytes().unwrap(), source);
+}
+
 #[test]
 fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
     let mut editor = NumbersEditor::from_package(test_package_with_text_box()).unwrap();

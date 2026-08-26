@@ -1,6 +1,6 @@
 //! Sheet, table, cell, formula, and comment model operations.
 
-use super::table_model_projection::{CandidateProbe, ProbeBudget, probe_candidate};
+use super::table_model_projection::{ProbeBudget, select_candidate};
 use super::*;
 use crate::application::Application;
 use crate::application_detection::detect;
@@ -9,7 +9,9 @@ use litchi_iwa_protos::comment_storage_codec;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
+#[cfg(test)]
 const LEGACY_TABLE_MODEL_MESSAGE_TYPE: u32 = 6_000;
+#[cfg(test)]
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 #[cfg(test)]
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] =
@@ -2024,7 +2026,7 @@ pub(super) fn decode_table_info(object: &ArchiveObject) -> Result<(usize, tst::T
 
 pub(super) fn find_table_model_message(object: &ArchiveObject) -> Result<usize> {
     let mut budget = ProbeBudget::new();
-    let index = select_table_model_message(object.messages.as_slice(), &mut budget, |reason| {
+    let index = select_candidate(object.messages.as_slice(), &mut budget, |reason| {
         Error::InvalidFormat(format!(
             "Object {:?} {reason}",
             object.archive_info.identifier
@@ -3410,42 +3412,20 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
     Ok(descriptors.into_values().collect())
 }
 
-fn select_table_model_message(
-    messages: &[RawMessage],
-    budget: &mut ProbeBudget,
-    error: impl Fn(&str) -> Error,
-) -> Result<Option<usize>> {
-    // Type 6000 is shared with modern TableInfoArchive. A canonical type-6001
-    // payload is therefore authoritative whenever present; legacy candidates
-    // are considered only when no canonical message exists, and the probe
-    // admits them only after the exact legacy model wire signature is proven.
-    let has_canonical = messages
-        .iter()
-        .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE);
-    let mut selected = None;
-    for (index, message) in messages.iter().enumerate().filter(|(_, message)| {
-        message.type_ == TABLE_MODEL_MESSAGE_TYPE
-            || (!has_canonical && message.type_ == LEGACY_TABLE_MODEL_MESSAGE_TYPE)
-    }) {
-        match probe_candidate(message.type_, message.data.as_slice(), budget)? {
-            CandidateProbe::Valid if selected.replace(index).is_some() => {
-                return Err(error("has multiple Numbers table model payloads"));
-            },
-            CandidateProbe::Valid | CandidateProbe::NotModel => {},
-            CandidateProbe::Malformed => {
-                return Err(error("contains a malformed Numbers table model payload"));
-            },
-        }
-    }
-    Ok(selected)
-}
-
-fn decode_attached_table_model(
+pub(super) fn decode_attached_table_model(
     messages: &[RawMessage],
     table_id: u64,
 ) -> Result<Option<TableModelArchive>> {
     let mut budget = ProbeBudget::new();
-    let Some(index) = select_table_model_message(messages, &mut budget, |reason| {
+    decode_attached_table_model_with_budget(messages, table_id, &mut budget)
+}
+
+pub(super) fn decode_attached_table_model_with_budget(
+    messages: &[RawMessage],
+    table_id: u64,
+    budget: &mut ProbeBudget,
+) -> Result<Option<TableModelArchive>> {
+    let Some(index) = select_candidate(messages, budget, |reason| {
         Error::InvalidFormat(format!("iWork table model {table_id} {reason}"))
     })?
     else {

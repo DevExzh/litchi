@@ -5826,26 +5826,38 @@ The legacy Numbers editor no longer constructs a generated `TableModelArchive`
 for every candidate merely to decide which message is the table model. A
 private generated-free projection now type-gates candidates, validates the
 known root wire envelope, and runs the selected-field strict table-cell
-storage projection under one finite object-local
-input/field/work/reference/text ledger. Balanced unknown groups remain opaque
-and source-authoritative. Historical
-sparse models retain a narrowly classified compatibility route, but must carry
-the exact selected DataStore/dimension/name signature. Type 6000 is shared by
-legacy table models and modern `TableInfoArchive`; a type-6000 payload is
-therefore ignored unless it proves that legacy signature. Canonical type 6001
-has explicit precedence, malformed canonical candidates do not fall back to a
-legacy alias, and duplicate canonical candidates fail closed. After admission,
-the one selected complete model still receives the pre-existing owned Prost
-decode before mutation or publication.
+storage projection under one finite input/field/work/reference/text ledger.
+The selector is shared by direct model lookup and rooted storage-catalog
+discovery; one catalog operation shares one probe ledger across every rooted
+model candidate rather than renewing the allowance per model. Balanced unknown
+groups remain opaque and source-authoritative. Historical sparse models retain
+a narrowly classified compatibility route, but must carry the exact selected
+DataStore/dimension/name signature. Malformed, duplicate, wrong-wire, or
+noncanonical selected DataStore references cannot take that sparse bypass.
 
-Direct projection coverage passes 9/9 and the affected model-discovery module
-passes 10/10, including TableInfo/model type confusion, missing selected
-fields, wrong-wire known fields, duplicate selected fields, canonical/legacy
-precedence, malformed fallback, unrelated messages, and aggregate resource
-failure atomicity. The tracked native focused edit/read regression passes, as
-do the affected library check and scoped strict Clippy. Two older synthetic
-resize/duplicate regressions remain blocked before this seam by their focused
-catalog selector resolving to `usize::MAX`; they are not counted as green.
+Type 6000 is shared by legacy table models and modern `TableInfoArchive`; a
+type-6000 payload is therefore ignored unless it proves the legacy model
+signature. Canonical type 6001 has explicit precedence, malformed canonical
+candidates do not fall back to a legacy alias, and duplicate canonical
+candidates fail closed. Rooted catalog discovery admits only the explicit
+TableInfo aliases 6000 and 6003, so unrelated drawable payloads cannot exploit
+permissive cross-message Prost decoding. Native type 6000 uses the strict
+generated-free TableInfo model-reference projection; legacy type 6003 retains
+only the historical missing-DrawableArchive compatibility while the same
+strict projection validates its remaining bytes. A recognized malformed
+TableInfo, zero or missing model route, TableInfo/model role alias, missing
+model payload, or duplicate TableInfo owner fails closed. After admission, the
+one selected complete model still receives the pre-existing owned Prost decode
+because current descriptor and mutation consumers require its full graph.
+
+Direct projection coverage passes 10/10, the affected model-discovery module
+passes 10/10, rooted discovery regressions pass 9/9, and affected storage tests
+pass 6/6. The matrix covers TableInfo/model type confusion, untyped drawable
+decoys, missing selected fields, wrong-wire and duplicate selected references,
+canonical/legacy precedence, malformed fallback, duplicate TableInfo/model
+owners, unrelated messages, transactional byte equality, and aggregate
+resource failure. The tracked native focused edit/read regression passes, as
+do the affected library check and scoped strict Clippy.
 
 Native acceptance used the tracked Numbers source
 `test-data/iwork/numbers/basic.numbers`, 136,357 bytes with SHA-256
@@ -5858,14 +5870,16 @@ candidate without repair, exposed 23 rows and 8 columns, retained B2 text
 `Litchi native Numbers fixture` and B3 value `42`, saved it, closed it, and
 reopened the exact path without repair. The 137,015-byte native-normalized
 artifact had SHA-256
-`7f53bf5204afb49fb0494f4b90e5cf38d80dab84e0f77867f525341f1bde5df7`;
-strict Rust reread still reported Table 1 as 23×8 with two materialized cells.
+`6f93de3369b643898a6a0a4ceacc18a0230e3d9c7de46082b9c97aad9fb2880d`;
+strict Rust reread through both the legacy catalog and focused package reader
+still reported Table 1 as 23×8 with exact B2/B3 semantics.
 
 This is only generated-free candidate admission in the legacy model editor.
-Complete `TableDescriptor` state, the selected mutation value, broad
-TableInfo/table-model ownership discovery, public storage enumeration, archive
-reference authority, and other editor selectors remain generated or outside
-this slice. The ledger is aggregate per model object rather than per package.
-This amendment makes no full model-codec ownership, TableInfo retirement,
-zero-copy, performance/RSS, dependency-edge, debt, crate-exit, or monolith-exit
-claim.
+Complete `TableDescriptor` state and the selected mutation value remain
+generated. TableInfo payloads are now strictly projected in this catalog, but
+other TableInfo consumers, the separate table extractor, other discovery
+sites, archive reference authority, and other editor selectors remain
+generated or outside this slice. The ledger is aggregate for one rooted
+catalog operation, not a package-wide extraction or publication budget. This
+amendment makes no full model-codec ownership, TableInfo retirement, zero-copy,
+performance/RSS, dependency-edge, debt, crate-exit, or monolith-exit claim.
