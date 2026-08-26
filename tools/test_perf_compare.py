@@ -119,10 +119,10 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
                 "elapsed_ns": {
                     "unit": "ns",
                     "samples": samples,
-                    "p50": value,
-                    "p95": value,
-                    "p99": value,
-                },
+                "p50": value,
+                "p95": value,
+                "p99": value,
+            },
                 "metrics": {
                     "allocation_calls": [1000] * 5,
                     "peak_rss_bytes": [10_000] * 5,
@@ -298,6 +298,42 @@ def filesystem_xlsx_operation_metrics_report_fields(sample_indices=None):
     if sample_indices is not None:
         operation_metrics["sample_indices"] = sample_indices
     return operation_metrics
+
+
+def opc_zip_operation_metrics_report_fields(status="measured", values=None):
+    operation_metrics = operation_metrics_report_fields()
+    operation_metrics["latency_claim"] = (
+        perf_compare.OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM
+    )
+    values = values or {}
+    fields = (
+        "compressed_deflate_payload_bytes_read",
+        "stored_payload_bytes_read",
+        "stored_payload_bytes_accepted",
+        "deflate_bytes_produced",
+        "deflate_bytes_accepted",
+        "generated_deflate_payload_bytes_emitted",
+        "stored_payload_bytes_emitted",
+        "precompressed_payload_bytes_emitted",
+        "raw_unchanged_source_bytes_accepted",
+        "output_bytes_accepted",
+    )
+    operation_metrics["opc_zip"] = {
+        "status": status,
+        "scope": perf_compare.OPC_ZIP_SCOPE,
+    }
+    for field in fields:
+        operation_metrics["opc_zip"][field] = metric_vector(
+            values.get(field, [0] * 5) if status == "measured" else None,
+            status=status,
+            scope=perf_compare.OPC_ZIP_SCOPE,
+        )
+    return operation_metrics
+
+
+def add_opc_zip_sample_order(*results):
+    for result in results:
+        result["elapsed_ns"]["sample_order"] = list(range(5))
 
 
 ALLOCATOR_VECTOR_FIELDS = (
@@ -2830,6 +2866,242 @@ class PerfCompareTests(unittest.TestCase):
             self.assertEqual(perf_compare.main(args), 2)
             self.assertEqual(json.loads(json_path.read_text())["status"], "invalid")
             self.assertIn("INVALID:", text_path.read_text())
+
+
+    def test_opc_zip_metrics_preserve_zeroes_and_omit_non_measured_values(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["elapsed_ns"]["sample_order"] = list(range(5))
+            item["operation_metrics"] = opc_zip_operation_metrics_report_fields()
+        add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+        self.assertEqual(result["status"], "pass")
+        opc_zip = current["results"][0]["operation_metrics"]["opc_zip"]
+        self.assertEqual(
+            opc_zip["output_bytes_accepted"]["values"], [0] * 5
+        )
+
+        for status in ("not_applicable", "unavailable", "overflow"):
+            with self.subTest(status=status):
+                baseline = report()
+                current = report(revision="current")
+                for item in (baseline["results"][0], current["results"][0]):
+                    item["elapsed_ns"]["sample_order"] = list(range(5))
+                    item["operation_metrics"] = opc_zip_operation_metrics_report_fields(
+                        status=status
+                    )
+                add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+                result = perf_compare.compare_reports(
+                    baseline, current, self.operation_metrics_policy()
+                )
+                self.assertEqual(result["status"], "pass")
+
+    def test_opc_zip_metrics_reject_unknown_invalid_and_misaligned_fields(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        current["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+        current["results"][0]["operation_metrics"]["opc_zip"]["mystery"] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "operation_metrics.opc_zip keys mismatch.*mystery",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        current["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+        del current["results"][0]["operation_metrics"]["opc_zip"][
+            "output_bytes_accepted"
+        ]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "operation_metrics.opc_zip keys mismatch.*output_bytes_accepted",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        invalid_values = (
+            [0] * 4,
+            [0, 0, False, 0, 0],
+            [0, 0, -1, 0, 0],
+            [0, 0, "bad", 0, 0],
+        )
+        for invalid in invalid_values:
+            with self.subTest(invalid=invalid):
+                baseline = report()
+                current = report(revision="current")
+                baseline["results"][0]["operation_metrics"] = (
+                    opc_zip_operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"] = (
+                    opc_zip_operation_metrics_report_fields()
+                )
+                add_opc_zip_sample_order(
+                    baseline["results"][0], current["results"][0]
+                )
+                current["results"][0]["operation_metrics"]["opc_zip"][
+                    "output_bytes_accepted"
+                ]["values"] = invalid
+                with self.assertRaises(perf_compare.ComparisonInputError):
+                    perf_compare.compare_reports(
+                        baseline, current, self.operation_metrics_policy()
+                    )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        current["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+        del current["results"][0]["operation_metrics"]["opc_zip"][
+            "output_bytes_accepted"
+        ]["values"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "opc_zip.output_bytes_accepted.values is required",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        non_measured = opc_zip_operation_metrics_report_fields(status="unavailable")
+        non_measured["opc_zip"]["output_bytes_accepted"]["values"] = [0] * 5
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields(status="unavailable")
+        )
+        current["results"][0]["operation_metrics"] = non_measured
+        add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "opc_zip.output_bytes_accepted.values must be omitted",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        current["results"][0]["operation_metrics"] = (
+            opc_zip_operation_metrics_report_fields()
+        )
+        add_opc_zip_sample_order(baseline["results"][0], current["results"][0])
+        current["results"][0]["operation_metrics"]["opc_zip"]["scope"] = (
+            "other_scope"
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "opc_zip.scope must be"
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+
+    def test_opc_zip_claim_alignment_and_u64_validation_fail_closed(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["elapsed_ns"]["sample_order"] = list(range(5))
+            item["operation_metrics"] = operation_metrics_report_fields()
+            item["operation_metrics"]["latency_claim"] = (
+                perf_compare.OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM
+            )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "latency_claim and operation_metrics.opc_zip must be present together",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["elapsed_ns"]["sample_order"] = list(range(5))
+            item["operation_metrics"] = opc_zip_operation_metrics_report_fields()
+            item["operation_metrics"]["latency_claim"] = (
+                perf_compare.EVIDENCE_ONLY_LATENCY_CLAIM
+            )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "latency_claim and operation_metrics.opc_zip must be present together",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["elapsed_ns"]["sample_order"] = list(range(5))
+            item["operation_metrics"] = opc_zip_operation_metrics_report_fields()
+        current["results"][0]["elapsed_ns"]["sample_order"] = [1, 0, 2, 3, 4]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "opc_zip sample_indices must match elapsed_ns.sample_order",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        for invalid in ([0, 0, 1 << 64, 0, 0], [0, 0, 1.0, 0, 0]):
+            with self.subTest(invalid=invalid):
+                baseline = report()
+                current = report(revision="current")
+                for item in (baseline["results"][0], current["results"][0]):
+                    item["elapsed_ns"]["sample_order"] = list(range(5))
+                    item["operation_metrics"] = opc_zip_operation_metrics_report_fields()
+                current["results"][0]["operation_metrics"]["opc_zip"][
+                    "output_bytes_accepted"
+                ]["values"] = invalid
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "must be a non-negative integer",
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, self.operation_metrics_policy()
+                    )
+
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["elapsed_ns"]["sample_order"] = list(range(5))
+            item["operation_metrics"] = opc_zip_operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["opc_zip"]["status"] = (
+            "unavailable"
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "opc_zip.status does not match",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
 
 
 if __name__ == "__main__":

@@ -54,8 +54,8 @@ use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
 };
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, Part, PartData,
-    ReadLimits, Relationships, SourceBackedPackage, SourceCacheCounterDelta,
+    BlobPart, OpcError, OpcOperationAccounting, OpcPackage, OpenSession, PackURI, PackageWriter,
+    Part, PartData, ReadLimits, Relationships, SourceBackedPackage, SourceCacheCounterDelta,
     SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
@@ -39933,16 +39933,23 @@ fn run_opc_source_overlay_one_part_save(
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     let mut measured_digests = Vec::with_capacity(samples);
+    let mut opc_zip_reports = Vec::with_capacity(samples);
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
         let replacement_part = replacement.clone();
+        let mut opc_zip_report = OpcOperationAccounting::default();
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
         let source_package =
             SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
-        source_package.write_part_overlay_to_stream(&mut sink, &target_uri, replacement_part)?;
+        source_package.write_part_overlay_to_stream_with_accounting(
+            &mut sink,
+            &target_uri,
+            replacement_part,
+            &mut opc_zip_report,
+        )?;
         let duration = started.elapsed();
 
         let metrics = source.snapshot();
@@ -39965,12 +39972,27 @@ fn run_opc_source_overlay_one_part_save(
             source_summary.record_opc(metrics, 1);
             sink_summaries.push(sink.summary());
             measured_digests.push(digest);
+            opc_zip_reports.push(opc_zip_report);
         }
         std::hint::black_box(&sink.bytes);
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
     let sink = deterministic_sink_summary(&sink_summaries, "OPC source overlay save")?;
+    let sink_observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let mut operation_metrics =
+        operation_metrics::from_sink_observation(elapsed.len(), sink_observation)?;
+    operation_metrics.set_opc_zip(&elapsed, &opc_zip_reports)?;
     if measured_digests
         .iter()
         .any(|digest| digest != &expected_digest)
@@ -39986,7 +40008,7 @@ fn run_opc_source_overlay_one_part_save(
         source: Some(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
-        operation_metrics: None,
+        operation_metrics: Some(operation_metrics),
     })
 }
 
