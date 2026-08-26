@@ -2621,3 +2621,27 @@ dependency declarations, and 13 ordered migration debts. Debt 014 and the
 the Pages edge, migration hosts, generated-schema and normal Prost/Buffa
 owners, and the IWA monolith. No crate, dependency edge, debt item,
 production manifest dependency, or monolith is removed by Wave87.
+
+## 2026-08-26 amendment: Wave88 current-topology Numbers split cell-control write cut
+
+Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
+makes `litchi-numbers` the current owner of admitted split-component Checkbox,
+Star Rating, Slider, and Stepper reads, exact edits, patch application, reset/
+clear, final cull, and inverse artifacts through the existing unified facade.
+The package now owns strict current/effective component and metadata authority,
+split model/tile/list transitions, BNC/list refcount census, operation-local
+resource accounting, prepared publication, candidate validation/readback,
+preview invalidation, and exact object/member locality.
+
+Cross-component Pop-Up Menu writes remain unsupported; popup reads and the
+previously admitted same-component popup lifecycle retain their existing
+owners. General data formats, table topology, Pages and Keynote control graphs,
+and arbitrary graph repair remain at their recorded boundaries. No additional
+host method or adapter is retired by Wave88.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do debts 014 and 017,
+the Pages edge, migration hosts, generated-schema and normal Prost/Buffa
+owners, and the IWA monolith. No crate, dependency edge, debt item, production
+manifest dependency, or monolith is removed by Wave88.

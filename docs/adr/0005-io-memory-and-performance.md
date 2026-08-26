@@ -1639,3 +1639,31 @@ geometry owner does not allocate objects or mutate Metadata/UUIDs/save tokens;
 legacy angle/flags/flip/original-size-restore compatibility remains outside
 this resource slice. No production dependency edge or normal generated-
 schema/Prost/Buffa owner changes by this record.
+
+## 2026-08-26 amendment: Wave88 Numbers split cell-control write resource record
+
+Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
+carries one operation-local transaction budget through source/catalog and
+component inventory, rooted model/tile/list selection, strict storage/control
+codec reports, BNC and list refcount census, metadata UUID/external-edge and
+save-token transitions, native archive/Snappy output bounds, prepared ZIP
+reassembly, candidate reopen, semantic readback, exact patch artifacts, and
+object/member locality. Distinct source and candidate walks are charged
+independently; nesting is merged by maximum and repeated borrowed payloads are
+not silently charged as new physical input.
+
+Residual input/output, entry, payload, object, message, item, reference,
+field, work, nesting, component, allocation, retained-byte, and scratch
+ceilings are propagated through the admitted split route. Checked arithmetic,
+fallible reservations, residual codec limits, prepared reassembly
+requirements, and typed codec/archive/core mappings reject oversized work
+before publication. Refcount and metadata censuses are repeated against the
+private candidate, and any rejected limit or verification leaves the source
+and published package unchanged.
+
+Codec payloads, native archives, metadata, compression output, and the final
+ZIP are staged as private candidates. This is not one global allocation-free
+preflight and makes no single-allocation, zero-copy, package-wide peak-memory
+or RSS, latency, throughput, or performance claim. Cross-component popup
+mutation is outside this resource contract. No production dependency edge or
+normal generated-schema/Prost/Buffa owner changes by this record.

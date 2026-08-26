@@ -5406,3 +5406,29 @@ generated-schema, Buffa, and normal Prost owners, migration hosts, and the
 IWA monolith remain. No crate, dependency edge, debt item, production
 manifest dependency, generated-schema owner, normal Prost owner, host-exit,
 or monolith-exit gate is retired by Wave87.
+
+## 2026-08-26 amendment: Wave88 Numbers split cell-control write bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
+extends only the existing unified Numbers cell-control package owner from
+split-component read/no-op to successful Checkbox, Star Rating, Slider, and
+Stepper write transactions. The selector-first facade and archive-free
+`CellControl` values are unchanged. The bounded owner now proves exact
+current/effective component and metadata authority, performs scalar-control
+copy-on-write/create/reset/final-cull transitions, advances the required root
+and current-component save tokens, and verifies candidate semantic readback,
+preview invalidation, locality, patches, and exact inverses.
+
+Cross-component Pop-Up Menu mutation remains fail-closed and source-exact;
+the popup model lifecycle is not broadened. The slice does not own general
+scalar formatting, table topology, Pages/Keynote controls, arbitrary
+cross-component repair, or a public native graph. Its staged-private resource
+policy is not a single global allocation-free preflight or a performance/RSS
+claim. Numbers-normalized native artifacts are not Rust/native byte parity.
+
+Debt 015, the `litchi-iwa -> litchi-numbers` dependency edge, debts 014 and
+017, the Pages edge, `litchi-iwa` and its remaining host responsibilities,
+generated-schema, Buffa, and normal Prost owners, migration hosts, and the IWA
+monolith remain. No crate, dependency edge, debt item, production manifest
+dependency, generated-schema owner, normal Prost owner, host-exit, or
+monolith-exit gate is retired by Wave88.

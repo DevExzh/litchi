@@ -3811,3 +3811,32 @@ declarations, and 13 ordered migration debts. Debt 014, the
 generated-schema and normal Prost/Buffa owners, and the IWA monolith remain.
 No crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by this cut.
+
+## 2026-08-26 amendment: Wave88 Numbers split cell-control write boundary
+
+Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
+extends the existing selector-first `litchi-numbers` cell-control transaction
+owner to admitted split-component Checkbox, Star Rating, Slider, and Stepper
+writes. The public facade remains
+`Package::{table_cell_control_format, edit_table_cell_control_format,
+apply_table_cell_control_format}` with `SheetSelector`, `TableSelector`,
+`CellPosition`, and archive-free `CellControl` values. Native identifiers,
+member locators, archive/wire values, generated messages, Prost values, and
+Buffa views remain private.
+
+The package owns current/effective component selection, exact metadata
+external-edge and UUID authority, split native model/tile/list rewriting,
+BNC/list refcount census, copy-on-write and final cull, save-token/watermark
+transitions, operation-local budgets, candidate reopen/readback, preview
+invalidation, exact object/member locality, and patch/inverse artifacts. The
+neutral storage codec owns strict mixed control-list dispatch and the
+source-preserving storage projection. Cross-component Pop-Up Menu mutation is
+still unsupported and fails closed; its existing focused lifecycle owner is
+not broadened by this cut.
+
+No additional host is retired by Wave88. The authoritative inventory remains
+64 workspace packages, 239 internal dependency declarations, and 13 ordered
+migration debts. Debt 015 and the `litchi-iwa -> litchi-numbers` edge remain
+open, as do debts 014 and 017, migration hosts, generated-schema and normal
+Prost/Buffa owners, and the IWA monolith. No crate, dependency edge, debt item,
+production manifest dependency, or monolith owner is removed.

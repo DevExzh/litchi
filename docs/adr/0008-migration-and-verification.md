@@ -14036,3 +14036,58 @@ close/reopen evidence only. The strict reread failure is recorded rather
 than converted into acceptance; there is no Rust/native byte-parity,
 normalized re-ingress, durable publication, performance/RSS, arbitrary
 producer-graph, host/debt/edge, monolith, or full-workspace claim.
+
+## 2026-08-26 amendment: Wave88 Numbers split cell-control write verification record
+
+Implementation commit `d1e11c7f218583becc85be7fa426650aa0113de4`
+was verified with these scoped gates:
+
+- the focused `litchi-numbers` unified cell-control integration passed 23/23;
+- the focused Pop-Up Menu integration passed 19/19;
+- the storage codec suite passed 56/56 and the Pop-Up Menu codec suite passed
+  15/15;
+- `cargo check -p litchi-numbers --lib` passed with only the two recorded
+  `object_count` deprecation warnings;
+- focused library and cell-control test Clippy with `-D warnings` and the
+  recorded baseline allowances passed;
+- workspace formatting and scoped diff checks passed before commit;
+- boundary Python compilation and the boundary unittest passed 532/532.
+
+The live boundary checker exited 1 only for the three known user-owned Pages
+table-lock findings (`body_table_lock_state`, `set_body_table_lock_state`, and
+the returned `crates/litchi-iwa/src/pages/editor/tables/lock.rs`). It reported
+no Wave88 control finding. The full-workspace hook was not used as a green
+claim: it inspected unrelated preserved formatting state and its broad rebuild
+was stopped when disk space became unsafe.
+
+The pristine source and Rust-produced artifacts were:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source `.numbers` | 143,744 | `9af60c5d67a02675902be60a4bd9ea2767650924aca5662854d0d4bd9882344f` |
+| Checkbox to Star Rating candidate | 80,625 | `66290b08cc6fd0c46efcbfb167b357f6a71343330199a31bad4d270dae022d6c` |
+| Star Rating to Checkbox candidate | 80,619 | `e6c6c78828ad2d41f5e22cd7d6ee095075aea8ba5361a569680c15e0279a2c26` |
+| Slider 10..110 step 10 candidate | 80,652 | `1e707921c196a2b90eb550077a2f2bef89f220cbd9140a36bcd77c392bce3fb3` |
+| Stepper 2..22 step 2 candidate | 80,656 | `b59c4762e18440c10cf9ac455886112fbf7a8f82e3b562ad6d6ec4784766174d` |
+
+Every Rust inverse was 143,744 bytes and exactly matched the pristine source
+SHA-256. Strict Rust reread verified the selected result and byte-identical
+unselected table cells before native acceptance.
+
+Numbers 14.4 opened each Rust candidate without repair, recovery, or
+conversion UI. Computer Use observed the replacement Star Rating and Checkbox
+values and the exact Slider 10/110/10 and Stepper 2/22/2 inspector settings.
+Each branch was saved, closed, and reopened at its exact path. Strict Rust
+reread then accepted every Numbers-normalized artifact:
+
+| normalized artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| Checkbox to Star Rating | 143,886 | `55dc4934258e6e2b736299fc456a372729c8c8c4fe4c80c18317c487431e7a5f` |
+| Star Rating to Checkbox | 142,999 | `76b3af9f4ed2980202bb764666a2ff4c42ff0c023fbfacfd938d65bce5c226d0` |
+| Slider 10..110 step 10 | 143,622 | `1757c8ba778d6e7023eb9c772b600fd6051ffbda41cb8b43039ad7999e4e890e` |
+| Stepper 2..22 step 2 | 143,627 | `1a0b89088f799455e140bea7649ad9a5cd16adac6970aad2d0517ab7f4c6d1cb` |
+
+Numbers-normalized bytes are not Rust/native byte parity. This is bounded
+open/render/save/close/reopen and strict normalized-reread evidence only; it
+makes no performance/RSS, arbitrary-graph, popup-write, host/edge/debt,
+monolith-exit, publication-system, or full-workspace claim.
