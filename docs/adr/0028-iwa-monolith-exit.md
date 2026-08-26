@@ -5606,3 +5606,21 @@ creation, segmented/cross-component graphs, arbitrary repair, and native UI
 acceptance remain unsupported. The raw-ID compatibility host, debt 015,
 remaining dependency edges/debts, performance/RSS and single-global-preflight
 claims, normal Prost/Buffa owners, and monolith exit remain.
+
+## 2026-08-26 amendment: Numbers missing author-storage creation (not a monolith-exit gate)
+
+The focused root-comment owner now also admits a rooted same-member table with
+an existing physical target cell and strict comment list but no annotation
+author or type-213 annotation-author storage object. The transaction allocates
+the comment, type-212 author, and type-213 storage identifiers together;
+creates the author-storage `[1]` reference authority exactly; registers all
+three UUIDs in the current component; advances that component and the root
+watermark/save token once; removes previews; reopens the semantic candidate;
+and retains byte-exact inverse restoration.
+
+This slice still requires an existing tile, row, BNC cell slot, and same-member
+ownership. Sparse-cell/tile creation, segmented or cross-component creation,
+arbitrary author-registry repair, native Numbers UI acceptance, a single
+global allocation-free resource preflight, performance/RSS evidence, debt or
+dependency-edge retirement, normal Prost/Buffa ownership, and monolith exit
+remain withheld.

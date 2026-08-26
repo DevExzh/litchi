@@ -45,6 +45,7 @@ struct CreationGraph {
     model: MessageRoute,
     author_identifier: u64,
     author_storage: Option<MessageRoute>,
+    create_author_storage: bool,
 }
 
 pub(super) fn create_root_comment(
@@ -84,8 +85,11 @@ pub(super) fn create_root_comment(
     }
     let metadata_source =
         comments_metadata::strict_source(source).map_err(|_| Error::InvalidSource { path })?;
-    let allocation_count =
-        1 + usize::from(graph.author_storage.is_some()) + usize::from(graph.list.is_none());
+    let creates_author = graph.author_storage.is_some() || graph.create_author_storage;
+    let allocation_count = 1
+        + usize::from(creates_author)
+        + usize::from(graph.create_author_storage)
+        + usize::from(graph.list.is_none());
     let metadata_options = metadata_options(metadata_source.payload().len(), allocation_count);
     let registry = comments_metadata::inspect(source, metadata_options)
         .map_err(|_| Error::InvalidSource { path })?;
@@ -97,7 +101,7 @@ pub(super) fn create_root_comment(
             .map_err(|_| Error::InvalidSource { path })?,
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    if graph.author_storage.is_none() {
+    if graph.author_storage.is_none() && !graph.create_author_storage {
         registry
             .current_uuid_if_registered(owner_component_index, graph.author_identifier)
             .map_err(|_| Error::InvalidSource { path })?;
@@ -111,7 +115,13 @@ pub(super) fn create_root_comment(
         .get(comment_index)
         .copied()
         .ok_or(Error::Verification)?;
-    let author_fresh = fresh.get(comment_index + 1).copied();
+    let author_fresh = creates_author
+        .then(|| fresh.get(comment_index + 1).copied())
+        .flatten();
+    let author_storage_fresh = graph
+        .create_author_storage
+        .then(|| fresh.get(comment_index + 2).copied())
+        .flatten();
     let author_identifier = author_fresh
         .map(|fresh| fresh.identifier)
         .unwrap_or(graph.author_identifier);
@@ -219,6 +229,19 @@ pub(super) fn create_root_comment(
             .try_reserve(2)
             .map_err(|_| Error::Allocation { amount: 2, path })?;
         archive.objects.push(author_object(fresh.identifier, path)?);
+    } else if let (Some(author), Some(storage)) = (author_fresh, author_storage_fresh) {
+        archive
+            .objects
+            .try_reserve(2)
+            .map_err(|_| Error::Allocation { amount: 2, path })?;
+        archive
+            .objects
+            .push(author_object(author.identifier, path)?);
+        archive.objects.push(author_storage_object(
+            storage.identifier,
+            author.identifier,
+            path,
+        )?);
     } else {
         archive
             .objects
@@ -248,6 +271,13 @@ pub(super) fn create_root_comment(
             .map_err(|_| Error::UnsupportedDependency { path })?,
     );
     if let Some(fresh) = author_fresh {
+        additions.push(
+            registry
+                .uuid_addition(owner_component_index, fresh)
+                .map_err(|_| Error::UnsupportedDependency { path })?,
+        );
+    }
+    if let Some(fresh) = author_storage_fresh {
         additions.push(
             registry
                 .uuid_addition(owner_component_index, fresh)
@@ -406,6 +436,7 @@ fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<Cre
             model,
             author_identifier: authors[0],
             author_storage: None,
+            create_author_storage: false,
         });
     }
     if !authors.is_empty() {
@@ -416,11 +447,12 @@ fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<Cre
         list,
         model,
         author_identifier: 0,
-        author_storage: Some(author_storage),
+        author_storage,
+        create_author_storage: author_storage.is_none(),
     })
 }
 
-fn empty_author_storage(source: &Package, path: Path) -> Result<MessageRoute, Error> {
+fn empty_author_storage(source: &Package, path: Path) -> Result<Option<MessageRoute>, Error> {
     let mut found = None;
     for (component_index, component) in source.state.components.catalog().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -447,7 +479,7 @@ fn empty_author_storage(source: &Package, path: Path) -> Result<MessageRoute, Er
             }
         }
     }
-    found.ok_or(Error::UnsupportedDependency { path })
+    Ok(found)
 }
 
 fn canonical_reference(identifier: u64, path: Path) -> Result<Vec<u8>, Error> {
@@ -528,6 +560,36 @@ fn author_object(identifier: u64, path: Path) -> Result<ArchiveObject, Error> {
         .first_mut()
         .ok_or(Error::InvalidSource { path })?;
     info.field_infos.push(FieldInfo::new(vec![4]));
+    Ok(object)
+}
+
+fn author_storage_object(
+    identifier: u64,
+    author_identifier: u64,
+    path: Path,
+) -> Result<ArchiveObject, Error> {
+    let reference = canonical_reference(author_identifier, path)?;
+    let mut payload = Vec::new();
+    append_length_delimited_field(&mut payload, 1, &reference)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
+            data: payload,
+        }],
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let info = object
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or(Error::InvalidSource { path })?;
+    info.object_references = vec![author_identifier];
+    let mut field = FieldInfo::new(vec![1]);
+    field.r#type = Some(FieldType::ObjectReference);
+    field.object_references = vec![author_identifier];
+    info.field_infos.push(field);
     Ok(object)
 }
 
