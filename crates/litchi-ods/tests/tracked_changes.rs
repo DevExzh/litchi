@@ -762,9 +762,8 @@ fn fixed_depth_limit_accepts_the_boundary_and_rejects_one_more_level() {
 
 #[test]
 fn rich_neighbor_bytes_are_preserved_while_unknown_records_and_regeneration_are_refused() {
-    let rich = format!(
-        r#"<table:insertion table:id="rich" table:type="row" table:position="0" ext:flag='keep'><office:change-info><dc:creator>Rich</dc:creator><dc:date>2026-08-08T00:00:00Z</dc:date><text:p>before <ext:inline ext:mode="exact"><text:span text:style-name="Emphasis">rich &amp; exact</text:span></ext:inline> after</text:p></office:change-info></table:insertion>"#
-    );
+    let rich = r#"<table:insertion table:id="rich" table:type="row" table:position="0" ext:flag='keep'><office:change-info><dc:creator>Rich</dc:creator><dc:date>2026-08-08T00:00:00Z</dc:date><text:p>before <ext:inline ext:mode="exact"><text:span text:style-name="Emphasis">rich &amp; exact</text:span></ext:inline> after</text:p></office:change-info></table:insertion>"#
+        .to_string();
     let opaque = r#"<ext:future-record ext:flag='keep'><ext:payload><![CDATA[<opaque>&bytes]]></ext:payload></ext:future-record>"#;
     let unknown_owner = format!(
         "<table:tracked-changes>{}{opaque}</table:tracked-changes>",
