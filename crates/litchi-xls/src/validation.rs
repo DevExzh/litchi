@@ -16,8 +16,7 @@ use std::{
     sync::Arc,
 };
 
-use litchi_biff::{Limits as BiffLimits, Records};
-use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits};
+use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor};
 use litchi_core::{
     CheckCapabilityId, CheckStatus, CompatibilityImpact, EvidenceValue, IssueEvidence,
     IssueLocation, IssueSeverity, ReadAt, RepairAvailability, ValidateReport, ValidationCheck,
@@ -121,7 +120,7 @@ impl XlsValidationLimits {
         self.max_input_bytes
     }
 
-    /// Maximum materialized Workbook/Book stream length.
+    /// Maximum logical Workbook/Book stream length inspected.
     #[must_use]
     pub const fn max_workbook_stream_bytes(self) -> u64 {
         self.max_workbook_stream_bytes
@@ -270,9 +269,9 @@ pub fn validate_source_with_limits(
             limits.report,
             "source exceeds the configured XLS validation input ceiling",
         )?;
-        let report = finish_report(statuses, Vec::new(), limits.report)?;
+        let report = finish_report(statuses, Vec::new(), limits.report);
         require_version(source.as_ref(), expected_version)?;
-        return Ok(report);
+        return report;
     }
 
     let cfb_limits =
@@ -288,9 +287,9 @@ pub fn validate_source_with_limits(
                 cfb_issue(&error, source_size, limits.report)?,
                 "CFB rejection report",
             )?;
-            let report = finish_report(statuses, issues, limits.report)?;
+            let report = finish_report(statuses, issues, limits.report);
             require_version(source.as_ref(), expected_version)?;
-            return Ok(report);
+            return report;
         },
         Err(error) => return Err(XlsValidationError::Ingress(error)),
     };
@@ -374,11 +373,11 @@ pub fn validate_source_with_limits(
         statuses[3] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         statuses[4] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         statuses[8] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
-        let report = finish_report(statuses, issues, limits.report)?;
+        let report = finish_report(statuses, issues, limits.report);
         shared
             .source_version()
             .map_err(XlsValidationError::Ingress)?;
-        return Ok(report);
+        return report;
     };
 
     if workbook_size > limits.max_workbook_stream_bytes {
@@ -390,23 +389,31 @@ pub fn validate_source_with_limits(
         statuses[3] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         statuses[4] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         statuses[8] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
-        let report = finish_report(statuses, issues, limits.report)?;
+        if markers.encryption_count == 0 {
+            statuses[5] = CheckStatus::stopped_by(check_id(WORKBOOK_STREAM, limits.report)?);
+        }
+        let report = finish_report(statuses, issues, limits.report);
         shared
             .source_version()
             .map_err(XlsValidationError::Ingress)?;
-        return Ok(report);
+        return report;
     }
 
-    let workbook_data = shared
-        .open_stream(&[workbook_name])
-        .map_err(XlsValidationError::Ingress)?;
-    let analysis = analyze_workbook(&workbook_data, markers.encryption_count != 0, limits)?;
+    let analysis = analyze_workbook(
+        &shared,
+        workbook_name,
+        markers.encryption_count != 0,
+        limits,
+    )?;
 
     let encryption_count = markers
         .encryption_count
         .checked_add(analysis.filepass_count)
         .ok_or(XlsValidationError::Allocation("encryption presence count"))?;
     statuses[5] = presence_status(encryption_count, directory_limited, limits.report)?;
+    if encryption_count == 0 && !analysis.scan_terminal && !directory_limited {
+        statuses[5] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+    }
     if !directory_limited {
         push_presence_issue(
             &mut issues,
@@ -473,6 +480,11 @@ pub fn validate_source_with_limits(
             "BIFF record traversal reached the configured record ceiling",
             limits.report,
         )?;
+    } else if analysis.scan_interrupted {
+        statuses[2] = CheckStatus::blocked(
+            "BIFF record traversal stopped before a complete frame boundary",
+            limits.report,
+        )?;
     } else if analysis.worksheet_limit {
         statuses[2] = CheckStatus::blocked(
             "BIFF ownership traversal reached the configured worksheet ceiling",
@@ -485,22 +497,22 @@ pub fn validate_source_with_limits(
         )?;
     } else {
         statuses[2] = CheckStatus::Complete;
-        if analysis.biff_invalid {
-            try_push(
-                &mut issues,
-                simple_issue(
-                    BIFF,
-                    "xls.biff.invalid",
-                    IssueSeverity::Error,
-                    "The Workbook stream contains malformed or incomplete BIFF ownership grammar.",
-                    Some("Workbook"),
-                    None,
-                    None,
-                    limits.report,
-                )?,
-                "XLS validation issues",
-            )?;
-        }
+    }
+    if analysis.biff_invalid && !analysis.biff_limit {
+        try_push(
+            &mut issues,
+            simple_issue(
+                BIFF,
+                "xls.biff.invalid",
+                IssueSeverity::Error,
+                "The Workbook stream contains malformed or incomplete BIFF ownership grammar.",
+                Some("Workbook"),
+                None,
+                None,
+                limits.report,
+            )?,
+            "XLS validation issues",
+        )?;
     }
 
     let biff_blocked = matches!(statuses[2], CheckStatus::Blocked { .. });
@@ -663,11 +675,11 @@ pub fn validate_source_with_limits(
         }
     }
 
-    let report = finish_report(statuses, issues, limits.report)?;
+    let report = finish_report(statuses, issues, limits.report);
     shared
         .source_version()
         .map_err(XlsValidationError::Ingress)?;
-    Ok(report)
+    report
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -695,6 +707,8 @@ struct Analysis {
     external_count: u64,
     external_invalid: bool,
     external_limit: bool,
+    scan_terminal: bool,
+    scan_interrupted: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -843,6 +857,22 @@ fn inspect_filepass_record(
         },
     }
     output.encrypted = true;
+    Ok(())
+}
+
+fn inspect_incomplete_filepass_record(
+    output: &mut Analysis,
+    valid_position: bool,
+) -> Result<(), XlsValidationError> {
+    output.filepass_count = output
+        .filepass_count
+        .checked_add(1)
+        .ok_or(XlsValidationError::Allocation("FILEPASS count"))?;
+    output.filepass_invalid = true;
+    output.encrypted = true;
+    if !valid_position {
+        output.filepass_placement_invalid = true;
+    }
     Ok(())
 }
 
@@ -1757,8 +1787,116 @@ fn logical_stream_len(
     }
 }
 
+struct StreamingRecord<'a> {
+    kind: u16,
+    payload: &'a [u8],
+    offset: u64,
+}
+
+impl StreamingRecord<'_> {
+    fn kind(&self) -> litchi_biff::Kind {
+        litchi_biff::Kind::from_wire(self.kind)
+    }
+
+    fn payload(&self) -> &[u8] {
+        self.payload
+    }
+
+    fn offset(&self) -> u64 {
+        self.offset
+    }
+}
+
+enum StreamingRecordStep<'a> {
+    End,
+    Invalid { kind: Option<u16> },
+    Limit { kind: Option<u16> },
+    Record(StreamingRecord<'a>),
+}
+
+struct StreamingRecordReader<'a> {
+    cursor: SharedOleStreamCursor<'a>,
+    max_records: usize,
+    record_count: usize,
+    header: [u8; 4],
+    payload: [u8; MAX_RECORD_BYTES],
+}
+
+impl<'a> StreamingRecordReader<'a> {
+    fn new(
+        shared: &'a SharedOleFile,
+        workbook_name: &str,
+        max_records: usize,
+    ) -> Result<Self, XlsValidationError> {
+        let cursor = shared
+            .stream_cursor_at(&[workbook_name], 0)
+            .map_err(XlsValidationError::Ingress)?;
+        Ok(Self {
+            cursor,
+            max_records,
+            record_count: 0,
+            header: [0; 4],
+            payload: [0; MAX_RECORD_BYTES],
+        })
+    }
+
+    fn read_next(&mut self) -> Result<StreamingRecordStep<'_>, XlsValidationError> {
+        let offset = self.cursor.position();
+        let length = self.cursor.len();
+        if offset == length {
+            return Ok(StreamingRecordStep::End);
+        }
+
+        let next_count = match self.record_count.checked_add(1) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: None }),
+        };
+        if next_count > self.max_records {
+            return Ok(StreamingRecordStep::Limit { kind: None });
+        }
+
+        let header_end = match offset.checked_add(self.header.len() as u64) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: None }),
+        };
+        if header_end > length {
+            return Ok(StreamingRecordStep::Invalid { kind: None });
+        }
+        self.cursor
+            .read_exact(&mut self.header)
+            .map_err(XlsValidationError::Ingress)?;
+
+        let kind = u16::from_le_bytes([self.header[0], self.header[1]]);
+        let payload_len = usize::from(u16::from_le_bytes([self.header[2], self.header[3]]));
+        if payload_len > MAX_RECORD_BYTES {
+            return Ok(StreamingRecordStep::Limit { kind: Some(kind) });
+        }
+        let frame_len = match 4_u64.checked_add(payload_len as u64) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: Some(kind) }),
+        };
+        let frame_end = match offset.checked_add(frame_len) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: Some(kind) }),
+        };
+        if frame_end > length {
+            return Ok(StreamingRecordStep::Invalid { kind: Some(kind) });
+        }
+        self.cursor
+            .read_exact(&mut self.payload[..payload_len])
+            .map_err(XlsValidationError::Ingress)?;
+        self.record_count = next_count;
+        Ok(StreamingRecordStep::Record(StreamingRecord {
+            kind,
+            payload: &self.payload[..payload_len],
+            offset,
+        }))
+    }
+}
+
 fn analyze_workbook(
-    data: &[u8],
+    shared: &SharedOleFile,
+    workbook_name: &str,
     container_encrypted: bool,
     limits: XlsValidationLimits,
 ) -> Result<Analysis, XlsValidationError> {
@@ -1770,32 +1908,7 @@ fn analyze_workbook(
         return Ok(output);
     }
 
-    let biff_limits = BiffLimits {
-        max_records: limits.max_biff_records,
-        max_record_bytes: MAX_RECORD_BYTES,
-        max_input_bytes: data.len(),
-        max_output_bytes: data.len(),
-    };
-    let records = match Records::with_limits(data, biff_limits) {
-        Ok(records) => records,
-        Err(litchi_biff::Error::LimitExceeded { .. }) => {
-            return Ok(Analysis {
-                biff_limit: true,
-                encrypted: container_encrypted,
-                ..Analysis::default()
-            });
-        },
-        Err(litchi_biff::Error::Allocation { .. }) => {
-            return Err(XlsValidationError::Allocation("BIFF frame traversal"));
-        },
-        Err(_) => {
-            return Ok(Analysis {
-                biff_invalid: true,
-                encrypted: container_encrypted,
-                ..Analysis::default()
-            });
-        },
-    };
+    let mut records = StreamingRecordReader::new(shared, workbook_name, limits.max_biff_records)?;
 
     let mut first_record = true;
     let mut globals_done = false;
@@ -1819,21 +1932,36 @@ fn analyze_workbook(
     let mut external_feed_failed = false;
     let mut external_record_count = 0_usize;
     let mut active_sheet: Option<ActiveSheet> = None;
+    let mut scan_interrupted = false;
 
-    for next in records {
-        let record = match next {
-            Ok(record) => record,
-            Err(litchi_biff::Error::LimitExceeded { .. }) => {
+    loop {
+        let record = match records.read_next()? {
+            StreamingRecordStep::End => break,
+            StreamingRecordStep::Limit { kind } => {
+                scan_interrupted = true;
+                if kind == Some(FILEPASS_RECORD_TYPE) {
+                    let valid_position = !globals_done
+                        && global_bof.is_some()
+                        && !output.biff_invalid
+                        && filepass_slot_open;
+                    inspect_incomplete_filepass_record(&mut output, valid_position)?;
+                }
                 output.biff_limit = true;
                 break;
             },
-            Err(litchi_biff::Error::Allocation { .. }) => {
-                return Err(XlsValidationError::Allocation("BIFF frame traversal"));
-            },
-            Err(_) => {
+            StreamingRecordStep::Invalid { kind } => {
+                scan_interrupted = true;
+                if kind == Some(FILEPASS_RECORD_TYPE) {
+                    let valid_position = !globals_done
+                        && global_bof.is_some()
+                        && !output.biff_invalid
+                        && filepass_slot_open;
+                    inspect_incomplete_filepass_record(&mut output, valid_position)?;
+                }
                 output.biff_invalid = true;
                 break;
             },
+            StreamingRecordStep::Record(record) => record,
         };
         let kind = record.kind().get();
         let is_first_record = first_record;
@@ -1967,8 +2095,7 @@ fn analyze_workbook(
             break;
         }
 
-        let offset = u64::try_from(record.offset())
-            .map_err(|_| XlsValidationError::Allocation("BIFF record offset"))?;
+        let offset = record.offset();
         if active_sheet.is_none() {
             if let Some(index) = targets.get(&offset).copied() {
                 let Some(observation) = bound_sheets.get_mut(index) else {
@@ -1995,7 +2122,7 @@ fn analyze_workbook(
                         protection: SheetProtectionState::default(),
                     });
                 }
-            } else {
+            } else if !output.worksheet_limit {
                 output.biff_invalid = true;
             }
         } else if let Some(active) = active_sheet.as_mut() {
@@ -2054,6 +2181,8 @@ fn analyze_workbook(
         output.external_present = external_collector.external_present;
         output.external_count = external_collector.observed_count();
         output.external_invalid = external_feed_failed;
+        output.scan_terminal = true;
+        output.scan_interrupted = scan_interrupted;
         return Ok(output);
     }
     if active_sheet.is_some() {
@@ -2088,6 +2217,8 @@ fn analyze_workbook(
     output.protection_seen = protection_seen;
     output.protection_invalid = protection_feed_failed;
     output.external_invalid = external_feed_failed;
+    output.scan_terminal = !scan_interrupted;
+    output.scan_interrupted = scan_interrupted;
     Ok(output)
 }
 

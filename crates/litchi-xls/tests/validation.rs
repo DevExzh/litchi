@@ -1,10 +1,15 @@
-use std::io::Cursor;
-use std::sync::Arc;
+use std::io::{self, Cursor};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicU64, Ordering},
+};
 
-use litchi_cfb::{SharedOleFile, writer::OleWriter};
-use litchi_core::{CheckStatus, OwnedSource, ReadAt};
+use litchi_cfb::{OleError, SharedOleFile, writer::OleWriter};
+use litchi_core::{CheckStatus, OwnedSource, ReadAt, SourceVersion};
 use litchi_xls::ClipboardFormat;
-use litchi_xls::validation::{XlsValidationLimits, validate_source, validate_source_with_limits};
+use litchi_xls::validation::{
+    XlsValidationError, XlsValidationLimits, validate_source, validate_source_with_limits,
+};
 use litchi_xls::writer::{
     AddInFunctionOptions, DdeOrOleItemOptions, DdeOrOleLinkOptions, ExternalDefinedNameOptions,
     ExternalSheetOptions, ExternalWorkbookOptions, WeakEncryptionPolicy, Writer,
@@ -97,6 +102,100 @@ fn authored_encrypted_with_write_reservation() -> Vec<u8> {
 
 fn source(bytes: Vec<u8>) -> Arc<dyn ReadAt> {
     Arc::new(OwnedSource::new(bytes))
+}
+
+#[derive(Clone)]
+struct ReadWidthSource {
+    bytes: Arc<Vec<u8>>,
+    maximum_request: usize,
+    maximum_observed: Arc<Mutex<usize>>,
+    ranges: Arc<Mutex<Vec<(u64, usize)>>>,
+    failure_range: Option<(u64, usize)>,
+    change_range: Option<(u64, usize)>,
+    revision: Arc<AtomicU64>,
+}
+
+impl ReadWidthSource {
+    fn new(bytes: Vec<u8>, maximum_request: usize) -> Self {
+        Self {
+            bytes: Arc::new(bytes),
+            maximum_request,
+            maximum_observed: Arc::new(Mutex::new(0)),
+            ranges: Arc::new(Mutex::new(Vec::new())),
+            failure_range: None,
+            change_range: None,
+            revision: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    fn with_failure_range(mut self, range: (u64, usize)) -> Self {
+        self.failure_range = Some(range);
+        self
+    }
+
+    fn with_change_range(mut self, range: (u64, usize)) -> Self {
+        self.change_range = Some(range);
+        self
+    }
+
+    fn maximum_observed(&self) -> usize {
+        *self.maximum_observed.lock().unwrap()
+    }
+
+    fn ranges(&self) -> Vec<(u64, usize)> {
+        self.ranges.lock().unwrap().clone()
+    }
+}
+
+impl ReadAt for ReadWidthSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let mut maximum_observed = self.maximum_observed.lock().unwrap();
+        *maximum_observed = (*maximum_observed).max(output.len());
+        if !output.is_empty() {
+            self.ranges.lock().unwrap().push((offset, output.len()));
+        }
+        if output.len() > self.maximum_request {
+            return Err(io::Error::other("read request exceeded test width"));
+        }
+        let requested = (offset, output.len());
+        if self
+            .change_range
+            .is_some_and(|range| ranges_overlap(requested, range))
+        {
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+        if self
+            .failure_range
+            .is_some_and(|range| ranges_overlap(requested, range))
+        {
+            return Err(io::Error::other("injected streaming read failure"));
+        }
+        let start = usize::try_from(offset)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+        if start >= self.bytes.len() || output.is_empty() {
+            return Ok(0);
+        }
+        let count = output.len().min(self.bytes.len() - start);
+        output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x584c_535f_5445_5354,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
+fn ranges_overlap(left: (u64, usize), right: (u64, usize)) -> bool {
+    let left_end = left.0.checked_add(left.1 as u64).unwrap();
+    let right_end = right.0.checked_add(right.1 as u64).unwrap();
+    left.0 < right_end && right.0 < left_end
 }
 
 fn cfb_with_streams(streams: &[(&str, Vec<u8>)], storages: &[&str]) -> Vec<u8> {
@@ -540,6 +639,390 @@ fn workbook_byte_ceiling_blocks_before_materialization() {
         status(&report, "xls.biff.parse"),
         CheckStatus::StoppedBy { .. }
     ));
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+}
+
+#[test]
+fn streaming_record_limits_match_biff_boundaries() {
+    let stream = minimal_workbook(
+        &[],
+        &[],
+        &bof_payload(0x0010, 16),
+        &[frame(0x7777, &[])],
+        &[],
+    );
+    let limits = |max_biff_records| {
+        XlsValidationLimits::new(
+            2 * 1024 * 1024 * 1024,
+            128 * 1024 * 1024,
+            max_biff_records,
+            65_535,
+            65_536,
+            100_000,
+            litchi_core::ValidationLimits::default(),
+        )
+    };
+
+    let preterminal = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", stream.clone())], &[])),
+        limits(1),
+    )
+    .expect("validation report");
+    assert!(!preterminal.has_errors());
+    assert!(matches!(
+        status(&preterminal, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+    assert!(matches!(
+        status(&preterminal, "xls.biff.parse"),
+        CheckStatus::Blocked { .. }
+    ));
+
+    for maximum in [6, 7] {
+        let report = validate_source_with_limits(
+            source(cfb_with_streams(&[("Workbook", stream.clone())], &[])),
+            limits(maximum),
+        )
+        .expect("validation report");
+        assert!(report.is_complete());
+        assert!(!report.has_errors());
+    }
+
+    let limited = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", stream.clone())], &[])),
+        limits(5),
+    )
+    .expect("validation report");
+    assert!(!limited.has_errors());
+    assert!(matches!(
+        status(&limited, "xls.biff.parse"),
+        CheckStatus::Blocked { .. }
+    ));
+    assert!(matches!(
+        status(&limited, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+
+    let zero = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        limits(0),
+    )
+    .expect("validation report");
+    assert!(!zero.has_errors());
+    assert!(matches!(
+        status(&zero, "xls.biff.parse"),
+        CheckStatus::Blocked { .. }
+    ));
+}
+
+#[test]
+fn streaming_record_payload_and_truncation_boundaries_match_biff() {
+    let maximum_payload = vec![0xA5; litchi_biff::MAX_RECORD_BYTES];
+    let accepted = minimal_workbook(
+        &[frame(0x7777, &maximum_payload)],
+        &[],
+        &bof_payload(0x0010, 16),
+        &[],
+        &[],
+    );
+    let report = validate_source(source(cfb_with_streams(&[("Workbook", accepted)], &[])))
+        .expect("validation report");
+    assert!(report.is_complete());
+    assert!(!report.has_errors());
+
+    let oversized_payload = vec![0xA5; litchi_biff::MAX_RECORD_BYTES + 1];
+    let oversized = minimal_workbook(
+        &[frame(0x7777, &oversized_payload)],
+        &[],
+        &bof_payload(0x0010, 16),
+        &[],
+        &[],
+    );
+    let report = validate_source(source(cfb_with_streams(&[("Workbook", oversized)], &[])))
+        .expect("validation report");
+    assert!(!report.has_errors());
+    assert!(matches!(
+        status(&report, "xls.biff.parse"),
+        CheckStatus::Blocked { .. }
+    ));
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+
+    let mut oversized_filepass = frame(0x0809, &bof_payload(0x0005, 16));
+    oversized_filepass.extend_from_slice(&0x002Fu16.to_le_bytes());
+    oversized_filepass.extend_from_slice(
+        &u16::try_from(litchi_biff::MAX_RECORD_BYTES + 1)
+            .expect("oversized BIFF payload")
+            .to_le_bytes(),
+    );
+    let report = validate_source(source(cfb_with_streams(
+        &[("Workbook", oversized_filepass)],
+        &[],
+    )))
+    .expect("validation report");
+    assert!(report.has_errors());
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::Complete
+    ));
+    assert!(
+        report
+            .issues()
+            .iter()
+            .any(|issue| issue.code() == "xls.encryption.filepass_invalid")
+    );
+
+    let mut truncated_filepass = frame(0x0809, &bof_payload(0x0005, 16));
+    truncated_filepass.extend_from_slice(&0x002Fu16.to_le_bytes());
+    truncated_filepass.extend_from_slice(&6u16.to_le_bytes());
+    truncated_filepass.extend_from_slice(&[0; 2]);
+    let report = validate_source(source(cfb_with_streams(
+        &[("Workbook", truncated_filepass)],
+        &[],
+    )))
+    .expect("validation report");
+    assert!(report.has_errors());
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::Complete
+    ));
+    assert!(
+        report
+            .issues()
+            .iter()
+            .any(|issue| issue.code() == "xls.encryption.filepass_invalid")
+    );
+
+    let valid = minimal_workbook(&[], &[], &bof_payload(0x0010, 16), &[], &[]);
+    let mut oversized_after_terminal = valid.clone();
+    oversized_after_terminal.extend_from_slice(&0x7777u16.to_le_bytes());
+    oversized_after_terminal.extend_from_slice(
+        &u16::try_from(litchi_biff::MAX_RECORD_BYTES + 1)
+            .expect("oversized BIFF payload")
+            .to_le_bytes(),
+    );
+    let report = validate_source(source(cfb_with_streams(
+        &[("Workbook", oversized_after_terminal)],
+        &[],
+    )))
+    .expect("validation report");
+    assert!(!report.has_errors());
+    assert!(matches!(
+        status(&report, "xls.biff.parse"),
+        CheckStatus::Blocked { .. }
+    ));
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+
+    for tail_len in 1..=3 {
+        let mut stream = valid.clone();
+        stream.extend(std::iter::repeat_n(0xAA, tail_len));
+        let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
+            .expect("validation report");
+        assert!(report.has_errors());
+        assert!(
+            report
+                .issues()
+                .iter()
+                .any(|issue| issue.code() == "xls.biff.invalid")
+        );
+        assert!(matches!(
+            status(&report, "xls.biff.parse"),
+            CheckStatus::Blocked { .. }
+        ));
+        assert!(matches!(
+            status(&report, "xls.encryption.presence"),
+            CheckStatus::StoppedBy { .. }
+        ));
+    }
+
+    let mut truncated = valid;
+    truncated.extend_from_slice(&0x7777u16.to_le_bytes());
+    truncated.extend_from_slice(&10u16.to_le_bytes());
+    truncated.extend_from_slice(&[0xAA; 3]);
+    let report = validate_source(source(cfb_with_streams(&[("Workbook", truncated)], &[])))
+        .expect("validation report");
+    assert!(report.has_errors());
+    assert!(
+        report
+            .issues()
+            .iter()
+            .any(|issue| issue.code() == "xls.biff.invalid")
+    );
+    assert!(matches!(
+        status(&report, "xls.biff.parse"),
+        CheckStatus::Blocked { .. }
+    ));
+
+    let mut early_truncated = frame(0x0809, &bof_payload(0x0005, 16));
+    early_truncated.extend_from_slice(&[0x77, 0x77, 0x0A]);
+    let report = validate_source(source(cfb_with_streams(
+        &[("Workbook", early_truncated)],
+        &[],
+    )))
+    .expect("validation report");
+    assert!(report.has_errors());
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+}
+
+#[test]
+fn streaming_validation_stops_before_large_ciphertext_tail() {
+    let mut stream = frame(0x0809, &bof_payload(0x0005, 16));
+    stream.extend_from_slice(&frame(0x002F, &[0, 0, 0, 0, 0, 0]));
+    let sentinel: Vec<u8> = (0_usize..64)
+        .map(|index| (index.wrapping_mul(37).wrapping_add(11) & 0xFF) as u8)
+        .collect();
+    stream.extend_from_slice(&sentinel);
+    stream.extend(std::iter::repeat_n(0xFF, 64 * 1024));
+    let cfb = cfb_with_streams(&[("Workbook", stream)], &[]);
+    let mut matches = cfb
+        .windows(sentinel.len())
+        .enumerate()
+        .filter_map(|item| (item.1 == sentinel.as_slice()).then_some(item.0));
+    let tail_start = matches.next().expect("ciphertext sentinel");
+    assert!(
+        matches.next().is_none(),
+        "ciphertext sentinel is not unique"
+    );
+    let tail_range = (tail_start as u64, sentinel.len());
+    let source = Arc::new(ReadWidthSource::new(cfb, 16 * 1024));
+
+    let report = validate_source(source.clone()).expect("validation report");
+    assert!(!report.has_errors());
+    assert!(source.maximum_observed() <= 16 * 1024);
+    assert!(
+        !source
+            .ranges()
+            .into_iter()
+            .any(|range| ranges_overlap(range, tail_range)),
+        "streaming validation touched the ciphertext tail"
+    );
+}
+
+#[test]
+fn streaming_validation_propagates_read_and_source_change_errors() {
+    let marker: Vec<u8> = (0_u8..64)
+        .map(|index| index.wrapping_mul(37).wrapping_add(11))
+        .collect();
+    let stream = minimal_workbook(
+        &[frame(0x7777, &marker)],
+        &[],
+        &bof_payload(0x0010, 16),
+        &[],
+        &[],
+    );
+    let cfb = cfb_with_streams(&[("Workbook", stream)], &[]);
+    let mut matches = cfb
+        .windows(marker.len())
+        .enumerate()
+        .filter_map(|item| (item.1 == marker.as_slice()).then_some(item.0));
+    let marker_start = matches.next().expect("streaming marker");
+    assert!(matches.next().is_none(), "streaming marker is not unique");
+    let marker_range = (marker_start as u64, marker.len());
+
+    let source =
+        Arc::new(ReadWidthSource::new(cfb.clone(), 16 * 1024).with_failure_range(marker_range));
+    let error = validate_source(source).expect_err("injected read failure");
+    assert!(matches!(
+        error,
+        XlsValidationError::Ingress(OleError::Io(_))
+    ));
+
+    let source =
+        Arc::new(ReadWidthSource::new(cfb.clone(), 16 * 1024).with_change_range(marker_range));
+    let error = validate_source(source).expect_err("injected source change");
+    assert!(matches!(
+        error,
+        XlsValidationError::Ingress(OleError::SourceChanged { .. })
+    ));
+
+    let source = Arc::new(
+        ReadWidthSource::new(cfb, 16 * 1024)
+            .with_failure_range(marker_range)
+            .with_change_range(marker_range),
+    );
+    let error = validate_source(source).expect_err("source change precedence");
+    assert!(matches!(
+        error,
+        XlsValidationError::Ingress(OleError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn incomplete_streaming_scans_fail_closed_for_encryption() {
+    let limits = |max_workbook_stream_bytes, max_biff_records| {
+        XlsValidationLimits::new(
+            2 * 1024 * 1024 * 1024,
+            max_workbook_stream_bytes,
+            max_biff_records,
+            65_535,
+            65_536,
+            100_000,
+            litchi_core::ValidationLimits::default(),
+        )
+    };
+
+    let mut record_limited = frame(0x0809, &bof_payload(0x0005, 16));
+    record_limited.extend_from_slice(&frame(0x7777, &[]));
+    let report = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", record_limited)], &[])),
+        limits(128 * 1024 * 1024, 1),
+    )
+    .expect("validation report");
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+
+    let mut payload_limited = frame(0x0809, &bof_payload(0x0005, 16));
+    payload_limited.extend_from_slice(&0x7777u16.to_le_bytes());
+    payload_limited.extend_from_slice(
+        &u16::try_from(litchi_biff::MAX_RECORD_BYTES + 1)
+            .expect("oversized BIFF payload")
+            .to_le_bytes(),
+    );
+    let report = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", payload_limited)], &[])),
+        limits(128 * 1024 * 1024, 1_000_000),
+    )
+    .expect("validation report");
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+
+    let mut header_truncated = frame(0x0809, &bof_payload(0x0005, 16));
+    header_truncated.extend_from_slice(&[0x77, 0x77, 0x0A]);
+    let report = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", header_truncated)], &[])),
+        limits(128 * 1024 * 1024, 1_000_000),
+    )
+    .expect("validation report");
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
+
+    let stream = frame(0x0809, &bof_payload(0x0005, 16));
+    let report = validate_source_with_limits(
+        source(cfb_with_streams(&[("Workbook", stream)], &[])),
+        limits(1, 1_000_000),
+    )
+    .expect("validation report");
+    assert!(matches!(
+        status(&report, "xls.encryption.presence"),
+        CheckStatus::StoppedBy { .. }
+    ));
 }
 
 #[test]
@@ -644,66 +1127,105 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
 #[test]
 fn rejects_hostile_biff_ownership_and_global_ordering() {
     let cases = [
-        {
-            let bytes = frame(0x0809, &[0; 8]);
-            bytes
-        },
-        {
-            let bytes = frame(0x0809, &bof_payload(0x0010, 16));
-            bytes
-        },
-        minimal_workbook(&[], &[], &bof_payload(0x0010, 8), &[], &[]),
-        minimal_workbook(&[], &[], &bof_payload(0x0020, 16), &[], &[]),
-        {
-            let mut worksheet_bof = bof_payload(0x0010, 8);
-            worksheet_bof[0..2].copy_from_slice(&0x0500u16.to_le_bytes());
-            minimal_workbook(&[], &[], &worksheet_bof, &[], &[])
-        },
-        minimal_workbook(
-            &[],
-            &[],
-            &bof_payload(0x0010, 16),
-            &[frame(0x000A, &[1])],
-            &[],
+        (frame(0x0809, &[0; 8]), false),
+        (frame(0x0809, &bof_payload(0x0010, 16)), false),
+        (
+            minimal_workbook(&[], &[], &bof_payload(0x0010, 8), &[], &[]),
+            false,
         ),
-        minimal_workbook(
-            &[],
-            &[],
-            &bof_payload(0x0010, 16),
-            &[],
-            &[frame(0x7777, &[0xAA])],
+        (
+            minimal_workbook(&[], &[], &bof_payload(0x0020, 16), &[], &[]),
+            false,
         ),
-        minimal_workbook(
-            &[],
-            &[],
-            &bof_payload(0x0010, 16),
-            &[],
-            &[frame(0x0809, &bof_payload(0x0010, 16))],
+        (
+            {
+                let mut worksheet_bof = bof_payload(0x0010, 8);
+                worksheet_bof[0..2].copy_from_slice(&0x0500u16.to_le_bytes());
+                minimal_workbook(&[], &[], &worksheet_bof, &[], &[])
+            },
+            false,
         ),
-        minimal_workbook(
-            &[],
-            &[],
-            &bof_payload(0x0010, 16),
-            &[],
-            &[frame(0x000A, &[])],
+        (
+            minimal_workbook(
+                &[],
+                &[],
+                &bof_payload(0x0010, 16),
+                &[frame(0x000A, &[1])],
+                &[],
+            ),
+            false,
         ),
-        minimal_workbook(
-            &[frame(0x0809, &bof_payload(0x0005, 16))],
-            &[],
-            &bof_payload(0x0010, 16),
-            &[],
-            &[],
+        (
+            minimal_workbook(
+                &[],
+                &[],
+                &bof_payload(0x0010, 16),
+                &[],
+                &[frame(0x7777, &[0xAA])],
+            ),
+            false,
         ),
-        minimal_workbook(
-            &[frame(0x0042, &0x04B0u16.to_le_bytes())],
-            &[frame(0x0042, &0x04B0u16.to_le_bytes())],
-            &bof_payload(0x0010, 16),
-            &[],
-            &[],
+        (
+            minimal_workbook(
+                &[],
+                &[],
+                &bof_payload(0x0010, 16),
+                &[],
+                &[frame(0x0809, &bof_payload(0x0010, 16))],
+            ),
+            false,
+        ),
+        (
+            minimal_workbook(
+                &[],
+                &[],
+                &bof_payload(0x0010, 16),
+                &[],
+                &[frame(0x000A, &[])],
+            ),
+            false,
+        ),
+        (
+            minimal_workbook(
+                &[frame(0x0809, &bof_payload(0x0005, 16))],
+                &[],
+                &bof_payload(0x0010, 16),
+                &[],
+                &[],
+            ),
+            false,
+        ),
+        (
+            minimal_workbook(
+                &[frame(0x0042, &0x04B0u16.to_le_bytes())],
+                &[frame(0x0042, &0x04B0u16.to_le_bytes())],
+                &bof_payload(0x0010, 16),
+                &[],
+                &[],
+            ),
+            false,
+        ),
+        (
+            {
+                let mut bytes = frame(0x0809, &bof_payload(0x0005, 16));
+                bytes.extend_from_slice(&[0x77, 0x77, 0x0A]);
+                bytes
+            },
+            true,
+        ),
+        (
+            {
+                let mut bytes = frame(0x0809, &bof_payload(0x0005, 16));
+                bytes.extend_from_slice(&0x7777u16.to_le_bytes());
+                bytes.extend_from_slice(&10u16.to_le_bytes());
+                bytes.extend_from_slice(&[0xAA; 3]);
+                bytes
+            },
+            true,
         ),
     ];
 
-    for stream in cases {
+    for (stream, expect_blocked) in cases {
         let report = validate_source(source(cfb_with_streams(&[("Workbook", stream)], &[])))
             .expect("validation report");
         assert!(report.has_errors(), "hostile BIFF was accepted");
@@ -714,6 +1236,17 @@ fn rejects_hostile_biff_ownership_and_global_ordering() {
                 .any(|issue| issue.code() == "xls.biff.invalid"
                     || issue.code() == "xls.worksheet.invalid")
         );
+        if expect_blocked {
+            assert!(matches!(
+                status(&report, "xls.biff.parse"),
+                CheckStatus::Blocked { .. }
+            ));
+        } else {
+            assert!(matches!(
+                status(&report, "xls.biff.parse"),
+                CheckStatus::Complete
+            ));
+        }
     }
 }
 
