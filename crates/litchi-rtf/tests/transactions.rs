@@ -388,6 +388,49 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
 }
 
 #[test]
+fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
+    let source = Document::parse(r"{\rtf1\ansi A\par B\par C}").unwrap();
+    let mut edit = source.edit();
+    edit.insert_paragraph_after(0, "X")
+        .unwrap()
+        .insert_paragraph_after(1, "Y")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().text(), "A\nX\nB\nY\nC");
+
+    let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
+    let durable_json: serde_json::Value =
+        serde_json::from_slice(&durable.to_deterministic_json().unwrap()).unwrap();
+    let targets = durable_json["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|operation| operation["forward"]["target"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(targets, ["body:paragraph:0", "body:paragraph:1"]);
+
+    let applied = source.apply_durable(&durable).unwrap();
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.snapshot().to_bytes().unwrap()
+    );
+
+    let inverse = durable.inverse();
+    let inverse_json: serde_json::Value =
+        serde_json::from_slice(&inverse.to_deterministic_json().unwrap()).unwrap();
+    let targets = inverse_json["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|operation| operation["forward"]["target"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(targets, ["body:paragraph:2", "body:paragraph:0"]);
+
+    let restored = applied.apply_durable(&inverse).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+}
+
+#[test]
 fn italic_property_is_bounded_batch_reversible_and_durable() {
     let source = Document::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
     let mut edit = source.edit();
