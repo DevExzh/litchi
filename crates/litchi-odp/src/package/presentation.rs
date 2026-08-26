@@ -3,8 +3,12 @@
 use crate::codec::Parser;
 use crate::core::{OwnedPackage, family::Package};
 use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_metadata, settings};
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{
+    Error, Metadata, Result, SequentialTextWriter, TextOutputError, TextOutputOptions,
+    TextOutputReport,
+};
 use litchi_odf_common::{constants::ODF_PRESENTATION, core::PreparedPackage};
+use std::io::Write;
 use std::path::Path;
 
 const BODY_MARKER: &str = "<office:presentation";
@@ -507,6 +511,33 @@ impl Presentation {
         }
 
         Ok(all_text.join("\n\n"))
+    }
+
+    /// Stream one semantic text object per slide into `output` in document order.
+    ///
+    /// The output may be partial when parsing, limits, or the sink fail. This
+    /// method does not flush or roll back the sink and provides no cancellation
+    /// hook. The paragraph separator is used for every retained paragraph,
+    /// title/body, and shape-text boundary within a slide; the slide separator
+    /// is used between slide objects. Use [`TextOutputOptions::paragraph_separator`]
+    /// and [`TextOutputOptions::slide_separator`] to select them.
+    /// Semantic output parity is defined for documents accepted by the ordinary
+    /// parser; the fused sink validates only its bounded XML/text contexts and
+    /// does not promise full parser validation or error-precedence parity. Use
+    /// `with_empty_objects(false)` to match [`Self::text`] filtering of empty
+    /// slides.
+    ///
+    /// # Errors
+    /// Returns a typed error containing exact partial-output progress.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        let paragraph_separator = options.paragraph_separator();
+        let mut writer = SequentialTextWriter::new(output, options);
+        Parser::write_slides_text_to(self.package.content_xml(), &mut writer, paragraph_separator)?;
+        Ok(writer.finish())
     }
 
     /// Get document metadata.
