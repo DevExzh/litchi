@@ -33,7 +33,7 @@ fn spreadsheet_facade_owns_rdf_crud() {
         },
     };
     let path = spreadsheet
-        .add_rdf_graph(None, &[triple.clone()])
+        .add_rdf_graph(None, std::slice::from_ref(&triple))
         .expect("test fixture or operation should succeed");
     assert_eq!(path, "Metadata/metadata_1.rdf");
     assert_eq!(
