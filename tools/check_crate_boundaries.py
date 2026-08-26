@@ -16762,7 +16762,8 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
     ``NumbersEditor::set_cell_comment`` is a deprecated compatibility entry
     point.  It may retain the old archive writer for comment graphs that the
     focused package cannot yet own, but every supported existing-root
-    replacement must first cross the selector-first ``litchi-numbers`` seam.
+    creation or replacement must first cross the selector-first
+    ``litchi-numbers`` seam.
     This is deliberately a call-graph check: a disconnected helper or a
     test-only focused call must not satisfy the migration boundary.
 
