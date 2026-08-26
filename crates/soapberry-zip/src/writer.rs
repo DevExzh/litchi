@@ -2,6 +2,7 @@ use crate::{
     CENTRAL_HEADER_SIGNATURE, CompressionMethod, DataDescriptor,
     END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE, END_OF_CENTRAL_DIR_SIGNATURE64,
     END_OF_CENTRAL_DIR_SIGNAUTRE_BYTES, Error, Header, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
+    accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
     crc,
     errors::ErrorKind,
     extra_fields::{ExtraFieldId, ExtraFieldsContainer},
@@ -541,6 +542,18 @@ where
     W: Write,
 {
     pub fn write_stored_file(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_stored_file_with_accounting(name, data, &mut accounting)
+    }
+
+    /// Write a stored file while recording payload bytes accepted by the
+    /// archive sink. ZIP framing bytes are excluded from the counter.
+    pub fn write_stored_file_with_accounting(
+        &mut self,
+        name: &str,
+        data: &[u8],
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
         let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
 
         if file_path.len() > u16::MAX as usize {
@@ -570,7 +583,7 @@ where
         self.file_names.extend_from_slice(name_bytes);
 
         let crc32 = crc::crc32(data);
-        let size_u64 = data.len() as u64;
+        let size_u64 = usize_to_u64(data.len(), "stored payload length")?;
         if size_u64 >= ZIP64_THRESHOLD_FILE_SIZE {
             return Err(Error::from(ErrorKind::InvalidInput {
                 msg: "stored file too large".to_string(),
@@ -593,7 +606,12 @@ where
 
         header.write(&mut self.writer)?;
         self.writer.write_all(file_path.as_ref().as_bytes())?;
-        self.writer.write_all(data)?;
+        write_all_counted(
+            &mut self.writer,
+            data,
+            accounting,
+            AccountingWriteKind::Stored,
+        )?;
 
         let mut file_header = FileHeader {
             name_len,
@@ -630,6 +648,73 @@ where
         uncompressed_size: u64,
         compressed: &[u8],
     ) -> Result<(), Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_precompressed_file_with_accounting(
+            name,
+            compression_method,
+            crc32,
+            uncompressed_size,
+            compressed,
+            &mut accounting,
+        )
+    }
+
+    /// Write a precompressed member while recording payload bytes accepted by
+    /// the archive sink. ZIP framing bytes are excluded from the counter.
+    pub fn write_precompressed_file_with_accounting(
+        &mut self,
+        name: &str,
+        compression_method: CompressionMethod,
+        crc32: u32,
+        uncompressed_size: u64,
+        compressed: &[u8],
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        let accounting_kind = match compression_method {
+            CompressionMethod::Store => AccountingWriteKind::Stored,
+            CompressionMethod::Deflate => AccountingWriteKind::Precompressed,
+            _ => AccountingWriteKind::Precompressed,
+        };
+        self.write_precompressed_file_classified(
+            name,
+            compression_method,
+            crc32,
+            uncompressed_size,
+            compressed,
+            accounting,
+            accounting_kind,
+        )
+    }
+
+    pub(crate) fn write_generated_deflate_file_with_accounting(
+        &mut self,
+        name: &str,
+        crc32: u32,
+        uncompressed_size: u64,
+        compressed: &[u8],
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<(), Error> {
+        self.write_precompressed_file_classified(
+            name,
+            CompressionMethod::Deflate,
+            crc32,
+            uncompressed_size,
+            compressed,
+            accounting,
+            AccountingWriteKind::GeneratedDeflate,
+        )
+    }
+
+    fn write_precompressed_file_classified(
+        &mut self,
+        name: &str,
+        compression_method: CompressionMethod,
+        crc32: u32,
+        uncompressed_size: u64,
+        compressed: &[u8],
+        accounting: &mut ZipOperationAccounting,
+        accounting_kind: AccountingWriteKind,
+    ) -> Result<(), Error> {
         if !matches!(
             compression_method,
             CompressionMethod::Store | CompressionMethod::Deflate
@@ -646,7 +731,7 @@ where
             }));
         }
 
-        let compressed_size = compressed.len() as u64;
+        let compressed_size = usize_to_u64(compressed.len(), "precompressed payload length")?;
         if uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
             || compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
         {
@@ -691,7 +776,7 @@ where
 
         header.write(&mut self.writer)?;
         self.writer.write_all(file_path.as_ref().as_bytes())?;
-        self.writer.write_all(compressed)?;
+        write_all_counted(&mut self.writer, compressed, accounting, accounting_kind)?;
 
         let mut file_header = FileHeader {
             name_len,
@@ -1754,7 +1839,145 @@ struct ZipEntryOptions {
 mod tests {
     use super::*;
     use crate::ZipArchive;
-    use std::io::Cursor;
+    use flate2::{Compression, write::DeflateEncoder};
+    use std::io::{Cursor, Write};
+
+    #[test]
+    fn accounting_distinguishes_low_level_payload_kinds() {
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        let mut accounting = ZipOperationAccounting::default();
+        let deflate = |data: &[u8]| {
+            let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(data).unwrap();
+            encoder.finish().unwrap()
+        };
+        let generated_payload = b"generated payload";
+        let generated = deflate(generated_payload);
+        let precompressed_payload = b"precompressed payload";
+        let precompressed = deflate(precompressed_payload);
+        let stored_precompressed = b"stored precompressed payload";
+
+        archive
+            .write_stored_file_with_accounting("stored.bin", b"stored", &mut accounting)
+            .unwrap();
+        archive
+            .write_generated_deflate_file_with_accounting(
+                "generated.bin",
+                crate::crc32(generated_payload),
+                generated_payload.len() as u64,
+                &generated,
+                &mut accounting,
+            )
+            .unwrap();
+        archive
+            .write_precompressed_file_with_accounting(
+                "precompressed.bin",
+                CompressionMethod::Deflate,
+                crate::crc32(precompressed_payload),
+                precompressed_payload.len() as u64,
+                &precompressed,
+                &mut accounting,
+            )
+            .unwrap();
+        archive
+            .write_precompressed_file_with_accounting(
+                "stored-precompressed.bin",
+                CompressionMethod::Store,
+                crate::crc32(stored_precompressed),
+                stored_precompressed.len() as u64,
+                stored_precompressed,
+                &mut accounting,
+            )
+            .unwrap();
+        archive.finish().unwrap();
+        let bytes = output.into_inner();
+        let reader = crate::office::ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.read("generated.bin").unwrap(), generated_payload);
+        assert_eq!(
+            reader.read("precompressed.bin").unwrap(),
+            precompressed_payload
+        );
+        assert_eq!(
+            reader.read("stored-precompressed.bin").unwrap(),
+            stored_precompressed
+        );
+
+        assert_eq!(
+            accounting.stored_payload_bytes_emitted(),
+            6 + stored_precompressed.len() as u64
+        );
+        assert_eq!(
+            accounting.generated_deflate_payload_bytes_emitted(),
+            generated.len() as u64
+        );
+        assert_eq!(
+            accounting.precompressed_payload_bytes_emitted(),
+            precompressed.len() as u64
+        );
+    }
+
+    struct PartialPrecompressedSink<'a> {
+        payload: &'a [u8],
+        bytes: Vec<u8>,
+        payload_started: bool,
+    }
+
+    impl Write for PartialPrecompressedSink<'_> {
+        fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+            if !self.payload_started && buffer == self.payload {
+                self.payload_started = true;
+                let accepted = buffer.len().min(3);
+                self.bytes.extend_from_slice(&buffer[..accepted]);
+                return Ok(accepted);
+            }
+            if self.payload_started {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "precompressed payload sink failure",
+                ));
+            }
+            self.bytes.extend_from_slice(buffer);
+            Ok(buffer.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn precompressed_accounting_charges_partial_payload_with_provenance() {
+        let payload = b"precompressed partial payload";
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(payload).unwrap();
+        let compressed = encoder.finish().unwrap();
+        assert!(compressed.len() > 3);
+
+        let mut sink = PartialPrecompressedSink {
+            payload: &compressed,
+            bytes: Vec::new(),
+            payload_started: false,
+        };
+        let mut archive = ZipArchiveWriter::new(&mut sink);
+        let mut accounting = ZipOperationAccounting::default();
+        let error = archive
+            .write_precompressed_file_with_accounting(
+                "partial.bin",
+                CompressionMethod::Deflate,
+                crate::crc32(payload),
+                payload.len() as u64,
+                &compressed,
+                &mut accounting,
+            )
+            .unwrap_err();
+
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(accounting.precompressed_payload_bytes_emitted(), 3);
+        assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+        assert_eq!(accounting.stored_payload_bytes_emitted(), 0);
+        assert_eq!(&sink.bytes[sink.bytes.len() - 3..], &compressed[..3]);
+    }
 
     #[test]
     fn test_name_lifetime_independence() {

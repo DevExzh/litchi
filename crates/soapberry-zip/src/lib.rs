@@ -24,6 +24,7 @@
 //! ```
 #![deny(unsafe_code)]
 
+mod accounting;
 mod archive;
 mod crc;
 mod errors;
@@ -39,6 +40,7 @@ pub mod time;
 mod utils;
 mod writer;
 
+pub use accounting::ZipOperationAccounting;
 pub use archive::*;
 pub use crc::crc32;
 pub use errors::{Error, ErrorKind, LimitResource};

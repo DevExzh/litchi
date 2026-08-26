@@ -9,6 +9,7 @@ use crate::office::ArchiveLimits;
 use crate::{
     CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
     ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
+    accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
 };
 use std::io::Write;
 use std::ops::Range;
@@ -481,7 +482,26 @@ where
     }
 
     /// Validates `plan` completely, then writes it to a non-seekable sink.
-    pub fn write_to<W>(&self, plan: &PreservationPlan, mut sink: W) -> Result<W, Error>
+    pub fn write_to<W>(&self, plan: &PreservationPlan, sink: W) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_accounting(plan, sink, &mut accounting)
+    }
+
+    /// Validate and write a preservation plan while recording unchanged source
+    /// bytes accepted by the publication sink. The counter intentionally
+    /// includes unchanged local-member spans, unchanged central-record bytes
+    /// outside regenerated local offsets, and the source archive comment; it
+    /// is not payload-only. Generated member framing and payload are excluded
+    /// from this raw-source counter.
+    pub fn write_to_with_accounting<W>(
+        &self,
+        plan: &PreservationPlan,
+        mut sink: W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<W, Error>
     where
         W: Write,
     {
@@ -500,54 +520,34 @@ where
                 continue;
             }
             local_offsets[index] = output_offset;
-            match &prepared[index].local {
-                PreparedLocal::Copy(range) => {
-                    copy_range(self.source, range.clone(), &mut sink, &mut copy_buffer)?;
-                    output_offset = output_offset
-                        .checked_add(range.end - range.start)
-                        .ok_or_else(|| unsupported("output offset overflow"))?;
-                },
-                PreparedLocal::Generated(bytes) => {
-                    sink.write_all(bytes)?;
-                    output_offset = output_offset
-                        .checked_add(bytes.len() as u64)
-                        .ok_or_else(|| unsupported("output offset overflow"))?;
-                },
-                PreparedLocal::Shared { bytes, range } => {
-                    let generated = &bytes[range.clone()];
-                    sink.write_all(generated)?;
-                    output_offset = output_offset
-                        .checked_add(generated.len() as u64)
-                        .ok_or_else(|| unsupported("output offset overflow"))?;
-                },
-            }
+            let local_size = write_prepared_local(
+                &prepared[index].local,
+                prepared[index].generated_payload.as_ref(),
+                self.source,
+                &mut sink,
+                &mut copy_buffer,
+                accounting,
+            )?;
+            output_offset = output_offset
+                .checked_add(local_size)
+                .ok_or_else(|| unsupported("output offset overflow"))?;
         }
         for index in self.entries.len()..prepared.len() {
             if prepared[index].omitted {
                 continue;
             }
             local_offsets[index] = output_offset;
-            match &prepared[index].local {
-                PreparedLocal::Copy(range) => {
-                    copy_range(self.source, range.clone(), &mut sink, &mut copy_buffer)?;
-                    output_offset = output_offset
-                        .checked_add(range.end - range.start)
-                        .ok_or_else(|| unsupported("output offset overflow"))?;
-                },
-                PreparedLocal::Generated(bytes) => {
-                    sink.write_all(bytes)?;
-                    output_offset = output_offset
-                        .checked_add(bytes.len() as u64)
-                        .ok_or_else(|| unsupported("output offset overflow"))?;
-                },
-                PreparedLocal::Shared { bytes, range } => {
-                    let generated = &bytes[range.clone()];
-                    sink.write_all(generated)?;
-                    output_offset = output_offset
-                        .checked_add(generated.len() as u64)
-                        .ok_or_else(|| unsupported("output offset overflow"))?;
-                },
-            }
+            let local_size = write_prepared_local(
+                &prepared[index].local,
+                prepared[index].generated_payload.as_ref(),
+                self.source,
+                &mut sink,
+                &mut copy_buffer,
+                accounting,
+            )?;
+            output_offset = output_offset
+                .checked_add(local_size)
+                .ok_or_else(|| unsupported("output offset overflow"))?;
         }
 
         let central_start = output_offset;
@@ -558,9 +558,28 @@ where
             let local_offset = u32::try_from(local_offsets[index])
                 .map_err(|_| unsupported("ZIP64 output promotion"))?;
             let central = entry.central.bytes(&self.entries);
-            sink.write_all(&central[..CENTRAL_LOCAL_HEADER_OFFSET.start])?;
+            let is_unchanged = matches!(&entry.central, PreparedCentral::Copy(_));
+            if is_unchanged {
+                write_all_counted(
+                    &mut sink,
+                    &central[..CENTRAL_LOCAL_HEADER_OFFSET.start],
+                    accounting,
+                    AccountingWriteKind::RawUnchangedSource,
+                )?;
+            } else {
+                sink.write_all(&central[..CENTRAL_LOCAL_HEADER_OFFSET.start])?;
+            }
             sink.write_all(&local_offset.to_le_bytes())?;
-            sink.write_all(&central[CENTRAL_LOCAL_HEADER_OFFSET.end..])?;
+            if is_unchanged {
+                write_all_counted(
+                    &mut sink,
+                    &central[CENTRAL_LOCAL_HEADER_OFFSET.end..],
+                    accounting,
+                    AccountingWriteKind::RawUnchangedSource,
+                )?;
+            } else {
+                sink.write_all(&central[CENTRAL_LOCAL_HEADER_OFFSET.end..])?;
+            }
             output_offset = output_offset
                 .checked_add(central.len() as u64)
                 .ok_or_else(|| unsupported("output offset overflow"))?;
@@ -589,7 +608,12 @@ where
                 .to_le_bytes(),
         );
         sink.write_all(&eocd)?;
-        sink.write_all(&self.archive_comment)?;
+        write_all_counted(
+            &mut sink,
+            &self.archive_comment,
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
         sink.flush()?;
         Ok(sink)
     }
@@ -622,6 +646,7 @@ where
                 PreparedEntry {
                     local: PreparedLocal::Generated(Vec::new()),
                     central: PreparedCentral::Generated(Vec::new()),
+                    generated_payload: None,
                     omitted: true,
                 }
             } else {
@@ -629,6 +654,7 @@ where
                     None => PreparedEntry {
                         local: PreparedLocal::Copy(source_entry.local_span.clone()),
                         central: PreparedCentral::Copy(index),
+                        generated_payload: None,
                         omitted: false,
                     },
                     Some(entry) => generated_entry(entry)?,
@@ -701,7 +727,13 @@ where
 struct PreparedEntry {
     local: PreparedLocal,
     central: PreparedCentral,
+    generated_payload: Option<GeneratedPayload>,
     omitted: bool,
+}
+
+struct GeneratedPayload {
+    range: Range<usize>,
+    kind: AccountingWriteKind,
 }
 
 fn retained_entry_count(prepared: &[PreparedEntry]) -> usize {
@@ -791,7 +823,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         _ => return Err(unsupported("generated compression method")),
     }
     let bytes = writer.finish()?;
-    let (directory_offset, eocd_offset) = {
+    let (directory_offset, eocd_offset, payload_start, payload_end) = {
         let archive = ZipArchive::from_slice(&bytes)?;
         if archive.is_zip64() || archive.entries_hint() != 1 {
             return Err(unsupported("generated ZIP64 output"));
@@ -810,7 +842,16 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         if entries.next_entry()?.is_some() || record.is_zip64() {
             return Err(unsupported("generated archive layout"));
         }
-        (directory_offset, eocd_offset)
+        let entry = archive.get_entry(record.wayfinder())?;
+        let (payload_start, payload_end) = entry.compressed_data_range();
+        let payload_start =
+            usize::try_from(payload_start).map_err(|_| unsupported("generated payload range"))?;
+        let payload_end =
+            usize::try_from(payload_end).map_err(|_| unsupported("generated payload range"))?;
+        if payload_start > payload_end || payload_end > directory_offset {
+            return Err(unsupported("generated payload range"));
+        }
+        (directory_offset, eocd_offset, payload_start, payload_end)
     };
     // Retain one owned archive buffer and publish disjoint ranges from it.
     // The previous implementation copied the central record into another
@@ -826,6 +867,14 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
             bytes,
             range: directory_offset..eocd_offset,
         },
+        generated_payload: Some(GeneratedPayload {
+            range: payload_start..payload_end,
+            kind: match entry.compression {
+                CompressionMethod::Store => AccountingWriteKind::Stored,
+                CompressionMethod::Deflate => AccountingWriteKind::GeneratedDeflate,
+                _ => return Err(unsupported("generated compression method")),
+            },
+        }),
         omitted: false,
     })
 }
@@ -864,11 +913,65 @@ fn validate_local_span<R: ReaderAt>(
     Ok(())
 }
 
+fn write_prepared_local<R, W>(
+    local: &PreparedLocal,
+    generated_payload: Option<&GeneratedPayload>,
+    source: &R,
+    sink: &mut W,
+    buffer: &mut [u8],
+    accounting: &mut ZipOperationAccounting,
+) -> Result<u64, Error>
+where
+    R: ReaderAt,
+    W: Write,
+{
+    match (local, generated_payload) {
+        (PreparedLocal::Copy(range), None) => {
+            copy_range(source, range.clone(), sink, buffer, accounting)?;
+            Ok(range.end - range.start)
+        },
+        (PreparedLocal::Copy(_), Some(_)) => Err(unsupported("generated payload on copied member")),
+        (PreparedLocal::Generated(bytes), None) => {
+            sink.write_all(bytes)?;
+            usize_to_u64(bytes.len(), "generated local bytes")
+        },
+        (PreparedLocal::Generated(_), Some(_)) => {
+            Err(unsupported("generated payload metadata on owned local"))
+        },
+        (PreparedLocal::Shared { bytes, range }, Some(payload)) => {
+            if payload.range.start < range.start
+                || payload.range.end > range.end
+                || payload.range.start > payload.range.end
+            {
+                return Err(unsupported("generated payload outside local member"));
+            }
+            let local_bytes = &bytes[range.clone()];
+            let payload_start = payload.range.start - range.start;
+            let payload_end = payload.range.end - range.start;
+            sink.write_all(&local_bytes[..payload_start])?;
+            write_all_counted(
+                sink,
+                &local_bytes[payload_start..payload_end],
+                accounting,
+                payload.kind,
+            )?;
+            sink.write_all(&local_bytes[payload_end..])?;
+            usize_to_u64(local_bytes.len(), "generated local bytes")
+        },
+        (PreparedLocal::Shared { bytes, range }, None) => {
+            let local_bytes = &bytes[range.clone()];
+            sink.write_all(local_bytes)?;
+            usize_to_u64(local_bytes.len(), "generated local bytes")
+        },
+    }
+}
+
 fn copy_range<R, W>(
     source: &R,
     range: Range<u64>,
     sink: &mut W,
     buffer: &mut [u8],
+    accounting: &mut ZipOperationAccounting,
 ) -> Result<(), Error>
 where
     R: ReaderAt,
@@ -879,7 +982,12 @@ where
         let len = usize::try_from((range.end - offset).min(buffer.len() as u64))
             .map_err(|_| unsupported("copy range length"))?;
         source.read_exact_at(&mut buffer[..len], offset)?;
-        sink.write_all(&buffer[..len])?;
+        write_all_counted(
+            sink,
+            &buffer[..len],
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
         offset += len as u64;
     }
     Ok(())
@@ -1463,6 +1571,91 @@ mod tests {
     }
 
     #[test]
+    fn accounting_distinguishes_changed_store_and_deflate_members() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        let store = b"replacement store";
+        let deflate = b"replacement deflate payload";
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("changed-store", store.as_slice()),
+        };
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new("changed-deflate", deflate.as_slice())
+                .compression_method(CompressionMethod::Deflate),
+        };
+
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
+            .unwrap();
+        let reader = crate::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(reader.read("changed-store").unwrap(), store);
+        assert_eq!(reader.read("changed-deflate").unwrap(), deflate);
+        assert_eq!(
+            accounting.stored_payload_bytes_emitted(),
+            store.len() as u64
+        );
+        assert!(accounting.generated_deflate_payload_bytes_emitted() > 0);
+        assert_eq!(accounting.precompressed_payload_bytes_emitted(), 0);
+
+        let unchanged = &index.entries()[2];
+        let unchanged_local = unchanged.local_span();
+        let unchanged_central = unchanged.central_record();
+        let expected_raw = unchanged_local.end - unchanged_local.start + unchanged_central.end
+            - unchanged_central.start
+            - CENTRAL_LOCAL_HEADER_OFFSET.len() as u64;
+        assert_eq!(
+            accounting.raw_unchanged_source_bytes_accepted(),
+            expected_raw
+        );
+    }
+
+    #[test]
+    fn accounting_charges_generated_payloads_on_partial_publication() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        let store = b"partial store payload";
+        let mut store_plan = PreservationPlan::copy_all(&index);
+        store_plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("partial-store", store.as_slice()),
+        };
+        let store_payload_start = ZipLocalFileHeaderFixed::SIZE + b"partial-store".len();
+        let mut store_sink = PartialFailingSink::new(store_payload_start + 3, usize::MAX);
+        let mut store_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(&store_plan, &mut store_sink, &mut store_accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(store_accounting.stored_payload_bytes_emitted(), 3);
+
+        let deflate = b"partial deflate payload with repeated repeated repeated bytes";
+        let mut deflate_plan = PreservationPlan::copy_all(&index);
+        deflate_plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("partial-deflate", deflate.as_slice())
+                .compression_method(CompressionMethod::Deflate),
+        };
+        let deflate_payload_start = ZipLocalFileHeaderFixed::SIZE + b"partial-deflate".len();
+        let mut deflate_sink = PartialFailingSink::new(deflate_payload_start + 3, usize::MAX);
+        let mut deflate_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(&deflate_plan, &mut deflate_sink, &mut deflate_accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(
+            deflate_accounting.generated_deflate_payload_bytes_emitted(),
+            3
+        );
+    }
+
+    #[test]
     fn regenerated_entry_can_retain_a_shared_payload() {
         let data = Arc::new(b"shared generated content".to_vec());
         let entry = RegeneratedEntry::new_shared("shared.bin", Arc::clone(&data));
@@ -1834,6 +2027,7 @@ mod tests {
         prepared.resize_with(u16::MAX as usize, || PreparedEntry {
             local: PreparedLocal::Generated(Vec::new()),
             central: PreparedCentral::Generated(Vec::new()),
+            generated_payload: None,
             omitted: false,
         });
         let error = index
@@ -1902,6 +2096,85 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
         }
+    }
+
+    #[derive(Debug)]
+    struct PartialFailingSink {
+        bytes: Vec<u8>,
+        fail_after: usize,
+        max_write: usize,
+    }
+
+    impl PartialFailingSink {
+        fn new(fail_after: usize, max_write: usize) -> Self {
+            Self {
+                bytes: Vec::new(),
+                fail_after,
+                max_write,
+            }
+        }
+    }
+
+    impl Write for PartialFailingSink {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            if self.bytes.len() >= self.fail_after {
+                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "sink failed"));
+            }
+            let available = self.fail_after - self.bytes.len();
+            let written = buffer.len().min(self.max_write).min(available);
+            self.bytes.extend_from_slice(&buffer[..written]);
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn accounting_counts_exact_raw_preservation_and_partial_sink_progress() {
+        let data = with_comment(ordinary_archive(), b"raw comment");
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                Vec::new(),
+                &mut accounting,
+            )
+            .unwrap();
+        let expected = index
+            .entries()
+            .iter()
+            .map(|entry| entry.local_span().end - entry.local_span().start)
+            .sum::<u64>()
+            + index
+                .entries()
+                .iter()
+                .map(|entry| {
+                    (entry.central_record().end - entry.central_record().start)
+                        - CENTRAL_LOCAL_HEADER_OFFSET.len() as u64
+                })
+                .sum::<u64>();
+        let expected = expected + b"raw comment".len() as u64;
+        assert_eq!(output, data);
+        assert_eq!(accounting.raw_unchanged_source_bytes_accepted(), expected);
+
+        let mut sink = PartialFailingSink::new(8, 5);
+        let mut partial_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                &mut sink,
+                &mut partial_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(
+            partial_accounting.raw_unchanged_source_bytes_accepted(),
+            sink.bytes.len() as u64
+        );
     }
 
     #[test]
