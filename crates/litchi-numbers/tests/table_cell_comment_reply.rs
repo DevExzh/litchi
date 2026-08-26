@@ -66,6 +66,8 @@ const TABLE_NAME: &str = "Reply fixture table";
 enum FixtureMode {
     /// An empty comment list plus an empty author registry.
     Rootless,
+    /// An empty comment graph with a missing second-column slot.
+    SparseCell,
     /// One rooted comment with duplicate reply text for ordinal selection.
     DuplicateText,
     /// The same root comment is referenced by two cells.
@@ -260,7 +262,7 @@ fn list_message(
 
 fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<ArchiveObject> {
     let mut comment_entries = match mode {
-        FixtureMode::Rootless => Vec::new(),
+        FixtureMode::Rootless | FixtureMode::SparseCell => Vec::new(),
         FixtureMode::SharedRoot | FixtureMode::DuplicateText | FixtureMode::SingleRoot => {
             vec![comment_entry(
                 1,
@@ -354,7 +356,7 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
         .get_mut(list_index)
         .ok_or_else(|| io::Error::other("comment list info is missing"))?;
     let roots: Vec<u64> = match mode {
-        FixtureMode::Rootless => Vec::new(),
+        FixtureMode::Rootless | FixtureMode::SparseCell => Vec::new(),
         FixtureMode::SharedReply | FixtureMode::CrossComponent => {
             vec![ROOT_COMMENT_ID, SECOND_ROOT_COMMENT_ID]
         },
@@ -391,7 +393,7 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
     Ok(result)
 }
 
-fn table_model(comment_list: bool) -> tst::TableModelArchive {
+fn table_model(comment_list: bool, columns: u32) -> tst::TableModelArchive {
     tst::TableModelArchive {
         table_id: "reply-fixture-table-id".to_owned(),
         table_name: TABLE_NAME.to_owned(),
@@ -405,7 +407,7 @@ fn table_model(comment_list: bool) -> tst::TableModelArchive {
         header_column_style: reference(SIDECAR_ID),
         footer_row_style: reference(SIDECAR_ID),
         number_of_rows: 2,
-        number_of_columns: 1,
+        number_of_columns: columns,
         base_data_store: tst::DataStore {
             row_headers: tst::HeaderStorage {
                 bucket_hash_function: 1,
@@ -446,7 +448,7 @@ fn comment_cell(key: Option<u32>) -> TestResult<Vec<u8>> {
 
 fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
     let keys = match mode {
-        FixtureMode::Rootless => [None, None],
+        FixtureMode::Rootless | FixtureMode::SparseCell => [None, None],
         FixtureMode::SharedRoot => [Some(1), Some(1)],
         FixtureMode::SharedReply | FixtureMode::CrossComponent => [Some(1), Some(2)],
         FixtureMode::DuplicateText | FixtureMode::SingleRoot => [Some(1), None],
@@ -454,6 +456,12 @@ fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
     let mut rows = Vec::new();
     for (row, key) in keys.into_iter().enumerate() {
         let bytes = comment_cell(key)?;
+        let sparse = matches!(mode, FixtureMode::SparseCell);
+        let offsets = if sparse {
+            vec![0, 0, 0xff, 0xff]
+        } else {
+            vec![0, 0]
+        };
         rows.push(tst::TileRowInfo {
             tile_row_index: u32::try_from(row)?,
             cell_count: 1,
@@ -461,12 +469,16 @@ fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
             cell_storage_buffer_pre_bnc: bytes.clone(),
             cell_offsets_pre_bnc: vec![0, 0],
             cell_storage_buffer: Some(bytes),
-            cell_offsets: Some(vec![0, 0]),
+            cell_offsets: Some(offsets),
             ..Default::default()
         });
     }
     Ok(tst::Tile {
-        max_column: 0,
+        max_column: if matches!(mode, FixtureMode::SparseCell) {
+            1
+        } else {
+            0
+        },
         max_row: 1,
         num_cells: 2,
         numrows: 2,
@@ -519,7 +531,7 @@ fn reply_objects(
     mode: FixtureMode,
     corruption: Option<Corruption>,
 ) -> TestResult<Vec<ArchiveObject>> {
-    if matches!(mode, FixtureMode::Rootless) {
+    if matches!(mode, FixtureMode::Rootless | FixtureMode::SparseCell) {
         return Ok(Vec::new());
     }
     let mut first_replies = match mode {
@@ -635,7 +647,7 @@ fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec
         AUTHOR_ID,
         AUTHOR_STORAGE_ID,
     ];
-    if matches!(mode, FixtureMode::Rootless) {
+    if matches!(mode, FixtureMode::Rootless | FixtureMode::SparseCell) {
         document_ids.retain(|identifier| {
             !matches!(
                 *identifier,
@@ -838,7 +850,15 @@ fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<
     let mut model = object(
         TABLE_MODEL_ID,
         TABLE_MODEL_TYPE,
-        table_model(!matches!(corruption, Some(Corruption::MissingCommentList))).encode_to_vec(),
+        table_model(
+            !matches!(corruption, Some(Corruption::MissingCommentList)),
+            if matches!(mode, FixtureMode::SparseCell) {
+                2
+            } else {
+                1
+            },
+        )
+        .encode_to_vec(),
     )?;
     set_message_info(&mut model, &[SIDECAR_ID, TILE_ID])?;
     set_field_info(&mut model, vec![25], &[SIDECAR_ID])?;
@@ -854,7 +874,7 @@ fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<
     if !matches!(corruption, Some(Corruption::MissingAuthor)) {
         document_objects.extend(author_objects(matches!(
             (mode, corruption),
-            (FixtureMode::Rootless, _)
+            (FixtureMode::Rootless | FixtureMode::SparseCell, _)
         ))?);
     }
     if matches!(corruption, Some(Corruption::MissingAuthorStorage)) {
@@ -1293,6 +1313,59 @@ fn root_comment_creation_builds_a_missing_author_storage_atomically() -> TestRes
             "fresh object {identifier} is missing current UUID ownership"
         );
     }
+    let restored = commit
+        .package()
+        .apply_table_cell_comment(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestResult {
+    let source = fixture(FixtureMode::SparseCell, None)?;
+    let package = load_package(&source)?;
+    assert_eq!(
+        package
+            .table(SheetSelector::index(0), TableSelector::index(0))?
+            .ok_or_else(|| io::Error::other("sparse table is missing"))?
+            .dimensions()
+            .columns(),
+        2,
+    );
+    assert_eq!(
+        package.table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(1, 1),
+        )?,
+        None,
+    );
+    let commit = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(1, 1),
+        "new root in sparse slot",
+    )?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 1),
+            )?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("new root in sparse slot"),
+    );
+    assert_eq!(
+        commit.package().table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(1, 0),
+        )?,
+        None,
+    );
     let restored = commit
         .package()
         .apply_table_cell_comment(&commit.patch().inverse())?;
