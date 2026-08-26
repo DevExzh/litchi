@@ -571,10 +571,15 @@ impl Snapshot {
         transaction_limits: TransactionLimits,
     ) -> Result<Self> {
         let bytes = input.into();
-        RevisionEditor::open(bytes.clone(), limits).map_err(Error::Invalid)?;
-        let mut package =
-            crate::Package::from_reader(Cursor::new(bytes.clone())).map_err(Error::Invalid)?;
-        package.document().map_err(Error::Invalid)?;
+        let (_strict_editor, mut ole) =
+            RevisionEditor::open_with_ole_file(bytes.clone(), limits).map_err(Error::Invalid)?;
+        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
+            bytes.len(),
+            crate::package::Limits::default(),
+        )
+        .map_err(Error::Invalid)?;
+        crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
+            .map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             fingerprint_cache: OnceLock::new(),
@@ -605,19 +610,27 @@ impl Snapshot {
         mut observer: impl FnMut(DiagnosticEvent),
     ) -> Result<Self> {
         let bytes = input.into();
-        observe_phase(
+        let mut ole = observe_phase(
             &mut observer,
             DiagnosticPhase::StrictOwnerValidation,
-            || RevisionEditor::open(bytes.clone(), limits).map_err(Error::Invalid),
+            || {
+                let (_strict_editor, ole) =
+                    RevisionEditor::open_with_ole_file(bytes.clone(), limits)
+                        .map_err(Error::Invalid)?;
+                Ok(ole)
+            },
         )?;
         observe_phase(
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
             || {
-                let mut package = crate::Package::from_reader(Cursor::new(bytes.clone()))
-                    .map_err(Error::Invalid)?;
-                package.document().map_err(Error::Invalid)?;
-                Ok(())
+                crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
+                    bytes.len(),
+                    crate::package::Limits::default(),
+                )
+                .map_err(Error::Invalid)?;
+                crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
+                    .map_err(Error::Invalid)
             },
         )?;
         let source = observe_phase(&mut observer, DiagnosticPhase::SourceRetention, || {
@@ -3809,9 +3822,7 @@ mod tests {
     };
     #[cfg(feature = "performance-diagnostics")]
     use super::{DiagnosticEvent, DiagnosticOutcome, DiagnosticPhase, observe_phase};
-    use crate::tracked_revision::Limits;
-    #[cfg(feature = "performance-diagnostics")]
-    use crate::tracked_revision::RevisionEditor;
+    use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
         CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
     };
@@ -3996,6 +4007,48 @@ mod tests {
     }
 
     #[cfg(feature = "performance-diagnostics")]
+    fn protected_dop_doc() -> Vec<u8> {
+        let mut package =
+            PackageEditor::open(doc(&["alpha"]), Targets::default(), Limits::default())
+                .expect("fixture package should open");
+        let word_path = ["WordDocument".to_string()];
+        let word = package
+            .stream(&word_path)
+            .expect("WordDocument stream")
+            .to_vec();
+        let flags = u16::from_le_bytes([word[10], word[11]]);
+        let table_name = if flags & 0x0200 != 0 {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut table = package
+            .stream(&table_path)
+            .expect("selected Table stream")
+            .to_vec();
+        let pointer = 154 + 31 * 8;
+        let offset = usize::try_from(u32::from_le_bytes(
+            word[pointer..pointer + 4]
+                .try_into()
+                .expect("DOP offset bytes"),
+        ))
+        .expect("DOP offset fits usize");
+        let length = usize::try_from(u32::from_le_bytes(
+            word[pointer + 4..pointer + 8]
+                .try_into()
+                .expect("DOP length bytes"),
+        ))
+        .expect("DOP length fits usize");
+        assert!(length >= 84, "fixture DOP should have protection fields");
+        table[offset + 6] |= 0x10;
+        package
+            .put_stream(&table_path, table)
+            .expect("protected DOP should remain a valid package");
+        package.finish().expect("fixture package should finish")
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn profiled_open_matches_ordinary_open_and_balances_success_events() {
         let bytes = doc(&["alpha", "bravo"]);
@@ -4050,11 +4103,10 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             |event| events.push(event),
-        )
-        .map_err(|error| error.to_string());
+        );
 
-        assert_eq!(profiled, ordinary);
-        assert!(profiled.is_err());
+        assert!(matches!(profiled, Err(Error::Invalid(_))));
+        assert_eq!(profiled.map_err(|error| error.to_string()), ordinary);
         assert_eq!(
             events,
             vec![
@@ -4102,6 +4154,37 @@ mod tests {
                 },
                 DiagnosticEvent::Finished {
                     phase: DiagnosticPhase::PublicReaderValidation,
+                    outcome: DiagnosticOutcome::Error,
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_open_native_dop_refusal_stays_strict_first() {
+        let bytes = protected_dop_doc();
+        let ordinary =
+            Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
+        let mut events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled(
+            bytes,
+            Limits::default(),
+            TransactionLimits::default(),
+            |event| events.push(event),
+        )
+        .map_err(|error| error.to_string());
+
+        assert_eq!(profiled, ordinary);
+        assert!(profiled.is_err());
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
                     outcome: DiagnosticOutcome::Error,
                 },
             ]
@@ -4467,6 +4550,57 @@ mod tests {
                 "unmodeled stream payload changed at {path:?}"
             );
         }
+    }
+
+    #[test]
+    fn shared_physical_validation_preserves_candidate_semantics_and_opaque_streams() {
+        let source = doc_with_opaque_stream(&["alpha", "bravo"]);
+        let (_strict_editor, mut ole) =
+            RevisionEditor::open_with_ole_file(source.clone(), Limits::default())
+                .expect("physical DOC context should open");
+        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
+            source.len(),
+            crate::package::Limits::default(),
+        )
+        .expect("public package preflight should pass");
+        crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
+            .expect("public reader should validate the shared context");
+
+        let source = Snapshot::from_bytes(source).expect("source should open");
+        let mut edit = source.edit().expect("edit should open");
+        edit.replace_paragraph(Position::new(0), "alpha expanded")
+            .expect("paragraph replacement should stage");
+        let commit = edit.commit().expect("changed candidate should reopen");
+        assert_eq!(
+            commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
+            "alpha expanded"
+        );
+        let mut public = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+            .expect("changed candidate should pass the public package gate");
+        assert_eq!(
+            public
+                .document()
+                .expect("changed candidate should pass public document parsing")
+                .paragraphs()
+                .expect("changed candidate paragraphs")
+                .first()
+                .expect("changed candidate first paragraph")
+                .text()
+                .expect("changed candidate paragraph text"),
+            "alpha expanded"
+        );
+        let package = PackageEditor::open(
+            commit.snapshot().finish(),
+            Targets::default(),
+            Limits::default(),
+        )
+        .expect("candidate package should open");
+        assert_eq!(
+            package
+                .stream(&["OpaqueVendorData".to_string()])
+                .expect("opaque stream should survive"),
+            b"untouched"
+        );
     }
 
     #[test]
