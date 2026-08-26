@@ -153,50 +153,6 @@ fn replace_cell_comment_with_focused_owner(
     Ok(FocusedCommentReplacement::Published(verified))
 }
 
-fn clear_cell_comment_with_focused_owner(
-    editor: &NumbersEditor,
-    table_id: u64,
-    row: usize,
-    column: usize,
-) -> Result<FocusedCommentReplacement> {
-    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
-    let position =
-        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
-            Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
-        })?;
-    let has_metadata = editor.package().contains_entry("Index/Metadata.iwa");
-    if !has_metadata {
-        return Ok(FocusedCommentReplacement::LegacyFallback);
-    }
-    let source_bytes = editor.to_bytes()?;
-    let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "focused Numbers comment-clear source validation failed: {error}"
-        ))
-    })?;
-    let commit = match source.clear_table_cell_comment(sheet, table, position) {
-        Ok(commit) => commit,
-        Err(error) => return Err(focused_comment_error(error)),
-    };
-    let mut bytes = Vec::new();
-    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
-        Error::InvalidFormat(
-            "could not allocate focused Numbers comment-clear candidate".to_owned(),
-        )
-    })?;
-    commit
-        .package()
-        .write_to(&mut bytes)
-        .map_err(|error| Error::Io(error.into_io_error()))?;
-    let verified = NumbersEditor::from_bytes(&bytes)?;
-    if cell_comment_in_package(verified.package(), table_id, row, column)?.is_some() {
-        return Err(Error::InvalidFormat(
-            "focused Numbers cell-comment clear failed legacy readback".to_owned(),
-        ));
-    }
-    Ok(FocusedCommentReplacement::Published(verified))
-}
-
 enum FocusedCommentReplySource {
     Ready {
         source: FocusedNumbersPackage,
@@ -2654,27 +2610,6 @@ impl NumbersEditor {
         }
         let mut staged = self.package.clone();
         set_cell_comment_in_package(&mut staged, table_id, row, column, text)?;
-        let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
-        self.package = staged;
-        Ok(())
-    }
-
-    /// Delete a cell comment without changing the cell value or style.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment API; use litchi_numbers::Package::edit_table_cell_comment or clear_table_cell_comment with SheetSelector and TableSelector where the focused owner supports the operation; comment-graph cleanup remains migration-host scope"
-    )]
-    pub fn clear_cell_comment(&mut self, table_id: u64, row: usize, column: usize) -> Result<()> {
-        match clear_cell_comment_with_focused_owner(self, table_id, row, column)? {
-            FocusedCommentReplacement::Published(verified) => {
-                *self = verified;
-                return Ok(());
-            },
-            FocusedCommentReplacement::LegacyFallback => {},
-        }
-        let mut staged = self.package.clone();
-        clear_cell_comment_in_package(&mut staged, table_id, row, column)?;
         let bytes = staged.to_bytes()?;
         IWorkPackage::from_bytes(&bytes)?;
         self.package = staged;

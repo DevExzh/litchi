@@ -1,18 +1,27 @@
-//! Create, update, or delete a Numbers cell comment.
+//! Update or delete an existing Numbers cell comment.
 
-#![allow(deprecated)]
+use std::{env, fs::File};
 
-use std::env;
-
-use litchi_iwa::numbers::NumbersEditor;
+use litchi_numbers::{Package, SheetSelector, TableSelector, table::CellPosition};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     let input = arguments.next().ok_or(
-        "usage: edit_numbers_comment <input.numbers> <output.numbers> <table-id-or-name> <row> <column> <text|--clear>",
+        "usage: edit_numbers_comment <input.numbers> <output.numbers> <sheet-index> <table-index> <row> <column> <text|--clear>",
     )?;
     let output = arguments.next().ok_or("missing output path")?;
-    let table_selector = arguments.next().ok_or("missing table ID or name")?;
+    let sheet = SheetSelector::index(
+        arguments
+            .next()
+            .ok_or("missing zero-based sheet index")?
+            .parse::<usize>()?,
+    );
+    let table = TableSelector::index(
+        arguments
+            .next()
+            .ok_or("missing zero-based table index")?
+            .parse::<usize>()?,
+    );
     let row = arguments
         .next()
         .ok_or("missing zero-based row")?
@@ -26,25 +35,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("missing comment text or --clear".into());
     }
 
-    let mut editor = NumbersEditor::open(&input)?;
-    let tables = editor.tables()?;
-    let table = table_selector
-        .parse::<u64>()
-        .ok()
-        .and_then(|id| tables.iter().find(|table| table.id() == id))
-        .or_else(|| tables.iter().find(|table| table.name == table_selector));
-    let table_id = table
-        .ok_or("table selector did not match a Numbers table")?
-        .id();
+    let position = CellPosition::try_from_usize(row, column)?;
+    let package = Package::open(&input)?;
 
-    if replacement == "--clear" {
-        editor.clear_cell_comment(table_id, row, column)?;
+    let commit = if replacement == "--clear" {
+        package.clear_table_cell_comment(sheet, table, position)?
     } else {
-        editor.set_cell_comment(table_id, row, column, replacement)?;
-    }
-    editor.save(&output)?;
+        package.set_table_cell_comment(sheet, table, position, replacement)?
+    };
+    let mut destination = File::create(&output)?;
+    commit.package().write_to(&mut destination)?;
 
-    let verified = NumbersEditor::open(&output)?.cell_comment(table_id, row, column)?;
+    let verified = Package::open(&output)?.table_cell_comment(sheet, table, position)?;
     println!("comment={verified:?}");
     Ok(())
 }
