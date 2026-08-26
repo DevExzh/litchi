@@ -14143,3 +14143,40 @@ publication-system, performance/RSS, full-workspace, host/debt/edge, or
 monolith-exit claim. Rust formatting, focused integration, Clippy, boundary,
 and documentation diff checks remain scoped verification gates rather than a
 claim that every workspace target is green.
+
+## 2026-08-26 amendment: Wave91 Numbers comment-reply read verification record
+
+Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` was checked
+with the following focused gates:
+
+- `cargo test -p litchi-numbers --test table_data_list_reader_integration
+  --quiet` passed 25/25, including stored-order selector/A1 reads, empty and
+  missing roots, redacted debug surfaces, direct external/deprecated-type/
+  nested refusal, duplicate/cycle/missing/alias/malformed graphs, and source
+  immutability;
+- targeted `litchi-numbers` library plus integration Clippy passed with
+  `-D warnings` and the recorded deprecated/manual-contains/clone-on-copy/
+  needless-question-mark baseline allowances;
+- `cargo check -p litchi-iwa --lib --quiet` passed with the repository's
+  existing deprecation/dead-code warnings;
+- Python compilation and the complete boundary unittest passed 545/545;
+- Rust 2024 formatting and scoped diff checks passed;
+- the live boundary checker reported only the three known user-owned,
+  untracked Pages table-lock findings (`body_table_lock_state`,
+  `set_body_table_lock_state`, and the returned `tables/lock.rs` source), with
+  no Wave91 Numbers comment-reply finding.
+
+Current file-backed inventory does not provide native direct-reply acceptance.
+The app-authored root-comment artifact
+`/private/tmp/litchi-native-numbers.3ny3Tz/litchi-native-table-data-list-20260821.numbers`
+is 219,511 bytes with SHA-256
+`e4c8cea583f2cd8587e26347c3d373103a9da7ae9c00d096d673fb30f665caa9`,
+but contains no direct reply. The 6,216-byte
+`/private/tmp/litchi-wave58-comment.yUGpYq/table-comments.numbers` (SHA-256
+`c370ffbabc7c84ce02edb01b699e796d6d368b51ec28ce7472ac278b8cf20a86`)
+is a litchi-generated synthetic artifact and is not native evidence. No
+Numbers UI run was performed for this slice.
+
+These are scoped verification facts, not native open/save/reopen, Rust/native
+byte parity, performance/RSS, full-workspace, host/debt/edge, publication, or
+monolith-exit claims.

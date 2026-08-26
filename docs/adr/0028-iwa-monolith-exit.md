@@ -5460,3 +5460,24 @@ identifiers, durable publication, performance/RSS, or general graph repair.
 No host method, crate, dependency edge, debt item, production manifest
 dependency, migration host, generated-schema/Prost/Buffa owner, or monolith
 gate is retired by Wave90. Debts 014, 015, 016, and 017 remain open.
+
+## 2026-08-26 amendment: Wave91 Numbers comment-reply read bounded owner slice (not a monolith-exit gate)
+
+Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` moves only
+the ID-free, selector-first projection of source-ordered direct comment replies
+into the focused Numbers package boundary. The slice validates the recognized
+comment graph with strict codecs and package-wide ownership checks, rejects
+external/deprecated-type/nested/cyclic/aliased/malformed routes, and redacts
+authored content from debug output.
+
+This does not move reply mutation, native identity, author/UUID lifecycle,
+comment-list repair, candidate publication, or the compatibility editor. It
+does not claim native direct-reply acceptance, opaque future-owner coverage,
+one aggregate operation-budget pass, full-workspace green status, or
+performance/RSS behavior.
+
+This is not a monolith-exit gate. Debt 015, the
+`litchi-iwa -> litchi-numbers` edge, the remaining hosts and debts,
+generated-schema/Prost/Buffa owners, and the IWA monolith remain. No crate,
+edge, debt item, production manifest dependency, host, or monolith owner is
+retired by Wave91.

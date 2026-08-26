@@ -253,10 +253,11 @@ pub use package::{
     SemanticPath as PackageSemanticPath, TableLockCommit, TableLockDiagnostics, TableLockEdit,
     TableLockError, TableLockLimitKind, TableLockPatch, WriteError,
     comments::{
-        Comment as TableCellComment, Commit as TableCellCommentCommit,
-        Diagnostics as TableCellCommentDiagnostics, Edit as TableCellCommentEdit,
-        Error as TableCellCommentError, LimitKind as TableCellCommentLimitKind,
-        Patch as TableCellCommentPatch, Path as TableCellCommentPath,
+        Comment as TableCellComment, CommentReply as TableCellCommentReply,
+        Commit as TableCellCommentCommit, Diagnostics as TableCellCommentDiagnostics,
+        Edit as TableCellCommentEdit, Error as TableCellCommentError,
+        LimitKind as TableCellCommentLimitKind, Patch as TableCellCommentPatch,
+        Path as TableCellCommentPath,
     },
     compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };

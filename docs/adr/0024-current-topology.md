@@ -2672,3 +2672,23 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 the Pages edge, migration hosts, generated-schema and normal Prost/Buffa
 owners, and the IWA monolith. No host method, crate, dependency edge, debt
 item, production manifest dependency, or monolith is removed by Wave90.
+
+## 2026-08-26 amendment: Wave91 current-topology Numbers comment-reply read cut
+
+Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` makes
+`litchi-numbers` the current selector-first owner of ID-free direct
+table-cell reply reads. The private path owns strict comment-storage decoding,
+recognized comment-graph census, direct source-order projection, alias/cycle/
+external/nested refusal, and authored-text debug redaction.
+
+`litchi-iwa` retains the deprecated identity-bearing `NumbersEditor` reply
+read plus reply creation, replacement, removal, graph cleanup, authors, and
+native object identities. This compatibility surface is not a duplicate
+semantic owner: it exposes information and mutations intentionally absent
+from the focused read facade.
+
+The inventory remains 64 workspace packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debt 015 and
+`litchi-iwa -> litchi-numbers` remain, together with other migration hosts,
+generated-schema/Prost/Buffa owners, and the IWA monolith. No host, edge, debt,
+manifest dependency, crate, or monolith owner is retired.

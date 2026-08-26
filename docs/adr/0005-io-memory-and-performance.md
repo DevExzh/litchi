@@ -1700,3 +1700,27 @@ behavior, package-wide peak memory or RSS, latency, throughput, or
 performance. Native semantic persistence does not alter that resource scope,
 and no production dependency edge or normal generated-schema/Prost/Buffa
 owner changes by this record.
+
+## 2026-08-26 amendment: Wave91 Numbers comment-reply read resource record
+
+The Wave91 facade is source-immutable and publishes no partial result. Package
+ingress retains the existing physical archive and semantic object/reference/
+text ceilings; each strict comment-storage decode retains typed byte, field,
+work, nesting, reference, and text ceilings. Census and output vectors use
+fallible reservations. Storage duplicate detection and selected reply lookup
+use hash indices, so the admitted census/projection path is linear rather than
+quadratic in recognized storage and reply counts.
+
+This amendment deliberately does not claim one aggregate operation-local
+ledger across selection, package-wide recognized-graph census, cycle checks,
+and reply projection. Root selection and the census can inspect the same
+payload in separate bounded passes, and allocation/scratch/retained/work
+counters are not exposed as a new reply-read limit profile. The read path has
+no candidate archive, metadata rewrite, compression, ZIP reassembly, reopen,
+locality, patch, inverse, or publication cost.
+
+Accordingly there is no single-allocation, allocation-free preflight,
+zero-copy, peak-memory/RSS, latency, throughput, or performance claim. The
+record is limited to existing package/per-decode ceilings, fallible local
+allocation, linear indexing, typed refusal where surfaced, and immutable
+source bytes.

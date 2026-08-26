@@ -3871,3 +3871,28 @@ dependency declarations, and 13 ordered migration debts. No host method,
 crate, dependency edge, debt item, production manifest dependency, or
 monolith owner is removed by Wave90; debts 014, 015, 016, and 017 and the
 remaining `litchi-iwa` responsibilities remain open.
+
+## 2026-08-26 amendment: Wave91 Numbers comment-reply read boundary
+
+Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` adds one
+selector-first, read-only direct-reply projection to `litchi-numbers`.
+`Package::{table_cell_comment_replies,table_cell_comment_replies_a1}` accepts
+sheet/table selectors plus a semantic cell position or A1 address and returns
+archive-free `CommentReply` values (re-exported as
+`TableCellCommentReply`). Native storage, author and reply identifiers, UUIDs,
+wire/archive values, physical locators, generated messages, Prost values, and
+Buffa views remain private.
+
+The private owner uses the strict comment-storage codec and a recognized
+package-wide comment-graph census. Stored direct-reply order is preserved;
+duplicate, aliased, missing, cyclic, nested, external, deprecated-typed, or
+malformed reply routes fail closed. The existing native-ID
+`NumbersEditor` reply read and mutation APIs remain deprecated compatibility
+surfaces because their identity-bearing return values and create/replace/
+remove graph lifecycle cannot delegate to the ID-free read facade.
+
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain open, as do the remaining hosts,
+generated-schema/Prost/Buffa owners, and the IWA monolith. No crate, edge,
+debt item, production dependency, host, or monolith owner is removed.

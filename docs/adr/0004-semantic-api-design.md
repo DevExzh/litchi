@@ -3284,3 +3284,27 @@ accepted by strict Rust reread; this remains semantic persistence evidence,
 not native/Rust byte parity. The amendment does not expose native identifiers
 or physical values and does not broaden ownership to arbitrary graph repair,
 table topology, general data formats, or Pages/Keynote controls.
+
+## 2026-08-26 amendment: Numbers comment-reply semantic projection
+
+Implementation base `8b7009a9295e296f309039f6cb3f8782913f3c58` makes
+source-ordered direct table-cell replies readable through
+`Package::{table_cell_comment_replies,table_cell_comment_replies_a1}`.
+`CommentReply` retains only authored text behind a borrowed `text()` accessor;
+its custom `Debug`, and the existing `Comment` and transaction debug surfaces,
+redact authored content. Authors, dates, storage UUIDs, native identities, and
+physical ownership are intentionally absent from the public value.
+
+A cell without a root comment returns `CommentNotFound`; a root with no direct
+replies returns an empty slice. Missing native comment text retains the
+existing strict empty-text semantic. Only direct replies are admitted:
+nested, external-marked, nonzero deprecated-type, cyclic, shared/aliased,
+missing, duplicate, or malformed reply graphs fail closed before text is
+published. The census covers the recognized comment graph and does not claim
+that opaque future archive metadata has been semantically interpreted.
+
+This is a read projection only. It owns no reply creation, replacement,
+removal, author lifecycle, UUID/save-token transition, comment-list mutation,
+candidate publication, repair, or native-ID API. Native direct-reply
+acceptance is withheld because no current app-authored direct-reply artifact
+was available.

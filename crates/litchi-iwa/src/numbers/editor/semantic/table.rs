@@ -2503,6 +2503,15 @@ impl NumbersEditor {
     }
 
     /// Read the direct replies attached to a cell comment in stored order.
+    ///
+    /// This compatibility method retains native table, root-storage, and
+    /// reply-storage identifiers in its return value. Prefer the selector-first
+    /// `litchi_numbers::Package::table_cell_comment_replies` projection for an
+    /// ID-free semantic read.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply mutations and graph cleanup remain compatibility-host scope"
+    )]
     pub fn cell_comment_replies(
         &self,
         table_id: u64,
@@ -2513,6 +2522,12 @@ impl NumbersEditor {
     }
 
     /// Append a direct reply to an existing cell comment.
+    ///
+    /// Reply creation and graph ownership remain compatibility-host scope.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply creation and graph ownership remain compatibility-host scope"
+    )]
     pub fn add_cell_comment_reply(
         &mut self,
         table_id: u64,
@@ -2530,6 +2545,12 @@ impl NumbersEditor {
     }
 
     /// Replace one direct reply and return its new copy-on-write object ID.
+    ///
+    /// Reply replacement and graph ownership remain compatibility-host scope.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply replacement and graph ownership remain compatibility-host scope"
+    )]
     pub fn set_cell_comment_reply(
         &mut self,
         table_id: u64,
@@ -2554,6 +2575,12 @@ impl NumbersEditor {
     }
 
     /// Remove one direct reply from an existing cell comment.
+    ///
+    /// Reply removal and graph cleanup remain compatibility-host scope.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply removal and graph cleanup remain compatibility-host scope"
+    )]
     pub fn remove_cell_comment_reply(
         &mut self,
         table_id: u64,
