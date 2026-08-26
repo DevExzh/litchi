@@ -5568,3 +5568,22 @@ message publication, native Numbers UI acceptance, or a single global
 allocation-free resource preflight. Those graphs continue to fail closed.
 This is therefore a semantic capability increment, not a crate, dependency
 edge, debt, compatibility-host, normal Prost/Buffa owner, or monolith exit.
+
+## 2026-08-26 amendment: Numbers empty author-registry root creation (not a monolith-exit gate)
+
+The focused root-comment transaction now also admits a rooted same-member
+table whose comment list and physical target cell already exist and whose
+canonical annotation-author storage is present but empty. The owner allocates
+one author and one comment identifier together, emits the local type-212
+author plus canonical Buffa comment leaf, appends the author-storage and
+comment-list references with exact ArchiveInfo paths, registers both UUIDs,
+advances one current-component token and the root watermark/save token, and
+retains exact candidate reopen and inverse restoration.
+
+This does not create a missing type-213 author storage, missing comment list,
+tile, or sparse BNC slot, and it does not admit segmented or cross-component
+creation. The deprecated raw-ID host remains necessary for those legacy
+blank/generated-table topologies. Native Numbers UI acceptance, a single
+global allocation-free resource preflight, performance/RSS, crate/dependency
+edge/debt retirement, normal Prost/Buffa ownership, and monolith exit remain
+withheld.

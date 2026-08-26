@@ -64,6 +64,8 @@ const TABLE_NAME: &str = "Reply fixture table";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FixtureMode {
+    /// An empty comment list plus an empty author registry.
+    Rootless,
     /// One rooted comment with duplicate reply text for ordinal selection.
     DuplicateText,
     /// The same root comment is referenced by two cells.
@@ -256,6 +258,7 @@ fn list_message(
 
 fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<ArchiveObject> {
     let mut comment_entries = match mode {
+        FixtureMode::Rootless => Vec::new(),
         FixtureMode::SharedRoot | FixtureMode::DuplicateText | FixtureMode::SingleRoot => {
             vec![comment_entry(
                 1,
@@ -272,10 +275,10 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
             comment_entry(2, SECOND_ROOT_COMMENT_ID, 1),
         ],
     };
-    if matches!(corruption, Some(Corruption::DuplicateListKey)) {
+    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::DuplicateListKey)) {
         comment_entries.push(comment_entries[0].clone());
     }
-    if matches!(corruption, Some(Corruption::ZeroRefcount)) {
+    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::ZeroRefcount)) {
         comment_entries[0].refcount = 0;
     }
     let actual_first_key_references: u32 = if matches!(mode, FixtureMode::SharedRoot) {
@@ -283,13 +286,13 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
     } else {
         1
     };
-    if matches!(corruption, Some(Corruption::RefcountUndercount)) {
+    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::RefcountUndercount)) {
         comment_entries[0].refcount = actual_first_key_references.saturating_sub(1);
     }
-    if matches!(corruption, Some(Corruption::RefcountOvercount)) {
+    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::RefcountOvercount)) {
         comment_entries[0].refcount = actual_first_key_references + 1;
     }
-    if matches!(corruption, Some(Corruption::WrongListType)) {
+    if !comment_entries.is_empty() && matches!(corruption, Some(Corruption::WrongListType)) {
         comment_entries[0].comment_storage = None;
         comment_entries[0].string = Some("wrong list payload".to_owned());
     }
@@ -345,6 +348,7 @@ fn sidecar(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Arch
         .get_mut(list_index)
         .ok_or_else(|| io::Error::other("comment list info is missing"))?;
     let roots: Vec<u64> = match mode {
+        FixtureMode::Rootless => Vec::new(),
         FixtureMode::SharedReply | FixtureMode::CrossComponent => {
             vec![ROOT_COMMENT_ID, SECOND_ROOT_COMMENT_ID]
         },
@@ -436,6 +440,7 @@ fn comment_cell(key: Option<u32>) -> TestResult<Vec<u8>> {
 
 fn tile(mode: FixtureMode) -> TestResult<tst::Tile> {
     let keys = match mode {
+        FixtureMode::Rootless => [None, None],
         FixtureMode::SharedRoot => [Some(1), Some(1)],
         FixtureMode::SharedReply | FixtureMode::CrossComponent => [Some(1), Some(2)],
         FixtureMode::DuplicateText | FixtureMode::SingleRoot => [Some(1), None],
@@ -508,6 +513,9 @@ fn reply_objects(
     mode: FixtureMode,
     corruption: Option<Corruption>,
 ) -> TestResult<Vec<ArchiveObject>> {
+    if matches!(mode, FixtureMode::Rootless) {
+        return Ok(Vec::new());
+    }
     let mut first_replies = match mode {
         FixtureMode::DuplicateText => vec![
             reference(FIRST_REPLY_ID),
@@ -621,6 +629,20 @@ fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec
         AUTHOR_ID,
         AUTHOR_STORAGE_ID,
     ];
+    if matches!(mode, FixtureMode::Rootless) {
+        document_ids.retain(|identifier| {
+            !matches!(
+                *identifier,
+                ROOT_COMMENT_ID
+                    | SECOND_ROOT_COMMENT_ID
+                    | FIRST_REPLY_ID
+                    | SECOND_REPLY_ID
+                    | THIRD_REPLY_ID
+                    | SHARED_REPLY_ID
+                    | AUTHOR_ID
+            )
+        });
+    }
     document_ids.retain(|identifier| {
         *identifier != SECOND_ROOT_COMMENT_ID
             || matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent)
@@ -729,7 +751,16 @@ fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
 }
 
-fn author_objects() -> TestResult<Vec<ArchiveObject>> {
+fn author_objects(empty: bool) -> TestResult<Vec<ArchiveObject>> {
+    if empty {
+        let mut storage = object(
+            AUTHOR_STORAGE_ID,
+            ANNOTATION_AUTHOR_STORAGE_TYPE,
+            tsk::AnnotationAuthorStorageArchive::default().encode_to_vec(),
+        )?;
+        set_message_info(&mut storage, &[])?;
+        return Ok(vec![storage]);
+    }
     let author = object(
         AUTHOR_ID,
         ANNOTATION_AUTHOR_TYPE,
@@ -809,7 +840,10 @@ fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<
     let sidecar = sidecar(mode, corruption)?;
     let mut document_objects = vec![document, sheet, info, model, sidecar, tile];
     if !matches!(corruption, Some(Corruption::MissingAuthor)) {
-        document_objects.extend(author_objects()?);
+        document_objects.extend(author_objects(matches!(
+            (mode, corruption),
+            (FixtureMode::Rootless, _)
+        ))?);
     }
     let all_comments = reply_objects(mode, corruption)?;
     let mut split_replies = Vec::new();
@@ -971,6 +1005,89 @@ fn root_comment_creation_reuses_strict_graph_and_is_exactly_reversible() -> Test
         Some("new strict root")
     );
     let restored = commit.package().apply_table_cell_comment(&inverse)?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_creation_populates_an_empty_author_storage_atomically() -> TestResult {
+    let source = fixture(FixtureMode::Rootless, None)?;
+    let package = load_package(&source)?;
+    let commit = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(1, 0),
+        "new root with generated author",
+    )?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 0),
+            )?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("new root with generated author"),
+    );
+    let candidate = exact_bytes(commit.package())?;
+    let archive = member_archive(&candidate, DOCUMENT_MEMBER)?;
+    let authors = archive
+        .objects
+        .iter()
+        .filter(|object| {
+            object
+                .messages
+                .iter()
+                .any(|message| message.type_ == ANNOTATION_AUTHOR_TYPE)
+        })
+        .count();
+    assert_eq!(authors, 1);
+    let fresh_ids = archive
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .filter(|identifier| *identifier > WATERMARK)
+        .collect::<Vec<_>>();
+    assert_eq!(fresh_ids.len(), 2);
+    let storage = archive
+        .object(AUTHOR_STORAGE_ID)
+        .ok_or_else(|| io::Error::other("author storage is missing"))?;
+    assert_eq!(
+        storage
+            .archive_info
+            .message_infos
+            .first()
+            .map(|info| info.object_references.len()),
+        Some(1),
+    );
+    let metadata_archive = member_archive(&candidate, METADATA_MEMBER)?;
+    let metadata_payload = metadata_archive
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .find(|message| message.type_ == METADATA_TYPE)
+        .ok_or_else(|| io::Error::other("package metadata is missing"))?;
+    let metadata = tsp::PackageMetadata::decode(metadata_payload.data.as_slice())?;
+    assert_eq!(metadata.last_object_identifier, WATERMARK + 2);
+    let document = metadata
+        .components
+        .iter()
+        .find(|component| component.identifier == 100)
+        .ok_or_else(|| io::Error::other("Document metadata component is missing"))?;
+    for identifier in &fresh_ids {
+        assert!(
+            document
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == *identifier),
+            "fresh object {identifier} is missing current UUID ownership"
+        );
+    }
+    let restored = commit
+        .package()
+        .apply_table_cell_comment(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, source);
     Ok(())
 }
