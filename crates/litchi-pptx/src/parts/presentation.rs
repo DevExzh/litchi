@@ -1,5 +1,7 @@
 //! Presentation-part graph decoding.
 
+use std::collections::HashSet;
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, Part};
 use quick_xml::events::Event;
@@ -117,6 +119,9 @@ impl<'a> PresentationPart<'a> {
         let xml = processed_xml(self.part)?;
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut references = Vec::new();
+        let mut slide_ids = HashSet::new();
+        let mut relationship_ids = HashSet::new();
+        let mut target_part_names = HashSet::new();
         loop {
             let (namespace, event) = reader.read_resolved_event()?;
             match event {
@@ -141,8 +146,51 @@ impl<'a> PresentationPart<'a> {
                     .ok_or_else(|| invalid("presentation slide reference lacks an id"))?;
                     let relationship_id = relationship_attribute(&element, &reader)?
                         .ok_or_else(|| invalid("presentation slide reference lacks r:id"))?;
+                    let id = super::parse_u32(&id, "slide ID")?;
+                    if !(256..=2_147_483_647).contains(&id) {
+                        return Err(invalid(
+                            "presentation slide reference id is outside 256..=2147483647",
+                        ));
+                    }
+                    slide_ids
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "presentation slide reference IDs",
+                            source,
+                        })?;
+                    if !slide_ids.insert(id) {
+                        return Err(invalid("presentation slide reference ids must be unique"));
+                    }
+                    relationship_ids
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "presentation slide reference relationship IDs",
+                            source,
+                        })?;
+                    if !relationship_ids.insert(relationship_id.clone()) {
+                        return Err(invalid(
+                            "presentation slide reference relationship ids must be unique",
+                        ));
+                    }
+                    if let Some(relationship) = self.part.rels().get(&relationship_id)
+                        && !relationship.is_external()
+                    {
+                        let target = relationship.target_partname()?;
+                        let target_key = target.as_str().to_ascii_lowercase();
+                        target_part_names
+                            .try_reserve(1)
+                            .map_err(|source| Error::Allocation {
+                                resource: "presentation slide reference target names",
+                                source,
+                            })?;
+                        if !target_part_names.insert(target_key) {
+                            return Err(invalid(
+                                "presentation slide reference targets must be unique",
+                            ));
+                        }
+                    }
                     references.push(SlideReference {
-                        id: super::parse_u32(&id, "slide ID")?,
+                        id,
                         relationship_id,
                     });
                 },

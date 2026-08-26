@@ -1723,6 +1723,16 @@ impl SourceSlide {
         self.data.position
     }
 
+    /// Stable `p:sldId@id` value retained from the presentation catalog.
+    ///
+    /// Reading the identifier never loads the selected slide XML or any
+    /// related media payload. The value is captured while the source-backed
+    /// presentation graph is opened.
+    #[must_use]
+    pub fn slide_id(&self) -> u32 {
+        self.data.slide_id
+    }
+
     /// Return the producer-visible slide name, falling back to the slide
     /// part URI when the root has no `name` attribute.
     ///
@@ -2400,35 +2410,12 @@ fn validate_slide_graph(
         })?;
     for (position, reference) in references.iter().enumerate() {
         package.check_execution()?;
-        let relationship = presentation
-            .rels()
-            .get(reference.relationship_id())
-            .ok_or_else(|| {
-                Error::Relationship(format!(
-                    "presentation slide reference is missing relationship '{}'",
-                    reference.relationship_id()
-                ))
-            })?;
-        if relationship.is_external() {
-            return Err(Error::Relationship(format!(
-                "slide relationship '{}' must be internal",
-                reference.relationship_id()
-            )));
-        }
-        if !crate::parts::is_relationship_type(relationship.reltype(), rt::SLIDE, "slide") {
-            return Err(Error::Relationship(format!(
-                "relationship '{}' is not a slide relationship",
-                reference.relationship_id()
-            )));
-        }
-        let part_uri = relationship.target_partname()?;
-        let slide = package.part(&part_uri)?;
-        if slide.content_type() != ct::PML_SLIDE {
-            return Err(Error::ContentType {
-                expected: ct::PML_SLIDE.to_string(),
-                actual: slide.content_type().to_string(),
-            });
-        }
+        let (relationship, part_uri, slide) = crate::parts::validate_slide_relationship(
+            presentation.rels().get(reference.relationship_id()),
+            reference.relationship_id(),
+            |target| Ok(package.part(target)?),
+            |part| part.content_type(),
+        )?;
         slides.push(Arc::new(SourceSlideData {
             position,
             slide_id: reference.id(),
@@ -3228,9 +3215,9 @@ mod tests {
         assert_eq!(
             presentation
                 .slides()
-                .map(|slide| slide.position())
+                .map(|slide| (slide.position(), slide.slide_id()))
                 .collect::<Vec<_>>(),
-            [0, 1]
+            [(0, 256), (1, 257)]
         );
         assert_eq!(source.second_payload_reads.load(Ordering::SeqCst), 0);
 

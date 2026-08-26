@@ -533,6 +533,9 @@ pub use document::{Document, DocumentElement};
 ))]
 pub use presentation::Presentation;
 
+#[cfg(feature = "pptx")]
+pub use presentation::SlideDescriptor;
+
 #[cfg(any(
     feature = "xls",
     feature = "xlsx",

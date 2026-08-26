@@ -81,6 +81,77 @@ fn malformed_presentation_children_are_reported_by_their_owner() {
 }
 
 #[test]
+fn slide_reference_owner_rejects_duplicate_ids_and_out_of_range_ids() {
+    let cases = [
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="255" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="2147483648" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+    ];
+
+    for blob in cases {
+        let package = with_presentation_blob(&blob);
+        let presentation = package
+            .presentation()
+            .expect("presentation root should remain valid");
+        assert!(
+            presentation.slide_references().is_err(),
+            "accepted invalid slide reference XML: {blob:?}"
+        );
+    }
+}
+
+#[test]
+fn slide_reference_owner_rejects_case_equivalent_target_parts() {
+    let output = NamedTempFile::with_suffix(".pptx").unwrap();
+    let mut package = Package::new().unwrap();
+    let presentation = package.presentation_mut().unwrap();
+    presentation.add_slide().unwrap();
+    presentation.add_slide().unwrap();
+    package.save(output.path()).unwrap();
+
+    let mut package = Package::open(output.path()).unwrap();
+    let second_relationship_id = package
+        .presentation()
+        .unwrap()
+        .slide_references()
+        .unwrap()
+        .get(1)
+        .unwrap()
+        .relationship_id()
+        .to_owned();
+    package
+        .edit_opc(|opc| {
+            let presentation = opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())?;
+            presentation
+                .rels_mut()
+                .retarget(&second_relationship_id, "slides/SLIDE1.XML".to_owned())?;
+            Ok(())
+        })
+        .unwrap();
+
+    let edited = NamedTempFile::with_suffix(".pptx").unwrap();
+    package.save(edited.path()).unwrap();
+    let package = Package::open(edited.path()).unwrap();
+    let presentation = package
+        .presentation()
+        .expect("presentation root should remain valid");
+    assert!(presentation.slide_references().is_err());
+}
+
+#[test]
 fn malformed_slide_accessors_do_not_panic() {
     let cases = [
         Vec::new(),
