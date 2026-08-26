@@ -580,7 +580,26 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("striked", None)?;
         }
 
-        fmt.character_positioning
+        let expansion = crate::text::character_positioning::effective_character_expansion(
+            fmt.character_positioning.expansion,
+            fmt.char_spacing,
+        )
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        let scale = crate::text::character_positioning::effective_character_scale(
+            fmt.character_positioning.horizontal_scale_percent,
+            fmt.char_scale,
+        )
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        let kerning = crate::text::character_positioning::effective_character_kerning(
+            fmt.character_positioning.kerning_half_points,
+            fmt.kerning,
+        )
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        let mut character_positioning = fmt.character_positioning;
+        character_positioning.expansion = expansion;
+        character_positioning.horizontal_scale_percent = scale;
+        character_positioning.kerning_half_points = kerning;
+        character_positioning
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         if fmt.character_positioning.baseline == CharacterBaseline::Normal
@@ -643,16 +662,7 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("impr", None)?;
         }
 
-        if fmt.character_positioning.expansion == CharacterExpansion::None
-            && !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
-                .contains(&fmt.char_spacing)
-        {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF legacy character spacing is out of range",
-            ));
-        }
-        match fmt.character_positioning.expansion {
+        match expansion {
             CharacterExpansion::None if fmt.char_spacing != 0 => {
                 self.write_control_word("expnd", Some(fmt.char_spacing))?;
             },
@@ -664,33 +674,11 @@ impl<W: Write> RtfWriter<W> {
                 self.write_control_word("expndtw", Some(i32::from(value)))?;
             },
         }
-        let scale = if fmt.character_positioning.horizontal_scale_percent == 100 {
-            fmt.char_scale
-        } else {
-            i32::from(fmt.character_positioning.horizontal_scale_percent)
-        };
-        if !(1..=crate::MAX_CHARACTER_SCALE_PERCENT).contains(&scale) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF legacy character scale is out of range",
-            ));
-        }
         if scale != 100 {
-            self.write_control_word("charscalex", Some(scale))?;
-        }
-        let kerning = if fmt.character_positioning.kerning_half_points != 0 {
-            i32::from(fmt.character_positioning.kerning_half_points)
-        } else {
-            fmt.kerning
-        };
-        if !(0..=crate::MAX_CHARACTER_KERNING_HALF_POINTS).contains(&kerning) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF legacy character kerning is out of range",
-            ));
+            self.write_control_word("charscalex", Some(i32::from(scale)))?;
         }
         if kerning != 0 {
-            self.write_control_word("kerning", Some(kerning))?;
+            self.write_control_word("kerning", Some(i32::from(kerning)))?;
         }
 
         Ok(())

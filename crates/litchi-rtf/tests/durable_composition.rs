@@ -842,6 +842,302 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
 }
 
 #[test]
+fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() {
+    let source = Document::parse(r"{\rtf1\ansi\super First Second Third}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_expansion(
+        TextSpan::new(0, 5).unwrap(),
+        litchi_rtf::CharacterExpansion::Twips(-12),
+    )
+    .unwrap();
+    edit.set_text_horizontal_scale_percent(TextSpan::new(6, 12).unwrap(), 80)
+        .unwrap();
+    edit.set_text_kerning(TextSpan::new(13, 18).unwrap(), 8)
+        .unwrap();
+    let durable = edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    assert_eq!(durable.operations().len(), 3);
+    assert_eq!(durable.operations()[0].op, "character-expansion.set");
+    assert_eq!(
+        durable.operations()[0].preconditions["expansion"],
+        serde_json::json!("none")
+    );
+    assert_eq!(
+        durable.operations()[0].value,
+        serde_json::json!("twips:-12")
+    );
+    assert_eq!(durable.operations()[1].op, "character-horizontal-scale.set");
+    assert_eq!(
+        durable.operations()[1].preconditions["horizontal_scale_percent"],
+        serde_json::json!(100)
+    );
+    assert_eq!(durable.operations()[1].value, serde_json::json!(80));
+    assert_eq!(durable.operations()[2].op, "character-kerning.set");
+    assert_eq!(
+        durable.operations()[2].preconditions["kerning_half_points"],
+        serde_json::json!(0)
+    );
+    assert_eq!(durable.operations()[2].value, serde_json::json!(8));
+
+    let formatted = source.apply_durable(&durable).unwrap();
+    let first = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(
+        first.format().expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(first.format().baseline(), CharacterBaseline::Superscript);
+    let second = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Second"))
+        .unwrap();
+    assert_eq!(second.format().horizontal_scale_percent(), 80);
+    assert_eq!(second.format().baseline(), CharacterBaseline::Superscript);
+    let third = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Third"))
+        .unwrap();
+    assert_eq!(third.format().kerning_half_points(), 8);
+    assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
+
+    let reopened = Document::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text().contains("First"))
+            .unwrap()
+            .format()
+            .expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text().contains("Second"))
+            .unwrap()
+            .format()
+            .horizontal_scale_percent(),
+        80
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text().contains("Third"))
+            .unwrap()
+            .format()
+            .kerning_half_points(),
+        8
+    );
+
+    let restored = formatted.apply_durable(&durable.inverse()).unwrap();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| {
+        run.format().expansion() == litchi_rtf::CharacterExpansion::None
+            && run.format().horizontal_scale_percent() == 100
+            && run.format().kerning_half_points() == 0
+            && run.format().baseline() == CharacterBaseline::Superscript
+    }));
+
+    let wire: serde_json::Value =
+        serde_json::from_slice(&durable.to_deterministic_json().unwrap()).unwrap();
+    let mut stale_wire = wire.clone();
+    stale_wire["operations"][0]["forward"]["preconditions"]["expansion"] =
+        serde_json::json!("twips:2");
+    let stale_bytes = serde_json::to_vec(&stale_wire).unwrap();
+    let stale =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &stale_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale),
+        Err(litchi_rtf::edit::Error::StalePrecondition(_))
+    ));
+
+    let mut stale_scale_wire = wire.clone();
+    stale_scale_wire["operations"][1]["forward"]["preconditions"]["horizontal_scale_percent"] =
+        serde_json::json!(99);
+    let stale_scale_bytes = serde_json::to_vec(&stale_scale_wire).unwrap();
+    let stale_scale =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &stale_scale_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale_scale),
+        Err(litchi_rtf::edit::Error::StalePrecondition(_))
+    ));
+
+    let mut stale_kerning_wire = wire.clone();
+    stale_kerning_wire["operations"][2]["forward"]["preconditions"]["kerning_half_points"] =
+        serde_json::json!(7);
+    let stale_kerning_bytes = serde_json::to_vec(&stale_kerning_wire).unwrap();
+    let stale_kerning =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &stale_kerning_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale_kerning),
+        Err(litchi_rtf::edit::Error::StalePrecondition(_))
+    ));
+
+    let mut malformed_wire = wire.clone();
+    malformed_wire["operations"][0]["forward"]["value"] = serde_json::json!("twips:invalid");
+    let malformed_bytes = serde_json::to_vec(&malformed_wire).unwrap();
+    let malformed =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed),
+        Err(litchi_rtf::edit::Error::DurablePatch(_))
+    ));
+
+    let mut malformed_scale_wire = wire.clone();
+    malformed_scale_wire["operations"][1]["forward"]["value"] = serde_json::json!(0);
+    let malformed_scale_bytes = serde_json::to_vec(&malformed_scale_wire).unwrap();
+    let malformed_scale =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_scale_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed_scale),
+        Err(litchi_rtf::edit::Error::DurablePatch(_))
+    ));
+
+    let mut malformed_kerning_wire = wire;
+    malformed_kerning_wire["operations"][2]["forward"]["value"] = serde_json::json!(32768);
+    let malformed_kerning_bytes = serde_json::to_vec(&malformed_kerning_wire).unwrap();
+    let malformed_kerning =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_kerning_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed_kerning),
+        Err(litchi_rtf::edit::Error::DurablePatch(_))
+    ));
+}
+
+#[test]
+fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
+    let source = Document::parse(r"{\rtf1\ansi\super\kerning2 First Second Third}").unwrap();
+    let mut expansion_edit = source.edit();
+    expansion_edit
+        .set_text_expansion(
+            TextSpan::new(0, 5).unwrap(),
+            litchi_rtf::CharacterExpansion::Twips(-12),
+        )
+        .unwrap();
+    let expansion = expansion_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut scale_edit = source.edit();
+    scale_edit
+        .set_text_horizontal_scale_percent(TextSpan::new(6, 12).unwrap(), 80)
+        .unwrap();
+    let scale = scale_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut kerning_edit = source.edit();
+    kerning_edit
+        .set_text_kerning(TextSpan::new(13, 18).unwrap(), 8)
+        .unwrap();
+    let kerning = kerning_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(expansion.clone()).unwrap();
+    composition.join(scale).unwrap();
+    composition.join(kerning).unwrap();
+    let combined = composition.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap();
+    let first = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(
+        first.format().expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(first.format().baseline(), CharacterBaseline::Superscript);
+    assert_eq!(first.format().kerning_half_points(), 2);
+    let second = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Second"))
+        .unwrap();
+    assert_eq!(second.format().horizontal_scale_percent(), 80);
+    assert_eq!(second.format().baseline(), CharacterBaseline::Superscript);
+    assert_eq!(second.format().kerning_half_points(), 2);
+    let third = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Third"))
+        .unwrap();
+    assert_eq!(third.format().kerning_half_points(), 8);
+    assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
+
+    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| {
+        run.format().expansion() == litchi_rtf::CharacterExpansion::None
+            && run.format().horizontal_scale_percent() == 100
+            && run.format().kerning_half_points() == 2
+            && run.format().baseline() == CharacterBaseline::Superscript
+    }));
+
+    let mut overlap_edit = source.edit();
+    overlap_edit
+        .set_text_kerning(TextSpan::new(0, 5).unwrap(), 8)
+        .unwrap();
+    let overlap_patch = overlap_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(expansion).unwrap();
+    assert!(overlap.join(overlap_patch).is_err());
+}
+
+#[test]
 fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overlap() {
     let source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut size_edit = source.edit();

@@ -25,6 +25,345 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 }
 
 #[test]
+fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
+    let source =
+        Document::parse(r"{\rtf1\ansi\super\expnd4\charscalex80\kerning8 First Second}").unwrap();
+    let span = TextSpan::new(0, 5).unwrap();
+    let mut edit = source.edit();
+    edit.set_text_expansion(span, litchi_rtf::CharacterExpansion::Twips(-12))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let first = commit
+        .snapshot()
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(
+        first.format().expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(first.format().baseline(), CharacterBaseline::Superscript);
+    assert_eq!(first.format().horizontal_scale_percent(), 80);
+    assert_eq!(first.format().kerning_half_points(), 8);
+
+    let second = commit
+        .snapshot()
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Second"))
+        .unwrap();
+    assert_eq!(
+        second.format().expansion(),
+        litchi_rtf::CharacterExpansion::QuarterPoints(4)
+    );
+    assert_eq!(second.format().baseline(), CharacterBaseline::Superscript);
+    assert_eq!(second.format().horizontal_scale_percent(), 80);
+    assert_eq!(second.format().kerning_half_points(), 8);
+
+    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened_first = reopened
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(
+        reopened_first.format().expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(
+        reopened_first.format().baseline(),
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(reopened_first.format().horizontal_scale_percent(), 80);
+    assert_eq!(reopened_first.format().kerning_half_points(), 8);
+    assert!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .same_snapshot(&source)
+    );
+}
+
+#[test]
+fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_resets() {
+    let source = Document::parse(r"{\rtf1\ansi First}").unwrap();
+    let span = TextSpan::new(0, 5).unwrap();
+
+    let mut quarter_edit = source.edit();
+    quarter_edit
+        .set_text_expansion(span, litchi_rtf::CharacterExpansion::QuarterPoints(4))
+        .unwrap();
+    let quarter = quarter_edit.commit().unwrap();
+    let quarter_bytes = quarter.snapshot().to_bytes().unwrap();
+    assert!(
+        quarter_bytes
+            .windows(br"\expnd4 ".len())
+            .any(|window| window == br"\expnd4 ")
+    );
+    assert_eq!(
+        quarter
+            .snapshot()
+            .body()
+            .runs()
+            .next()
+            .unwrap()
+            .format()
+            .expansion(),
+        litchi_rtf::CharacterExpansion::QuarterPoints(4)
+    );
+
+    let quarter_inverse = quarter.patch().inverse().apply(quarter.snapshot()).unwrap();
+    assert_eq!(
+        quarter_inverse.to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
+    let quarter_document = Document::from_bytes(&quarter_bytes).unwrap();
+    let mut twips_edit = quarter_document.edit();
+    twips_edit
+        .set_text_expansion(span, litchi_rtf::CharacterExpansion::Twips(-15))
+        .unwrap();
+    let twips = twips_edit.commit().unwrap();
+    let twips_bytes = twips.snapshot().to_bytes().unwrap();
+    assert!(
+        twips_bytes
+            .windows(br"\expndtw-15 ".len())
+            .any(|window| window == br"\expndtw-15 ")
+    );
+    assert_eq!(
+        twips
+            .snapshot()
+            .body()
+            .runs()
+            .next()
+            .unwrap()
+            .format()
+            .expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-15)
+    );
+
+    let twips_inverse = twips.patch().inverse().apply(twips.snapshot()).unwrap();
+    assert_eq!(
+        twips_inverse.to_bytes().unwrap(),
+        quarter_document.to_bytes().unwrap()
+    );
+    let twips_document = Document::from_bytes(&twips_bytes).unwrap();
+    let mut reset_edit = twips_document.edit();
+    reset_edit
+        .set_text_expansion(span, litchi_rtf::CharacterExpansion::None)
+        .unwrap();
+    let reset = reset_edit.commit().unwrap();
+    let reset_bytes = reset.snapshot().to_bytes().unwrap();
+    assert!(
+        reset_bytes
+            .windows(br"\expnd0 ".len())
+            .any(|window| window == br"\expnd0 ")
+    );
+    assert_eq!(
+        reset
+            .snapshot()
+            .body()
+            .runs()
+            .next()
+            .unwrap()
+            .format()
+            .expansion(),
+        litchi_rtf::CharacterExpansion::None
+    );
+    let reset_inverse = reset.patch().inverse().apply(reset.snapshot()).unwrap();
+    assert_eq!(
+        reset_inverse.to_bytes().unwrap(),
+        twips_document.to_bytes().unwrap()
+    );
+    let reopened = Document::from_bytes(&reset_bytes).unwrap();
+    assert_eq!(
+        reopened.body().runs().next().unwrap().format().expansion(),
+        litchi_rtf::CharacterExpansion::None
+    );
+}
+
+#[test]
+fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
+    let scale_source = Document::parse(r"{\rtf1\ansi\charscalex80 First}").unwrap();
+    let mut scale_edit = scale_source.edit();
+    scale_edit
+        .set_text_horizontal_scale_percent(TextSpan::new(0, 5).unwrap(), 100)
+        .unwrap();
+    let scale_commit = scale_edit.commit().unwrap();
+    let scale_bytes = scale_commit.snapshot().to_bytes().unwrap();
+    assert!(
+        scale_bytes
+            .windows(br"\charscalex100 ".len())
+            .any(|window| window == br"\charscalex100 ")
+    );
+    let scale_reopened = Document::from_bytes(&scale_bytes).unwrap();
+    assert_eq!(
+        scale_reopened
+            .body()
+            .runs()
+            .next()
+            .unwrap()
+            .format()
+            .horizontal_scale_percent(),
+        100
+    );
+    let scale_inverse = scale_commit
+        .patch()
+        .inverse()
+        .apply(scale_commit.snapshot())
+        .unwrap();
+    assert_eq!(
+        scale_inverse.to_bytes().unwrap(),
+        scale_source.to_bytes().unwrap()
+    );
+
+    let kerning_source = Document::parse(r"{\rtf1\ansi\kerning8 First}").unwrap();
+    let mut kerning_edit = kerning_source.edit();
+    kerning_edit
+        .set_text_kerning(TextSpan::new(0, 5).unwrap(), 0)
+        .unwrap();
+    let kerning_commit = kerning_edit.commit().unwrap();
+    let kerning_bytes = kerning_commit.snapshot().to_bytes().unwrap();
+    assert!(
+        kerning_bytes
+            .windows(br"\kerning0 ".len())
+            .any(|window| window == br"\kerning0 ")
+    );
+    let kerning_reopened = Document::from_bytes(&kerning_bytes).unwrap();
+    assert_eq!(
+        kerning_reopened
+            .body()
+            .runs()
+            .next()
+            .unwrap()
+            .format()
+            .kerning_half_points(),
+        0
+    );
+    let kerning_inverse = kerning_commit
+        .patch()
+        .inverse()
+        .apply(kerning_commit.snapshot())
+        .unwrap();
+    assert_eq!(
+        kerning_inverse.to_bytes().unwrap(),
+        kerning_source.to_bytes().unwrap()
+    );
+}
+
+#[test]
+fn ordinary_positioning_publication_respects_source_limit_atomically() {
+    let source_bytes = br"{\rtf1\ansi First}";
+    let source = Document::from_bytes_with_limits(
+        source_bytes,
+        litchi_rtf::read::Limits::new().with_max_source_bytes(source_bytes.len()),
+    )
+    .unwrap();
+    let before = source.to_bytes().unwrap();
+    let mut edit = source.edit();
+    edit.set_text_expansion(
+        TextSpan::new(0, 5).unwrap(),
+        litchi_rtf::CharacterExpansion::QuarterPoints(4),
+    )
+    .unwrap();
+
+    assert!(matches!(edit.commit(), Err(Error::InputTooLarge { .. })));
+    assert_eq!(source.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
+    let source = Document::parse(r"{\rtf1\ansi\expnd4\charscalex80\kerning8 First}").unwrap();
+    let span = TextSpan::new(0, 5).unwrap();
+
+    for expansion in [
+        litchi_rtf::CharacterExpansion::QuarterPoints(31681),
+        litchi_rtf::CharacterExpansion::Twips(-31681),
+    ] {
+        let mut edit = source.edit();
+        assert!(edit.set_text_expansion(span, expansion).is_err());
+    }
+    for scale in [0, 601, u16::MAX] {
+        let mut edit = source.edit();
+        assert!(edit.set_text_horizontal_scale_percent(span, scale).is_err());
+    }
+    for kerning in [32768, u16::MAX] {
+        let mut edit = source.edit();
+        assert!(edit.set_text_kerning(span, kerning).is_err());
+    }
+
+    let max_source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut max_edit = max_source.edit();
+    max_edit
+        .set_text_horizontal_scale_percent(span, 600)
+        .unwrap();
+    max_edit
+        .set_text_kerning(TextSpan::new(6, 12).unwrap(), 32767)
+        .unwrap();
+    let max_commit = max_edit.commit().unwrap();
+    let max_scale_run = max_commit
+        .snapshot()
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(max_scale_run.format().horizontal_scale_percent(), 600);
+    let max_kerning_run = max_commit
+        .snapshot()
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Second"))
+        .unwrap();
+    assert_eq!(max_kerning_run.format().kerning_half_points(), 32767);
+
+    let mut expansion_noop = source.edit();
+    expansion_noop
+        .set_text_expansion(span, litchi_rtf::CharacterExpansion::QuarterPoints(4))
+        .unwrap();
+    let expansion_noop = expansion_noop.commit().unwrap();
+    assert!(!expansion_noop.diagnostics().changed());
+    assert!(expansion_noop.snapshot().same_snapshot(&source));
+
+    let mut scale_noop = source.edit();
+    scale_noop
+        .set_text_horizontal_scale_percent(span, 80)
+        .unwrap();
+    let scale_noop = scale_noop.commit().unwrap();
+    assert!(!scale_noop.diagnostics().changed());
+    assert!(scale_noop.snapshot().same_snapshot(&source));
+
+    let mut kerning_noop = source.edit();
+    kerning_noop.set_text_kerning(span, 8).unwrap();
+    let kerning_noop = kerning_noop.commit().unwrap();
+    assert!(!kerning_noop.diagnostics().changed());
+    assert!(kerning_noop.snapshot().same_snapshot(&source));
+}
+
+#[test]
+fn ordinary_positioning_crud_refuses_mixed_character_ranges() {
+    let expansion_source = Document::parse(r"{\rtf1\ansi\expnd4 First{\expndtw8 Second}}").unwrap();
+    let span = TextSpan::new(0, 11).unwrap();
+    let mut expansion = expansion_source.edit();
+    assert!(
+        expansion
+            .set_text_expansion(span, litchi_rtf::CharacterExpansion::None)
+            .is_err()
+    );
+
+    let scale_source =
+        Document::parse(r"{\rtf1\ansi\charscalex80 First{\charscalex120 Second}}").unwrap();
+    let mut scale = scale_source.edit();
+    assert!(scale.set_text_horizontal_scale_percent(span, 100).is_err());
+    let kerning_source =
+        Document::parse(r"{\rtf1\ansi\kerning8 First{\kerning16 Second}}").unwrap();
+    let mut kerning = kerning_source.edit();
+    assert!(kerning.set_text_kerning(span, 0).is_err());
+}
+
+#[test]
 fn body_text_commit_is_atomic_reversible_and_source_checked() {
     let source = Document::parse(r"{\rtf1\ansi Plain\par Body}").unwrap();
     let mut edit = source.edit();

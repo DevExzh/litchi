@@ -11,8 +11,8 @@
 //! destinations and dependent positioned content.
 
 use crate::{
-    Alignment, CharacterBaseline, Document, HeaderFooterType, RtfError, RtfWriter, TableCellPath,
-    UnderlineStyle,
+    Alignment, CharacterBaseline, CharacterExpansion, Document, HeaderFooterType, RtfError,
+    RtfWriter, TableCellPath, UnderlineStyle,
 };
 use bumpalo::Bump;
 use serde_json::Value;
@@ -924,6 +924,21 @@ enum Operation {
         before: CharacterBaseline,
         after: CharacterBaseline,
     },
+    Expansion {
+        span: TextSpan,
+        before: CharacterExpansion,
+        after: CharacterExpansion,
+    },
+    HorizontalScale {
+        span: TextSpan,
+        before: u16,
+        after: u16,
+    },
+    Kerning {
+        span: TextSpan,
+        before: u16,
+        after: u16,
+    },
     Strike {
         span: TextSpan,
         before: bool,
@@ -1065,7 +1080,10 @@ impl Operation {
             | Self::AllCaps { .. }
             | Self::Outline { .. }
             | Self::FontSize { .. }
-            | Self::Baseline { .. } => 0,
+            | Self::Baseline { .. }
+            | Self::Expansion { .. }
+            | Self::HorizontalScale { .. }
+            | Self::Kerning { .. } => 0,
         }
     }
 
@@ -1099,6 +1117,18 @@ impl Operation {
             )],
             Self::Baseline { span, .. } => vec![format!(
                 "body:character:{}-{}:baseline",
+                span.start, span.end
+            )],
+            Self::Expansion { span, .. } => vec![format!(
+                "body:character:{}-{}:expansion",
+                span.start, span.end
+            )],
+            Self::HorizontalScale { span, .. } => vec![format!(
+                "body:character:{}-{}:horizontal-scale",
+                span.start, span.end
+            )],
+            Self::Kerning { span, .. } => vec![format!(
+                "body:character:{}-{}:kerning",
                 span.start, span.end
             )],
             Self::Strike { span, .. } => {
@@ -1162,6 +1192,9 @@ impl Operation {
             | Self::SmallCaps { span, .. }
             | Self::AllCaps { span, .. }
             | Self::Outline { span, .. }
+            | Self::Expansion { span, .. }
+            | Self::HorizontalScale { span, .. }
+            | Self::Kerning { span, .. }
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
@@ -1195,6 +1228,9 @@ impl Operation {
                 | Self::SmallCaps { .. }
                 | Self::AllCaps { .. }
                 | Self::Outline { .. }
+                | Self::Expansion { .. }
+                | Self::HorizontalScale { .. }
+                | Self::Kerning { .. }
         )
     }
 
@@ -1825,6 +1861,84 @@ impl Edit {
             span,
             before,
             after: baseline,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective character expansion on one non-empty paragraph span.
+    ///
+    /// Zero-valued tagged expansions are canonicalized to [`CharacterExpansion::None`].
+    /// The legacy `char_spacing` alias is updated together with the typed value.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_expansion(
+        &mut self,
+        span: TextSpan,
+        expansion: CharacterExpansion,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        let expansion = normalize_character_expansion(expansion)?;
+        self.ensure_character_property_span(span, "expansion")?;
+        let before = expansion_for_span(&self.source, span)?;
+        self.operations.push(Operation::Expansion {
+            span,
+            before,
+            after: expansion,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective horizontal character scale percentage on one span.
+    ///
+    /// The accepted range is `1..=600`; the legacy `char_scale` alias is
+    /// updated together with the typed value.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_horizontal_scale_percent(
+        &mut self,
+        span: TextSpan,
+        scale_percent: u16,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        validate_character_scale(scale_percent)?;
+        self.ensure_character_property_span(span, "horizontal scale")?;
+        let before = horizontal_scale_for_span(&self.source, span)?;
+        self.operations.push(Operation::HorizontalScale {
+            span,
+            before,
+            after: scale_percent,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective character kerning in half-points on one span.
+    ///
+    /// The accepted range is `0..=32767`; the legacy `kerning` alias is
+    /// updated together with the typed value.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_kerning(
+        &mut self,
+        span: TextSpan,
+        kerning_half_points: u16,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        validate_character_kerning(kerning_half_points)?;
+        self.ensure_character_property_span(span, "kerning")?;
+        let before = kerning_for_span(&self.source, span)?;
+        self.operations.push(Operation::Kerning {
+            span,
+            before,
+            after: kerning_half_points,
         });
         Ok(self)
     }
@@ -2714,6 +2828,9 @@ impl Edit {
                     | Operation::Underline { .. }
                     | Operation::FontSize { .. }
                     | Operation::Baseline { .. }
+                    | Operation::Expansion { .. }
+                    | Operation::HorizontalScale { .. }
+                    | Operation::Kerning { .. }
                     | Operation::Strike { .. }
                     | Operation::DoubleStrike { .. }
                     | Operation::Hidden { .. }
@@ -3025,6 +3142,60 @@ impl Edit {
         Ok(())
     }
 
+    fn ensure_character_property_span(
+        &self,
+        span: TextSpan,
+        property: &'static str,
+    ) -> Result<(), Error> {
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::ParagraphLayoutTextConflict);
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::UnsupportedSource(match property {
+                "expansion" => "expansion edits require non-empty text within one paragraph",
+                "horizontal scale" => {
+                    "horizontal-scale edits require non-empty text within one paragraph"
+                },
+                "kerning" => "kerning edits require non-empty text within one paragraph",
+                _ => "character-property edits require non-empty text within one paragraph",
+            }));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+            )
+        }) {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        Ok(())
+    }
+
     fn ensure_operation_room(&self) -> Result<(), Error> {
         self.ensure_operation_room_for(1)
     }
@@ -3144,12 +3315,27 @@ impl Edit {
                     | Operation::Outline { .. }
                     | Operation::FontSize { .. }
                     | Operation::Baseline { .. }
+                    | Operation::Expansion { .. }
+                    | Operation::HorizontalScale { .. }
+                    | Operation::Kerning { .. }
             )
         });
         let has_font_size_operation = self
             .operations
             .iter()
             .any(|operation| matches!(operation, Operation::FontSize { .. }));
+        let has_expansion_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Expansion { .. }));
+        let has_horizontal_scale_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::HorizontalScale { .. }));
+        let has_kerning_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Kerning { .. }));
         let mut alignments = if property_operation {
             source_alignments(&self.source)
         } else {
@@ -3177,6 +3363,21 @@ impl Edit {
                 || crate::types::Formatting::default().font_size,
                 |run| run.format().raw().font_size,
             )
+        };
+        let base_expansion = if property_operation && !layout_operation {
+            base_expansion_for_edit(&self.source, &self.operations)?
+        } else {
+            CharacterExpansion::None
+        };
+        let base_horizontal_scale = if property_operation && !layout_operation {
+            base_horizontal_scale_for_edit(&self.source, &self.operations)?
+        } else {
+            100
+        };
+        let base_kerning = if property_operation && !layout_operation {
+            base_kerning_for_edit(&self.source, &self.operations)?
+        } else {
+            0
         };
         let base_strike = if property_operation && !layout_operation {
             base_strike_for_edit(&self.source, &self.operations)?
@@ -3223,6 +3424,17 @@ impl Edit {
         baseline.italic = base_italic;
         baseline.underline = base_underline;
         baseline.font_size = base_font_size;
+        baseline.character_positioning.expansion = base_expansion;
+        baseline.char_spacing = match base_expansion {
+            CharacterExpansion::None => 0,
+            CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value) => {
+                i32::from(value)
+            },
+        };
+        baseline.character_positioning.horizontal_scale_percent = base_horizontal_scale;
+        baseline.char_scale = i32::from(base_horizontal_scale);
+        baseline.character_positioning.kerning_half_points = base_kerning;
+        baseline.kerning = i32::from(base_kerning);
         baseline.strike = base_strike;
         baseline.double_strike = base_double_strike;
         baseline.hidden = base_hidden;
@@ -3236,6 +3448,9 @@ impl Edit {
         let mut projected_italic_ranges = Vec::new();
         let mut projected_underline_ranges = Vec::new();
         let mut projected_font_size_ranges = Vec::new();
+        let mut projected_expansion_ranges = Vec::new();
+        let mut projected_horizontal_scale_ranges = Vec::new();
+        let mut projected_kerning_ranges = Vec::new();
         let mut projected_strike_ranges = Vec::new();
         let mut projected_double_strike_ranges = Vec::new();
         let mut projected_hidden_ranges = Vec::new();
@@ -3301,6 +3516,18 @@ impl Edit {
                 },
                 Operation::FontSize { span, after, .. } => {
                     projected_font_size_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Expansion { span, after, .. } => {
+                    projected_expansion_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::HorizontalScale { span, after, .. } => {
+                    projected_horizontal_scale_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Kerning { span, after, .. } => {
+                    projected_kerning_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
                 Operation::Strike { span, after, .. } => {
@@ -3386,6 +3613,18 @@ impl Edit {
         let has_baseline_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::Baseline { before, after, .. } if before != after)
         });
+        let has_expansion_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Expansion { before, after, .. } if before != after)
+        });
+        let has_horizontal_scale_delta = self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::HorizontalScale { before, after, .. } if before != after
+            )
+        });
+        let has_kerning_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Kerning { before, after, .. } if before != after)
+        });
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
@@ -3402,7 +3641,10 @@ impl Edit {
             || has_small_caps_delta
             || has_all_caps_delta
             || has_outline_delta
-            || has_baseline_delta;
+            || has_baseline_delta
+            || has_expansion_delta
+            || has_horizontal_scale_delta
+            || has_kerning_delta;
         let semantic_delta =
             semantic_changes_with_replacement(&self.operations, &projected_spans, &replacement);
         if !did_change {
@@ -3515,6 +3757,21 @@ impl Edit {
                 "baseline edits refuse non-ASCII transport encodings",
             ));
         }
+        if has_expansion_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "expansion edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_horizontal_scale_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "horizontal-scale edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_kerning_operation && !source_bytes.is_ascii() {
+            return Err(Error::UnsupportedSource(
+                "kerning edits refuse non-ASCII transport encodings",
+            ));
+        }
         if layout_operation {
             self.source
                 .model()
@@ -3531,6 +3788,9 @@ impl Edit {
             || has_all_caps_operation
             || has_outline_operation
             || has_baseline_operation
+            || has_expansion_operation
+            || has_horizontal_scale_operation
+            || has_kerning_operation
         {
             if has_bold_operation
                 && !has_italic_operation
@@ -3543,6 +3803,9 @@ impl Edit {
                 && !has_all_caps_operation
                 && !has_outline_operation
                 && !has_baseline_operation
+                && !has_expansion_operation
+                && !has_horizontal_scale_operation
+                && !has_kerning_operation
             {
                 self.source
                     .model()
@@ -3551,17 +3814,22 @@ impl Edit {
             } else {
                 plain_body_character_editability(
                     &self.source,
-                    has_bold_operation,
-                    has_italic_operation,
-                    has_underline_operation,
-                    has_font_size_operation,
-                    has_strike_operation,
-                    has_double_strike_operation,
-                    has_hidden_operation,
-                    has_small_caps_operation,
-                    has_all_caps_operation,
-                    has_outline_operation,
-                    has_baseline_operation,
+                    CharacterEditabilityOptions {
+                        allow_mixed_bold: has_bold_operation,
+                        allow_mixed_italic: has_italic_operation,
+                        allow_mixed_underline: has_underline_operation,
+                        allow_mixed_font_size: has_font_size_operation,
+                        allow_mixed_strike: has_strike_operation,
+                        allow_mixed_double_strike: has_double_strike_operation,
+                        allow_mixed_hidden: has_hidden_operation,
+                        allow_mixed_small_caps: has_small_caps_operation,
+                        allow_mixed_all_caps: has_all_caps_operation,
+                        allow_mixed_outline: has_outline_operation,
+                        allow_mixed_baseline: has_baseline_operation,
+                        allow_mixed_expansion: has_expansion_operation,
+                        allow_mixed_horizontal_scale: has_horizontal_scale_operation,
+                        allow_mixed_kerning: has_kerning_operation,
+                    },
                 )
                 .map_err(Error::UnsupportedSource)?;
             }
@@ -3585,6 +3853,9 @@ impl Edit {
                 || has_all_caps_operation
                 || has_outline_operation
                 || has_baseline_operation
+                || has_expansion_operation
+                || has_horizontal_scale_operation
+                || has_kerning_operation
             {
                 return Err(Error::ParagraphLayoutTextConflict);
             }
@@ -3608,6 +3879,12 @@ impl Edit {
                     underline_changes: &projected_underline_ranges,
                     base_font_size,
                     font_size_changes: &projected_font_size_ranges,
+                    base_expansion,
+                    expansion_changes: &projected_expansion_ranges,
+                    base_horizontal_scale,
+                    horizontal_scale_changes: &projected_horizontal_scale_ranges,
+                    base_kerning,
+                    kerning_changes: &projected_kerning_ranges,
                     base_strike,
                     strike_changes: &projected_strike_ranges,
                     base_double_strike,
@@ -3694,6 +3971,27 @@ impl Edit {
             if font_size_for_span(&snapshot, font_size_span)? != expected {
                 return Err(Error::UnsupportedSource(
                     "candidate font-size property did not survive RTF validation",
+                ));
+            }
+        }
+        for (expansion_span, expected) in projected_expansion_ranges {
+            if expansion_for_span(&snapshot, expansion_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate expansion property did not survive RTF validation",
+                ));
+            }
+        }
+        for (scale_span, expected) in projected_horizontal_scale_ranges {
+            if horizontal_scale_for_span(&snapshot, scale_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate horizontal-scale property did not survive RTF validation",
+                ));
+            }
+        }
+        for (kerning_span, expected) in projected_kerning_ranges {
+            if kerning_for_span(&snapshot, kerning_span)? != expected {
+                return Err(Error::UnsupportedSource(
+                    "candidate kerning property did not survive RTF validation",
                 ));
             }
         }
@@ -4045,6 +4343,9 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -4129,6 +4430,9 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -4799,6 +5103,9 @@ fn project_text(
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -4947,6 +5254,9 @@ fn project_lifecycle_text(source: &Snapshot, operation: &Operation) -> Result<St
         | Operation::Outline { .. }
         | Operation::FontSize { .. }
         | Operation::Baseline { .. }
+        | Operation::Expansion { .. }
+        | Operation::HorizontalScale { .. }
+        | Operation::Kerning { .. }
         | Operation::InsertParagraph { .. }
         | Operation::TableCellText { .. }
         | Operation::HeaderFooterText { .. }
@@ -5090,8 +5400,8 @@ fn uniform_body_bold(source: &Snapshot) -> Result<bool, Error> {
     Ok(value.unwrap_or(false))
 }
 
-fn plain_body_character_editability(
-    source: &Snapshot,
+#[derive(Clone, Copy, Default)]
+struct CharacterEditabilityOptions {
     allow_mixed_bold: bool,
     allow_mixed_italic: bool,
     allow_mixed_underline: bool,
@@ -5103,6 +5413,14 @@ fn plain_body_character_editability(
     allow_mixed_all_caps: bool,
     allow_mixed_outline: bool,
     allow_mixed_baseline: bool,
+    allow_mixed_expansion: bool,
+    allow_mixed_horizontal_scale: bool,
+    allow_mixed_kerning: bool,
+}
+
+fn plain_body_character_editability(
+    source: &Snapshot,
+    options: CharacterEditabilityOptions,
 ) -> Result<(), &'static str> {
     source.model().local_paragraph_property_editability()?;
     let mut paragraph_format = None;
@@ -5115,40 +5433,52 @@ fn plain_body_character_editability(
         paragraph_format = Some(raw_paragraph);
         for run in paragraph.runs() {
             let mut raw_character = *run.format().raw();
-            if allow_mixed_bold {
+            if options.allow_mixed_bold {
                 raw_character.bold = false;
             }
-            if allow_mixed_italic {
+            if options.allow_mixed_italic {
                 raw_character.italic = false;
             }
-            if allow_mixed_underline {
+            if options.allow_mixed_underline {
                 raw_character.underline = UnderlineStyle::None;
             }
-            if allow_mixed_font_size {
+            if options.allow_mixed_font_size {
                 raw_character.font_size = crate::types::Formatting::default().font_size;
             }
-            if allow_mixed_strike {
+            if options.allow_mixed_strike {
                 raw_character.strike = false;
             }
-            if allow_mixed_double_strike {
+            if options.allow_mixed_double_strike {
                 raw_character.double_strike = false;
             }
-            if allow_mixed_hidden {
+            if options.allow_mixed_hidden {
                 raw_character.hidden = false;
             }
-            if allow_mixed_small_caps {
+            if options.allow_mixed_small_caps {
                 raw_character.smallcaps = false;
             }
-            if allow_mixed_all_caps {
+            if options.allow_mixed_all_caps {
                 raw_character.all_caps = false;
             }
-            if allow_mixed_outline {
+            if options.allow_mixed_outline {
                 raw_character.outline = false;
             }
-            if allow_mixed_baseline {
+            if options.allow_mixed_baseline {
                 raw_character.character_positioning.baseline = CharacterBaseline::Normal;
                 raw_character.superscript = false;
                 raw_character.subscript = false;
+            }
+            if options.allow_mixed_expansion {
+                raw_character.character_positioning.expansion = CharacterExpansion::None;
+                raw_character.char_spacing = 0;
+            }
+            if options.allow_mixed_horizontal_scale {
+                raw_character.character_positioning.horizontal_scale_percent = 100;
+                raw_character.char_scale = 100;
+            }
+            if options.allow_mixed_kerning {
+                raw_character.character_positioning.kerning_half_points = 0;
+                raw_character.kerning = 0;
             }
             if character_format.is_some_and(|existing| existing != raw_character) {
                 return Err("the body has mixed run or paragraph formatting");
@@ -5186,6 +5516,9 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5245,6 +5578,9 @@ fn base_bold_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<boo
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5294,6 +5630,9 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5353,6 +5692,9 @@ fn base_italic_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5405,6 +5747,9 @@ fn base_underline_for_edit(
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5464,6 +5809,9 @@ fn base_underline_for_edit(
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5516,6 +5864,9 @@ fn base_font_size_for_edit(
             | Operation::AllCaps { .. }
             | Operation::Outline { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5569,6 +5920,9 @@ fn base_font_size_for_edit(
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::Strike { .. }
                 | Operation::DoubleStrike { .. }
                 | Operation::Hidden { .. }
@@ -5618,6 +5972,246 @@ fn effective_baseline(formatting: &crate::types::Formatting) -> CharacterBaselin
     }
 }
 
+fn map_positioning_error(error: RtfError, fallback: &'static str) -> Error {
+    match error {
+        RtfError::MalformedDocument(message) => match message.as_str() {
+            "RTF legacy character spacing is out of range" => {
+                Error::UnsupportedSource("legacy character spacing is out of range")
+            },
+            "RTF legacy character scale is out of range" => {
+                Error::UnsupportedSource("legacy character scale is out of range")
+            },
+            "RTF legacy character kerning is out of range" => {
+                Error::UnsupportedSource("legacy character kerning is out of range")
+            },
+            _ => Error::UnsupportedSource(fallback),
+        },
+        _ => Error::UnsupportedSource(fallback),
+    }
+}
+
+fn normalize_character_expansion(
+    expansion: CharacterExpansion,
+) -> Result<CharacterExpansion, Error> {
+    crate::text::character_positioning::normalize_character_expansion(expansion)
+        .map_err(|error| map_positioning_error(error, "character expansion is out of range"))
+}
+
+fn validate_character_scale(value: u16) -> Result<(), Error> {
+    crate::text::character_positioning::validate_character_scale(value)
+        .map_err(|error| map_positioning_error(error, "character horizontal scale is out of range"))
+}
+
+fn validate_character_kerning(value: u16) -> Result<(), Error> {
+    crate::text::character_positioning::validate_character_kerning(value)
+        .map_err(|error| map_positioning_error(error, "character kerning is out of range"))
+}
+
+fn effective_character_expansion(
+    formatting: &crate::types::Formatting,
+) -> Result<CharacterExpansion, Error> {
+    crate::text::character_positioning::effective_character_expansion(
+        formatting.character_positioning.expansion,
+        formatting.char_spacing,
+    )
+    .map_err(|error| map_positioning_error(error, "character expansion is out of range"))
+}
+
+fn effective_character_scale(formatting: &crate::types::Formatting) -> Result<u16, Error> {
+    crate::text::character_positioning::effective_character_scale(
+        formatting.character_positioning.horizontal_scale_percent,
+        formatting.char_scale,
+    )
+    .map_err(|error| map_positioning_error(error, "character horizontal scale is out of range"))
+}
+
+fn effective_character_kerning(formatting: &crate::types::Formatting) -> Result<u16, Error> {
+    crate::text::character_positioning::effective_character_kerning(
+        formatting.character_positioning.kerning_half_points,
+        formatting.kerning,
+    )
+    .map_err(|error| map_positioning_error(error, "character kerning is out of range"))
+}
+
+fn base_character_property_for_edit<T: Copy + PartialEq>(
+    source: &Snapshot,
+    selected_spans: &[TextSpan],
+    getter: fn(&crate::types::Formatting) -> Result<T, Error>,
+    fallback: T,
+    mixed_error: &'static str,
+) -> Result<T, Error> {
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, selected_spans) {
+                let value = getter(run.format().raw())?;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::UnsupportedSource(mixed_error));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or(fallback))
+}
+
+fn expansion_for_span(source: &Snapshot, span: TextSpan) -> Result<CharacterExpansion, Error> {
+    character_property_for_span(
+        source,
+        span,
+        effective_character_expansion,
+        "the selected character span has mixed expansion state",
+        "the selected character span has no character expansion",
+    )
+}
+
+fn horizontal_scale_for_span(source: &Snapshot, span: TextSpan) -> Result<u16, Error> {
+    character_property_for_span(
+        source,
+        span,
+        effective_character_scale,
+        "the selected character span has mixed horizontal-scale state",
+        "the selected character span has no character scale",
+    )
+}
+
+fn kerning_for_span(source: &Snapshot, span: TextSpan) -> Result<u16, Error> {
+    character_property_for_span(
+        source,
+        span,
+        effective_character_kerning,
+        "the selected character span has mixed kerning state",
+        "the selected character span has no character kerning",
+    )
+}
+
+fn character_property_for_span<T: Copy + PartialEq>(
+    source: &Snapshot,
+    span: TextSpan,
+    getter: fn(&crate::types::Formatting) -> Result<T, Error>,
+    mixed_error: &'static str,
+    empty_error: &'static str,
+) -> Result<T, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let current = getter(run.format().raw())?;
+                if value.is_some_and(|existing| existing != current) {
+                    return Err(Error::UnsupportedSource(mixed_error));
+                }
+                value = Some(current);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::UnsupportedSource(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::UnsupportedSource(empty_error))
+}
+
+fn base_expansion_for_edit(
+    source: &Snapshot,
+    operations: &[Operation],
+) -> Result<CharacterExpansion, Error> {
+    let selected = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Expansion { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let fallback = operations
+        .iter()
+        .find_map(|operation| match operation {
+            Operation::Expansion { after, .. } => Some(*after),
+            _ => None,
+        })
+        .unwrap_or(CharacterExpansion::None);
+    base_character_property_for_edit(
+        source,
+        &selected,
+        effective_character_expansion,
+        fallback,
+        "unselected body text has mixed expansion state",
+    )
+}
+
+fn base_horizontal_scale_for_edit(
+    source: &Snapshot,
+    operations: &[Operation],
+) -> Result<u16, Error> {
+    let selected = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::HorizontalScale { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let fallback = operations
+        .iter()
+        .find_map(|operation| match operation {
+            Operation::HorizontalScale { after, .. } => Some(*after),
+            _ => None,
+        })
+        .unwrap_or(100);
+    base_character_property_for_edit(
+        source,
+        &selected,
+        effective_character_scale,
+        fallback,
+        "unselected body text has mixed horizontal-scale state",
+    )
+}
+
+fn base_kerning_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<u16, Error> {
+    let selected = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Kerning { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let fallback = operations
+        .iter()
+        .find_map(|operation| match operation {
+            Operation::Kerning { after, .. } => Some(*after),
+            _ => None,
+        })
+        .unwrap_or(0);
+    base_character_property_for_edit(
+        source,
+        &selected,
+        effective_character_kerning,
+        fallback,
+        "unselected body text has mixed kerning state",
+    )
+}
+
 fn uniform_body_baseline(source: &Snapshot) -> Result<CharacterBaseline, Error> {
     let mut value = None;
     for run in source.body().runs() {
@@ -5653,6 +6247,9 @@ fn base_baseline_for_edit(
             | Operation::SmallCaps { .. }
             | Operation::AllCaps { .. }
             | Operation::Outline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5712,6 +6309,9 @@ fn base_baseline_for_edit(
                 | Operation::SmallCaps { .. }
                 | Operation::AllCaps { .. }
                 | Operation::Outline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5775,6 +6375,9 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5834,6 +6437,9 @@ fn base_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5869,6 +6475,9 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -5928,6 +6537,9 @@ fn base_double_strike_for_edit(source: &Snapshot, operations: &[Operation]) -> R
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5977,6 +6589,9 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -6036,6 +6651,9 @@ fn base_hidden_for_edit(source: &Snapshot, operations: &[Operation]) -> Result<b
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -6085,6 +6703,9 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -6144,6 +6765,9 @@ fn base_small_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Resu
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -6193,6 +6817,9 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::InsertParagraph { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
@@ -6252,6 +6879,9 @@ fn base_all_caps_for_edit(source: &Snapshot, operations: &[Operation]) -> Result
                 | Operation::Outline { .. }
                 | Operation::FontSize { .. }
                 | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -6304,6 +6934,9 @@ fn operation_changes_semantics(operation: &Operation) -> bool {
         Operation::Underline { before, after, .. } => before != after,
         Operation::FontSize { before, after, .. } => before != after,
         Operation::Baseline { before, after, .. } => before != after,
+        Operation::Expansion { before, after, .. } => before != after,
+        Operation::HorizontalScale { before, after, .. } => before != after,
+        Operation::Kerning { before, after, .. } => before != after,
         Operation::MoveParagraph {
             position,
             final_position,
@@ -6852,6 +7485,9 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
@@ -7025,21 +7661,11 @@ fn validate_opaque_preservation(
 }
 
 fn encoded_body_text(text: &str, limits: crate::ParseLimits) -> Result<Vec<u8>, Error> {
-    let required = encoded_body_len(text)?;
-    if required > limits.max_source_bytes() {
-        return Err(Error::InputTooLarge {
-            observed: required,
-            limit: limits.max_source_bytes(),
-        });
+    let mut output = BoundedVec::new(limits.max_source_bytes());
+    match RtfWriter::new(&mut output).write_text(text) {
+        Ok(()) => Ok(output.into_inner()),
+        Err(error) => Err(output.map_io_error(error)),
     }
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(required)
-        .map_err(|_error| Error::Write("could not reserve replacement RTF bytes".to_string()))?;
-    RtfWriter::new(&mut output)
-        .write_text(text)
-        .map_err(|error| Error::Write(error.to_string()))?;
-    Ok(output)
 }
 
 #[derive(Clone, Copy)]
@@ -7049,6 +7675,9 @@ enum CharacterPropertyChange {
     Underline(UnderlineStyle),
     FontSize(NonZeroU16),
     Baseline(CharacterBaseline),
+    Expansion(CharacterExpansion),
+    HorizontalScale(u16),
+    Kerning(u16),
     Strike(bool),
     DoubleStrike(bool),
     Hidden(bool),
@@ -7066,6 +7695,12 @@ struct CharacterPropertyOverlays<'a> {
     underline_changes: &'a [(TextSpan, UnderlineStyle)],
     base_font_size: NonZeroU16,
     font_size_changes: &'a [(TextSpan, NonZeroU16)],
+    base_expansion: CharacterExpansion,
+    expansion_changes: &'a [(TextSpan, CharacterExpansion)],
+    base_horizontal_scale: u16,
+    horizontal_scale_changes: &'a [(TextSpan, u16)],
+    base_kerning: u16,
+    kerning_changes: &'a [(TextSpan, u16)],
     base_baseline: CharacterBaseline,
     baseline_changes: &'a [(TextSpan, CharacterBaseline)],
     base_strike: bool,
@@ -7089,42 +7724,14 @@ fn encoded_body_with_properties(
     overlays: CharacterPropertyOverlays<'_>,
     limits: crate::ParseLimits,
 ) -> Result<Vec<u8>, Error> {
-    let extra = alignments
-        .len()
-        .checked_mul(4)
-        .and_then(|bytes| bytes.checked_add(overlays.bold_changes.len().saturating_mul(6)))
-        .and_then(|bytes| bytes.checked_add(overlays.italic_changes.len().saturating_mul(6)))
-        .and_then(|bytes| bytes.checked_add(overlays.underline_changes.len().saturating_mul(12)))
-        .and_then(|bytes| bytes.checked_add(overlays.font_size_changes.len().saturating_mul(10)))
-        .and_then(|bytes| bytes.checked_add(overlays.baseline_changes.len().saturating_mul(18)))
-        .and_then(|bytes| bytes.checked_add(overlays.strike_changes.len().saturating_mul(6)))
-        .and_then(|bytes| {
-            bytes.checked_add(overlays.double_strike_changes.len().saturating_mul(10))
-        })
-        .and_then(|bytes| bytes.checked_add(overlays.hidden_changes.len().saturating_mul(6)))
-        .and_then(|bytes| bytes.checked_add(overlays.small_caps_changes.len().saturating_mul(8)))
-        .and_then(|bytes| bytes.checked_add(overlays.all_caps_changes.len().saturating_mul(6)))
-        .and_then(|bytes| bytes.checked_add(overlays.outline_changes.len().saturating_mul(6)))
-        .ok_or(Error::InputTooLarge {
-            observed: usize::MAX,
-            limit: limits.max_source_bytes(),
-        })?;
-    let required = encoded_body_len(text)?
-        .checked_add(extra)
-        .ok_or(Error::InputTooLarge {
-            observed: usize::MAX,
-            limit: limits.max_source_bytes(),
-        })?;
-    if required > limits.max_source_bytes() {
+    let encoded_text_length = encoded_body_len(text)?;
+    if encoded_text_length > limits.max_source_bytes() {
         return Err(Error::InputTooLarge {
-            observed: required,
+            observed: encoded_text_length,
             limit: limits.max_source_bytes(),
         });
     }
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(required)
-        .map_err(|_error| Error::Write("could not reserve formatted RTF bytes".to_string()))?;
+    let mut output = BoundedVec::new(limits.max_source_bytes());
     let mut paragraph = 0usize;
     let mut paragraph_start = 0usize;
     loop {
@@ -7139,10 +7746,11 @@ fn encoded_body_with_properties(
             .get(paragraph)
             .copied()
             .ok_or(Error::StructuralPropertyConflict)?;
-        output.extend_from_slice(br"\plain ");
-        RtfWriter::new(&mut output)
-            .write_formatting(&baseline)
-            .map_err(|error| Error::Write(error.to_string()))?;
+        output.append(br"\plain ")?;
+        let result = RtfWriter::new(&mut output).write_formatting(&baseline);
+        if let Err(error) = result {
+            return Err(output.map_io_error(error));
+        }
         write_alignment(&mut output, Some(alignment))?;
         let mut cursor = paragraph_start;
         let mut paragraph_changes = overlays
@@ -7174,6 +7782,30 @@ fn encoded_body_with_properties(
                     .copied()
                     .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
                     .map(|(span, value)| (span, CharacterPropertyChange::FontSize(value))),
+            )
+            .chain(
+                overlays
+                    .expansion_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Expansion(value))),
+            )
+            .chain(
+                overlays
+                    .horizontal_scale_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::HorizontalScale(value))),
+            )
+            .chain(
+                overlays
+                    .kerning_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Kerning(value))),
             )
             .chain(
                 overlays
@@ -7237,108 +7869,129 @@ fn encoded_body_with_properties(
             write_encoded_fragment(&mut output, text, cursor..span.start)?;
             match change {
                 CharacterPropertyChange::Bold(value) => {
-                    write_bold(&mut output, value);
+                    write_bold(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
+                    write_bold(&mut output, overlays.base_bold)?;
                 },
                 CharacterPropertyChange::Italic(value) => {
                     // The parser flushes body text at bold controls but not at
                     // italic controls. Reasserting the current bold state around
                     // this italic fragment creates a run boundary without
                     // changing the effective formatting or source envelope.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_italic(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_italic(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_italic(&mut output, overlays.base_italic);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_italic(&mut output, overlays.base_italic)?;
                 },
                 CharacterPropertyChange::Underline(value) => {
                     // Underline controls do not by themselves flush all parser
                     // run state. Bold controls force the same safe boundary as
                     // the existing italic property path.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_underline(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_underline(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_underline(&mut output, overlays.base_underline);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_underline(&mut output, overlays.base_underline)?;
                 },
                 CharacterPropertyChange::FontSize(value) => {
                     // Font-size controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
                     // while preserving associated font size and every other
                     // baseline facet.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_font_size(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_font_size(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_font_size(&mut output, overlays.base_font_size);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_font_size(&mut output, overlays.base_font_size)?;
+                },
+                CharacterPropertyChange::Expansion(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_expansion(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_expansion(&mut output, overlays.base_expansion)?;
+                },
+                CharacterPropertyChange::HorizontalScale(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_horizontal_scale(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_horizontal_scale(&mut output, overlays.base_horizontal_scale)?;
+                },
+                CharacterPropertyChange::Kerning(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_kerning(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_kerning(&mut output, overlays.base_kerning)?;
                 },
                 CharacterPropertyChange::Baseline(value) => {
-                    write_bold(&mut output, overlays.base_bold);
-                    write_baseline(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_baseline(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_baseline(&mut output, overlays.base_baseline);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_baseline(&mut output, overlays.base_baseline)?;
                 },
                 CharacterPropertyChange::Strike(value) => {
                     // Strike controls do not by themselves flush all parser
                     // run state. Bold controls force the same safe boundary
                     // while the baseline's double-strike facet remains intact.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_strike(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_strike(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_strike(&mut output, overlays.base_strike);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_strike(&mut output, overlays.base_strike)?;
                 },
                 CharacterPropertyChange::DoubleStrike(value) => {
                     // Double-strike controls are local character state. Keep
                     // single strike untouched and reassert bold for a stable
                     // run boundary around the selected fragment.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_double_strike(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_double_strike(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_double_strike(&mut output, overlays.base_double_strike);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_double_strike(&mut output, overlays.base_double_strike)?;
                 },
                 CharacterPropertyChange::Hidden(value) => {
                     // Hidden controls are local character state. Reasserting
                     // bold around the fragment forces the same run boundary
                     // used by the other character-property encoders.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_hidden(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_hidden(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_hidden(&mut output, overlays.base_hidden);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_hidden(&mut output, overlays.base_hidden)?;
                 },
                 CharacterPropertyChange::SmallCaps(value) => {
                     // Small-caps controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
                     // without changing all-caps or any other facet.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_small_caps(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_small_caps(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_small_caps(&mut output, overlays.base_small_caps);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_small_caps(&mut output, overlays.base_small_caps)?;
                 },
                 CharacterPropertyChange::AllCaps(value) => {
                     // All-caps controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
                     // without changing small-caps or any other facet.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_all_caps(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_all_caps(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_all_caps(&mut output, overlays.base_all_caps);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_all_caps(&mut output, overlays.base_all_caps)?;
                 },
                 CharacterPropertyChange::Outline(value) => {
                     // Outline controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
                     // while preserving every unrelated character facet.
-                    write_bold(&mut output, overlays.base_bold);
-                    write_outline(&mut output, value);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_outline(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
-                    write_bold(&mut output, overlays.base_bold);
-                    write_outline(&mut output, overlays.base_outline);
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_outline(&mut output, overlays.base_outline)?;
                 },
             }
             cursor = span.end;
@@ -7348,13 +8001,13 @@ fn encoded_body_with_properties(
         if paragraph_end == text.len() {
             break;
         }
-        output.extend_from_slice(br"\par ");
+        output.append(br"\par ")?;
         paragraph_start = paragraph_end.saturating_add(1);
     }
     if paragraph != alignments.len() {
         return Err(Error::StructuralPropertyConflict);
     }
-    Ok(output)
+    Ok(output.into_inner())
 }
 
 fn encoded_body_with_paragraph_properties(
@@ -7380,25 +8033,33 @@ fn encoded_body_with_paragraph_properties(
         let mut runs = paragraph.runs().peekable();
         if runs.peek().is_none() {
             write_bounded(&mut output, br"\plain\pard ")?;
-            let mut writer = RtfWriter::new(&mut output);
-            writer
-                .write_paragraph_properties(properties)
-                .map_err(|error| Error::Write(error.to_string()))?;
+            let result = {
+                let mut writer = RtfWriter::new(&mut output);
+                writer.write_paragraph_properties(properties)
+            };
+            if let Err(error) = result {
+                return Err(output.map_io_error(error));
+            }
             if terminated {
                 write_bounded(&mut output, br"\par ")?;
             }
         } else {
             while let Some(run) = runs.next() {
                 write_bounded(&mut output, br"\plain\pard ")?;
-                let mut writer = RtfWriter::new(&mut output);
-                writer
-                    .write_formatting(run.format().raw())
-                    .and_then(|()| writer.write_paragraph_properties(properties))
-                    .map_err(|error| Error::Write(error.to_string()))?;
+                let result = {
+                    let mut writer = RtfWriter::new(&mut output);
+                    writer
+                        .write_formatting(run.format().raw())
+                        .and_then(|()| writer.write_paragraph_properties(properties))
+                };
+                if let Err(error) = result {
+                    return Err(output.map_io_error(error));
+                }
                 write_bounded(&mut output, b" ")?;
-                RtfWriter::new(&mut output)
-                    .write_text(run.text())
-                    .map_err(|error| Error::Write(error.to_string()))?;
+                match RtfWriter::new(&mut output).write_text(run.text()) {
+                    Ok(()) => {},
+                    Err(error) => return Err(output.map_io_error(error)),
+                }
                 if terminated && runs.peek().is_none() {
                     write_bounded(&mut output, br"\par ")?;
                 }
@@ -7414,14 +8075,16 @@ fn encoded_body_with_paragraph_properties(
 }
 
 fn write_bounded(output: &mut BoundedVec, bytes: &[u8]) -> Result<(), Error> {
-    output
-        .write_all(bytes)
-        .map_err(|error| Error::Write(error.to_string()))
+    match output.write_all(bytes) {
+        Ok(()) => Ok(()),
+        Err(error) => Err(output.map_io_error(error)),
+    }
 }
 
 struct BoundedVec {
     bytes: Vec<u8>,
     limit: usize,
+    overflow_observed: Option<usize>,
 }
 
 impl BoundedVec {
@@ -7429,7 +8092,25 @@ impl BoundedVec {
         Self {
             bytes: Vec::new(),
             limit,
+            overflow_observed: None,
         }
+    }
+
+    fn append(&mut self, bytes: &[u8]) -> Result<(), Error> {
+        match self.write_all(bytes) {
+            Ok(()) => Ok(()),
+            Err(error) => Err(self.map_io_error(error)),
+        }
+    }
+
+    fn map_io_error(&self, error: io::Error) -> Error {
+        self.overflow_observed.map_or_else(
+            || Error::Write(error.to_string()),
+            |observed| Error::InputTooLarge {
+                observed,
+                limit: self.limit,
+            },
+        )
     }
 
     fn into_inner(self) -> Vec<u8> {
@@ -7439,12 +8120,17 @@ impl BoundedVec {
 
 impl io::Write for BoundedVec {
     fn write(&mut self, input: &[u8]) -> io::Result<usize> {
-        let observed = self
-            .bytes
-            .len()
-            .checked_add(input.len())
-            .ok_or_else(|| io::Error::other("RTF paragraph-layout output size overflow"))?;
+        let observed = match self.bytes.len().checked_add(input.len()) {
+            Some(observed) => observed,
+            None => {
+                self.overflow_observed = Some(usize::MAX);
+                return Err(io::Error::other(
+                    "RTF paragraph-layout output size overflow",
+                ));
+            },
+        };
         if observed > self.limit {
+            self.overflow_observed = Some(observed);
             return Err(io::Error::other(
                 "RTF paragraph-layout output exceeds the source limit",
             ));
@@ -7462,28 +8148,29 @@ impl io::Write for BoundedVec {
 }
 
 fn write_encoded_fragment(
-    output: &mut Vec<u8>,
+    output: &mut BoundedVec,
     text: &str,
     range: Range<usize>,
 ) -> Result<(), Error> {
     let fragment = text.get(range).ok_or(Error::UnsupportedSource(
         "property span is not a UTF-8 text boundary",
     ))?;
-    RtfWriter::new(output)
-        .write_text(fragment)
-        .map_err(|error| Error::Write(error.to_string()))
+    match RtfWriter::new(&mut *output).write_text(fragment) {
+        Ok(()) => Ok(()),
+        Err(error) => Err(output.map_io_error(error)),
+    }
 }
 
-fn write_bold(output: &mut Vec<u8>, bold: bool) {
-    output.extend_from_slice(if bold { br"\b " } else { br"\b0 " });
+fn write_bold(output: &mut BoundedVec, bold: bool) -> Result<(), Error> {
+    output.append(if bold { br"\b " } else { br"\b0 " })
 }
 
-fn write_italic(output: &mut Vec<u8>, italic: bool) {
-    output.extend_from_slice(if italic { br"\i " } else { br"\i0 " });
+fn write_italic(output: &mut BoundedVec, italic: bool) -> Result<(), Error> {
+    output.append(if italic { br"\i " } else { br"\i0 " })
 }
 
-fn write_underline(output: &mut Vec<u8>, underline: UnderlineStyle) {
-    output.extend_from_slice(match underline {
+fn write_underline(output: &mut BoundedVec, underline: UnderlineStyle) -> Result<(), Error> {
+    output.append(match underline {
         UnderlineStyle::None => br"\ulnone ",
         UnderlineStyle::Single => br"\ul ",
         UnderlineStyle::Double => br"\uldb ",
@@ -7503,18 +8190,17 @@ fn write_underline(output: &mut Vec<u8>, underline: UnderlineStyle) {
         UnderlineStyle::LongDash => br"\ulldash ",
         UnderlineStyle::HeavyWave => br"\ulhwave ",
         UnderlineStyle::DoubleWave => br"\ululdbwave ",
-    });
+    })
 }
 
-fn write_alignment(output: &mut Vec<u8>, alignment: Option<Alignment>) -> Result<(), Error> {
+fn write_alignment(output: &mut BoundedVec, alignment: Option<Alignment>) -> Result<(), Error> {
     let bytes = match alignment.ok_or(Error::StructuralPropertyConflict)? {
         Alignment::Left => br"\ql ".as_slice(),
         Alignment::Right => br"\qr ".as_slice(),
         Alignment::Center => br"\qc ".as_slice(),
         Alignment::Justify => br"\qj ".as_slice(),
     };
-    output.extend_from_slice(bytes);
-    Ok(())
+    output.append(bytes)
 }
 
 fn encoded_body_len(text: &str) -> Result<usize, Error> {
@@ -7590,74 +8276,86 @@ impl Diagnostics {
     }
 }
 
-fn write_font_size(output: &mut Vec<u8>, font_size: NonZeroU16) {
-    output.extend_from_slice(br"\fs");
-    output.extend_from_slice(font_size.get().to_string().as_bytes());
-    output.push(b' ');
+fn write_font_size(output: &mut BoundedVec, font_size: NonZeroU16) -> Result<(), Error> {
+    output.append(br"\fs")?;
+    output.append(font_size.get().to_string().as_bytes())?;
+    output.append(b" ")
 }
 
-fn write_strike(output: &mut Vec<u8>, strike: bool) {
-    if strike {
-        output.extend_from_slice(br"\strike ");
-    } else {
-        output.extend_from_slice(br"\strike0 ");
+fn write_expansion(output: &mut BoundedVec, expansion: CharacterExpansion) -> Result<(), Error> {
+    match expansion {
+        CharacterExpansion::None => output.append(br"\expnd0 "),
+        CharacterExpansion::QuarterPoints(value) => {
+            output.append(br"\expnd")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
+        },
+        CharacterExpansion::Twips(value) => {
+            output.append(br"\expndtw")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
+        },
     }
 }
 
-fn write_double_strike(output: &mut Vec<u8>, double_strike: bool) {
-    if double_strike {
-        output.extend_from_slice(br"\striked ");
-    } else {
-        output.extend_from_slice(br"\striked0 ");
-    }
+fn write_horizontal_scale(output: &mut BoundedVec, scale_percent: u16) -> Result<(), Error> {
+    output.append(br"\charscalex")?;
+    output.append(scale_percent.to_string().as_bytes())?;
+    output.append(b" ")
 }
 
-fn write_hidden(output: &mut Vec<u8>, hidden: bool) {
-    if hidden {
-        output.extend_from_slice(br"\v ");
-    } else {
-        output.extend_from_slice(br"\v0 ");
-    }
+fn write_kerning(output: &mut BoundedVec, kerning_half_points: u16) -> Result<(), Error> {
+    output.append(br"\kerning")?;
+    output.append(kerning_half_points.to_string().as_bytes())?;
+    output.append(b" ")
 }
 
-fn write_small_caps(output: &mut Vec<u8>, small_caps: bool) {
-    if small_caps {
-        output.extend_from_slice(br"\scaps ");
-    } else {
-        output.extend_from_slice(br"\scaps0 ");
-    }
+fn write_strike(output: &mut BoundedVec, strike: bool) -> Result<(), Error> {
+    output.append(if strike { br"\strike " } else { br"\strike0 " })
 }
 
-fn write_all_caps(output: &mut Vec<u8>, all_caps: bool) {
-    if all_caps {
-        output.extend_from_slice(br"\caps ");
+fn write_double_strike(output: &mut BoundedVec, double_strike: bool) -> Result<(), Error> {
+    output.append(if double_strike {
+        br"\striked "
     } else {
-        output.extend_from_slice(br"\caps0 ");
-    }
+        br"\striked0 "
+    })
 }
 
-fn write_outline(output: &mut Vec<u8>, outline: bool) {
-    if outline {
-        output.extend_from_slice(br"\outl ");
-    } else {
-        output.extend_from_slice(br"\outl0 ");
-    }
+fn write_hidden(output: &mut BoundedVec, hidden: bool) -> Result<(), Error> {
+    output.append(if hidden { br"\v " } else { br"\v0 " })
 }
 
-fn write_baseline(output: &mut Vec<u8>, baseline: CharacterBaseline) {
+fn write_small_caps(output: &mut BoundedVec, small_caps: bool) -> Result<(), Error> {
+    output.append(if small_caps {
+        br"\scaps "
+    } else {
+        br"\scaps0 "
+    })
+}
+
+fn write_all_caps(output: &mut BoundedVec, all_caps: bool) -> Result<(), Error> {
+    output.append(if all_caps { br"\caps " } else { br"\caps0 " })
+}
+
+fn write_outline(output: &mut BoundedVec, outline: bool) -> Result<(), Error> {
+    output.append(if outline { br"\outl " } else { br"\outl0 " })
+}
+
+fn write_baseline(output: &mut BoundedVec, baseline: CharacterBaseline) -> Result<(), Error> {
     match baseline {
-        CharacterBaseline::Normal => output.extend_from_slice(br"\nosupersub "),
-        CharacterBaseline::Superscript => output.extend_from_slice(br"\super "),
-        CharacterBaseline::Subscript => output.extend_from_slice(br"\sub "),
+        CharacterBaseline::Normal => output.append(br"\nosupersub "),
+        CharacterBaseline::Superscript => output.append(br"\super "),
+        CharacterBaseline::Subscript => output.append(br"\sub "),
         CharacterBaseline::RaisedHalfPoints(value) => {
-            output.extend_from_slice(br"\up");
-            output.extend_from_slice(value.to_string().as_bytes());
-            output.push(b' ');
+            output.append(br"\up")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
         },
         CharacterBaseline::LoweredHalfPoints(value) => {
-            output.extend_from_slice(br"\dn");
-            output.extend_from_slice(value.to_string().as_bytes());
-            output.push(b' ');
+            output.append(br"\dn")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
         },
     }
 }
@@ -7764,6 +8462,24 @@ enum Change {
         after_span: TextSpan,
         before: CharacterBaseline,
         after: CharacterBaseline,
+    },
+    Expansion {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: CharacterExpansion,
+        after: CharacterExpansion,
+    },
+    HorizontalScale {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: u16,
+        after: u16,
+    },
+    Kerning {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: u16,
+        after: u16,
     },
     Strike {
         span: TextSpan,
@@ -7957,6 +8673,39 @@ impl Change {
                 before,
                 after,
             } => Self::Baseline {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Expansion {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Expansion {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::HorizontalScale {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::HorizontalScale {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Kerning {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Kerning {
                 span: *after_span,
                 after_span: *span,
                 before: *after,
@@ -8267,6 +9016,36 @@ fn semantic_changes_with_replacement(
                 before: *before,
                 after: *after,
             }),
+            Operation::Expansion {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Expansion {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::HorizontalScale {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::HorizontalScale {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Kerning {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Kerning {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
             Operation::Strike {
                 span,
                 before,
@@ -8481,6 +9260,9 @@ fn semantic_changes_with_replacement(
             | Operation::Outline { .. }
             | Operation::FontSize { .. }
             | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
             | Operation::MoveParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
@@ -8727,6 +9509,60 @@ fn durable_operation(
                 format!("body:utf8:{}-{}", span.start, span.end),
                 preconditions,
                 Value::String(baseline_name(*after)),
+            )
+        },
+        Change::Expansion {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "expansion".to_string(),
+                Value::String(expansion_name(*before)),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-expansion.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(expansion_name(*after)),
+            )
+        },
+        Change::HorizontalScale {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "horizontal_scale_percent".to_string(),
+                Value::Number(serde_json::Number::from(u64::from(*before))),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-horizontal-scale.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Number(serde_json::Number::from(u64::from(*after))),
+            )
+        },
+        Change::Kerning {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "kerning_half_points".to_string(),
+                Value::Number(serde_json::Number::from(u64::from(*before))),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-kerning.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Number(serde_json::Number::from(u64::from(*after))),
             )
         },
         Change::Strike {
@@ -9314,6 +10150,93 @@ pub(crate) fn apply_durable<Mode>(
                         Error::DurablePatch("baseline value must be a canonical string".to_string())
                     })?;
                 edit.set_text_baseline(span, replacement)?;
+            },
+            "character-expansion.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("expansion")
+                    .and_then(Value::as_str)
+                    .and_then(parse_expansion)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "expansion precondition must be a canonical string".to_string(),
+                        )
+                    })?;
+                if expansion_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character expansion state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_expansion)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "expansion value must be a canonical string".to_string(),
+                        )
+                    })?;
+                edit.set_text_expansion(span, replacement)?;
+            },
+            "character-horizontal-scale.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("horizontal_scale_percent")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| (1..=crate::MAX_CHARACTER_SCALE_PERCENT as u16).contains(value))
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "horizontal scale precondition must be an integer in 1..=600"
+                                .to_string(),
+                        )
+                    })?;
+                if horizontal_scale_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character horizontal-scale state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| (1..=crate::MAX_CHARACTER_SCALE_PERCENT as u16).contains(value))
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "horizontal scale value must be an integer in 1..=600".to_string(),
+                        )
+                    })?;
+                edit.set_text_horizontal_scale_percent(span, replacement)?;
+            },
+            "character-kerning.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("kerning_half_points")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| *value <= crate::MAX_CHARACTER_KERNING_HALF_POINTS as u16)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "kerning precondition must be an integer in 0..=32767".to_string(),
+                        )
+                    })?;
+                if kerning_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character kerning state differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| *value <= crate::MAX_CHARACTER_KERNING_HALF_POINTS as u16)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "kerning value must be an integer in 0..=32767".to_string(),
+                        )
+                    })?;
+                edit.set_text_kerning(span, replacement)?;
             },
             "character-strike.set" => {
                 let span = parse_text_target(&operation.target)?;
@@ -10089,6 +11012,44 @@ fn parse_baseline(value: &str) -> Option<CharacterBaseline> {
             })
         },
     }
+}
+
+fn expansion_name(expansion: CharacterExpansion) -> String {
+    match expansion {
+        CharacterExpansion::None => "none".to_string(),
+        CharacterExpansion::QuarterPoints(0) | CharacterExpansion::Twips(0) => "none".to_string(),
+        CharacterExpansion::QuarterPoints(value) => format!("quarter-points:{value}"),
+        CharacterExpansion::Twips(value) => format!("twips:{value}"),
+    }
+}
+
+fn parse_expansion(value: &str) -> Option<CharacterExpansion> {
+    if value == "none" {
+        return Some(CharacterExpansion::None);
+    }
+    let (quarter_points, digits) = value
+        .strip_prefix("quarter-points:")
+        .map(|digits| (true, digits))
+        .or_else(|| value.strip_prefix("twips:").map(|digits| (false, digits)))?;
+    let unsigned_digits = digits.strip_prefix('-').unwrap_or(digits);
+    if unsigned_digits.is_empty()
+        || unsigned_digits.starts_with('0')
+        || !unsigned_digits.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let value = digits.parse::<i32>().ok()?;
+    if value == 0
+        || !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION).contains(&value)
+    {
+        return None;
+    }
+    let value = i16::try_from(value).ok()?;
+    Some(if quarter_points {
+        CharacterExpansion::QuarterPoints(value)
+    } else {
+        CharacterExpansion::Twips(value)
+    })
 }
 
 const fn underline_name(underline: UnderlineStyle) -> &'static str {

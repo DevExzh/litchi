@@ -25,6 +25,104 @@ pub enum CharacterExpansion {
     Twips(i16),
 }
 
+/// Normalize a typed expansion to its canonical stored representation.
+///
+/// The parser and edit layer use `None` for a zero-valued expansion regardless
+/// of which RTF unit was used to express it. Non-zero values remain typed so
+/// that a valid typed value continues to take precedence over the legacy
+/// quarter-point alias.
+pub(crate) fn normalize_character_expansion(
+    expansion: CharacterExpansion,
+) -> RtfResult<CharacterExpansion> {
+    match expansion {
+        CharacterExpansion::None => Ok(CharacterExpansion::None),
+        CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value) => {
+            if value == 0 {
+                return Ok(CharacterExpansion::None);
+            }
+            if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&i32::from(value)) {
+                return Err(RtfError::MalformedDocument(
+                    "RTF character expansion is out of range".to_string(),
+                ));
+            }
+            Ok(expansion)
+        },
+    }
+}
+
+pub(crate) fn validate_character_scale(value: u16) -> RtfResult<()> {
+    if !(1..=MAX_CHARACTER_SCALE_PERCENT as u16).contains(&value) {
+        return Err(RtfError::MalformedDocument(
+            "RTF character scale is out of range".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_character_kerning(value: u16) -> RtfResult<()> {
+    if i32::from(value) > MAX_CHARACTER_KERNING_HALF_POINTS {
+        return Err(RtfError::MalformedDocument(
+            "RTF character kerning is out of range".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Resolve typed and legacy expansion fields to one canonical value.
+pub(crate) fn effective_character_expansion(
+    typed: CharacterExpansion,
+    legacy_quarter_points: i32,
+) -> RtfResult<CharacterExpansion> {
+    let typed = normalize_character_expansion(typed)?;
+    if typed != CharacterExpansion::None {
+        return Ok(typed);
+    }
+    if legacy_quarter_points == 0 {
+        return Ok(CharacterExpansion::None);
+    }
+    if !(-MAX_CHARACTER_EXPANSION..=MAX_CHARACTER_EXPANSION).contains(&legacy_quarter_points) {
+        return Err(RtfError::MalformedDocument(
+            "RTF legacy character spacing is out of range".to_string(),
+        ));
+    }
+    let value = i16::try_from(legacy_quarter_points).map_err(|_error| {
+        RtfError::MalformedDocument("RTF legacy character spacing is out of range".to_string())
+    })?;
+    normalize_character_expansion(CharacterExpansion::QuarterPoints(value))
+}
+
+/// Resolve typed and legacy horizontal scale fields to one canonical value.
+pub(crate) fn effective_character_scale(typed: u16, legacy: i32) -> RtfResult<u16> {
+    validate_character_scale(typed)?;
+    if typed != 100 {
+        return Ok(typed);
+    }
+    if legacy == 100 {
+        return Ok(100);
+    }
+    let value = u16::try_from(legacy).map_err(|_error| {
+        RtfError::MalformedDocument("RTF legacy character scale is out of range".to_string())
+    })?;
+    validate_character_scale(value)?;
+    Ok(value)
+}
+
+/// Resolve typed and legacy kerning fields to one canonical value.
+pub(crate) fn effective_character_kerning(typed: u16, legacy: i32) -> RtfResult<u16> {
+    validate_character_kerning(typed)?;
+    if typed != 0 {
+        return Ok(typed);
+    }
+    if legacy == 0 {
+        return Ok(0);
+    }
+    let value = u16::try_from(legacy).map_err(|_error| {
+        RtfError::MalformedDocument("RTF legacy character kerning is out of range".to_string())
+    })?;
+    validate_character_kerning(value)?;
+    Ok(value)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CharacterPositioning {
     pub baseline: CharacterBaseline,
@@ -180,7 +278,8 @@ impl CharacterPositioning {
         }
         match self.expansion {
             CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value)
-                if i32::from(value).unsigned_abs() > MAX_CHARACTER_EXPANSION as u32 =>
+                if value == 0
+                    || i32::from(value).unsigned_abs() > MAX_CHARACTER_EXPANSION as u32 =>
             {
                 return Err(RtfError::MalformedDocument(
                     "RTF character expansion is out of range".to_string(),

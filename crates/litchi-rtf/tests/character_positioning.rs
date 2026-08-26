@@ -93,6 +93,100 @@ fn parses_inherits_resets_and_keeps_destinations_inert() {
 }
 
 #[test]
+fn wire_positioning_boundaries_and_explicit_expansion_resets_round_trip() {
+    let document = RtfDocument::parse(
+        r"{\rtf1\ansi{\expnd-31680\charscalex1\kerning0 Quarter}{\expndtw31680\charscalex600\kerning32767 Twips}{\expnd4 Active\expnd0 Reset\expndtw0 TwipReset}{\charscalex100 ScaleReset}}",
+    )
+    .unwrap();
+    assert_eq!(
+        block(&document, "Quarter").formatting.character_positioning,
+        CharacterPositioning {
+            baseline: CharacterBaseline::Normal,
+            expansion: CharacterExpansion::QuarterPoints(-31680),
+            horizontal_scale_percent: 1,
+            kerning_half_points: 0,
+        }
+    );
+    assert_eq!(block(&document, "Quarter").formatting.char_spacing, -31680);
+    assert_eq!(block(&document, "Quarter").formatting.char_scale, 1);
+    assert_eq!(block(&document, "Quarter").formatting.kerning, 0);
+    assert_eq!(
+        block(&document, "Twips").formatting.character_positioning,
+        CharacterPositioning {
+            baseline: CharacterBaseline::Normal,
+            expansion: CharacterExpansion::Twips(31680),
+            horizontal_scale_percent: 600,
+            kerning_half_points: 32767,
+        }
+    );
+    assert_eq!(block(&document, "Twips").formatting.char_spacing, 31680);
+    assert_eq!(block(&document, "Twips").formatting.char_scale, 600);
+    assert_eq!(block(&document, "Twips").formatting.kerning, 32767);
+    assert_eq!(
+        block(&document, "Reset")
+            .formatting
+            .character_positioning
+            .expansion,
+        CharacterExpansion::None
+    );
+    assert_eq!(block(&document, "Reset").formatting.char_spacing, 0);
+    assert_eq!(
+        block(&document, "TwipReset")
+            .formatting
+            .character_positioning
+            .expansion,
+        CharacterExpansion::None
+    );
+    assert_eq!(block(&document, "TwipReset").formatting.char_spacing, 0);
+    assert_eq!(
+        block(&document, "ScaleReset")
+            .formatting
+            .character_positioning
+            .horizontal_scale_percent,
+        100
+    );
+    assert_eq!(block(&document, "ScaleReset").formatting.char_scale, 100);
+
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
+    let reopened = RtfDocument::parse_bytes(&output).unwrap();
+    assert_eq!(
+        block(&reopened, "Quarter").formatting.character_positioning,
+        block(&document, "Quarter").formatting.character_positioning
+    );
+    assert_eq!(
+        block(&reopened, "Twips").formatting.character_positioning,
+        block(&document, "Twips").formatting.character_positioning
+    );
+    assert_eq!(
+        block(&reopened, "Reset")
+            .formatting
+            .character_positioning
+            .expansion,
+        CharacterExpansion::None
+    );
+    assert_eq!(block(&reopened, "Reset").formatting.char_spacing, 0);
+    assert_eq!(
+        block(&reopened, "TwipReset")
+            .formatting
+            .character_positioning
+            .expansion,
+        CharacterExpansion::None
+    );
+    assert_eq!(block(&reopened, "TwipReset").formatting.char_spacing, 0);
+    assert_eq!(
+        block(&reopened, "ScaleReset")
+            .formatting
+            .character_positioning
+            .horizontal_scale_percent,
+        100
+    );
+    assert_eq!(block(&reopened, "ScaleReset").formatting.char_scale, 100);
+}
+
+#[test]
 fn writer_is_deterministic_and_preserves_units() {
     let document =
         RtfDocument::parse(r"{\rtf1 A{\up2\expndtw-15\charscalex75\kerning8 B}{\sub\expnd3 C}}")
