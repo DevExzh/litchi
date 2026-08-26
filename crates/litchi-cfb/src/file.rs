@@ -142,6 +142,14 @@ enum PhysicalSectorRole {
     RegularStream,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PendingPhysicalRange {
+    physical: u64,
+    output_start: usize,
+    length: usize,
+    sector: u32,
+}
+
 impl PhysicalSectorRole {
     fn label(self) -> &'static str {
         match self {
@@ -1559,6 +1567,343 @@ impl<R: Read + Seek> OleFile<R> {
         usize::try_from(remaining.min(wanted as u64)).unwrap_or(wanted)
     }
 
+    fn read_physical_range(&mut self, physical: u64, output: &mut [u8]) -> Result<(), OleError> {
+        if output.is_empty() {
+            return Ok(());
+        }
+        let output_len = u64::try_from(output.len())
+            .map_err(|_error| OleError::CorruptedFile("physical read is too large".to_string()))?;
+        physical
+            .checked_add(output_len)
+            .ok_or_else(|| OleError::CorruptedFile("physical read end overflow".to_string()))?;
+        if physical >= self.file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "physical offset {physical} is outside the file"
+            )));
+        }
+
+        let present = self.present_sector_bytes(physical, output.len());
+        self.reader.seek(SeekFrom::Start(physical))?;
+        self.reader.read_exact(&mut output[..present])?;
+        output[present..].fill(0);
+        Ok(())
+    }
+
+    fn read_stream_range_from_fat(
+        &mut self,
+        start_sector: u32,
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let sector_size = self.sector_size;
+        let sector_size_u64 = u64::try_from(sector_size)
+            .map_err(|_error| OleError::CorruptedFile("sector size is too large".to_string()))?;
+        if sector_size == 0 {
+            return Err(OleError::CorruptedFile("sector size is zero".to_string()));
+        }
+        if start_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "FAT range starts with an invalid sector marker".to_string(),
+            ));
+        }
+        let first_ordinal = usize::try_from(offset / sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("FAT range sector does not fit usize".to_string())
+        })?;
+        let within = usize::try_from(offset % sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("FAT range offset does not fit usize".to_string())
+        })?;
+        let logical_span = within
+            .checked_add(output.len())
+            .ok_or_else(|| OleError::InvalidData("FAT range span overflows usize".to_string()))?;
+        let required_sectors = logical_span.div_ceil(sector_size);
+        let touched = first_ordinal.checked_add(required_sectors).ok_or_else(|| {
+            OleError::CorruptedFile("FAT range traversal length overflow".to_string())
+        })?;
+        if touched > self.fat.len() {
+            return Err(OleError::CorruptedFile(
+                "FAT range exceeds its allocation table".to_string(),
+            ));
+        }
+
+        let mut sector = start_sector;
+        for _ in 0..first_ordinal {
+            sector = next_chain_sector(&self.fat, sector, "FAT")?;
+            if sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "FAT chain ends before stream range".to_string(),
+                ));
+            }
+        }
+        let mut within = within;
+        let mut written = 0_usize;
+        while written < output.len() {
+            let run_start = sector;
+            let run_within = within;
+            let mut run_bytes = (sector_size - run_within).min(output.len() - written);
+            let mut remaining = output.len() - written - run_bytes;
+            let mut next_run = None;
+            let mut last_sector = sector;
+
+            while remaining > 0 {
+                let next = next_chain_sector(&self.fat, last_sector, "FAT")?;
+                if next == last_sector {
+                    return Err(OleError::CorruptedFile(format!(
+                        "cycle detected in FAT range at sector {last_sector}"
+                    )));
+                }
+                if next == ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "FAT chain ends within stream range".to_string(),
+                    ));
+                }
+                let contiguous = last_sector.checked_add(1).ok_or_else(|| {
+                    OleError::CorruptedFile("FAT sector index overflow".to_string())
+                })?;
+                if next != contiguous {
+                    next_run = Some(next);
+                    break;
+                }
+                last_sector = next;
+                let count = sector_size.min(remaining);
+                run_bytes = run_bytes.checked_add(count).ok_or_else(|| {
+                    OleError::CorruptedFile("FAT range run size overflow".to_string())
+                })?;
+                remaining -= count;
+            }
+
+            let physical = (u64::from(run_start) + 1)
+                .checked_mul(sector_size_u64)
+                .and_then(|value| value.checked_add(u64::try_from(run_within).ok()?))
+                .ok_or_else(|| {
+                    OleError::CorruptedFile("FAT range physical offset overflow".to_string())
+                })?;
+            let run_end = written.checked_add(run_bytes).ok_or_else(|| {
+                OleError::CorruptedFile("FAT range output offset overflow".to_string())
+            })?;
+            self.read_physical_range(physical, &mut output[written..run_end])?;
+            written = run_end;
+            if let Some(next) = next_run {
+                sector = next;
+                within = 0;
+            }
+        }
+        Ok(())
+    }
+
+    fn read_stream_range_from_minifat(
+        &mut self,
+        start_sector: u32,
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let root_size =
+            self.root.as_ref().map(|root| root.size).ok_or_else(|| {
+                OleError::CorruptedFile("mini stream has no root entry".to_string())
+            })?;
+        let mini_sector_size = self.mini_sector_size;
+        let mini_sector_size_u64 = u64::try_from(mini_sector_size).map_err(|_error| {
+            OleError::CorruptedFile("mini sector size is too large".to_string())
+        })?;
+        if mini_sector_size == 0 {
+            return Err(OleError::CorruptedFile(
+                "mini sector size is zero".to_string(),
+            ));
+        }
+        if start_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT range starts with an invalid sector marker".to_string(),
+            ));
+        }
+        let first_ordinal = usize::try_from(offset / mini_sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("MiniFAT range sector does not fit usize".to_string())
+        })?;
+        let within = usize::try_from(offset % mini_sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("MiniFAT range offset does not fit usize".to_string())
+        })?;
+        let logical_span = within.checked_add(output.len()).ok_or_else(|| {
+            OleError::InvalidData("MiniFAT range span overflows usize".to_string())
+        })?;
+        let required_sectors = logical_span.div_ceil(mini_sector_size);
+        let touched = first_ordinal.checked_add(required_sectors).ok_or_else(|| {
+            OleError::CorruptedFile("MiniFAT range traversal length overflow".to_string())
+        })?;
+        if touched > self.minifat.len() {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT range exceeds its allocation table".to_string(),
+            ));
+        }
+
+        let mut mini_sector = start_sector;
+        for _ in 0..first_ordinal {
+            mini_sector = next_chain_sector(&self.minifat, mini_sector, "MiniFAT")?;
+            if mini_sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "MiniFAT chain ends before stream range".to_string(),
+                ));
+            }
+        }
+        let mut within = within;
+        let mut written = 0_usize;
+        let mut pending = None;
+        while written < output.len() {
+            let count = (mini_sector_size - within).min(output.len() - written);
+            let current =
+                match self.minifat_physical_range(root_size, mini_sector, within, count, written) {
+                    Ok(current) => current,
+                    Err(error) => {
+                        self.flush_pending_range(&mut pending, output)?;
+                        return Err(error);
+                    },
+                };
+
+            if let Some(previous) = pending {
+                let previous_physical_end = previous
+                    .physical
+                    .checked_add(u64::try_from(previous.length).map_err(|_error| {
+                        OleError::CorruptedFile("MiniFAT physical run is too large".to_string())
+                    })?)
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT physical run end overflow".to_string())
+                    })?;
+                let previous_output_end = previous
+                    .output_start
+                    .checked_add(previous.length)
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT output range end overflow".to_string())
+                    })?;
+                if current.physical == previous_physical_end
+                    && current.output_start == previous_output_end
+                {
+                    let length = previous.length.checked_add(current.length).ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT physical run size overflow".to_string())
+                    })?;
+                    pending = Some(PendingPhysicalRange {
+                        physical: previous.physical,
+                        output_start: previous.output_start,
+                        length,
+                        sector: previous.sector,
+                    });
+                } else {
+                    self.flush_pending_range(&mut pending, output)?;
+                    pending = Some(current);
+                }
+            } else {
+                pending = Some(current);
+            }
+
+            written = written.checked_add(count).ok_or_else(|| {
+                OleError::CorruptedFile("MiniFAT output offset overflow".to_string())
+            })?;
+            within = 0;
+            if written < output.len() {
+                let next = match next_chain_sector(&self.minifat, mini_sector, "MiniFAT") {
+                    Ok(next) => next,
+                    Err(error) => {
+                        self.flush_pending_range(&mut pending, output)?;
+                        return Err(error);
+                    },
+                };
+                if next == mini_sector {
+                    self.flush_pending_range(&mut pending, output)?;
+                    return Err(OleError::CorruptedFile(format!(
+                        "cycle detected in MiniFAT range at sector {mini_sector}"
+                    )));
+                }
+                if next == ENDOFCHAIN {
+                    self.flush_pending_range(&mut pending, output)?;
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT chain ends within stream range".to_string(),
+                    ));
+                }
+                mini_sector = next;
+            }
+        }
+        self.flush_pending_range(&mut pending, output)
+    }
+
+    fn minifat_physical_range(
+        &self,
+        root_size: u64,
+        mini_sector: u32,
+        within: usize,
+        count: usize,
+        output_start: usize,
+    ) -> Result<PendingPhysicalRange, OleError> {
+        if mini_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT range contains an invalid sector marker".to_string(),
+            ));
+        }
+        let mini_sector_size = u64::try_from(self.mini_sector_size).map_err(|_error| {
+            OleError::CorruptedFile("mini sector size is too large".to_string())
+        })?;
+        let mini_offset = u64::from(mini_sector)
+            .checked_mul(mini_sector_size)
+            .and_then(|value| value.checked_add(u64::try_from(within).ok()?))
+            .ok_or_else(|| OleError::CorruptedFile("mini-sector offset overflow".to_string()))?;
+        let mini_end = mini_offset
+            .checked_add(u64::try_from(count).map_err(|_error| {
+                OleError::CorruptedFile("mini-sector range is too large".to_string())
+            })?)
+            .ok_or_else(|| OleError::CorruptedFile("mini-sector range end overflow".to_string()))?;
+        if mini_end > root_size {
+            return Err(OleError::CorruptedFile(
+                "mini-sector range exceeds root mini stream".to_string(),
+            ));
+        }
+        let sector_size = u64::try_from(self.sector_size)
+            .map_err(|_error| OleError::CorruptedFile("sector size is too large".to_string()))?;
+        if sector_size == 0 {
+            return Err(OleError::CorruptedFile("sector size is zero".to_string()));
+        }
+        let root_ordinal = usize::try_from(mini_offset / sector_size).map_err(|_error| {
+            OleError::CorruptedFile("root mini-stream sector does not fit usize".to_string())
+        })?;
+        let root_within = usize::try_from(mini_offset % sector_size).map_err(|_error| {
+            OleError::CorruptedFile("root mini-stream offset does not fit usize".to_string())
+        })?;
+        let root_sector = *self.root_chain.get(root_ordinal).ok_or_else(|| {
+            OleError::CorruptedFile("mini-sector is outside the root FAT chain".to_string())
+        })?;
+        if root_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "root mini-stream contains an invalid sector marker".to_string(),
+            ));
+        }
+        let physical = (u64::from(root_sector) + 1)
+            .checked_mul(sector_size)
+            .and_then(|value| value.checked_add(u64::try_from(root_within).ok()?))
+            .ok_or_else(|| {
+                OleError::CorruptedFile("mini-stream physical offset overflow".to_string())
+            })?;
+        Ok(PendingPhysicalRange {
+            physical,
+            output_start,
+            length: count,
+            sector: root_sector,
+        })
+    }
+
+    fn flush_pending_range(
+        &mut self,
+        pending: &mut Option<PendingPhysicalRange>,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let Some(range) = pending.take() else {
+            return Ok(());
+        };
+        let output_end = range
+            .output_start
+            .checked_add(range.length)
+            .ok_or_else(|| OleError::CorruptedFile("physical output range overflow".to_string()))?;
+        if output_end > output.len() {
+            return Err(OleError::CorruptedFile(
+                "physical output range exceeds destination".to_string(),
+            ));
+        }
+        self.read_physical_range(range.physical, &mut output[range.output_start..output_end])
+    }
+
     /// Read a stream by following the FAT chain with optimized batching
     ///
     /// This implementation batches contiguous sector reads to minimize
@@ -1940,6 +2285,62 @@ impl<R: Read + Seek> OleFile<R> {
         }
     }
 
+    /// Read one bounded logical stream range into caller-owned storage.
+    ///
+    /// The requested range must be contained in the stream's declared
+    /// length. The reader follows only the FAT or MiniFAT entries needed for
+    /// that range, writes directly into `output`, and never materializes a
+    /// complete stream or the root MiniStream. An eligible truncated final
+    /// physical sector retains the existing CFB zero-fill behavior; bytes
+    /// beyond this file's captured `file_size` are never read.
+    ///
+    /// The operation uses the reader's absolute seek position, so its result
+    /// does not depend on the cursor position before the call. A failure
+    /// after payload I/O may leave a partially written destination; callers
+    /// must discard `output` after any error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::StreamNotFound`] when `path` does not identify an
+    /// entry, an invalid-format error when it identifies a storage, an
+    /// invalid-data error when the checked range is outside the stream, or a
+    /// typed I/O/corruption error when the selected allocation cannot be read
+    /// safely. Empty ranges still perform path and bounds validation but no
+    /// payload I/O.
+    pub fn read_stream_range(
+        &mut self,
+        path: &[&str],
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let (is_minifat, start_sector, size) = {
+            let entry = self.find_entry(path)?;
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
+        let output_len = u64::try_from(output.len())
+            .map_err(|_error| OleError::InvalidData("stream range is too large".to_string()))?;
+        let end = offset
+            .checked_add(output_len)
+            .ok_or_else(|| OleError::InvalidData("stream range end overflow".to_string()))?;
+        if end > size {
+            return Err(OleError::InvalidData(format!(
+                "stream range {offset}..{end} exceeds length {size}"
+            )));
+        }
+        if output.is_empty() {
+            return Ok(());
+        }
+
+        if is_minifat {
+            self.read_stream_range_from_minifat(start_sector, offset, output)
+        } else {
+            self.read_stream_range_from_fat(start_sector, offset, output)
+        }
+    }
+
     /// Return a stream's declared length without materializing its contents.
     ///
     /// # Errors
@@ -2071,6 +2472,30 @@ fn read_u32_le(bytes: &[u8], description: &str) -> Result<u32, OleError> {
         .try_into()
         .map_err(|_err| OleError::InvalidFormat(format!("{description} is truncated")))?;
     Ok(u32::from_le_bytes(value))
+}
+
+fn next_chain_sector(
+    allocation_table: &[u32],
+    sector: u32,
+    table_name: &str,
+) -> Result<u32, OleError> {
+    if sector >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "invalid sector marker 0x{sector:08X} in {table_name} chain"
+        )));
+    }
+    let index = usize::try_from(sector).map_err(|_error| {
+        OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
+    })?;
+    let next = *allocation_table.get(index).ok_or_else(|| {
+        OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
+    })?;
+    if next != ENDOFCHAIN && next >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "invalid sector marker 0x{next:08X} in {table_name} chain"
+        )));
+    }
+    Ok(next)
 }
 
 fn collect_sector_chain(
@@ -2445,7 +2870,7 @@ mod tests {
     )]
     use super::*;
     use crate::writer::OleWriter;
-    use std::io::Cursor;
+    use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
     fn sample_file() -> Vec<u8> {
         let mut writer = OleWriter::new();
@@ -2757,6 +3182,112 @@ mod tests {
         }
     }
 
+    fn synthetic_range_file(
+        bytes: Vec<u8>,
+        fat: Vec<u32>,
+        minifat: Vec<u32>,
+        root_chain: Vec<u32>,
+        root_size: u64,
+        stream_name: &str,
+        start_sector: u32,
+        stream_size: u64,
+        is_minifat: bool,
+    ) -> OleFile<Cursor<Vec<u8>>> {
+        let root = DirectoryEntry {
+            sid: 0,
+            name: "Root Entry".to_string(),
+            entry_type: STGTY_ROOT,
+            sid_left: NOSTREAM,
+            sid_right: NOSTREAM,
+            sid_child: 1,
+            clsid: String::new(),
+            start_sector: ENDOFCHAIN,
+            size: root_size,
+            is_minifat: false,
+            children: Vec::new(),
+        };
+        let stream = DirectoryEntry {
+            sid: 1,
+            name: stream_name.to_string(),
+            entry_type: STGTY_STREAM,
+            sid_left: NOSTREAM,
+            sid_right: NOSTREAM,
+            sid_child: NOSTREAM,
+            clsid: String::new(),
+            start_sector,
+            size: stream_size,
+            is_minifat,
+            children: Vec::new(),
+        };
+        OleFile {
+            reader: Cursor::new(bytes.clone()),
+            file_size: bytes.len() as u64,
+            sector_size: SECTOR_SIZE_V3,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat,
+            root_chain,
+            first_dir_sector: ENDOFCHAIN,
+            root: Some(root.clone()),
+            dir_entries: vec![Some(root), Some(stream)],
+            dir_name_data: vec![
+                Some(directory_name_data("Root Entry").unwrap()),
+                Some(directory_name_data(stream_name).unwrap()),
+            ],
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; bytes.len() / SECTOR_SIZE_V3],
+        }
+    }
+
+    #[derive(Debug)]
+    struct TrackingReader {
+        inner: Cursor<Vec<u8>>,
+        reads: Vec<(u64, usize)>,
+        interrupt_reads: usize,
+        fail_reads: bool,
+        fail_seeks: bool,
+    }
+
+    impl TrackingReader {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                reads: Vec::new(),
+                interrupt_reads: 0,
+                fail_reads: false,
+                fail_seeks: false,
+            }
+        }
+    }
+
+    impl Read for TrackingReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if self.interrupt_reads > 0 {
+                self.interrupt_reads -= 1;
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
+            }
+            if self.fail_reads {
+                return Err(io::Error::other("injected read failure"));
+            }
+            let position = self.inner.position();
+            let read = self.inner.read(output)?;
+            if read > 0 {
+                self.reads.push((position, read));
+            }
+            Ok(read)
+        }
+    }
+
+    impl Seek for TrackingReader {
+        fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+            if self.fail_seeks {
+                return Err(io::Error::other("injected seek failure"));
+            }
+            self.inner.seek(position)
+        }
+    }
+
     #[test]
     fn fat_stream_replays_fragmented_chain_in_order_at_exact_size() {
         let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
@@ -2858,6 +3389,271 @@ mod tests {
             out_of_bounds.read_stream_from_minifat(1, 1),
             Err(OleError::CorruptedFile(message)) if message == "Mini sector out of bounds"
         ));
+    }
+
+    #[test]
+    fn direct_ranges_follow_fragmented_fat_and_minifat_chains() {
+        let mut fat_bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        fat_bytes[SECTOR_SIZE_V3..2 * SECTOR_SIZE_V3].fill(0x11);
+        fat_bytes[3 * SECTOR_SIZE_V3..4 * SECTOR_SIZE_V3].fill(0x22);
+        let mut fat_file = synthetic_range_file(
+            fat_bytes,
+            vec![2, ENDOFCHAIN, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Fat",
+            0,
+            2 * SECTOR_SIZE_V3 as u64,
+            false,
+        );
+        let mut fat_output = vec![0u8; 2 * SECTOR_SIZE_V3];
+        fat_file
+            .read_stream_range(&["Fat"], 0, &mut fat_output)
+            .unwrap();
+        assert!(
+            fat_output[..SECTOR_SIZE_V3]
+                .iter()
+                .all(|&byte| byte == 0x11)
+        );
+        assert!(
+            fat_output[SECTOR_SIZE_V3..]
+                .iter()
+                .all(|&byte| byte == 0x22)
+        );
+
+        let mut mini_bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        mini_bytes[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 64].fill(0x33);
+        mini_bytes[3 * SECTOR_SIZE_V3..3 * SECTOR_SIZE_V3 + 64].fill(0x44);
+        let mut mini_table = vec![ENDOFCHAIN; 9];
+        mini_table[8] = 0;
+        let mut mini_file = synthetic_range_file(
+            mini_bytes,
+            Vec::new(),
+            mini_table,
+            vec![0, 2],
+            1024,
+            "Mini",
+            8,
+            128,
+            true,
+        );
+        let mut mini_output = vec![0u8; 128];
+        mini_file
+            .read_stream_range(&["Mini"], 0, &mut mini_output)
+            .unwrap();
+        assert!(mini_output[..64].iter().all(|&byte| byte == 0x44));
+        assert!(mini_output[64..].iter().all(|&byte| byte == 0x33));
+        assert!(mini_file.ministream.is_none());
+    }
+
+    #[test]
+    fn direct_ranges_cover_boundaries_and_preserve_truncated_sector_zero_fill() {
+        let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        bytes[SECTOR_SIZE_V3 + SECTOR_SIZE_V3 - 2..2 * SECTOR_SIZE_V3].fill(0x51);
+        bytes[2 * SECTOR_SIZE_V3..2 * SECTOR_SIZE_V3 + 2].fill(0x62);
+        let mut file = synthetic_range_file(
+            bytes,
+            vec![1, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Boundary",
+            0,
+            (SECTOR_SIZE_V3 + 2) as u64,
+            false,
+        );
+        let mut boundary = [0u8; 4];
+        file.read_stream_range(&["Boundary"], 510, &mut boundary)
+            .unwrap();
+        assert_eq!(boundary, [0x51, 0x51, 0x62, 0x62]);
+
+        let mut truncated = vec![0u8; SECTOR_SIZE_V3 + 3];
+        truncated[SECTOR_SIZE_V3..].copy_from_slice(b"CFB");
+        let mut truncated_file = synthetic_range_file(
+            truncated,
+            vec![ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Tail",
+            0,
+            SECTOR_SIZE_V3 as u64,
+            false,
+        );
+        let mut tail = [0xFFu8; SECTOR_SIZE_V3];
+        truncated_file
+            .read_stream_range(&["Tail"], 0, &mut tail)
+            .unwrap();
+        assert_eq!(&tail[..3], b"CFB");
+        assert!(tail[3..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn direct_ranges_reject_bad_metadata_without_unbounded_traversal() {
+        let bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+
+        let mut short = synthetic_range_file(
+            bytes.clone(),
+            vec![ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Short",
+            0,
+            513,
+            false,
+        );
+        let mut one = [0u8; 1];
+        assert!(matches!(
+            short.read_stream_range(&["Short"], 512, &mut one),
+            Err(OleError::CorruptedFile(_))
+        ));
+
+        let mut invalid = synthetic_range_file(
+            bytes.clone(),
+            vec![MAXREGSECT, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Invalid",
+            0,
+            513,
+            false,
+        );
+        let mut invalid_output = [0u8; 513];
+        assert!(matches!(
+            invalid.read_stream_range(&["Invalid"], 0, &mut invalid_output),
+            Err(OleError::CorruptedFile(_))
+        ));
+
+        let mut cycle = synthetic_range_file(
+            bytes,
+            vec![0, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Cycle",
+            0,
+            1024,
+            false,
+        );
+        let mut cycle_output = [0u8; 1024];
+        assert!(matches!(
+            cycle.read_stream_range(&["Cycle"], 0, &mut cycle_output),
+            Err(OleError::CorruptedFile(_))
+        ));
+
+        let mut mini_short = synthetic_range_file(
+            vec![0u8; 2 * SECTOR_SIZE_V3],
+            Vec::new(),
+            vec![ENDOFCHAIN, ENDOFCHAIN],
+            vec![0],
+            64,
+            "MiniShort",
+            0,
+            128,
+            true,
+        );
+        let mut mini_output = [0u8; 1];
+        assert!(matches!(
+            mini_short.read_stream_range(&["MiniShort"], 64, &mut mini_output),
+            Err(OleError::CorruptedFile(_))
+        ));
+    }
+
+    #[test]
+    fn direct_ranges_validate_bounds_before_payload_io_and_allow_exact_eof() {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Data"], b"payload").unwrap();
+        writer.create_storage(&["Folder"]).unwrap();
+        let mut serialized = Cursor::new(Vec::new());
+        writer.write_to(&mut serialized).unwrap();
+        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        file.reader.reads.clear();
+
+        let mut byte = [0u8; 1];
+        assert!(matches!(
+            file.read_stream_range(&["Data"], 7, &mut byte),
+            Err(OleError::InvalidData(_))
+        ));
+        assert!(matches!(
+            file.read_stream_range(&["Data"], u64::MAX, &mut byte),
+            Err(OleError::InvalidData(_))
+        ));
+        assert!(matches!(
+            file.read_stream_range(&["Missing"], 0, &mut byte),
+            Err(OleError::StreamNotFound)
+        ));
+        assert!(matches!(
+            file.read_stream_range(&["Folder"], 0, &mut byte),
+            Err(OleError::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            file.read_stream_range(&[], 0, &mut byte),
+            Err(OleError::InvalidFormat(_))
+        ));
+        let mut empty = [];
+        file.read_stream_range(&["Data"], 7, &mut empty).unwrap();
+        assert!(matches!(
+            file.read_stream_range(&["Data"], 8, &mut empty),
+            Err(OleError::InvalidData(_))
+        ));
+        assert!(file.reader.reads.is_empty());
+    }
+
+    #[test]
+    fn direct_ranges_are_cursor_independent_local_and_retry_interrupted_reads() {
+        let mut writer = OleWriter::new();
+        let payload = vec![0xA5; 4096];
+        writer.create_stream(&["Large"], &payload).unwrap();
+        let mut serialized = Cursor::new(Vec::new());
+        writer.write_to(&mut serialized).unwrap();
+        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let start_sector = file.find_entry(&["Large"]).unwrap().start_sector;
+        let physical = (u64::from(start_sector) + 1) * file.sector_size as u64 + 510;
+        file.reader.reads.clear();
+        file.reader.seek(SeekFrom::End(0)).unwrap();
+        file.reader.interrupt_reads = 1;
+        let mut output = [0u8; 4];
+        file.read_stream_range(&["Large"], 510, &mut output)
+            .unwrap();
+        assert_eq!(output, [0xA5; 4]);
+        assert_eq!(file.reader.reads, vec![(physical, 4)]);
+
+        file.reader.reads.clear();
+        file.reader.seek(SeekFrom::Start(0)).unwrap();
+        file.read_stream_range(&["Large"], 510, &mut output)
+            .unwrap();
+        assert_eq!(output, [0xA5; 4]);
+        assert_eq!(file.reader.reads, vec![(physical, 4)]);
+    }
+
+    #[test]
+    fn direct_ranges_propagate_seek_and_read_failures_and_match_open_stream() {
+        let mut writer = OleWriter::new();
+        let payload = vec![0x37; 4096];
+        writer.create_stream(&["Large"], &payload).unwrap();
+        let mut serialized = Cursor::new(Vec::new());
+        writer.write_to(&mut serialized).unwrap();
+        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        file.reader.fail_seeks = true;
+        let mut output = [0u8; 4];
+        assert!(matches!(
+            file.read_stream_range(&["Large"], 0, &mut output),
+            Err(OleError::Io(_))
+        ));
+        file.reader.fail_seeks = false;
+        file.reader.fail_reads = true;
+        assert!(matches!(
+            file.read_stream_range(&["Large"], 0, &mut output),
+            Err(OleError::Io(_))
+        ));
+        file.reader.fail_reads = false;
+        let full = file.open_stream(&["Large"]).unwrap();
+        let mut range = vec![0u8; full.len()];
+        file.read_stream_range(&["Large"], 0, &mut range).unwrap();
+        assert_eq!(range, full);
     }
 
     #[test]
