@@ -368,6 +368,30 @@ pub struct TableModelSnapshot<'source> {
     spill_owner: Option<&'source [u8]>,
 }
 
+/// Borrowed table-model root together with the exact nested DataStore
+/// projection decoded from the same source traversal.
+///
+/// Keeping both snapshots in one result lets archive adapters stream tile
+/// references without reparsing the generated DataStore envelope or
+/// materializing either generated message.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TableModelDataStoreSnapshot<'source> {
+    model: TableModelSnapshot<'source>,
+    data_store: DataStoreSnapshot<'source>,
+}
+
+impl<'source> TableModelDataStoreSnapshot<'source> {
+    #[must_use]
+    pub const fn model(self) -> TableModelSnapshot<'source> {
+        self.model
+    }
+
+    #[must_use]
+    pub const fn data_store(self) -> DataStoreSnapshot<'source> {
+        self.data_store
+    }
+}
+
 impl<'source> TableModelSnapshot<'source> {
     #[must_use]
     pub const fn table_id(self) -> &'source str {
@@ -1560,13 +1584,14 @@ pub fn decode_table_model_with_compatibility_data_store_with_report(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(TableModelSnapshot<'_>, DecodeReport), DecodeError> {
-    decode_table_model_with_visitor_mode(
+    let (snapshot, report) = decode_table_model_with_data_store_and_visitor_mode(
         source,
         options,
         &mut (),
         false,
         DataStoreProjection::DenseNative,
-    )
+    )?;
+    Ok((snapshot.model(), report))
 }
 
 /// Decode a model and stream every selected repeated storage record.
@@ -1575,7 +1600,24 @@ pub fn decode_table_model_with_visitor<'source>(
     options: DecodeOptions,
     visitor: &mut dyn StorageVisitor,
 ) -> Result<(TableModelSnapshot<'source>, DecodeReport), DecodeError> {
-    decode_table_model_with_visitor_mode(
+    let (snapshot, report) = decode_table_model_with_data_store_and_visitor_mode(
+        source,
+        options,
+        visitor,
+        false,
+        DataStoreProjection::Strict,
+    )?;
+    Ok((snapshot.model(), report))
+}
+
+/// Decode a strict model and return its model and DataStore projections from
+/// one traversal while streaming selected repeated storage records.
+pub fn decode_table_model_with_data_store_and_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+) -> Result<(TableModelDataStoreSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_table_model_with_data_store_and_visitor_mode(
         source,
         options,
         visitor,
@@ -1590,7 +1632,24 @@ pub fn decode_table_model_compatibility_with_visitor<'source>(
     options: DecodeOptions,
     visitor: &mut dyn StorageVisitor,
 ) -> Result<(TableModelSnapshot<'source>, DecodeReport), DecodeError> {
-    decode_table_model_with_visitor_mode(
+    let (snapshot, report) = decode_table_model_with_data_store_and_visitor_mode(
+        source,
+        options,
+        visitor,
+        true,
+        DataStoreProjection::Compatibility,
+    )?;
+    Ok((snapshot.model(), report))
+}
+
+/// Compatibility variant of
+/// [`decode_table_model_with_data_store_and_visitor`].
+pub fn decode_table_model_compatibility_with_data_store_and_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+) -> Result<(TableModelDataStoreSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_table_model_with_data_store_and_visitor_mode(
         source,
         options,
         visitor,
@@ -1623,13 +1682,13 @@ fn decode_style_reference(
     }
 }
 
-fn decode_table_model_with_visitor_mode<'source>(
+fn decode_table_model_with_data_store_and_visitor_mode<'source>(
     source: &'source [u8],
     options: DecodeOptions,
     visitor: &mut dyn StorageVisitor,
     compatibility_defaults: bool,
     data_store_projection: DataStoreProjection,
-) -> Result<(TableModelSnapshot<'source>, DecodeReport), DecodeError> {
+) -> Result<(TableModelDataStoreSnapshot<'source>, DecodeReport), DecodeError> {
     let mut budget = Budget::new(source, options)?;
     let snapshot = decode_table_model_in(
         source,
@@ -1649,12 +1708,13 @@ fn decode_table_model_in<'source>(
     visitor: &mut dyn StorageVisitor,
     compatibility_defaults: bool,
     data_store_projection: DataStoreProjection,
-) -> Result<TableModelSnapshot<'source>, DecodeError> {
+) -> Result<TableModelDataStoreSnapshot<'source>, DecodeError> {
     budget.message(source, depth)?;
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
     let mut table_id = None;
     let mut table_name = None;
     let mut base_data_store = None;
+    let mut base_data_store_snapshot = None;
     let mut number_of_rows = None;
     let mut number_of_columns = None;
     let mut table_style = None;
@@ -1690,9 +1750,9 @@ fn decode_table_model_in<'source>(
                     return Err(DecodeError::invalid());
                 }
                 let store =
-                    decode_data_store_in(raw, budget, child_depth, visitor, data_store_projection);
-                let _ = store?;
+                    decode_data_store_in(raw, budget, child_depth, visitor, data_store_projection)?;
                 base_data_store = Some(raw);
+                base_data_store_snapshot = Some(store);
             },
             3 => {
                 let raw = field.bytes()?;
@@ -1891,7 +1951,10 @@ fn decode_table_model_in<'source>(
             return Err(DecodeError::invalid());
         }
     }
-    Ok(snapshot)
+    Ok(TableModelDataStoreSnapshot {
+        model: snapshot,
+        data_store: base_data_store_snapshot.ok_or_else(DecodeError::invalid)?,
+    })
 }
 
 /// Decode one native data-store envelope.
@@ -6305,6 +6368,58 @@ mod tests {
         );
         assert!(report.work_bytes() > model.len() * 2);
         assert_eq!(report.max_depth(), 3);
+    }
+
+    #[test]
+    fn combined_model_store_projection_streams_tiles_without_reparse() {
+        let mut tile_record = Vec::new();
+        v(&mut tile_record, 1, 3);
+        b(&mut tile_record, 2, &reference(77));
+        let mut tile_storage = Vec::new();
+        b(&mut tile_storage, 1, &tile_record);
+        v(&mut tile_storage, 2, 256);
+
+        let mut store = minimal_store();
+        let empty_tile_field = [0x1a, 0x00];
+        let position = store
+            .windows(empty_tile_field.len())
+            .position(|window| window == empty_tile_field)
+            .unwrap();
+        store.splice(
+            position..position + empty_tile_field.len(),
+            core::iter::once(0x1a)
+                .chain(core::iter::once(u8::try_from(tile_storage.len()).unwrap()))
+                .chain(tile_storage.iter().copied()),
+        );
+        let mut model = Vec::new();
+        b(&mut model, 1, b"T-1");
+        b(&mut model, 4, &store);
+        v(&mut model, 6, 10);
+        v(&mut model, 7, 20);
+        b(&mut model, 8, b"Table");
+
+        #[derive(Default)]
+        struct Routes(Vec<(u32, u64)>);
+        impl StorageVisitor for Routes {
+            fn visit_tile_reference(
+                &mut self,
+                record: TileReferenceRecord<'_>,
+            ) -> Result<(), DecodeError> {
+                self.0
+                    .push((record.tile_id(), record.reference().identifier()));
+                Ok(())
+            }
+        }
+
+        let mut routes = Routes::default();
+        let (projection, report) =
+            decode_table_model_with_data_store_and_visitor(&model, options(&model), &mut routes)
+                .unwrap();
+        assert_eq!(projection.model().table_name(), "Table");
+        assert_eq!(projection.data_store().tiles(), tile_storage.as_slice());
+        assert_eq!(projection.data_store().string_table().identifier(), 7);
+        assert_eq!(routes.0, [(3, 77)]);
+        assert_eq!(report.source_bytes(), model.len());
     }
 
     #[test]

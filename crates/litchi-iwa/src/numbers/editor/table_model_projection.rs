@@ -133,7 +133,7 @@ impl ShapeScanner {
 /// that need the full model still decode that one source into the existing
 /// owned Prost value before mutation or publication.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct ProbeBudget {
+pub(crate) struct ProbeBudget {
     input_bytes: usize,
     fields: usize,
     work: usize,
@@ -142,7 +142,7 @@ pub(super) struct ProbeBudget {
 }
 
 impl ProbeBudget {
-    pub(super) const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             input_bytes: 0,
             fields: 0,
@@ -152,7 +152,7 @@ impl ProbeBudget {
         }
     }
 
-    fn options(self, source: &[u8]) -> table_model_codec::DecodeOptions {
+    pub(crate) fn options(self, source: &[u8]) -> table_model_codec::DecodeOptions {
         table_model_codec::DecodeOptions::new(
             source
                 .len()
@@ -208,7 +208,7 @@ impl ProbeBudget {
         Ok(())
     }
 
-    fn charge_report(&mut self, report: table_model_codec::DecodeReport) -> Result<()> {
+    pub(crate) fn charge_report(&mut self, report: table_model_codec::DecodeReport) -> Result<()> {
         let mut next = *self;
         Self::charge_typed(
             &mut next.input_bytes,
@@ -669,7 +669,10 @@ fn combined_observed(current: usize, observed: usize, context: &str) -> Result<u
     })
 }
 
-fn map_resource_error(error: table_model_codec::DecodeError, budget: ProbeBudget) -> Result<Error> {
+pub(crate) fn map_resource_error(
+    error: table_model_codec::DecodeError,
+    budget: ProbeBudget,
+) -> Result<Error> {
     use table_model_codec::DecodeLimit;
 
     let mapped = match error.resource_limit() {
@@ -766,7 +769,7 @@ pub(super) fn probe_candidate(
 /// payload is therefore authoritative whenever it is present. Legacy aliases
 /// are considered only when the object has no canonical message, and only
 /// after their exact model signature passes the generated-free projection.
-pub(super) fn select_candidate(
+pub(crate) fn select_candidate(
     messages: &[RawMessage],
     budget: &mut ProbeBudget,
     error: impl Fn(&str) -> Error,

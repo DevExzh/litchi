@@ -14187,6 +14187,101 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_iwa_numbers_table_extractor_accepts_bounded_model_tile_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn extract(bytes: &[u8]) {\n"
+                "    let _ = select_candidate(bytes);\n"
+                "    let _ = decode_table_model_compatibility_with_data_store_and_visitor(bytes);\n"
+                "    let _ = decode_tile_storage_with_visitor(bytes);\n"
+                "    let _ = decode_tile_with_visitor(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_model_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_rejects_eager_model_and_tile_decodes(
+        self,
+    ) -> None:
+        for marker, expected in (
+            ("tst::TableModelArchive::decode(bytes);", "TableModelArchive::decode"),
+            ("tst::Tile::decode(bytes);", "Tile::decode"),
+            ("tst::TileRowInfo::decode(bytes);", "TileRowInfo::decode"),
+        ):
+            with self.subTest(marker=marker):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn extract(bytes: &[u8]) {\n"
+                        "    let _ = select_candidate(bytes);\n"
+                        "    let _ = decode_table_model_compatibility_with_data_store_and_visitor(bytes);\n"
+                        "    let _ = decode_tile_storage_with_visitor(bytes);\n"
+                        "    let _ = decode_tile_with_visitor(bytes);\n"
+                        f"    let _ = {marker}\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_iwa_numbers_table_extractor_model_tile_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(expected, violations[0])
+
+    def test_iwa_numbers_table_extractor_masks_test_and_non_code_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// TableModelArchive::decode\n"
+                'const NOTE: &str = "Tile::decode";\n'
+                "fn extract(bytes: &[u8]) {\n"
+                "    let _ = select_candidate(bytes);\n"
+                "    let _ = decode_table_model_compatibility_with_data_store_and_visitor(bytes);\n"
+                "    let _ = decode_tile_storage_with_visitor(bytes);\n"
+                "    let _ = decode_tile_with_visitor(bytes);\n"
+                "}\n"
+                "#[cfg(test)] mod tests {\n"
+                "    fn oracle(bytes: &[u8]) { let _ = tst::Tile::decode(bytes); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_model_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_requires_every_projection_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text("fn extract() {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_numbers_table_extractor_model_tile_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 4)
+            for marker in boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_REQUIRED_MARKERS:
+                self.assertTrue(any(marker in violation for violation in violations))
+
     def test_focused_numbers_extractor_no_eager_table_data_list_allows_test_only_usage(
         self,
     ) -> None:
