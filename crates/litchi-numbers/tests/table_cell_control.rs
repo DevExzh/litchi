@@ -181,6 +181,26 @@ fn menu() -> TestResult<PopUpMenu> {
     )
 }
 
+fn serialization_growth_menu() -> TestResult<PopUpMenu> {
+    let items = (0..4)
+        .map(|seed| {
+            let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ (seed as u64);
+            (0..4_096)
+                .map(|_| {
+                    state = state
+                        .wrapping_mul(6_364_136_223_846_793_005)
+                        .wrapping_add(1_442_695_040_888_963_407);
+                    char::from_u32(33 + (state % 94) as u32)
+                        .expect("printable fixture character is valid")
+                })
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>();
+    Ok(PopUpMenu::new(items)?.with_initial_selection(
+        litchi_numbers::cell::data_format::pop_up_menu::InitialSelection::Blank,
+    ))
+}
+
 fn range(minimum: f64, maximum: f64, increment: f64) -> Range {
     Range::new(minimum, maximum, increment).expect("fixture range is finite and representable")
 }
@@ -1458,6 +1478,17 @@ fn split_popup_model_ids(source: &[u8]) -> TestResult<Vec<u64>> {
         );
     }
     Ok(identifiers)
+}
+
+fn split_max_iwa_stream_bytes(source: &[u8]) -> TestResult<usize> {
+    let mut maximum = 0;
+    for entry in Catalog::from_bytes(source)?.iter() {
+        if !entry.name().ends_with(".iwa") {
+            continue;
+        }
+        maximum = maximum.max(SnappyStream::decompress(entry.data())?.as_bytes().len());
+    }
+    Ok(maximum)
 }
 
 fn split_popup_model_member(source: &[u8], identifier: u64) -> TestResult<&'static str> {
@@ -3474,6 +3505,111 @@ fn split_popup_native_aggregate_only_metadata_mutates_and_reopens() -> TestResul
         let hostile = with_split_popup_control_metadata_corruption(&source, corruption)?;
         assert_split_popup_owner_rejects(&hostile, &format!("aggregate-only {corruption:?}"))?;
     }
+    Ok(())
+}
+
+#[test]
+fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> TestResult {
+    let source_with_previews = split_component_fixture()?;
+    let source = Catalog::from_bytes(&source_with_previews)?.reassemble_with_deletions_to_bytes(
+        &[],
+        &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+        Limits::default(),
+    )?;
+    let desired = CellControl::PopUpMenu(serialization_growth_menu()?);
+    let unrestricted = Package::from_bytes(&source)?;
+    let unrestricted_commit = unrestricted
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .set(desired.clone())
+        .commit()?;
+    let target = unrestricted_commit.package().exact_bytes();
+    assert!(
+        target.len() > source.len().saturating_add(1),
+        "split candidate must grow beyond the source for an output ceiling test"
+    );
+    let source_stream = split_max_iwa_stream_bytes(&source)?;
+    let target_stream = split_max_iwa_stream_bytes(&target)?;
+    assert!(
+        target_stream > source_stream.saturating_add(1),
+        "split candidate IWA stream must grow beyond the source for a stream ceiling test"
+    );
+
+    let exact_output_limits = Limits::new(
+        u64::try_from(target.len())?,
+        Limits::MAX_ENTRIES,
+        Limits::MAX_ENTRY_BYTES,
+        Limits::MAX_TOTAL_BYTES,
+        target_stream,
+    )?;
+    let exact = Package::from_bytes_with_options(
+        &source,
+        PackageReadOptions::new(exact_output_limits, PackageSemanticLimits::default()),
+    )?;
+    let exact_commit = exact
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .set(desired.clone())
+        .commit()?;
+    assert_eq!(exact_commit.package().exact_bytes(), target);
+
+    let output_minus_one_limits = Limits::new(
+        u64::try_from(target.len().saturating_sub(1))?,
+        Limits::MAX_ENTRIES,
+        Limits::MAX_ENTRY_BYTES,
+        Limits::MAX_TOTAL_BYTES,
+        target_stream,
+    )?;
+    let output_limited = Package::from_bytes_with_options(
+        &source,
+        PackageReadOptions::new(output_minus_one_limits, PackageSemanticLimits::default()),
+    )?;
+    let output_before = output_limited.exact_bytes();
+    assert!(
+        output_limited
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(4, 0),
+            )?
+            .set(desired.clone())
+            .commit()
+            .is_err(),
+        "split candidate output max-minus-one must reject before publication"
+    );
+    assert_eq!(output_limited.exact_bytes(), output_before);
+
+    let stream_minus_one_limits = Limits::new(
+        u64::try_from(target.len())?,
+        Limits::MAX_ENTRIES,
+        Limits::MAX_ENTRY_BYTES,
+        Limits::MAX_TOTAL_BYTES,
+        target_stream.saturating_sub(1),
+    )?;
+    let stream_limited = Package::from_bytes_with_options(
+        &source,
+        PackageReadOptions::new(stream_minus_one_limits, PackageSemanticLimits::default()),
+    )?;
+    let stream_before = stream_limited.exact_bytes();
+    assert!(
+        stream_limited
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(4, 0),
+            )?
+            .set(desired)
+            .commit()
+            .is_err(),
+        "split candidate IWA stream max-minus-one must reject before publication"
+    );
+    assert_eq!(stream_limited.exact_bytes(), stream_before);
     Ok(())
 }
 

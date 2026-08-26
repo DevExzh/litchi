@@ -1018,6 +1018,7 @@ fn split_popup_candidate(
         .members
         .len()
         .checked_mul(2)
+        .and_then(|count| count.checked_add(1))
         .ok_or(NativePopUpError::InvalidSource)?;
     let comparison_bytes =
         input
@@ -1081,9 +1082,25 @@ fn split_popup_candidate(
         if !changed {
             continue;
         }
+        // Recheck the preflighted encoded lengths immediately before each
+        // serialization.  `to_bytes_with_limits` derives its output length
+        // from the current object metadata, so retaining these values here
+        // proves that the two temporary Vecs below are still covered by the
+        // aggregate preflight and that no late header-length change can evade
+        // the source/candidate scratch and work charges.
+        let expected_candidate_len = per_member[member_index]
+            .encoded_len_with_limits(input.limits)
+            .map_err(|_| NativePopUpError::Archive)?;
+        let expected_source_len = member
+            .archive
+            .encoded_len_with_limits(input.limits)
+            .map_err(|_| NativePopUpError::Archive)?;
         let bytes = per_member[member_index]
             .to_bytes_with_limits(input.limits)
             .map_err(|_| NativePopUpError::Archive)?;
+        if bytes.len() != expected_candidate_len {
+            return Err(NativePopUpError::InvalidSource);
+        }
         // Object provenance can differ after the private merge/split even
         // when the physical member is byte-identical (for example, an
         // untouched popup object retains the source payload but receives a
@@ -1094,6 +1111,9 @@ fn split_popup_candidate(
             .archive
             .to_bytes_with_limits(input.limits)
             .map_err(|_| NativePopUpError::Archive)?;
+        if source_bytes.len() != expected_source_len {
+            return Err(NativePopUpError::InvalidSource);
+        }
         if bytes == source_bytes {
             continue;
         }

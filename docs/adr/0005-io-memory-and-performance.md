@@ -1667,3 +1667,36 @@ preflight and makes no single-allocation, zero-copy, package-wide peak-memory
 or RSS, latency, throughput, or performance claim. Cross-component popup
 mutation is outside this resource contract. No production dependency edge or
 normal generated-schema/Prost/Buffa owner changes by this record.
+
+## 2026-08-26 amendment: Wave90 Numbers split Pop-Up Menu resource record
+
+Implementation base `e867003d80fb9cc9373f2f659e2b51c3264de06b` carries one
+operation-local transaction budget through the complete admitted split popup
+route: current-member and ownership census, aggregate merge scratch and
+object slots, popup/control codecs, BNC/list references, metadata UUID,
+external-edge and combined save-token transitions, per-member archive and
+Snappy output, prepared ZIP reassembly, candidate reopen/readback/locality,
+and patch/inverse artifacts. Source and candidate walks are staged and
+charged independently; checked arithmetic, fallible reservations, and
+residual codec ceilings gate each output stage.
+
+The split implementation's exact-byte filter can serialize the source
+`Archive` once for every structurally changed source member
+(`Archive::to_bytes_with_limits`) before deciding whether that member edit
+is a no-op. That per-member source serialization and its comparison bytes are
+part of the staged operation-local allocation/resource record; they are not
+free and do not establish an allocation-free preflight. Merge scratch,
+candidate archives, metadata, compression output, and final ZIP storage are
+likewise private staged allocations.
+
+The same output-free `encoded_len_with_limits` preflight, checked aggregate
+source/candidate arithmetic, and immediate actual-length replay now cover the
+earlier split scalar-control serializer. This closes a shared serialization
+accounting seam without widening the Wave88 semantic transition set.
+
+This amendment records bounded resource accounting only. It makes no claim of
+a single global allocation-free pass, a single allocation, zero-copy
+behavior, package-wide peak memory or RSS, latency, throughput, or
+performance. Native semantic persistence does not alter that resource scope,
+and no production dependency edge or normal generated-schema/Prost/Buffa
+owner changes by this record.

@@ -14091,3 +14091,55 @@ Numbers-normalized bytes are not Rust/native byte parity. This is bounded
 open/render/save/close/reopen and strict normalized-reread evidence only; it
 makes no performance/RSS, arbitrary-graph, popup-write, host/edge/debt,
 monolith-exit, publication-system, or full-workspace claim.
+
+## 2026-08-26 amendment: Wave90 Numbers split Pop-Up Menu lifecycle verification record
+
+Implementation base `e867003d80fb9cc9373f2f659e2b51c3264de06b` was verified
+with these scoped gates:
+
+- the focused Numbers unified cell-control integration passed 27/27,
+  including exact output/IWA-stream ceilings and max-minus-one atomic failure;
+- the focused Pop-Up Menu integration passed 19/19;
+- targeted `litchi-numbers` library plus unified-control Clippy passed with
+  `-D warnings` and only the recorded deprecated/manual-contains/
+  clone-on-copy/needless-question-mark baseline allowances;
+- Rust 2024 formatting and the scoped source/documentation diff check passed;
+- the clean tracked-HEAD boundary unittest passed 536/536;
+- the clean tracked-HEAD boundary checker reported 64 workspace packages,
+  239 internal dependency declarations, and 13 explicit migration debts;
+- no `litchi-iwa` dependency edge or migration debt was retired by this
+  implementation.
+
+The live checker in the shared dirty worktree still exits 1 only for the
+three known user-owned, untracked Pages table-lock findings:
+`body_table_lock_state`, `set_body_table_lock_state`, and the returned
+`crates/litchi-iwa/src/pages/editor/tables/lock.rs`. They are not present
+in the clean tracked HEAD audit and are not a Wave90 Numbers finding.
+
+The native semantic acceptance record used the following disposable
+artifacts:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| native source `/private/tmp/litchi-wave81-popup-native.fX9qBn/blank-native-popup-source.numbers` | 135,226 | `b830e8981cd9cd0ede3f125506b6b7076e33b7cc79110a8a59696270d005afc9` |
+| Rust split Pop-Up Menu candidate before Numbers save | 78,984 | `74e32fe72161639eae5d6bee434c718aa68fc4df9183ecfc1a8b1b85564f39f3` |
+| exact Rust inverse | 135,226 | `b830e8981cd9cd0ede3f125506b6b7076e33b7cc79110a8a59696270d005afc9` |
+| Numbers-normalized candidate | 135,726 | `c0adc359cbdd26ca6df2ea4be90166f889410f0fa70c6e32b7322783c1d988da` |
+
+The native source initially contained the three-item popup used by the
+fixture. The Rust candidate replaced it with `Wave90-Low` and
+`Wave90-High`, with blank initial selection. Numbers opened the candidate
+without repair, recovery, or conversion UI; its popup menu showed
+`None`, `Wave90-Low`, and `Wave90-High`. Save, close, and exact-path
+reopen preserved those semantic choices. The Rust inverse, produced before
+the native round trip, was byte-exact to the 135,226-byte source, and strict
+Rust reread of the 135,726-byte Numbers-normalized candidate succeeded.
+
+This establishes bounded semantic persistence across the admitted split
+route and native open/render/save/close/reopen. It does not establish
+Rust/native byte parity: Numbers-normalized bytes are expected to differ.
+The record makes no arbitrary-producer-graph, broad Numbers-format,
+publication-system, performance/RSS, full-workspace, host/debt/edge, or
+monolith-exit claim. Rust formatting, focused integration, Clippy, boundary,
+and documentation diff checks remain scoped verification gates rather than a
+claim that every workspace target is green.

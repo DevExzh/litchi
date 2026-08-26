@@ -582,7 +582,57 @@ pub(super) fn rewrite_scalar_control(
     )
     .map_err(|_| Error::InvalidSource { path })?;
 
+    // `to_bytes_with_limits` performs the same length calculation internally,
+    // but its output Vec is allocated before this transaction budget can see
+    // the result.  Preflight every source/candidate pair while both archives
+    // are still private, so the aggregate scratch/work/retained ceilings and
+    // serialization reservations are charged before the first output buffer
+    // is allocated.  Charging every pair is conservative: the scalar owner
+    // currently publishes every candidate member, while a future exact-byte
+    // filter may prove some candidates unchanged.
+    let mut source_serialized_bytes = 0usize;
+    let mut candidate_serialized_bytes = 0usize;
+    for (component_index, candidate) in &archives {
+        let source_archive = source
+            .state
+            .components
+            .catalog()
+            .get_index(*component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .archive();
+        let source_length = source_archive
+            .encoded_len_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        let candidate_length = candidate
+            .encoded_len_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        source_serialized_bytes = source_serialized_bytes
+            .checked_add(source_length)
+            .ok_or(Error::InvalidSource { path })?;
+        candidate_serialized_bytes = candidate_serialized_bytes
+            .checked_add(candidate_length)
+            .ok_or(Error::InvalidSource { path })?;
+    }
+    let comparison_bytes = source_serialized_bytes
+        .checked_add(candidate_serialized_bytes)
+        .ok_or(Error::InvalidSource { path })?;
+    let serialization_allocations = archives
+        .len()
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(serialization_allocations, path)?;
+    budget.charge_scratch_bytes(comparison_bytes, path)?;
+    budget.charge_retained_bytes(candidate_serialized_bytes, path)?;
+    budget.charge_transaction_work(comparison_bytes, path)?;
+
     let mut members = Vec::new();
+    members
+        .try_reserve_exact(archives.len())
+        .map_err(|_| Error::Allocation {
+            amount: archives.len(),
+            path,
+        })?;
     for (component_index, archive) in archives {
         let changed_identifiers = [
             (tile_component_index, tile_identifier),
@@ -604,9 +654,19 @@ pub(super) fn rewrite_scalar_control(
             &changed_identifiers,
         )
         .map_err(|_| Error::Verification)?;
+        // Recheck the candidate length immediately before serialization.  The
+        // aggregate preflight above covers every member; this assertion
+        // proves that no late archive-header change can make the output Vec
+        // exceed the amount charged to the transaction.
+        let expected_archive_bytes = archive
+            .encoded_len_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
         let archive_bytes = archive
             .to_bytes_with_limits(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
+        if archive_bytes.len() != expected_archive_bytes {
+            return Err(Error::Verification);
+        }
         budget
             .charge_payload_bytes(archive_bytes.len(), path)
             .map_err(|_| Error::LimitExceeded {
