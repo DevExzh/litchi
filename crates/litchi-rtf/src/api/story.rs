@@ -607,6 +607,36 @@ impl<'a> Format<'a> {
         }
     }
 
+    /// The effective local character expansion.
+    #[must_use]
+    pub fn expansion(self) -> crate::CharacterExpansion {
+        crate::text::character_positioning::effective_character_expansion(
+            self.raw.character_positioning.expansion,
+            self.raw.char_spacing,
+        )
+        .unwrap_or(crate::CharacterExpansion::None)
+    }
+
+    /// The effective local horizontal scale percentage.
+    #[must_use]
+    pub fn horizontal_scale_percent(self) -> u16 {
+        crate::text::character_positioning::effective_character_scale(
+            self.raw.character_positioning.horizontal_scale_percent,
+            self.raw.char_scale,
+        )
+        .unwrap_or(100)
+    }
+
+    /// The effective local kerning in half-points.
+    #[must_use]
+    pub fn kerning_half_points(self) -> u16 {
+        crate::text::character_positioning::effective_character_kerning(
+            self.raw.character_positioning.kerning_half_points,
+            self.raw.kerning,
+        )
+        .unwrap_or(0)
+    }
+
     /// Resolve the run's font definition without exposing its numeric RTF ID.
     ///
     /// `None` means that the retained reference has no corresponding font-table

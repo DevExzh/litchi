@@ -448,6 +448,6 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     let mut edit = bounded.edit();
     edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::Write(_))));
+    assert!(matches!(edit.commit(), Err(Error::InputTooLarge { .. })));
     assert_eq!(bounded.to_bytes().unwrap(), exact);
 }

@@ -369,6 +369,9 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Underline { .. }
         | Operation::FontSize { .. }
         | Operation::Baseline { .. }
+        | Operation::Expansion { .. }
+        | Operation::HorizontalScale { .. }
+        | Operation::Kerning { .. }
         | Operation::Strike { .. }
         | Operation::DoubleStrike { .. }
         | Operation::Hidden { .. }
@@ -488,6 +491,9 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::Underline { span, .. }
         | Operation::FontSize { span, .. }
         | Operation::Baseline { span, .. }
+        | Operation::Expansion { span, .. }
+        | Operation::HorizontalScale { span, .. }
+        | Operation::Kerning { span, .. }
         | Operation::Strike { span, .. }
         | Operation::DoubleStrike { span, .. }
         | Operation::Hidden { span, .. }
@@ -1206,6 +1212,9 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
             | "character-underline.set"
             | "character-font-size.set"
             | "character-baseline.set"
+            | "character-expansion.set"
+            | "character-horizontal-scale.set"
+            | "character-kerning.set"
             | "character-strike.set"
             | "character-double-strike.set"
             | "character-hidden.set"
@@ -1598,6 +1607,9 @@ fn durable_inverse_targets_equal(
         | "character-underline.set"
         | "character-font-size.set"
         | "character-baseline.set"
+        | "character-expansion.set"
+        | "character-horizontal-scale.set"
+        | "character-kerning.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -1656,6 +1668,9 @@ fn durable_inverse_values_match(forward: &DurableOperation, inverse: &DurableOpe
         "character-underline.set" => "underline",
         "character-font-size.set" => "font_size_half_points",
         "character-baseline.set" => "baseline",
+        "character-expansion.set" => "expansion",
+        "character-horizontal-scale.set" => "horizontal_scale_percent",
+        "character-kerning.set" => "kerning_half_points",
         "character-strike.set" => "strike",
         "character-double-strike.set" => "double_strike",
         "character-hidden.set" => "hidden",
@@ -1676,6 +1691,9 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
         | ("character-underline.set", "character-underline.set")
         | ("character-font-size.set", "character-font-size.set")
         | ("character-baseline.set", "character-baseline.set")
+        | ("character-expansion.set", "character-expansion.set")
+        | ("character-horizontal-scale.set", "character-horizontal-scale.set")
+        | ("character-kerning.set", "character-kerning.set")
         | ("character-strike.set", "character-strike.set")
         | ("character-double-strike.set", "character-double-strike.set")
         | ("character-hidden.set", "character-hidden.set")
@@ -1962,6 +1980,72 @@ fn verify_durable_inverse_semantics(
                     ));
                 }
             },
+            "character-expansion.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("expansion")
+                    .and_then(Value::as_str)
+                    .and_then(super::parse_expansion)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing expansion state".to_string(),
+                        )
+                    })?;
+                if super::expansion_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore expansion state".to_string(),
+                    ));
+                }
+            },
+            "character-horizontal-scale.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("horizontal_scale_percent")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| (1..=crate::MAX_CHARACTER_SCALE_PERCENT as u16).contains(value))
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing horizontal-scale state".to_string(),
+                        )
+                    })?;
+                if super::horizontal_scale_for_span(restored, span)
+                    .map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore horizontal-scale state".to_string(),
+                    ));
+                }
+            },
+            "character-kerning.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let expected = operation
+                    .preconditions
+                    .get("kerning_half_points")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| *value <= crate::MAX_CHARACTER_KERNING_HALF_POINTS as u16)
+                    .ok_or_else(|| {
+                        CompositionError::Durable(
+                            "durable branch is missing kerning state".to_string(),
+                        )
+                    })?;
+                if super::kerning_for_span(restored, span).map_err(CompositionError::Edit)?
+                    != expected
+                {
+                    return Err(CompositionError::Durable(
+                        "durable branch inverse did not restore kerning state".to_string(),
+                    ));
+                }
+            },
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -2096,6 +2180,9 @@ fn validate_durable_operation_shape(
         | "character-underline.set"
         | "character-font-size.set"
         | "character-baseline.set"
+        | "character-expansion.set"
+        | "character-horizontal-scale.set"
+        | "character-kerning.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2138,6 +2225,9 @@ fn validate_durable_operation_shape(
         | "character-underline.set"
         | "character-font-size.set"
         | "character-baseline.set"
+        | "character-expansion.set"
+        | "character-horizontal-scale.set"
+        | "character-kerning.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2199,6 +2289,9 @@ fn durable_operation_domain(operation: &DurableOperation) -> Option<DurableDomai
         | "character-underline.set"
         | "character-font-size.set"
         | "character-baseline.set"
+        | "character-expansion.set"
+        | "character-horizontal-scale.set"
+        | "character-kerning.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2242,6 +2335,9 @@ fn durable_text_span(operation: &DurableOperation) -> Option<super::TextSpan> {
         | "character-underline.set"
         | "character-font-size.set"
         | "character-baseline.set"
+        | "character-expansion.set"
+        | "character-horizontal-scale.set"
+        | "character-kerning.set"
         | "character-strike.set"
         | "character-double-strike.set"
         | "character-hidden.set"
@@ -2402,6 +2498,47 @@ fn commit_durable_operations(
                         CompositionError::Durable("invalid baseline value".to_string())
                     })?;
                 edit.set_text_baseline(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-expansion.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation
+                    .value
+                    .as_str()
+                    .and_then(super::parse_expansion)
+                    .ok_or_else(|| {
+                        CompositionError::Durable("invalid expansion value".to_string())
+                    })?;
+                edit.set_text_expansion(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-horizontal-scale.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| (1..=crate::MAX_CHARACTER_SCALE_PERCENT as u16).contains(value))
+                    .ok_or_else(|| {
+                        CompositionError::Durable("invalid horizontal-scale value".to_string())
+                    })?;
+                edit.set_text_horizontal_scale_percent(span, value)
+                    .map_err(CompositionError::Edit)?;
+            },
+            "character-kerning.set" => {
+                let span =
+                    super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
+                let value = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| *value <= crate::MAX_CHARACTER_KERNING_HALF_POINTS as u16)
+                    .ok_or_else(|| {
+                        CompositionError::Durable("invalid kerning value".to_string())
+                    })?;
+                edit.set_text_kerning(span, value)
                     .map_err(CompositionError::Edit)?;
             },
             "character-strike.set" => {
