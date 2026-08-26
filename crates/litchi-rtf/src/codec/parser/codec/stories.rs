@@ -5,8 +5,8 @@
 )]
 use super::{
     ControlWord, Cow, Formatting, MAX_STORY_GROUP_DEPTH, MAX_TEXT_INTERMEDIATE_BYTES,
-    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
-    is_section_control, require_parameterless,
+    ParsedBodyStoryEvent, Parser, RtfEncoding, RtfError, RtfResult, SmallVec, State, Token,
+    control_symbol_text, is_section_control, require_parameterless,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,7 +171,8 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                         pending_paragraph_break = false;
                     }
-                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    let decoded =
+                        self.parse_destination_unicode_sequence_for_current_font(*code)?;
                     if !decoded.is_empty() {
                         observe_story_baseline(
                             &mut paragraph_baseline,
@@ -231,7 +232,7 @@ impl<'a> Parser<'a> {
                     self.apply_control_word(control)?;
                 },
                 Token::Text(text) => {
-                    let decoded = self.decode_transport_text(text)?;
+                    let decoded = self.decode_transport_text_for_current_font(text)?;
                     self.pos += 1;
                     if !decoded.is_empty() {
                         inert_section_format = false;
@@ -414,7 +415,7 @@ impl<'a> Parser<'a> {
                         *pending_paragraph_break = false;
                     }
                     let code = *code;
-                    let decoded = self.parse_destination_unicode_sequence(code)?;
+                    let decoded = self.parse_destination_unicode_sequence_for_current_font(code)?;
                     if !decoded.is_empty() {
                         observe_story_baseline(
                             paragraph_baseline,
@@ -454,7 +455,7 @@ impl<'a> Parser<'a> {
                     self.apply_control_word(&control)?;
                 },
                 Some(Token::Text(text)) => {
-                    let decoded = self.decode_transport_text(text)?;
+                    let decoded = self.decode_transport_text_for_current_font(text)?;
                     self.pos += 1;
                     if !decoded.is_empty() && *pending_paragraph_break {
                         self.current_hf_story_offset =
@@ -493,6 +494,26 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_destination_unicode_sequence(
         &mut self,
         first_code: i32,
+    ) -> RtfResult<String> {
+        let encoding = self.current_state()?.encoding;
+        self.parse_destination_unicode_sequence_with_encoding(first_code, encoding)
+    }
+
+    pub(super) fn parse_destination_unicode_sequence_for_current_font(
+        &mut self,
+        first_code: i32,
+    ) -> RtfResult<String> {
+        let encoding = {
+            let state = self.current_state()?;
+            self.effective_text_encoding(state)?
+        };
+        self.parse_destination_unicode_sequence_with_encoding(first_code, encoding)
+    }
+
+    fn parse_destination_unicode_sequence_with_encoding(
+        &mut self,
+        first_code: i32,
+        encoding: RtfEncoding,
     ) -> RtfResult<String> {
         let skip_count = self.current_state()?.unicode_skip.max(0).cast_unsigned() as usize;
         let mut utf16 = SmallVec::<[u16; 4]>::new();
@@ -563,7 +584,7 @@ impl<'a> Parser<'a> {
             }
         }
         let mut decoded = Self::decode_bounded_utf16(&utf16, "RTF destination Unicode")?;
-        let fallback = self.decode_transport_text(&remainder)?;
+        let fallback = self.decode_transport_text_strict_with_encoding(&remainder, encoding)?;
         let observed = decoded.len().checked_add(fallback.len()).ok_or_else(|| {
             RtfError::MalformedDocument("RTF Unicode fallback size overflow".to_string())
         })?;
@@ -634,7 +655,8 @@ impl<'a> Parser<'a> {
                         )));
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
-                    let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    let decoded =
+                        self.parse_destination_unicode_sequence_for_current_font(*code)?;
                     if !decoded.is_empty() {
                         observe_story_baseline(
                             &mut note_baseline,
@@ -667,7 +689,7 @@ impl<'a> Parser<'a> {
                     self.apply_control_word(control)?;
                 },
                 Token::Text(text) => {
-                    let decoded = self.decode_transport_text(text)?;
+                    let decoded = self.decode_transport_text_for_current_font(text)?;
                     self.pos += 1;
                     if !decoded.is_empty() {
                         observe_story_baseline(
@@ -804,7 +826,7 @@ impl<'a> Parser<'a> {
                 },
                 Some(Token::Control(ControlWord::Unicode(code))) => {
                     let code = *code;
-                    let decoded = self.parse_destination_unicode_sequence(code)?;
+                    let decoded = self.parse_destination_unicode_sequence_for_current_font(code)?;
                     if !decoded.is_empty() {
                         observe_story_baseline(
                             note_baseline,
@@ -844,7 +866,7 @@ impl<'a> Parser<'a> {
                     self.apply_control_word(&control)?;
                 },
                 Some(Token::Text(text)) => {
-                    let decoded = self.decode_transport_text(text)?;
+                    let decoded = self.decode_transport_text_for_current_font(text)?;
                     self.pos += 1;
                     if !decoded.is_empty() {
                         observe_story_baseline(
