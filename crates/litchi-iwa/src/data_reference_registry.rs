@@ -5,16 +5,22 @@ use std::collections::{HashMap, HashSet};
 use prost::Message;
 
 use crate::archive::RawMessage;
-use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
+use crate::package_metadata::{
+    PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE, inspect_package_metadata,
+    inspect_package_metadata_source, package_metadata_read_options,
+};
 use crate::protobuf::tsp::{
-    ComponentDataReference, ComponentInfo, PackageMetadata,
-    component_data_reference::ObjectReference,
+    ComponentDataReference, ComponentInfo, component_data_reference::ObjectReference,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_varint_field,
     remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_protos::package_metadata_codec::{
+    ComponentDescriptor, DataReferenceDescriptor, DataReferenceOwnerDescriptor,
+    PackageMetadataVisitor, RewriteError, RewriteOptions,
+};
 
 const COMPONENTS_FIELD: u32 = 3;
 const VERSIONED_COMPONENTS_FIELD: u32 = 11;
@@ -28,6 +34,172 @@ const REFERENCE_COUNT_FIELD: u32 = 2;
 enum Adjustment {
     Add,
     Remove,
+}
+
+struct DataReferenceRecordFact {
+    data_identifier: u64,
+    expected_owner_count: usize,
+    owners: Vec<(u64, u32)>,
+}
+
+struct DataReferenceFactsVisitor {
+    component_identifier: u64,
+    component_matches: usize,
+    records: Vec<DataReferenceRecordFact>,
+    invalid_grouping: bool,
+}
+
+impl DataReferenceFactsVisitor {
+    fn new(component_identifier: u64) -> Self {
+        Self {
+            component_identifier,
+            component_matches: 0,
+            records: Vec::new(),
+            invalid_grouping: false,
+        }
+    }
+
+    fn push_record(
+        &mut self,
+        data_identifier: u64,
+        owner_count: usize,
+    ) -> std::result::Result<(), RewriteError> {
+        let requested = self
+            .records
+            .len()
+            .checked_add(1)
+            .and_then(|length| length.checked_mul(std::mem::size_of::<DataReferenceRecordFact>()))
+            .unwrap_or(usize::MAX);
+        self.records
+            .try_reserve(1)
+            .map_err(|_error| RewriteError::allocation(requested))?;
+        self.records.push(DataReferenceRecordFact {
+            data_identifier,
+            expected_owner_count: owner_count,
+            owners: Vec::new(),
+        });
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Vec<(u64, u64, u32)>> {
+        if self.component_matches != 1 {
+            return Err(Error::InvalidFormat(format!(
+                "PackageMetadata must contain exactly one component {}",
+                self.component_identifier
+            )));
+        }
+        if self.invalid_grouping {
+            return Err(Error::InvalidFormat(format!(
+                "Component {} has an ungrouped data-reference owner",
+                self.component_identifier
+            )));
+        }
+        let owner_count = self
+            .records
+            .iter()
+            .try_fold(0usize, |total, record| {
+                total.checked_add(record.owners.len())
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat("Component data-reference owner count overflow".to_owned())
+            })?;
+        let requested = owner_count.saturating_mul(std::mem::size_of::<(u64, u64, u32)>());
+        let mut references = Vec::new();
+        references
+            .try_reserve_exact(owner_count)
+            .map_err(|_error| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "PackageMetadata component data-reference facts",
+                    amount: requested,
+                })
+            })?;
+
+        for (record_index, record) in self.records.iter().enumerate() {
+            if record.expected_owner_count != record.owners.len() {
+                return Err(Error::InvalidFormat(format!(
+                    "Component data reference {} has a mismatched owner count",
+                    record.data_identifier
+                )));
+            }
+            if self.records[..record_index]
+                .iter()
+                .any(|existing| existing.data_identifier == record.data_identifier)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Component {} has an invalid or repeated data reference {}",
+                    self.component_identifier, record.data_identifier
+                )));
+            }
+            for (owner_index, (object_identifier, count)) in record.owners.iter().enumerate() {
+                if record.owners[..owner_index]
+                    .iter()
+                    .any(|(existing, _count)| existing == object_identifier)
+                {
+                    return Err(Error::InvalidFormat(format!(
+                        "Component data reference {} has an invalid or repeated object {object_identifier}",
+                        record.data_identifier
+                    )));
+                }
+                references.push((record.data_identifier, *object_identifier, *count));
+            }
+        }
+        Ok(references)
+    }
+}
+
+impl PackageMetadataVisitor for DataReferenceFactsVisitor {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if component.identifier() == self.component_identifier {
+            self.component_matches = self
+                .component_matches
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+        }
+        Ok(())
+    }
+
+    fn visit_data_reference(
+        &mut self,
+        reference: DataReferenceDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if reference.component().identifier() == self.component_identifier {
+            self.push_record(reference.data_identifier(), reference.owner_count())?;
+        }
+        Ok(())
+    }
+
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if owner.component().identifier() == self.component_identifier {
+            let Some(record) = self
+                .records
+                .last_mut()
+                .filter(|record| record.data_identifier == owner.data_identifier())
+            else {
+                self.invalid_grouping = true;
+                return Ok(());
+            };
+            let requested = record
+                .owners
+                .len()
+                .checked_add(1)
+                .and_then(|length| length.checked_mul(std::mem::size_of::<(u64, u32)>()))
+                .unwrap_or(usize::MAX);
+            record
+                .owners
+                .try_reserve(1)
+                .map_err(|_error| RewriteError::allocation(requested))?;
+            record
+                .owners
+                .push((owner.object_identifier(), owner.count()));
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn add_component_data_reference(
@@ -158,6 +330,7 @@ fn adjust_component_data_reference_by(
             "Component data-reference adjustment count must be non-zero".to_owned(),
         ));
     }
+    let metadata_options = package_metadata_read_options(package);
     package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
         let mut location = None;
         for (object_index, object) in archive.objects.iter().enumerate() {
@@ -176,13 +349,16 @@ fn adjust_component_data_reference_by(
         })?;
         let object = &mut archive.objects[object_index];
         let original = &object.messages[message_index];
-        let metadata = PackageMetadata::decode(original.data.as_slice())?;
-        let old_count = component_reference_count(
-            &metadata,
+        let source_references = component_data_reference_snapshot(
+            original.data.as_slice(),
+            metadata_options,
             component_identifier,
+        )?;
+        let old_count = component_reference_count(
+            &source_references,
             data_identifier,
             object_identifier,
-        )?;
+        );
         let expected_count = match adjustment {
             Adjustment::Add => old_count.checked_add(count).ok_or_else(|| {
                 Error::InvalidFormat("Component data-reference count overflow".to_owned())
@@ -218,13 +394,13 @@ fn adjust_component_data_reference_by(
                 "PackageMetadata contains {matched_components} components with identifier {component_identifier}"
             )));
         }
-        let verified = PackageMetadata::decode(data.as_slice())?;
+        let verified =
+            component_data_reference_snapshot(data.as_slice(), metadata_options, component_identifier)?;
         if component_reference_count(
             &verified,
-            component_identifier,
             data_identifier,
             object_identifier,
-        )? != expected_count
+        ) != expected_count
         {
             return Err(Error::InvalidFormat(
                 "Component data-reference adjustment failed validation".to_owned(),
@@ -392,73 +568,13 @@ fn component_object_data_references(
     package: &IWorkPackage,
     component_identifier: u64,
 ) -> Result<Vec<(u64, u64, u32)>> {
-    let component = component_info(package, component_identifier)?;
-    let capacity = component
-        .data_references
-        .iter()
-        .map(|reference| reference.object_reference_list.len())
-        .sum();
-    let mut references = Vec::with_capacity(capacity);
-    let mut data_identifiers = HashSet::with_capacity(component.data_references.len());
-    for reference in &component.data_references {
-        if reference.data_identifier == 0 || !data_identifiers.insert(reference.data_identifier) {
-            return Err(Error::InvalidFormat(format!(
-                "Component {component_identifier} has an invalid or repeated data reference {}",
-                reference.data_identifier
-            )));
-        }
-        let mut object_identifiers = HashSet::with_capacity(reference.object_reference_list.len());
-        for owner in &reference.object_reference_list {
-            if owner.object_identifier == 0
-                || owner.count == 0
-                || !object_identifiers.insert(owner.object_identifier)
-            {
-                return Err(Error::InvalidFormat(format!(
-                    "Component data reference {} has an invalid or repeated object {}",
-                    reference.data_identifier, owner.object_identifier
-                )));
-            }
-            references.push((
-                reference.data_identifier,
-                owner.object_identifier,
-                owner.count,
-            ));
-        }
-    }
-    Ok(references)
-}
-
-fn component_info(package: &IWorkPackage, component_identifier: u64) -> Result<ComponentInfo> {
-    let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
-    let messages = archive
-        .objects
-        .iter()
-        .flat_map(|object| &object.messages)
-        .filter(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    let [message] = messages.as_slice() else {
+    let mut visitor = DataReferenceFactsVisitor::new(component_identifier);
+    if inspect_package_metadata(package, &mut visitor)?.is_none() {
         return Err(Error::InvalidFormat(format!(
-            "Package must contain exactly one PackageMetadata payload, found {}",
-            messages.len()
-        )));
-    };
-    let metadata = PackageMetadata::decode(message.data.as_slice())?;
-    let mut components = metadata
-        .components
-        .into_iter()
-        .chain(metadata.versioned_components)
-        .filter(|component| component.identifier == component_identifier);
-    let Some(component) = components.next() else {
-        return Err(Error::InvalidFormat(format!(
-            "PackageMetadata must contain exactly one component {component_identifier}"
-        )));
-    };
-    if components.next().is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "PackageMetadata must contain exactly one component {component_identifier}"
+            "PackageMetadata payload is missing for component {component_identifier}"
         )));
     }
-    Ok(component)
+    visitor.finish()
 }
 
 fn validate_data_reference_identifier(data: &[u8], expected: u64) -> Result<bool> {
@@ -489,47 +605,206 @@ fn validate_object_reference_identifier(data: &[u8], expected: u64) -> Result<bo
     Ok(decoded.object_identifier == expected)
 }
 
-fn component_reference_count(
-    metadata: &PackageMetadata,
+fn component_data_reference_snapshot(
+    source: &[u8],
+    options: RewriteOptions,
     component_identifier: u64,
+) -> Result<Vec<(u64, u64, u32)>> {
+    let mut visitor = DataReferenceFactsVisitor::new(component_identifier);
+    let _inspection = inspect_package_metadata_source(source, options, &mut visitor)?;
+    visitor.finish()
+}
+
+fn component_reference_count(
+    references: &[(u64, u64, u32)],
     data_identifier: u64,
     object_identifier: u64,
-) -> Result<u32> {
-    let components = metadata
-        .components
+) -> u32 {
+    references
         .iter()
-        .chain(&metadata.versioned_components)
-        .filter(|component| component.identifier == component_identifier)
-        .collect::<Vec<_>>();
-    let [component] = components.as_slice() else {
-        return Err(Error::InvalidFormat(format!(
-            "PackageMetadata must contain exactly one component {component_identifier}"
-        )));
-    };
-    let references = component
-        .data_references
-        .iter()
-        .filter(|reference| reference.data_identifier == data_identifier)
-        .collect::<Vec<_>>();
-    let reference = match references.as_slice() {
-        [] => return Ok(0),
-        [reference] => *reference,
-        _ => {
-            return Err(Error::InvalidFormat(format!(
-                "Component {component_identifier} repeats data reference {data_identifier}"
-            )));
-        },
-    };
-    let owners = reference
-        .object_reference_list
-        .iter()
-        .filter(|owner| owner.object_identifier == object_identifier)
-        .collect::<Vec<_>>();
-    match owners.as_slice() {
-        [] => Ok(0),
-        [owner] => Ok(owner.count),
-        _ => Err(Error::InvalidFormat(format!(
-            "Component data reference {data_identifier} repeats object {object_identifier}"
-        ))),
+        .find_map(|(data, object, count)| {
+            (*data == data_identifier && *object == object_identifier).then_some(*count)
+        })
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::archive::{Archive, ArchiveObject};
+    use crate::protobuf::tsp::PackageMetadata;
+
+    fn component(identifier: u64, references: Vec<ComponentDataReference>) -> ComponentInfo {
+        ComponentInfo {
+            identifier,
+            preferred_locator: format!("Component-{identifier}"),
+            data_references: references,
+            ..Default::default()
+        }
+    }
+
+    fn reference(data_identifier: u64, owners: &[(u64, u32)]) -> ComponentDataReference {
+        ComponentDataReference {
+            data_identifier,
+            object_reference_list: owners
+                .iter()
+                .map(|(object_identifier, count)| ObjectReference {
+                    object_identifier: *object_identifier,
+                    count: *count,
+                })
+                .collect(),
+        }
+    }
+
+    fn metadata(
+        components: Vec<ComponentInfo>,
+        versioned_components: Vec<ComponentInfo>,
+    ) -> Vec<u8> {
+        PackageMetadata {
+            last_object_identifier: 100,
+            components,
+            versioned_components,
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn options(source: &[u8]) -> RewriteOptions {
+        RewriteOptions::new(
+            source.len().max(1),
+            source.len().max(1),
+            1_024,
+            1 << 20,
+            64,
+            128,
+            128,
+            0,
+        )
+    }
+
+    fn package_with_metadata(source: Vec<u8>) -> IWorkPackage {
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                PACKAGE_METADATA_ENTRY,
+                &Archive {
+                    objects: vec![
+                        ArchiveObject::new(
+                            10,
+                            vec![RawMessage {
+                                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                                data: source,
+                            }],
+                        )
+                        .unwrap(),
+                    ],
+                },
+            )
+            .unwrap();
+        package
+    }
+
+    fn metadata_source(package: &IWorkPackage) -> Vec<u8> {
+        package
+            .archive(PACKAGE_METADATA_ENTRY)
+            .unwrap()
+            .object(10)
+            .unwrap()
+            .messages[0]
+            .data
+            .clone()
+    }
+
+    #[test]
+    fn strict_snapshot_streams_current_versioned_and_empty_data_records() {
+        let source = metadata(
+            vec![component(
+                7,
+                vec![reference(70, &[(5, 2), (6, 3)]), reference(71, &[])],
+            )],
+            vec![component(9, vec![reference(72, &[(8, 4)])])],
+        );
+        let before = source.clone();
+
+        let current = component_data_reference_snapshot(&source, options(&source), 7).unwrap();
+        assert_eq!(current, vec![(70, 5, 2), (70, 6, 3)]);
+        assert_eq!(component_reference_count(&current, 70, 6), 3);
+        assert_eq!(component_reference_count(&current, 71, 5), 0);
+        assert_eq!(
+            component_data_reference_snapshot(&source, options(&source), 9).unwrap(),
+            vec![(72, 8, 4)]
+        );
+        assert!(component_data_reference_snapshot(&source, options(&source), 10).is_err());
+        assert_eq!(source, before);
+    }
+
+    #[test]
+    fn strict_snapshot_rejects_duplicate_records_owners_and_components() {
+        let duplicate_records = metadata(
+            vec![component(
+                7,
+                vec![reference(70, &[(5, 1)]), reference(70, &[(6, 1)])],
+            )],
+            vec![],
+        );
+        assert!(
+            component_data_reference_snapshot(&duplicate_records, options(&duplicate_records), 7)
+                .is_err()
+        );
+
+        let duplicate_owners = metadata(
+            vec![component(7, vec![reference(70, &[(5, 1), (5, 2)])])],
+            vec![],
+        );
+        assert!(
+            component_data_reference_snapshot(&duplicate_owners, options(&duplicate_owners), 7)
+                .is_err()
+        );
+
+        let duplicate_components = metadata(
+            vec![component(7, vec![reference(70, &[(5, 1)])])],
+            vec![component(7, vec![reference(71, &[(6, 1)])])],
+        );
+        assert!(
+            component_data_reference_snapshot(
+                &duplicate_components,
+                options(&duplicate_components),
+                7
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn registry_mutation_uses_strict_source_and_candidate_snapshots() {
+        let mut source = metadata(vec![component(7, vec![reference(70, &[(5, 2)])])], vec![]);
+        let known_length = source.len();
+        crate::wire::append_varint_field(&mut source, 90, 17).unwrap();
+        let unknown_suffix = source[known_length..].to_vec();
+        let mut package = package_with_metadata(source);
+
+        add_component_data_reference(&mut package, 7, 70, 5).unwrap();
+        assert_eq!(
+            component_object_data_references(&package, 7).unwrap(),
+            vec![(70, 5, 3)]
+        );
+        remove_component_data_reference(&mut package, 7, 70, 5).unwrap();
+        assert_eq!(
+            component_object_data_references(&package, 7).unwrap(),
+            vec![(70, 5, 2)]
+        );
+        assert!(metadata_source(&package).ends_with(&unknown_suffix));
+
+        let duplicate_source = metadata(
+            vec![component(
+                7,
+                vec![reference(70, &[(5, 1)]), reference(70, &[(6, 1)])],
+            )],
+            vec![],
+        );
+        let mut duplicate = package_with_metadata(duplicate_source);
+        let before = metadata_source(&duplicate);
+        assert!(add_component_data_reference(&mut duplicate, 7, 70, 5).is_err());
+        assert_eq!(metadata_source(&duplicate), before);
     }
 }

@@ -879,7 +879,7 @@ pub(crate) fn component_uuid_identifiers(
 
 const PACKAGE_METADATA_RECURSION_LIMIT: u32 = 64;
 
-fn package_metadata_read_options(package: &IWorkPackage) -> RewriteOptions {
+pub(crate) fn package_metadata_read_options(package: &IWorkPackage) -> RewriteOptions {
     let package_limits = package.limits();
     let archive_limits = package_limits.archive_limits();
     let message_limit = package_limits
@@ -906,22 +906,25 @@ fn inspect_package_metadata_payload<V: PackageMetadataVisitor>(
     source: &[u8],
     visitor: &mut V,
 ) -> Result<()> {
-    inspect_package_metadata_with_visitor(source, package_metadata_read_options(package), visitor)
+    inspect_package_metadata_source(source, package_metadata_read_options(package), visitor)
         .map(|_inspection| ())
+}
+
+pub(crate) fn inspect_package_metadata_source<V: PackageMetadataVisitor>(
+    source: &[u8],
+    options: RewriteOptions,
+    visitor: &mut V,
+) -> Result<PackageMetadataInspection> {
+    inspect_package_metadata_with_visitor(source, options, visitor)
         .map_err(package_metadata_inspection_error)
 }
 
-fn inspect_package_metadata<V: PackageMetadataVisitor>(
+pub(crate) fn inspect_package_metadata<V: PackageMetadataVisitor>(
     package: &IWorkPackage,
     visitor: &mut V,
 ) -> Result<Option<PackageMetadataInspection>> {
     with_package_metadata_payload(package, |source| {
-        inspect_package_metadata_with_visitor(
-            source,
-            package_metadata_read_options(package),
-            visitor,
-        )
-        .map_err(package_metadata_inspection_error)
+        inspect_package_metadata_source(source, package_metadata_read_options(package), visitor)
     })
 }
 
