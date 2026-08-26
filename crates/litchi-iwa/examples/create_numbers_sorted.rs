@@ -50,8 +50,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     editor.set_cell_comment(table_id, 2, 1, "South comment follows its sorted row")?;
-    let reply_id =
-        editor.add_cell_comment_reply(table_id, 2, 1, "Numbers keeps this thread intact")?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let reply_commit = package.add_table_cell_comment_reply(
+        SheetSelector::index(0),
+        table,
+        CellPosition::new(2, 1),
+        "Numbers keeps this thread intact",
+    )?;
+    let mut bytes = Vec::new();
+    reply_commit.package().write_to(&mut bytes)?;
+    editor = NumbersEditor::from_bytes(&bytes)?;
     let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
         NumbersTableSortColumnIndex::new(1)?,
         NumbersTableSortDirection::Ascending,
@@ -67,15 +75,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !editor.apply_table_sort_order(table)? {
         return Err("expected the source table to be reordered".into());
     }
-    let moved = editor
-        .cell_comment(table_id, 1, 1)?
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let moved = package
+        .table_cell_comment(SheetSelector::index(0), table, CellPosition::new(1, 1))?
         .ok_or("sorted row lost its comment")?;
-    let moved_reply_id = editor
-        .cell_comment_replies(table_id, 1, 1)?
-        .first()
-        .map(|reply| reply.storage_id.get());
-    if moved.comment.text != "South comment follows its sorted row"
-        || moved_reply_id != Some(reply_id)
+    let moved_replies = package.table_cell_comment_replies(
+        SheetSelector::index(0),
+        table,
+        CellPosition::new(1, 1),
+    )?;
+    let moved_reply = moved_replies.first().map(|reply| reply.text());
+    if moved.text() != "South comment follows its sorted row"
+        || moved_reply != Some("Numbers keeps this thread intact")
     {
         return Err("sorted row did not preserve its comment thread".into());
     }

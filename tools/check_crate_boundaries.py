@@ -4430,6 +4430,191 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_REDACTION = re.compile(
     r"(?i)(?:redact(?:ed|ion)?|omitted|hidden|finish_non_exhaustive|"
     r"authored[ \t\r\n_-]*(?:content|text)|content[ \t\r\n_-]*redact)"
 )
+
+# Wave93 owns mutation of an existing cell-comment reply thread.  The read
+# projection above intentionally remains a separate, already-landed contract:
+# seeing ``CommentReply`` alone must not retire the compatibility host or
+# activate these stronger checks.  Activation therefore requires one of the
+# mutation-only names below in non-test production source.
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/comment.rs"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TRANSACTION_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/comment/transaction.rs"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE = (
+    NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_HELPER_ROOT = Path(
+    "crates/litchi-numbers/src/package"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_SOURCE = (
+    NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE = Path(
+    "crates/litchi-iwa-protos/fuzz/fuzz_targets/comment_storage_reply_codec.rs"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_CORPUS = Path(
+    "crates/litchi-iwa-protos/fuzz/corpus/comment_storage_reply_codec"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE = Path(
+    "crates/litchi/fuzz/fuzz_targets/numbers_table_cell_comment_reply.rs"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS = Path(
+    "crates/litchi/fuzz/corpus/numbers_table_cell_comment_reply"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES = (
+    "CommentReplyIndex",
+    "CommentReplyEdit",
+    "CommentReplyPatch",
+    "CommentReplyCommit",
+    "CommentReplyDiagnostics",
+    "CommentReplyError",
+    "CommentReplyLimitKind",
+    "CommentReplyPath",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_INDEX_METHODS = (
+    "new",
+    "index",
+    "get",
+    "try_from_usize",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES = (
+    "TableCellCommentReply",
+    *(f"TableCellCommentReply{name.removeprefix('CommentReply')}"
+      for name in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES),
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS = (
+    "table_cell_comment_reply",
+    "table_cell_comment_reply_a1",
+    "edit_table_cell_comment_replies",
+    "edit_table_cell_comment_replies_a1",
+    "set_table_cell_comment_reply",
+    "set_table_cell_comment_reply_a1",
+    "remove_table_cell_comment_reply",
+    "remove_table_cell_comment_reply_a1",
+    "add_table_cell_comment_reply",
+    "add_table_cell_comment_reply_a1",
+    "apply_table_cell_comment_reply",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ACTIVATION = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:edit_table_cell_comment_replies|"
+    r"set_table_cell_comment_reply|"
+    r"remove_table_cell_comment_reply|add_table_cell_comment_reply|"
+    r"apply_table_cell_comment_reply)(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_REQUIRED_MARKERS = {
+    "rooted selector graph": re.compile(
+        r"(?i)\b(?:rooted|resolve[_ -]?(?:comment|reply)|SheetSelector|"
+        r"TableSelector|CellPosition|CommentReplyIndex)\b"
+    ),
+    "comment list and cell references": re.compile(
+        r"(?i)\b(?:CommentList|comment[_ -]?list[_ -]?ids|cell[_ -]?comment[_ -]?keys|"
+        r"list[_ -]?entries|entry[_ -]?storage[_ -]?ids|table[_ -]?references|"
+        r"comment[_ -]?storage)\b"
+    ),
+    "global ownership census": re.compile(
+        r"(?i)\b(?:CommentOwnershipCensus|CommentReplyOwnershipCensus|"
+        r"census[_ -]?comment(?:[_ -]?reply)?[_ -]?ownership|global|"
+        r"all[_ -]?components|ArchiveReference)\b"
+    ),
+    "storage/reply identity census": re.compile(
+        r"(?i)\b(?:storages|reply[_ -]?ids|storage[_ -]?uuid|author[_ -]?ids|"
+        r"storage[_ -]?occurrences|refcount|reference[_ -]?count)\b"
+    ),
+    "copy-on-write/shared-thread lifecycle": re.compile(
+        r"(?i)\b(?:copy[_ -]?on[_ -]?write|cow|shared|clone|new[_ -]?storage|"
+        r"cull)\b"
+    ),
+    "duplicate/alias/dependency rejection": re.compile(
+        r"(?i)\b(?:duplicate|alias|cycle|depth|invalid|reject|dependency)\b"
+    ),
+    "ArchiveInfo authority": re.compile(
+        r"(?i)\b(?:ArchiveInfo|MessageInfo|FieldInfo|object[_ -]?references|"
+        r"aggregate|field[_ -]?infos|preserve)\b"
+    ),
+    "metadata ownership": re.compile(
+        r"(?i)\b(?:metadata|uuid|object[_ -]?uuid|save[_ -]?token|watermark|"
+        r"versioned|ambiguous|data[_ -]?owner|root[_ -]?map|external)\b"
+    ),
+    "atomic candidate/inverse locality": re.compile(
+        r"(?i)\b(?:atomic|source(?:[_ -]?bytes)?|inverse|Patch|candidate|reopen|"
+        r"locality|same[_ -]?content|previews|publication)\b"
+    ),
+    "aggregate transaction budget": re.compile(
+        r"(?i)\b(?:TransactionBudget|WireBudget|budget|residual|preflight|charge|"
+        r"max[_ -]?(?:input|output)|fields|work|depth|references|alloc(?:ation|ations)?|"
+        r"scratch|retained|reassembly|Snappy|ZIP|try[_ -]?reserve)\b"
+    ),
+    "prepared strict codec route": re.compile(
+        r"(?i)\b(?:CommentStorageReplyRewrite|prepare_comment_storage_reply_rewrite|"
+        r"CommentStorage|visitor|execution[_ -]?requirements|execute)\b"
+    ),
+}
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PUBLIC_LEAKS = frozenset(
+    {
+        "u64",
+        "usize",
+        "StorageId",
+        "AuthorId",
+        "ReplyStorageId",
+        "ObjectId",
+        "ObjectIdentifier",
+        "Uuid",
+        "RawMessage",
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "IWA",
+        "Wire",
+        "WireView",
+        "WireLimits",
+        "MessageInfo",
+        "FieldInfo",
+        "ObjectReference",
+        "SourceCatalog",
+        "Prost",
+        "Buffa",
+        "bytes",
+    }
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PUBLIC_LEAK_PREFIXES = (
+    "Wire",
+    "Prost",
+    "Buffa",
+    "Archive",
+    "SourceCatalog",
+    "CommentStorage",
+    "ReplyStorage",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_DEBUG_SENSITIVE = re.compile(
+    r"(?i)\b(?:text|content|body|message|author)\b"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_A1_ADDRESS = re.compile(
+    r"(?<![A-Za-z0-9_])(?:address|a1)(?![A-Za-z0-9_])|"
+    r"&[ \t\r\n]*str\b"
+)
+
+# Numbers-only host retirement.  Pages, Keynote, and the shared private
+# cell-data-format adapters deliberately do not appear in this source root.
+RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_METHODS = (
+    "cell_comment_replies",
+    "add_cell_comment_reply",
+    "set_cell_comment_reply",
+    "remove_cell_comment_reply",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_numbers_comment_reply.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_MIXED_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/create_iwork_table_comments.rs"
+)
+IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_FOCUSED_METHODS = frozenset(
+    NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS
+)
 PACKAGE_METADATA_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/package_metadata_codec.rs"
 )
@@ -14757,6 +14942,36 @@ def _numbers_table_cell_comment_reply_public_leak(identifier: str) -> str | None
     return _iwork_public_leak(identifier)
 
 
+def _numbers_table_cell_comment_reply_mutation_public_leak(
+    identifier: str,
+) -> str | None:
+    """Classify native vocabulary forbidden in the reply mutation facade."""
+
+    if identifier in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PUBLIC_LEAKS:
+        return "forbidden native reply vocabulary"
+    if identifier in {
+        "bytes",
+        "wire",
+        "iwa",
+        "prost",
+        "buffa",
+        "raw_bytes",
+        "raw_message",
+        "storage_id",
+        "reply_storage_id",
+        "object_id",
+        "object_identifier",
+        "usize",
+    }:
+        return "forbidden native reply vocabulary"
+    if any(
+        identifier.startswith(prefix)
+        for prefix in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PUBLIC_LEAK_PREFIXES
+    ):
+        return "forbidden native reply vocabulary"
+    return _iwork_public_leak(identifier)
+
+
 def _numbers_table_cell_control_owner_declaration(declaration: str) -> bool:
     identifiers = [
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -16864,6 +17079,190 @@ def audit_iwa_numbers_cell_comment_clear_delegation_source_topology(
                 "litchi-iwa Numbers cell-comment focused clear passes a raw native "
                 f"identifier ({raw.group(0)}) instead of selectors"
             )
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_cell_comment_reply_mutation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Audit only the Numbers reply bridge after the package owner activates.
+
+    The old ``NumbersEditor`` methods are allowed during the migration while
+    they remain explicitly deprecated and route through a narrow private
+    compatibility helper.  Calls in Numbers examples/production must not be
+    mistaken for the supported API.  Pages, Keynote, and the shared
+    ``cell_data_format`` adapters are intentionally outside this scan.
+    """
+
+    if not _numbers_table_cell_comment_reply_mutation_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    def location(path: Path, line_number: int) -> str:
+        return f"{path.relative_to(root)}:{line_number}"
+
+    call_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>cell_comment_replies|"
+        r"add_cell_comment_reply|set_cell_comment_reply|remove_cell_comment_reply)"
+        r"[ \t\r\n]*\("
+    )
+    focused_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>"
+        + "|".join(
+            re.escape(method)
+            for method in sorted(IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_FOCUSED_METHODS)
+        )
+        + r")[ \t\r\n]*\("
+    )
+
+    def call_arguments(source: str, match: re.Match[str]) -> str:
+        code = _mask_rust_non_code(source)
+        cursor = match.end()
+        depth = 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "(":
+                depth += 1
+            elif code[cursor] == ")":
+                depth -= 1
+            cursor += 1
+        return code[match.end() : cursor - 1] if depth == 0 else ""
+
+    def scan_focused_calls(source: str, path: Path) -> None:
+        masked = _mask_rust_non_code(source)
+        focused = list(focused_pattern.finditer(masked))
+        if not focused:
+            return
+        route = masked
+        focused_location_helper = re.search(
+            r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)?"
+            r"focused_table_location[ \t\r\n]*\(",
+            route,
+        ) is not None
+        for label, pattern in (
+            ("SheetSelector::index", r"\bSheetSelector\s*::\s*index\b"),
+            ("TableSelector::index", r"\bTableSelector\s*::\s*index\b"),
+            (
+                "CellPosition::try_from_usize",
+                r"\bCellPosition\s*::\s*try_from_usize\b",
+            ),
+        ):
+            if re.search(pattern, route) is None and not (
+                label in {"SheetSelector::index", "TableSelector::index"}
+                and focused_location_helper
+            ):
+                line_number = route.count("\n", 0, focused[0].start()) + 1
+                violations.append(
+                    "litchi-iwa Numbers comment-reply focused bridge is missing "
+                    f"{label}: {location(path, line_number)}"
+                )
+        for match in focused:
+            if match.group("method") == "apply_table_cell_comment_reply":
+                continue
+            arguments = call_arguments(source, match)
+            raw = re.search(
+                r"\b(?:table_id|row|column|reply_storage_object_id|storage_id|"
+                r"object_id|native_id|raw_object_id)\b",
+                arguments,
+            )
+            if raw is not None:
+                line_number = masked.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa Numbers comment-reply focused bridge passes raw "
+                    f"identifier/coordinate {raw.group(0)}: {location(path, line_number)}"
+                )
+
+    tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
+    for path in sorted(source_root.rglob("*.rs")):
+        # The Numbers editor test module is included from a cfg(test) parent
+        # but is stored as an otherwise ordinary ``tests.rs`` file.  Keep its
+        # legacy identity regressions out of the production bridge audit.
+        if path == tests_path:
+            continue
+        if "cell_data_format" in path.parts:
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_cfg_test_items(raw_source)
+        masked = _mask_rust_non_code(source)
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            methods = identifiers & RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_METHOD_SET
+            for method in sorted(methods):
+                declaration_match = re.search(
+                    rf"\bfn\s+(?:r#)?{re.escape(method)}\b", masked
+                )
+                offset = declaration_match.start() if declaration_match else 0
+                prefix = raw_source[max(0, offset - 700) : offset]
+                if re.search(r"#\s*\[\s*deprecated\b", prefix) is None:
+                    violations.append(
+                        "litchi-iwa Numbers comment-reply compatibility method must be "
+                        f"deprecated {method}: {location(path, line_number)}"
+                    )
+                if re.search(r"(?i)\b(?:legacy|compatibility|raw[- ]?id)\b", prefix) is None:
+                    violations.append(
+                        "litchi-iwa Numbers comment-reply compatibility method must document "
+                        f"legacy scope {method}: {location(path, line_number)}"
+                    )
+                body = _rust_any_function_body(source, method)
+                if body is None or re.search(
+                    r"(?:_in_package|legacy|compatibility|focused)", body, re.IGNORECASE
+                ) is None:
+                    violations.append(
+                        "litchi-iwa Numbers comment-reply compatibility method must use a "
+                        f"narrow bridge/helper {method}: {location(path, line_number)}"
+                    )
+
+        # Calls from a declaration's own signature are not call sites.  A
+        # cfg(test) item was already removed above, so this catches production
+        # callers and keeps the migration inventory honest.
+        for match in call_pattern.finditer(masked):
+            line_start = masked.rfind("\n", 0, match.start()) + 1
+            line_end = masked.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(masked)
+            if re.search(
+                rf"\bfn\s+(?:r#)?{re.escape(match.group('method'))}\b",
+                masked[line_start:line_end],
+            ):
+                continue
+            line_number = masked.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers comment-reply mutation call "
+                f"{match.group('method')}: {location(path, line_number)}"
+            )
+        scan_focused_calls(source, path)
+
+    example = root / RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_EXAMPLE
+    if example.is_file():
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(example.read_text(encoding="utf-8"))
+        )
+        for match in call_pattern.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers comment-reply example call "
+                f"{match.group('method')}: {location(example, line_number)}"
+            )
+
+    mixed_example = root / RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_MIXED_EXAMPLE
+    if mixed_example.is_file():
+        source = _mask_rust_cfg_test_items(mixed_example.read_text(encoding="utf-8"))
+        source = _rust_mask_named_function_bodies(
+            source, frozenset({"create_pages", "create_keynote"})
+        )
+        source = _mask_rust_non_code(source)
+        for match in call_pattern.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers comment-reply mixed example call "
+                f"{match.group('method')}: {location(mixed_example, line_number)}"
+            )
+
     return sorted(set(violations))
 
 
@@ -21052,6 +21451,587 @@ def audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
             violations.append(
                 "focused Numbers comment-storage codec reply rewrite is missing "
                 f"{label}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
+def _numbers_table_cell_comment_reply_mutation_owner_present(root: Path) -> bool:
+    """Return whether Wave93 reply mutation is present in production source."""
+
+    source_paths = [
+        root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE,
+        root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE,
+        root / NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0],
+    ]
+    owner_helper_root = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_HELPER_ROOT
+    if owner_helper_root.is_dir():
+        source_paths.extend(owner_helper_root.glob("comments*.rs"))
+    for path in source_paths:
+        if not path.is_file():
+            continue
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        if NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ACTIVATION.search(
+            _mask_rust_non_code(production_source)
+        ) is not None:
+            return True
+    return False
+
+
+def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the Wave93 selector-first reply mutation boundary.
+
+    Wave91's plural read projection is intentionally independent from this
+    ratchet.  Once a production mutation symbol appears, this check requires
+    the complete semantic/transaction surface, a private owner, strict
+    prepared codec usage, package-wide ownership and metadata proofs, and the
+    two fuzz inventories.  All checks are source-only and cfg(test)-items are
+    masked before activation or leak inspection.
+    """
+
+    if not _numbers_table_cell_comment_reply_mutation_owner_present(root):
+        return []
+
+    violations: list[str] = []
+
+    def location(path: Path, line_number: int) -> str:
+        return f"{path.relative_to(root)}:{line_number}"
+
+    def read(path: Path) -> str:
+        return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+    def production(path: Path) -> str:
+        return _mask_rust_cfg_test_items(read(path))
+
+    def code(path: Path) -> str:
+        return _mask_rust_non_code(production(path))
+
+    semantic_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+    semantic_source = production(semantic_path)
+    semantic_code = _mask_rust_non_code(semantic_source)
+    if not semantic_path.is_file():
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing "
+            f"semantic cell::comment source: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE}"
+        )
+    if re.search(r"\bpub\s+mod\s+transaction\b", semantic_code) is None:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing "
+            "cell::comment::transaction module: "
+            f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE}"
+        )
+    cell_mod_path = root / NUMBERS_SOURCE_ROOT / "cell" / "mod.rs"
+    if re.search(r"\bpub\s+mod\s+comment\b", code(cell_mod_path)) is None:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing "
+            f"cell::comment export: {cell_mod_path.relative_to(root)}"
+        )
+    transaction_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TRANSACTION_SOURCE
+    transaction_source = production(transaction_path)
+    transaction_code = _mask_rust_non_code(transaction_source)
+    if not transaction_path.is_file() and re.search(
+        r"\bpub\s+mod\s+transaction\s*\{", semantic_code
+    ) is None:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing "
+            f"transaction source: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TRANSACTION_SOURCE}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+    owner_paths: set[Path] = set()
+    for candidate in (
+        owner_path,
+        root / NUMBERS_SOURCE_ROOT / "package" / "table_cell_comment_reply.rs",
+    ):
+        if candidate.is_file():
+            owner_paths.add(candidate)
+    owner_parent = owner_path.parent
+    if owner_parent.is_dir():
+        owner_paths.update(
+            path
+            for path in owner_parent.glob("comment*.rs")
+            if path.is_file()
+        )
+        owner_paths.update(
+            path
+            for path in owner_parent.glob("table_cell_comment_reply*.rs")
+            if path.is_file()
+        )
+    helper_root = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        owner_paths.update(
+            path for path in helper_root.glob("comments_reply*.rs") if path.is_file()
+        )
+    owner_sources = {
+        path: production(path) for path in sorted(owner_paths) if path.is_file()
+    }
+    owner_graph_source = "\n".join(owner_sources.values())
+    owner_graph_code = _mask_rust_non_code(owner_graph_source)
+    package_path = root / NUMBERS_SOURCE_ROOT / "package.rs"
+    if re.search(r"\b(?:pub\s*\([^)]*\)\s*)?mod\s+comments\b", code(package_path)) is None:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing private "
+            f"package::comments owner module: {package_path.relative_to(root)}"
+        )
+    if not owner_paths:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing private "
+            f"owner source: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+        )
+
+    semantic_exports = _rust_canonical_exports(
+        semantic_source,
+        frozenset({"CommentReply"}),
+    )
+    if "CommentReply" not in semantic_exports:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing canonical "
+            f"cell::comment CommentReply: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        transaction_source or semantic_source,
+        frozenset(NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES[1:]),
+    )
+    for name in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES:
+        if name == "CommentReplyIndex":
+            exports = _rust_canonical_exports(
+                semantic_source + "\n" + transaction_source,
+                frozenset({name}),
+            )
+        else:
+            exports = transaction_exports
+        if name not in exports:
+            violations.append(
+                "focused Numbers comment-reply mutation public API is missing "
+                f"canonical transaction type {name}: "
+                f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TRANSACTION_SOURCE}"
+            )
+
+    lib_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+    lib_source = production(lib_path)
+    lib_code = _mask_rust_non_code(lib_source)
+    if re.search(r"\bpub\s+mod\s+cell\b", lib_code) is None:
+        violations.append(
+            "focused Numbers comment-reply mutation public API is missing root cell module: "
+            f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]}"
+        )
+    root_exports = _rust_canonical_exports(
+        lib_source, frozenset(NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES)
+    )
+    for alias in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES:
+        if alias not in root_exports:
+            violations.append(
+                "focused Numbers comment-reply mutation public API is missing named root alias "
+                f"{alias}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]}"
+            )
+
+    method_records: dict[str, tuple[str, Path, int]] = {}
+    for path, source in owner_sources.items():
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            source, "Package"
+        ):
+            method_records.setdefault(name, (declaration, path, line_number))
+    method_result_names = {
+        "table_cell_comment_reply": ("CommentReply",),
+        "table_cell_comment_reply_a1": ("CommentReply",),
+        "edit_table_cell_comment_replies": ("CommentReplyEdit", "Edit"),
+        "edit_table_cell_comment_replies_a1": ("CommentReplyEdit", "Edit"),
+        "set_table_cell_comment_reply": ("CommentReplyCommit", "Commit"),
+        "set_table_cell_comment_reply_a1": ("CommentReplyCommit", "Commit"),
+        "remove_table_cell_comment_reply": ("CommentReplyCommit", "Commit"),
+        "remove_table_cell_comment_reply_a1": ("CommentReplyCommit", "Commit"),
+        "add_table_cell_comment_reply": ("CommentReplyCommit", "Commit"),
+        "add_table_cell_comment_reply_a1": ("CommentReplyCommit", "Commit"),
+        "apply_table_cell_comment_reply": ("CommentReplyCommit", "Commit"),
+    }
+    for method in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS:
+        record = method_records.get(method)
+        if record is None:
+            violations.append(
+                "focused Numbers comment-reply mutation public API is missing "
+                f"Package method {method}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+            )
+            continue
+        declaration, path, line_number = record
+        for selector in ("SheetSelector", "TableSelector"):
+            if re.search(rf"\b{re.escape(selector)}\b", declaration) is None and method != "apply_table_cell_comment_reply":
+                violations.append(
+                    "focused Numbers comment-reply mutation Package method "
+                    f"{method} must accept selector-first {selector}: {location(path, line_number)}"
+                )
+        if (
+            method != "apply_table_cell_comment_reply"
+            and not method.endswith("_a1")
+            and re.search(r"\bCellPosition\b", declaration) is None
+        ):
+            violations.append(
+                "focused Numbers comment-reply mutation Package method "
+                f"{method} must accept selector-first CellPosition: {location(path, line_number)}"
+            )
+        if method in {"table_cell_comment_reply", "set_table_cell_comment_reply", "remove_table_cell_comment_reply"} and re.search(
+            r"\bCommentReplyIndex\b", declaration
+        ) is None:
+            violations.append(
+                "focused Numbers comment-reply mutation Package method "
+                f"{method} must accept CommentReplyIndex: {location(path, line_number)}"
+            )
+        if method.endswith("_a1"):
+            if NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_A1_ADDRESS.search(declaration) is None:
+                violations.append(
+                    "focused Numbers comment-reply mutation A1 method "
+                    f"{method} must accept an A1 address: {location(path, line_number)}"
+                )
+            body = _rust_any_function_body(owner_sources[path], method)
+            if body is None or re.search(r"from_a1", _mask_rust_non_code(body)) is None:
+                violations.append(
+                    "focused Numbers comment-reply mutation A1 method "
+                    f"{method} must construct CellPosition from A1: {location(path, line_number)}"
+                )
+        if not any(re.search(rf"\b{re.escape(name)}\b", declaration) for name in method_result_names[method]):
+            violations.append(
+                "focused Numbers comment-reply mutation Package method "
+                f"{method} must expose its typed transaction result: {location(path, line_number)}"
+            )
+
+    edit_methods: dict[str, tuple[str, Path, int]] = {}
+    for path, source in owner_sources.items():
+        for impl_name in ("Edit", "CommentReplyEdit"):
+            for name, declaration, line_number in _rust_public_methods_in_impl(
+                source, impl_name
+            ):
+                edit_methods.setdefault(name, (declaration, path, line_number))
+    for name in ("set", "remove", "commit"):
+        if name not in edit_methods:
+            violations.append(
+                "focused Numbers comment-reply mutation Edit is missing "
+                f"{name} operation: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+            )
+
+    index_methods: dict[str, tuple[str, Path, int]] = {}
+    for path, source in {
+        **owner_sources,
+        semantic_path: semantic_source,
+        transaction_path: transaction_source,
+    }.items():
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            source, "CommentReplyIndex"
+        ):
+            index_methods.setdefault(name, (declaration, path, line_number))
+    for name in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_INDEX_METHODS:
+        if name not in index_methods:
+            violations.append(
+                "focused Numbers comment-reply mutation CommentReplyIndex is missing "
+                f"{name} constructor/accessor: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE}"
+            )
+        elif name == "try_from_usize" and re.search(
+            r"->[ 	\r\n]*(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ 	\r\n]*::[ 	\r\n]*)*"
+            r"(?:r#)?Result[ 	\r\n]*<",
+            index_methods[name][0],
+        ) is None:
+            declaration, path, line_number = index_methods[name]
+            violations.append(
+                "focused Numbers comment-reply mutation CommentReplyIndex "
+                f"{name} must return Result: {location(path, line_number)}"
+            )
+
+    # Scan the public semantic/transaction/owner/export surface for native
+    # vocabulary, raw bytes, flat aliases, and unredacted text-bearing Debug.
+    dedicated_paths = set(owner_sources)
+    dedicated_paths.update(
+        path
+        for path in (semantic_path, transaction_path)
+        if path.is_file()
+    )
+    canonical_public_names = set(NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES)
+    canonical_public_names.add("CommentReply")
+
+    def public_type_surface(source: str, name: str) -> tuple[str, int] | None:
+        masked = _mask_rust_non_code(source)
+        declaration = re.search(
+            rf"(?m)^[ \t]*pub[ \t]+(?:struct|enum|type|union)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b",
+            masked,
+        )
+        if declaration is None:
+            return None
+        opening = masked.find("{", declaration.end())
+        semicolon = masked.find(";", declaration.end())
+        if opening < 0 or (semicolon >= 0 and semicolon < opening):
+            end = semicolon + 1 if semicolon >= 0 else len(masked)
+            return masked[declaration.start() : end], source.count("\n", 0, declaration.start()) + 1
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(masked) and depth:
+            if masked[cursor] == "{":
+                depth += 1
+            elif masked[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        return masked[declaration.start() : cursor], source.count("\n", 0, declaration.start()) + 1
+
+    def scan_surface(
+        source: str,
+        path: Path,
+        surface: str,
+        line_number: int,
+        *,
+        allow_usize: bool = False,
+    ) -> None:
+        for match in RUST_IDENTIFIER.finditer(surface):
+            identifier = match.group(1)
+            if allow_usize and identifier == "usize":
+                continue
+            reason = _numbers_table_cell_comment_reply_mutation_public_leak(identifier)
+            if reason is not None:
+                violations.append(
+                    "focused Numbers comment-reply mutation public API exposes "
+                    f"{reason} {identifier}: {location(path, line_number + surface.count(chr(10), 0, match.start(1)))}"
+                )
+        for match in RUST_BYTE_SLICE.finditer(surface):
+            byte_slice = re.sub(r"\s+", "", match.group(0))
+            violations.append(
+                "focused Numbers comment-reply mutation public API exposes raw byte slice "
+                f"{byte_slice}: "
+                f"{location(path, line_number + surface.count(chr(10), 0, match.start()))}"
+            )
+
+    for path in sorted(dedicated_paths):
+        source = production(path)
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration and any(
+                name in declaration
+                for name in ("comment", "CommentReply", "CommentReplyEdit")
+            ):
+                violations.append(
+                    "focused Numbers comment-reply mutation public API retains "
+                    f"comment transaction glob: {location(path, line_number)}"
+                )
+            if identifiers[:2] == ["pub", "type"]:
+                alias = identifiers[2] if len(identifiers) > 2 else "unknown"
+                targets = set(identifiers[3:])
+                if alias not in canonical_public_names and targets & (
+                    canonical_public_names | {"TableCellCommentReply"}
+                ):
+                    violations.append(
+                        "focused Numbers comment-reply mutation public API retains flat alias "
+                        f"{alias}: {location(path, line_number)}"
+                    )
+                if path == lib_path and alias in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES:
+                    violations.append(
+                        "focused Numbers comment-reply mutation root aliases must be named "
+                        f"re-exports, not type aliases: {location(path, line_number)}"
+                    )
+        for name in canonical_public_names:
+            surface = public_type_surface(source, name)
+            if surface is None:
+                continue
+            # Platform-sized counters retained behind a canonical semantic
+            # value are not raw-ID/coordinate method leaks. Public Package
+            # and index method declarations are scanned separately below,
+            # where `usize` remains forbidden except for the checked
+            # `try_from_usize` constructor.
+            scan_surface(surface[0], path, surface[0], surface[1], allow_usize=True)
+            if re.search(
+                rf"(?m)^[ \t]*#\s*\[\s*derive\s*\([^]]*\bDebug\b[^]]*\)\s*\]\s*\n"
+                rf"[ \t]*pub[ \t]+(?:struct|enum|type|union)[ \t]+(?:r#)?{re.escape(name)}\b",
+                source,
+            ) is not None and NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_DEBUG_SENSITIVE.search(
+                surface[0]
+            ) is not None:
+                violations.append(
+                    "focused Numbers comment-reply mutation text-bearing type must not derive "
+                    f"Debug: {location(path, surface[1])}"
+                )
+
+    # The crate root and package module contain unrelated public APIs with
+    # native implementation vocabulary.  Inspect only declarations that
+    # explicitly participate in this comment-reply export, rather than
+    # treating those legacy surfaces as part of the new facade.
+    for path, source in ((lib_path, lib_source),):
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            relevant = any(
+                alias in identifiers
+                for alias in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES
+            ) or (
+                identifiers[:2] in (["pub", "use"], ["pub", "type"])
+                and any(
+                    name in declaration
+                    for name in ("comment", "CommentReply", "TableCellCommentReply")
+                )
+            )
+            if not relevant:
+                continue
+            scan_surface(declaration, path, declaration, line_number)
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration and any(
+                name in declaration
+                for name in ("comment", "CommentReply", "CommentReplyEdit")
+            ):
+                violations.append(
+                    "focused Numbers comment-reply mutation public API retains "
+                    f"comment transaction glob: {location(path, line_number)}"
+                )
+            if identifiers[:2] == ["pub", "type"]:
+                alias = identifiers[2] if len(identifiers) > 2 else "unknown"
+                if alias in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES:
+                    violations.append(
+                        "focused Numbers comment-reply mutation root aliases must be named "
+                        f"re-exports, not type aliases: {location(path, line_number)}"
+                    )
+
+    for path, source in owner_sources.items():
+        for name, declaration, line_number in _rust_public_methods_in_impl(source, "Package"):
+            scan_surface(declaration, path, declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            source, "CommentReplyIndex"
+        ):
+            scan_surface(
+                declaration,
+                path,
+                declaration,
+                line_number,
+                allow_usize=name == "try_from_usize",
+            )
+    for source_path in (semantic_path, transaction_path):
+        source = semantic_source if source_path == semantic_path else transaction_source
+        if not source:
+            continue
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            source, "CommentReplyIndex"
+        ):
+            scan_surface(
+                declaration,
+                source_path,
+                declaration,
+                line_number,
+                allow_usize=name == "try_from_usize",
+            )
+
+    for label, marker in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_graph_code) is None:
+            violations.append(
+                "focused Numbers comment-reply mutation owner is missing "
+                f"{label} transaction marker: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+            )
+
+    codec_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_SOURCE
+    codec_source = production(codec_path)
+    codec_code = _mask_rust_non_code(codec_source)
+    if not codec_path.is_file():
+        violations.append(
+            "focused Numbers comment-reply mutation owner is missing strict codec source: "
+            f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_SOURCE}"
+        )
+    else:
+        for api in NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub(?:\([^()]*\))?[ \t]+)?(?:fn|struct|enum|type|trait)"
+                rf"[ \t]+{re.escape(api)}\b",
+                codec_code,
+            ) is None:
+                violations.append(
+                    "focused Numbers comment-reply mutation strict codec is missing API "
+                    f"{api}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_SOURCE}"
+                )
+        if re.search(r"\bprepare_comment_storage_reply_rewrite\s*\(", owner_graph_code) is None:
+            violations.append(
+                "focused Numbers comment-reply mutation owner does not call the prepared "
+                f"codec: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+            )
+
+    fuzz_contracts = (
+        (
+            NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE,
+            "codec",
+            ("prepare_comment_storage_reply_rewrite", "execute", "unknown", "inverse"),
+        ),
+        (
+            NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE,
+            "package",
+            ("add_table_cell_comment_reply", "set_table_cell_comment_reply", "remove_table_cell_comment_reply", "CommentReplyIndex", "inverse", "conflict", "atomic", "limit"),
+        ),
+    )
+    for fuzz_path, kind, markers in fuzz_contracts:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused Numbers comment-reply mutation boundary is missing "
+                f"{kind} fuzz target: {fuzz_path}"
+            )
+        else:
+            fuzz_source = _mask_rust_non_code(absolute.read_text(encoding="utf-8"))
+            if "fuzz_target!" not in fuzz_source:
+                violations.append(
+                    "focused Numbers comment-reply mutation "
+                    f"{kind} fuzz target is missing fuzz_target! harness: {fuzz_path}"
+                )
+            for marker in markers:
+                if marker not in fuzz_source.lower() and marker.lower() not in fuzz_source.lower():
+                    violations.append(
+                        "focused Numbers comment-reply mutation "
+                        f"{kind} fuzz target is missing {marker}: {fuzz_path}"
+                    )
+    for corpus, kind in (
+        (NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_CORPUS, "codec"),
+        (NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS, "package"),
+    ):
+        absolute = root / corpus
+        if not absolute.is_dir():
+            violations.append(
+                "focused Numbers comment-reply mutation boundary is missing "
+                f"{kind} fuzz corpus: {corpus}"
+            )
+        elif not any(path.is_file() for path in absolute.rglob("*")):
+            violations.append(
+                "focused Numbers comment-reply mutation "
+                f"{kind} fuzz corpus is empty: {corpus}"
+            )
+
+    debug_source = owner_graph_source + "\n" + semantic_source
+    debug_code = _mask_rust_non_code(debug_source)
+    debug_match = NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_IMPL.search(debug_code)
+    if debug_match is None:
+        violations.append(
+            "focused Numbers comment-reply mutation CommentReply is missing custom "
+            f"Debug redaction: {NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+        )
+    else:
+        opening = debug_code.find("{", debug_match.end())
+        cursor = opening + 1 if opening >= 0 else -1
+        depth = 1 if opening >= 0 else 0
+        while cursor >= 0 and cursor < len(debug_code) and depth:
+            if debug_code[cursor] == "{":
+                depth += 1
+            elif debug_code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if cursor < 0 or depth:
+            cursor = len(debug_code)
+        debug_region = debug_source[debug_match.start() : cursor]
+        debug_region_code = debug_code[debug_match.start() : cursor]
+        if NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_REDACTION.search(
+            debug_region
+        ) is None:
+            violations.append(
+                "focused Numbers comment-reply mutation Debug must redact authored content: "
+                f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
+            )
+        elif re.search(
+            r"\bself\s*\.\s*(?:text|content|body|message|author)\b",
+            debug_region_code,
+        ) is not None:
+            violations.append(
+                "focused Numbers comment-reply mutation Debug exposes authored content: "
+                f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE}"
             )
 
     return sorted(set(violations))
@@ -27376,6 +28356,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_comment_clear_metadata_prerequisite_source_topology()
         + audit_numbers_table_cell_comment_reply_facade_source_topology()
         + audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology()
+        + audit_numbers_table_cell_comment_reply_mutation_facade_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
@@ -27407,6 +28388,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_mutation_source_topology()
         + audit_iwa_numbers_cell_comment_delegation_source_topology()
         + audit_iwa_numbers_cell_comment_clear_delegation_source_topology()
+        + audit_iwa_numbers_cell_comment_reply_mutation_source_topology()
         + audit_iwa_numbers_table_lock_source_topology()
         + audit_numbers_table_lock_facade_source_topology()
         + audit_iwa_numbers_document_source_topology()

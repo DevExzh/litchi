@@ -25,3 +25,6 @@ target
 !/corpus/keynote_slide_movie_geometry/*
 artifacts
 coverage
+!/corpus/numbers_table_cell_comment_reply/
+/corpus/numbers_table_cell_comment_reply/*
+!/corpus/numbers_table_cell_comment_reply/*.seed

@@ -8,6 +8,16 @@
 pub mod comments;
 #[allow(
     dead_code,
+    reason = "Comment reply mutations reuse the strict metadata registry and prepared transitions as the owner lands."
+)]
+pub(crate) mod comments_metadata;
+#[allow(
+    dead_code,
+    reason = "The private native reply transition is reached through package::comments."
+)]
+pub(crate) mod comments_reply_native;
+#[allow(
+    dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
 )]
 mod extractor;

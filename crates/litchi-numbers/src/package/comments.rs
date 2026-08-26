@@ -41,9 +41,17 @@ use crate::{SheetSelector, TableSelector, table::CellPosition};
 
 use super::Package;
 
+#[path = "comments_reply.rs"]
+mod comments_reply;
+pub use comments_reply::{
+    CommentReplyCommit, CommentReplyDiagnostics, CommentReplyEdit, CommentReplyError,
+    CommentReplyIndex, CommentReplyLimitKind, CommentReplyPatch, CommentReplyPath,
+};
+
 const TILE_MESSAGE_TYPE: u32 = 6_002;
 const TABLE_DATA_LIST_MESSAGE_TYPES: [u32; 2] = [6_005, 6_201];
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
 const DEFAULT_TILE_SIZE: usize = 256;
 const COMMENT_MAX_NESTING: u32 = 64;
 const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
@@ -552,10 +560,12 @@ struct CommentStorageFact {
 
 #[derive(Debug, Clone, Copy)]
 struct CommentListFact {
+    component_index: usize,
     table_id: u64,
     list_type: i32,
     key: u32,
     storage_id: Option<u64>,
+    refcount: u32,
     root: bool,
 }
 
@@ -566,6 +576,7 @@ struct CommentOwnershipCensus {
     list_entries: Vec<CommentListFact>,
     table_references: Vec<u64>,
     cell_comment_keys: Vec<u32>,
+    cell_comment_owners: Vec<(usize, u32)>,
     storages: Vec<CommentStorageFact>,
     author_ids: Vec<u64>,
     reply_ids: Vec<u64>,
@@ -688,6 +699,8 @@ impl Package {
         }
 
         let census = census_comment_ownership(self, path)?;
+        validate_comment_authors(self, &census, path)?;
+        validate_reply_package_metadata(self, path)?;
         let entry = located
             .entry
             .as_ref()
@@ -713,8 +726,35 @@ impl Package {
                     .ok_or(Error::InvalidSource { path })?,
             )
             .ok_or(Error::InvalidSource { path })?;
+        let selected_key = located.comment_key.ok_or(Error::InvalidSource { path })?;
+        let selected_storage_id = entry.entry.storage_id;
+        let mut matching_lists = census.list_entries.iter().filter(|fact| {
+            fact.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                && fact.table_id == located.comment_table_id.unwrap_or(0)
+                && fact.key == selected_key
+                && fact.storage_id == Some(selected_storage_id)
+                && fact.root
+        });
+        let list = matching_lists.next().ok_or(Error::InvalidSource { path })?;
+        if matching_lists.next().is_some()
+            || usize::try_from(list.refcount).ok()
+                != Some(
+                    census
+                        .cell_comment_keys
+                        .iter()
+                        .filter(|key| **key == selected_key)
+                        .count(),
+                )
+        {
+            return Err(Error::InvalidSource { path });
+        }
         if root.reply_ids != located.reply_ids {
             return Err(Error::InvalidSource { path });
+        }
+        prove_archive_reference_ownership(self, root.object_id, entry.route, path)?;
+        let root_route = located.storage.ok_or(Error::InvalidSource { path })?;
+        for reply_id in &located.reply_ids {
+            prove_archive_reference_ownership(self, *reply_id, root_route, path)?;
         }
         if located.reply_ids.is_empty() {
             return Ok(Box::default());
@@ -919,6 +959,62 @@ impl Package {
             ),
         })
     }
+}
+
+fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), Error> {
+    let metadata = super::comments_metadata::strict_source(source)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let payload_len = metadata.payload().len();
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    if payload_len == 0 || payload_len > maximum_wire {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: payload_len,
+            maximum: maximum_wire,
+            path,
+        });
+    }
+    let options = MetadataRewriteOptions::new(
+        payload_len,
+        payload_len.saturating_mul(2).max(1),
+        payload_len.saturating_mul(16).max(1),
+        payload_len.saturating_mul(64).max(1),
+        COMMENT_MAX_NESTING,
+        payload_len.saturating_mul(2).max(1),
+        payload_len.saturating_mul(2).max(1),
+        1,
+    );
+    super::comments_metadata::inspect(source, options)
+        .map_err(|_| Error::InvalidSource { path })?;
+    Ok(())
+}
+
+fn validate_comment_authors(
+    source: &Package,
+    census: &CommentOwnershipCensus,
+    path: Path,
+) -> Result<(), Error> {
+    for identifier in &census.author_ids {
+        let resolved = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, *identifier)
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        if resolved.messages.len() != 1
+            || resolved.messages[0].type_ != ANNOTATION_AUTHOR_MESSAGE_TYPE
+        {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    Ok(())
 }
 
 fn resolve_comment<'sheet, 'table>(
@@ -2819,7 +2915,7 @@ fn scan_global_comment_cells(
     storage: DecodedTableStorage<'_>,
     path: Path,
     scan_work: &mut usize,
-) -> Result<Vec<u32>, Error> {
+) -> Result<Vec<(usize, u32)>, Error> {
     let tile_size = usize::try_from(
         storage
             .tile_storage
@@ -2957,7 +3053,7 @@ fn scan_global_comment_cells(
                     amount: comment_keys.len().saturating_add(1),
                     path,
                 })?;
-                comment_keys.push(comment_key);
+                comment_keys.push((tile_resolved.component_index, comment_key));
             }
         }
     }
@@ -3244,7 +3340,11 @@ fn prove_archive_reference_ownership(
             }
         }
     }
-    if census.occurrences != 1 || census.unexpected {
+    // ArchiveInfo may encode one logical edge in both the aggregate and its
+    // exact FieldInfo path. The message-metadata validator proves those two
+    // views agree; this package-wide census only needs at least one occurrence
+    // and no occurrence owned by another object/message route.
+    if census.occurrences == 0 || census.unexpected {
         return Err(Error::UnsupportedDependency { path });
     }
     Ok(())
@@ -3301,7 +3401,15 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                             }
                             push_nonzero(&mut census.comment_list_ids, object_id, path)?;
                         }
-                        append_list_facts(&mut census, object_id, list_type, &probe, true, path)?;
+                        append_list_facts(
+                            &mut census,
+                            component_index,
+                            object_id,
+                            list_type,
+                            &probe,
+                            true,
+                            path,
+                        )?;
                         for (segment_position, (segment_id, _)) in
                             probe.segment_ids.iter().copied().enumerate()
                         {
@@ -3394,15 +3502,38 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                         )?;
                         let expected = probe.storage_ids.clone();
                         validate_comment_message_metadata(object, message_index, &expected, path)?;
-                        append_list_facts(&mut census, object_id, list_type, &probe, false, path)?;
+                        append_list_facts(
+                            &mut census,
+                            component_index,
+                            object_id,
+                            list_type,
+                            &probe,
+                            false,
+                            path,
+                        )?;
                     },
                     COMMENT_STORAGE_MESSAGE_TYPE => {
                         let details =
                             decode_comment_storage(source, message.data.as_slice(), path)?;
-                        let mut expected = details.reply_ids.clone();
+                        let mut expected = Vec::new();
+                        expected
+                            .try_reserve(
+                                details
+                                    .reply_ids
+                                    .len()
+                                    .saturating_add(usize::from(details.author_id.is_some())),
+                            )
+                            .map_err(|_| Error::Allocation {
+                                amount: details
+                                    .reply_ids
+                                    .len()
+                                    .saturating_add(usize::from(details.author_id.is_some())),
+                                path,
+                            })?;
                         if let Some(author) = details.author_id {
                             expected.push(author);
                         }
+                        expected.extend(details.reply_ids.iter().copied());
                         validate_comment_message_metadata(object, message_index, &expected, path)?;
                         let fact = CommentStorageFact {
                             object_id,
@@ -3462,6 +3593,7 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
 
 fn append_list_facts(
     census: &mut CommentOwnershipCensus,
+    component_index: usize,
     table_id: u64,
     list_type: i32,
     probe: &ListProbe,
@@ -3492,10 +3624,12 @@ fn append_list_facts(
             .try_reserve(1)
             .map_err(|_| Error::Allocation { amount: 1, path })?;
         census.list_entries.push(CommentListFact {
+            component_index,
             table_id,
             list_type,
             key: entry.key,
             storage_id: entry.storage_id,
+            refcount: entry.refcount,
             root,
         });
     }
@@ -3525,6 +3659,7 @@ fn census_alias_checks(
         census.list_entries.len(),
         census.table_references.len(),
         census.cell_comment_keys.len(),
+        census.cell_comment_owners.len(),
         census.storages.len(),
         census.author_ids.len(),
         census.reply_ids.len(),
@@ -3761,6 +3896,9 @@ fn validate_comment_message_metadata(
     expected: &[u64],
     path: Path,
 ) -> Result<(), Error> {
+    if object.archive_info.message_infos.len() != object.messages.len() {
+        return Err(Error::InvalidSource { path });
+    }
     let info = object
         .archive_info
         .message_infos
@@ -3802,16 +3940,46 @@ fn validate_comment_message_metadata(
             return Err(Error::InvalidSource { path });
         }
     }
-    for field in &info.field_infos {
+    if !expected.is_empty() && info.object_references != expected {
+        return Err(Error::InvalidSource { path });
+    }
+    if !expected.is_empty() && info.field_infos.is_empty() {
+        return Err(Error::InvalidSource { path });
+    }
+    let mut field_reference_index = 0usize;
+    for (field_index, field) in info.field_infos.iter().enumerate() {
+        if !expected.is_empty()
+            && info.field_infos[..field_index]
+                .iter()
+                .any(|prior| prior.path == field.path)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        if !expected.is_empty()
+            && !field.object_references.is_empty()
+            && (field.path.path.is_empty()
+                || field.r#type != Some(litchi_iwa_core::FieldType::ObjectReference))
+        {
+            return Err(Error::InvalidSource { path });
+        }
         for reference in &field.object_references {
             if *reference == 0
                 || (!expected.is_empty() && !expected.contains(reference))
                 || (!info.object_references.is_empty()
                     && !info.object_references.contains(reference))
+                || (!expected.is_empty() && expected.get(field_reference_index) != Some(reference))
             {
                 return Err(Error::InvalidSource { path });
             }
+            if !expected.is_empty() {
+                field_reference_index = field_reference_index
+                    .checked_add(1)
+                    .ok_or(Error::InvalidSource { path })?;
+            }
         }
+    }
+    if !expected.is_empty() && field_reference_index != expected.len() {
+        return Err(Error::InvalidSource { path });
     }
     Ok(())
 }
@@ -3919,14 +4087,25 @@ fn census_models_and_cells(
                 if comment_table.is_none() && !keys.is_empty() {
                     return Err(Error::InvalidSource { path });
                 }
+                let key_count = keys.len();
                 census
                     .cell_comment_keys
-                    .try_reserve(keys.len())
+                    .try_reserve(key_count)
                     .map_err(|_| Error::Allocation {
-                        amount: keys.len(),
+                        amount: key_count,
                         path,
                     })?;
-                census.cell_comment_keys.extend(keys);
+                census
+                    .cell_comment_owners
+                    .try_reserve(key_count)
+                    .map_err(|_| Error::Allocation {
+                        amount: key_count,
+                        path,
+                    })?;
+                census
+                    .cell_comment_keys
+                    .extend(keys.iter().map(|(_, key)| *key));
+                census.cell_comment_owners.extend(keys);
             }
         }
     }

@@ -8,6 +8,7 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
 
 const TABLE_ROWS: usize = 3;
 const TABLE_COLUMNS: usize = 3;
@@ -39,12 +40,16 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         COMMENT_COLUMN,
         "Numbers root comment",
     )?;
-    editor.add_cell_comment_reply(
-        table_id,
-        COMMENT_ROW,
-        COMMENT_COLUMN,
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package.add_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::try_from_usize(COMMENT_ROW, COMMENT_COLUMN)?,
         "Numbers direct reply",
     )?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    editor = litchi_iwa::numbers::NumbersEditor::from_bytes(&bytes)?;
     editor.save(output)?;
     Ok(())
 }
