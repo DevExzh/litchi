@@ -196,6 +196,44 @@ def add_numbers_table_cell_comment_reply_scaffold(
     )
 
 
+def add_numbers_table_cell_comment_reply_codec_rewrite_scaffold(root: Path) -> None:
+    codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        """/// Strict canonical known-field/reference validation rejects duplicate,
+/// wrong-wire, and noncanonical values.
+/// Unknown/raw fields, source_order, raw framing, and balanced unknown groups
+/// remain preserved.
+/// Resource/preflight accounting covers max_input, max_output, max_fields,
+/// max_work, max_depth, max_references, max_text, try_reserve, scratch,
+/// retained bytes, and allocations.
+pub struct CommentStorageReplyRewrite;
+pub struct PreparedCommentStorageReplyRewrite;
+pub struct RewriteExecutionRequirements;
+pub struct RewriteExecutionLimits;
+pub fn prepare_comment_storage_reply_rewrite() -> PreparedCommentStorageReplyRewrite {
+    todo!()
+}
+impl PreparedCommentStorageReplyRewrite {
+    pub fn prepare_report(&self) {}
+    pub fn execution_requirements(&self) -> RewriteExecutionRequirements { todo!() }
+    pub fn execute(&self, _limits: RewriteExecutionLimits) {}
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn comment_storage_reply_rewrite_round_trip_preserves_unknown_raw_and_limits() {
+        let prepared = prepare_comment_storage_reply_rewrite();
+        prepared.prepare_report();
+        prepared.execution_requirements();
+        prepared.execute(RewriteExecutionLimits);
+    }
+}
+""",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -23472,6 +23510,139 @@ fn rewrite_movie_title_operation(
                 any("missing Package method" in item for item in violations),
                 violations,
             )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_is_dormant_until_production_symbol(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "#[cfg(test)]\n"
+                "pub struct CommentStorageReplyRewrite;\n"
+                "#[cfg(test)]\n"
+                "fn prepare_comment_storage_reply_rewrite() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_accepts_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_codec_rewrite_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_requires_apis_markers_and_tests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_codec_rewrite_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+
+            for api in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_APIS:
+                with self.subTest(api=api):
+                    modified = complete
+                    if api == "CommentStorageReplyRewrite":
+                        modified = modified.replace(
+                            "pub struct CommentStorageReplyRewrite;",
+                            "fn activate() { let _ = CommentStorageReplyRewrite; }",
+                        )
+                    else:
+                        modified = modified.replace(api, "MissingReplyRewriteApi")
+                    codec.write_text(modified, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing strict API {api}" in item for item in violations),
+                        violations,
+                    )
+
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_MARKERS.items():
+                with self.subTest(marker=label):
+                    codec.write_text(marker.sub("", complete), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_TEST_MARKERS.items():
+                with self.subTest(test_marker=label):
+                    modified = complete
+                    if label == "direct cfg(test) coverage":
+                        modified = modified.replace("    #[test]\n", "")
+                    else:
+                        modified = modified.replace(
+                            "        let prepared = prepare_comment_storage_reply_rewrite();\n"
+                            "        prepared.prepare_report();\n"
+                            "        prepared.execution_requirements();\n"
+                            "        prepared.execute(RewriteExecutionLimits);\n",
+                            "",
+                        )
+                    codec.write_text(modified, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_masks_cfg_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "fn activates_reply_rewrite() { let _ = CommentStorageReplyRewrite; }\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    pub struct CommentStorageReplyRewrite;\n"
+                "    pub struct PreparedCommentStorageReplyRewrite;\n"
+                "    pub struct RewriteExecutionRequirements;\n"
+                "    pub struct RewriteExecutionLimits;\n"
+                "    pub fn prepare_comment_storage_reply_rewrite() {}\n"
+                "    #[test]\n"
+                "    fn reply_rewrite() { prepare_report(); execution_requirements(); execute(); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                root
+            )
+            self.assertTrue(any("missing strict API" in item for item in violations), violations)
+            self.assertTrue(
+                any("missing strict known-field/reference validation marker" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(any("missing direct cfg(test) coverage" in item for item in violations), violations)
+
+    def test_numbers_comment_storage_reply_rewrite_codec_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology()",
+            main_source,
+        )
 
     def test_numbers_table_cell_comment_reply_projection_accepts_positive_contract(
         self,

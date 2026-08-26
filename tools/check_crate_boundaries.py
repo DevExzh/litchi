@@ -4299,6 +4299,43 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE = NUMBERS_COMMENT_SOURCE
 NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/comment_storage_codec.rs"
 )
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_ACTIVATION = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?CommentStorageReplyRewrite(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_APIS = (
+    "CommentStorageReplyRewrite",
+    "prepare_comment_storage_reply_rewrite",
+    "PreparedCommentStorageReplyRewrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "prepare_report",
+    "execution_requirements",
+    "execute",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_MARKERS = {
+    "strict known-field/reference validation": re.compile(
+        r"(?i)\b(?:canonical|duplicate|wrong[_ -]?wire|noncanonical|strict)\b"
+    ),
+    "unknown/raw preservation": re.compile(
+        r"(?i)\b(?:unknown[_ -]?(?:field|scalar|group)|raw[_ -]?"
+        r"(?:field|byte|framing|wire)|source[_ -]?order|preserv(?:e|ation)|"
+        r"balanced[_ -]?group)\b"
+    ),
+    "resource/preflight accounting": re.compile(
+        r"(?i)\b(?:max[_ -]?(?:input|output|fields|work|depth|references|text)|"
+        r"try[_ -]?reserve|preflight|scratch|retained|alloc(?:ation|ations)?|"
+        r"resource)\b"
+    ),
+}
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_TEST_MARKERS = {
+    "direct cfg(test) coverage": re.compile(r"#[ \t\r\n]*\[[ \t]*test\b"),
+    "prepared replay calls": re.compile(
+        r"(?=[\s\S]*\bprepare_comment_storage_reply_rewrite\b)"
+        r"(?=[\s\S]*\bprepare_report\b)"
+        r"(?=[\s\S]*\bexecution_requirements\b)"
+        r"(?=[\s\S]*\bexecute\b)"
+    ),
+}
 NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES = (
     Path("crates/litchi-numbers/src/lib.rs"),
     NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE,
@@ -20949,6 +20986,77 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Ratchet the prepared reply-rewrite codec independently of the owner.
+
+    The Wave91 facade intentionally remains a read-only projection.  This
+    separate ratchet is dormant until a production (non-``cfg(test)``)
+    ``CommentStorageReplyRewrite`` symbol appears in the strict codec.  Once
+    that symbol lands, the codec must expose the complete prepared
+    prepare/report/execute contract, document strict raw preservation and
+    bounded resource accounting, and carry direct unit coverage.  It does not
+    activate or require a Numbers package mutation owner, host migration, or
+    fuzz target.
+    """
+
+    codec_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+    if not codec_path.is_file():
+        return []
+
+    raw_source = codec_path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(raw_source)
+    production_code = _mask_rust_non_code(production_source)
+    if (
+        NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_ACTIVATION.search(
+            production_code
+        )
+        is None
+    ):
+        return []
+
+    violations: list[str] = []
+    for api in NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_APIS:
+        if re.search(
+            rf"\b(?:pub(?:\([^()]*\))?[ \t]+)?"
+            rf"(?:fn|struct|enum|type|trait)[ \t]+{re.escape(api)}\b",
+            production_code,
+        ) is None:
+            violations.append(
+                "focused Numbers comment-storage codec reply rewrite is missing "
+                f"strict API {api}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE}"
+            )
+
+    for label, marker in (
+        NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_MARKERS.items()
+    ):
+        if marker.search(production_source) is None:
+            violations.append(
+                "focused Numbers comment-storage codec reply rewrite is missing "
+                f"{label} marker: {NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE}"
+            )
+
+    # Recover only the text masked by the item-level cfg(test) scanner.  This
+    # lets the direct-coverage ratchet inspect unit tests without allowing a
+    # test-only symbol or decoy to activate the production contract above.
+    gated_source = "".join(
+        character if character != masked else " "
+        for character, masked in zip(raw_source, production_source)
+    )
+    test_code = _mask_rust_non_code(gated_source)
+    for label, marker in (
+        NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_TEST_MARKERS.items()
+    ):
+        if marker.search(test_code) is None:
+            violations.append(
+                "focused Numbers comment-storage codec reply rewrite is missing "
+                f"{label}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_comment_clear_metadata_prerequisite_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -27267,6 +27375,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_package_metadata_read_source_topology()
         + audit_numbers_comment_clear_metadata_prerequisite_source_topology()
         + audit_numbers_table_cell_comment_reply_facade_source_topology()
+        + audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()

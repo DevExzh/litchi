@@ -115,6 +115,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "comment_storage_reply_codec"
+path = "fuzz_targets/comment_storage_reply_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_chart_title"
 path = "fuzz_targets/keynote_chart_title.rs"
 test = false

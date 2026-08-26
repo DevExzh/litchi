@@ -770,3 +770,57 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 `cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
+
+## Numbers comment-storage direct-reply rewrite codec
+
+`comment_storage_reply_codec` drives the prepared, source-preserving
+`TSD.CommentStorageArchive` direct-reply rewrite seam. Each bounded source is
+decoded, then exercised through append, replace, and remove preparation and
+execution. Successful candidates are read back through the strict decoder;
+the target also restores the original reply sequence through the inverse-like
+operation and checks that the caller-owned source remains unchanged. A wrong
+expected reply identifier must fail before candidate publication.
+
+The harness checks `CommentStorageReplyRewrite` preparation reports and exact
+`RewriteExecutionRequirements` replay, including output bytes, fields, work,
+nesting, references, scratch, retained bytes, and allocation ceilings. For
+each successful preparation it retries every finite axis at its exact bound
+and at one below that bound, requiring the latter to fail without an output
+allocation. Malformed framing, wrong wire types, duplicate or missing reply
+references, unterminated and deeply nested groups, and unknown balanced-group
+bytes are exercised without allowing a panic or unbounded recursion.
+
+The target accepts raw inputs up to 64 KiB and keeps all decode/rewrite limits
+finite (64-level nesting and bounded fields, work, references, text, scratch,
+retained bytes, and allocations). Recipes under
+`corpus/comment_storage_reply_codec/` are hand-authored `hex:` payloads; they
+are not copied from native Numbers packages.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check comment_storage_reply_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build
+output outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-comment-storage-reply-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/comment_storage_reply_codec/*.hex "$fuzz_corpus/"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  comment_storage_reply_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
