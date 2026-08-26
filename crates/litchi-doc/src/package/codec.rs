@@ -67,9 +67,38 @@ impl<R: Read + Seek> Package<R> {
     }
 
     /// Create a package whose document reads inherit explicit finite limits.
-    pub fn from_reader_with_limits(mut reader: R, limits: Limits) -> Result<Self> {
+    pub fn from_reader_with_limits(reader: R, limits: Limits) -> Result<Self> {
+        let ole = Self::open_ole_file_with_limits(reader, limits)?;
+        Self::from_ole_file_with_limits(ole, limits)
+    }
+
+    /// Validate a source length before entering the public DOC-reader gate.
+    ///
+    /// Callers that already own the source bytes can perform this check after
+    /// a strict format owner has validated the same source and before handing
+    /// its parsed OLE context to the public reader.
+    pub(crate) fn validate_source_len(source_len: usize, limits: Limits) -> Result<()> {
+        let source_len = u64::try_from(source_len).unwrap_or(u64::MAX);
+        validate_package_size(source_len, limits)
+    }
+
+    /// Parse the physical OLE container after applying the package byte
+    /// preflight, without applying DOC-specific public-reader validation.
+    pub(crate) fn open_ole_file_with_limits(mut reader: R, limits: Limits) -> Result<OleFile<R>> {
         preflight_source_len(&mut reader, limits)?;
-        let ole = OleFile::open(reader)?;
+        Ok(OleFile::open(reader)?)
+    }
+
+    /// Validate the complete public DOC reader over an already-parsed OLE
+    /// container.  This keeps the package gate separate from strict format
+    /// owners that need to run first on the same physical validation context.
+    pub(crate) fn validate_ole_file(ole: &mut OleFile<R>, limits: Limits) -> Result<()> {
+        Self::validate_package_ole_file(ole, limits)?;
+        Document::from_ole_with_limits(ole, limits).map(|_| ())
+    }
+
+    fn validate_package_ole_file(ole: &OleFile<R>, limits: Limits) -> Result<()> {
+        validate_package_size(ole.file_size(), limits)?;
 
         // Verify it's a Word document by checking for the WordDocument stream
         if !ole.exists(&["WordDocument"]) {
@@ -78,7 +107,7 @@ impl<R: Read + Seek> Package<R> {
             ));
         }
 
-        Ok(Self { ole, limits })
+        Ok(())
     }
 
     /// Create a Package from an already-parsed OLE file.
@@ -108,14 +137,7 @@ impl<R: Read + Seek> Package<R> {
 
     /// Wrap an already-parsed OLE file with explicit document-read limits.
     pub fn from_ole_file_with_limits(ole: OleFile<R>, limits: Limits) -> Result<Self> {
-        validate_package_size(ole.file_size(), limits)?;
-        // Verify it's a Word document by checking for the WordDocument stream
-        if !ole.exists(&["WordDocument"]) {
-            return Err(Error::InvalidFormat(
-                "Not a valid Word document: WordDocument stream not found".to_string(),
-            ));
-        }
-
+        Self::validate_package_ole_file(&ole, limits)?;
         Ok(Self { ole, limits })
     }
 

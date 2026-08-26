@@ -24,8 +24,10 @@ use crate::sprm_operations::{
     SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
+use litchi_cfb::OleFile;
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 use smallvec::SmallVec;
+use std::io::Cursor;
 use std::sync::Arc;
 
 /// Exact, deliberately narrow picture dependency closure shared with the
@@ -899,8 +901,20 @@ pub struct RevisionEditor {
 
 impl RevisionEditor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package =
-            ObjectEditor::open(bytes, Targets::default(), limits).map_err(PackageError::from)?;
+        Self::open_with_ole_file(bytes, limits).map(|(editor, _ole)| editor)
+    }
+
+    pub(crate) fn open_with_ole_file(
+        bytes: Vec<u8>,
+        limits: Limits,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
+        let (package, ole) = ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
+            .map_err(PackageError::from)?;
+        let editor = Self::open_from_package(package)?;
+        Ok((editor, ole))
+    }
+
+    fn open_from_package(package: ObjectEditor) -> Result<Self> {
         let word_path = vec!["WordDocument".to_string()];
         let word = package
             .stream(&word_path)

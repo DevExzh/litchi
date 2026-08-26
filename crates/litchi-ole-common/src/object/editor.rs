@@ -9,7 +9,7 @@ use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
 use litchi_cfb::{OleError, OleFile};
-use std::io::Cursor;
+use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
 /// Maximum number of stream selectors accepted by one removal publication.
@@ -34,6 +34,33 @@ impl Editor {
     /// Returns an error when the CFB is malformed or protected, a target is
     /// missing/invalid, or a configured resource limit is exceeded.
     pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, OleError> {
+        Self::open_with_ole_file(bytes, targets, limits).map(|(editor, _ole)| editor)
+    }
+
+    /// Opens a package and returns the validated physical OLE context used by
+    /// the object owner.
+    ///
+    /// The returned `OleFile` is parsed from the same source bytes owned by
+    /// the returned editor.  Keeping source opening inside this bounded API
+    /// prevents callers from pairing an editor with an unrelated parsed CFB.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same protection, target, capture, discovery, and resource
+    /// limit errors as [`Self::open`].
+    pub fn open_with_ole_file(
+        bytes: Vec<u8>,
+        targets: Targets,
+        limits: Limits,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
+        Self::validate_open_inputs(&targets, limits)?;
+        let original = Arc::new(bytes);
+        let mut ole = OleFile::open(Cursor::new(original.as_ref().clone()))?;
+        let editor = Self::open_from_parsed_ole(Arc::clone(&original), &mut ole, targets, limits)?;
+        Ok((editor, ole))
+    }
+
+    fn validate_open_inputs(targets: &Targets, limits: Limits) -> Result<(), OleError> {
         limits.validate()?;
         if targets.len() > limits.max_objects {
             return Err(OleError::InvalidFormat(format!(
@@ -42,9 +69,16 @@ impl Editor {
                 limits.max_objects
             )));
         }
-        let original = Arc::new(bytes);
-        let mut ole = OleFile::open(Cursor::new(original.as_slice()))?;
-        codec::open(&ole)?;
+        Ok(())
+    }
+
+    fn open_from_parsed_ole<R: Read + Seek>(
+        original: Arc<Vec<u8>>,
+        ole: &mut OleFile<R>,
+        targets: Targets,
+        limits: Limits,
+    ) -> Result<Self, OleError> {
+        codec::open(ole)?;
         if targets
             .iter()
             .any(|target| target.path().len() > limits.max_storage_depth)
@@ -56,10 +90,10 @@ impl Editor {
         let resolved_target_entries = targets
             .into_vec()
             .into_iter()
-            .map(|target| target.resolve(&ole))
+            .map(|target| target.resolve(ole))
             .collect::<Result<Vec<_>, _>>()?;
         let resolved_targets = Targets::new(resolved_target_entries)?;
-        let package = Package::capture(&mut ole, limits)?;
+        let package = Package::capture(&mut *ole, limits)?;
         package.check(limits)?;
         let objects = discovery::from_package(&package, &resolved_targets, limits)?;
         Ok(Self {
