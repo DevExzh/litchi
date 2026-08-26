@@ -40,10 +40,11 @@ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use smallvec::SmallVec;
+use std::borrow::Cow;
 use std::io::Write;
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// A DOCX package that leaves ordinary part bodies cold at open.
 pub struct Package {
@@ -102,6 +103,68 @@ impl DocumentVariablesPublication {
 struct FingerprintingWriter<W> {
     inner: W,
     hasher: Sha256,
+}
+
+struct SourceCheckedTextSink<'a, W: ?Sized> {
+    output: &'a mut W,
+    package: &'a SourceBackedPackage,
+    failure: Arc<Mutex<Option<Error>>>,
+}
+
+impl<'a, W: ?Sized> SourceCheckedTextSink<'a, W> {
+    fn record_failure(&self, error: Error) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check(&self) -> std::io::Result<()> {
+        let result = self
+            .package
+            .check_execution()
+            .map_err(Error::from)
+            .and_then(|_| {
+                self.package
+                    .source_version()
+                    .map(|_| ())
+                    .map_err(Error::from)
+            });
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let message = error.to_string();
+                self.record_failure(error);
+                Err(std::io::Error::other(message))
+            },
+        }
+    }
+}
+
+impl<'a, W: Write + ?Sized> Write for SourceCheckedTextSink<'a, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check()?;
+        let result = self.output.write(bytes);
+        let _ = self.check();
+        result
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check()?;
+        let result = self.output.flush();
+        let _ = self.check();
+        result
+    }
+}
+
+fn take_source_text_failure(failure: &Arc<Mutex<Option<Error>>>) -> Option<Error> {
+    failure
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
 }
 
 impl<W: Write> Write for FingerprintingWriter<W> {
@@ -440,6 +503,112 @@ impl Package {
         self.package.source_version()?;
         self.package.check_execution()?;
         document
+    }
+
+    /// Stream visible main-document paragraphs to a caller-owned sink.
+    ///
+    /// The source catalog and execution policy are checked before deferred
+    /// payload work. The parser checks them before and after every XML event
+    /// and immediately before each paragraph emission; the source-checked
+    /// sink checks both fences around every underlying write and after the
+    /// final object. The main-document ZIP declaration is checked before
+    /// payload materialization; the payload reader still verifies its actual
+    /// decoded length and source boundary. Only one bounded paragraph text
+    /// value is retained by the semantic parser.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> std::result::Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<Error>>
+    {
+        let source_failure = Arc::new(Mutex::new(None));
+        let mut checked_output = SourceCheckedTextSink {
+            output,
+            package: &self.package,
+            failure: Arc::clone(&source_failure),
+        };
+        let mut writer = litchi_core::SequentialTextWriter::new(&mut checked_output, options);
+
+        let parsed = (|| -> std::result::Result<(), litchi_core::TextOutputError<Error>> {
+            self.package
+                .check_execution()
+                .map_err(|source| writer.document_error(source.into()))?;
+            self.package
+                .source_version()
+                .map_err(|source| writer.document_error(source.into()))?;
+            let main = self
+                .package
+                .main_document_part()
+                .map_err(|source| writer.document_error(source.into()))?;
+            validate_document_main_content_type(main.content_type())
+                .map_err(|source| writer.document_error(source))?;
+            let declared = main
+                .declared_uncompressed_size()
+                .map_err(|source| writer.document_error(source.into()))?;
+            let limit =
+                u64::try_from(crate::paragraph::semantic_text_raw_xml_limit()).map_err(|_| {
+                    writer.document_error(Error::InvalidFormat(
+                        "semantic DOCX XML limit overflow".into(),
+                    ))
+                })?;
+            let mce_limit = crate::paragraph::semantic_text_raw_xml_limit();
+            if declared > limit {
+                return Err(writer.document_error(Error::InvalidFormat(format!(
+                    "semantic DOCX declared XML exceeds {limit} bytes"
+                ))));
+            }
+            let data = main
+                .data()
+                .map_err(|source| writer.document_error(source.into()))?;
+            let managed = self.package.cache_diagnostics().budget_managed;
+            let visible: Cow<'_, [u8]> = if managed {
+                ensure_source_document_xml(data.as_bytes())
+                    .map_err(|source| writer.document_error(source))?;
+                Cow::Borrowed(data.as_bytes())
+            } else {
+                let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+                capabilities
+                    .understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
+                litchi_ooxml_common::mce::process_markup_compatibility(
+                    data.as_bytes(),
+                    &capabilities,
+                    &litchi_ooxml_common::mce::Limits {
+                        max_input_bytes: mce_limit,
+                        max_output_bytes: mce_limit,
+                        ..Default::default()
+                    },
+                )
+                .map_err(|source| writer.document_error(source.into()))?
+                .xml
+            };
+            self.package
+                .source_version()
+                .map_err(|source| writer.document_error(source.into()))?;
+            self.package
+                .check_execution()
+                .map_err(|source| writer.document_error(source.into()))?;
+            crate::paragraph::write_text_to_with_operation_check(
+                visible.as_ref(),
+                &mut writer,
+                || {
+                    self.package.check_execution().map_err(Error::from)?;
+                    self.package.source_version().map_err(Error::from)?;
+                    Ok(())
+                },
+            )
+        })();
+        let progress = writer.progress();
+        let source = self
+            .package
+            .check_execution()
+            .err()
+            .map(Error::from)
+            .or_else(|| self.package.source_version().err().map(Error::from))
+            .or_else(|| take_source_text_failure(&source_failure));
+        if let Some(source) = source {
+            return Err(litchi_core::TextOutputError::Document { source, progress });
+        }
+        parsed.map(|()| writer.finish())
     }
 
     /// Load only the mandatory main-document payload and capture its immutable
