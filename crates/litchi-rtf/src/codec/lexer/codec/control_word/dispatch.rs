@@ -907,7 +907,7 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "striked" => ControlWord::DoubleStrike(param_bool),
         "super" => ControlWord::Superscript(param_bool),
         "sub" => ControlWord::Subscript(param_bool),
-        "nosupersub" => ControlWord::NoSuperSub,
+        "nosupersub" => ControlWord::NoSuperSub(param),
         "up" => ControlWord::BaselineUp(param.unwrap_or(6)),
         "dn" => ControlWord::BaselineDown(param.unwrap_or(6)),
         "scaps" => ControlWord::SmallCaps(param_bool),

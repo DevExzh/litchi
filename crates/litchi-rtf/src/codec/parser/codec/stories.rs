@@ -4,10 +4,60 @@
     reason = "decoding steps deliberately rebind a working value as it is refined through the parse pipeline"
 )]
 use super::{
-    ControlWord, Cow, MAX_STORY_GROUP_DEPTH, MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent,
-    Parser, RtfError, RtfResult, SmallVec, State, Token, control_symbol_text, is_section_control,
-    require_parameterless,
+    ControlWord, Cow, Formatting, MAX_STORY_GROUP_DEPTH, MAX_TEXT_INTERMEDIATE_BYTES,
+    ParsedBodyStoryEvent, Parser, RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
+    is_section_control, require_parameterless,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct StoryBaseline {
+    ordinary: crate::CharacterBaseline,
+    associated: Option<crate::AssociatedCharacterBaseline>,
+}
+
+fn effective_story_baseline(formatting: Formatting) -> StoryBaseline {
+    let ordinary = match formatting.character_positioning.baseline {
+        crate::CharacterBaseline::Normal if formatting.superscript => {
+            crate::CharacterBaseline::Superscript
+        },
+        crate::CharacterBaseline::Normal if formatting.subscript => {
+            crate::CharacterBaseline::Subscript
+        },
+        baseline => baseline,
+    };
+    StoryBaseline {
+        ordinary,
+        associated: formatting.associated.baseline,
+    }
+}
+
+fn observe_story_baseline(
+    observed: &mut Option<StoryBaseline>,
+    formatting: Formatting,
+    owner: &'static str,
+) -> RtfResult<()> {
+    let baseline = effective_story_baseline(formatting);
+    if observed.is_some_and(|existing| existing != baseline) {
+        return Err(RtfError::MalformedDocument(format!(
+            "RTF {owner} has mixed character baseline formatting that cannot be represented losslessly"
+        )));
+    }
+    *observed = Some(baseline);
+    Ok(())
+}
+
+fn retain_story_baseline(
+    mut formatting: Formatting,
+    observed: Option<StoryBaseline>,
+) -> Formatting {
+    if let Some(baseline) = observed {
+        formatting.character_positioning.baseline = baseline.ordinary;
+        formatting.superscript = matches!(baseline.ordinary, crate::CharacterBaseline::Superscript);
+        formatting.subscript = matches!(baseline.ordinary, crate::CharacterBaseline::Subscript);
+        formatting.associated.baseline = baseline.associated;
+    }
+    formatting
+}
 
 impl<'a> Parser<'a> {
     /// Parse header or footer content.
@@ -23,6 +73,7 @@ impl<'a> Parser<'a> {
         self.current_hf_story_events.clear();
         self.current_hf_story_offset = 0;
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
+        let mut paragraph_baseline = None;
         let mut pending_paragraph_break = false;
         let default_state = State::default();
         let mut inert_section_format = false;
@@ -36,7 +87,7 @@ impl<'a> Parser<'a> {
                             let text_alloc = self.arena.alloc_str(text);
                             let para = super::super::super::section::HeaderFooterParagraph::new(
                                 Cow::Borrowed(text_alloc),
-                                state.formatting,
+                                retain_story_baseline(state.formatting, paragraph_baseline),
                                 state.paragraph,
                             );
                             hf.add_paragraph(para);
@@ -52,9 +103,11 @@ impl<'a> Parser<'a> {
                         &mut hf,
                         &mut text_buffer,
                         &mut pending_paragraph_break,
+                        &mut paragraph_baseline,
                     )?;
                 },
-                Token::Control(ControlWord::Par | ControlWord::Line) => {
+                Token::Control(control @ (ControlWord::Par | ControlWord::Line)) => {
+                    let paragraph_break = matches!(control, ControlWord::Par);
                     inert_section_format = false;
                     self.pos += 1;
                     if pending_paragraph_break {
@@ -70,10 +123,13 @@ impl<'a> Parser<'a> {
                     let text_alloc = self.arena.alloc_str(text);
                     hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
                         Cow::Borrowed(text_alloc),
-                        state.formatting,
+                        retain_story_baseline(state.formatting, paragraph_baseline),
                         state.paragraph,
                     ));
                     text_buffer.clear();
+                    if paragraph_break {
+                        paragraph_baseline = None;
+                    }
                     pending_paragraph_break = true;
                 },
                 Token::Control(ControlWord::Page(param)) => {
@@ -97,6 +153,14 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                         pending_paragraph_break = false;
                     }
+                    observe_story_baseline(
+                        &mut paragraph_baseline,
+                        self.current_state()
+                            .ok()
+                            .unwrap_or(&default_state)
+                            .formatting,
+                        "header/footer paragraph",
+                    )?;
                     text_buffer.push(b'\t');
                     self.current_hf_story_offset = self.current_hf_story_offset.saturating_add(1);
                 },
@@ -108,6 +172,16 @@ impl<'a> Parser<'a> {
                         pending_paragraph_break = false;
                     }
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            &mut paragraph_baseline,
+                            self.current_state()
+                                .ok()
+                                .unwrap_or(&default_state)
+                                .formatting,
+                            "header/footer paragraph",
+                        )?;
+                    }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset =
                         self.current_hf_story_offset.saturating_add(decoded.len());
@@ -120,9 +194,18 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                         pending_paragraph_break = false;
                     }
-                    text_buffer.extend_from_slice(
-                        control_symbol_text(control).unwrap_or_default().as_bytes(),
-                    );
+                    let value = control_symbol_text(control).unwrap_or_default();
+                    if !value.is_empty() {
+                        observe_story_baseline(
+                            &mut paragraph_baseline,
+                            self.current_state()
+                                .ok()
+                                .unwrap_or(&default_state)
+                                .formatting,
+                            "header/footer paragraph",
+                        )?;
+                    }
+                    text_buffer.extend_from_slice(value.as_bytes());
                     self.current_hf_story_offset = self
                         .current_hf_story_offset
                         .saturating_add(control_symbol_text(control).unwrap_or_default().len());
@@ -157,6 +240,14 @@ impl<'a> Parser<'a> {
                                 self.current_hf_story_offset.saturating_add(1);
                             pending_paragraph_break = false;
                         }
+                        observe_story_baseline(
+                            &mut paragraph_baseline,
+                            self.current_state()
+                                .ok()
+                                .unwrap_or(&default_state)
+                                .formatting,
+                            "header/footer paragraph",
+                        )?;
                     }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset =
@@ -206,6 +297,7 @@ impl<'a> Parser<'a> {
         hf: &mut super::super::super::section::HeaderFooter<'a>,
         text_buffer: &mut SmallVec<[u8; 256]>,
         pending_paragraph_break: &mut bool,
+        paragraph_baseline: &mut Option<StoryBaseline>,
     ) -> RtfResult<()> {
         self.reject_non_body_custom_xml_markup_group()?;
         if self.is_root_drawing_group() {
@@ -255,7 +347,12 @@ impl<'a> Parser<'a> {
                     return Ok(());
                 },
                 Some(Token::OpenBrace) => {
-                    self.parse_header_footer_group(hf, text_buffer, pending_paragraph_break)?;
+                    self.parse_header_footer_group(
+                        hf,
+                        text_buffer,
+                        pending_paragraph_break,
+                        paragraph_baseline,
+                    )?;
                 },
                 Some(Token::Control(ControlWord::Tab)) => {
                     self.pos += 1;
@@ -264,10 +361,16 @@ impl<'a> Parser<'a> {
                             self.current_hf_story_offset.saturating_add(1);
                         *pending_paragraph_break = false;
                     }
+                    observe_story_baseline(
+                        paragraph_baseline,
+                        self.current_state()?.formatting,
+                        "header/footer paragraph",
+                    )?;
                     text_buffer.push(b'\t');
                     self.current_hf_story_offset += 1;
                 },
-                Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
+                Some(Token::Control(control @ (ControlWord::Par | ControlWord::Line))) => {
+                    let paragraph_break = matches!(control, ControlWord::Par);
                     self.pos += 1;
                     if *pending_paragraph_break {
                         self.current_hf_story_offset =
@@ -282,10 +385,13 @@ impl<'a> Parser<'a> {
                     let text_alloc = self.arena.alloc_str(text);
                     hf.add_paragraph(super::super::super::section::HeaderFooterParagraph::new(
                         Cow::Borrowed(text_alloc),
-                        state.formatting,
+                        retain_story_baseline(state.formatting, *paragraph_baseline),
                         state.paragraph,
                     ));
                     text_buffer.clear();
+                    if paragraph_break {
+                        *paragraph_baseline = None;
+                    }
                     *pending_paragraph_break = true;
                 },
                 Some(Token::Control(ControlWord::Page(param))) => {
@@ -309,6 +415,13 @@ impl<'a> Parser<'a> {
                     }
                     let code = *code;
                     let decoded = self.parse_destination_unicode_sequence(code)?;
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            paragraph_baseline,
+                            self.current_state()?.formatting,
+                            "header/footer paragraph",
+                        )?;
+                    }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset += decoded.len();
                 },
@@ -319,6 +432,13 @@ impl<'a> Parser<'a> {
                         *pending_paragraph_break = false;
                     }
                     let value = control_symbol_text(control).unwrap_or_default();
+                    if !value.is_empty() {
+                        observe_story_baseline(
+                            paragraph_baseline,
+                            self.current_state()?.formatting,
+                            "header/footer paragraph",
+                        )?;
+                    }
                     text_buffer.extend_from_slice(value.as_bytes());
                     self.current_hf_story_offset += value.len();
                     self.pos += 1;
@@ -340,6 +460,13 @@ impl<'a> Parser<'a> {
                         self.current_hf_story_offset =
                             self.current_hf_story_offset.saturating_add(1);
                         *pending_paragraph_break = false;
+                    }
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            paragraph_baseline,
+                            self.current_state()?.formatting,
+                            "header/footer paragraph",
+                        )?;
                     }
                     text_buffer.extend_from_slice(decoded.as_bytes());
                     self.current_hf_story_offset += decoded.len();
@@ -469,6 +596,7 @@ impl<'a> Parser<'a> {
         self.current_note_shape_groups.clear();
         self.current_note_drawing_order.clear();
         self.current_note_story_events.clear();
+        let mut note_baseline = None;
         let mut reference = String::from(if is_footnote { "1" } else { "i" });
 
         while let Some(token) = self.tokens.get(self.pos) {
@@ -478,7 +606,7 @@ impl<'a> Parser<'a> {
                     break;
                 },
                 Token::OpenBrace => {
-                    self.parse_note_group()?;
+                    self.parse_note_group(&mut note_baseline)?;
                 },
                 Token::Control(ControlWord::FootnoteNumber(n)) => {
                     self.pos += 1;
@@ -486,6 +614,11 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::Tab) => {
                     self.pos += 1;
+                    observe_story_baseline(
+                        &mut note_baseline,
+                        self.current_state()?.formatting,
+                        "note",
+                    )?;
                     self.current_note_buffer.push(b'\t');
                 },
                 Token::Control(ControlWord::Par | ControlWord::Line) => {
@@ -502,14 +635,27 @@ impl<'a> Parser<'a> {
                 },
                 Token::Control(ControlWord::Unicode(code)) => {
                     let decoded = self.parse_destination_unicode_sequence(*code)?;
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            &mut note_baseline,
+                            self.current_state()?.formatting,
+                            "note",
+                        )?;
+                    }
                     self.current_note_buffer
                         .extend_from_slice(decoded.as_bytes());
                 },
                 Token::Control(control) if control_symbol_text(control).is_some() => {
                     self.pos += 1;
-                    self.current_note_buffer.extend_from_slice(
-                        control_symbol_text(control).unwrap_or_default().as_bytes(),
-                    );
+                    let value = control_symbol_text(control).unwrap_or_default();
+                    if !value.is_empty() {
+                        observe_story_baseline(
+                            &mut note_baseline,
+                            self.current_state()?.formatting,
+                            "note",
+                        )?;
+                    }
+                    self.current_note_buffer.extend_from_slice(value.as_bytes());
                 },
                 Token::Control(ControlWord::Unknown(_, _)) => {
                     let token = self.pos;
@@ -523,6 +669,13 @@ impl<'a> Parser<'a> {
                 Token::Text(text) => {
                     let decoded = self.decode_transport_text(text)?;
                     self.pos += 1;
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            &mut note_baseline,
+                            self.current_state()?.formatting,
+                            "note",
+                        )?;
+                    }
                     self.current_note_buffer
                         .extend_from_slice(decoded.as_bytes());
                 },
@@ -558,7 +711,7 @@ impl<'a> Parser<'a> {
         note.story_events = std::mem::take(&mut self.current_note_story_events);
 
         if let Ok(state) = self.current_state() {
-            note.formatting = state.formatting;
+            note.formatting = retain_story_baseline(state.formatting, note_baseline);
         }
 
         let aggregate = note.text_bytes().and_then(|initial| {
@@ -584,7 +737,10 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    pub(super) fn parse_note_group(&mut self) -> RtfResult<()> {
+    pub(super) fn parse_note_group(
+        &mut self,
+        note_baseline: &mut Option<StoryBaseline>,
+    ) -> RtfResult<()> {
         self.reject_non_body_custom_xml_markup_group()?;
         if self.is_root_drawing_group() {
             return self.parse_group();
@@ -624,9 +780,14 @@ impl<'a> Parser<'a> {
                     self.states.pop();
                     return Ok(());
                 },
-                Some(Token::OpenBrace) => self.parse_note_group()?,
+                Some(Token::OpenBrace) => self.parse_note_group(note_baseline)?,
                 Some(Token::Control(ControlWord::Tab)) => {
                     self.pos += 1;
+                    observe_story_baseline(
+                        note_baseline,
+                        self.current_state()?.formatting,
+                        "note",
+                    )?;
                     self.current_note_buffer.push(b'\t');
                 },
                 Some(Token::Control(ControlWord::Par | ControlWord::Line)) => {
@@ -644,13 +805,26 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::Unicode(code))) => {
                     let code = *code;
                     let decoded = self.parse_destination_unicode_sequence(code)?;
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            note_baseline,
+                            self.current_state()?.formatting,
+                            "note",
+                        )?;
+                    }
                     self.current_note_buffer
                         .extend_from_slice(decoded.as_bytes());
                 },
                 Some(Token::Control(control)) if control_symbol_text(control).is_some() => {
-                    self.current_note_buffer.extend_from_slice(
-                        control_symbol_text(control).unwrap_or_default().as_bytes(),
-                    );
+                    let value = control_symbol_text(control).unwrap_or_default();
+                    if !value.is_empty() {
+                        observe_story_baseline(
+                            note_baseline,
+                            self.current_state()?.formatting,
+                            "note",
+                        )?;
+                    }
+                    self.current_note_buffer.extend_from_slice(value.as_bytes());
                     self.pos += 1;
                 },
                 Some(Token::Control(ControlWord::Footnote | ControlWord::Endnote)) => {
@@ -672,6 +846,13 @@ impl<'a> Parser<'a> {
                 Some(Token::Text(text)) => {
                     let decoded = self.decode_transport_text(text)?;
                     self.pos += 1;
+                    if !decoded.is_empty() {
+                        observe_story_baseline(
+                            note_baseline,
+                            self.current_state()?.formatting,
+                            "note",
+                        )?;
+                    }
                     self.current_note_buffer
                         .extend_from_slice(decoded.as_bytes());
                 },

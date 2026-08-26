@@ -10,8 +10,8 @@
 use litchi_rtf::{NoteSeparatorElement, NoteSeparatorKind, RtfDocument, RtfWriter};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
-{\*\ftnsep \'8a\chftnsep\par}
-{\*\ftnsepc \chftnsepc\line}
+{\*\ftnsep \'8a\chftnsep A\par B}
+{\*\ftnsepc \chftnsepc C\line D}
 {\*\ftncn Notice \u20320?}
 {\*\aftnsep E\chftnsep\par}
 {\*\aftnsepc EC\chftnsepc\par}

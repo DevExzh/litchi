@@ -166,7 +166,7 @@ impl CharacterPositioning {
         match self.baseline {
             CharacterBaseline::RaisedHalfPoints(value)
             | CharacterBaseline::LoweredHalfPoints(value)
-                if i32::from(value) > MAX_CHARACTER_BASELINE_HALF_POINTS =>
+                if value == 0 || i32::from(value) > MAX_CHARACTER_BASELINE_HALF_POINTS =>
             {
                 return Err(RtfError::MalformedDocument(
                     "RTF character baseline is out of range".to_string(),

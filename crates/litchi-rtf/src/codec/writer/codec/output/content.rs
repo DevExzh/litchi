@@ -583,6 +583,15 @@ impl<W: Write> RtfWriter<W> {
         fmt.character_positioning
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
+        if fmt.character_positioning.baseline == CharacterBaseline::Normal
+            && fmt.superscript
+            && fmt.subscript
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF character formatting cannot be both superscript and subscript",
+            ));
+        }
         match fmt.character_positioning.baseline {
             CharacterBaseline::Normal if fmt.superscript => {
                 self.write_control_word("super", None)?;
@@ -634,6 +643,15 @@ impl<W: Write> RtfWriter<W> {
             self.write_control_word("impr", None)?;
         }
 
+        if fmt.character_positioning.expansion == CharacterExpansion::None
+            && !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
+                .contains(&fmt.char_spacing)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF legacy character spacing is out of range",
+            ));
+        }
         match fmt.character_positioning.expansion {
             CharacterExpansion::None if fmt.char_spacing != 0 => {
                 self.write_control_word("expnd", Some(fmt.char_spacing))?;
@@ -651,6 +669,12 @@ impl<W: Write> RtfWriter<W> {
         } else {
             i32::from(fmt.character_positioning.horizontal_scale_percent)
         };
+        if !(1..=crate::MAX_CHARACTER_SCALE_PERCENT).contains(&scale) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF legacy character scale is out of range",
+            ));
+        }
         if scale != 100 {
             self.write_control_word("charscalex", Some(scale))?;
         }
@@ -659,6 +683,12 @@ impl<W: Write> RtfWriter<W> {
         } else {
             fmt.kerning
         };
+        if !(0..=crate::MAX_CHARACTER_KERNING_HALF_POINTS).contains(&kerning) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF legacy character kerning is out of range",
+            ));
+        }
         if kerning != 0 {
             self.write_control_word("kerning", Some(kerning))?;
         }

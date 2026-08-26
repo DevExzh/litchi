@@ -1281,11 +1281,9 @@ fn apply_associated_character_control(
                 Some(associated_required_u16(*value, "acf", i32::from(u16::MAX))?);
         },
         ControlWord::AssociatedBaselineDown(value) => {
-            formatting.baseline = Some(Baseline::LoweredHalfPoints(associated_required_u16(
-                *value,
-                "adn",
-                crate::MAX_CHARACTER_BASELINE_HALF_POINTS,
-            )?));
+            let value =
+                associated_required_u16(*value, "adn", crate::MAX_CHARACTER_BASELINE_HALF_POINTS)?;
+            formatting.baseline = (value != 0).then_some(Baseline::LoweredHalfPoints(value));
         },
         ControlWord::AssociatedExpansion(value) => {
             let expansion = value.ok_or_else(|| {
@@ -1350,11 +1348,9 @@ fn apply_associated_character_control(
             formatting.underline = Some(Underline::Words);
         },
         ControlWord::AssociatedBaselineUp(value) => {
-            formatting.baseline = Some(Baseline::RaisedHalfPoints(associated_required_u16(
-                *value,
-                "aup",
-                crate::MAX_CHARACTER_BASELINE_HALF_POINTS,
-            )?));
+            let value =
+                associated_required_u16(*value, "aup", crate::MAX_CHARACTER_BASELINE_HALF_POINTS)?;
+            formatting.baseline = (value != 0).then_some(Baseline::RaisedHalfPoints(value));
         },
         _ => return Ok(false),
     }

@@ -327,7 +327,7 @@ impl<'a> Parser<'a> {
                     ControlWord::Bold(_)
                         | ControlWord::Superscript(_)
                         | ControlWord::Subscript(_)
-                        | ControlWord::NoSuperSub
+                        | ControlWord::NoSuperSub(_)
                         | ControlWord::BaselineUp(_)
                         | ControlWord::BaselineDown(_)
                         | ControlWord::Outline(_)

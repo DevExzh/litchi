@@ -2031,7 +2031,7 @@ impl<'a> Parser<'a> {
             ControlWord::DoubleStrike(_) => "double-strike",
             ControlWord::Superscript(_)
             | ControlWord::Subscript(_)
-            | ControlWord::NoSuperSub
+            | ControlWord::NoSuperSub(_)
             | ControlWord::BaselineUp(_)
             | ControlWord::BaselineDown(_) => "baseline",
             ControlWord::SmallCaps(_) => "small-caps",
@@ -2424,6 +2424,7 @@ impl<'a> Parser<'a> {
         reason = "remaining variants share the same fallback by design"
     )]
     pub(super) fn parse_style_entry(&mut self) -> RtfResult<()> {
+        let entry_start = self.pos;
         self.pos += 1; // opening brace
         let starred = matches!(
             self.tokens.get(self.pos),
@@ -2509,6 +2510,11 @@ impl<'a> Parser<'a> {
                     continue;
                 },
                 Some(Token::Control(control)) => match control {
+                    ControlWord::Unknown(_, _) if starred && style_type.is_none() => {
+                        self.pos = entry_start.saturating_add(1);
+                        self.preserve_unknown_destination_in(crate::opaque::Context::Metadata)?;
+                        return Ok(());
+                    },
                     name_control
                         if !name_complete && control_symbol_text(name_control).is_some() =>
                     {
@@ -3643,7 +3649,8 @@ impl<'a> Parser<'a> {
                 }
                 state.formatting.character_positioning.set_subscript(*value);
             },
-            ControlWord::NoSuperSub => {
+            ControlWord::NoSuperSub(parameter) => {
+                require_parameterless(*parameter, "nosupersub")?;
                 state.formatting.superscript = false;
                 state.formatting.subscript = false;
                 state.formatting.character_positioning.clear_baseline();
