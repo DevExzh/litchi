@@ -275,7 +275,7 @@ impl Workbook {
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         #[cfg(all(
-            any(feature = "xlsx", feature = "ods", feature = "xls"),
+            any(feature = "xlsx", feature = "ods", feature = "xls", feature = "xlsb"),
             any(unix, windows)
         ))]
         {
@@ -288,6 +288,20 @@ impl Workbook {
                     inner: WorkbookImpl::Xlsx(super::adapters::Workbook::from_source_backed(
                         workbook,
                     )),
+                    cached_metadata: metadata,
+                }),
+                #[cfg(feature = "xlsb")]
+                crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
+                    workbook,
+                    metadata,
+                    source,
+                    limits,
+                } => Ok(Self {
+                    inner: WorkbookImpl::XlsbSource(
+                        super::adapters::XlsbWorkbook::from_source_backed(
+                            workbook, source, limits,
+                        )?,
+                    ),
                     cached_metadata: metadata,
                 }),
                 #[cfg(feature = "ods")]
@@ -322,7 +336,7 @@ impl Workbook {
         }
 
         #[cfg(not(all(
-            any(feature = "xlsx", feature = "ods", feature = "xls"),
+            any(feature = "xlsx", feature = "ods", feature = "xls", feature = "xlsb"),
             any(unix, windows)
         )))]
         {
@@ -370,8 +384,30 @@ impl Workbook {
             Err(bytes) => bytes,
         };
 
-        #[cfg(feature = "xlsx")]
+        #[cfg(any(feature = "xlsx", feature = "xlsb"))]
         let bytes = match crate::detection_smart::detected::detect_workbook_source_bytes(bytes) {
+            #[cfg(feature = "xlsb")]
+            crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsb {
+                package,
+                source,
+                limits,
+                ..
+            } => {
+                let metadata = crate::ooxml_common::properties::read_source_backed(&package)
+                    .map_err(crate::map_ooxml_error)?
+                    .map(litchi_core::Metadata::from)
+                    .unwrap_or_default();
+                let workbook =
+                    crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)
+                        .map_err(crate::map_ooxml_error)?;
+                let adapter =
+                    super::adapters::XlsbWorkbook::from_source_backed(workbook, source, limits)?;
+                return Ok(Self {
+                    inner: WorkbookImpl::XlsbSource(adapter),
+                    cached_metadata: metadata,
+                });
+            },
+            #[cfg(feature = "xlsx")]
             crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsx(package) => {
                 let metadata = crate::ooxml_common::properties::read_source_backed(&package)
                     .map_err(crate::map_ooxml_error)?
@@ -529,6 +565,11 @@ impl Workbook {
 
             #[cfg(feature = "xlsb")]
             WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_names().to_vec()),
+            #[cfg(feature = "xlsb")]
+            WorkbookImpl::XlsbSource(xlsb) => {
+                xlsb.ensure_source_current()?;
+                Ok(WorkbookTrait::worksheet_names(xlsb).to_vec())
+            },
 
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_names().to_vec()),
@@ -576,6 +617,11 @@ impl Workbook {
             },
             #[cfg(feature = "xlsb")]
             WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_count()),
+            #[cfg(feature = "xlsb")]
+            WorkbookImpl::XlsbSource(xlsb) => {
+                xlsb.ensure_source_current()?;
+                Ok(WorkbookTrait::worksheet_count(xlsb))
+            },
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsFile(xls) => Ok(xls.worksheet_count()),
             #[cfg(feature = "xls")]
@@ -662,6 +708,30 @@ impl Workbook {
                     }
                 }
                 Ok(out)
+            },
+            #[cfg(feature = "xlsb")]
+            WorkbookImpl::XlsbSource(xlsb) => {
+                xlsb.ensure_source_current()?;
+                let result = (|| {
+                    let mut out = String::new();
+                    for i in 0..WorkbookTrait::worksheet_count(xlsb) {
+                        let ws = WorkbookTrait::worksheet_by_index(xlsb, i)?;
+                        let mut rows = ws.rows();
+                        while let Some(row) = rows.next() {
+                            let row = row?;
+                            for (idx, cell) in row.iter().enumerate() {
+                                if idx > 0 {
+                                    out.push('\t');
+                                }
+                                append_cell_text(&mut out, cell);
+                            }
+                            out.push('\n');
+                        }
+                    }
+                    Ok(out)
+                })();
+                xlsb.ensure_source_current()?;
+                result
             },
 
             #[cfg(feature = "xls")]
@@ -764,6 +834,10 @@ impl Workbook {
         #[cfg(all(feature = "xls", any(unix, windows)))]
         if let WorkbookImpl::XlsSource(source) = &self.inner {
             return source.metadata();
+        }
+        #[cfg(feature = "xlsb")]
+        if let WorkbookImpl::XlsbSource(source) = &self.inner {
+            source.ensure_source_current()?;
         }
         Ok(self.cached_metadata.clone())
     }

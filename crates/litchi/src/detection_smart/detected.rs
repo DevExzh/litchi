@@ -176,28 +176,49 @@ pub(crate) fn detect_prepared_ods(
     }
 }
 
-/// Result of the private source-backed XLSX bytes probe.
-#[cfg(feature = "xlsx")]
+/// Result of the private source-backed workbook bytes probe.
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
 #[allow(
     clippy::large_enum_variant,
-    reason = "the valid XLSX handoff moves the existing source-backed package without an extra allocation"
+    reason = "the valid workbook handoff moves the existing source-backed package without an extra allocation"
 )]
 pub(crate) enum WorkbookSourceBytesDetection {
     /// A validated source-retaining OPC owner whose catalog identifies XLSX.
+    #[cfg(feature = "xlsx")]
     Xlsx(crate::opc::SourceBackedPackage),
+    /// A validated source-retaining OPC owner whose catalog identifies XLSB.
+    ///
+    /// The source and effective read policy remain alongside the package so
+    /// the unified XLSB facade can preserve the exact positional source and
+    /// policy while consuming the package into its lazy owner.
+    #[cfg(feature = "xlsb")]
+    Xlsb {
+        package: crate::opc::SourceBackedPackage,
+        source: std::sync::Arc<dyn litchi_core::ReadAt>,
+        limits: crate::opc::ReadLimits,
+    },
     /// The original bytes for the established byte-backed detector.
     Fallback(Vec<u8>),
 }
 
+/// Probe owned bytes through the source-backed OPC catalog with default limits.
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn detect_workbook_source_bytes(bytes: Vec<u8>) -> WorkbookSourceBytesDetection {
+    detect_workbook_source_bytes_with_limits(bytes, crate::opc::ReadLimits::default())
+}
+
 /// Probe owned bytes through the source-backed OPC catalog, retaining the
-/// original allocation for every non-XLSX fallback.
+/// original allocation for every non-workbook fallback.
 ///
 /// This is deliberately narrower than [`detect_format_smart`]: the public
 /// smart-detector result remains source-compatible and eager, while the
-/// unified workbook facade can adopt the existing read-only XLSX catalog
-/// owner. ODS precedence is resolved by the caller before this probe.
-#[cfg(feature = "xlsx")]
-pub(crate) fn detect_workbook_source_bytes(bytes: Vec<u8>) -> WorkbookSourceBytesDetection {
+/// unified workbook facade can adopt the existing read-only XLSX or XLSB
+/// catalog owner. ODS precedence is resolved by the caller before this probe.
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn detect_workbook_source_bytes_with_limits(
+    bytes: Vec<u8>,
+    limits: crate::opc::ReadLimits,
+) -> WorkbookSourceBytesDetection {
     use litchi_core::ReadAt;
     use std::sync::Arc;
 
@@ -214,26 +235,34 @@ pub(crate) fn detect_workbook_source_bytes(bytes: Vec<u8>) -> WorkbookSourceByte
     // through the historical detector without copying its input. The source
     // package is dropped before the reclaim attempt in both fallback paths.
     let shared = Arc::new(bytes);
-    let package_result = {
-        let source: Arc<dyn ReadAt> =
-            Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
-        crate::opc::SourceBackedPackage::from_read_at(source)
-    };
+    let source: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
+    let package_result =
+        crate::opc::SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits);
     let Ok(package) = package_result else {
+        drop(source);
         return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
     };
 
-    if crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-        == Some(litchi_core::detection::FileFormat::Xlsx)
-    {
-        return WorkbookSourceBytesDetection::Xlsx(package);
+    match crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package) {
+        #[cfg(feature = "xlsx")]
+        Some(litchi_core::detection::FileFormat::Xlsx) => {
+            WorkbookSourceBytesDetection::Xlsx(package)
+        },
+        #[cfg(feature = "xlsb")]
+        Some(litchi_core::detection::FileFormat::Xlsb) => WorkbookSourceBytesDetection::Xlsb {
+            package,
+            source,
+            limits,
+        },
+        _ => {
+            drop(package);
+            drop(source);
+            WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared))
+        },
     }
-
-    drop(package);
-    WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared))
 }
 
-#[cfg(feature = "xlsx")]
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
 fn reclaim_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
     std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
 }
@@ -463,14 +492,14 @@ fn reclaim_presentation_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8>
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(unix, windows)
 ))]
 const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Result of the private source-backed workbook path probe.
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(unix, windows)
 ))]
 #[allow(
@@ -488,6 +517,15 @@ pub(crate) enum WorkbookSourcePathDetection {
     Xlsx {
         workbook: crate::xlsx::SourceBackedWorkbook,
         metadata: litchi_core::Metadata,
+    },
+    /// A validated, source-retaining XLSB owner and its source-backed core
+    /// properties projection.
+    #[cfg(feature = "xlsb")]
+    Xlsb {
+        workbook: crate::xlsb::SourceBackedWorkbook,
+        metadata: litchi_core::Metadata,
+        source: std::sync::Arc<dyn litchi_core::ReadAt>,
+        limits: crate::opc::ReadLimits,
     },
     /// A validated, source-retaining ODS owner.
     #[cfg(feature = "ods")]
@@ -517,11 +555,26 @@ pub(crate) enum WorkbookSourcePathDetection {
 /// unified filesystem workbook facade. Other formats retain bytes from the
 /// same pinned source for the established eager fallback.
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(unix, windows)
 ))]
 pub(crate) fn detect_workbook_source_path(
     path: &std::path::Path,
+) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
+    detect_workbook_source_path_with_limits(path, crate::opc::ReadLimits::default())
+}
+
+/// Open a filesystem workbook through one positional source-backed owner with
+/// an explicit OPC resource policy. The byte-backed [`DetectedFormat`] API
+/// remains unchanged; this helper is only used by the unified filesystem
+/// workbook facade.
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
+    any(unix, windows)
+))]
+pub(crate) fn detect_workbook_source_path_with_limits(
+    path: &std::path::Path,
+    limits: crate::opc::ReadLimits,
 ) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
     use litchi_core::ReadAt;
     use std::sync::Arc;
@@ -542,7 +595,7 @@ pub(crate) fn detect_workbook_source_path(
     let ordinary_ods = is_ods
         && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
             source.as_ref(),
-            super::catalog_probe_limits(crate::opc::ReadLimits::default()),
+            super::catalog_probe_limits(limits),
         )? == Some(false);
     #[cfg(all(
         not(feature = "ods"),
@@ -564,7 +617,7 @@ pub(crate) fn detect_workbook_source_path(
             super::record_opc_probe();
             match crate::opc::SourceBackedPackage::from_read_at_with_limits(
                 Arc::clone(&source),
-                crate::opc::ReadLimits::default(),
+                limits,
             ) {
                 Ok(package) => Some(package),
                 Err(error) if !is_ods && hard_workbook_ooxml_probe_error(&error) => {
@@ -606,6 +659,28 @@ pub(crate) fn detect_workbook_source_path(
                 return Ok(WorkbookSourcePathDetection::Xlsx { workbook, metadata });
             }
 
+            #[cfg(feature = "xlsb")]
+            if format == litchi_core::detection::FileFormat::Xlsb {
+                let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
+                    .map(litchi_core::Metadata::from)
+                    .unwrap_or_default();
+                let workbook =
+                    crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)?;
+                let owner_version = workbook.source_version()?;
+                if owner_version != source_version {
+                    return Err(Box::new(litchi_core::Error::SourceChanged {
+                        expected: source_version,
+                        observed: owner_version,
+                    }));
+                }
+                return Ok(WorkbookSourcePathDetection::Xlsb {
+                    workbook,
+                    metadata,
+                    source,
+                    limits,
+                });
+            }
+
             let enabled = match format {
                 #[cfg(feature = "docx")]
                 litchi_core::detection::FileFormat::Docx => true,
@@ -633,7 +708,7 @@ pub(crate) fn detect_workbook_source_path(
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
@@ -652,7 +727,7 @@ fn hard_workbook_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(unix, windows)
 ))]
 fn finish_non_ooxml_workbook_source(
@@ -805,7 +880,7 @@ fn xls_source_recoverable_probe_error(error: &crate::xls::SourceBackedError) -> 
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(unix, windows)
 ))]
 fn ensure_path_source_current(
@@ -821,7 +896,7 @@ fn ensure_path_source_current(
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls"),
+    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
     any(unix, windows)
 ))]
 fn read_path_source_bytes(
@@ -1850,7 +1925,10 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
 #[cfg(test)]
 mod short_signature_tests {
     use super::detect_format_smart;
-    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    #[cfg(all(
+        any(feature = "ods", feature = "rtf"),
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
     use super::detect_format_smart_with_limits;
     #[cfg(any(feature = "docx", feature = "pptx"))]
     use std::io::{Cursor, Write};

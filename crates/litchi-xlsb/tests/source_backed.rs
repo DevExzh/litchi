@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceCacheLimits};
+use litchi_xlsb::package::PackageError;
+use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, kind};
 use litchi_xlsb::{ReadLimits, SourceBackedWorkbook};
 
 fn fixture() -> Vec<u8> {
@@ -112,6 +114,31 @@ fn rewrite_sheet_relationship(relationship_type: &str, content_type: &str) -> Ve
         .unwrap()
         .set_content_type(content_type.to_owned())
         .unwrap();
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
+fn set_date1904() -> Vec<u8> {
+    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let payload_offset = Records::new(&workbook_blob)
+        .find_map(|record| {
+            let record = record.unwrap();
+            if record.kind() != kind::WORKBOOK_PROP || record.payload().is_empty() {
+                return None;
+            }
+            let (_, header_len) =
+                Header::parse(&workbook_blob[record.offset()..], RawLimits::DEFAULT).unwrap();
+            Some(record.offset() + header_len)
+        })
+        .unwrap();
+    workbook_blob[payload_offset] |= 1;
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(workbook_blob);
     let mut output = Vec::new();
     package.to_stream(&mut output).unwrap();
     output
@@ -344,6 +371,64 @@ fn recognized_nonworksheet_sheet_relationships_require_binary_content_types() {
             "accepted mismatched content type for {relationship_type}"
         );
     }
+}
+
+#[test]
+fn full_sheet_catalog_preserves_nonworksheet_tabs_and_worksheet_selectors() {
+    const RELATIONSHIPS: &[(&str, &str)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+        ),
+    ];
+    for &(relationship_type, content_type) in RELATIONSHIPS {
+        let source = rewrite_sheet_relationship(relationship_type, content_type);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let names = workbook.sheet_names().unwrap();
+        assert_eq!(workbook.sheet_count().unwrap(), names.len());
+        assert!(names.len() >= 2);
+
+        let sheets = workbook.sheets().unwrap();
+        assert_eq!(sheets.len(), names.len());
+        for (position, sheet) in sheets.iter().enumerate() {
+            assert_eq!(sheet.name().unwrap(), names[position].as_str());
+            assert_eq!(sheet.workbook_position().unwrap(), position);
+        }
+        assert!(matches!(
+            sheets[0].materialize(),
+            Err(PackageError::UnsupportedFeature(_))
+        ));
+
+        assert_eq!(workbook.worksheet_count().unwrap(), names.len() - 1);
+        assert_eq!(workbook.worksheet_names().unwrap(), names[1..].to_vec());
+        assert_eq!(
+            workbook
+                .worksheet_by_index(0)
+                .unwrap()
+                .unwrap()
+                .workbook_position()
+                .unwrap(),
+            1
+        );
+        assert!(workbook.sheet_by_name(&names[0]).unwrap().is_some());
+        assert!(workbook.sheet_by_index(names.len()).unwrap().is_none());
+    }
+}
+
+#[test]
+fn date1904_flag_is_retained_in_source_catalog() {
+    let source = set_date1904();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    assert!(workbook.is_1904_date_system().unwrap());
 }
 
 #[test]
