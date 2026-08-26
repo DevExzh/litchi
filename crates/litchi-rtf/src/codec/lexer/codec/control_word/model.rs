@@ -695,7 +695,7 @@ pub(crate) enum ControlWord<'a> {
     DoubleStrike(bool),
     Superscript(bool),
     Subscript(bool),
-    NoSuperSub,
+    NoSuperSub(Option<i32>),
     BaselineUp(i32),
     BaselineDown(i32),
     SmallCaps(bool),

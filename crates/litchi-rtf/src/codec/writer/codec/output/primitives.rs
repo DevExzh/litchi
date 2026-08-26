@@ -319,6 +319,7 @@ impl<W: Write> RtfWriter<W> {
         // Write note content
         self.write_str(" {")?;
         self.write_formatting(&note.formatting)?;
+        self.write_str(" ")?;
         self.write_field_story(
             note.content.as_ref(),
             &note.shapes,

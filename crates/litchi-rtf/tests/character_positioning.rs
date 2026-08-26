@@ -7,7 +7,10 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{CharacterBaseline, CharacterExpansion, RtfDocument, RtfWriter};
+use litchi_rtf::{
+    AssociatedCharacterBaseline, AssociatedCharacterFormatting, CharacterBaseline,
+    CharacterExpansion, CharacterPositioning, RtfDocument, RtfWriter,
+};
 
 fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
     document
@@ -78,7 +81,7 @@ fn parses_inherits_resets_and_keeps_destinations_inert() {
     );
     assert_eq!(
         block(&document, "Plain").formatting.character_positioning,
-        litchi_rtf::CharacterPositioning::default()
+        CharacterPositioning::default()
     );
     assert_eq!(
         block(&document, "Visible")
@@ -142,7 +145,146 @@ fn rejects_out_of_range_parameters() {
         r"{\rtf1\charscalex601 X}",
         r"{\rtf1\kerning-1 X}",
         r"{\rtf1\kerning32768 X}",
+        r"{\rtf1\nosupersub1 X}",
+        r"{\rtf1\ansi{\header\nosupersub1 H}Body}",
+        r"{\rtf1 A{\footnote\nosupersub1 N}B}",
+        r"{\rtf1{\stylesheet{\s0\nosupersub1 Normal;}}Body}",
     ] {
         assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
     }
+    assert!(RtfDocument::parse(r"{\rtf1 A{\*\unknown\nosupersub1 hidden}B}").is_ok());
+    assert!(
+        RtfDocument::parse(
+            r"{\rtf1{\stylesheet{\s0 Normal;}{\*\futurestyle\nosupersub1 ignored;}}Body}"
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn typed_zero_baseline_offsets_are_invalid_but_wire_zero_is_normal() {
+    for baseline in [
+        CharacterBaseline::RaisedHalfPoints(0),
+        CharacterBaseline::LoweredHalfPoints(0),
+    ] {
+        let positioning = CharacterPositioning {
+            baseline,
+            ..CharacterPositioning::default()
+        };
+        assert!(positioning.validate().is_err());
+    }
+    for baseline in [
+        AssociatedCharacterBaseline::RaisedHalfPoints(0),
+        AssociatedCharacterBaseline::LoweredHalfPoints(0),
+    ] {
+        let mut formatting = AssociatedCharacterFormatting::default();
+        assert!(formatting.set_baseline(Some(baseline)).is_err());
+        formatting.baseline = Some(baseline);
+        assert!(formatting.validate().is_err());
+    }
+    for source in [r"{\rtf1\up0 X}", r"{\rtf1\dn0 X}"] {
+        let document = RtfDocument::parse(source).unwrap();
+        assert_eq!(
+            block(&document, "X")
+                .formatting
+                .character_positioning
+                .baseline,
+            CharacterBaseline::Normal
+        );
+    }
+    for source in [r"{\rtf1\aup0 X}", r"{\rtf1\adn0 X}"] {
+        let document = RtfDocument::parse(source).unwrap();
+        assert_eq!(block(&document, "X").formatting.associated.baseline, None);
+    }
+}
+
+#[test]
+fn non_body_stories_preserve_one_baseline_and_refuse_mixed_states() {
+    let document = RtfDocument::parse(
+        r"{\rtf1\ansi{\header {\super\aup2 Head}}A{\footnote {\sub\adn2 Note}}B}",
+    )
+    .unwrap();
+    assert_eq!(
+        document.sections()[0].headers_footers[0].paragraphs[0]
+            .formatting
+            .character_positioning
+            .baseline,
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        document.notes()[0]
+            .formatting
+            .character_positioning
+            .baseline,
+        CharacterBaseline::Subscript
+    );
+    assert_eq!(
+        document.sections()[0].headers_footers[0].paragraphs[0]
+            .formatting
+            .associated
+            .baseline,
+        Some(AssociatedCharacterBaseline::RaisedHalfPoints(2))
+    );
+    assert_eq!(
+        document.notes()[0].formatting.associated.baseline,
+        Some(AssociatedCharacterBaseline::LoweredHalfPoints(2))
+    );
+    let mut output = Vec::new();
+    RtfWriter::new(&mut output)
+        .write_document(&document)
+        .unwrap();
+    let reopened = RtfDocument::parse_bytes(&output).unwrap();
+    assert_eq!(
+        reopened.sections()[0].headers_footers[0].paragraphs[0]
+            .formatting
+            .character_positioning
+            .baseline,
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        reopened.notes()[0]
+            .formatting
+            .character_positioning
+            .baseline,
+        CharacterBaseline::Subscript
+    );
+    assert_eq!(
+        reopened.sections()[0].headers_footers[0].paragraphs[0]
+            .formatting
+            .associated
+            .baseline,
+        Some(AssociatedCharacterBaseline::RaisedHalfPoints(2))
+    );
+    assert_eq!(
+        reopened.notes()[0].formatting.associated.baseline,
+        Some(AssociatedCharacterBaseline::LoweredHalfPoints(2))
+    );
+
+    for source in [
+        r"{\rtf1\ansi{\header\super Head\nosupersub Tail}Body}",
+        r"{\rtf1 A{\footnote\sub One\par\nosupersub Two}B}",
+        r"{\rtf1 A{\endnote\up2 One\dn2 Two}B}",
+        r"{\rtf1\ansi{\header\aup2 One\aup4 Two}Body}",
+        r"{\rtf1 A{\footnote\adn2 One\par\adn4 Two}B}",
+        r"{\rtf1\ansi{\header\super One\line\sub Two}Body}",
+    ] {
+        assert!(RtfDocument::parse(source).is_err(), "accepted {source}");
+    }
+
+    let representable =
+        RtfDocument::parse(r"{\rtf1\ansi{\header\super One\par\nosupersub Two}Body}").unwrap();
+    assert_eq!(
+        representable.sections()[0].headers_footers[0].paragraphs[0]
+            .formatting
+            .character_positioning
+            .baseline,
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        representable.sections()[0].headers_footers[0].paragraphs[1]
+            .formatting
+            .character_positioning
+            .baseline,
+        CharacterBaseline::Normal
+    );
 }

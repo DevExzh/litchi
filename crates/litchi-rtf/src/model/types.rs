@@ -1343,7 +1343,7 @@ impl AssociatedCharacterFormatting {
             Some(
                 AssociatedCharacterBaseline::RaisedHalfPoints(points)
                     | AssociatedCharacterBaseline::LoweredHalfPoints(points)
-            ) if i32::from(points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
+            ) if points == 0 || i32::from(points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
         ) {
             return Err(RtfError::MalformedDocument(
                 "RTF associated character baseline is out of range".to_string(),
@@ -1389,7 +1389,7 @@ impl AssociatedCharacterFormatting {
                 AssociatedCharacterBaseline::RaisedHalfPoints(value)
                 | AssociatedCharacterBaseline::LoweredHalfPoints(value) => value,
             };
-            if i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS {
+            if value == 0 || i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS {
                 return Err(RtfError::MalformedDocument(
                     "RTF associated character baseline is out of range".to_string(),
                 ));

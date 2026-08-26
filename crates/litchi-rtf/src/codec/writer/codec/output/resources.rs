@@ -875,12 +875,20 @@ impl<W: Write> RtfWriter<W> {
                     NoteSeparatorElement::Text(text) => self.write_text(text.as_ref())?,
                     NoteSeparatorElement::SeparatorMark => {
                         self.write_control_word("chftnsep", None)?;
+                        self.write_str(" ")?;
                     },
                     NoteSeparatorElement::ContinuationSeparatorMark => {
                         self.write_control_word("chftnsepc", None)?;
+                        self.write_str(" ")?;
                     },
-                    NoteSeparatorElement::ParagraphBreak => self.write_control_word("par", None)?,
-                    NoteSeparatorElement::LineBreak => self.write_control_word("line", None)?,
+                    NoteSeparatorElement::ParagraphBreak => {
+                        self.write_control_word("par", None)?;
+                        self.write_str(" ")?;
+                    },
+                    NoteSeparatorElement::LineBreak => {
+                        self.write_control_word("line", None)?;
+                        self.write_str(" ")?;
+                    },
                     NoteSeparatorElement::Drawing(StoryDrawing::Shape(index)) => {
                         let shape = separator.shapes.get(*index).ok_or_else(|| {
                             io::Error::new(

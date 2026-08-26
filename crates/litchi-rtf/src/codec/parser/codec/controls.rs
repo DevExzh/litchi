@@ -2163,7 +2163,8 @@ impl Parser<'_> {
                 }
                 state.formatting.character_positioning.set_subscript(*b);
             },
-            ControlWord::NoSuperSub => {
+            ControlWord::NoSuperSub(parameter) => {
+                require_parameterless(*parameter, "nosupersub")?;
                 state.formatting.superscript = false;
                 state.formatting.subscript = false;
                 state.formatting.character_positioning.clear_baseline();
