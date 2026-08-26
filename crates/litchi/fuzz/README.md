@@ -116,6 +116,23 @@ bytes unchanged. The recipes under `corpus/numbers_table_cell_control/` are
 command bytes except for the explicitly named native split source; no native
 IDs, BNC payloads, archive names, or generated values cross this target.
 
+`numbers_table_cell_comment_reply` is the selector-first direct-reply
+lifecycle target. Its first byte is a bounded command prefix (unless the
+input already starts with a ZIP local header); the remaining bytes are
+offered to bounded Numbers package ingress. Any admitted package is probed
+for a rooted cell-comment thread and then exercised by reply ordinal and A1
+address. The collection edit covers
+append, duplicate-text ordinal replacement, and removal, while the direct
+add/set/remove and A1 conveniences cover the same transitions. Successful
+commits are reopened, applied, conflicted, inverted, and checked for exact
+source restoration; malformed, missing-root, stale-ordinal, selector, and
+limit paths must remain source-atomic. The target does not embed an
+unverified native reply artifact: command seeds are deliberately small, and a
+valid reply-bearing package can be supplied as a fuzz input when available.
+The target uses only `SheetSelector`, `TableSelector`, `CellPosition`, and
+`CommentReplyIndex`; native IDs, comment-storage payloads, archive names, and
+generated types do not cross the fuzz boundary.
+
 `numbers_table_sort_order` is the focused selector-first persisted table-sort
 configuration target. It offers arbitrary bytes to bounded Numbers ingress
 and reuses native `basic.numbers` for no-op, set, clear/reset, exact patch apply,
@@ -432,6 +449,15 @@ The `split_component_write_commands.hex` and
 `split_component_clear_refcount.hex` recipes select the multi-member write
 and clear/refcount branches; the native `split_component_source.numbers` is
 embedded by the target and is therefore exercised on every command campaign.
+
+Run the focused Numbers direct-comment-reply lifecycle target with its
+bounded command seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_comment_reply \
+  corpus/numbers_table_cell_comment_reply -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
 
 Run the focused Numbers persisted-sort target with its command seeds:
 

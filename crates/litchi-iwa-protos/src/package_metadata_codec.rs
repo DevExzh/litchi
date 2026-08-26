@@ -2029,6 +2029,10 @@ mod tests {
 
         let mut source = Vec::new();
         put_varint_field(&mut source, 1, 10);
+        // Schema-known save-token fields must not be reported as unknown while
+        // the deliberately unknown records below still exercise the callback.
+        put_varint_field(&mut source, 8, 11);
+        put_varint_field(&mut current, 12, 13);
         bytes_field(&mut source, 3, &current);
         // Unknown root field.
         put_varint_field(&mut source, 50, 7);
@@ -8043,6 +8047,10 @@ fn inspect_metadata_pass<V: PackageMetadataVisitor>(
                 }
                 visitor.visit_data_metadata_map(reference.identifier, reference.unknown_fields)?;
             },
+            // These are schema-known root scalars/records which are not part
+            // of the inspection callbacks above.  They are intentionally
+            // ignored rather than being mistaken for unknown extensions.
+            2 | 4 | 5 | 6 | 7 | 8 | 9 => {},
             _ => visitor.visit_unknown_field()?,
         }
     }
@@ -8084,7 +8092,7 @@ fn inspect_component<V: PackageMetadataVisitor>(
             // The first pass only decodes ComponentInfo's own header.  The
             // remaining fields are known component-level records handled by
             // the second pass below, not unknown fields.
-            6 | 7 | 11 | 18 | 20 => {},
+            4 | 5 | 6 | 7 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 => {},
             _ => visitor.visit_unknown_field()?,
         }
     }

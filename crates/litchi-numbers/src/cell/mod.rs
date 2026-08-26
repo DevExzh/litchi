@@ -5,6 +5,9 @@
 //! [`data_format`](crate::cell::data_format) APIs instead of depending on its
 //! byte layout.
 
+/// Archive-free direct replies attached to a cell comment.
+pub mod comment;
+
 /// Checked, archive-free cell display formats.
 pub mod data_format;
 /// Unified archive-free interactive cell controls.

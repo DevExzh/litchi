@@ -234,6 +234,120 @@ mod tests {
     )
 
 
+def add_numbers_table_cell_comment_reply_mutation_scaffold(root: Path) -> None:
+    """Create the frozen Wave93 reply mutation contract in a temp tree."""
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        + "\n".join(
+            f"pub struct {name};"
+            for name in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES[1:]
+        )
+        + "\n}\n"
+        "pub struct CommentReply { pub text: String }\n"
+        "impl fmt::Debug for CommentReply {\n"
+        "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+        "        f.debug_struct(\"CommentReply\").field(\"text\", &\"<redacted>\").finish()\n"
+        "    }\n"
+        "}\n"
+        "pub struct CommentReplyIndex(u32);\n"
+        "impl CommentReplyIndex {\n"
+        "    pub fn new(value: u32) -> Self { Self(value) }\n"
+        "    pub fn index(self) -> u32 { self.0 }\n"
+        "    pub fn get(self) -> u32 { self.0 }\n"
+        "    pub fn try_from_usize(value: usize) -> Result<Self, CommentReplyError> { Ok(Self(value as u32)) }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    cell_mod = root / boundaries.NUMBERS_SOURCE_ROOT / "cell" / "mod.rs"
+    cell_mod.parent.mkdir(parents=True, exist_ok=True)
+    cell_mod.write_text("pub mod comment;\n", encoding="utf-8")
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "use crate::cell::comment::{CommentReply, CommentReplyIndex};\n"
+        "use crate::cell::comment::transaction::{CommentReplyCommit, CommentReplyEdit, CommentReplyPatch};\n"
+        "struct CommentOwnershipCensus;\n"
+        "fn resolve_comment_reply_rooted(_: SheetSelector, _: TableSelector, _: CellPosition, _: CommentReplyIndex) {}\n"
+        "fn comment_graph() { CommentList; comment_list_ids; cell_comment_keys; list_entries; entry_storage_ids; table_references; comment_storage; }\n"
+        "fn census_comment_reply_ownership() { CommentOwnershipCensus; global; all_components; ArchiveReference; storages; reply_ids; storage_uuid; author_ids; storage_occurrences; refcount; reference_count; }\n"
+        "fn copy_on_write_shared_clone_new_storage_cull() { copy_on_write; shared; clone; new_storage; cull; }\n"
+        "fn reject_duplicate_alias_cycle_depth_dependency() { duplicate; alias; cycle; depth; invalid; reject; dependency; }\n"
+        "fn archive_info_authority() { ArchiveInfo; MessageInfo; FieldInfo; object_references; aggregate; field_infos; preserve; }\n"
+        "fn metadata_ownership() { metadata; uuid; object_uuid; save_token; watermark; versioned; ambiguous; data_owner; root_map; external; }\n"
+        "fn atomic_source_bytes_inverse_patch_candidate_reopen_locality_same_content_previews() { atomic; source_bytes; inverse; Patch; candidate; reopen; locality; same_content; previews; publication; }\n"
+        "fn transaction_budget_preflight_charge() { TransactionBudget; WireBudget; budget; residual; preflight; charge; max_input; max_output; fields; work; depth; references; allocations; scratch; retained; reassembly; Snappy; ZIP; try_reserve; }\n"
+        "fn strict_comment_storage_route() { CommentStorageReplyRewrite; prepare_comment_storage_reply_rewrite(); CommentStorage; visitor; execution_requirements; execute; }\n"
+        "impl Package {\n"
+        "pub fn table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, index: CommentReplyIndex) -> Result<CommentReply, CommentReplyError> { todo!() }\n"
+        "pub fn table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex) -> Result<CommentReply, CommentReplyError> { self.table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), index) }\n"
+        "pub fn edit_table_cell_comment_replies(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition) -> Result<CommentReplyEdit, CommentReplyError> { todo!() }\n"
+        "pub fn edit_table_cell_comment_replies_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str) -> Result<CommentReplyEdit, CommentReplyError> { self.edit_table_cell_comment_replies(sheet, table, CellPosition::from_a1(address)) }\n"
+        "pub fn set_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, index: CommentReplyIndex, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "pub fn set_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { self.set_table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), index, value) }\n"
+        "pub fn remove_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, index: CommentReplyIndex) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "pub fn remove_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, index: CommentReplyIndex) -> Result<CommentReplyCommit, CommentReplyError> { self.remove_table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), index) }\n"
+        "pub fn add_table_cell_comment_reply(&self, sheet: SheetSelector, table: TableSelector, position: CellPosition, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "pub fn add_table_cell_comment_reply_a1(&self, sheet: SheetSelector, table: TableSelector, address: &str, value: CommentReply) -> Result<CommentReplyCommit, CommentReplyError> { self.add_table_cell_comment_reply(sheet, table, CellPosition::from_a1(address), value) }\n"
+        "pub fn apply_table_cell_comment_reply(&self, patch: &CommentReplyPatch) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "}\n"
+        "impl CommentReplyEdit {\n"
+        "pub fn set(self, value: CommentReply) -> Result<Self, CommentReplyError> { let _ = value; Ok(self) }\n"
+        "pub fn remove(self, index: CommentReplyIndex) -> Result<Self, CommentReplyError> { let _ = index; Ok(self) }\n"
+        "pub fn commit(self) -> Result<CommentReplyCommit, CommentReplyError> { todo!() }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    package = root / boundaries.NUMBERS_SOURCE_ROOT / "package.rs"
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text("pub(crate) mod comments;\n", encoding="utf-8")
+
+    lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        "pub mod cell;\n"
+        "pub use cell::comment::{CommentReply as TableCellCommentReply, CommentReplyIndex as TableCellCommentReplyIndex};\n"
+        "pub use cell::comment::transaction::{CommentReplyEdit as TableCellCommentReplyEdit, CommentReplyPatch as TableCellCommentReplyPatch, CommentReplyCommit as TableCellCommentReplyCommit, CommentReplyDiagnostics as TableCellCommentReplyDiagnostics, CommentReplyError as TableCellCommentReplyError, CommentReplyLimitKind as TableCellCommentReplyLimitKind, CommentReplyPath as TableCellCommentReplyPath};\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct CommentStorageReplyRewrite;\n"
+        "pub struct PreparedCommentStorageReplyRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn prepare_comment_storage_reply_rewrite() {}\n"
+        "impl PreparedCommentStorageReplyRewrite { pub fn prepare_report(&self) {} pub fn execution_requirements(&self) -> RewriteExecutionRequirements { todo!() } pub fn execute(&self, _: RewriteExecutionLimits) {} }\n"
+        "// strict canonical duplicate wrong-wire validation; unknown raw balanced groups preserve source order; max_input max_output max_fields max_work max_depth max_references try_reserve scratch retained allocations\n",
+        encoding="utf-8",
+    )
+    codec_fuzz = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE
+    codec_fuzz.parent.mkdir(parents=True, exist_ok=True)
+    codec_fuzz.write_text(
+        "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+        "fuzz_target!(|data: &[u8]| { let _ = data; prepare_comment_storage_reply_rewrite(); execute; unknown; inverse; });\n",
+        encoding="utf-8",
+    )
+    package_fuzz = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE
+    package_fuzz.parent.mkdir(parents=True, exist_ok=True)
+    package_fuzz.write_text(
+        "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+        "fuzz_target!(|data: &[u8]| { let _ = data; add_table_cell_comment_reply; set_table_cell_comment_reply; remove_table_cell_comment_reply; CommentReplyIndex; inverse; conflict; atomic; limit; });\n",
+        encoding="utf-8",
+    )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS,
+    ):
+        directory = root / corpus
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "seed.hex").write_text("00\n", encoding="utf-8")
+
+
 def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -23906,6 +24020,389 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_numbers_table_cell_comment_reply_facade_source_topology()",
+            main_source,
+        )
+
+    def test_numbers_table_cell_comment_reply_mutation_inventory_is_frozen(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS,
+            (
+                "table_cell_comment_reply",
+                "table_cell_comment_reply_a1",
+                "edit_table_cell_comment_replies",
+                "edit_table_cell_comment_replies_a1",
+                "set_table_cell_comment_reply",
+                "set_table_cell_comment_reply_a1",
+                "remove_table_cell_comment_reply",
+                "remove_table_cell_comment_reply_a1",
+                "add_table_cell_comment_reply",
+                "add_table_cell_comment_reply_a1",
+                "apply_table_cell_comment_reply",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES,
+            (
+                "CommentReplyIndex",
+                "CommentReplyEdit",
+                "CommentReplyPatch",
+                "CommentReplyCommit",
+                "CommentReplyDiagnostics",
+                "CommentReplyError",
+                "CommentReplyLimitKind",
+                "CommentReplyPath",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE,
+            Path("crates/litchi-iwa-protos/fuzz/fuzz_targets/comment_storage_reply_codec.rs"),
+        )
+
+    def test_numbers_table_cell_comment_reply_mutation_is_dormant_until_production_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub struct CommentReply { raw: u64 }\n"
+                "#[cfg(test)]\n"
+                "pub struct CommentReplyIndex(u32);\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn add_table_cell_comment_reply() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn add_table_cell_comment_reply() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any("missing semantic cell::comment source" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_mutation_accepts_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_mutation_requires_each_api_and_index_accessor(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            owner_complete = owner.read_text(encoding="utf-8")
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+            semantic_complete = semantic.read_text(encoding="utf-8")
+
+            for method in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS:
+                with self.subTest(method=method):
+                    owner.write_text(
+                        owner_complete.replace(
+                            f"pub fn {method}", f"pub fn missing_{method}", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing Package method {method}" in item for item in violations),
+                        violations,
+                    )
+
+            for name in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES:
+                with self.subTest(transaction_type=name):
+                    owner.write_text(owner_complete, encoding="utf-8")
+                    semantic.write_text(
+                        semantic_complete.replace(
+                            f"pub struct {name}", f"struct Missing{name}", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing canonical transaction type {name}" in item for item in violations),
+                        violations,
+                    )
+
+            semantic.write_text(semantic_complete, encoding="utf-8")
+            for name in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_INDEX_METHODS:
+                with self.subTest(index_accessor=name):
+                    semantic.write_text(
+                        semantic_complete.replace(
+                            f"pub fn {name}", f"fn missing_{name}", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {name} constructor/accessor" in item for item in violations),
+                        violations,
+                    )
+                    semantic.write_text(semantic_complete, encoding="utf-8")
+
+            semantic.write_text(
+                semantic_complete.replace(
+                    "-> Result<Self, CommentReplyError>", "-> Self", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("try_from_usize must return Result" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_mutation_requires_owner_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_REQUIRED_MARKERS.items():
+                with self.subTest(marker=label):
+                    owner.write_text(marker.sub("", complete), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+            owner.write_text(complete, encoding="utf-8")
+
+    def test_numbers_table_cell_comment_reply_mutation_rejects_public_leaks_aliases_and_debug(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for token in ("u64", "usize", "RawMessage", "Archive", "WireView", "MessageInfo", "FieldInfo", "ObjectReference", "bytes"):
+                with self.subTest(token=token):
+                    owner.write_text(
+                        complete
+                        + f"impl Package {{ pub fn leak_{token}(&self, value: {token}) -> CommentReply {{ todo!() }} }}\n",
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f" {token}" in item for item in violations),
+                        violations,
+                    )
+            owner.write_text(complete + "pub type ReplyEdit = CommentReplyEdit;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("flat alias ReplyEdit" in item for item in violations), violations)
+
+            lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use cell::comment::*;\n"
+                + "pub type TableCellCommentReply = CommentReply;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("comment transaction glob" in item for item in violations), violations)
+            self.assertTrue(any("not type aliases" in item for item in violations), violations)
+
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+            semantic_complete = semantic.read_text(encoding="utf-8")
+            semantic.write_text(
+                semantic_complete.replace(
+                    "pub struct CommentReply { pub text: String }",
+                    "#[derive(Debug)]\n"
+                    "pub struct CommentReply { pub text: String }",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            lib.write_text(
+                "pub mod cell;\n"
+                "pub use cell::comment::{CommentReply as TableCellCommentReply, CommentReplyIndex as TableCellCommentReplyIndex};\n"
+                "pub use cell::comment::transaction::{CommentReplyEdit as TableCellCommentReplyEdit, CommentReplyPatch as TableCellCommentReplyPatch, CommentReplyCommit as TableCellCommentReplyCommit, CommentReplyDiagnostics as TableCellCommentReplyDiagnostics, CommentReplyError as TableCellCommentReplyError, CommentReplyLimitKind as TableCellCommentReplyLimitKind, CommentReplyPath as TableCellCommentReplyPath};\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("text-bearing type must not derive Debug" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_mutation_masks_cfg_test_decoys_and_requires_fuzz_inventory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn cfg_only_reply_marker() { RawMessage; u64; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            codec_fuzz = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE
+            package_fuzz = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE
+            for path, fragment in (
+                (codec_fuzz, "codec fuzz target"),
+                (package_fuzz, "package fuzz target"),
+            ):
+                with self.subTest(path=path):
+                    original = path.read_text(encoding="utf-8")
+                    path.unlink()
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+                    self.assertTrue(any(fragment in item for item in violations), violations)
+                    path.write_text(original, encoding="utf-8")
+            corpus = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS
+            corpus_file = next(corpus.iterdir())
+            corpus_file.unlink()
+            corpus.rmdir()
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("package fuzz corpus" in item for item in violations), violations)
+
+    def test_iwa_numbers_cell_comment_reply_mutation_host_bridge_is_scoped_and_owner_gated(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_cell_comment_reply_mutation_source_topology(root),
+                [],
+            )
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            host = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "#[deprecated(note=\"legacy compatibility raw-ID bridge\")]\n"
+                "pub fn cell_comment_replies(&self, table_id: u64, row: usize, column: usize) { cell_comment_replies_in_package(); }\n"
+                "#[deprecated(note=\"legacy compatibility raw-ID bridge\")]\n"
+                "pub fn add_cell_comment_reply(&mut self, table_id: u64, row: usize, column: usize, text: String) { add_cell_comment_reply_in_package(); }\n"
+                "#[deprecated(note=\"legacy compatibility raw-ID bridge\")]\n"
+                "pub fn set_cell_comment_reply(&mut self, table_id: u64, row: usize, column: usize, reply_storage_object_id: u64, text: String) { set_cell_comment_reply_in_package(); }\n"
+                "#[deprecated(note=\"legacy compatibility raw-ID bridge\")]\n"
+                "pub fn remove_cell_comment_reply(&mut self, table_id: u64, row: usize, column: usize, reply_storage_object_id: u64) { remove_cell_comment_reply_in_package(); }\n"
+                "fn focused_bridge(input: &[u8]) { let package = litchi_numbers::Package::from_bytes(input); let (sheet, table) = selectors::focused_table_location(&editor, 10); let position = CellPosition::try_from_usize(0); package.table_cell_comment_reply(sheet, table, position, CommentReplyIndex::new(0)); }\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "fn legacy_test_identity() { editor.add_cell_comment_reply(); editor.cell_comment_replies(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_cell_comment_reply_mutation_source_topology(root),
+                [],
+            )
+            host.write_text(
+                host.read_text(encoding="utf-8").replace(
+                    "#[deprecated(note=\"legacy compatibility raw-ID bridge\")]\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_cell_comment_reply_mutation_source_topology(root)
+            self.assertTrue(any("must be deprecated" in item for item in violations), violations)
+
+    def test_iwa_numbers_cell_comment_reply_mutation_rejects_numbers_call_but_masks_pages_keynote(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            numbers_example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_COMMENT_REPLY_MIXED_EXAMPLE
+            numbers_example.parent.mkdir(parents=True, exist_ok=True)
+            (root / boundaries.IWA_NUMBERS_SOURCE_ROOT).mkdir(parents=True, exist_ok=True)
+            numbers_example.write_text(
+                "fn create_numbers() { editor.add_cell_comment_reply(); }\n"
+                "fn create_pages() { editor.add_cell_comment_reply(); }\n"
+                "fn create_keynote() { editor.add_cell_comment_reply(); }\n",
+                encoding="utf-8",
+            )
+            pages = root / "crates/litchi-iwa/src/pages/editor/comments.rs"
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/comments.rs"
+            pages.parent.mkdir(parents=True, exist_ok=True)
+            keynote.parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text("fn pages() { add_cell_comment_reply(); }\n", encoding="utf-8")
+            keynote.write_text("fn keynote() { add_cell_comment_reply(); }\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_numbers_cell_comment_reply_mutation_source_topology(root)
+            self.assertTrue(any("mixed example call" in item for item in violations), violations)
+            self.assertFalse(any("pages/editor/comments.rs" in item for item in violations), violations)
+            self.assertFalse(any("keynote/editor/comments.rs" in item for item in violations), violations)
+
+    def test_iwa_numbers_cell_comment_reply_mutation_rejects_raw_focused_bridge_arguments(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            host = root / boundaries.IWA_NUMBERS_CELL_COMMENT_EDITOR_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn focused_bridge(table_id: u64) { let package = litchi_numbers::Package::from_bytes(&[]); TableSelector::index(0); CellPosition::try_from_usize(0); package.add_table_cell_comment_reply(table_id, table_id, table_id, CommentReply); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_cell_comment_reply_mutation_source_topology(root)
+            self.assertTrue(any("missing SheetSelector::index" in item for item in violations), violations)
+            self.assertTrue(any("passes raw identifier/coordinate" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_mutation_audits_are_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_comment_reply_mutation_facade_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_iwa_numbers_cell_comment_reply_mutation_source_topology()",
             main_source,
         )
 

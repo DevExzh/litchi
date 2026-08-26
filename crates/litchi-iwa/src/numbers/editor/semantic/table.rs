@@ -6,6 +6,9 @@ use crate::numbers::editor::table::cell::Borders;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 use litchi_iwa_common::shape::stroke::Stroke;
 use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
+use litchi_numbers::cell::comment::{
+    CommentReplyIndex, transaction::Error as FocusedCommentReplyError,
+};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
 
@@ -192,6 +195,260 @@ fn clear_cell_comment_with_focused_owner(
         ));
     }
     Ok(FocusedCommentReplacement::Published(verified))
+}
+
+enum FocusedCommentReplySource {
+    Ready {
+        source: FocusedNumbersPackage,
+        sheet: litchi_numbers::SheetSelector<'static>,
+        table: litchi_numbers::TableSelector<'static>,
+        position: litchi_numbers::table::CellPosition,
+        source_bytes: Vec<u8>,
+    },
+    LegacyFallback,
+}
+
+enum FocusedCommentReplyPublication {
+    Published {
+        editor: NumbersEditor,
+        reply_id: Option<u64>,
+    },
+    LegacyFallback,
+}
+
+fn focused_comment_reply_source(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<FocusedCommentReplySource> {
+    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
+    // Re-materialize the checked positional selectors at this boundary so
+    // the legacy native ID is resolved exactly once before entering the
+    // selector-first package owner.
+    let sheet = litchi_numbers::SheetSelector::index(sheet.as_index().ok_or_else(|| {
+        Error::InvalidFormat("focused Numbers comment-reply sheet was not positional".to_owned())
+    })?);
+    let table = litchi_numbers::TableSelector::index(table.as_index().ok_or_else(|| {
+        Error::InvalidFormat("focused Numbers comment-reply table was not positional".to_owned())
+    })?);
+    let position =
+        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
+            Error::InvalidFormat(format!("invalid Numbers comment-reply coordinate: {error}"))
+        })?;
+    let source_bytes = editor.to_bytes()?;
+    let source = match FocusedNumbersPackage::from_bytes(&source_bytes) {
+        Ok(source) => source,
+        Err(litchi_numbers::PackageError::InvalidFormat(_)) => {
+            return Ok(FocusedCommentReplySource::LegacyFallback);
+        },
+        Err(error) => {
+            return Err(Error::InvalidFormat(format!(
+                "focused Numbers comment-reply source validation failed: {error}"
+            )));
+        },
+    };
+    Ok(FocusedCommentReplySource::Ready {
+        source,
+        sheet,
+        table,
+        position,
+        source_bytes,
+    })
+}
+
+fn focused_comment_reply_error(error: FocusedCommentReplyError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers comment-reply operation failed: {error}"
+    ))
+}
+
+fn focused_comment_reply_can_fallback(error: FocusedCommentReplyError) -> bool {
+    matches!(
+        error,
+        FocusedCommentReplyError::CommentNotFound { .. }
+            | FocusedCommentReplyError::UnsupportedDependency { .. }
+            | FocusedCommentReplyError::UnsupportedSource
+    )
+}
+
+fn publish_focused_comment_reply_package(
+    source_bytes: &[u8],
+    package: &FocusedNumbersPackage,
+) -> Result<NumbersEditor> {
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
+        Error::InvalidFormat(
+            "could not allocate focused Numbers comment-reply candidate".to_owned(),
+        )
+    })?;
+    package
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    NumbersEditor::from_bytes(&bytes)
+}
+
+fn focused_add_cell_comment_reply(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    text: &str,
+) -> Result<FocusedCommentReplyPublication> {
+    let before = match cell_comment_replies_in_package(editor.package(), table_id, row, column) {
+        Ok(replies) => replies,
+        Err(_) => return Ok(FocusedCommentReplyPublication::LegacyFallback),
+    };
+    let FocusedCommentReplySource::Ready {
+        source,
+        sheet,
+        table,
+        position,
+        source_bytes,
+    } = focused_comment_reply_source(editor, table_id, row, column)?
+    else {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    };
+    let commit = match source.add_table_cell_comment_reply(sheet, table, position, text) {
+        Ok(commit) => commit,
+        Err(error) if focused_comment_reply_can_fallback(error) => {
+            return Ok(FocusedCommentReplyPublication::LegacyFallback);
+        },
+        Err(error) => return Err(focused_comment_reply_error(error)),
+    };
+    let verified = publish_focused_comment_reply_package(&source_bytes, commit.package())?;
+    let after = cell_comment_replies_in_package(verified.package(), table_id, row, column)?;
+    if after.len() != before.len().saturating_add(1)
+        || before.iter().zip(after.iter()).any(|(before, after)| {
+            before.storage_id != after.storage_id || before.comment.text != after.comment.text
+        })
+        || after.last().is_none_or(|reply| reply.comment.text != text)
+    {
+        return Err(Error::InvalidFormat(
+            "focused Numbers comment-reply append failed legacy readback".to_owned(),
+        ));
+    }
+    Ok(FocusedCommentReplyPublication::Published {
+        editor: verified,
+        reply_id: after.last().map(|reply| reply.storage_id.get()),
+    })
+}
+
+fn focused_set_cell_comment_reply(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+    text: &str,
+) -> Result<FocusedCommentReplyPublication> {
+    let before = match cell_comment_replies_in_package(editor.package(), table_id, row, column) {
+        Ok(replies) => replies,
+        Err(_) => return Ok(FocusedCommentReplyPublication::LegacyFallback),
+    };
+    let Some(ordinal) = before
+        .iter()
+        .position(|reply| reply.storage_id.get() == reply_storage_object_id)
+    else {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    };
+    let index = CommentReplyIndex::try_from_usize(ordinal)
+        .map_err(|_| Error::InvalidFormat("Numbers comment-reply ordinal overflow".to_owned()))?;
+    let FocusedCommentReplySource::Ready {
+        source,
+        sheet,
+        table,
+        position,
+        source_bytes,
+    } = focused_comment_reply_source(editor, table_id, row, column)?
+    else {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    };
+    let commit = match source.set_table_cell_comment_reply(sheet, table, position, index, text) {
+        Ok(commit) => commit,
+        Err(error) if focused_comment_reply_can_fallback(error) => {
+            return Ok(FocusedCommentReplyPublication::LegacyFallback);
+        },
+        Err(error) => return Err(focused_comment_reply_error(error)),
+    };
+    let verified = publish_focused_comment_reply_package(&source_bytes, commit.package())?;
+    let after = cell_comment_replies_in_package(verified.package(), table_id, row, column)?;
+    if after.len() != before.len()
+        || after.iter().enumerate().any(|(index, reply)| {
+            if index == ordinal {
+                reply.comment.text != text
+            } else {
+                reply.storage_id != before[index].storage_id
+                    || reply.comment.text != before[index].comment.text
+            }
+        })
+    {
+        return Err(Error::InvalidFormat(
+            "focused Numbers comment-reply replacement failed legacy readback".to_owned(),
+        ));
+    }
+    Ok(FocusedCommentReplyPublication::Published {
+        editor: verified,
+        reply_id: after.get(ordinal).map(|reply| reply.storage_id.get()),
+    })
+}
+
+fn focused_remove_cell_comment_reply(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    reply_storage_object_id: u64,
+) -> Result<FocusedCommentReplyPublication> {
+    let before = match cell_comment_replies_in_package(editor.package(), table_id, row, column) {
+        Ok(replies) => replies,
+        Err(_) => return Ok(FocusedCommentReplyPublication::LegacyFallback),
+    };
+    let Some(ordinal) = before
+        .iter()
+        .position(|reply| reply.storage_id.get() == reply_storage_object_id)
+    else {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    };
+    let index = CommentReplyIndex::try_from_usize(ordinal)
+        .map_err(|_| Error::InvalidFormat("Numbers comment-reply ordinal overflow".to_owned()))?;
+    let FocusedCommentReplySource::Ready {
+        source,
+        sheet,
+        table,
+        position,
+        source_bytes,
+    } = focused_comment_reply_source(editor, table_id, row, column)?
+    else {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    };
+    let commit = match source.remove_table_cell_comment_reply(sheet, table, position, index) {
+        Ok(commit) => commit,
+        Err(error) if focused_comment_reply_can_fallback(error) => {
+            return Ok(FocusedCommentReplyPublication::LegacyFallback);
+        },
+        Err(error) => return Err(focused_comment_reply_error(error)),
+    };
+    let verified = publish_focused_comment_reply_package(&source_bytes, commit.package())?;
+    let after = cell_comment_replies_in_package(verified.package(), table_id, row, column)?;
+    if after.len().saturating_add(1) != before.len()
+        || after
+            .iter()
+            .any(|reply| reply.storage_id.get() == reply_storage_object_id)
+        || after.iter().enumerate().any(|(index, reply)| {
+            let before_index = if index < ordinal { index } else { index + 1 };
+            reply.storage_id != before[before_index].storage_id
+                || reply.comment.text != before[before_index].comment.text
+        })
+    {
+        return Err(Error::InvalidFormat(
+            "focused Numbers comment-reply removal failed legacy readback".to_owned(),
+        ));
+    }
+    Ok(FocusedCommentReplyPublication::Published {
+        editor: verified,
+        reply_id: None,
+    })
 }
 
 impl NumbersEditor {
@@ -2510,7 +2767,7 @@ impl NumbersEditor {
     /// ID-free semantic read.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply mutations and graph cleanup remain compatibility-host scope"
+        note = "legacy raw-ID Numbers cell-comment-reply read; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply identity remains compatibility-host scope"
     )]
     pub fn cell_comment_replies(
         &self,
@@ -2523,10 +2780,11 @@ impl NumbersEditor {
 
     /// Append a direct reply to an existing cell comment.
     ///
-    /// Reply creation and graph ownership remain compatibility-host scope.
+    /// Supported exact graphs delegate to the selector-first package owner;
+    /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply creation and graph ownership remain compatibility-host scope"
+        note = "legacy raw-ID Numbers cell-comment-reply creation API; use litchi_numbers::Package::add_table_cell_comment_reply with SheetSelector, TableSelector, and CellPosition for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn add_cell_comment_reply(
         &mut self,
@@ -2535,9 +2793,20 @@ impl NumbersEditor {
         column: usize,
         text: impl Into<String>,
     ) -> Result<u64> {
+        let text = text.into();
+        match focused_add_cell_comment_reply(self, table_id, row, column, &text)? {
+            FocusedCommentReplyPublication::Published { editor, reply_id } => {
+                *self = editor;
+                return reply_id.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "focused Numbers comment-reply append returned no identity".to_owned(),
+                    )
+                });
+            },
+            FocusedCommentReplyPublication::LegacyFallback => {},
+        }
         let mut staged = self.package.clone();
-        let reply_id =
-            add_cell_comment_reply_in_package(&mut staged, table_id, row, column, text.into())?;
+        let reply_id = add_cell_comment_reply_in_package(&mut staged, table_id, row, column, text)?;
         let bytes = staged.to_bytes()?;
         IWorkPackage::from_bytes(&bytes)?;
         self.package = staged;
@@ -2546,10 +2815,11 @@ impl NumbersEditor {
 
     /// Replace one direct reply and return its new copy-on-write object ID.
     ///
-    /// Reply replacement and graph ownership remain compatibility-host scope.
+    /// Supported exact graphs delegate to the selector-first package owner;
+    /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply replacement and graph ownership remain compatibility-host scope"
+        note = "legacy raw-ID Numbers cell-comment-reply replacement API; use litchi_numbers::Package::set_table_cell_comment_reply with SheetSelector, TableSelector, CellPosition, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn set_cell_comment_reply(
         &mut self,
@@ -2559,6 +2829,25 @@ impl NumbersEditor {
         reply_storage_object_id: u64,
         text: impl Into<String>,
     ) -> Result<u64> {
+        let text = text.into();
+        match focused_set_cell_comment_reply(
+            self,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+            &text,
+        )? {
+            FocusedCommentReplyPublication::Published { editor, reply_id } => {
+                *self = editor;
+                return reply_id.ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "focused Numbers comment-reply replacement returned no identity".to_owned(),
+                    )
+                });
+            },
+            FocusedCommentReplyPublication::LegacyFallback => {},
+        }
         let mut staged = self.package.clone();
         let reply_id = set_cell_comment_reply_in_package(
             &mut staged,
@@ -2566,7 +2855,7 @@ impl NumbersEditor {
             row,
             column,
             reply_storage_object_id,
-            text.into(),
+            text,
         )?;
         let bytes = staged.to_bytes()?;
         IWorkPackage::from_bytes(&bytes)?;
@@ -2576,10 +2865,11 @@ impl NumbersEditor {
 
     /// Remove one direct reply from an existing cell comment.
     ///
-    /// Reply removal and graph cleanup remain compatibility-host scope.
+    /// Supported exact graphs delegate to the selector-first package owner;
+    /// this deprecated raw-ID surface remains as a compatibility fallback.
     #[deprecated(
         since = "0.0.1",
-        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::table_cell_comment_replies with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read; reply removal and graph cleanup remain compatibility-host scope"
+        note = "legacy raw-ID Numbers cell-comment-reply removal API; use litchi_numbers::Package::remove_table_cell_comment_reply with SheetSelector, TableSelector, CellPosition, and CommentReplyIndex for selector-first writes; this method delegates supported graphs and retains a compatibility fallback"
     )]
     pub fn remove_cell_comment_reply(
         &mut self,
@@ -2588,6 +2878,19 @@ impl NumbersEditor {
         column: usize,
         reply_storage_object_id: u64,
     ) -> Result<()> {
+        match focused_remove_cell_comment_reply(
+            self,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+        )? {
+            FocusedCommentReplyPublication::Published { editor, .. } => {
+                *self = editor;
+                return Ok(());
+            },
+            FocusedCommentReplyPublication::LegacyFallback => {},
+        }
         let mut staged = self.package.clone();
         remove_cell_comment_reply_in_package(
             &mut staged,
