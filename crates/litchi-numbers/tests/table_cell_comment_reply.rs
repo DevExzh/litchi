@@ -112,6 +112,7 @@ enum Corruption {
     UnknownMetadata,
     Locked,
     MissingAuthor,
+    MissingAuthorStorage,
     MissingCommentList,
 }
 
@@ -648,6 +649,9 @@ fn metadata(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec
             )
         });
     }
+    if matches!(corruption, Some(Corruption::MissingAuthorStorage)) {
+        document_ids.retain(|identifier| !matches!(*identifier, AUTHOR_ID | AUTHOR_STORAGE_ID));
+    }
     document_ids.retain(|identifier| {
         *identifier != SECOND_ROOT_COMMENT_ID
             || matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent)
@@ -852,6 +856,14 @@ fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> TestResult<Vec<
             (mode, corruption),
             (FixtureMode::Rootless, _)
         ))?);
+    }
+    if matches!(corruption, Some(Corruption::MissingAuthorStorage)) {
+        document_objects.retain(|object| {
+            !object.messages.iter().any(|message| {
+                message.type_ == ANNOTATION_AUTHOR_STORAGE_TYPE
+                    || message.type_ == ANNOTATION_AUTHOR_TYPE
+            })
+        });
     }
     let all_comments = reply_objects(mode, corruption)?;
     let mut split_replies = Vec::new();
@@ -1153,6 +1165,103 @@ fn root_comment_creation_builds_a_missing_comment_list_atomically() -> TestResul
     assert!(model_info.object_references.contains(&list_identifier));
     assert!(model_info.field_infos.iter().any(|field| {
         field.path.as_slice() == [4, 19] && field.object_references == [list_identifier]
+    }));
+    let fresh_ids = archive
+        .objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .filter(|identifier| *identifier > WATERMARK)
+        .collect::<Vec<_>>();
+    assert_eq!(fresh_ids.len(), 3);
+    let metadata_archive = member_archive(&candidate, METADATA_MEMBER)?;
+    let metadata_payload = metadata_archive
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .find(|message| message.type_ == METADATA_TYPE)
+        .ok_or_else(|| io::Error::other("package metadata is missing"))?;
+    let metadata = tsp::PackageMetadata::decode(metadata_payload.data.as_slice())?;
+    assert_eq!(metadata.last_object_identifier, WATERMARK + 3);
+    let document = metadata
+        .components
+        .iter()
+        .find(|component| component.identifier == 100)
+        .ok_or_else(|| io::Error::other("Document metadata component is missing"))?;
+    for identifier in &fresh_ids {
+        assert!(
+            document
+                .object_uuid_map_entries
+                .iter()
+                .any(|entry| entry.identifier == *identifier),
+            "fresh object {identifier} is missing current UUID ownership"
+        );
+    }
+    let restored = commit
+        .package()
+        .apply_table_cell_comment(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn root_comment_creation_builds_a_missing_author_storage_atomically() -> TestResult {
+    let source = fixture(
+        FixtureMode::Rootless,
+        Some(Corruption::MissingAuthorStorage),
+    )?;
+    let package = load_package(&source)?;
+    let commit = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        CellPosition::new(1, 0),
+        "new root with generated author storage",
+    )?;
+    assert_eq!(
+        commit
+            .package()
+            .table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 0),
+            )?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("new root with generated author storage"),
+    );
+    let candidate = exact_bytes(commit.package())?;
+    let archive = member_archive(&candidate, DOCUMENT_MEMBER)?;
+    let author = archive
+        .objects
+        .iter()
+        .find(|object| {
+            object
+                .messages
+                .iter()
+                .any(|message| message.type_ == ANNOTATION_AUTHOR_TYPE)
+        })
+        .ok_or_else(|| io::Error::other("generated author is missing"))?;
+    let author_identifier = author.archive_info.identifier.unwrap_or_default();
+    assert!(author_identifier > WATERMARK);
+    let storage = archive
+        .objects
+        .iter()
+        .find(|object| {
+            object
+                .messages
+                .iter()
+                .any(|message| message.type_ == ANNOTATION_AUTHOR_STORAGE_TYPE)
+        })
+        .ok_or_else(|| io::Error::other("generated author storage is missing"))?;
+    let storage_identifier = storage.archive_info.identifier.unwrap_or_default();
+    assert!(storage_identifier > WATERMARK);
+    let storage_info = storage
+        .archive_info
+        .message_infos
+        .first()
+        .ok_or_else(|| io::Error::other("generated author-storage metadata is missing"))?;
+    assert_eq!(storage_info.object_references, [author_identifier]);
+    assert!(storage_info.field_infos.iter().any(|field| {
+        field.path.as_slice() == [1] && field.object_references == [author_identifier]
     }));
     let fresh_ids = archive
         .objects
