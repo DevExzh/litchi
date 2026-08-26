@@ -1295,6 +1295,7 @@ enum Case {
     OdpSemanticListSlides,
     OdpSemanticOneSlide,
     OdpSemanticFullText,
+    OdpSemanticTextToSink,
     OdpSemanticCreateSmall,
     OdpSemanticNoopEditSave,
     OdpSemanticOneEditSave,
@@ -1842,6 +1843,7 @@ impl Case {
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
             Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
             Self::OdpSemanticFullText => "odp_semantic_full_text",
+            Self::OdpSemanticTextToSink => "odp_semantic_text_to_sink",
             Self::OdpSemanticCreateSmall => "odp_semantic_create_small",
             Self::OdpSemanticNoopEditSave => "odp_semantic_noop_edit_save",
             Self::OdpSemanticOneEditSave => "odp_semantic_one_edit_save",
@@ -2343,6 +2345,7 @@ impl Case {
                 | Self::OdpSemanticListSlides
                 | Self::OdpSemanticOneSlide
                 | Self::OdpSemanticFullText
+                | Self::OdpSemanticTextToSink
                 | Self::OdpSemanticCreateSmall
                 | Self::OdpSemanticNoopEditSave
                 | Self::OdpSemanticOneEditSave
@@ -10382,6 +10385,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
         "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
         "odp_semantic_full_text" => Some(Case::OdpSemanticFullText),
+        "odp_semantic_text_to_sink" => Some(Case::OdpSemanticTextToSink),
         "odp_semantic_create_small" => Some(Case::OdpSemanticCreateSmall),
         "odp_semantic_noop_edit_save" => Some(Case::OdpSemanticNoopEditSave),
         "odp_semantic_one_edit_save" => Some(Case::OdpSemanticOneEditSave),
@@ -10784,6 +10788,7 @@ fn usage_text() -> String {
                                        detect_ods_polyglot,detect_ods_catalog_alias,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
+                                       odp_semantic_text_to_sink,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
                                        odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
                                        odp_media_textbox_scalar_replace_save,\n\
@@ -19480,6 +19485,7 @@ fn run_case_with_config(
         | Case::OdpSemanticListSlides
         | Case::OdpSemanticOneSlide
         | Case::OdpSemanticFullText
+        | Case::OdpSemanticTextToSink
         | Case::OdpSemanticCreateSmall
         | Case::OdpSemanticNoopEditSave
         | Case::OdpSemanticOneEditSave => {
@@ -30813,6 +30819,9 @@ fn run_semantic_odp(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    if case == Case::OdpSemanticTextToSink {
+        return run_semantic_odp_text_to_sink(corpus, warmup_iterations, samples);
+    }
     let shape = semantic_shape(corpus)?;
     let index = shape.pptx_slides() / 2;
     let mut elapsed = Vec::with_capacity(samples);
@@ -30910,6 +30919,70 @@ fn run_semantic_odp(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_odp_text_to_sink(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let slide_count = shape.pptx_slides();
+    let expected_text = (0..slide_count)
+        .map(|index| {
+            format!(
+                "{}\n{}",
+                semantic_odp_title(index, false),
+                semantic_odp_text(index, false)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let expected_bytes = u64::try_from(expected_text.len())?;
+    let expected_objects = u64::try_from(slide_count)?;
+    let expected_digest = sha256_hex(expected_text.as_bytes());
+    let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+
+    verify_semantic_odp(&presentation, shape, false)?;
+    if presentation.text()? != expected_text {
+        return Err("semantic ODP sink oracle differs from full-text semantics".into());
+    }
+    let options =
+        litchi_core::TextOutputOptions::new("\n", "\n\n", expected_bytes, expected_objects);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = HashingDiscardSink::without_authoring_window(expected_bytes);
+        let started = Instant::now();
+        let report = presentation.write_text_to(&mut sink, options)?;
+        let duration = started.elapsed();
+        let (summary, digest) = sink.finish();
+        if report.bytes_written() != expected_bytes
+            || report.objects_written() != expected_objects
+            || summary.accepted_bytes != expected_bytes
+            || digest != expected_digest
+        {
+            return Err("semantic ODP text sink evidence differs from expected semantics".into());
+        }
+        if summary.retained_output_bytes != Some(0)
+            || summary.write_calls == 0
+            || summary.largest_write == 0
+        {
+            return Err("semantic ODP text sink did not expose bounded write evidence".into());
+        }
+        std::hint::black_box(report);
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "semantic ODP sequential output")?;
+    if sink.retained_output_bytes != Some(0) || sink.write_calls == 0 || sink.largest_write == 0 {
+        return Err("semantic ODP text sink summary is incomplete".into());
+    }
+    let mut result = result(Case::OdpSemanticTextToSink, corpus, elapsed, Some(sink));
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
 }
 
 fn run_odp_media_textbox_edit_save(
@@ -49343,7 +49416,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 398);
+        assert_eq!(selectable_count, 399);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -52757,6 +52830,39 @@ mod tests {
         );
 
         let sink = result.sink.expect("ODT semantic text sink summary");
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert!(sink.accepted_bytes > 0);
+        assert!(sink.write_calls > 0);
+        assert!(sink.largest_write <= sink.accepted_bytes);
+    }
+
+    #[test]
+    fn semantic_odp_text_sink_is_opt_in_and_deterministic() {
+        let case = Case::OdpSemanticTextToSink;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert!(!Case::DEFAULT.contains(&case));
+
+        let corpus = build_semantic_odp_corpus(SemanticShape::Tiny).unwrap();
+        let result = run_case(case, &corpus, 0, 1).unwrap();
+        assert_eq!(result.case, "odp_semantic_text_to_sink");
+        assert_eq!(result.elapsed_ns.samples.len(), 1);
+        let expected_text = (0..SemanticShape::Tiny.pptx_slides())
+            .map(|index| {
+                format!(
+                    "{}\n{}",
+                    super::semantic_odp_title(index, false),
+                    super::semantic_odp_text(index, false)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let expected_digest = super::sha256_hex(expected_text.as_bytes());
+        assert_eq!(
+            result.output_sha256.as_deref(),
+            Some(expected_digest.as_str())
+        );
+
+        let sink = result.sink.expect("ODP semantic text sink summary");
         assert_eq!(sink.retained_output_bytes, Some(0));
         assert!(sink.accepted_bytes > 0);
         assert!(sink.write_calls > 0);

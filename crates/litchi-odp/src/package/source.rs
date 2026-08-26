@@ -16,7 +16,10 @@ use std::path::Path;
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
-use litchi_core::{Error, ReadAt, Result, SourceVersion};
+use litchi_core::{
+    Error, ReadAt, Result, SequentialTextWriter, SourceVersion, TextOutputError, TextOutputOptions,
+    TextOutputReport,
+};
 use litchi_odf_common::core::{
     Meta, SourceBackedPackage, SourcePackageLimits, validate_content_part,
 };
@@ -455,6 +458,45 @@ impl SourceBackedPresentation {
         }
         self.check_source()?;
         Ok(all_text.join("\n\n"))
+    }
+
+    /// Stream one semantic text object per slide into `output` in document order.
+    ///
+    /// The retained `content.xml` snapshot is used directly; package media is
+    /// not read. Output may be partial when parsing, limits, or the sink fail.
+    /// This method does not flush or roll back the sink and provides no
+    /// cancellation hook. The paragraph separator applies to all paragraph,
+    /// title/body, and shape-text boundaries within each slide; the slide
+    /// separator applies between slide objects. Source freshness is checked
+    /// before and after the pass, with a source-change error taking precedence while preserving
+    /// exact progress.
+    /// Semantic output parity is defined for documents accepted by the ordinary
+    /// parser; the fused sink validates only its bounded XML/text contexts and
+    /// does not promise full parser validation or error-precedence parity. Use
+    /// `with_empty_objects(false)` to match [`super::Presentation::text`]
+    /// filtering of empty slides.
+    ///
+    /// # Errors
+    /// Returns a typed error containing exact partial-output progress.
+    pub fn write_text_to<W: std::io::Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        self.check_source()
+            .map_err(|source| TextOutputError::Document {
+                source,
+                progress: TextOutputReport::default(),
+            })?;
+        let paragraph_separator = options.paragraph_separator();
+        let mut writer = SequentialTextWriter::new(output, options);
+        let result =
+            Parser::write_slides_text_to(&self.content_xml, &mut writer, paragraph_separator);
+        let progress = writer.progress();
+        if let Err(source) = self.check_source() {
+            return Err(TextOutputError::Document { source, progress });
+        }
+        result.map(|()| writer.finish())
     }
 
     fn text_from_cache(&self, cache: &Option<String>) -> Result<String> {

@@ -7,9 +7,12 @@ use super::super::{
     PRESENTATION_NAMESPACE, ParagraphText, Parser, Result, SCRIPT_NAMESPACE, STYLE_NAMESPACE,
     ScriptEventListener, Shape, ShapeBuilder, ShapeContainerScope, ShapeEventListener, ShapeType,
     Slide, Speed, Transition, TransitionStyleDefinition, TransitionStyles, XLINK_NAMESPACE,
-    XmlVersion, validate_legacy_animation_root,
+    XmlNamespace, XmlVersion, validate_legacy_animation_root,
 };
 use super::validation::ElementAttrs;
+use litchi_core::{SequentialTextWriter, TextObjectKind, TextOutputError};
+use quick_xml::name::ResolveResult;
+use std::io::Write;
 
 impl Parser {
     pub(super) fn parse_animation_node(
@@ -2054,6 +2057,1049 @@ impl Parser {
 /// driver surfaces it ahead of any recorded slide-scan error, matching the
 /// historical pass order in which the transition scan ran to completion (or
 /// failed) before slide parsing started.
+const SINK_MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
+const SINK_MAX_TEXT_FRAGMENTS: usize = 1_000_000;
+const SINK_MAX_TEXT_DEPTH: usize = 4096;
+const SINK_MAX_SHAPES: usize = 65_536;
+const SINK_MAX_SHAPE_DEPTH: usize = 64;
+const SINK_MAX_SPACE_COUNT: usize = 1_000_000;
+const SINK_MAX_ELEMENT_NAME_BYTES: usize = 1_048_576;
+const SINK_MAX_OPEN_ELEMENT_NAME_BYTES: usize = 4 * 1_048_576;
+
+/// Bounded accounting for decoded visible text on the fused presentation pass.
+///
+/// The ordinary slide projection keeps one complete model, whereas this path
+/// keeps only the current slide. Charging before appending still prevents a
+/// document with many simultaneously active nested shape strings from gaining
+/// one full text budget per string.
+struct SinkTextBudget {
+    decoded_bytes: usize,
+    fragments: usize,
+}
+
+impl SinkTextBudget {
+    fn charge(&mut self, additional: usize) -> Result<()> {
+        self.decoded_bytes = self
+            .decoded_bytes
+            .checked_add(additional)
+            .ok_or_else(|| Error::InvalidFormat("ODP text size overflow".to_string()))?;
+        if self.decoded_bytes > SINK_MAX_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP text exceeds {SINK_MAX_TEXT_BYTES} bytes"
+            )));
+        }
+        Ok(())
+    }
+
+    fn count_fragment(&mut self) -> Result<()> {
+        self.fragments = self
+            .fragments
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("ODP text fragment count overflow".to_string()))?;
+        if self.fragments > SINK_MAX_TEXT_FRAGMENTS {
+            return Err(Error::InvalidFormat(format!(
+                "ODP text exceeds {SINK_MAX_TEXT_FRAGMENTS} paragraphs"
+            )));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct SinkElementNameBudget {
+    open_bytes: usize,
+    open_lengths: Vec<usize>,
+}
+
+impl SinkElementNameBudget {
+    fn validate_name(name: &[u8]) -> Result<usize> {
+        if name.len() > SINK_MAX_ELEMENT_NAME_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP element name exceeds {SINK_MAX_ELEMENT_NAME_BYTES} bytes"
+            )));
+        }
+        Ok(name.len())
+    }
+
+    fn start(&mut self, name: &[u8]) -> Result<()> {
+        let length = Self::validate_name(name)?;
+        let total = self.open_bytes.checked_add(length).ok_or_else(|| {
+            Error::InvalidFormat("ODP open element name size overflow".to_string())
+        })?;
+        if total > SINK_MAX_OPEN_ELEMENT_NAME_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP open element names exceed {SINK_MAX_OPEN_ELEMENT_NAME_BYTES} bytes"
+            )));
+        }
+        self.open_lengths
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODP sink open element names",
+                source,
+            })?;
+        self.open_lengths.push(length);
+        self.open_bytes = total;
+        Ok(())
+    }
+
+    fn end(&mut self, name: &[u8]) -> Result<()> {
+        Self::validate_name(name)?;
+        let length = self.open_lengths.pop().ok_or_else(|| {
+            Error::InvalidFormat("ODP sink element name stack underflow".to_string())
+        })?;
+        self.open_bytes = self.open_bytes.checked_sub(length).ok_or_else(|| {
+            Error::InvalidFormat("ODP open element name size underflow".to_string())
+        })?;
+        Ok(())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.open_lengths.is_empty()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SinkShapeKind {
+    TextBox,
+    Placeholder,
+    Other,
+}
+
+struct SinkShape {
+    kind: SinkShapeKind,
+    is_title: bool,
+    paragraphs: SinkTextPart,
+    children: Vec<SinkShape>,
+}
+
+impl SinkShape {
+    fn new(kind: SinkShapeKind, is_title: bool) -> Self {
+        Self {
+            kind,
+            is_title,
+            paragraphs: SinkTextPart::new(),
+            children: Vec::new(),
+        }
+    }
+
+    fn push_paragraph(
+        &mut self,
+        text: String,
+        budget: &mut SinkTextBudget,
+        separator: &str,
+    ) -> Result<()> {
+        self.paragraphs.push(text, budget, separator)
+    }
+}
+
+struct SinkTextPart {
+    paragraphs: Vec<String>,
+}
+
+impl SinkTextPart {
+    fn new() -> Self {
+        Self {
+            paragraphs: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, text: String, budget: &mut SinkTextBudget, separator: &str) -> Result<()> {
+        if !self.paragraphs.is_empty() {
+            budget.charge(separator.len())?;
+        }
+        budget.count_fragment()?;
+        self.paragraphs
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODP sink text fragments",
+                source,
+            })?;
+        self.paragraphs.push(text);
+        Ok(())
+    }
+
+    fn append_part(
+        &mut self,
+        mut part: SinkTextPart,
+        budget: &mut SinkTextBudget,
+        separator: &str,
+    ) -> Result<()> {
+        if part.paragraphs.is_empty() {
+            return Ok(());
+        }
+        if !self.paragraphs.is_empty() {
+            budget.charge(separator.len())?;
+        }
+        self.paragraphs
+            .try_reserve(part.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODP sink text fragments",
+                source,
+            })?;
+        self.paragraphs.append(&mut part.paragraphs);
+        Ok(())
+    }
+
+    fn trim_outer(mut self) -> Option<Self> {
+        let mut first = 0;
+        while first < self.paragraphs.len() && self.paragraphs[first].trim_start().is_empty() {
+            first += 1;
+        }
+        let mut last = self.paragraphs.len();
+        while last > first && self.paragraphs[last - 1].trim_end().is_empty() {
+            last -= 1;
+        }
+        if first != 0 {
+            self.paragraphs.drain(..first).for_each(drop);
+        }
+        self.paragraphs.truncate(last - first);
+        if let Some(first) = self.paragraphs.first_mut() {
+            let start = first.len().saturating_sub(first.trim_start().len());
+            if start != 0 {
+                first.drain(..start).for_each(drop);
+            }
+        }
+        if let Some(last) = self.paragraphs.last_mut() {
+            last.truncate(last.trim_end().len());
+        }
+        (!self.paragraphs.is_empty()).then_some(self)
+    }
+}
+
+struct SinkSlideState {
+    title: Option<SinkTextPart>,
+    body: SinkTextPart,
+    shapes: Vec<SinkShape>,
+    shape_stack: Vec<SinkShape>,
+}
+
+impl SinkSlideState {
+    fn new() -> Self {
+        Self {
+            title: None,
+            body: SinkTextPart::new(),
+            shapes: Vec::new(),
+            shape_stack: Vec::new(),
+        }
+    }
+
+    fn finish_shape(
+        &mut self,
+        shape: SinkShape,
+        budget: &mut SinkTextBudget,
+        separator: &str,
+    ) -> Result<()> {
+        if let Some(parent) = self.shape_stack.last_mut() {
+            parent
+                .children
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODP sink shape children",
+                    source,
+                })?;
+            parent.children.push(shape);
+            return Ok(());
+        }
+
+        if shape.is_title {
+            self.title = Some(shape.paragraphs);
+        } else if matches!(
+            shape.kind,
+            SinkShapeKind::TextBox | SinkShapeKind::Placeholder
+        ) && shape
+            .paragraphs
+            .paragraphs
+            .iter()
+            .any(|text| !text.trim().is_empty())
+        {
+            self.body.append_part(shape.paragraphs, budget, separator)?;
+        } else {
+            self.shapes
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODP sink top-level shapes",
+                    source,
+                })?;
+            self.shapes.push(shape);
+        }
+        Ok(())
+    }
+
+    fn append_body_paragraph(
+        &mut self,
+        text: String,
+        budget: &mut SinkTextBudget,
+        separator: &str,
+    ) -> Result<()> {
+        self.body.push(text, budget, separator)
+    }
+
+    fn into_parts(self, budget: &mut SinkTextBudget, separator: &str) -> Result<Vec<String>> {
+        let Self {
+            title,
+            body,
+            shapes,
+            shape_stack: _,
+        } = self;
+        let mut output = Vec::new();
+        output
+            .try_reserve(shapes.len().saturating_add(2))
+            .map_err(|source| Error::Allocation {
+                resource: "ODP sink slide fragments",
+                source,
+            })?;
+        if let Some(title) = title.and_then(SinkTextPart::trim_outer) {
+            append_sink_part_fragments(&mut output, title, budget, separator)?;
+        }
+        if let Some(body) = body.trim_outer() {
+            append_sink_part_fragments(&mut output, body, budget, separator)?;
+        }
+        for shape in shapes {
+            collect_sink_shape_parts(shape, &mut output, budget, separator)?;
+        }
+        Ok(output)
+    }
+}
+
+fn append_sink_part_fragments(
+    output: &mut Vec<String>,
+    part: SinkTextPart,
+    budget: &mut SinkTextBudget,
+    separator: &str,
+) -> Result<()> {
+    if !output.is_empty() {
+        budget.charge(separator.len())?;
+    }
+    output
+        .try_reserve(part.paragraphs.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODP sink slide fragments",
+            source,
+        })?;
+    output.extend(part.paragraphs);
+    Ok(())
+}
+
+fn collect_sink_shape_parts(
+    shape: SinkShape,
+    output: &mut Vec<String>,
+    budget: &mut SinkTextBudget,
+    separator: &str,
+) -> Result<()> {
+    let SinkShape {
+        paragraphs,
+        children,
+        kind: _,
+        is_title: _,
+    } = shape;
+    if let Some(paragraphs) = paragraphs.trim_outer() {
+        append_sink_part_fragments(output, paragraphs, budget, separator)?;
+    }
+    for child in children {
+        collect_sink_shape_parts(child, output, budget, separator)?;
+    }
+    Ok(())
+}
+
+fn sink_is_page(namespace: NsClass, local_name: &[u8]) -> bool {
+    namespace == NsClass::Drawing && local_name == b"page"
+}
+
+fn sink_is_notes(namespace: NsClass, local_name: &[u8]) -> bool {
+    namespace == NsClass::Presentation && local_name == b"notes"
+}
+
+fn sink_is_text_block(namespace: NsClass, local_name: &[u8]) -> bool {
+    namespace == NsClass::Text && matches!(local_name, b"p" | b"h")
+}
+
+fn sink_shape_kind(namespace: NsClass, local_name: &[u8]) -> Option<SinkShapeKind> {
+    if namespace == NsClass::Drawing {
+        return match local_name {
+            b"frame" => Some(SinkShapeKind::TextBox),
+            b"rect" | b"ellipse" | b"line" | b"custom-shape" | b"circle" | b"path" | b"polygon"
+            | b"polyline" | b"regular-polygon" | b"page-thumbnail" | b"measure" | b"caption"
+            | b"connector" | b"control" | b"g" => Some(SinkShapeKind::Other),
+            _ => None,
+        };
+    }
+    if namespace == NsClass::Dr3d {
+        return match local_name {
+            b"scene" | b"light" | b"cube" | b"sphere" | b"extrude" | b"rotate" => {
+                Some(SinkShapeKind::Other)
+            },
+            _ => None,
+        };
+    }
+    None
+}
+
+fn sink_shape(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    namespace: NsClass,
+) -> Result<SinkShape> {
+    let presentation_class = sink_presentation_class(reader, element)?;
+    let kind = if namespace == NsClass::Drawing && element.local_name().as_ref() == b"frame" {
+        if !matches!(presentation_class, SinkPresentationClass::Absent) {
+            SinkShapeKind::Placeholder
+        } else {
+            SinkShapeKind::TextBox
+        }
+    } else {
+        SinkShapeKind::Other
+    };
+    Ok(SinkShape::new(
+        kind,
+        matches!(presentation_class, SinkPresentationClass::Title),
+    ))
+}
+
+const SINK_MAX_ATTRIBUTES: usize = 256;
+const SINK_MAX_ATTRIBUTE_VALUE_BYTES: usize = 1_048_576;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SinkPresentationClass {
+    Absent,
+    Present,
+    Title,
+}
+
+fn sink_presentation_class(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<SinkPresentationClass> {
+    let mut attribute_count = 0usize;
+    for result in element.attributes() {
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("ODP shape attribute count overflow".to_string())
+        })?;
+        if attribute_count > SINK_MAX_ATTRIBUTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP shape exceeds {SINK_MAX_ATTRIBUTES} attributes"
+            )));
+        }
+        let attribute = result.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODP shape attribute: {error}"))
+        })?;
+        if attribute.value.len() > SINK_MAX_ATTRIBUTE_VALUE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP shape attribute exceeds {SINK_MAX_ATTRIBUTE_VALUE_BYTES} bytes"
+            )));
+        }
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        if !matches!(namespace, ResolveResult::Bound(XmlNamespace(uri)) if uri == PRESENTATION_NAMESPACE)
+            || local_name.as_ref() != b"class"
+        {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid presentation:class value: {error}"))
+            })?;
+        if value.len() > SINK_MAX_ATTRIBUTE_VALUE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "presentation:class exceeds {SINK_MAX_ATTRIBUTE_VALUE_BYTES} bytes"
+            )));
+        }
+        return Ok(if value.as_ref() == "title" {
+            SinkPresentationClass::Title
+        } else {
+            SinkPresentationClass::Present
+        });
+    }
+    Ok(SinkPresentationClass::Absent)
+}
+
+fn sink_text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<usize> {
+    let mut attribute_count = 0usize;
+    let mut count = None;
+    for result in element.attributes() {
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("ODP text:s attribute count overflow".to_string())
+        })?;
+        if attribute_count > SINK_MAX_ATTRIBUTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP text:s exceeds {SINK_MAX_ATTRIBUTES} attributes"
+            )));
+        }
+        let attribute = result.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODP text:s attribute: {error}"))
+        })?;
+        if attribute.value.len() > SINK_MAX_ATTRIBUTE_VALUE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODP text:s attribute exceeds {SINK_MAX_ATTRIBUTE_VALUE_BYTES} bytes"
+            )));
+        }
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        if !matches!(namespace, ResolveResult::Bound(XmlNamespace(uri)) if uri == super::super::TEXT_NAMESPACE)
+            || local_name.as_ref() != b"c"
+        {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| Error::InvalidFormat(format!("invalid text:s count: {error}")))?;
+        if value.len() > SINK_MAX_ATTRIBUTE_VALUE_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "text:s count exceeds {SINK_MAX_ATTRIBUTE_VALUE_BYTES} bytes"
+            )));
+        }
+        let parsed = value
+            .parse::<usize>()
+            .map_err(|_error| Error::InvalidFormat("invalid text:s count value".to_string()))?;
+        if count.replace(parsed).is_some() {
+            return Err(Error::InvalidFormat(
+                "duplicate text:s count attribute".to_string(),
+            ));
+        }
+    }
+    Ok(count.unwrap_or(1))
+}
+
+fn normalized_xml10_decoded_len(raw: &[u8], context: &str) -> Result<usize> {
+    std::str::from_utf8(raw).map_err(|error| {
+        Error::InvalidFormat(format!("invalid presentation {context}: {error}"))
+    })?;
+    let mut length = raw.len();
+    let mut index = 0;
+    while index < raw.len() {
+        if raw[index] == b'\r' {
+            if raw.get(index + 1) == Some(&b'\n') {
+                length = length
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("ODP text size overflow".to_string()))?;
+                index += 2;
+            } else {
+                index += 1;
+            }
+        } else {
+            index += 1;
+        }
+    }
+    Ok(length)
+}
+
+fn sink_push_decoded_text(
+    paragraph: &mut ParagraphText,
+    decoded: &str,
+    charged_len: usize,
+) -> Result<()> {
+    if decoded.len() != charged_len {
+        return Err(Error::InvalidFormat(
+            "ODP sink text precharge mismatch".to_string(),
+        ));
+    }
+    paragraph
+        .value
+        .try_reserve(charged_len)
+        .map_err(|source| Error::Allocation {
+            resource: "ODP sink paragraph text",
+            source,
+        })?;
+    paragraph.push_text(decoded);
+    Ok(())
+}
+
+fn sink_push_xml_text(
+    paragraph: &mut ParagraphText,
+    raw: &[u8],
+    context: &str,
+    budget: &mut SinkTextBudget,
+) -> Result<()> {
+    let decoded_len = normalized_xml10_decoded_len(raw, context)?;
+    budget.charge(decoded_len)?;
+    let mut segment_start = 0usize;
+    let mut index = 0usize;
+    while index < raw.len() {
+        if raw[index] == b'\r' {
+            if segment_start != index {
+                let segment = std::str::from_utf8(&raw[segment_start..index]).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid presentation {context}: {error}"))
+                })?;
+                sink_push_decoded_text(paragraph, segment, segment.len())?;
+            }
+            if raw.get(index + 1) == Some(&b'\n') {
+                index += 1;
+            }
+            sink_push_decoded_text(paragraph, "\n", 1)?;
+            index += 1;
+            segment_start = index;
+        } else {
+            index += 1;
+        }
+    }
+    if segment_start != raw.len() {
+        let segment = std::str::from_utf8(&raw[segment_start..]).map_err(|error| {
+            Error::InvalidFormat(format!("invalid presentation {context}: {error}"))
+        })?;
+        sink_push_decoded_text(paragraph, segment, segment.len())?;
+    }
+    Ok(())
+}
+
+fn sink_push_control(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    local_name: &[u8],
+    paragraph: &mut ParagraphText,
+    budget: &mut SinkTextBudget,
+) -> Result<()> {
+    match local_name {
+        b"s" => {
+            let count = sink_text_space_count(reader, element)?;
+            if count > SINK_MAX_SPACE_COUNT {
+                return Err(Error::InvalidFormat(format!(
+                    "text:s count exceeds {SINK_MAX_SPACE_COUNT}"
+                )));
+            }
+            budget.charge(count)?;
+            paragraph
+                .value
+                .try_reserve(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODP sink paragraph spaces",
+                    source,
+                })?;
+            paragraph.push_explicit(' ', count);
+        },
+        b"tab" => {
+            budget.charge(1)?;
+            paragraph
+                .value
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODP sink paragraph tab",
+                    source,
+                })?;
+            paragraph.push_explicit('\t', 1);
+        },
+        b"line-break" => {
+            budget.charge(1)?;
+            paragraph
+                .value
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODP sink paragraph line break",
+                    source,
+                })?;
+            paragraph.push_explicit('\n', 1);
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn finish_sink_slide<'options, 'output, W: Write + ?Sized>(
+    slide: &mut Option<SinkSlideState>,
+    writer: &mut SequentialTextWriter<'options, 'output, W>,
+    budget: &mut SinkTextBudget,
+    paragraph_separator: &str,
+) -> std::result::Result<(), TextOutputError<Error>> {
+    let Some(slide) = slide.take() else {
+        return Ok(());
+    };
+    if !slide.shape_stack.is_empty() {
+        return Err(writer.document_error(Error::InvalidFormat(
+            "ODP sink shape stack is not empty at slide end".to_string(),
+        )));
+    }
+    let parts = slide
+        .into_parts(budget, paragraph_separator)
+        .map_err(|error| writer.document_error(error))?;
+    writer.write_joined_object::<Error, _, _>(
+        TextObjectKind::Slide,
+        || parts.iter().map(String::as_str),
+        paragraph_separator,
+    )
+}
+
+impl Parser {
+    /// Feed one visible semantic text object per `draw:page` to a bounded sink.
+    ///
+    /// This is intentionally separate from the retained slide model path. It
+    /// preserves the title/body/shape traversal used by [`Slide::all_text`]
+    /// while retaining only the current slide and its nested shape text.
+    pub(crate) fn write_slides_text_to<'options, 'output, W: Write + ?Sized>(
+        xml_content: &str,
+        writer: &mut SequentialTextWriter<'options, 'output, W>,
+        paragraph_separator: &str,
+    ) -> std::result::Result<(), TextOutputError<Error>> {
+        let mut reader = NsReader::from_str(xml_content);
+        let mut depth = 0usize;
+        let mut slide_count = 0usize;
+        let mut shape_count = 0usize;
+        let mut notes_depth = 0usize;
+        let mut in_slide = false;
+        let mut slide: Option<SinkSlideState> = None;
+        let mut paragraph: Option<ParagraphText> = None;
+        let mut budget = SinkTextBudget {
+            decoded_bytes: 0,
+            fragments: 0,
+        };
+        let mut element_names = SinkElementNameBudget::default();
+
+        loop {
+            let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+                writer.document_error(Error::InvalidFormat(format!("XML parsing error: {error}")))
+            })?;
+            let ns_class = NsClass::from_resolve(&namespace);
+
+            match event {
+                Event::Start(element) => {
+                    element_names
+                        .start(element.name().as_ref())
+                        .map_err(|error| writer.document_error(error))?;
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        writer.document_error(Error::InvalidFormat(
+                            "ODP text nesting depth overflow".to_string(),
+                        ))
+                    })?;
+                    if depth > SINK_MAX_TEXT_DEPTH {
+                        return Err(writer.document_error(Error::InvalidFormat(format!(
+                            "ODP text nesting exceeds {SINK_MAX_TEXT_DEPTH} levels"
+                        ))));
+                    }
+
+                    if notes_depth > 0 {
+                        notes_depth += 1;
+                        continue;
+                    }
+                    if sink_is_notes(ns_class, element.local_name().as_ref()) {
+                        notes_depth = 1;
+                        continue;
+                    }
+                    if sink_is_page(ns_class, element.local_name().as_ref()) {
+                        if in_slide {
+                            if paragraph.is_some() {
+                                return Err(writer.document_error(Error::InvalidFormat(
+                                    "ODP text paragraph is open at slide boundary".to_string(),
+                                )));
+                            }
+                            finish_sink_slide(
+                                &mut slide,
+                                writer,
+                                &mut budget,
+                                paragraph_separator,
+                            )?;
+                        }
+                        slide_count = slide_count.checked_add(1).ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP slide count overflow".to_string(),
+                            ))
+                        })?;
+                        if slide_count > SINK_MAX_SHAPES {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "ODP document exceeds 65536 slides".to_string(),
+                            )));
+                        }
+                        slide = Some(SinkSlideState::new());
+                        in_slide = true;
+                        continue;
+                    }
+                    if !in_slide {
+                        continue;
+                    }
+                    if sink_shape_kind(ns_class, element.local_name().as_ref()).is_some() {
+                        shape_count = shape_count.checked_add(1).ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP shape count overflow".to_string(),
+                            ))
+                        })?;
+                        if shape_count > SINK_MAX_SHAPES {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "ODP document exceeds 65536 shapes".to_string(),
+                            )));
+                        }
+                        let state = slide.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink slide state is missing".to_string(),
+                            ))
+                        })?;
+                        if state.shape_stack.len() >= SINK_MAX_SHAPE_DEPTH {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "ODP shape groups exceed 64 levels".to_string(),
+                            )));
+                        }
+                        let shape = sink_shape(&reader, &element, ns_class)
+                            .map_err(|error| writer.document_error(error))?;
+                        state.shape_stack.try_reserve(1).map_err(|source| {
+                            writer.document_error(Error::Allocation {
+                                resource: "ODP sink shape stack",
+                                source,
+                            })
+                        })?;
+                        state.shape_stack.push(shape);
+                        continue;
+                    }
+                    if sink_is_text_block(ns_class, element.local_name().as_ref()) {
+                        if paragraph.is_some() {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "nested ODP text paragraphs are not supported".to_string(),
+                            )));
+                        }
+                        paragraph = Some(ParagraphText::default());
+                    } else if ns_class == NsClass::Text
+                        && paragraph.is_some()
+                        && matches!(element.local_name().as_ref(), b"s" | b"tab" | b"line-break")
+                    {
+                        let paragraph = paragraph.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink paragraph state is missing".to_string(),
+                            ))
+                        })?;
+                        sink_push_control(
+                            &reader,
+                            &element,
+                            element.local_name().as_ref(),
+                            paragraph,
+                            &mut budget,
+                        )
+                        .map_err(|error| writer.document_error(error))?;
+                    }
+                },
+                Event::Empty(element) => {
+                    SinkElementNameBudget::validate_name(element.name().as_ref())
+                        .map_err(|error| writer.document_error(error))?;
+                    if notes_depth > 0 {
+                        continue;
+                    }
+                    if sink_is_page(ns_class, element.local_name().as_ref()) {
+                        if in_slide {
+                            if paragraph.is_some() {
+                                return Err(writer.document_error(Error::InvalidFormat(
+                                    "ODP text paragraph is open at slide boundary".to_string(),
+                                )));
+                            }
+                            finish_sink_slide(
+                                &mut slide,
+                                writer,
+                                &mut budget,
+                                paragraph_separator,
+                            )?;
+                        }
+                        slide_count = slide_count.checked_add(1).ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP slide count overflow".to_string(),
+                            ))
+                        })?;
+                        if slide_count > SINK_MAX_SHAPES {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "ODP document exceeds 65536 slides".to_string(),
+                            )));
+                        }
+                        slide = Some(SinkSlideState::new());
+                        finish_sink_slide(&mut slide, writer, &mut budget, paragraph_separator)?;
+                        in_slide = false;
+                        continue;
+                    }
+                    if !in_slide {
+                        continue;
+                    }
+                    if sink_shape_kind(ns_class, element.local_name().as_ref()).is_some() {
+                        shape_count = shape_count.checked_add(1).ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP shape count overflow".to_string(),
+                            ))
+                        })?;
+                        if shape_count > SINK_MAX_SHAPES {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "ODP document exceeds 65536 shapes".to_string(),
+                            )));
+                        }
+                        let state = slide.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink slide state is missing".to_string(),
+                            ))
+                        })?;
+                        let shape = sink_shape(&reader, &element, ns_class)
+                            .map_err(|error| writer.document_error(error))?;
+                        state
+                            .finish_shape(shape, &mut budget, paragraph_separator)
+                            .map_err(|error| writer.document_error(error))?;
+                        continue;
+                    }
+                    if sink_is_text_block(ns_class, element.local_name().as_ref()) {
+                        if paragraph.is_some() {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "nested ODP text paragraphs are not supported".to_string(),
+                            )));
+                        }
+                        paragraph = Some(ParagraphText::default());
+                        let value = paragraph
+                            .take()
+                            .ok_or_else(|| {
+                                writer.document_error(Error::InvalidFormat(
+                                    "ODP sink paragraph state is missing".to_string(),
+                                ))
+                            })?
+                            .finish();
+                        let state = slide.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink slide state is missing".to_string(),
+                            ))
+                        })?;
+                        if let Some(shape) = state.shape_stack.last_mut() {
+                            shape
+                                .push_paragraph(value, &mut budget, paragraph_separator)
+                                .map_err(|error| writer.document_error(error))?;
+                        } else {
+                            state
+                                .append_body_paragraph(value, &mut budget, paragraph_separator)
+                                .map_err(|error| writer.document_error(error))?;
+                        }
+                        continue;
+                    }
+                    if ns_class == NsClass::Text
+                        && paragraph.is_some()
+                        && matches!(element.local_name().as_ref(), b"s" | b"tab" | b"line-break")
+                    {
+                        let paragraph = paragraph.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink paragraph state is missing".to_string(),
+                            ))
+                        })?;
+                        sink_push_control(
+                            &reader,
+                            &element,
+                            element.local_name().as_ref(),
+                            paragraph,
+                            &mut budget,
+                        )
+                        .map_err(|error| writer.document_error(error))?;
+                    }
+                },
+                Event::End(element) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        writer.document_error(Error::InvalidFormat(
+                            "ODP text element stack underflow".to_string(),
+                        ))
+                    })?;
+                    element_names
+                        .end(element.name().as_ref())
+                        .map_err(|error| writer.document_error(error))?;
+                    if notes_depth > 0 {
+                        notes_depth -= 1;
+                        continue;
+                    }
+                    if sink_is_text_block(ns_class, element.local_name().as_ref()) {
+                        let Some(paragraph_value) = paragraph.take() else {
+                            continue;
+                        };
+                        let value = paragraph_value.finish();
+                        let state = slide.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink slide state is missing".to_string(),
+                            ))
+                        })?;
+                        if let Some(shape) = state.shape_stack.last_mut() {
+                            shape
+                                .push_paragraph(value, &mut budget, paragraph_separator)
+                                .map_err(|error| writer.document_error(error))?;
+                        } else {
+                            state
+                                .append_body_paragraph(value, &mut budget, paragraph_separator)
+                                .map_err(|error| writer.document_error(error))?;
+                        }
+                    } else if sink_shape_kind(ns_class, element.local_name().as_ref()).is_some() {
+                        let state = slide.as_mut().ok_or_else(|| {
+                            writer.document_error(Error::InvalidFormat(
+                                "ODP sink slide state is missing".to_string(),
+                            ))
+                        })?;
+                        if let Some(shape) = state.shape_stack.pop() {
+                            state
+                                .finish_shape(shape, &mut budget, paragraph_separator)
+                                .map_err(|error| writer.document_error(error))?;
+                        }
+                    } else if sink_is_page(ns_class, element.local_name().as_ref()) {
+                        if paragraph.is_some() {
+                            return Err(writer.document_error(Error::InvalidFormat(
+                                "ODP text paragraph is open at slide end".to_string(),
+                            )));
+                        }
+                        finish_sink_slide(&mut slide, writer, &mut budget, paragraph_separator)?;
+                        in_slide = false;
+                    }
+                },
+                Event::Text(text) if paragraph.is_some() => {
+                    let paragraph = paragraph.as_mut().ok_or_else(|| {
+                        writer.document_error(Error::InvalidFormat(
+                            "ODP sink paragraph state is missing".to_string(),
+                        ))
+                    })?;
+                    sink_push_xml_text(paragraph, text.as_ref(), "text content", &mut budget)
+                        .map_err(|error| writer.document_error(error))?;
+                },
+                Event::CData(text) if paragraph.is_some() => {
+                    let paragraph = paragraph.as_mut().ok_or_else(|| {
+                        writer.document_error(Error::InvalidFormat(
+                            "ODP sink paragraph state is missing".to_string(),
+                        ))
+                    })?;
+                    sink_push_xml_text(paragraph, text.as_ref(), "CDATA", &mut budget)
+                        .map_err(|error| writer.document_error(error))?;
+                },
+                Event::GeneralRef(reference) if paragraph.is_some() => {
+                    let paragraph = paragraph.as_mut().ok_or_else(|| {
+                        writer.document_error(Error::InvalidFormat(
+                            "ODP sink paragraph state is missing".to_string(),
+                        ))
+                    })?;
+                    sink_push_reference(&reference, paragraph, &mut budget)
+                        .map_err(|error| writer.document_error(error))?;
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+
+        if depth != 0
+            || !element_names.is_empty()
+            || notes_depth != 0
+            || paragraph.is_some()
+            || in_slide
+            || slide.is_some()
+        {
+            return Err(writer.document_error(Error::InvalidFormat(
+                "incomplete ODP presentation text XML structure".to_string(),
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn sink_push_reference(
+    reference: &BytesRef<'_>,
+    paragraph: &mut ParagraphText,
+    budget: &mut SinkTextBudget,
+) -> Result<()> {
+    if let Some(character) = reference.resolve_char_ref().map_err(|error| {
+        Error::InvalidFormat(format!("invalid presentation character reference: {error}"))
+    })? {
+        let mut encoded = [0_u8; 4];
+        let value = character.encode_utf8(&mut encoded);
+        budget.charge(value.len())?;
+        return sink_push_decoded_text(paragraph, value, value.len());
+    }
+
+    let value = match reference.as_ref() {
+        b"amp" => "&",
+        b"lt" => "<",
+        b"gt" => ">",
+        b"quot" => "\"",
+        b"apos" => "'",
+        _ => {
+            return Err(Error::InvalidFormat(
+                "unsupported presentation entity reference".to_string(),
+            ));
+        },
+    };
+    budget.charge(value.len())?;
+    sink_push_decoded_text(paragraph, value, value.len())
+}
+
 #[derive(Default)]
 pub(super) struct TransitionStyleCollector {
     result: TransitionStyles,
