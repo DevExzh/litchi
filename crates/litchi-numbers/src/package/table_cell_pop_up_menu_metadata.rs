@@ -10,14 +10,17 @@
 use core::mem::size_of;
 
 use litchi_iwa_protos::package_metadata_codec::{
-    AdditionSaveTokenBatch, ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
-    ExternalReferenceDescriptor, InvalidReason, ObjectUuidAddition, ObjectUuidDescriptor,
-    ObjectUuidRemoval, PackageMetadataInspection, PackageMetadataVisitor,
+    AdditionSaveTokenBatch, CombinedBatch, CombinedSaveTokenBatch, ComponentDescriptor,
+    ComponentSelector, DataReferenceOwnerDescriptor, ExternalReferenceAddition,
+    ExternalReferenceDescriptor, ExternalReferenceRemoval, InvalidReason, ObjectUuidAddition,
+    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataInspection, PackageMetadataVisitor,
     PreparedPackageMetadataAdditionSaveTokenRewrite,
+    PreparedPackageMetadataCombinedSaveTokenRewrite,
     PreparedPackageMetadataRemovalSaveTokenRewrite, PreparedPackageMetadataSaveTokenRewrite,
     RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions, RewriteReport,
     SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor,
     prepare_package_metadata_additions_and_save_tokens,
+    prepare_package_metadata_combined_additions_and_removals_and_save_tokens,
     prepare_package_metadata_removals_and_save_tokens, prepare_package_metadata_save_tokens,
 };
 
@@ -91,6 +94,13 @@ impl MetadataError {
 
 type Result<T> = core::result::Result<T, MetadataError>;
 
+/// Codec-owned atomic transition aliases kept private to the Numbers
+/// package owner.  The facade uses these aliases rather than exposing the
+/// generated-free metadata wire vocabulary through its semantic API.
+pub(super) type CombinedTransition<'source> = CombinedBatch<'source>;
+pub(super) type PreparedCombinedTransition<'source, 'batch> =
+    PreparedPackageMetadataCombinedSaveTokenRewrite<'source, 'batch>;
+
 /// The unique metadata payload and its native archive route.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct MetadataSource<'source> {
@@ -156,6 +166,36 @@ struct ExternalFact {
     versioned: bool,
 }
 
+/// One metadata-owned component edge that must be proved before a popup
+/// graph is rewritten.  The object identifier is deliberately required: a
+/// popup edge is an object-specific ownership edge, while a component-only
+/// sidecar edge can use the component's rooted object identifier supplied by
+/// the caller.  Keeping the request typed here prevents callers from
+/// accidentally treating a weak/deprecated edge as an exact popup owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ExternalEdge {
+    pub(super) source_component_index: usize,
+    pub(super) target_component_index: usize,
+    pub(super) object_identifier: u64,
+    pub(super) is_weak: Option<bool>,
+}
+
+impl ExternalEdge {
+    pub(super) const fn new(
+        source_component_index: usize,
+        target_component_index: usize,
+        object_identifier: u64,
+        is_weak: Option<bool>,
+    ) -> Self {
+        Self {
+            source_component_index,
+            target_component_index,
+            object_identifier,
+            is_weak,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DataOwnerFact {
     data_identifier: u64,
@@ -178,6 +218,7 @@ pub(super) struct RegistryFacts<'source> {
     root_data_map_identifier: Option<u64>,
     last_object_identifier: u64,
     maximum_identifier: u64,
+    physical_identifiers: Vec<u64>,
     physical_alias: bool,
     report: RewriteReport,
 }
@@ -254,6 +295,73 @@ impl<'source> RegistryFacts<'source> {
             return Err(MetadataError::kind(FailureKind::InvalidSource));
         }
         Ok(selectors)
+    }
+
+    /// Validate and return the exact current/effective selector for every
+    /// touched component.  This is the write-side counterpart of
+    /// `selectors_for_components`: it additionally rejects a repeated
+    /// physical component index and current records whose preferred and
+    /// effective locators disagree with the physical route discovered by the
+    /// census.  The returned vector is deduplicated by component identifier,
+    /// which is the unit used by save-token publication.
+    pub(super) fn touched_selectors(
+        &self,
+        component_indices: &[usize],
+    ) -> Result<Vec<ComponentSelector<'_>>> {
+        if component_indices.is_empty() {
+            return Err(MetadataError::invalid());
+        }
+        let mut seen = Vec::new();
+        seen.try_reserve_exact(component_indices.len())
+            .map_err(|_| MetadataError::allocation(component_indices.len()))?;
+        for &component_index in component_indices {
+            if seen.contains(&component_index) {
+                continue;
+            }
+            let selector = self.selector(component_index)?;
+            seen.push(component_index);
+            // A current descriptor with an explicit effective locator is the
+            // authority.  Ensure that a second current descriptor cannot
+            // resolve the same component identifier through another locator.
+            let same_identifier = self
+                .components
+                .iter()
+                .filter(|component| {
+                    component.current && component.identifier == selector.identifier()
+                })
+                .count();
+            if same_identifier != 1 {
+                return Err(MetadataError::kind(FailureKind::AmbiguousRoute));
+            }
+        }
+        self.selectors_for_components(&seen)
+    }
+
+    /// Return the touched physical component indices in first-seen order,
+    /// rejecting an index that cannot resolve to one current/effective
+    /// metadata selector.  Keeping this helper here makes the caller's save
+    /// token set and its native member edit set derive from the same census.
+    pub(super) fn dedupe_touched_components(
+        &self,
+        component_indices: &[usize],
+    ) -> Result<Vec<usize>> {
+        if component_indices.is_empty() {
+            return Err(MetadataError::invalid());
+        }
+        let mut deduplicated = Vec::new();
+        deduplicated
+            .try_reserve_exact(component_indices.len())
+            .map_err(|_| MetadataError::allocation(component_indices.len()))?;
+        for &component_index in component_indices {
+            if deduplicated.contains(&component_index) {
+                continue;
+            }
+            // Resolve before returning the index so a caller cannot build a
+            // save-token batch for an unmapped/versioned component.
+            self.selector(component_index)?;
+            deduplicated.push(component_index);
+        }
+        Ok(deduplicated)
     }
 
     /// Validate that a codec save-token batch uses the exact effective
@@ -344,6 +452,77 @@ impl<'source> RegistryFacts<'source> {
         current.ok_or_else(|| MetadataError::kind(FailureKind::MissingRoute))
     }
 
+    /// Inspect UUID ownership without requiring a UUID record to exist.  A
+    /// few native Numbers sidecar components intentionally omit UUID-map
+    /// entries for physically unique list/model objects; those objects are a
+    /// valid legacy-compatible ownership shape.  Any present alternate owner,
+    /// versioned-only record, cross-component binding, or metadata namespace
+    /// collision remains a hard failure.
+    pub(super) fn current_uuid_if_registered(
+        &self,
+        component_index: usize,
+        object_identifier: u64,
+    ) -> Result<Option<UuidBits>> {
+        if object_identifier == 0 || self.has_physical_alias() {
+            return Err(MetadataError::kind(FailureKind::Conflict));
+        }
+        if self.has_conflicting_non_uuid_owner(object_identifier) {
+            return Err(MetadataError::kind(FailureKind::Conflict));
+        }
+        let mut current = None;
+        let mut versioned = false;
+        for binding in self.uuids.iter().copied() {
+            if binding.object_identifier != object_identifier {
+                continue;
+            }
+            if !binding.current {
+                versioned = true;
+                continue;
+            }
+            if binding.component_index != Some(component_index) {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+            if current.replace(binding.uuid).is_some() {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+        }
+        if versioned {
+            return Err(MetadataError::kind(FailureKind::VersionedOwnership));
+        }
+        Ok(current)
+    }
+
+    /// Batch form of [`Self::current_uuid_if_registered`], preserving input
+    /// order so callers can associate an optional UUID with each native
+    /// object route without exposing metadata internals.
+    pub(super) fn current_uuids_if_registered(
+        &self,
+        owners: &[(usize, u64)],
+    ) -> Result<Vec<Option<UuidBits>>> {
+        let mut uuids: Vec<Option<UuidBits>> = Vec::new();
+        uuids
+            .try_reserve_exact(owners.len())
+            .map_err(|_| MetadataError::allocation(owners.len()))?;
+        let mut seen_objects = Vec::new();
+        seen_objects
+            .try_reserve_exact(owners.len())
+            .map_err(|_| MetadataError::allocation(owners.len()))?;
+        for &(component_index, object_identifier) in owners {
+            if seen_objects.contains(&(component_index, object_identifier)) {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+            seen_objects.push((component_index, object_identifier));
+            let uuid = self.current_uuid_if_registered(component_index, object_identifier)?;
+            if let Some(uuid) = uuid {
+                if uuids.iter().flatten().any(|existing| *existing == uuid) {
+                    return Err(MetadataError::kind(FailureKind::Conflict));
+                }
+            }
+            uuids.push(uuid);
+        }
+        Ok(uuids)
+    }
+
     /// Prove one current, effective-locator-resolved external edge for a
     /// cross-component native graph.  Component UUID records are deliberately
     /// not used as a substitute: sidecar members commonly have no object UUID
@@ -410,12 +589,179 @@ impl<'source> RegistryFacts<'source> {
         Ok(())
     }
 
+    /// Strict object-edge variant used for the control-to-popup ownership
+    /// tuple.  Unlike the compatibility-aware component graph helper above,
+    /// a component-only record never satisfies an object-specific request.
+    pub(super) fn require_external_edge_exact(&self, edge: ExternalEdge) -> Result<()> {
+        let source = self.selector(edge.source_component_index)?;
+        let target = self.selector(edge.target_component_index)?;
+        let mut exact = 0usize;
+        let mut conflicting = false;
+        for reference in &self.external_references {
+            if reference.source_component_index != Some(edge.source_component_index)
+                || reference.source_identifier != source.identifier()
+                || reference.target_component_identifier != target.identifier()
+                || reference.object_identifier != Some(edge.object_identifier)
+            {
+                continue;
+            }
+            let weak_matches = match edge.is_weak {
+                Some(false) => reference.is_weak != Some(true),
+                expected => reference.is_weak == expected,
+            };
+            if !reference.current || reference.versioned || !weak_matches {
+                conflicting = true;
+            } else {
+                exact = exact.saturating_add(1);
+            }
+        }
+        if conflicting || exact != 1 {
+            return Err(MetadataError::kind(FailureKind::Conflict));
+        }
+        Ok(())
+    }
+
+    /// Prove that an exact edge is absent before appending it.  Any related
+    /// current, versioned, weak, or object-mismatched edge is hostile: it
+    /// would make the new edge an ambiguous ownership record after the
+    /// metadata codec appends it.
+    pub(super) fn require_external_edge_absent(&self, edge: ExternalEdge) -> Result<()> {
+        let source = self.selector(edge.source_component_index)?;
+        let target = self.selector(edge.target_component_index)?;
+        for reference in &self.external_references {
+            if reference.source_component_index != Some(edge.source_component_index)
+                || reference.source_identifier != source.identifier()
+                || reference.target_component_identifier != target.identifier()
+            {
+                continue;
+            }
+            // An object-specific edge is a unique owner.  A component-only
+            // edge and an object-specific edge for the same source/target
+            // pair are ambiguous, while distinct object-specific popup
+            // models may legitimately share the same component pair.
+            if reference.object_identifier.is_none()
+                || reference.object_identifier == Some(edge.object_identifier)
+            {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+        }
+        Ok(())
+    }
+
+    /// Construct one exact external-reference addition after proving both
+    /// selectors are current/effective and the edge has no existing owner.
+    pub(super) fn external_addition(
+        &self,
+        edge: ExternalEdge,
+    ) -> Result<ExternalReferenceAddition<'_>> {
+        if edge.object_identifier == 0 {
+            return Err(MetadataError::invalid());
+        }
+        self.require_external_edge_absent(edge)?;
+        Ok(ExternalReferenceAddition::new(
+            self.selector(edge.source_component_index)?,
+            self.selector(edge.target_component_index)?,
+            edge.object_identifier,
+            edge.is_weak,
+        ))
+    }
+
+    /// Construct one exact external-reference removal after proving the
+    /// current/effective source and target selectors and the expected edge
+    /// shape.  The metadata codec then verifies the same tuple again during
+    /// its prepared execution.
+    pub(super) fn external_removal(
+        &self,
+        edge: ExternalEdge,
+    ) -> Result<ExternalReferenceRemoval<'_>> {
+        if edge.object_identifier == 0 {
+            return Err(MetadataError::invalid());
+        }
+        self.require_external_edge_exact(edge)?;
+        let source = self.selector(edge.source_component_index)?;
+        let target = self.selector(edge.target_component_index)?;
+        let mut weakness = None;
+        for reference in &self.external_references {
+            if reference.source_component_index == Some(edge.source_component_index)
+                && reference.source_identifier == source.identifier()
+                && reference.target_component_identifier == target.identifier()
+                && reference.object_identifier == Some(edge.object_identifier)
+                && reference.current
+                && !reference.versioned
+            {
+                if weakness.replace(reference.is_weak).is_some() {
+                    return Err(MetadataError::kind(FailureKind::Conflict));
+                }
+            }
+        }
+        Ok(ExternalReferenceRemoval::new(
+            source,
+            target,
+            edge.object_identifier,
+            weakness.ok_or_else(MetadataError::invalid)?,
+        ))
+    }
+
+    /// Construct a fallibly allocated, deduplicated set of exact external
+    /// additions.  Duplicate edge tuples are rejected before a metadata
+    /// candidate is staged; callers can append the returned slice directly to
+    /// a metadata `Batch`.
+    pub(super) fn external_additions(
+        &self,
+        edges: &[ExternalEdge],
+    ) -> Result<Vec<ExternalReferenceAddition<'_>>> {
+        let mut additions: Vec<ExternalReferenceAddition<'_>> = Vec::new();
+        additions
+            .try_reserve_exact(edges.len())
+            .map_err(|_| MetadataError::allocation(edges.len()))?;
+        for &edge in edges {
+            let source = self.selector(edge.source_component_index)?;
+            let target = self.selector(edge.target_component_index)?;
+            if additions.iter().any(|existing| {
+                existing.source() == source
+                    && existing.target() == target
+                    && existing.object_identifier() == edge.object_identifier
+            }) {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+            additions.push(self.external_addition(edge)?);
+        }
+        Ok(additions)
+    }
+
+    /// Construct a fallibly allocated, deduplicated set of exact external
+    /// removals.  Each tuple must be present exactly once in the current
+    /// metadata registry.
+    pub(super) fn external_removals(
+        &self,
+        edges: &[ExternalEdge],
+    ) -> Result<Vec<ExternalReferenceRemoval<'_>>> {
+        let mut removals: Vec<ExternalReferenceRemoval<'_>> = Vec::new();
+        removals
+            .try_reserve_exact(edges.len())
+            .map_err(|_| MetadataError::allocation(edges.len()))?;
+        for &edge in edges {
+            let source = self.selector(edge.source_component_index)?;
+            let target = self.selector(edge.target_component_index)?;
+            if removals.iter().any(|existing| {
+                existing.source() == source
+                    && existing.target() == target
+                    && existing.object_identifier() == edge.object_identifier
+            }) {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+            removals.push(self.external_removal(edge)?);
+        }
+        Ok(removals)
+    }
+
     /// Reject any existing ownership record before appending a fresh UUID.
     pub(super) fn require_uuid_absent(&self, object_identifier: u64) -> Result<()> {
-        if self
-            .uuids
-            .iter()
-            .any(|binding| binding.object_identifier == object_identifier)
+        if self.physical_identifiers.contains(&object_identifier)
+            || self
+                .uuids
+                .iter()
+                .any(|binding| binding.object_identifier == object_identifier)
             || self.has_non_uuid_owner(object_identifier)
         {
             return Err(MetadataError::kind(FailureKind::Conflict));
@@ -436,6 +782,30 @@ impl<'source> RegistryFacts<'source> {
             identifier.identifier,
             identifier.uuid,
         ))
+    }
+
+    /// Prepare several UUID additions for one atomic metadata batch.  Every
+    /// object is checked against the complete physical and metadata
+    /// reservation census, and duplicate component/object requests are
+    /// rejected before the codec allocates a candidate.
+    pub(super) fn uuid_additions(
+        &self,
+        entries: &[(usize, FreshIdentifier)],
+    ) -> Result<Vec<ObjectUuidAddition<'_>>> {
+        let mut additions: Vec<ObjectUuidAddition<'_>> = Vec::new();
+        additions
+            .try_reserve_exact(entries.len())
+            .map_err(|_| MetadataError::allocation(entries.len()))?;
+        for &(component_index, identifier) in entries {
+            if additions.iter().any(|existing| {
+                existing.object_identifier() == identifier.identifier
+                    || existing.uuid() == identifier.uuid
+            }) {
+                return Err(MetadataError::kind(FailureKind::Conflict));
+            }
+            additions.push(self.uuid_addition(component_index, identifier)?);
+        }
+        Ok(additions)
     }
 
     /// Prepare the exact current UUID removal record and prove that no known
@@ -554,6 +924,7 @@ fn inspect_with_policy(
 struct PhysicalFacts {
     maximum_identifier: u64,
     duplicate_identifier: bool,
+    identifiers: Vec<u64>,
 }
 
 fn physical_identifiers(source: &Package) -> Result<PhysicalFacts> {
@@ -572,6 +943,11 @@ fn physical_identifiers(source: &Package) -> Result<PhysicalFacts> {
                 facts.duplicate_identifier = true;
             }
             seen.push(identifier);
+            facts
+                .identifiers
+                .try_reserve(1)
+                .map_err(|_| MetadataError::allocation(1))?;
+            facts.identifiers.push(identifier);
             facts.maximum_identifier = facts.maximum_identifier.max(identifier);
         }
     }
@@ -678,6 +1054,7 @@ impl<'source> RegistryVisitor<'source> {
             root_data_map_identifier: self.root_data_map_identifier,
             last_object_identifier: inspection.last_object_identifier(),
             maximum_identifier,
+            physical_identifiers: physical.identifiers,
             physical_alias: physical.duplicate_identifier,
             report: inspection.report(),
         })
@@ -858,6 +1235,26 @@ pub(super) fn prepare_removals<'source, 'batch>(
     facts.validate_save_tokens(batch.save_tokens())?;
     prepare_package_metadata_removals_and_save_tokens(facts.payload(), batch, options)
         .map_err(map_rewrite_error)
+}
+
+/// Prepare one atomic UUID/external-reference addition+removal transition and
+/// one deduplicated current-component save-token advance.  This is required
+/// for a popup replacement that creates a fresh model while culling the old
+/// model: executing the existing addition and removal helpers separately
+/// would advance the metadata root/token twice and expose an intermediate
+/// ownership state that never existed in the source package.
+pub(super) fn prepare_combined<'source, 'batch>(
+    facts: &RegistryFacts<'source>,
+    batch: CombinedSaveTokenBatch<'batch>,
+    options: RewriteOptions,
+) -> Result<PreparedCombinedTransition<'source, 'batch>> {
+    facts.validate_save_tokens(batch.save_tokens())?;
+    prepare_package_metadata_combined_additions_and_removals_and_save_tokens(
+        facts.payload(),
+        batch,
+        options,
+    )
+    .map_err(map_rewrite_error)
 }
 
 /// Prepare a root + selected current-component save-token transition with no

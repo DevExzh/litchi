@@ -14,7 +14,6 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
 use litchi_numbers::CellPosition;
-use litchi_numbers::cell::data_format::control::transaction::Error as ControlError;
 use litchi_numbers::cell::data_format::control::{
     CellControl, DisplayFormat, Range, Slider, Stepper,
 };
@@ -114,11 +113,19 @@ enum SplitMetadataCorruption {
     VersionedCalculationExternal,
     VersionedPopupExternal,
     MissingFormatComponent,
+    MissingPopupComponent,
     DuplicateFormatComponent,
     WrongCalculationLocator,
     WrongFormatLocator,
     WrongControlLocator,
+    WrongPopupLocator,
     OpaquePopupInbound,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SplitPopupControlMetadataCorruption {
+    DuplicateField,
+    WrongPath,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -621,8 +628,8 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
 /// Wave85 source: the rooted model lives in CalculationEngine, its tile is a
 /// Tables member, format/control lists are separate list members, and the
 /// popup model is a separate current component.  Scalar controls are fully
-/// metadata-owned across those members; the popup model remains a deliberately
-/// unsupported changed dependency for this bounded owner slice.
+/// metadata-owned across those members; popup lifecycle tests use the same
+/// rooted graph to prove cross-member placement and save-token ownership.
 fn split_component_fixture() -> TestResult<Vec<u8>> {
     let source = fixture(FixtureMode::Mixed)?;
     let archive = member_archive(&source, DOCUMENT_MEMBER)?;
@@ -718,59 +725,89 @@ fn split_component_fixture() -> TestResult<Vec<u8>> {
     )?)
 }
 
-/// Keep the rooted model, tile, and both lists co-located while moving only
-/// the shared Pop-Up Menu model to its own metadata-owned member. This guards
-/// the early changed-operation refusal against the smallest split graph.
-fn popup_only_split_fixture() -> TestResult<Vec<u8>> {
-    let source = fixture(FixtureMode::Mixed)?;
-    let popup = member_archive(&source, DOCUMENT_MEMBER)?
-        .object(CONTROL_MODEL_ID)
-        .cloned()
-        .ok_or_else(|| io::Error::other("Pop-Up model is missing"))?;
-    let source = rewrite_member(&source, DOCUMENT_MEMBER, |archive| {
-        archive
-            .remove_object(CONTROL_MODEL_ID)
-            .ok_or_else(|| io::Error::other("Pop-Up model is missing"))?;
-        Ok(())
-    })?;
-    let source = rewrite_metadata_root(&source, |metadata| {
-        let document = metadata
-            .components
+/// The native split fixture has one rooted Pop-Up Menu cell.  Duplicate that
+/// cell into the adjacent column and raise both list refcounts so lifecycle
+/// tests can prove a cross-component copy-on-write transition without
+/// changing the rooted table topology.  The second cell is intentionally the
+/// same semantic menu: the first replacement must leave its sibling and the
+/// original PopupModel byte-identical.
+fn split_shared_popup_fixture() -> TestResult<Vec<u8>> {
+    let source = split_component_fixture()?;
+    let source = rewrite_member(&source, TILE_MEMBER, |archive| {
+        let object = archive
+            .object_mut(TILE_ID)
+            .ok_or_else(|| io::Error::other("split tile object is missing"))?;
+        let message = object
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("split tile payload is missing"))?;
+        let mut tile = tst::Tile::decode(message.data.as_slice())?;
+        let row = tile
+            .row_infos
             .iter_mut()
-            .find(|component| component.identifier == 100)
-            .ok_or_else(|| io::Error::other("Document metadata is missing"))?;
-        document
-            .object_uuid_map_entries
-            .retain(|entry| entry.identifier != CONTROL_MODEL_ID);
-        document
-            .external_references
-            .push(tsp::ComponentExternalReference {
-                component_identifier: POPUP_COMPONENT_ID,
-                object_identifier: Some(CONTROL_MODEL_ID),
-                is_weak: Some(false),
-            });
-        metadata.components.push(tsp::ComponentInfo {
-            identifier: POPUP_COMPONENT_ID,
-            preferred_locator: "Tables/Popup-905753".to_owned(),
-            locator: Some("Tables/Popup-905753".to_owned()),
-            save_token: Some(10),
-            object_uuid_map_entries: vec![uuid_entry(CONTROL_MODEL_ID)],
-            ..Default::default()
-        });
+            .find(|row| row.tile_row_index == 4)
+            .ok_or_else(|| io::Error::other("split popup row is missing"))?;
+        let popup_cell = cell_for_control(5, 5, CellDataFormatKind::PopUpMenu, None)?;
+        let (storage, offsets) = pack_row(vec![popup_cell.clone(), popup_cell, empty_cell()]);
+        row.cell_count = 3;
+        row.cell_storage_buffer = Some(storage);
+        row.cell_offsets = Some(offsets);
+        message.data = tile.encode_to_vec();
         Ok(())
     })?;
-    let popup_member = compressed(vec![popup])?;
-    let mut entries = Catalog::from_bytes(&source)?
-        .iter()
-        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
-        .collect::<Vec<_>>();
-    entries.push((POPUP_MEMBER.to_owned(), popup_member));
-    Ok(litchi_iwa_archive::package::to_bytes(
-        entries
-            .iter()
-            .map(|(name, data)| (name.as_str(), data.as_slice())),
-        Limits::default(),
-    )?)
+    let source = rewrite_split_list(
+        &source,
+        FORMAT_MEMBER,
+        FORMAT_LIST_ID,
+        tst::table_data_list::ListType::Format,
+        |list| {
+            list.entries
+                .iter_mut()
+                .find(|entry| entry.key == 5)
+                .ok_or_else(|| io::Error::other("split popup format entry is missing"))?
+                .refcount = 2;
+            Ok(())
+        },
+    )?;
+    rewrite_split_list(
+        &source,
+        CONTROL_MEMBER,
+        CONTROL_LIST_ID,
+        tst::table_data_list::ListType::ControlCellSpec,
+        |list| {
+            list.entries
+                .iter_mut()
+                .find(|entry| entry.key == 5)
+                .ok_or_else(|| io::Error::other("split popup control entry is missing"))?
+                .refcount = 2;
+            Ok(())
+        },
+    )
+}
+
+/// Match the aggregate-only metadata shape accepted by the native Numbers
+/// reader: the selected ControlCellSpec message names its popup model in the
+/// ArchiveInfo aggregate, but has no FieldInfo path for that reference. The
+/// sidecar components may also omit UUID-map entries; the physical graph and
+/// control-to-popup edge remain authoritative for this compatibility case.
+fn split_native_compatible_popup_fixture() -> TestResult<Vec<u8>> {
+    let source = split_component_fixture()?;
+    let source = rewrite_control_info(&source, |info| {
+        assert_eq!(info.object_references, [CONTROL_MODEL_ID]);
+        info.field_infos.clear();
+        Ok(())
+    })?;
+    rewrite_metadata_root(&source, |metadata| {
+        for identifier in [CONTROL_COMPONENT_ID, POPUP_COMPONENT_ID] {
+            let component = metadata
+                .components
+                .iter_mut()
+                .find(|component| component.identifier == identifier)
+                .ok_or_else(|| io::Error::other("split popup component is missing"))?;
+            component.object_uuid_map_entries.clear();
+        }
+        Ok(())
+    })
 }
 
 fn object_with_messages(source: &ArchiveObject, indices: &[usize]) -> TestResult<ArchiveObject> {
@@ -1044,17 +1081,57 @@ fn rewrite_control_info(
     source: &[u8],
     mut rewrite: impl FnMut(&mut litchi_iwa_core::MessageInfo) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    rewrite_member(source, DOCUMENT_MEMBER, |archive| {
-        let index = control_message_index(archive)?;
+    let catalog = Catalog::from_bytes(source)?;
+    let split = catalog.iter().any(|entry| entry.name() == CONTROL_MEMBER);
+    let (member, object_identifier) = if split {
+        (CONTROL_MEMBER, CONTROL_LIST_ID)
+    } else {
+        (DOCUMENT_MEMBER, SIDECAR_ID)
+    };
+    rewrite_member(source, member, |archive| {
         let object = archive
-            .object_mut(SIDECAR_ID)
+            .object_mut(object_identifier)
             .ok_or_else(|| io::Error::other("sidecar object is missing"))?;
+        let index = object
+            .messages
+            .iter()
+            .position(|message| {
+                message.type_ == TABLE_DATA_LIST_TYPE
+                    && tst::TableDataList::decode(message.data.as_slice())
+                        .map(|list| {
+                            list.list_type == tst::table_data_list::ListType::ControlCellSpec as i32
+                        })
+                        .unwrap_or(false)
+            })
+            .ok_or_else(|| io::Error::other("control list message is missing"))?;
         let info = object
             .archive_info
             .message_infos
             .get_mut(index)
             .ok_or_else(|| io::Error::other("control message metadata is missing"))?;
         rewrite(info)
+    })
+}
+
+fn with_split_popup_control_metadata_corruption(
+    source: &[u8],
+    corruption: SplitPopupControlMetadataCorruption,
+) -> TestResult<Vec<u8>> {
+    rewrite_control_info(source, |info| {
+        let mut field = FieldInfo::new(match corruption {
+            SplitPopupControlMetadataCorruption::DuplicateField => vec![3, 5],
+            SplitPopupControlMetadataCorruption::WrongPath => vec![3, 6],
+        });
+        field.r#type = Some(FieldType::ObjectReference);
+        field.object_references = vec![CONTROL_MODEL_ID];
+        match corruption {
+            SplitPopupControlMetadataCorruption::DuplicateField => {
+                info.field_infos.push(field.clone());
+                info.field_infos.push(field);
+            },
+            SplitPopupControlMetadataCorruption::WrongPath => info.field_infos.push(field),
+        }
+        Ok(())
     })
 }
 
@@ -1365,6 +1442,249 @@ fn assert_split_scalar_locality(source: &[u8], target: &[u8], changed: &[String]
     Ok(())
 }
 
+fn split_popup_model_ids(source: &[u8]) -> TestResult<Vec<u64>> {
+    let mut identifiers = Vec::new();
+    for entry in Catalog::from_bytes(source)?.iter() {
+        if !entry.name().ends_with(".iwa") {
+            continue;
+        }
+        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        identifiers.extend(
+            archive
+                .objects
+                .iter()
+                .filter(|object| object.messages.iter().any(|message| message.type_ == 6_206))
+                .filter_map(|object| object.archive_info.identifier),
+        );
+    }
+    Ok(identifiers)
+}
+
+fn split_popup_model_member(source: &[u8], identifier: u64) -> TestResult<&'static str> {
+    for entry in Catalog::from_bytes(source)?.iter() {
+        if !entry.name().ends_with(".iwa") {
+            continue;
+        }
+        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        if archive.objects.iter().any(|object| {
+            object.archive_info.identifier == Some(identifier)
+                && object.messages.iter().any(|message| message.type_ == 6_206)
+        }) {
+            return match entry.name() {
+                POPUP_MEMBER => Ok(POPUP_MEMBER),
+                CONTROL_MEMBER => Ok(CONTROL_MEMBER),
+                _ => Err(io::Error::other("popup model has an unsupported owner member").into()),
+            };
+        }
+    }
+    Err(io::Error::other("popup model owner member is missing").into())
+}
+
+fn split_component_for_member(member: &str) -> Option<u64> {
+    match member {
+        DOCUMENT_MEMBER => Some(100),
+        CALCULATION_MEMBER => Some(CALCULATION_COMPONENT_ID),
+        TILE_MEMBER => Some(TILE_COMPONENT_ID),
+        FORMAT_MEMBER => Some(FORMAT_COMPONENT_ID),
+        CONTROL_MEMBER => Some(CONTROL_COMPONENT_ID),
+        POPUP_MEMBER => Some(POPUP_COMPONENT_ID),
+        VIEW_STATE_MEMBER => Some(300),
+        _ => None,
+    }
+}
+
+fn split_popup_component_member(identifier: u64) -> Option<&'static str> {
+    match identifier {
+        100 => Some(DOCUMENT_MEMBER),
+        CALCULATION_COMPONENT_ID => Some(CALCULATION_MEMBER),
+        TILE_COMPONENT_ID => Some(TILE_MEMBER),
+        FORMAT_COMPONENT_ID => Some(FORMAT_MEMBER),
+        CONTROL_COMPONENT_ID => Some(CONTROL_MEMBER),
+        POPUP_COMPONENT_ID => Some(POPUP_MEMBER),
+        300 => Some(VIEW_STATE_MEMBER),
+        _ => None,
+    }
+}
+
+fn assert_split_popup_metadata_transition(
+    source: &[u8],
+    target: &[u8],
+    changed: &[String],
+) -> TestResult {
+    let before = metadata_payload(source)?;
+    let after = metadata_payload(target)?;
+    assert_eq!(
+        after.save_token,
+        before.save_token.and_then(|token| token.checked_add(1)),
+        "the split popup root metadata token must advance exactly once",
+    );
+    let before_edges = metadata_external_signature(source)?;
+    let after_edges = metadata_external_signature(target)?;
+    let source_models = split_popup_model_ids(source)?;
+    let target_models = split_popup_model_ids(target)?;
+    assert!(
+        after_edges.iter().all(|(_, component, object, weak)| {
+            *component != POPUP_COMPONENT_ID
+                || (*weak != Some(true)
+                    && object.is_none_or(|identifier| {
+                        split_popup_model_ids(target)
+                            .map(|ids| ids.contains(&identifier))
+                            .unwrap_or(false)
+                    }))
+        }),
+        "split popup external ownership contains a stale/weak target",
+    );
+    let has_cross_component_model = target_models.iter().copied().any(|identifier| {
+        split_popup_model_member(target, identifier)
+            .map(|member| member == POPUP_MEMBER)
+            .unwrap_or(false)
+    });
+    if has_cross_component_model {
+        assert!(
+            after_edges
+                .iter()
+                .any(|(source_component, target_component, _, weak)| {
+                    *source_component == CONTROL_COMPONENT_ID
+                        && *target_component == POPUP_COMPONENT_ID
+                        && *weak != Some(true)
+                }),
+            "split popup control component lost its current ownership edge",
+        );
+    }
+    if target_models.len() > source_models.len() {
+        let fresh_model = target_models
+            .iter()
+            .find(|identifier| !source_models.contains(identifier))
+            .copied()
+            .ok_or_else(|| io::Error::other("split popup fresh model is missing"))?;
+        let fresh_member = split_popup_model_member(target, fresh_model)?;
+        let fresh_component = split_component_for_member(fresh_member)
+            .ok_or_else(|| io::Error::other("fresh popup component is unknown"))?;
+        if fresh_component != CONTROL_COMPONENT_ID {
+            assert!(
+                after_edges
+                    .iter()
+                    .any(|(source_component, target_component, object, weak)| {
+                        *source_component == CONTROL_COMPONENT_ID
+                            && *target_component == fresh_component
+                            && *weak != Some(true)
+                            && (object.is_none() || object == &Some(fresh_model))
+                    }),
+                "split popup COW did not retain ownership for the fresh model",
+            );
+        }
+    }
+    if before_edges != after_edges {
+        // A COW transition may replace one object-specific edge with another
+        // object-specific edge; every edge remains checked above.  No
+        // unrelated component edge may be manufactured by the popup owner.
+        assert!(after_edges.iter().all(|edge| {
+            edge.0 == CONTROL_COMPONENT_ID && edge.1 == POPUP_COMPONENT_ID
+                || before_edges.contains(edge)
+        }));
+    }
+    for component in &before.components {
+        let candidate = after
+            .components
+            .iter()
+            .find(|other| other.identifier == component.identifier)
+            .ok_or_else(|| io::Error::other("split popup metadata component disappeared"))?;
+        let Some(member) = split_popup_component_member(component.identifier) else {
+            assert_eq!(candidate.save_token, component.save_token);
+            continue;
+        };
+        let member_changed = changed.iter().any(|name| name == member);
+        assert_eq!(
+            candidate.save_token,
+            if member_changed {
+                after.save_token
+            } else {
+                component.save_token
+            },
+            "unexpected split popup save-token transition for component {}",
+            component.identifier,
+        );
+    }
+    Ok(())
+}
+
+fn assert_split_popup_locality(
+    source: &[u8],
+    target: &[u8],
+    changed: &[String],
+    popup_changed: bool,
+) -> TestResult {
+    let allowed = [
+        TILE_MEMBER,
+        FORMAT_MEMBER,
+        CONTROL_MEMBER,
+        POPUP_MEMBER,
+        METADATA_MEMBER,
+        "preview.jpg",
+        "preview-micro.jpg",
+        "preview-web.jpg",
+    ];
+    assert!(
+        changed
+            .iter()
+            .all(|member| allowed.contains(&member.as_str())),
+        "unexpected split popup member mutation: {changed:?}",
+    );
+    for required in [TILE_MEMBER, CONTROL_MEMBER, METADATA_MEMBER] {
+        assert!(
+            changed.iter().any(|member| member == required),
+            "split popup edit did not touch required member {required}"
+        );
+    }
+    if popup_changed {
+        assert!(
+            changed
+                .iter()
+                .any(|member| member == POPUP_MEMBER || member == CONTROL_MEMBER),
+            "split popup graph transition did not mutate its model owner member",
+        );
+    } else {
+        assert!(
+            changed.iter().all(|member| member != POPUP_MEMBER),
+            "split popup reuse unexpectedly rewrote the popup model member",
+        );
+    }
+    let before = Catalog::from_bytes(source)?;
+    let after = Catalog::from_bytes(target)?;
+    for member in [
+        DOCUMENT_MEMBER,
+        CALCULATION_MEMBER,
+        VIEW_STATE_MEMBER,
+        "Data/sentinel.bin",
+    ] {
+        let source_entry = before
+            .iter()
+            .find(|entry| entry.name() == member)
+            .ok_or_else(|| io::Error::other(format!("source member {member} is missing")))?;
+        let target_entry = after
+            .iter()
+            .find(|entry| entry.name() == member)
+            .ok_or_else(|| io::Error::other(format!("target member {member} is missing")))?;
+        assert_eq!(
+            source_entry.data(),
+            target_entry.data(),
+            "unselected split popup member {member} changed"
+        );
+    }
+    if !popup_changed {
+        let source_entry = before
+            .iter()
+            .find(|entry| entry.name() == POPUP_MEMBER)
+            .ok_or_else(|| io::Error::other("source popup member is missing"))?;
+        let target_entry = after
+            .iter()
+            .find(|entry| entry.name() == POPUP_MEMBER)
+            .ok_or_else(|| io::Error::other("target popup member is missing"))?;
+        assert_eq!(source_entry.data(), target_entry.data());
+    }
+    Ok(())
+}
+
 fn split_list_entries(
     source: &[u8],
     member: &str,
@@ -1491,6 +1811,28 @@ fn assert_split_owner_rejects(source: &[u8], label: &str) -> TestResult {
         )
         .and_then(|edit| edit.set(CellControl::StarRating(StarRating)).commit());
     assert!(result.is_err(), "hostile split graph published: {label}");
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+fn assert_split_popup_owner_rejects(source: &[u8], label: &str) -> TestResult {
+    let package = match Package::from_bytes(source) {
+        Err(_) => return Ok(()),
+        Ok(package) => package,
+    };
+    let before = package.exact_bytes();
+    let position = CellPosition::new(4, 0);
+    assert!(
+        package
+            .table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+            .is_err(),
+        "hostile split popup read was accepted: {label}"
+    );
+    let replacement = CellControl::PopUpMenu(PopUpMenu::new(["Rejected"])?);
+    let result = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)
+        .and_then(|edit| edit.set(replacement).commit());
+    assert!(result.is_err(), "hostile split popup published: {label}");
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -1902,6 +2244,11 @@ fn with_split_metadata_corruption(
                     .components
                     .retain(|component| component.identifier != FORMAT_COMPONENT_ID);
             },
+            SplitMetadataCorruption::MissingPopupComponent => {
+                metadata
+                    .components
+                    .retain(|component| component.identifier != POPUP_COMPONENT_ID);
+            },
             SplitMetadataCorruption::DuplicateFormatComponent => {
                 let format = metadata
                     .components
@@ -1934,6 +2281,15 @@ fn with_split_metadata_corruption(
                     .ok_or_else(|| io::Error::other("control metadata is missing"))?;
                 control.preferred_locator = "Wrong/Tables/Control".to_owned();
                 control.locator = Some("Wrong/Tables/Control".to_owned());
+            },
+            SplitMetadataCorruption::WrongPopupLocator => {
+                let popup = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == POPUP_COMPONENT_ID)
+                    .ok_or_else(|| io::Error::other("popup metadata is missing"))?;
+                popup.preferred_locator = "Wrong/Tables/Popup".to_owned();
+                popup.locator = Some("Wrong/Tables/Popup".to_owned());
             },
             SplitMetadataCorruption::OpaquePopupInbound => unreachable!(),
         }
@@ -2628,18 +2984,31 @@ fn split_components_read_noop_and_popup_transition_remains_atomic() -> TestResul
     }
     let package = Package::from_bytes(&source)?;
     let before = package.exact_bytes();
-    assert!(
-        package
-            .edit_table_cell_control_format(
-                SheetSelector::index(0),
-                TableSelector::index(0),
-                CellPosition::new(4, 0),
-            )?
-            .set(CellControl::Checkbox(Checkbox))
-            .commit()
-            .is_err()
+    let replacement = CellControl::Checkbox(Checkbox);
+    let commit = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .set(replacement.clone())
+        .commit()?;
+    assert_eq!(
+        commit.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?,
+        Some(replacement),
     );
-    assert_eq!(package.exact_bytes(), before);
+    assert_eq!(
+        commit
+            .package()
+            .apply_table_cell_control_format(&commit.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        before,
+    );
     Ok(())
 }
 
@@ -2975,9 +3344,11 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         SplitMetadataCorruption::VersionedCalculationExternal,
         SplitMetadataCorruption::VersionedPopupExternal,
         SplitMetadataCorruption::DuplicateFormatComponent,
+        SplitMetadataCorruption::MissingPopupComponent,
         SplitMetadataCorruption::WrongCalculationLocator,
         SplitMetadataCorruption::WrongFormatLocator,
         SplitMetadataCorruption::WrongControlLocator,
+        SplitMetadataCorruption::WrongPopupLocator,
     ] {
         let hostile = with_split_metadata_corruption(&source, corruption)?;
         assert_split_owner_rejects(&hostile, &format!("split edge {corruption:?}"))?;
@@ -3009,17 +3380,14 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
         Some(CellControl::PopUpMenu(menu()?)),
     );
     let before = package.exact_bytes();
-    assert!(
-        package
-            .edit_table_cell_control_format(
-                SheetSelector::index(0),
-                TableSelector::index(0),
-                CellPosition::new(4, 0),
-            )?
-            .clear()
-            .commit()
-            .is_err()
-    );
+    let result = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )
+        .and_then(|edit| edit.clear().commit());
+    assert!(result.is_err());
     assert_eq!(package.exact_bytes(), before);
     for (member, alias) in [
         (CALCULATION_MEMBER, "Index/CalculationAlias.iwa"),
@@ -3035,17 +3403,423 @@ fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically(
 }
 
 #[test]
-fn popup_only_split_reads_but_popup_changed_route_refuses_atomically() -> TestResult {
-    let source = popup_only_split_fixture()?;
+fn split_popup_native_aggregate_only_metadata_mutates_and_reopens() -> TestResult {
+    let source = split_native_compatible_popup_fixture()?;
+    let position = CellPosition::new(4, 0);
     let package = Package::from_bytes(&source)?;
+    let original = CellControl::PopUpMenu(menu()?);
     assert_eq!(
         package.table_cell_control_format(
             SheetSelector::index(0),
             TableSelector::index(0),
-            CellPosition::new(0, 0),
+            position,
         )?,
-        Some(CellControl::Checkbox(Checkbox)),
+        Some(original.clone()),
     );
+    let noop = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .set(original)
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().exact_bytes(), source);
+
+    let replacement = CellControl::PopUpMenu(
+        PopUpMenu::new(["Draft", "Published"])?.with_initial_selection(
+            litchi_numbers::cell::data_format::pop_up_menu::InitialSelection::Blank,
+        ),
+    );
+    let commit = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .set(replacement.clone())
+        .commit()?;
+    let target = commit.package().exact_bytes();
+    assert_eq!(
+        commit.patch().before(),
+        Some(&CellControl::PopUpMenu(menu()?))
+    );
+    assert_eq!(commit.patch().after(), Some(&replacement));
+    assert_eq!(
+        commit.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        Some(replacement.clone()),
+    );
+    assert_eq!(
+        Package::from_bytes(&target)?.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        Some(replacement),
+    );
+    assert_ne!(target, source);
+    let changed = changed_members(&source, &target)?;
+    assert_previews_invalidated(&source, &target)?;
+    assert_split_popup_locality(&source, &target, &changed, true)?;
+    assert_split_popup_metadata_transition(&source, &target, &changed)?;
+    assert_eq!(
+        Package::from_bytes(&target)?
+            .apply_table_cell_control_format(&commit.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        source,
+    );
+
+    for corruption in [
+        SplitPopupControlMetadataCorruption::DuplicateField,
+        SplitPopupControlMetadataCorruption::WrongPath,
+    ] {
+        let hostile = with_split_popup_control_metadata_corruption(&source, corruption)?;
+        assert_split_popup_owner_rejects(&hostile, &format!("aggregate-only {corruption:?}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn split_popup_some_to_some_cow_apply_conflict_inverse_and_locality() -> TestResult {
+    let source = split_shared_popup_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    let original = CellControl::PopUpMenu(menu()?);
+    for position in [CellPosition::new(4, 0), CellPosition::new(4, 1)] {
+        assert_eq!(
+            package.table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position,
+            )?,
+            Some(original.clone()),
+        );
+    }
+    let noop = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .set(original.clone())
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().exact_bytes(), source);
+
+    let replacement = CellControl::PopUpMenu(
+        PopUpMenu::new(["Draft", "Published"])?.with_initial_selection(
+            litchi_numbers::cell::data_format::pop_up_menu::InitialSelection::Blank,
+        ),
+    );
+    let commit = package
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .set(replacement.clone())
+        .commit()?;
+    let target = commit.package().exact_bytes();
+    assert_eq!(commit.patch().before(), Some(&original));
+    assert_eq!(commit.patch().after(), Some(&replacement));
+    assert_eq!(
+        commit.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?,
+        Some(replacement),
+    );
+    assert_eq!(
+        commit.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 1),
+        )?,
+        Some(original),
+    );
+    let source_models = split_popup_model_ids(&source)?;
+    let target_models = split_popup_model_ids(&target)?;
+    assert_eq!(source_models, vec![CONTROL_MODEL_ID]);
+    assert_eq!(target_models.len(), 2);
+    let fresh = target_models
+        .iter()
+        .copied()
+        .find(|identifier| *identifier != CONTROL_MODEL_ID)
+        .ok_or_else(|| io::Error::other("split popup COW did not allocate a model"))?;
+    assert!(fresh > 1_000);
+    assert!(
+        split_list_entries(
+            &target,
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )?
+        .iter()
+        .filter(|entry| entry.refcount > 0)
+        .count()
+            >= 2
+    );
+    assert_previews_invalidated(&source, &target)?;
+    let changed = changed_members(&source, &target)?;
+    assert_split_popup_locality(&source, &target, &changed, true)?;
+    assert_split_popup_metadata_transition(&source, &target, &changed)?;
+    let fresh_member = split_popup_model_member(&target, fresh)?;
+    let fresh_component = split_component_for_member(fresh_member)
+        .ok_or_else(|| io::Error::other("fresh popup component is unknown"))?;
+    let popup_metadata = metadata_payload(&target)?
+        .components
+        .into_iter()
+        .find(|component| component.identifier == fresh_component)
+        .ok_or_else(|| io::Error::other("split popup metadata component is missing"))?;
+    assert!(
+        popup_metadata
+            .object_uuid_map_entries
+            .iter()
+            .any(|entry| entry.identifier == fresh),
+        "fresh split popup model is not registered in current metadata"
+    );
+    let applied = Package::from_bytes(&source)?.apply_table_cell_control_format(commit.patch())?;
+    assert_eq!(applied.package().exact_bytes(), target);
+    assert!(
+        Package::from_bytes(&target)?
+            .apply_table_cell_control_format(commit.patch())
+            .is_err(),
+        "split popup patch did not conflict after publication"
+    );
+    assert_eq!(
+        Package::from_bytes(&target)?
+            .apply_table_cell_control_format(&commit.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn split_popup_create_reuse_clear_and_final_cull_are_reversible() -> TestResult {
+    let source = split_component_fixture()?;
+    let package = Package::from_bytes(&source)?;
+    let position = CellPosition::new(0, 1);
+    assert_eq!(
+        package.table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        None,
+    );
+    let original_models = split_popup_model_ids(&source)?;
+    assert_eq!(original_models, vec![CONTROL_MODEL_ID]);
+    let create = package
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .set(CellControl::PopUpMenu(menu()?))
+        .commit()?;
+    let created = create.package().exact_bytes();
+    assert_eq!(
+        create.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        Some(CellControl::PopUpMenu(menu()?)),
+    );
+    assert_eq!(split_popup_model_ids(&created)?, original_models);
+    assert_eq!(
+        split_list_entries(
+            &created,
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )?
+        .iter()
+        .find(|entry| entry.key == 5)
+        .map(|entry| entry.refcount),
+        Some(2),
+    );
+    let changed = changed_members(&source, &created)?;
+    assert_split_popup_locality(&source, &created, &changed, false)?;
+    assert_split_popup_metadata_transition(&source, &created, &changed)?;
+    assert_previews_invalidated(&source, &created)?;
+
+    let clear = create
+        .package()
+        .edit_table_cell_control_format(SheetSelector::index(0), TableSelector::index(0), position)?
+        .clear()
+        .commit()?;
+    let cleared = clear.package().exact_bytes();
+    assert_eq!(
+        clear.package().table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+        )?,
+        None,
+    );
+    assert_eq!(split_popup_model_ids(&cleared)?, original_models);
+    let clear_changed = changed_members(&created, &cleared)?;
+    assert_split_popup_locality(&created, &cleared, &clear_changed, false)?;
+    assert_split_popup_metadata_transition(&created, &cleared, &clear_changed)?;
+    assert_eq!(
+        Package::from_bytes(&cleared)?
+            .apply_table_cell_control_format(&clear.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        created,
+    );
+    assert_eq!(
+        Package::from_bytes(&created)?
+            .apply_table_cell_control_format(&create.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        source,
+    );
+
+    let shared = split_shared_popup_fixture()?;
+    let first = Package::from_bytes(&shared)?
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 0),
+        )?
+        .clear()
+        .commit()?;
+    let first_bytes = first.package().exact_bytes();
+    assert_eq!(split_popup_model_ids(&first_bytes)?, vec![CONTROL_MODEL_ID]);
+    assert_eq!(
+        split_list_entries(
+            &first_bytes,
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )?
+        .iter()
+        .find(|entry| entry.key == 5)
+        .map(|entry| entry.refcount),
+        Some(1),
+    );
+    let final_commit = first
+        .package()
+        .edit_table_cell_control_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            CellPosition::new(4, 1),
+        )?
+        .clear()
+        .commit()?;
+    let final_bytes = final_commit.package().exact_bytes();
+    assert!(split_popup_model_ids(&final_bytes)?.is_empty());
+    let final_changed = changed_members(&first_bytes, &final_bytes)?;
+    assert_split_popup_locality(&first_bytes, &final_bytes, &final_changed, true)?;
+    assert_split_popup_metadata_transition(&first_bytes, &final_bytes, &final_changed)?;
+    assert!(
+        split_list_entries(
+            &final_bytes,
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+        )?
+        .iter()
+        .all(|entry| entry.key != 5)
+    );
+    let final_metadata = metadata_payload(&final_bytes)?;
+    let popup_component = final_metadata
+        .components
+        .iter()
+        .find(|component| component.identifier == POPUP_COMPONENT_ID)
+        .ok_or_else(|| io::Error::other("split popup component was removed unexpectedly"))?;
+    assert!(
+        popup_component
+            .object_uuid_map_entries
+            .iter()
+            .all(|entry| entry.identifier != CONTROL_MODEL_ID)
+    );
+    assert!(final_metadata.components.iter().all(|component| {
+        component.external_references.iter().all(|edge| {
+            !(component.identifier == CONTROL_COMPONENT_ID
+                && edge.component_identifier == POPUP_COMPONENT_ID
+                && edge.object_identifier == Some(CONTROL_MODEL_ID))
+        })
+    }));
+    assert_eq!(
+        Package::from_bytes(&final_bytes)?
+            .apply_table_cell_control_format(&final_commit.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        first_bytes,
+    );
+    assert_eq!(
+        Package::from_bytes(&first_bytes)?
+            .apply_table_cell_control_format(&first.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        shared,
+    );
+    Ok(())
+}
+
+#[test]
+fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() -> TestResult {
+    let source = split_shared_popup_fixture()?;
+    for corruption in [
+        SplitMetadataCorruption::MissingPopupExternal,
+        SplitMetadataCorruption::VersionedPopupExternal,
+        SplitMetadataCorruption::MissingPopupComponent,
+        SplitMetadataCorruption::WrongPopupLocator,
+    ] {
+        let hostile = with_split_metadata_corruption(&source, corruption)?;
+        assert_split_owner_rejects(&hostile, &format!("popup split {corruption:?}"))?;
+    }
+    for member in [POPUP_MEMBER, CONTROL_MEMBER, TILE_MEMBER] {
+        let aliased = with_physical_alias_for_member(
+            &source,
+            member,
+            match member {
+                POPUP_MEMBER => "Index/Tables/PopupAlias.iwa",
+                CONTROL_MEMBER => "Index/Tables/ControlAlias.iwa",
+                _ => "Index/Tables/TileAlias.iwa",
+            },
+        )?;
+        assert_split_owner_rejects(&aliased, &format!("popup physical alias {member}"))?;
+    }
+    for (member, object_identifier, list_type, label) in [
+        (
+            FORMAT_MEMBER,
+            FORMAT_LIST_ID,
+            tst::table_data_list::ListType::Format,
+            "format",
+        ),
+        (
+            CONTROL_MEMBER,
+            CONTROL_LIST_ID,
+            tst::table_data_list::ListType::ControlCellSpec,
+            "control",
+        ),
+    ] {
+        let hostile = rewrite_split_list(&source, member, object_identifier, list_type, |list| {
+            list.entries
+                .iter_mut()
+                .find(|entry| entry.key == 5)
+                .ok_or_else(|| io::Error::other("popup split entry is missing"))?
+                .refcount = 1;
+            Ok(())
+        })?;
+        let package = Package::from_bytes(&hostile)?;
+        let before = package.exact_bytes();
+        let result = package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(4, 0),
+            )
+            .and_then(|edit| edit.clear().commit());
+        assert!(
+            result.is_err(),
+            "split popup {label} refcount undercount was accepted"
+        );
+        assert_eq!(package.exact_bytes(), before);
+    }
+    let opaque =
+        with_split_metadata_corruption(&source, SplitMetadataCorruption::OpaquePopupInbound)?;
+    let package = Package::from_bytes(&opaque)?;
     assert_eq!(
         package.table_cell_control_format(
             SheetSelector::index(0),
@@ -3060,13 +3834,49 @@ fn popup_only_split_reads_but_popup_changed_route_refuses_atomically() -> TestRe
             SheetSelector::index(0),
             TableSelector::index(0),
             CellPosition::new(4, 0),
-        )?
-        .set(CellControl::Checkbox(Checkbox))
-        .commit();
-    assert!(matches!(
-        result,
-        Err(ControlError::UnsupportedDependency { .. })
-    ));
+        )
+        .and_then(|edit| edit.clear().commit());
+    assert!(result.is_err());
     assert_eq!(package.exact_bytes(), before);
+
+    let without = without_metadata(&source)?;
+    let package = Package::from_bytes(&without)?;
+    let before = package.exact_bytes();
+    let desired = PopUpMenu::new(["No", "Metadata"])?.with_initial_selection(
+        litchi_numbers::cell::data_format::pop_up_menu::InitialSelection::Blank,
+    );
+    assert!(
+        package
+            .edit_table_cell_control_format(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(4, 0),
+            )
+            .and_then(|edit| { edit.set(CellControl::PopUpMenu(desired.clone())).commit() })
+            .is_err()
+    );
+    assert_eq!(package.exact_bytes(), before);
+
+    let tight = Limits::new(
+        u64::try_from(source.len().saturating_sub(1))?,
+        Limits::MAX_ENTRIES,
+        Limits::MAX_ENTRY_BYTES,
+        Limits::MAX_TOTAL_BYTES,
+        Limits::MAX_IWA_STREAM_BYTES,
+    )?;
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+        )
+        .is_err()
+    );
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            PackageReadOptions::new(Limits::default(), PackageSemanticLimits::new(1, 1, 1, 1)?,),
+        )
+        .is_err()
+    );
     Ok(())
 }

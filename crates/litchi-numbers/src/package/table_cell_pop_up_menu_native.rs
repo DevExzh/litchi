@@ -1,10 +1,11 @@
-//! Native, same-component Pop-Up Menu graph transitions.
+//! Native Pop-Up Menu graph transitions.
 //!
 //! This module is deliberately below the public Pop-Up Menu facade.  It takes
 //! already-resolved native routes and returns private archive bytes; selector,
 //! package metadata, ZIP, preview, and publication policy remain owned by the
-//! facade.  The input is a single decompressed IWA archive, so a route that
-//! crosses components cannot accidentally be treated as a local edit.
+//! facade.  The compatibility entry point accepts one decompressed IWA
+//! archive; the split entry point accepts a complete set of current members
+//! and projects its private merged candidate back to those members.
 
 use std::fmt;
 
@@ -49,7 +50,7 @@ pub(super) struct NativePopUpValue<'items> {
     pub(super) first_item_string_identifier: Option<u32>,
 }
 
-/// A fully resolved same-component native graph.
+/// A fully resolved native graph for the compatibility single-member path.
 ///
 /// Every identifier must occur in the supplied archive exactly once.  The
 /// package owner resolves these identifiers from its rooted selector before
@@ -75,6 +76,57 @@ pub(super) struct NativePopUpInput<'source> {
     pub(super) format_payload: &'source [u8],
     /// Identifier reserved by the package metadata allocator for a new
     /// PopUpMenuModel object. It is unused when an identical model is reused.
+    pub(super) new_popup_model_identifier: Option<u64>,
+    pub(super) desired: Option<NativePopUpValue<'source>>,
+    pub(super) limits: Limits,
+    pub(super) path: Path,
+}
+
+/// A physical IWA member supplied to the multi-member native transition.
+///
+/// The archive is borrowed from the package source and is never mutated in
+/// place.  A member is identified by both its component index and effective
+/// member name; either value alone is insufficient when a package contains
+/// versioned or explicitly-located component records.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct NativePopUpMember<'source> {
+    pub(super) archive: &'source Archive,
+    pub(super) component_index: usize,
+    pub(super) member_name: &'source str,
+}
+
+/// A rooted object route into one of [`NativePopUpMember`]s.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct NativePopUpObjectRoute {
+    pub(super) member_index: usize,
+    pub(super) identifier: u64,
+}
+
+/// The resolved physical graph for a split Pop-Up Menu transaction.
+///
+/// The model, tile, and list objects may live in different current component
+/// members.  The native transition merges only their parsed object graphs in
+/// a private working archive, performs the same strict lifecycle/census logic
+/// as the single-member path, then splits the candidate back along the source
+/// ownership map.  This keeps cross-member references visible to refcount and
+/// cull checks without ever publishing a merged archive.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct NativePopUpGraphInput<'source> {
+    /// All current physical members that can contain rooted table/storage
+    /// objects, not merely the members named by the selected cell.  The
+    /// merged working archive uses this complete set to census BNC/list
+    /// references before a refcount decrement or popup cull.
+    pub(super) members: &'source [NativePopUpMember<'source>],
+    pub(super) model: NativePopUpObjectRoute,
+    pub(super) tile: NativePopUpObjectRoute,
+    pub(super) control_table_identifier: u64,
+    pub(super) format_table_identifier: u64,
+    /// Member in which a newly-created PopUpMenuModel is allowed to live.
+    /// Existing models are assigned to their resolved source member.
+    pub(super) creation_member_index: usize,
+    pub(super) tile_row: u32,
+    pub(super) tile_column: u32,
+    pub(super) format_payload: &'source [u8],
     pub(super) new_popup_model_identifier: Option<u64>,
     pub(super) desired: Option<NativePopUpValue<'source>>,
     pub(super) limits: Limits,
@@ -180,9 +232,9 @@ impl NativeControlOutput {
 /// can perform an object-level locality assertion for the selected BNC cell.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct NativePopUpOutput {
-    /// Deduplicated physical edits.  The popup owner currently emits exactly
-    /// one edit; the envelope is shared with the scalar-control owner so a
-    /// split format/control graph can stage all changed members atomically.
+    /// Deduplicated physical edits.  The compatibility path normally emits
+    /// one edit; the split path emits one edit for each changed member so a
+    /// format/control graph can stage all changed members atomically.
     pub(super) member_edits: NativeControlOutput,
     pub(super) cell_bytes: Vec<u8>,
     pub(super) format_identifier: Option<u32>,
@@ -191,6 +243,21 @@ pub(super) struct NativePopUpOutput {
     pub(super) added_object_identifiers: Vec<u64>,
     pub(super) removed_object_identifiers: Vec<u64>,
     pub(super) changed_member_names: Vec<String>,
+}
+
+/// Candidate archive transition before it is serialized into one or more
+/// physical members.  Keeping the parsed candidate here is what allows the
+/// split-member wrapper to preserve each source member's object ownership and
+/// object order.
+#[derive(Debug)]
+struct NativePopUpTransition {
+    candidate: Archive,
+    cell_bytes: Vec<u8>,
+    format_identifier: Option<u32>,
+    control_cell_spec_identifier: Option<u32>,
+    popup_model_identifier: Option<u64>,
+    added_object_identifiers: Vec<u64>,
+    removed_object_identifiers: Vec<u64>,
 }
 
 /// Native graph failure. The facade maps this to its content-redacted error
@@ -222,7 +289,7 @@ impl std::error::Error for NativePopUpError {}
 
 pub(super) type Result<T> = std::result::Result<T, NativePopUpError>;
 
-/// Plan and execute one same-component Pop-Up Menu graph transition.
+/// Plan and execute one compatibility single-member Pop-Up Menu transition.
 ///
 /// The function validates the model/DataStore field-21 route, exactly one
 /// control and format list, the selected tile/BNC cell, every existing popup
@@ -235,10 +302,11 @@ pub(super) type Result<T> = std::result::Result<T, NativePopUpError>;
 /// caller supplied a collision-free metadata-reserved identifier. A model is
 /// culled only after a complete same-archive inbound scan proves that no
 /// remaining control-list entry references it. Empty control lists are kept.
-pub(super) fn rewrite_native_popup_menu(
+fn rewrite_native_popup_menu_transition(
     input: NativePopUpInput<'_>,
     budget: &mut TransactionBudget,
-) -> Result<NativePopUpOutput> {
+    preserve_aggregate_only: bool,
+) -> Result<NativePopUpTransition> {
     let source = input.archive;
     let decoded_bytes = source
         .objects
@@ -366,6 +434,9 @@ pub(super) fn rewrite_native_popup_menu(
         old_format,
         model_options,
     )?;
+    if input.desired.is_none() {
+        validate_control_list_payloads(control.payload, model_options, budget, input.path)?;
+    }
     // Only models reachable from the rooted control-list graph may be reused.
     // A semantically identical orphan 6206 object is not a safe deduplication
     // candidate: it may be versioned, unregistered, or owned by another
@@ -438,6 +509,7 @@ pub(super) fn rewrite_native_popup_menu(
         control.payload,
         control_bytes,
         input.limits,
+        preserve_aggregate_only,
     )?;
 
     let desired_bnc = match desired_state.as_ref() {
@@ -571,7 +643,30 @@ pub(super) fn rewrite_native_popup_menu(
         model_options,
     )?;
 
-    let archive_bytes = candidate
+    Ok(NativePopUpTransition {
+        candidate,
+        cell_bytes: bnc_output,
+        format_identifier: format_key,
+        control_cell_spec_identifier: control_key,
+        popup_model_identifier: desired_popup_identifier,
+        added_object_identifiers: added,
+        removed_object_identifiers: removed,
+    })
+}
+
+/// Plan and serialize one same-component Pop-Up Menu transition.
+///
+/// This is retained as the compatibility entry point for callers that have
+/// already proved all graph objects share one member.  Split-component callers
+/// should use [`rewrite_native_popup_menu_multi`], which emits one edit per
+/// changed member.
+pub(super) fn rewrite_native_popup_menu(
+    input: NativePopUpInput<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<NativePopUpOutput> {
+    let transition = rewrite_native_popup_menu_transition(input, budget, false)?;
+    let archive_bytes = transition
+        .candidate
         .to_bytes_with_limits(input.limits)
         .map_err(|_| NativePopUpError::Archive)?;
     let member_edits =
@@ -579,14 +674,436 @@ pub(super) fn rewrite_native_popup_menu(
     let changed_members = member_edits.member_names().map(str::to_owned).collect();
     Ok(NativePopUpOutput {
         member_edits,
-        cell_bytes: bnc_output,
-        format_identifier: format_key,
-        control_cell_spec_identifier: control_key,
-        popup_model_identifier: desired_popup_identifier,
-        added_object_identifiers: added,
-        removed_object_identifiers: removed,
+        cell_bytes: transition.cell_bytes,
+        format_identifier: transition.format_identifier,
+        control_cell_spec_identifier: transition.control_cell_spec_identifier,
+        popup_model_identifier: transition.popup_model_identifier,
+        added_object_identifiers: transition.added_object_identifiers,
+        removed_object_identifiers: transition.removed_object_identifiers,
         changed_member_names: changed_members,
     })
+}
+
+/// Plan and execute a split-component Pop-Up Menu transition.
+///
+/// The strict graph algorithm above intentionally operates on one `Archive`:
+/// that makes global BNC/list/model refcount and cull checks straightforward.
+/// This adapter constructs a private object-only view by concatenating the
+/// resolved current members, runs the algorithm once, and then projects the
+/// candidate back to the exact source member that owned every object.  Object
+/// identifiers must be globally unique across the supplied members; accepting
+/// an alias here would make a cull or a refcount transition ambiguous.
+pub(super) fn rewrite_native_popup_menu_multi(
+    input: NativePopUpGraphInput<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<NativePopUpOutput> {
+    let source_object_count = input
+        .members
+        .iter()
+        .try_fold(0usize, |total, member| {
+            total.checked_add(member.archive.objects.len())
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let source_payload_bytes = input
+        .members
+        .iter()
+        .flat_map(|member| member.archive.objects.iter())
+        .flat_map(|object| object.messages.iter())
+        .try_fold(0usize, |total, message| {
+            total.checked_add(message.data.len())
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    // The merged working view and the per-member projection each retain an
+    // object slot.  Charge those private scratch allocations before either
+    // phase starts; the ordinary single-member path has no equivalent copy.
+    let merge_allocation_count = source_object_count
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(input.members.len()))
+        .ok_or(NativePopUpError::InvalidSource)?;
+    budget
+        .charge_allocations(merge_allocation_count, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    budget
+        .charge_scratch_bytes(source_payload_bytes, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    let (working, ownership) = merge_popup_members(&input)?;
+    let placement = input
+        .members
+        .get(input.creation_member_index)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let model_member = input
+        .members
+        .get(input.model.member_index)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let tile_member = input
+        .members
+        .get(input.tile.member_index)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    if model_member
+        .archive
+        .objects
+        .iter()
+        .filter(|object| object.archive_info.identifier == Some(input.model.identifier))
+        .count()
+        != 1
+        || tile_member
+            .archive
+            .objects
+            .iter()
+            .filter(|object| object.archive_info.identifier == Some(input.tile.identifier))
+            .count()
+            != 1
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    if input.model.identifier == input.tile.identifier {
+        return Err(NativePopUpError::UnsupportedDependency);
+    }
+    let synthetic = NativePopUpInput {
+        archive: &working,
+        component_index: placement.component_index,
+        model_identifier: input.model.identifier,
+        tile_identifier: input.tile.identifier,
+        tile_row: input.tile_row,
+        tile_column: input.tile_column,
+        control_table_identifier: input.control_table_identifier,
+        format_table_identifier: input.format_table_identifier,
+        member_name: placement.member_name,
+        format_payload: input.format_payload,
+        new_popup_model_identifier: input.new_popup_model_identifier,
+        desired: input.desired,
+        limits: input.limits,
+        path: input.path,
+    };
+    let transition = rewrite_native_popup_menu_transition(synthetic, budget, true)?;
+    let member_edits = split_popup_candidate(
+        &input,
+        &ownership,
+        &transition.candidate,
+        &transition.added_object_identifiers,
+        &transition.removed_object_identifiers,
+        budget,
+    )?;
+    let changed_members = member_edits.member_names().map(str::to_owned).collect();
+    Ok(NativePopUpOutput {
+        member_edits,
+        cell_bytes: transition.cell_bytes,
+        format_identifier: transition.format_identifier,
+        control_cell_spec_identifier: transition.control_cell_spec_identifier,
+        popup_model_identifier: transition.popup_model_identifier,
+        added_object_identifiers: transition.added_object_identifiers,
+        removed_object_identifiers: transition.removed_object_identifiers,
+        changed_member_names: changed_members,
+    })
+}
+
+/// Return the current popup model IDs reachable from a split control graph.
+/// This mirrors [`existing_popup_model_identifiers`] but first builds the same
+/// private merged view used by the write path, so the facade can preflight UUID
+/// ownership without silently ignoring a sidecar member.
+pub(super) fn existing_popup_model_identifiers_multi(
+    input: NativePopUpGraphInput<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u64>> {
+    let source_object_count = input
+        .members
+        .iter()
+        .try_fold(0usize, |total, member| {
+            total.checked_add(member.archive.objects.len())
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let source_payload_bytes = input
+        .members
+        .iter()
+        .flat_map(|member| member.archive.objects.iter())
+        .flat_map(|object| object.messages.iter())
+        .try_fold(0usize, |total, message| {
+            total.checked_add(message.data.len())
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let merge_allocation_count = source_object_count
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(input.members.len()))
+        .ok_or(NativePopUpError::InvalidSource)?;
+    budget
+        .charge_allocations(merge_allocation_count, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    budget
+        .charge_scratch_bytes(source_payload_bytes, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    let (working, _) = merge_popup_members(&input)?;
+    let placement = input
+        .members
+        .get(input.creation_member_index)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let synthetic = NativePopUpInput {
+        archive: &working,
+        component_index: placement.component_index,
+        model_identifier: input.model.identifier,
+        tile_identifier: input.tile.identifier,
+        tile_row: input.tile_row,
+        tile_column: input.tile_column,
+        control_table_identifier: input.control_table_identifier,
+        format_table_identifier: input.format_table_identifier,
+        member_name: placement.member_name,
+        format_payload: input.format_payload,
+        new_popup_model_identifier: input.new_popup_model_identifier,
+        desired: input.desired,
+        limits: input.limits,
+        path: input.path,
+    };
+    existing_popup_model_identifiers(synthetic, budget, input.path)
+}
+
+fn merge_popup_members(input: &NativePopUpGraphInput<'_>) -> Result<(Archive, Vec<(u64, usize)>)> {
+    if input.members.is_empty() {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    if input.creation_member_index >= input.members.len()
+        || input.model.member_index >= input.members.len()
+        || input.tile.member_index >= input.members.len()
+    {
+        return Err(NativePopUpError::InvalidSource);
+    }
+    let mut working = Archive::new();
+    let object_count = input
+        .members
+        .iter()
+        .try_fold(0usize, |total, member| {
+            total.checked_add(member.archive.objects.len())
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    working
+        .objects
+        .try_reserve_exact(object_count)
+        .map_err(|_| NativePopUpError::Allocation)?;
+    let mut ownership = Vec::new();
+    ownership
+        .try_reserve_exact(object_count)
+        .map_err(|_| NativePopUpError::Allocation)?;
+    for (member_index, member) in input.members.iter().enumerate() {
+        if member.member_name.is_empty()
+            || input.members[..member_index].iter().any(|prior| {
+                prior.component_index == member.component_index
+                    || prior.member_name == member.member_name
+            })
+        {
+            return Err(NativePopUpError::UnsupportedDependency);
+        }
+        for object in &member.archive.objects {
+            let identifier = object
+                .archive_info
+                .identifier
+                .ok_or(NativePopUpError::InvalidSource)?;
+            if identifier == 0 || ownership.iter().any(|(id, _)| *id == identifier) {
+                return Err(NativePopUpError::UnsupportedDependency);
+            }
+            ownership.push((identifier, member_index));
+            working.objects.push(object.clone());
+        }
+    }
+    Ok((working, ownership))
+}
+
+fn split_popup_candidate(
+    input: &NativePopUpGraphInput<'_>,
+    ownership: &[(u64, usize)],
+    candidate: &Archive,
+    added: &[u64],
+    removed: &[u64],
+    budget: &mut TransactionBudget,
+) -> Result<NativeControlOutput> {
+    let mut per_member: Vec<Archive> = Vec::new();
+    per_member
+        .try_reserve_exact(input.members.len())
+        .map_err(|_| NativePopUpError::Allocation)?;
+    for member in input.members {
+        let mut archive = Archive::new();
+        archive
+            .objects
+            .try_reserve_exact(member.archive.objects.len())
+            .map_err(|_| NativePopUpError::Allocation)?;
+        per_member.push(archive);
+    }
+    let mut seen = Vec::new();
+    seen.try_reserve_exact(candidate.objects.len())
+        .map_err(|_| NativePopUpError::Allocation)?;
+    for object in &candidate.objects {
+        let identifier = object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        if seen.contains(&identifier) {
+            return Err(NativePopUpError::UnsupportedDependency);
+        }
+        seen.push(identifier);
+        let member_index =
+            if let Some((_, index)) = ownership.iter().find(|(id, _)| *id == identifier) {
+                *index
+            } else if added.contains(&identifier) {
+                input.creation_member_index
+            } else {
+                return Err(NativePopUpError::InvalidSource);
+            };
+        per_member
+            .get_mut(member_index)
+            .ok_or(NativePopUpError::InvalidSource)?
+            .objects
+            .push(object.clone());
+    }
+    for &(identifier, member_index) in ownership {
+        let source_member = input
+            .members
+            .get(member_index)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let source_object = source_member
+            .archive
+            .objects
+            .iter()
+            .find(|object| object.archive_info.identifier == Some(identifier))
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let present = per_member[member_index]
+            .objects
+            .iter()
+            .any(|object| object.archive_info.identifier == Some(identifier));
+        if !present && !removed.contains(&identifier) {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        if present {
+            let candidate_object = per_member[member_index]
+                .objects
+                .iter()
+                .find(|object| object.archive_info.identifier == Some(identifier))
+                .ok_or(NativePopUpError::InvalidSource)?;
+            if !source_object.same_content_ignoring_offsets(candidate_object)
+                && removed.contains(&identifier)
+            {
+                return Err(NativePopUpError::InvalidSource);
+            }
+        }
+    }
+    // Removal compacts the object vector, so comparing by absolute position
+    // would incorrectly reject every object following a culled popup.  The
+    // source order must instead equal source IDs with removals filtered,
+    // followed by any newly-created object assigned to this member.
+    for (member_index, member) in input.members.iter().enumerate() {
+        let mut expected = member
+            .archive
+            .objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .filter(|identifier| !removed.contains(identifier))
+            .collect::<Vec<_>>();
+        expected.extend(
+            added
+                .iter()
+                .copied()
+                .filter(|_identifier| input.creation_member_index == member_index),
+        );
+        let actual = per_member[member_index]
+            .objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .collect::<Vec<_>>();
+        if expected != actual {
+            return Err(NativePopUpError::InvalidSource);
+        }
+    }
+    // The exact-byte publication filter below retains one candidate and one
+    // source serialization at the same time. Preflight both temporary Vecs
+    // for every member before the first serialization allocation; charging
+    // all members is conservative when the structural comparison later
+    // proves some of them unchanged.
+    let comparison_allocations = input
+        .members
+        .len()
+        .checked_mul(2)
+        .ok_or(NativePopUpError::InvalidSource)?;
+    let comparison_bytes =
+        input
+            .members
+            .iter()
+            .zip(&per_member)
+            .try_fold(0usize, |total, (source, candidate)| {
+                let source_len = source
+                    .archive
+                    .encoded_len_with_limits(input.limits)
+                    .map_err(|_| NativePopUpError::Archive)?;
+                let candidate_len = candidate
+                    .encoded_len_with_limits(input.limits)
+                    .map_err(|_| NativePopUpError::Archive)?;
+                total
+                    .checked_add(source_len)
+                    .and_then(|value| value.checked_add(candidate_len))
+                    .ok_or(NativePopUpError::InvalidSource)
+            })?;
+    budget
+        .charge_allocations(comparison_allocations, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    budget
+        .charge_scratch_bytes(comparison_bytes, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    budget
+        .charge_transaction_work(comparison_bytes, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(input.members.len())
+        .map_err(|_| NativePopUpError::Allocation)?;
+    for (member_index, member) in input.members.iter().enumerate() {
+        let source_objects = &member.archive.objects;
+        let candidate_objects = &per_member[member_index].objects;
+        let source_ids = source_objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .filter(|identifier| !removed.contains(identifier))
+            .collect::<Vec<_>>();
+        let candidate_ids = candidate_objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .collect::<Vec<_>>();
+        let changed = source_ids != candidate_ids
+            || source_objects.iter().any(|source_object| {
+                let Some(identifier) = source_object.archive_info.identifier else {
+                    return true;
+                };
+                if removed.contains(&identifier) {
+                    return true;
+                }
+                let Some(candidate_object) = candidate_objects
+                    .iter()
+                    .find(|object| object.archive_info.identifier == Some(identifier))
+                else {
+                    return true;
+                };
+                !source_object.same_content_ignoring_offsets(candidate_object)
+            });
+        if !changed {
+            continue;
+        }
+        let bytes = per_member[member_index]
+            .to_bytes_with_limits(input.limits)
+            .map_err(|_| NativePopUpError::Archive)?;
+        // Object provenance can differ after the private merge/split even
+        // when the physical member is byte-identical (for example, an
+        // untouched popup object retains the source payload but receives a
+        // fresh in-memory archive position).  Compare the serialized source
+        // member before publishing an edit; metadata token selectors must
+        // describe actual byte changes, never merely private provenance.
+        let source_bytes = member
+            .archive
+            .to_bytes_with_limits(input.limits)
+            .map_err(|_| NativePopUpError::Archive)?;
+        if bytes == source_bytes {
+            continue;
+        }
+        edits.push(NativeMemberEdit::new(
+            member.component_index,
+            member.member_name,
+            bytes,
+        ));
+    }
+    NativeControlOutput::from_edits(edits)
 }
 
 /// Census the popup model IDs reachable from the selected control list
@@ -797,6 +1314,41 @@ fn prepare_desired_state(
     })
 }
 
+fn validate_control_list_payloads(
+    source: &[u8],
+    options: storage_codec::DecodeOptions,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<()> {
+    let list = decode_list_entries(source, options)?;
+    for entry in list.entries {
+        if entry.payload_kind != PayloadKind::ControlCellSpec {
+            continue;
+        }
+        if entry.ref_count == 0 {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        let (_, report) = control_codec::decode_any_cell_spec_with_report(
+            &entry.payload,
+            budget.residual_popup_options(&entry.payload),
+        )
+        .map_err(|_| NativePopUpError::Codec)?;
+        budget
+            .charge_wire_bytes(report.input_bytes(), path)
+            .and_then(|_| budget.charge_wire_fields(report.fields(), path))
+            .and_then(|_| budget.charge_wire_work(report.work_bytes(), path))
+            .and_then(|_| budget.charge_wire_nesting(report.max_depth(), path))
+            .and_then(|_| budget.charge_payload_references(report.references(), path))
+            .and_then(|_| budget.charge_payload_items(report.items(), path))
+            .and_then(|_| budget.charge_wire_text_bytes(report.text_bytes(), path))
+            .and_then(|_| budget.charge_allocations(report.allocations(), path))
+            .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), path))
+            .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), path))
+            .map_err(|_| NativePopUpError::Limit)?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Default)]
 struct BncReferenceCounts {
     format: Vec<(u32, u32)>,
@@ -959,6 +1511,23 @@ fn validate_bnc_refcounts(
     options: storage_codec::DecodeOptions,
 ) -> Result<()> {
     let list = decode_list_entries(payload, options)?;
+    if list_type == LIST_CONTROL_CELL_SPEC {
+        for (index, entry) in list.entries.iter().enumerate() {
+            if list.entries[index + 1..].iter().any(|other| {
+                entry.payload_kind == PayloadKind::ControlCellSpec
+                    && other.payload_kind == PayloadKind::ControlCellSpec
+                    && entry.payload == other.payload
+            }) {
+                // Equal display-format payloads are valid in native format
+                // lists: distinct scalar controls can share the same
+                // formatting while retaining separate keys.  Control-list
+                // entries are different: two byte-identical CellSpecs make
+                // popup reuse/refcount ownership ambiguous, so require one
+                // canonical entry for an equal control payload.
+                return Err(NativePopUpError::UnsupportedDependency);
+            }
+        }
+    }
     let mut seen = Vec::new();
     for entry in list.entries {
         let observed = match list_type {
@@ -1725,6 +2294,7 @@ pub(super) fn replace_control_message_with_transition(
     source_payload: &[u8],
     payload: Vec<u8>,
     limits: Limits,
+    preserve_aggregate_only: bool,
 ) -> Result<()> {
     let object = archive
         .object_mut(object_identifier)
@@ -1832,9 +2402,13 @@ pub(super) fn replace_control_message_with_transition(
         .message_infos
         .get_mut(message_index)
         .ok_or(NativePopUpError::InvalidSource)?;
-    if info.field_infos.is_empty() && !before.is_empty() {
-        return Err(NativePopUpError::InvalidSource);
-    }
+    // Native Numbers producers commonly store only the aggregate popup
+    // object reference for this list message.  An absent FieldInfo collection
+    // is therefore an authoritative producer shape, not a missing proof.  It
+    // must stay absent through a transition; when FieldInfo records exist we
+    // validate every existing path and add a path only for a newly appended
+    // popup entry.
+    let aggregate_only = preserve_aggregate_only && info.field_infos.is_empty();
     // A builder-produced list may omit FieldInfo records only for entries
     // introduced by this transition. Existing rooted entries must already
     // have an exact [3,key] record; otherwise their aggregate and per-entry
@@ -1851,15 +2425,18 @@ pub(super) fn replace_control_message_with_transition(
             .iter()
             .any(|field| field.path.path.as_slice() == [3, *key])
         {
-            if before_entries
-                .iter()
-                .any(|(before_key, _)| *before_key == *key)
+            if !aggregate_only
+                && before_entries
+                    .iter()
+                    .any(|(before_key, _)| *before_key == *key)
             {
                 return Err(NativePopUpError::InvalidSource);
             }
-            let mut field = FieldInfo::new(vec![3, *key]);
-            field.r#type = Some(FieldType::ObjectReference);
-            info.field_infos.push(field);
+            if !aggregate_only {
+                let mut field = FieldInfo::new(vec![3, *key]);
+                field.r#type = Some(FieldType::ObjectReference);
+                info.field_infos.push(field);
+            }
         }
     }
     let mut field_changes = Vec::new();
@@ -1913,26 +2490,28 @@ pub(super) fn replace_control_message_with_transition(
             after: new_id.into_iter().collect(),
         });
     }
-    for (key, identifier) in &after_entries {
-        if identifier.is_none() {
-            continue;
+    if !aggregate_only {
+        for (key, identifier) in &after_entries {
+            if identifier.is_none() {
+                continue;
+            }
+            if !field_changes
+                .iter()
+                .any(|change| change.path.as_slice() == [3, *key])
+            {
+                return Err(NativePopUpError::InvalidSource);
+            }
         }
-        if !field_changes
-            .iter()
-            .any(|change| change.path.as_slice() == [3, *key])
-        {
-            return Err(NativePopUpError::InvalidSource);
-        }
-    }
-    for (key, identifier) in &before_entries {
-        if identifier.is_none() {
-            continue;
-        }
-        if !field_changes
-            .iter()
-            .any(|change| change.path.as_slice() == [3, *key])
-        {
-            return Err(NativePopUpError::InvalidSource);
+        for (key, identifier) in &before_entries {
+            if identifier.is_none() {
+                continue;
+            }
+            if !field_changes
+                .iter()
+                .any(|change| change.path.as_slice() == [3, *key])
+            {
+                return Err(NativePopUpError::InvalidSource);
+            }
         }
     }
     if field_changes

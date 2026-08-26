@@ -362,8 +362,139 @@ fn exercise_split_component_source(data: &[u8]) {
         );
         exercise_split_write(package, position, before, desired, data);
     }
+    exercise_split_popup_lifecycle(package, data);
     exercise_split_shared_refcount(package, &observed, data);
     exercise_split_component_limits();
+}
+
+/// Keep the unified facade's Pop-Up branch explicit in the split-member
+/// campaign.  The general loop above covers all five controls, but this
+/// deterministic probe guarantees replacement, creation/reuse, and final
+/// clear/cull are exercised even when the fuzz command selects only scalar
+/// variants.
+fn exercise_split_popup_lifecycle(package: &Package, data: &[u8]) {
+    let sheet = SheetSelector::index(0);
+    let table = TableSelector::index(0);
+    let popup_position = CellPosition::new(4, 0);
+    let desired = control(4, data);
+    if let Ok(Some(before)) = package.table_cell_control_format(sheet, table, popup_position) {
+        exercise_split_write(package, popup_position, before, desired.clone(), data);
+    }
+
+    let create_position = CellPosition::new(0, 1);
+    let sibling_position = CellPosition::new(1, 1);
+    let source_bytes = package_bytes(package);
+    let created = package
+        .edit_table_cell_control_format(sheet, table, create_position)
+        .and_then(|edit| edit.set(desired.clone()).commit());
+    let Ok(created) = created else {
+        assert_eq!(package_bytes(package), source_bytes);
+        return;
+    };
+    let create_patch = created.patch().clone();
+    let created_bytes = package_bytes(created.package());
+    assert_eq!(create_patch.before(), None);
+    assert_eq!(create_patch.after(), Some(&desired));
+    assert!(!create_patch.is_noop());
+    assert!(created.diagnostics().touched_components() >= 2);
+    assert_eq!(
+        created
+            .package()
+            .table_cell_control_format(sheet, table, create_position)
+            .unwrap_or_else(|error| panic!("split popup control create readback failed: {error}")),
+        Some(desired.clone())
+    );
+    let restored = created
+        .package()
+        .apply_table_cell_control_format(&create_patch.inverse())
+        .unwrap_or_else(|error| panic!("split popup control create inverse failed: {error}"));
+    assert_eq!(package_bytes(restored.package()), source_bytes);
+    exercise_reopened_replay(
+        &source_bytes,
+        &created_bytes,
+        &create_patch,
+        create_position,
+        created.diagnostics().touched_components(),
+    );
+
+    let reused = created
+        .package()
+        .edit_table_cell_control_format(sheet, table, sibling_position)
+        .and_then(|edit| edit.set(desired.clone()).commit());
+    let Ok(reused) = reused else {
+        assert_eq!(package_bytes(created.package()), created_bytes);
+        return;
+    };
+    let reuse_patch = reused.patch().clone();
+    let reuse_bytes = package_bytes(reused.package());
+    assert_eq!(reuse_patch.before(), None);
+    assert_eq!(reuse_patch.after(), Some(&desired));
+    assert!(!reuse_patch.is_noop());
+    assert!(reused.diagnostics().touched_components() >= 2);
+    let cleared = reused
+        .package()
+        .edit_table_cell_control_format(sheet, table, create_position)
+        .and_then(|edit| edit.clear().commit());
+    if let Ok(cleared) = cleared {
+        assert_eq!(cleared.patch().after(), None);
+        assert!(cleared.diagnostics().touched_components() >= 2);
+        assert_eq!(
+            cleared
+                .package()
+                .table_cell_control_format(sheet, table, sibling_position)
+                .unwrap_or_else(|error| panic!(
+                    "split popup control sibling readback failed: {error}"
+                )),
+            Some(desired.clone())
+        );
+        let clear_source = reuse_bytes;
+        let clear_target = package_bytes(cleared.package());
+        let restored = cleared
+            .package()
+            .apply_table_cell_control_format(&cleared.patch().inverse())
+            .unwrap_or_else(|error| panic!("split popup control clear inverse failed: {error}"));
+        assert_eq!(package_bytes(restored.package()), clear_source);
+        exercise_reopened_replay(
+            &clear_source,
+            &clear_target,
+            cleared.patch(),
+            create_position,
+            cleared.diagnostics().touched_components(),
+        );
+        let final_clear = cleared
+            .package()
+            .edit_table_cell_control_format(sheet, table, sibling_position)
+            .and_then(|edit| edit.reset().commit());
+        if let Ok(final_clear) = final_clear {
+            assert_eq!(final_clear.patch().after(), None);
+            assert!(final_clear.diagnostics().touched_components() >= 2);
+            assert_eq!(
+                final_clear
+                    .package()
+                    .table_cell_control_format(sheet, table, sibling_position)
+                    .unwrap_or_else(|error| panic!(
+                        "split popup control final cull readback failed: {error}"
+                    )),
+                None
+            );
+            let final_source = clear_target;
+            let final_target = package_bytes(final_clear.package());
+            let restored = final_clear
+                .package()
+                .apply_table_cell_control_format(&final_clear.patch().inverse())
+                .unwrap_or_else(|error| {
+                    panic!("split popup control final inverse failed: {error}")
+                });
+            assert_eq!(package_bytes(restored.package()), final_source);
+            exercise_reopened_replay(
+                &final_source,
+                &final_target,
+                final_clear.patch(),
+                sibling_position,
+                final_clear.diagnostics().touched_components(),
+            );
+        }
+    }
 }
 
 /// Run one split-component no-op/change/clear transaction and all exact

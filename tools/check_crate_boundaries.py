@@ -3578,6 +3578,115 @@ NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS = {
         re.IGNORECASE,
     ),
 }
+# Wave90 completes the split Pop-Up Menu graph under the generic CellControl
+# facade.  The earlier Wave86 contract deliberately required a refusal guard;
+# that guard must disappear once the owner can stage every changed member in a
+# single transaction.  Keep this contract separate from the scalar-control
+# bridge so Pages/Keynote adapters and the shared private cell-data-format
+# implementation remain out of scope.
+NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_OWNER_REQUIRED_MARKERS = {
+    "per-member graph ownership": re.compile(
+        r"(?<![A-Za-z0-9_])(?:NativePopUpGraphInput|NativePopUpMember|"
+        r"NativePopUpObjectRoute|NativeMemberEdit|member_edits)(?![A-Za-z0-9_])"
+    ),
+    "multi-member native transition": re.compile(
+        r"(?<![A-Za-z0-9_])rewrite_native_popup_menu_multi(?![A-Za-z0-9_])"
+    ),
+    "member edit deduplication": re.compile(
+        r"(?<![A-Za-z0-9_])(?:NativeControlOutput|from_edits|"
+        r"deduplicat(?:e|ed|ion)|conflicting bytes)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "component UUID ownership": re.compile(
+        r"(?<![A-Za-z0-9_])(?:require_current_uuid|uuid_(?:addition|removal)|"
+        r"IdentifierCensus|reserved[_-]?identifier)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "external edge and save-token batch": re.compile(
+        r"(?<![A-Za-z0-9_])(?:require_external_edge|"
+        r"prove_cross_component_reference|external[_-]?reference|"
+        r"selectors_for_components|SaveTokenBatch|save_tokens|"
+        r"touched_components)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "COW reuse cull and refcount census": re.compile(
+        r"(?<![A-Za-z0-9_])(?:copy[_-]?on[_-]?write|"
+        r"prepare_desired_state|existing_popup_model_identifiers|"
+        r"archive_has_popup_reference|census_bnc_references|"
+        r"validate_bnc_refcounts|ref[_-]?count|cull)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "aggregate and FieldInfo transition": re.compile(
+        r"(?<![A-Za-z0-9_])(?:ArchiveInfo|FieldInfo|object_references|"
+        r"replace_(?:control|message).*transition|aggregate)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "aggregate transaction budget": re.compile(
+        r"(?<![A-Za-z0-9_])(?:TransactionBudget|WireBudget|charge_|"
+        r"residual_|preflight)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "prepared archive and ZIP reassembly": re.compile(
+        r"(?<![A-Za-z0-9_])(?:prepare[_-]?reassembly|"
+        r"execution[_-]?requirements|Prepared|prepared|reassembly)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "candidate reopen and object locality": re.compile(
+        r"(?<![A-Za-z0-9_])(?:candidate|reopen|verify[_-]?package[_-]?locality|"
+        r"same[_-]?content)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_FORBIDDEN_MARKERS = {
+    "cross-component write refusal": re.compile(
+        r"(?<![A-Za-z0-9_])reject[_-]?cross[_-]?component[_-]?write(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_INTEGRATION_MARKERS = {
+    "split PopUpMenu read/no-op": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,12000}"
+        r"pop[_-]?up[\s\S]{0,5000}(?:read|no[_-]?op)"
+    ),
+    "split PopUpMenu replacement/COW": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,12000}"
+        r"pop[_-]?up[\s\S]{0,5000}(?:replace|replacement|copy[_-]?on[_-]?write|cow)"
+    ),
+    "split PopUpMenu create/reuse/cull/refcount": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,16000}"
+        r"pop[_-]?up[\s\S]{0,8000}(?:create|reuse|cull|ref[_-]?count)"
+    ),
+    "split PopUpMenu inverse/apply/conflict": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,16000}"
+        r"pop[_-]?up[\s\S]{0,8000}(?:inverse|apply|conflict)"
+    ),
+    "split PopUpMenu member locality": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,16000}"
+        r"pop[_-]?up[\s\S]{0,8000}(?:member|locality|exact[_-]?bytes)"
+    ),
+    "split PopUpMenu metadata ownership": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,16000}"
+        r"pop[_-]?up[\s\S]{0,8000}(?:metadata|uuid|save[_-]?token|external)"
+    ),
+    "split PopUpMenu hostile ownership atomicity": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,16000}"
+        r"pop[_-]?up[\s\S]{0,8000}(?:alias|opaque|versioned|atomic|reject)"
+    ),
+    "split PopUpMenu resource/reassembly": re.compile(
+        r"(?is)(?:split|cross[_-]?component)[\s\S]{0,16000}"
+        r"pop[_-]?up[\s\S]{0,8000}(?:budget|limit|reassembl|allocation|scratch)"
+    ),
+}
+NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_FUZZ_MARKERS = {
+    "package fuzz split lifecycle": re.compile(
+        r"(?is)(?:split|member)[\s\S]{0,10000}(?:popup|pop[_-]?up)[\s\S]{0,10000}"
+        r"(?:create|clear|reset|inverse|conflict|atomic)"
+    ),
+    "codec fuzz prepared replay": re.compile(
+        r"(?is)(?:prepare|execution[_-]?requirements|replay)[\s\S]{0,10000}"
+        r"(?:unknown|limit|depth|allocation|scratch)"
+    ),
+}
 NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS = {
     "split-component read coverage": re.compile(
         r"\bfn\s+split_components?[_a-z0-9]*read[_a-z0-9]*\s*\(", re.IGNORECASE
@@ -14953,12 +15062,28 @@ def audit_numbers_table_cell_control_facade_source_topology(
                 f"{label} transaction marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
             )
 
-    for label, marker in NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS.items():
-        if marker.search(owner_graph_code) is None:
-            violations.append(
-                "focused litchi-numbers cell-control bounded cross-component owner is missing "
-                f"{label} marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
-            )
+    # Keep the Wave86 refusal contract as a migration bridge only.  Once the
+    # Wave90 popup split lifecycle contract is complete, requiring the old
+    # refusal marker would make a successful multi-member owner fail the
+    # generic facade audit.  The dedicated Wave90 audit below owns the new
+    # positive contract and rejects stale refusal guards itself.
+    popup_split_owner_complete = (
+        all(
+            marker.search(owner_graph_code) is not None
+            for marker in NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_OWNER_REQUIRED_MARKERS.values()
+        )
+        and all(
+            marker.search(owner_graph_code) is None
+            for marker in NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_FORBIDDEN_MARKERS.values()
+        )
+    )
+    if not popup_split_owner_complete:
+        for label, marker in NUMBERS_TABLE_CELL_CONTROL_BOUNDED_OWNER_REQUIRED_MARKERS.items():
+            if marker.search(owner_graph_code) is None:
+                violations.append(
+                    "focused litchi-numbers cell-control bounded cross-component owner is missing "
+                    f"{label} marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
+                )
 
     split_test_path = root / NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
     split_test_source = (
@@ -14968,12 +15093,13 @@ def audit_numbers_table_cell_control_facade_source_topology(
         if split_test_path.is_file()
         else ""
     )
-    for label, marker in NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS.items():
-        if marker.search(split_test_source) is None:
-            violations.append(
-                "focused litchi-numbers cell-control integration is missing "
-                f"{label}: {NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE}"
-            )
+    if not popup_split_owner_complete:
+        for label, marker in NUMBERS_TABLE_CELL_CONTROL_SPLIT_INTEGRATION_MARKERS.items():
+            if marker.search(split_test_source) is None:
+                violations.append(
+                    "focused litchi-numbers cell-control integration is missing "
+                    f"{label}: {NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE}"
+                )
 
     codec_path = root / NUMBERS_TABLE_CELL_CONTROL_CODEC_SOURCE
     codec_source = (
@@ -15141,6 +15267,129 @@ def audit_numbers_table_cell_control_facade_source_topology(
                     "focused litchi-numbers cell-control public API exposes raw byte "
                     f"slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
                 )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the complete Wave90 split Pop-Up Menu lifecycle.
+
+    The public surface remains the selector-first ``CellControl`` facade.  A
+    popup graph is nevertheless allowed to span several current component
+    members, so the boundary must inspect the private popup native/metadata
+    siblings as one ownership unit.  This ratchet intentionally checks
+    positive lifecycle evidence (member edits, metadata transitions, cull and
+    candidate locality) and rejects the temporary Wave86 refusal guard.  It
+    does not scan the shared adapter or same-named Pages/Keynote code.
+    """
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir() or not _numbers_table_cell_control_owner_present(root):
+        return []
+
+    owner_path = root / NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+    graph_paths: set[Path] = {
+        owner_path,
+        root / NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE,
+        root / "crates/litchi-numbers/src/package/table_cell_pop_up_menu_native.rs",
+        root / "crates/litchi-numbers/src/package/table_cell_pop_up_menu_metadata.rs",
+    }
+    graph_paths.update(owner_path.parent.glob("table_cell_control*.rs"))
+    graph_paths.update(owner_path.parent.glob("table_cell_pop_up_menu*.rs"))
+    graph_source = "\n".join(
+        _mask_rust_non_code(_mask_rust_cfg_test_items(path.read_text(encoding="utf-8")))
+        for path in sorted(graph_paths)
+        if path.is_file()
+    )
+    violations: list[str] = []
+
+    for label, marker in NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(graph_source) is None:
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split owner is missing "
+                f"{label} marker: {NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE}"
+            )
+    for label, marker in NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_FORBIDDEN_MARKERS.items():
+        match = marker.search(graph_source)
+        if match is not None:
+            line_number = graph_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split owner retains "
+                f"{label} marker at {NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE}:"
+                f"{line_number}"
+            )
+
+    integration_path = root / NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+    integration_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(integration_path.read_text(encoding="utf-8"))
+        )
+        if integration_path.is_file()
+        else ""
+    )
+    if not integration_path.is_file():
+        violations.append(
+            "focused litchi-numbers cell-control Pop-Up Menu split integration source is missing: "
+            f"{NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE}"
+        )
+    else:
+        for label, marker in NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_INTEGRATION_MARKERS.items():
+            if marker.search(integration_source) is None:
+                violations.append(
+                    "focused litchi-numbers cell-control Pop-Up Menu split integration is missing "
+                    f"{label}: {NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE}"
+                )
+
+    fuzz_contracts = (
+        (
+            NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE,
+            "package",
+            "package fuzz split lifecycle",
+        ),
+        (
+            NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_SOURCE,
+            "codec",
+            "codec fuzz prepared replay",
+        ),
+    )
+    for fuzz_path, kind, marker_name in fuzz_contracts:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split boundary is missing "
+                f"{kind} fuzz target: {fuzz_path}"
+            )
+            continue
+        fuzz_source = _mask_rust_non_code(absolute.read_text(encoding="utf-8"))
+        if "fuzz_target!" not in fuzz_source:
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split "
+                f"{kind} fuzz target is missing fuzz_target! harness: {fuzz_path}"
+            )
+        marker = NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_FUZZ_MARKERS[marker_name]
+        if marker.search(fuzz_source) is None:
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split "
+                f"{kind} fuzz target is missing {marker_name}: {fuzz_path}"
+            )
+
+    for corpus, kind in (
+        (NUMBERS_TABLE_CELL_CONTROL_FUZZ_CORPUS, "package"),
+        (NUMBERS_TABLE_CELL_CONTROL_CODEC_FUZZ_CORPUS, "codec"),
+    ):
+        absolute = root / corpus
+        if not absolute.is_dir():
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split boundary is missing "
+                f"{kind} fuzz corpus: {corpus}"
+            )
+        elif not any(path.is_file() for path in absolute.rglob("*")):
+            violations.append(
+                "focused litchi-numbers cell-control Pop-Up Menu split "
+                f"{kind} fuzz corpus is empty: {corpus}"
+            )
 
     return sorted(set(violations))
 
@@ -26515,6 +26764,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_control_bridge_source_topology()
         + audit_iwa_numbers_table_cell_control_source_topology()
         + audit_numbers_table_cell_control_facade_source_topology()
+        + audit_numbers_table_cell_control_popup_split_lifecycle_source_topology()
         + audit_iwa_numbers_table_cell_pop_up_menu_source_topology()
         + audit_numbers_table_cell_pop_up_menu_facade_source_topology()
         + audit_iwa_numbers_table_dimension_source_topology()
