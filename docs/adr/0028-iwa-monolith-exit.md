@@ -4594,7 +4594,8 @@ through the semantic API.
 This is intentionally narrower than general comment deletion. Shared or
 segmented storage, replies, exact aliases, unknown archive owners, registered
 Metadata UUID/external/data/root-map ownership, missing or ambiguous Metadata,
-comment creation, and wider graph cleanup remain refused by the focused owner.
+comment creation without an existing strict comment list/author graph, and
+wider graph cleanup remain refused by the focused owner.
 The deprecated `litchi-iwa` raw-ID clear still exists: metadata-bearing
 accepted sources delegate through semantic selectors, while sources with no
 Metadata sidecar retain the legacy compatibility writer. Focused errors on a
@@ -5546,3 +5547,24 @@ Numbers graph operations, Pages/Keynote hosts, debt 015, the
 Buffa owners, and the IWA monolith remain. Native, resource/performance,
 package-count, dependency-count, debt-exit, and monolith-exit claims are
 withheld beyond the recorded scoped gates.
+
+## 2026-08-26 amendment: strict existing-graph Numbers root-comment creation (not a monolith-exit gate)
+
+The focused Numbers `Package::set_table_cell_comment` transaction now admits
+`None -> Some` when the selected cell already has a physical BNC slot and the
+rooted table already owns one strict, unsegmented comment list plus one
+resolvable author. The private owner allocates the storage identifier and UUID
+against physical and current/versioned Metadata namespaces, emits a canonical
+Buffa `CommentStorageArchive` leaf, appends the exact list entry and
+`ArchiveInfo [3,key]` edge, rewrites only the selected tile cell, advances the
+owning current-component and root save tokens, removes previews, reopens the
+candidate, and retains exact apply/inverse artifacts. The strict integration
+suite also covers sibling preservation, conflict, missing author, unknown
+Metadata, and cross-component fail-closed behavior.
+
+The slice does not create a missing comment list, author, tile, or sparse BNC
+slot; it does not admit segmented or cross-component creation, generated
+message publication, native Numbers UI acceptance, or a single global
+allocation-free resource preflight. Those graphs continue to fail closed.
+This is therefore a semantic capability increment, not a crate, dependency
+edge, debt, compatibility-host, normal Prost/Buffa owner, or monolith exit.
