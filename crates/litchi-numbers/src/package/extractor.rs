@@ -9547,6 +9547,49 @@ mod tests {
     }
 
     #[test]
+    fn tile_projection_accepts_missing_slots_inside_the_table_width() -> super::Result<()> {
+        let cell = BncCell::minimal().encode();
+        let source = tile_source(
+            vec![tile_row(
+                0,
+                1,
+                cell.clone(),
+                vec![0, 0, 0xff, 0xff],
+                Some(cell),
+                Some(vec![0, 0, 0xff, 0xff]),
+                None,
+            )],
+            1,
+            1,
+        );
+        let table = parse_projected_rows(&source, 2)?;
+        assert_eq!(table.get_cell(0, 0), Some(&CellValue::Empty));
+        assert_eq!(table.get_cell(0, 1), None);
+        Ok(())
+    }
+
+    #[test]
+    fn tile_projection_rejects_sparse_rows_with_a_false_declared_cell_count() {
+        let cell = BncCell::minimal().encode();
+        let source = tile_source(
+            vec![tile_row(
+                0,
+                2,
+                cell.clone(),
+                vec![0, 0, 0xff, 0xff],
+                Some(cell),
+                Some(vec![0, 0, 0xff, 0xff]),
+                None,
+            )],
+            2,
+            1,
+        );
+        let error = parse_projected_rows(&source, 2)
+            .expect_err("a missing slot cannot satisfy the declared occupied-cell count");
+        assert!(matches!(error, Error::ParseError(message) if message.contains("has 1 offsets")));
+    }
+
+    #[test]
     fn populated_cell_offset_slots_outside_table_width_are_rejected() {
         let offsets = [0, 0, 0, 0];
         let error = match TableDataExtractor::parse_cell_offsets(&offsets, 1, false, 1, 1) {
