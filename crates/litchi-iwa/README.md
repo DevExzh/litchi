@@ -1074,8 +1074,10 @@ assert_eq!(restored_bytes, original);
 
 See `litchi-numbers/examples/edit_table_cells.rs` for bounded batch parsing
 and synchronized sibling-temporary, distinct-output, no-clobber publication.
-Cell comments and replies remain separate migration-host APIs in the
-compatibility example below.
+Selector-first `litchi_numbers::Package` reads provide ID-free root-comment
+and admitted direct-reply projections. The compatibility example below
+intentionally retains deprecated native-ID `NumbersEditor` calls for reply
+creation, replacement, removal, and graph cleanup.
 
 ```rust
 #![allow(deprecated)]
@@ -2247,12 +2249,16 @@ ranges. Unknown fields remain in place, malformed duplicate identifiers fail
 transactionally, and a real text-cell create/clear cycle restores every
 decompressed Numbers member exactly.
 
-Numbers cell comments are decoded from root or segmented `COMMENT_STORAGE`
-lists and expose their text, creation date, author, replies, and storage UUID.
-Root and direct-reply create/update/delete operations preserve the cell value
-and style, retain app metadata on in-place edits, use copy-on-write for shared
-threads, maintain list refcounts and BNC flags, and reclaim unreferenced roots,
-replies, authors, and segment objects. Comment identifier `1` remains reserved,
+The compatibility `NumbersEditor` comment surface decodes root or segmented
+`COMMENT_STORAGE` lists and exposes their text, creation date, author, replies,
+and storage UUID. Selector-first `litchi_numbers::Package` projections cover
+ID-free root-comment and admitted direct-reply reads; direct-reply creation,
+replacement, removal, and graph ownership remain compatibility-host scope.
+The compatibility editor's root and direct-reply create/update/delete
+operations preserve the cell value and style, retain app metadata on in-place
+edits, use copy-on-write for shared threads, maintain list refcounts and BNC
+flags, and reclaim unreferenced roots, replies, authors, and segment objects.
+Comment identifier `1` remains reserved,
 matching Numbers' native first key of `2`. Numbers silently rejects fabricated
 cell-comment authors, so creation reuses the first registered native annotation
 author and fails before mutation when a real package's author storage is still
@@ -2261,8 +2267,8 @@ Comment-only empty cells and tables that did not yet have a comment list are
 created transactionally. Adding that list patches only the nested
 `DataStore.commentStorageTable` reference instead of re-encoding the table
 model, so unknown table-model and data-store extensions remain intact. The
-`edit_numbers_comment` and `edit_numbers_comment_reply` examples exercise both
-thread layers.
+`edit_numbers_comment` and `edit_numbers_comment_reply` examples exercise
+both compatibility-host thread layers.
 
 Direct drawable comments use the shared `IWorkDrawableCommentEditor` across
 Pages, Numbers, and Keynote protobufs. It resolves every supported nesting of

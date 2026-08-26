@@ -4291,6 +4291,108 @@ NUMBERS_TABLE_CELL_STORAGE_NO_EAGER_DECODE_PATTERNS = (
 )
 IWA_PACKAGE_METADATA_SOURCE = Path("crates/litchi-iwa/src/package_metadata.rs")
 NUMBERS_COMMENT_SOURCE = Path("crates/litchi-numbers/src/package/comments.rs")
+# Wave91 adds a read-only, selector-first projection of direct table-cell
+# comment replies.  Keep this ratchet dormant until the canonical semantic
+# type is present: the existing root-comment owner and the raw-ID
+# NumbersEditor reply mutation/identity APIs remain compatibility surfaces.
+NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE = NUMBERS_COMMENT_SOURCE
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/comment_storage_codec.rs"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES = (
+    Path("crates/litchi-numbers/src/lib.rs"),
+    NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE,
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CANONICAL_TYPE = "CommentReply"
+NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_ALIAS = "TableCellCommentReply"
+NUMBERS_TABLE_CELL_COMMENT_REPLY_PACKAGE_METHODS = (
+    "table_cell_comment_replies",
+    "table_cell_comment_replies_a1",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_ACTIVATION = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?CommentReply(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REQUIRED_MARKERS = {
+    "strict comment-storage codec visitor": re.compile(
+        r"(?<![A-Za-z0-9_])(?:comment_storage_codec|"
+        r"decode_comment_storage_archive_with_visitor|"
+        r"CommentStorageVisitor)(?![A-Za-z0-9_])"
+    ),
+    "bounded decode options": re.compile(
+        r"(?<![A-Za-z0-9_])(?:DecodeOptions|DecodeLimit|"
+        r"max_(?:message_)?bytes|max_(?:wire_)?fields|max_references)(?![A-Za-z0-9_])"
+    ),
+    "streamed reply cardinality": re.compile(
+        r"(?<![A-Za-z0-9_])(?:visit_reply|reply_references|"
+        r"report[ \t\r\n]*\.[ \t\r\n]*(?:replies|reply_references))(?![A-Za-z0-9_])"
+    ),
+    "strict borrowed snapshot": re.compile(
+        r"(?<![A-Za-z0-9_])(?:CommentStorageSnapshot|"
+        r"decode_comment_storage_archive_with_report|borrowed|source_order)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+NUMBERS_TABLE_CELL_COMMENT_REPLY_CENSUS_REQUIRED_MARKERS = {
+    "ownership census type": re.compile(
+        r"(?<![A-Za-z0-9_])(?:CommentOwnershipCensus|"
+        r"CommentReplyOwnershipCensus)(?![A-Za-z0-9_])"
+    ),
+    "global ownership census": re.compile(
+        r"(?<![A-Za-z0-9_])(?:census_comment_ownership|"
+        r"census_comment_reply_ownership|prove_global_comment_ownership)(?![A-Za-z0-9_])"
+    ),
+    "table/list/cell references": re.compile(
+        r"(?<![A-Za-z0-9_])(?:table_references|cell_comment_keys|"
+        r"list_entries|comment_list_ids)(?![A-Za-z0-9_])"
+    ),
+    "storage/reply identities": re.compile(
+        r"(?<![A-Za-z0-9_])(?:storages|reply_ids|entry_storage_ids|"
+        r"storage_occurrences)(?![A-Za-z0-9_])"
+    ),
+    "author/UUID identities": re.compile(
+        r"(?<![A-Za-z0-9_])(?:author_ids|storage_uuid|uuids|"
+        r"object_uuid)(?![A-Za-z0-9_])"
+    ),
+    "duplicate/alias rejection": re.compile(
+        r"(?<![A-Za-z0-9_])(?:census_alias_checks|duplicate|"
+        r"alias|unique)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAKS = frozenset(
+    {
+        "u64",
+        "StorageId",
+        "AuthorId",
+        "Uuid",
+        "RawMessage",
+        "IWA",
+        "Wire",
+        "Prost",
+        "Buffa",
+        "bytes",
+    }
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAK_PREFIXES = (
+    "Wire",
+    "Prost",
+    "Buffa",
+    "Iwa",
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_A1_ADDRESS = re.compile(
+    r"(?<![A-Za-z0-9_])(?:address|a1)(?![A-Za-z0-9_])|"
+    r"&[ \t\r\n]*str\b"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_IMPL = re.compile(
+    r"(?<![A-Za-z0-9_])impl(?:[ \t\r\n]+<[^>{}]*>)?[ \t\r\n]+"
+    r"(?:std[ \t\r\n]*::[ \t\r\n]*|core[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:fmt[ \t\r\n]*::[ \t\r\n]*)?Debug[ \t\r\n]+for[ \t\r\n]+"
+    r"(?:r#)?CommentReply(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_REDACTION = re.compile(
+    r"(?i)(?:redact(?:ed|ion)?|omitted|hidden|finish_non_exhaustive|"
+    r"authored[ \t\r\n_-]*(?:content|text)|content[ \t\r\n_-]*redact)"
+)
 PACKAGE_METADATA_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/package_metadata_codec.rs"
 )
@@ -14593,6 +14695,31 @@ def _numbers_table_cell_control_public_leak(identifier: str) -> str | None:
     return _iwork_public_leak(identifier)
 
 
+def _numbers_table_cell_comment_reply_public_leak(identifier: str) -> str | None:
+    """Classify native vocabulary forbidden in the reply read facade."""
+
+    if identifier in NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAKS:
+        return "forbidden native reply vocabulary"
+    if identifier.lower() in {
+        "bytes",
+        "wire",
+        "iwa",
+        "prost",
+        "buffa",
+        "rawmessage",
+        "storageid",
+        "authorid",
+        "uuid",
+    }:
+        return "forbidden native reply vocabulary"
+    if any(
+        identifier.startswith(prefix)
+        for prefix in NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAK_PREFIXES
+    ):
+        return "forbidden native reply vocabulary"
+    return _iwork_public_leak(identifier)
+
+
 def _numbers_table_cell_control_owner_declaration(declaration: str) -> bool:
     identifiers = [
         match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -20423,6 +20550,401 @@ def audit_iwa_package_metadata_read_source_topology(
                         f"{function_name}{helper_suffix} uses {label}: "
                         f"{IWA_PACKAGE_METADATA_SOURCE}:{line_number}"
                     )
+
+    return sorted(set(violations))
+
+
+def _numbers_table_cell_comment_reply_owner_present(root: Path) -> bool:
+    """Return whether the production Numbers reply projection has activated."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return False
+    for relative in (
+        NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE,
+        NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0],
+    ):
+        path = root / relative
+        if not path.is_file():
+            continue
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        code = _mask_rust_non_code(production_source)
+        if NUMBERS_TABLE_CELL_COMMENT_REPLY_ACTIVATION.search(code) is not None:
+            return True
+    return False
+
+
+def audit_numbers_table_cell_comment_reply_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the read-only, selector-first Numbers comment-reply facade.
+
+    The public projection is deliberately archive-free: ``CommentReply`` is
+    owned by the Numbers package and is re-exported only as
+    ``TableCellCommentReply`` at the crate root.  Its two Package read methods
+    use ``SheetSelector``/``TableSelector`` and semantic cell positions, while
+    strict comment-storage decoding and a package-wide ownership census stay
+    behind the private owner boundary.  This ratchet does not require reply
+    mutation.  The legacy raw-ID ``NumbersEditor`` reply read/add/set/remove
+    methods remain retained mutation/identity compatibility and are
+    intentionally neither required nor retired here.
+    """
+
+    if not _numbers_table_cell_comment_reply_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    owner_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    owner_code = _mask_rust_non_code(owner_source)
+
+    def location(path: Path, line_number: int) -> str:
+        return f"{path.relative_to(root)}:{line_number}"
+
+    def public_type_surface(source: str, name: str) -> tuple[str, int] | None:
+        """Return one complete public type declaration, including its body."""
+
+        code = _mask_rust_non_code(source)
+        declaration = re.search(
+            rf"(?m)^[ \t]*pub[ \t]+(?:struct|enum|type|union)[ \t]+"
+            rf"(?:r#)?{re.escape(name)}\b",
+            code,
+        )
+        if declaration is None:
+            return None
+        line_number = source.count("\n", 0, declaration.start()) + 1
+        opening = code.find("{", declaration.end())
+        semicolon = code.find(";", declaration.end())
+        if opening < 0 or (semicolon >= 0 and semicolon < opening):
+            end = semicolon + 1 if semicolon >= 0 else len(code)
+            return code[declaration.start() : end], line_number
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        end = cursor if depth == 0 else len(code)
+        return code[declaration.start() : end], line_number
+
+    def scan_public_surface(
+        surface: str, path: Path, line_number: int
+    ) -> None:
+        for match in RUST_IDENTIFIER.finditer(surface):
+            identifier = match.group(1)
+            reason = _numbers_table_cell_comment_reply_public_leak(identifier)
+            if reason is None:
+                continue
+            identifier_line = line_number + surface.count("\n", 0, match.start(1))
+            violations.append(
+                "focused litchi-numbers comment-reply public API exposes "
+                f"{reason} {identifier}: {location(path, identifier_line)}"
+            )
+        for match in RUST_BYTE_SLICE.finditer(surface):
+            byte_slice = re.sub(r"\s+", "", match.group(0))
+            byte_slice_line = line_number + surface.count("\n", 0, match.start())
+            violations.append(
+                "focused litchi-numbers comment-reply public API exposes raw byte "
+                f"slice {byte_slice}: {location(path, byte_slice_line)}"
+            )
+
+    canonical_type = NUMBERS_TABLE_CELL_COMMENT_REPLY_CANONICAL_TYPE
+    canonical_exports = _rust_canonical_exports(
+        owner_source, frozenset({canonical_type})
+    )
+    if canonical_type not in canonical_exports:
+        violations.append(
+            "focused litchi-numbers comment-reply public API is missing "
+            f"canonical {canonical_type}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+        )
+    type_surface = public_type_surface(owner_source, canonical_type)
+    if type_surface is not None:
+        scan_public_surface(type_surface[0], owner_path, type_surface[1])
+
+    public_alias = NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_ALIAS
+    lib_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    lib_exports = _rust_canonical_exports(lib_source, frozenset({public_alias}))
+    if public_alias not in lib_exports:
+        violations.append(
+            "focused litchi-numbers comment-reply public API is missing "
+            f"canonical root {public_alias}: "
+            f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]}"
+        )
+
+    canonical_alias_pattern = re.compile(
+        rf"\b{re.escape(canonical_type)}\b[ \t\r\n]+as[ \t\r\n]+"
+        rf"{re.escape(public_alias)}\b"
+    )
+    for declaration, line_number in _rust_public_declarations(owner_source):
+        identifiers = [
+            match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+        ]
+        public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+        canonical_type_declaration = re.match(
+            rf"^[ \t]*pub[ \t]+(?:struct|enum|type|union)[ \t]+"
+            rf"(?:r#)?{re.escape(canonical_type)}\b",
+            declaration,
+        )
+        if (
+            public_use_or_type
+            and canonical_type in identifiers
+            and canonical_type_declaration is None
+        ):
+            flat_alias = canonical_type
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) > 2:
+                flat_alias = identifiers[2]
+            violations.append(
+                "focused litchi-numbers comment-reply public API retains flat "
+                f"alias {flat_alias}: {location(owner_path, line_number)}"
+            )
+        if public_alias in identifiers:
+            violations.append(
+                "focused litchi-numbers comment-reply public API retains owner "
+                f"alias {public_alias}: {location(owner_path, line_number)}"
+            )
+        for match in re.finditer(
+            rf"\b{re.escape(canonical_type)}\b[ \t\r\n]+as[ \t\r\n]+"
+            rf"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)",
+            declaration,
+        ):
+            if match.group("alias") != public_alias:
+                violations.append(
+                    "focused litchi-numbers comment-reply public API retains flat "
+                    f"alias {match.group('alias')}: {location(owner_path, line_number)}"
+                )
+        if public_use_or_type and canonical_type in identifiers:
+            scan_public_surface(declaration, owner_path, line_number)
+
+    for declaration, line_number in _rust_public_declarations(lib_source):
+        identifiers = [
+            match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+        ]
+        public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+        if (
+            public_use_or_type
+            and "*" in declaration
+            and (
+                "comments" in identifiers
+                or canonical_type in identifiers
+                or public_alias in identifiers
+            )
+        ):
+            violations.append(
+                "focused litchi-numbers comment-reply public API retains root "
+                f"aliases via glob: {location(lib_path, line_number)}"
+            )
+        if public_alias in identifiers and identifiers[:2] == ["pub", "type"]:
+            violations.append(
+                "focused litchi-numbers comment-reply canonical "
+                f"{public_alias} must be a named re-export, not a type alias: "
+                f"{location(lib_path, line_number)}"
+            )
+        if canonical_type in identifiers and identifiers[:2] == ["pub", "use"]:
+            if canonical_alias_pattern.search(declaration) is None:
+                violations.append(
+                    "focused litchi-numbers comment-reply public API retains flat "
+                    f"alias {canonical_type}: {location(lib_path, line_number)}"
+                )
+            for match in re.finditer(
+                rf"\b{re.escape(canonical_type)}\b[ \t\r\n]+as[ \t\r\n]+"
+                rf"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)",
+                declaration,
+            ):
+                if match.group("alias") != public_alias:
+                    violations.append(
+                        "focused litchi-numbers comment-reply public API retains flat "
+                        f"alias {match.group('alias')}: {location(lib_path, line_number)}"
+                    )
+        if public_use_or_type and (
+            canonical_type in identifiers or public_alias in identifiers
+        ):
+            scan_public_surface(declaration, lib_path, line_number)
+
+    for name, declaration, line_number in _rust_public_methods_in_impl(
+        owner_source, canonical_type
+    ):
+        scan_public_surface(declaration, owner_path, line_number)
+
+    package_methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for name, (declaration, line_number) in package_methods.items():
+        if "comment_repl" in name or re.search(r"\bCommentReply\b", declaration):
+            scan_public_surface(declaration, owner_path, line_number)
+    for method in NUMBERS_TABLE_CELL_COMMENT_REPLY_PACKAGE_METHODS:
+        method_record = package_methods.get(method)
+        if method_record is None:
+            violations.append(
+                "focused litchi-numbers comment-reply public API is missing "
+                f"Package method {method}: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+            continue
+        declaration, line_number = method_record
+        scan_public_surface(declaration, owner_path, line_number)
+        for selector in ("SheetSelector", "TableSelector"):
+            if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                violations.append(
+                    "focused litchi-numbers comment-reply Package method "
+                    f"{method} must accept selector-first {selector}: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+        if method == "table_cell_comment_replies":
+            if re.search(r"\bCellPosition\b", declaration) is None:
+                violations.append(
+                    "focused litchi-numbers comment-reply Package method "
+                    f"{method} must accept selector-first CellPosition: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+        if re.search(r"\bCommentReply\b", declaration) is None:
+            violations.append(
+                "focused litchi-numbers comment-reply Package method "
+                f"{method} must return CommentReply: "
+                f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+        if method == "table_cell_comment_replies_a1":
+            if NUMBERS_TABLE_CELL_COMMENT_REPLY_A1_ADDRESS.search(declaration) is None:
+                violations.append(
+                    "focused litchi-numbers comment-reply Package method "
+                    f"{method} must accept an A1 address: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+            body = _rust_any_function_body(owner_source, method)
+            if body is None:
+                violations.append(
+                    "focused litchi-numbers comment-reply Package method "
+                    f"{method} has no readable routing body: "
+                    f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                )
+            else:
+                body_code = _mask_rust_non_code(body)
+                if re.search(
+                    r"\btable_cell_comment_replies\b[ \t\r\n]*\(", body_code
+                ) is None:
+                    violations.append(
+                        "focused litchi-numbers comment-reply A1 method must route "
+                        "through table_cell_comment_replies: "
+                        f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                    )
+                if re.search(
+                    r"\bCellPosition[ \t\r\n]*::[ \t\r\n]*from_a1\b", body_code
+                ) is None:
+                    violations.append(
+                        "focused litchi-numbers comment-reply A1 method must construct "
+                        "CellPosition from A1: "
+                        f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+                    )
+
+    derive_debug = re.search(
+        rf"#[ \t]*\[[ \t]*derive[ \t]*\([^]]*\bDebug\b[^]]*\)[ \t]*\]"
+        rf"(?:[ \t\r\n]*#[ \t]*\[[^]]*\])*[ \t\r\n]*pub[ \t]+"
+        rf"(?:struct|enum)[ \t]+(?:r#)?{re.escape(canonical_type)}\b",
+        owner_source,
+    )
+    if derive_debug is not None:
+        violations.append(
+            "focused litchi-numbers comment-reply CommentReply must not derive "
+            f"Debug: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}:"
+            f"{owner_source.count(chr(10), 0, derive_debug.start()) + 1}"
+        )
+
+    debug_match = NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_IMPL.search(owner_code)
+    if debug_match is None:
+        violations.append(
+            "focused litchi-numbers comment-reply CommentReply is missing custom "
+            f"Debug implementation: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+        )
+    else:
+        opening = owner_code.find("{", debug_match.end())
+        depth = 1
+        cursor = opening + 1
+        while opening >= 0 and cursor < len(owner_code) and depth:
+            if owner_code[cursor] == "{":
+                depth += 1
+            elif owner_code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if opening < 0 or depth:
+            debug_body = ""
+        else:
+            debug_body = owner_source[opening + 1 : cursor - 1]
+        debug_body_code = _mask_rust_non_code(debug_body)
+        if NUMBERS_TABLE_CELL_COMMENT_REPLY_DEBUG_REDACTION.search(debug_body) is None:
+            violations.append(
+                "focused litchi-numbers comment-reply custom Debug must redact "
+                f"authored content: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+        if re.search(
+            r"\bself[ \t\r\n]*\.[ \t\r\n]*(?:text|content|body|message)\b",
+            debug_body_code,
+        ) is not None:
+            violations.append(
+                "focused litchi-numbers comment-reply custom Debug exposes authored "
+                f"content: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+
+    graph_paths: set[Path] = {owner_path}
+    extractor_path = root / NUMBERS_EXTRACTOR_SOURCE
+    if extractor_path.is_file():
+        graph_paths.add(extractor_path)
+    graph_paths.update(
+        path
+        for path in owner_path.parent.glob("comments*.rs")
+        if path.is_file()
+    )
+    owner_graph_code = "\n".join(
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for path in sorted(graph_paths)
+    )
+    codec_path = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-numbers comment-reply public API is missing strict "
+            f"comment_storage_codec source: {NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE}"
+        )
+        codec_code = ""
+    else:
+        codec_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        )
+    for label, marker in NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REQUIRED_MARKERS.items():
+        if marker.search(codec_code) is None:
+            violations.append(
+                "focused litchi-numbers comment-reply owner is missing "
+                f"{label} marker: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
+    if re.search(
+        r"\bdecode_comment_storage_archive_with_visitor\b", owner_graph_code
+    ) is None:
+        violations.append(
+            "focused litchi-numbers comment-reply owner does not call the strict "
+            "comment-storage codec visitor: "
+            f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+        )
+    for label, marker in NUMBERS_TABLE_CELL_COMMENT_REPLY_CENSUS_REQUIRED_MARKERS.items():
+        if marker.search(owner_graph_code) is None:
+            violations.append(
+                "focused litchi-numbers comment-reply owner is missing full "
+                f"ownership-census {label} marker: "
+                f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
+            )
 
     return sorted(set(violations))
 
@@ -26744,6 +27266,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_storage_source_topology()
         + audit_iwa_package_metadata_read_source_topology()
         + audit_numbers_comment_clear_metadata_prerequisite_source_topology()
+        + audit_numbers_table_cell_comment_reply_facade_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()

@@ -117,6 +117,85 @@ def add_keynote_slide_delete_canonical_scaffold(root: Path) -> None:
     slide_export.write_text("pub mod delete;\n", encoding="utf-8")
 
 
+def add_numbers_table_cell_comment_reply_scaffold(
+    root: Path,
+    *,
+    owner_source: str | None = None,
+    lib_source: str | None = None,
+    codec_source: str | None = None,
+) -> None:
+    owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        owner_source
+        or (
+            "pub struct CommentReply { text: String }\n"
+            "impl fmt::Debug for CommentReply {\n"
+            "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+            "        f.debug_struct(\"CommentReply\")\n"
+            "            .field(\"text\", &\"<redacted>\")\n"
+            "            .finish()\n"
+            "    }\n"
+            "}\n"
+            "struct CommentOwnershipCensus {\n"
+            "    comment_list_ids: Vec<u64>, list_entries: Vec<u64>,\n"
+            "    table_references: Vec<u64>, cell_comment_keys: Vec<u64>,\n"
+            "    storages: Vec<u64>, reply_ids: Vec<u64>,\n"
+            "    entry_storage_ids: Vec<u64>, author_ids: Vec<u64>,\n"
+            "    storage_uuid: Vec<u64>, uuids: Vec<u64>,\n"
+            "}\n"
+            "fn census_comment_ownership() { census_models_and_cells(); census_alias_checks(); }\n"
+            "fn census_models_and_cells() {}\n"
+            "fn census_alias_checks() {}\n"
+            "fn strict_comment_reply_codec() {\n"
+            "    comment_storage_codec::decode_comment_storage_archive_with_visitor();\n"
+            "    visit_reply(); reply_references();\n"
+            "    let _ = DecodeOptions; let _ = DecodeLimit;\n"
+            "    let _ = CommentStorageVisitor; let _ = CommentStorageSnapshot;\n"
+            "}\n"
+            "impl Package {\n"
+            "    pub fn table_cell_comment_replies<'sheet, 'table>(\n"
+            "        &self, sheet: impl Into<SheetSelector<'sheet>>,\n"
+            "        table: impl Into<TableSelector<'table>>, position: CellPosition,\n"
+            "    ) -> Result<Box<[CommentReply]>, Error> { todo!() }\n"
+            "    pub fn table_cell_comment_replies_a1<'sheet, 'table>(\n"
+            "        &self, sheet: impl Into<SheetSelector<'sheet>>,\n"
+            "        table: impl Into<TableSelector<'table>>, address: &str,\n"
+            "    ) -> Result<Box<[CommentReply]>, Error> {\n"
+            "        self.table_cell_comment_replies(sheet, table, CellPosition::from_a1(address))\n"
+            "    }\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        codec_source
+        or (
+            "pub struct DecodeOptions;\n"
+            "pub enum DecodeLimit { Bytes }\n"
+            "pub trait CommentStorageVisitor {}\n"
+            "pub struct CommentStorageSnapshot<'source> {\n"
+            "    source_order: &'source str,\n"
+            "}\n"
+            "pub fn decode_comment_storage_archive_with_visitor() {}\n"
+            "fn visit_reply() {}\n"
+            "fn reply_references() {}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        lib_source
+        or "pub use package::{ comments::{CommentReply as TableCellCommentReply} };\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -23357,6 +23436,305 @@ fn rewrite_movie_title_operation(
         )
         self.assertIn(
             "+ audit_numbers_table_cell_control_popup_split_lifecycle_source_topology()",
+            main_source,
+        )
+
+    def test_numbers_table_cell_comment_reply_projection_is_dormant_until_type(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "pub struct CommentReply { raw: u64 }\n"
+                "struct CommentReplyVisitor;\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8") + "pub struct CommentReply;\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("missing Package method" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_accepts_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_requires_type_and_methods(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                complete.replace("pub struct CommentReply", "pub struct MissingReply"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing canonical CommentReply" in item for item in violations), violations)
+
+            for method in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_PACKAGE_METHODS:
+                with self.subTest(method=method):
+                    owner.write_text(complete, encoding="utf-8")
+                    source = owner.read_text(encoding="utf-8")
+                    if method == "table_cell_comment_replies":
+                        start = source.index("    pub fn table_cell_comment_replies<")
+                        end = source.index("    pub fn table_cell_comment_replies_a1<", start)
+                    else:
+                        start = source.index("    pub fn table_cell_comment_replies_a1<")
+                        end = source.index("}\n", start) + 2
+                    owner.write_text(source[:start] + source[end:], encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing Package method {method}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_numbers_table_cell_comment_reply_projection_masks_cfg_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub struct CommentReplyDecoy { raw: u64, bytes: &[u8] }\n"
+                "#[cfg(test)]\n"
+                "pub type TableCellCommentReply = CommentReply;\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            complete = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                complete.replace("census_alias_checks();", "")
+                .replace("fn census_alias_checks() {}\n", "")
+                + "#[cfg(test)]\nfn census_alias_checks() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("duplicate/alias rejection marker" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_rejects_aliases_and_globs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type ReplyAlias = CommentReply;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use package::comments::*;\n"
+                + "pub use package::comments::CommentReply;\n"
+                + "pub type TableCellCommentReply = CommentReply;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias ReplyAlias",
+                "retains root aliases via glob",
+                "retains flat alias CommentReply",
+                "must be a named re-export, not a type alias",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_numbers_table_cell_comment_reply_projection_rejects_leaks_and_debug_content(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for token in (
+                "u64",
+                "StorageId",
+                "AuthorId",
+                "Uuid",
+                "RawMessage",
+                "IWA",
+                "Wire",
+                "Prost",
+                "Buffa",
+                "bytes",
+            ):
+                with self.subTest(token=token):
+                    owner.write_text(
+                        complete.replace("text: String", f"text: {token}"),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f" {token}:" in item for item in violations),
+                        violations,
+                    )
+
+            owner.write_text(
+                complete
+                + "impl Package { pub fn table_cell_comment_reply_raw("
+                "&self, storage_id: u64, bytes: &[u8], wire: WireView) "
+                "-> CommentReply { todo!() } }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            for fragment in (" u64:", " bytes:", " WireView:", "raw byte slice"):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing extra reply-method leak {fragment!r}: {violations!r}",
+                )
+
+            owner.write_text(
+                complete.replace("pub struct CommentReply", "#[derive(Debug)]\npub struct CommentReply"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("must not derive Debug" in item for item in violations), violations)
+
+            owner.write_text(
+                complete.replace('&"<redacted>"', "&self.text"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("must redact authored content" in item for item in violations), violations)
+            self.assertTrue(any("exposes authored content" in item for item in violations), violations)
+
+            owner.write_text(
+                complete.replace("text: String", "text: &'a [u8]"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_projection_requires_codec_and_census_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            owner_complete = owner.read_text(encoding="utf-8")
+            codec_complete = codec.read_text(encoding="utf-8")
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REQUIRED_MARKERS.items():
+                with self.subTest(marker=label):
+                    owner.write_text(marker.sub("", owner_complete), encoding="utf-8")
+                    codec.write_text(marker.sub("", codec_complete), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CENSUS_REQUIRED_MARKERS.items():
+                with self.subTest(census_marker=label):
+                    owner.write_text(marker.sub("", owner_complete), encoding="utf-8")
+                    codec.write_text(codec_complete, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing full ownership-census {label} marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_numbers_table_cell_comment_reply_projection_retains_legacy_raw_id_compatibility(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            legacy = root / "crates/litchi-iwa/src/numbers/editor/semantic/table.rs"
+            legacy.parent.mkdir(parents=True, exist_ok=True)
+            legacy.write_text(
+                "pub fn cell_comment_replies(table_id: u64) {}\n"
+                "pub fn add_cell_comment_reply(table_id: u64) {}\n"
+                "pub fn set_cell_comment_reply(table_id: u64) {}\n"
+                "pub fn remove_cell_comment_reply(table_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertIn(
+                "retained mutation/identity compatibility",
+                inspect.getdoc(
+                    boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology
+                ),
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_comment_reply_facade_source_topology()",
             main_source,
         )
 

@@ -70,11 +70,36 @@ enum Corruption {
     CommentMalformedNestedWire,
     CommentDuplicateCanonicalPayload,
     CommentDuplicateMalformedPayload,
+    CommentDuplicateReplyReference,
+    CommentSelfReplyReference,
+    CommentCyclicReplyReference,
+    CommentMissingReplyReference,
+    CommentAliasedReplyStorage,
+    CommentMalformedReplyWire,
+    CommentExternalReplyReference,
+    CommentTypedReplyReference,
+    CommentNestedReplyReference,
 }
 
 fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
+        ..Default::default()
+    }
+}
+
+fn external_reference(identifier: u64) -> tsp::Reference {
+    tsp::Reference {
+        identifier,
+        deprecated_is_external: Some(true),
+        ..Default::default()
+    }
+}
+
+fn typed_reference(identifier: u64) -> tsp::Reference {
+    tsp::Reference {
+        identifier,
+        deprecated_type: Some(1),
         ..Default::default()
     }
 }
@@ -446,12 +471,39 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
         );
     }
 
+    let replies = match corruption {
+        Corruption::CommentDuplicateReplyReference => {
+            vec![reference(COMMENT_REPLY_ID), reference(COMMENT_REPLY_ID)]
+        },
+        Corruption::CommentSelfReplyReference => {
+            vec![
+                reference(COMMENT_STORAGE_ID),
+                reference(COMMENT_REPLY_TWO_ID),
+            ]
+        },
+        Corruption::CommentCyclicReplyReference => vec![reference(COMMENT_REPLY_ID)],
+        Corruption::CommentMissingReplyReference => {
+            vec![reference(999_999), reference(COMMENT_REPLY_TWO_ID)]
+        },
+        Corruption::CommentAliasedReplyStorage => {
+            vec![
+                reference(ISOLATED_COMMENT_STORAGE_ID),
+                reference(COMMENT_REPLY_TWO_ID),
+            ]
+        },
+        Corruption::CommentExternalReplyReference => {
+            vec![external_reference(COMMENT_REPLY_ID)]
+        },
+        Corruption::CommentTypedReplyReference => vec![typed_reference(COMMENT_REPLY_ID)],
+        Corruption::CommentNestedReplyReference => vec![reference(COMMENT_REPLY_ID)],
+        _ => vec![reference(COMMENT_REPLY_ID), reference(COMMENT_REPLY_TWO_ID)],
+    };
     let comment = tsd::CommentStorageArchive {
         text: (!matches!(corruption, Corruption::CommentMissingText))
             .then(|| "Comment retained by Package".to_owned()),
         creation_date: Some(tsp::Date { seconds: 123.5 }),
         author: Some(reference(COMMENT_AUTHOR_ID)),
-        replies: vec![reference(COMMENT_REPLY_ID), reference(COMMENT_REPLY_TWO_ID)],
+        replies,
         storage_uuid: Some(tsp::Uuid {
             lower: COMMENT_STORAGE_ID,
             upper: 0x6c69_7463_6869_6977,
@@ -533,11 +585,20 @@ fn segmented_comment_storage_object() -> TestResult<ArchiveObject> {
 }
 
 fn comment_reply_storage_object(identifier: u64, text: &str) -> TestResult<ArchiveObject> {
+    comment_reply_storage_object_with_replies(identifier, text, &[])
+}
+
+fn comment_reply_storage_object_with_replies(
+    identifier: u64,
+    text: &str,
+    reply_ids: &[u64],
+) -> TestResult<ArchiveObject> {
     object(
         identifier,
         COMMENT_STORAGE_MESSAGE_TYPE,
         tsd::CommentStorageArchive {
             text: Some(text.to_owned()),
+            replies: reply_ids.iter().copied().map(reference).collect(),
             storage_uuid: Some(tsp::Uuid {
                 lower: identifier,
                 upper: identifier.rotate_left(17),
@@ -717,10 +778,25 @@ fn synthetic_table_data_list_package_with_message_type(
     objects.push(comment_storage_object(corruption)?);
     objects.push(isolated_comment_storage_object()?);
     objects.push(segmented_comment_storage_object()?);
-    objects.push(comment_reply_storage_object(
-        COMMENT_REPLY_ID,
-        "First reply",
-    )?);
+    if matches!(corruption, Corruption::CommentMalformedReplyWire) {
+        objects.push(object(
+            COMMENT_REPLY_ID,
+            COMMENT_STORAGE_MESSAGE_TYPE,
+            vec![0xff],
+        )?);
+    } else {
+        objects.push(comment_reply_storage_object_with_replies(
+            COMMENT_REPLY_ID,
+            "First reply",
+            if matches!(corruption, Corruption::CommentCyclicReplyReference) {
+                &[COMMENT_STORAGE_ID]
+            } else if matches!(corruption, Corruption::CommentNestedReplyReference) {
+                &[COMMENT_REPLY_TWO_ID]
+            } else {
+                &[]
+            },
+        )?);
+    }
     objects.push(comment_reply_storage_object(
         COMMENT_REPLY_TWO_ID,
         "Second reply",
@@ -982,6 +1058,256 @@ fn missing_comment_text_is_an_empty_strict_value_and_document_still_skips_commen
     let document = Document::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
+    Ok(())
+}
+
+#[test]
+fn package_cell_comment_replies_preserve_direct_source_order_for_selector_and_a1() -> TestResult {
+    let bytes = synthetic_table_data_list_package(Corruption::None, 2)?;
+    let original = bytes.clone();
+    let package = Package::from_bytes(&bytes)?;
+    let sheet = "Mixed table-data-list sheet";
+    let table = "Mixed table-data-list table";
+
+    let selected = package.table_cell_comment_replies(sheet, table, CellPosition::new(4, 0))?;
+    assert_eq!(
+        selected
+            .iter()
+            .map(|reply| reply.text())
+            .collect::<Vec<_>>(),
+        vec!["First reply", "Second reply"]
+    );
+    let addressed = package.table_cell_comment_replies_a1(sheet, table, "A5")?;
+    assert_eq!(
+        addressed
+            .iter()
+            .map(|reply| reply.text())
+            .collect::<Vec<_>>(),
+        vec!["First reply", "Second reply"]
+    );
+    assert_eq!(bytes, original, "reply reads mutated their borrowed source");
+    Ok(())
+}
+
+#[test]
+fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() -> TestResult {
+    let empty_bytes = synthetic_table_data_list_package(Corruption::None, 50)?;
+    let empty_original = empty_bytes.clone();
+    let empty_package = Package::from_bytes(&empty_bytes)?;
+    assert!(
+        empty_package
+            .table_cell_comment_replies(
+                "Mixed table-data-list sheet",
+                "Mixed table-data-list table",
+                CellPosition::new(4, 0),
+            )?
+            .is_empty()
+    );
+    assert!(
+        empty_package
+            .table_cell_comment_replies_a1(
+                "Mixed table-data-list sheet",
+                "Mixed table-data-list table",
+                "A5",
+            )?
+            .is_empty()
+    );
+    assert_eq!(
+        empty_bytes, empty_original,
+        "empty reply reads mutated source"
+    );
+
+    let package = Package::from_bytes(&empty_bytes)?;
+    let expected_path = TableCellCommentPath::Cell {
+        sheet: 0,
+        table: 0,
+        row: 0,
+        column: 0,
+    };
+    let error = package
+        .table_cell_comment_replies(
+            "Mixed table-data-list sheet",
+            "Mixed table-data-list table",
+            CellPosition::new(0, 0),
+        )
+        .expect_err("a cell without a root comment must be rejected");
+    assert_eq!(
+        error,
+        TableCellCommentError::CommentNotFound {
+            path: expected_path,
+        }
+    );
+    let error = package
+        .table_cell_comment_replies_a1(
+            "Mixed table-data-list sheet",
+            "Mixed table-data-list table",
+            "A1",
+        )
+        .expect_err("A1 lookup without a root comment must be rejected");
+    assert_eq!(
+        error,
+        TableCellCommentError::CommentNotFound {
+            path: expected_path,
+        }
+    );
+    assert!(matches!(
+        package.table_cell_comment_replies_a1(
+            "Mixed table-data-list sheet",
+            "Mixed table-data-list table",
+            "not-an-address",
+        ),
+        Err(TableCellCommentError::InvalidAddress)
+    ));
+    assert_eq!(
+        empty_bytes, empty_original,
+        "missing-root reads mutated source"
+    );
+    Ok(())
+}
+
+fn assert_comment_reply_source_rejected(corruption: Corruption) -> TestResult {
+    let bytes = synthetic_table_data_list_package(corruption, 2)?;
+    let original = bytes.clone();
+    if let Ok(package) = Package::from_bytes(&bytes) {
+        let error = package
+            .table_cell_comment_replies_a1(
+                "Mixed table-data-list sheet",
+                "Mixed table-data-list table",
+                "A5",
+            )
+            .expect_err("comment reply corruption must be rejected by the reply API");
+        assert!(
+            matches!(error, TableCellCommentError::InvalidSource { .. }),
+            "comment reply corruption {corruption:?} returned an unexpected error: {error:?}"
+        );
+    }
+    assert_eq!(
+        bytes, original,
+        "comment reply corruption {corruption:?} mutated its source"
+    );
+    Ok(())
+}
+
+fn assert_comment_reply_projection_rejects(corruption: Corruption) -> TestResult {
+    let bytes = synthetic_table_data_list_package(corruption, 2)?;
+    let original = bytes.clone();
+    let package = Package::from_bytes(&bytes).map_err(|error| {
+        std::io::Error::other(format!(
+            "selector-specific corruption {corruption:?} failed package ingress unexpectedly: {error}"
+        ))
+    })?;
+    let error = package
+        .table_cell_comment_replies_a1(
+            "Mixed table-data-list sheet",
+            "Mixed table-data-list table",
+            "A5",
+        )
+        .expect_err("selector-specific reply corruption must fail in the reply projection");
+    assert!(
+        matches!(error, TableCellCommentError::InvalidSource { .. }),
+        "selector-specific corruption {corruption:?} returned an unexpected error: {error:?}"
+    );
+    assert_eq!(
+        bytes, original,
+        "selector-specific corruption {corruption:?} mutated its source"
+    );
+    Ok(())
+}
+
+#[test]
+fn duplicate_self_cyclic_missing_alias_and_malformed_replies_are_rejected_atomically() -> TestResult
+{
+    for corruption in [
+        Corruption::CommentDuplicateReplyReference,
+        Corruption::CommentSelfReplyReference,
+        Corruption::CommentCyclicReplyReference,
+        Corruption::CommentMissingReplyReference,
+        Corruption::CommentAliasedReplyStorage,
+        Corruption::CommentMalformedReplyWire,
+    ] {
+        assert_comment_reply_source_rejected(corruption)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn external_and_nested_reply_references_fail_in_selector_projection_atomically() -> TestResult {
+    for corruption in [
+        Corruption::CommentExternalReplyReference,
+        Corruption::CommentTypedReplyReference,
+        Corruption::CommentNestedReplyReference,
+    ] {
+        assert_comment_reply_projection_rejects(corruption)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn comment_reply_reference_limit_rejects_atomically() -> TestResult {
+    let bytes = synthetic_table_data_list_package(Corruption::None, 2)?;
+    let original = bytes.clone();
+    let semantic = PackageSemanticLimits::new(
+        PackageSemanticLimits::MAX_OBJECTS,
+        1,
+        PackageSemanticLimits::MAX_TABLES,
+        1,
+    )?;
+    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    assert!(Package::from_bytes_with_options(&bytes, options).is_err());
+    assert_eq!(
+        bytes, original,
+        "comment reply limit refusal mutated source"
+    );
+    Ok(())
+}
+
+#[test]
+fn comment_and_reply_debug_redact_authored_text_across_transactions() -> TestResult {
+    let threaded_bytes = synthetic_table_data_list_package(Corruption::None, 2)?;
+    let threaded = Package::from_bytes(&threaded_bytes)?;
+    let comment = threaded
+        .table_cell_comment(
+            "Mixed table-data-list sheet",
+            "Mixed table-data-list table",
+            CellPosition::new(4, 0),
+        )?
+        .ok_or_else(|| std::io::Error::other("threaded synthetic comment is missing"))?;
+    let reply = threaded
+        .table_cell_comment_replies_a1(
+            "Mixed table-data-list sheet",
+            "Mixed table-data-list table",
+            "A5",
+        )?
+        .into_iter()
+        .next()
+        .ok_or_else(|| std::io::Error::other("threaded synthetic reply is missing"))?;
+    let comment_debug = format!("{comment:?}");
+    let reply_debug = format!("{reply:?}");
+    assert!(!comment_debug.contains("Comment retained by Package"));
+    assert!(!reply_debug.contains("First reply"));
+
+    let editable_bytes = synthetic_table_data_list_package(Corruption::None, 50)?;
+    let editable = Package::from_bytes(&editable_bytes)?;
+    let edit = editable.edit_table_cell_comment(
+        "Mixed table-data-list sheet",
+        "Mixed table-data-list table",
+        CellPosition::new(4, 0),
+    )?;
+    let edit_debug = format!("{edit:?}");
+    assert!(!edit_debug.contains("Comment retained by Package"));
+
+    let replacement = "replacement authored text";
+    let staged = edit.set(replacement);
+    let staged_debug = format!("{staged:?}");
+    assert!(!staged_debug.contains("Comment retained by Package"));
+    assert!(!staged_debug.contains(replacement));
+    let commit = staged.commit()?;
+    let patch_debug = format!("{:?}", commit.patch());
+    let commit_debug = format!("{commit:?}");
+    for debug in [patch_debug, commit_debug] {
+        assert!(!debug.contains("Comment retained by Package"));
+        assert!(!debug.contains(replacement));
+    }
     Ok(())
 }
 

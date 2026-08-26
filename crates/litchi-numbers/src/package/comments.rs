@@ -13,7 +13,11 @@
 //! ownership of the deleted storage object. Creating comments remains
 //! unsupported.
 
-use std::{collections::HashSet, fmt, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    sync::Arc,
+};
 
 use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
@@ -49,9 +53,18 @@ const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-w
 /// Numbers comment metadata (authors, reply identities, and storage UUIDs)
 /// is format-owned.  The focused package seam intentionally publishes only
 /// the editable text, so callers cannot depend on native identifiers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Comment {
     text: Arc<str>,
+}
+
+impl fmt::Debug for Comment {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Comment")
+            .field("text", &"<redacted>")
+            .finish()
+    }
 }
 
 impl Comment {
@@ -109,6 +122,33 @@ impl Comment {
         Ok(Self {
             text: Arc::from(retained.into_boxed_str()),
         })
+    }
+}
+
+/// One archive-free semantic reply attached to a table-cell comment.
+///
+/// Reply authors, native object identifiers, storage UUIDs, and the physical
+/// archive graph remain private to the Numbers adapter. Only the reply text is
+/// retained at this boundary.
+#[derive(Clone, PartialEq, Eq)]
+pub struct CommentReply {
+    text: Arc<str>,
+}
+
+impl fmt::Debug for CommentReply {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CommentReply")
+            .field("text", &"<redacted>")
+            .finish()
+    }
+}
+
+impl CommentReply {
+    /// Borrow the reply text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        self.text.as_ref()
     }
 }
 
@@ -498,6 +538,7 @@ struct Located {
     comment_key: Option<u32>,
     comment_table_id: Option<u64>,
     replies: usize,
+    reply_ids: Vec<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -624,6 +665,111 @@ impl Package {
     ) -> Result<Option<Comment>, Error> {
         let located = resolve_comment(self, sheet, table, position)?;
         Ok(located.comment)
+    }
+
+    /// Read the source-ordered semantic replies for one table-cell comment.
+    ///
+    /// The recognized native comment graph is validated package-wide before
+    /// any direct-reply text is published. Reply identities, authors, UUIDs,
+    /// and archive objects never cross this boundary. A cell without a root
+    /// comment returns [`Error::CommentNotFound`]; a comment without replies
+    /// returns an empty slice. Nested replies are outside this focused read
+    /// contract and fail closed.
+    pub fn table_cell_comment_replies<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: CellPosition,
+    ) -> Result<Box<[CommentReply]>, Error> {
+        let located = resolve_comment(self, sheet, table, position)?;
+        let path = located.target.path;
+        if located.comment.is_none() {
+            return Err(Error::CommentNotFound { path });
+        }
+
+        let census = census_comment_ownership(self, path)?;
+        let entry = located
+            .entry
+            .as_ref()
+            .ok_or(Error::InvalidSource { path })?;
+        let mut storage_indices = HashMap::new();
+        storage_indices
+            .try_reserve(census.storages.len())
+            .map_err(|_| Error::Allocation {
+                amount: census.storages.len(),
+                path,
+            })?;
+        for (index, storage) in census.storages.iter().enumerate() {
+            if storage_indices.insert(storage.object_id, index).is_some() {
+                return Err(Error::InvalidSource { path });
+            }
+        }
+        let root = census
+            .storages
+            .get(
+                storage_indices
+                    .get(&entry.entry.storage_id)
+                    .copied()
+                    .ok_or(Error::InvalidSource { path })?,
+            )
+            .ok_or(Error::InvalidSource { path })?;
+        if root.reply_ids != located.reply_ids {
+            return Err(Error::InvalidSource { path });
+        }
+        if located.reply_ids.is_empty() {
+            return Ok(Box::default());
+        }
+
+        let mut replies = Vec::new();
+        replies
+            .try_reserve_exact(located.reply_ids.len())
+            .map_err(|_| Error::Allocation {
+                amount: located.reply_ids.len(),
+                path,
+            })?;
+        for reply_id in located.reply_ids {
+            let storage = census
+                .storages
+                .get(
+                    storage_indices
+                        .get(&reply_id)
+                        .copied()
+                        .ok_or(Error::InvalidSource { path })?,
+                )
+                .ok_or(Error::InvalidSource { path })?;
+            let resolved = self
+                .state
+                .index
+                .resolve_ref_id(&self.state.components, storage.object_id)
+                .map_err(|_| Error::InvalidSource { path })?
+                .ok_or(Error::InvalidSource { path })?;
+            let message_index =
+                unique_message_index(resolved.messages, COMMENT_STORAGE_MESSAGE_TYPE, path)?;
+            if resolved.messages.len() != 1 {
+                return Err(Error::InvalidSource { path });
+            }
+            let details = decode_comment_storage(
+                self,
+                resolved.messages[message_index].data.as_slice(),
+                path,
+            )?;
+            replies.push(CommentReply {
+                text: details.comment.text,
+            });
+        }
+        Ok(replies.into_boxed_slice())
+    }
+
+    /// Read source-ordered semantic replies using a relative or absolute A1
+    /// address.
+    pub fn table_cell_comment_replies_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<Box<[CommentReply]>, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        self.table_cell_comment_replies(sheet, table, position)
     }
 
     /// Read one semantic comment using a relative or absolute A1 address.
@@ -1004,6 +1150,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment_key: None,
             comment_table_id: None,
             replies: 0,
+            reply_ids: Vec::new(),
         });
     };
     let tile_resolved = source
@@ -1052,6 +1199,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment_key: None,
             comment_table_id: None,
             replies: 0,
+            reply_ids: Vec::new(),
         });
     };
     let tile_view = WireView::parse_with_limits(
@@ -1105,6 +1253,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment_key: None,
             comment_table_id: None,
             replies: 0,
+            reply_ids: Vec::new(),
         });
     };
     let cell_source = storage_buffer
@@ -1124,6 +1273,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
             comment_key: None,
             comment_table_id: None,
             replies: 0,
+            reply_ids: Vec::new(),
         });
     };
     if comment_key == 0 {
@@ -1182,6 +1332,7 @@ fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Locate
         comment_key: Some(comment_key),
         comment_table_id: Some(comment_table_id),
         replies: details.replies,
+        reply_ids: details.reply_ids,
     })
 }
 
@@ -1336,6 +1487,7 @@ struct CommentStorageDetails {
 struct ReplyIdCollector {
     ids: Vec<u64>,
     allocation_failed: Option<usize>,
+    unsupported_reference: bool,
 }
 
 impl comment_storage_codec::CommentStorageVisitor for ReplyIdCollector {
@@ -1343,6 +1495,15 @@ impl comment_storage_codec::CommentStorageVisitor for ReplyIdCollector {
         &mut self,
         reply: comment_storage_codec::ReferenceRecord<'_>,
     ) -> Result<(), comment_storage_codec::DecodeError> {
+        let reference = reply.reference();
+        if reference.deprecated_is_external() == Some(true)
+            || reference
+                .deprecated_type()
+                .is_some_and(|deprecated_type| deprecated_type != 0)
+        {
+            self.unsupported_reference = true;
+            return Ok(());
+        }
         if self.ids.try_reserve(1).is_err() {
             self.allocation_failed = Some(self.ids.len().saturating_add(1));
         } else {
@@ -1377,6 +1538,9 @@ fn decode_comment_storage(
     .map_err(|error| map_comment_codec_error(error, path))?;
     if let Some(amount) = replies.allocation_failed {
         return Err(Error::Allocation { amount, path });
+    }
+    if replies.unsupported_reference {
+        return Err(Error::InvalidSource { path });
     }
     let text = snapshot.text().unwrap_or_default();
     let comment = Comment::try_from_text(text, max_text, path)?;
@@ -3088,6 +3252,7 @@ fn prove_archive_reference_ownership(
 
 fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
     let mut census = CommentOwnershipCensus::default();
+    let mut storage_ids = HashSet::new();
     for (component_index, component) in source.state.components.catalog().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
             let object_id = object
@@ -3246,13 +3411,13 @@ fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwner
                             reply_ids: details.reply_ids.clone(),
                             storage_uuid: details.storage_uuid,
                         };
-                        if details.author_id == Some(0)
-                            || details.storage_uuid == Some((0, 0))
-                            || census
-                                .storages
-                                .iter()
-                                .any(|item| item.object_id == object_id)
-                        {
+                        if details.author_id == Some(0) || details.storage_uuid == Some((0, 0)) {
+                            return Err(Error::InvalidSource { path });
+                        }
+                        storage_ids
+                            .try_reserve(1)
+                            .map_err(|_| Error::Allocation { amount: 1, path })?;
+                        if !storage_ids.insert(object_id) {
                             return Err(Error::InvalidSource { path });
                         }
                         census
@@ -3382,15 +3547,15 @@ fn census_alias_checks(
         });
     }
 
-    let mut storage_ids = HashSet::new();
-    storage_ids
+    let mut storage_indices = HashMap::new();
+    storage_indices
         .try_reserve(census.storages.len())
         .map_err(|_| Error::Allocation {
             amount: census.storages.len(),
             path,
         })?;
-    for storage in &census.storages {
-        if !storage_ids.insert(storage.object_id) {
+    for (index, storage) in census.storages.iter().enumerate() {
+        if storage_indices.insert(storage.object_id, index).is_some() {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -3441,7 +3606,7 @@ fn census_alias_checks(
     for author in &census.author_ids {
         if reply_ids.contains(author)
             || entry_storage_ids.contains(author)
-            || storage_ids.contains(author)
+            || storage_indices.contains_key(author)
         {
             return Err(Error::InvalidSource { path });
         }
@@ -3452,7 +3617,7 @@ fn census_alias_checks(
         }
     }
     for storage in &census.entry_storage_ids {
-        if !storage_ids.contains(storage) {
+        if !storage_indices.contains_key(storage) {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -3476,7 +3641,13 @@ fn census_alias_checks(
         }
     }
     for reply in &census.reply_ids {
-        if entry_storage_ids.contains(reply) || !storage_ids.contains(reply) {
+        let reply_storage = storage_indices
+            .get(reply)
+            .and_then(|index| census.storages.get(*index));
+        if entry_storage_ids.contains(reply)
+            || reply_storage.is_none()
+            || reply_storage.is_some_and(|storage| !storage.reply_ids.is_empty())
+        {
             return Err(Error::InvalidSource { path });
         }
     }
@@ -3490,6 +3661,95 @@ fn census_alias_checks(
     for uuid in &census.uuids {
         if *uuid == (0, 0) || !uuids.insert(*uuid) {
             return Err(Error::InvalidSource { path });
+        }
+    }
+    reject_comment_reply_cycles(census, path)?;
+    Ok(())
+}
+
+/// Reject cycles in the complete comment-storage reply graph.
+///
+/// Reply references are validated package-wide rather than only from the
+/// selected cell. This keeps a detached cycle from being mistaken for a
+/// harmless unrelated object and prevents any future reply projection from
+/// relying on an ambiguous ownership graph.
+fn reject_comment_reply_cycles(census: &CommentOwnershipCensus, path: Path) -> Result<(), Error> {
+    let mut storage_indices = HashMap::new();
+    storage_indices
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+    for (index, storage) in census.storages.iter().enumerate() {
+        if storage_indices.insert(storage.object_id, index).is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+
+    let mut visited = HashSet::new();
+    visited
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+    let mut active = HashSet::new();
+    active
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+
+    let mut stack = Vec::new();
+    stack
+        .try_reserve(1)
+        .map_err(|_| Error::Allocation { amount: 1, path })?;
+    for storage in &census.storages {
+        if visited.contains(&storage.object_id) {
+            continue;
+        }
+        stack.push((storage.object_id, false));
+        while let Some((object_id, leaving)) = stack.pop() {
+            if leaving {
+                active.remove(&object_id);
+                visited.insert(object_id);
+                continue;
+            }
+            if visited.contains(&object_id) {
+                continue;
+            }
+            if !active.insert(object_id) {
+                return Err(Error::InvalidSource { path });
+            }
+            stack.try_reserve(1).map_err(|_| Error::Allocation {
+                amount: stack.len().saturating_add(1),
+                path,
+            })?;
+            stack.push((object_id, true));
+            let index = storage_indices
+                .get(&object_id)
+                .copied()
+                .ok_or(Error::InvalidSource { path })?;
+            let replies = &census.storages[index].reply_ids;
+            stack
+                .try_reserve(replies.len())
+                .map_err(|_| Error::Allocation {
+                    amount: stack.len().saturating_add(replies.len()),
+                    path,
+                })?;
+            for reply_id in replies.iter().rev().copied() {
+                if !storage_indices.contains_key(&reply_id) {
+                    return Err(Error::InvalidSource { path });
+                }
+                if active.contains(&reply_id) {
+                    return Err(Error::InvalidSource { path });
+                }
+                if !visited.contains(&reply_id) {
+                    stack.push((reply_id, false));
+                }
+            }
         }
     }
     Ok(())
