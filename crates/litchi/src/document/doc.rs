@@ -946,7 +946,7 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DetectedFormat::Rtf(bytes) => {
-                let doc = litchi_rtf::RtfDocument::parse_bytes(&bytes).map_err(|e| {
+                let doc = litchi_rtf::RtfDocument::from_owned_bytes(bytes).map_err(|e| {
                     Error::ParseError(format!("Failed to parse RTF document: {}", e))
                 })?;
 
@@ -3411,6 +3411,21 @@ mod tests {
             "Failed to load RTF from bytes: {:?}",
             doc.err()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn unified_owned_rtf_route_accepts_all_supported_transport_forms() {
+        let plain = br#"{\rtf1\ansi Plain owned route\par Second paragraph}"#.to_vec();
+        let mut cp1252 = br#"{\rtf1\ansi\ansicpg1252 caf"#.to_vec();
+        cp1252.extend_from_slice(&[0xe9, b'}']);
+        let lzfu = litchi_rtf::transport::compress(&plain, true).expect("compress LZFu RTF");
+        let mela = litchi_rtf::transport::compress(&plain, false).expect("compress MELA RTF");
+
+        for source in [plain, cp1252, lzfu, mela] {
+            let document = Document::from_bytes(source).expect("owned RTF route");
+            assert!(!document.text().expect("RTF text").is_empty());
+        }
     }
 
     #[test]
