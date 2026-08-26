@@ -1,5 +1,21 @@
 # Performance CRUD coverage
 
+## 2026-08-26: change 0288 adds ODS semantic text sink evidence
+
+- The opt-in `ods_semantic_text_to_sink` selector adds deterministic ODS
+  semantic-text streaming evidence for the generated spreadsheet corpora.
+  Each logical worksheet row is one paragraph-equivalent object with stored
+  cell text joined by tabs; each zero-row sheet contributes one synthetic
+  empty object. The harness independently specifies this row-major output,
+  validates the opened `Spreadsheet`, and times only
+  `Spreadsheet::write_text_to` into a zero-retained-output hashing sink.
+- The harness checks exact report bytes/object counts, accepted bytes, the
+  independent SHA-256 digest, nonzero deterministic write evidence, and zero
+  retained output. `performance_claim: none`; the current matrix is **400
+  names** and the default remains **36 cases / 198 records**. No latency,
+  throughput, allocation, RSS, physical-I/O, zero-copy, or whole-transaction
+  memory-bound claim follows.
+
 ## 2026-08-26: change 0287 adds ODP semantic text sink evidence
 
 - The opt-in `odp_semantic_text_to_sink` selector adds deterministic ODP
@@ -98,7 +114,7 @@ claims withheld.
 
 Date: 2026-08-24
 
-This is a coverage map, not a completion claim. It compares the 399 selectable
+This is a coverage map, not a completion claim. It compares the 400 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -165,7 +181,7 @@ claims remain out of scope.
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part. Change 0120 adds a source-path PPTX slide-100 read with no unselected-slide/media payload overlap in its separate untimed replay; change 0122 adds an explicit ODP selected-media replay that proves one complete compressed `Pictures/` range and reports non-Pictures bytes separately; change 0123 adds root-path ODP archive/member/hash parity and direct typed source replay evidence; change 0124 adds typed ODS selected-cell and selected-media controls, with compressed-range and uncompressed-payload evidence kept distinct. Three opt-in OPC source-cache selectors add exact managed-Budget boundary evidence plus finite-control/managed same-Part and fixed-work disjoint-Part contention across `1/2x`, `1x`, and `2x` capacities and capped worker widths; their deterministic source delay is correctness evidence, not a latency claim. Semantic image selection remains missing |
 | Scan all cells/paragraphs/slides | Covered for generated native/OOXML/RTF/ODF text corpora | XLS/XLSB/XLSX/ODS cell scans, including the opt-in XLSB prepared boxed-iterator scan with exact canonical count/digest verification, the isolated ODS public-cell scalar and ordered batch sweeps; DOC/RTF/DOCX/ODT paragraph enumeration and PPT/PPTX/ODP slide/text enumeration. Change 0120 adds an ordinary-root PPTX full owned-slide list; its source replay reads all slide payloads and no media, while eager/source parity and names/text are checked outside timing |
 | Full text extraction | Covered for generated DOC/PPT/RTF/DOCX/PPTX/ODT/ODS/ODP; partial for XLSB | Complete deterministic text or row-major cell text is checked; the separate XLSB binary adds exact bytes/digest parity for one real POI workbook. RTF additionally verifies raw CP-1252/LZFu text and the body plus public header-shape projection of a real-producer watermark; change 0258 adds unified-facade open-plus-text parity for plain, CP-1252, LZFu, and MELA inputs, with the same-native-parser oracle caveat and no accepted latency claim. ODT consuming block ownership is measured in change 0023, and change 0191 records zero additional logical source reads plus accepted warm p50/mean/p95/p99 reductions for the retained high-level source-backed ODT open-plus-full-text lifecycle; change 0188 measures DOCX open-plus-full-text but withholds latency; broader real-producer/media-heavy corpora remain missing |
-| Semantic conversion to sequential sink | Partial | Measured: RTF, ODT, and ODP write semantic body or slide text to bounded forward-only, non-seek UTF-8 sinks with configurable separators; output, report progress, semantic SHA-256, and sink counters are fully verified outside timing. The opt-in ODT and ODP selectors use pre-opened documents or presentations and zero-retained hashing sinks, with deterministic write-call and largest-write evidence. Production correctness tests, rather than the timing sinks, cover partial/interrupted/write-zero behavior |
+| Semantic conversion to sequential sink | Partial | Measured: RTF, ODT, ODS, and ODP write semantic body, row, or slide text to bounded forward-only, non-seek UTF-8 sinks with configurable separators; output, report progress, semantic SHA-256, and sink counters are fully verified outside timing. The opt-in ODT, ODS, and ODP selectors use pre-opened documents, spreadsheets, or presentations and zero-retained hashing sinks, with deterministic write-call and largest-write evidence. Production correctness tests, rather than the timing sinks, cover partial/interrupted/write-zero behavior |
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring, and narrow XLSX/RTF forward-only creation with selectable timing evidence; broader streaming authoring remains missing |
 | Create or append a very large stream | Partial | XLSX one-sheet scalar rows and plain-run RTF paragraphs have opt-in small/medium/large fixed-window creation cases through non-seek hashing sinks, deterministic untimed reopen, exact counters, and output hashes. Existing-document RTF logical tail append is now covered by both the original pair and four matched Commit-versus-PublicationPlan selectors measured at the pre-staged publication-call interval over tiny/medium/large plain corpora, with a 16 KiB non-seek sink window, exact byte counters, separate planning/publication/reopen/lifecycle scopes, and untimed patch/reopen/source-conflict/failure gates. Planning/publication vectors are per-sample; reopen/lifecycle vectors are one-element preflight-only gates run once outside the sample loop, and the retained candidate snapshot is not claimed to be window-bounded. Large fresh legacy writers still accumulate before final output |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication, and the dedicated logical-tail no-op case proves shared snapshot identity plus exact sequential bytes. Change 0262 adds exact no-op bytes and raw preservation for the XLSX orphan vendor XML/BIN/relationship members. Change 0264 separately proves exact source bytes for three valid signed OOXML packages and a protected DOCX; signed/protected mutation paths are refusal gates, not successful generated or producer edit coverage |
@@ -219,7 +235,7 @@ forward-only sink and records complete positional input plus bounded output,
 but this is not semantic conversion or memory-bounded authoring. RTF and DOCX
 final serialization also accept and test a forward-only non-seek sink. RTF
 semantic body-text output independently has a selectable bounded forward-only
-sink benchmark. ODT and ODP semantic text output each have separate opt-in
+sink benchmark. ODT, ODS, and ODP semantic text output each have separate opt-in
 forward-only hashing-sink selectors with zero retained output and deterministic
 write-call/largest-write evidence; these selectors establish no latency, RSS,
 I/O, or zero-copy claim. Narrow XLSX scalar-row and RTF plain-run creation also

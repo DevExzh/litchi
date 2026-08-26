@@ -707,6 +707,12 @@ impl SemanticShape {
     const fn ods_cell_count(self) -> usize {
         self.ods_sheet_count() * self.ods_rows_per_sheet() * self.ods_columns_per_sheet()
     }
+
+    const fn ods_text_object_count(self) -> usize {
+        let sheets = self.ods_sheet_count();
+        let rows = self.ods_rows_per_sheet();
+        sheets * rows + if rows == 0 { sheets } else { 0 }
+    }
 }
 
 impl XlsxShape {
@@ -1275,6 +1281,7 @@ enum Case {
     OdsSemanticOneCell,
     OdsSemanticCellSweep,
     OdsSemanticFullCellText,
+    OdsSemanticTextToSink,
     OdsSemanticCreateSmall,
     OdsSemanticNoopEditSave,
     OdsSemanticOneEditSave,
@@ -1823,6 +1830,7 @@ impl Case {
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
             Self::OdsSemanticCellSweep => "ods_semantic_cell_sweep",
             Self::OdsSemanticFullCellText => "ods_semantic_full_cell_text",
+            Self::OdsSemanticTextToSink => "ods_semantic_text_to_sink",
             Self::OdsSemanticCreateSmall => "ods_semantic_create_small",
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
@@ -2317,6 +2325,7 @@ impl Case {
                 | Self::OdsSemanticOneCell
                 | Self::OdsSemanticCellSweep
                 | Self::OdsSemanticFullCellText
+                | Self::OdsSemanticTextToSink
                 | Self::OdsSemanticCreateSmall
                 | Self::OdsSemanticNoopEditSave
                 | Self::OdsSemanticOneEditSave
@@ -10365,6 +10374,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
         "ods_semantic_cell_sweep" => Some(Case::OdsSemanticCellSweep),
         "ods_semantic_full_cell_text" => Some(Case::OdsSemanticFullCellText),
+        "ods_semantic_text_to_sink" => Some(Case::OdsSemanticTextToSink),
         "ods_semantic_create_small" => Some(Case::OdsSemanticCreateSmall),
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
@@ -10774,7 +10784,8 @@ fn usage_text() -> String {
                                        ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
-                                       ods_semantic_full_cell_text,ods_semantic_create_small,\n\
+                                       ods_semantic_full_cell_text,ods_semantic_text_to_sink,\n\
+                                       ods_semantic_create_small,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
                                        ods_semantic_one_percent_edit_save,\n\
                                        ods_source_eager_one_edit_save,\n\
@@ -19460,6 +19471,7 @@ fn run_case_with_config(
         | Case::OdsSemanticOneCell
         | Case::OdsSemanticCellSweep
         | Case::OdsSemanticFullCellText
+        | Case::OdsSemanticTextToSink
         | Case::OdsSemanticCreateSmall
         | Case::OdsSemanticNoopEditSave
         | Case::OdsSemanticOneEditSave
@@ -20779,6 +20791,38 @@ fn expected_semantic_ods_full_cell_text(shape: SemanticShape, updated_indices: &
         }
     }
     values.join("\n")
+}
+
+fn expected_semantic_ods_row_text(shape: SemanticShape, updated_indices: &[usize]) -> String {
+    let full_cell_text = expected_semantic_ods_full_cell_text(shape, updated_indices);
+    let cells = if full_cell_text.is_empty() {
+        Vec::new()
+    } else {
+        full_cell_text.split('\n').collect::<Vec<_>>()
+    };
+    let rows_per_sheet = shape.ods_rows_per_sheet();
+    let columns_per_sheet = shape.ods_columns_per_sheet();
+    let mut cell_index = 0usize;
+    let mut rows = Vec::with_capacity(shape.ods_text_object_count());
+    for _sheet in 0..shape.ods_sheet_count() {
+        if rows_per_sheet == 0 {
+            rows.push(String::new());
+            continue;
+        }
+        for _row in 0..rows_per_sheet {
+            let mut row = String::new();
+            for column in 0..columns_per_sheet {
+                if column != 0 {
+                    row.push('\t');
+                }
+                row.push_str(cells.get(cell_index).copied().unwrap_or_default());
+                cell_index += 1;
+            }
+            rows.push(row);
+        }
+    }
+    debug_assert_eq!(cell_index, cells.len());
+    rows.join("\n")
 }
 
 fn verify_semantic_ods(
@@ -29571,6 +29615,9 @@ fn run_semantic_ods(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    if case == Case::OdsSemanticTextToSink {
+        return run_semantic_ods_text_to_sink(corpus, warmup_iterations, samples);
+    }
     let shape = semantic_shape(corpus)?;
     let sheet = shape.ods_sheet_count() / 2;
     let row = shape.ods_rows_per_sheet() / 2;
@@ -29753,6 +29800,61 @@ fn run_semantic_ods(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_ods_text_to_sink(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let expected_text = expected_semantic_ods_row_text(shape, &[]);
+    let expected_bytes = u64::try_from(expected_text.len())?;
+    let expected_objects = u64::try_from(shape.ods_text_object_count())?;
+    let expected_digest = sha256_hex(expected_text.as_bytes());
+    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+
+    verify_semantic_ods(&spreadsheet, shape, false)?;
+    let expected_cells = expected_semantic_ods_full_cell_text(shape, &[]);
+    if semantic_ods_full_cell_text(&spreadsheet, shape)? != expected_cells {
+        return Err("semantic ODS sink oracle differs from full-cell semantics".into());
+    }
+    let options =
+        litchi_core::TextOutputOptions::new("\n", "", expected_bytes, expected_objects);
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = HashingDiscardSink::without_authoring_window(expected_bytes);
+        let started = Instant::now();
+        let report = spreadsheet.write_text_to(&mut sink, options)?;
+        let duration = started.elapsed();
+        let (summary, digest) = sink.finish();
+        if report.bytes_written() != expected_bytes
+            || report.objects_written() != expected_objects
+            || summary.accepted_bytes != expected_bytes
+            || digest != expected_digest
+        {
+            return Err("semantic ODS text sink evidence differs from expected semantics".into());
+        }
+        if summary.retained_output_bytes != Some(0)
+            || summary.write_calls == 0
+            || summary.largest_write == 0
+        {
+            return Err("semantic ODS text sink did not expose bounded write evidence".into());
+        }
+        std::hint::black_box(report);
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let sink = deterministic_sink_summary(&summaries, "semantic ODS sequential output")?;
+    if sink.retained_output_bytes != Some(0) || sink.write_calls == 0 || sink.largest_write == 0 {
+        return Err("semantic ODS text sink summary is incomplete".into());
+    }
+    let mut result = result(Case::OdsSemanticTextToSink, corpus, elapsed, Some(sink));
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
 }
 
 fn run_ods_media_one_edit_save(
@@ -52832,6 +52934,36 @@ mod tests {
         let sink = result.sink.expect("ODT semantic text sink summary");
         assert_eq!(sink.retained_output_bytes, Some(0));
         assert!(sink.accepted_bytes > 0);
+        assert!(sink.write_calls > 0);
+        assert!(sink.largest_write <= sink.accepted_bytes);
+    }
+
+    #[test]
+    fn semantic_ods_text_sink_is_opt_in_and_deterministic() {
+        let case = Case::OdsSemanticTextToSink;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert!(!Case::DEFAULT.contains(&case));
+        assert_eq!(SemanticShape::Tiny.ods_text_object_count(), 8);
+        assert_eq!(SemanticShape::Medium.ods_text_object_count(), 64);
+        assert_eq!(SemanticShape::Large.ods_text_object_count(), 256);
+
+        let corpus = build_semantic_ods_corpus(SemanticShape::Tiny).unwrap();
+        let result = run_case(case, &corpus, 0, 1).unwrap();
+        assert_eq!(result.case, "ods_semantic_text_to_sink");
+        assert_eq!(result.elapsed_ns.samples.len(), 1);
+        let expected_text = super::expected_semantic_ods_row_text(SemanticShape::Tiny, &[]);
+        let expected_digest = super::sha256_hex(expected_text.as_bytes());
+        assert_eq!(
+            result.output_sha256.as_deref(),
+            Some(expected_digest.as_str())
+        );
+
+        let sink = result.sink.expect("ODS semantic text sink summary");
+        assert_eq!(sink.retained_output_bytes, Some(0));
+        assert_eq!(
+            sink.accepted_bytes,
+            u64::try_from(expected_text.len()).unwrap()
+        );
         assert!(sink.write_calls > 0);
         assert!(sink.largest_write <= sink.accepted_bytes);
     }
