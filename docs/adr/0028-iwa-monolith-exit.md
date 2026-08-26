@@ -5503,3 +5503,29 @@ This is not a monolith-exit gate. Debt 015, the
 generated-schema/normal Prost/Buffa owners, and the IWA monolith remain. No
 crate, edge, debt item, production manifest dependency, host, or monolith
 owner is retired by Wave92.
+
+## 2026-08-26 amendment: Wave93 Numbers comment-reply bounded owner slice (not a monolith-exit gate)
+
+Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
+moves only the admitted existing-root, same-member, direct-leaf reply lifecycle
+into the focused Numbers package. The archive-free facade owns semantic
+ordinals and authored text; the private owner owns strict rooted graph,
+refcount, author, ArchiveInfo, Metadata, COW/cull, resource, publication,
+candidate verification, locality, patch, and inverse behavior.
+
+The slice deliberately excludes root-comment creation, shared reply leaves,
+nested/cyclic replies, segmented lists, cross-member writes, author creation,
+opaque graph repair, Pages/Keynote comments, and arbitrary producer graphs.
+The `litchi-iwa` Numbers methods retain a deprecated compatibility fallback
+where native identity or an unsupported graph prevents focused delegation.
+The staged-private resource policy is not a single global allocation-free
+preflight or a performance/RSS claim, and the inert Numbers Reply UI means
+native direct-reply acceptance remains withheld.
+
+This is not a monolith-exit gate. Debt 015, the
+`litchi-iwa -> litchi-numbers` edge, the remaining hosts and debts,
+generated-schema/normal Prost/Buffa owners, and the IWA monolith remain. The
+authoritative inventory stays at 64 packages, 239 internal dependency
+declarations, and 13 ordered migration debts. No crate, edge, debt item,
+production manifest dependency, compatibility host, generated-schema owner,
+normal Prost/Buffa owner, or monolith gate is retired by Wave93.

@@ -3328,3 +3328,29 @@ members, or physical locators. This amendment deliberately does not freeze an
 append/set/remove package API because graph census, shared-thread COW,
 refcounts, author/UUID lifecycle, metadata transitions, patch/inverse, and
 native acceptance are not yet proved.
+
+## 2026-08-26 amendment: Wave93 Numbers comment-reply lifecycle semantics
+
+Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
+freezes the archive-free reply lifecycle API. `CommentReplyIndex` is a checked
+source-order ordinal, not a native identity. `Package` exposes one-reply reads,
+collection edits, direct append/set/remove helpers, A1 conveniences, and exact
+patch application; the semantic transaction namespace exposes both the
+prefixed `CommentReply*` names and concise `Edit`, `Patch`, `Commit`,
+`Diagnostics`, `Error`, `LimitKind`, and `Path` re-exports.
+
+Append targets an existing rooted comment. Set and remove select a direct
+reply by ordinal, never by text or native ID. Equal adjacent reply text is
+therefore unambiguous. Exact no-ops preserve source bytes. Changed edits COW a
+shared root, preserve sibling cells, allocate fresh private identities, update
+the selected BNC/list route, and cull only globally unreferenced old objects.
+Removing the last direct reply leaves the rooted comment with an empty direct
+reply list; it does not clear the root comment.
+
+The admitted graph is same-member and direct-leaf only. Shared reply leaves,
+nested/cyclic replies, segmented comment lists, cross-component mutation,
+new root-comment creation, author creation, opaque ownership, graph repair,
+and Pages/Keynote comment mutation are outside this slice and fail closed.
+Authored content remains redacted from `Debug`. Native direct-reply acceptance
+is withheld, so these semantics are a strict Rust package contract rather
+than a claim about every Numbers producer graph.

@@ -2714,3 +2714,28 @@ declarations, and 13 ordered migration debts. Debt 015 and
 `litchi-iwa -> litchi-numbers` remain, along with other hosts,
 generated-schema/normal Prost/Buffa owners, and the IWA monolith. No host,
 edge, debt, manifest dependency, crate, or monolith owner is retired.
+
+## 2026-08-26 amendment: Wave93 current-topology Numbers comment-reply lifecycle cut
+
+Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
+makes `litchi-numbers` the current selector-first owner of the admitted
+existing-root, same-member, direct-leaf comment-reply lifecycle. The package
+owns ordinal reads, append/set/remove, shared-root COW, exact list/BNC
+refcounts, strict author/ArchiveInfo/Metadata authority, private identity and
+save-token transitions, staged publication, candidate reopen/readback,
+locality, patches, and inverses. Its codec and package fuzz/boundary contracts
+are part of the current source topology.
+
+`litchi-iwa` Numbers mutation entry points delegate admitted sources to that
+owner while retaining deprecated compatibility behavior for unsupported
+native-ID graphs. Pages/Keynote comments, root-comment creation, shared reply
+leaves, segmented or cross-member reply graphs, author creation, and broader
+comment graph repair remain at their recorded owners or fail closed. Native
+direct-reply acceptance remains withheld.
+
+The inventory remains 64 workspace packages, 239 internal dependency
+declarations, and 13 ordered migration debts. Debt 015 and the
+`litchi-iwa -> litchi-numbers` edge remain, together with other migration
+hosts, generated-schema/normal Prost/Buffa owners, and the IWA monolith. No
+crate, edge, debt, manifest dependency, compatibility host, or monolith owner
+is retired by Wave93.

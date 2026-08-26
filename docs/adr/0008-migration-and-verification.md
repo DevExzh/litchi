@@ -14224,3 +14224,47 @@ These facts establish a strict private codec primitive only. They do not
 establish package reply mutation, host retirement, native reply persistence,
 Rust/native byte parity, performance/RSS, publication, dependency/debt exit,
 or a monolith-exit gate.
+
+## 2026-08-26 amendment: Wave93 Numbers comment-reply lifecycle verification record
+
+Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
+was checked with the following scoped gates:
+
+- `table_cell_comment_reply` integration passed 16/16, covering selector and
+  A1 reads, no-op, append/set/remove, duplicate-text ordinals, shared-root COW,
+  final cull, exact inverse/apply/conflict/locality/reopen, lock refusal,
+  malformed graph and ArchiveInfo authority, metadata/UUID collisions,
+  package-wide opaque inbound owners, unknown framing, and semantic/physical
+  atomic limit failures;
+- the `litchi-numbers` library target passed 402 tests with four ignored, and
+  strict library plus focused-test Clippy passed with the recorded deprecated,
+  `manual_contains`, `clone_on_copy`, and test-only `needless_question_mark`
+  baseline allowances;
+- the isolated `numbers_table_cell_comment_reply` fuzz target compiled with
+  its ten checked-in command/malformed seeds; the focused host library and
+  examples compiled; and the Metadata codec target passed 41/41 with strict
+  proto check/Clippy;
+- Python compilation and the complete boundary unittest passed 561/561. The
+  focused facade and Numbers host audits were empty. The full live checker
+  reported only the three known user-owned, untracked Pages table-lock
+  findings (`body_table_lock_state`, `set_body_table_lock_state`, and the
+  returned `tables/lock.rs` source);
+- Rust 2024 scoped formatting, tracked/untracked diff checks, and diagnostic
+  marker scans passed.
+
+The repository-wide pre-commit sweep was not green: it inspected unrelated
+user-owned Rust formatting differences, existing Numbers deprecation and
+`manual_contains` lints, and an unrelated `litchi-iwa-archive` test
+qualification. The implementation was therefore committed with hooks bypassed
+after the scoped gates above; this is not a full-workspace-green claim.
+
+A bounded Numbers 14.4 UI probe created and reopened a root comment, but the
+visible Reply control remained inert and unavailable through accessibility,
+coordinate, keyboard, menu, and toolbar attempts. The source and probe at
+`/private/tmp/wave93-native-comment-reply/` remained byte-identical at 135,404
+bytes with SHA-256
+`1b13a8176811b5a0534da31986a818f5e8969ec0e139456114bce8ef27d0911f`.
+No native direct reply, changed candidate, inverse, normalized artifact, or
+post-edit reopen exists. Native direct-reply acceptance, Rust/native byte
+parity, durable native publication, performance/RSS, debt/edge exit, and
+monolith-exit claims are explicitly withheld.

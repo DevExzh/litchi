@@ -3925,3 +3925,34 @@ dependency declarations, and 13 ordered migration debts. Debt 015 and the
 hosts, generated-schema/normal Prost/Buffa owners, and the IWA monolith. No
 crate, edge, debt item, production dependency, host, or monolith owner is
 removed by Wave92.
+
+## 2026-08-26 amendment: Wave93 Numbers comment-reply lifecycle boundary
+
+Implementation commit `21004a78ec4c6c7d8436424de270ad6ed6051eb0`
+makes `litchi-numbers` the selector-first owner of the admitted direct
+table-cell reply lifecycle. The public facade uses `SheetSelector`,
+`TableSelector`, `CellPosition`, `CommentReplyIndex`, archive-free
+`CommentReply`, and the `cell::comment::transaction` types. Native object and
+list identifiers, authors, UUIDs, physical locators, raw archive/wire values,
+generated messages, Prost values, and Buffa views remain private.
+
+The bounded package owner proves the rooted comment-list/BNC/storage graph,
+stored refcounts, direct-leaf order, exact aggregate and `FieldInfo`
+authority, physical author resolution, package-wide inbound ownership,
+strict current Metadata registries, and same-member COW/cull semantics before
+publication. It owns append, ordinal replacement, ordinal removal, exact
+no-op, conflict-checked patch, inverse, prepared ZIP publication, candidate
+reopen, semantic readback, and scoped locality for existing rooted comments.
+Shared roots use COW; shared replies, nested replies, segmented lists,
+cross-member mutation, missing/ambiguous metadata, opaque inbound owners,
+locked tables, and otherwise unproven graphs fail closed.
+
+The `litchi-iwa` Numbers mutation surface now delegates to the focused owner
+when the source is admitted, but retains a deprecated compatibility fallback
+for unsupported legacy-native graphs and native reply identity behavior.
+Pages and Keynote comment hosts are unchanged. The authoritative inventory
+remains 64 workspace packages, 239 internal dependency declarations, and 13
+ordered migration debts. Debt 015 and the `litchi-iwa -> litchi-numbers`
+edge remain open, as do the other hosts, generated-schema/normal Prost/Buffa
+owners, and the IWA monolith. No crate, edge, debt item, production manifest
+dependency, or monolith owner is removed by Wave93.
