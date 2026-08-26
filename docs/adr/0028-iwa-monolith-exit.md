@@ -5768,3 +5768,54 @@ graphs, Numbers table-cell refcount correctness, global list-key ownership,
 one operation-wide resource budget, performance/RSS behavior, dependency-edge
 or debt retirement, normal generated-schema ownership, crate exit, or monolith
 exit.
+
+## 2026-08-26 amendment: PackageMetadata watermark prepared publication (not a monolith-exit gate)
+
+The legacy package last-object watermark setter no longer verifies its common
+forward-allocation path by materializing a generated Prost
+`PackageMetadata`. It first performs strict raw inspection, then publishes a
+monotonic field-1 transition through the prepared source-preserving metadata
+codec at its exact execution limits. The empty registry batch requires one
+candidate-output allocation; duplicate, wrong-wire, noncanonical, truncated,
+or stale sources fail before the archive message is replaced. Equal values are
+strict byte-and-revision no-ops. The legacy suffix-release contract remains
+available through a singular raw field patch followed by strict full
+reinspection; this compatibility decrease is deliberately not described as a
+prepared or allocation-accounted transition. Missing `Index/Metadata.iwa`
+retains its established no-op behavior.
+
+Direct facade coverage passes 4/4, the complete PackageMetadata facade module
+passes 16/16, and the strict empty-batch codec coverage passes 3/3. Six
+allocation/release call-path regressions for Keynote object CRUD and shared
+comment graphs also pass. The complete already-built protos library suite
+passes 541/541; both affected library checks pass, as does scoped strict Clippy
+with the named unrelated identity/Pages dead-code, collapsible-if, and
+derivable-impl allowances. Formatting and diff checks pass. Boundary tests pass
+560/560, while the live audit retains only the three known untracked Pages
+table-lock findings. A concurrent full `litchi-iwa` library run was not green:
+1,544/1,595 passed and 51 unrelated pre-existing Keynote/Numbers projection
+tests failed, so this amendment makes no full-library or full-workspace green
+claim. Security review found no P0/P1 blocker; retained P2 follow-ups are
+decrease-path allocation reporting, error-label precision, and an optional
+global-registry-floor invariant for intentional decreases.
+
+Native acceptance used the tracked 500,058-byte Keynote source
+`test-data/iwork/keynote/basic.key`, SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+The object-allocating Rust example added a second slide from the default
+`Title & Bullets` layout. Its 501,837-byte candidate had SHA-256
+`375b51c2ff483b4ea11c29973f096ed3d1d9f36d6eaab662591f958a5722f37f`
+and advanced `last_object_identifier` from 2,652,562 to 2,652,582. It added
+`Index/Slide-2652564.iwa`; among existing members only `Index/Document.iwa`
+and `Index/Metadata.iwa` changed. Keynote 14.4 opened the exact candidate
+without repair, visibly exposed both slides, saved it, closed, and reopened
+the same path with the added slide intact. The 504,715-byte native-normalized
+artifact had SHA-256
+`e089756a71107a6af947d1d0984ed719c62600f7d6f576fb381783974d2675b7`;
+strict Rust reread found both layouts and watermark 2,652,762.
+
+Metadata archive discovery, component/UUID/external-reference writers,
+suffix-release budgeting, and surrounding operation-level transaction budgets
+remain in `litchi-iwa`. This slice therefore makes no full generated-schema
+retirement, inverse/native byte-parity, zero-copy, allocation-free,
+throughput/RSS, dependency-edge, debt, crate-exit, or monolith-exit claim.
