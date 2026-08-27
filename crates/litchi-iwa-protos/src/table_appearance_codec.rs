@@ -3178,6 +3178,93 @@ mod tests {
     }
 
     #[test]
+    fn model_style_rewrite_from_zero_materializes_fresh_style_and_inverts() {
+        let mut style_reference = reference_payload(0);
+        style_reference.extend_from_slice(&[0x98, 0x03, 0x81, 0x80, 0x00]);
+        let mut source = length_field(MODEL_STYLE_FIELD, &style_reference);
+        source.extend_from_slice(&length_field(
+            MODEL_STYLE_PRESET_FIELD,
+            &reference_payload(17),
+        ));
+        let before = decode_table_model(&source, options(&source)).unwrap();
+        assert_eq!(before.style_identifier(), 0);
+        assert_eq!(before.style_preset_identifier(), Some(17));
+
+        let prepared = prepare_table_model_style_rewrite(&source, 0, 129, options(&source))
+            .expect("present zero style edge is a valid rewrite source");
+        let requirements = prepared.execution_requirements();
+        let (candidate, report) = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(report.output_bytes(), candidate.len());
+        assert_eq!(candidate.len(), source.len() + 1);
+        assert!(
+            candidate
+                .windows(5)
+                .any(|window| window == [0x98, 0x03, 0x81, 0x80, 0x00])
+        );
+        let after = decode_table_model(&candidate, options(&candidate)).unwrap();
+        assert_eq!(after.style_identifier(), 129);
+        assert_eq!(after.style_preset_identifier(), Some(17));
+
+        let inverse_plan =
+            prepare_table_model_style_rewrite(&candidate, 129, 0, options(&candidate)).unwrap();
+        let inverse = inverse_plan
+            .execute(inverse_plan.execution_requirements().exact_limits())
+            .unwrap()
+            .0;
+        assert_eq!(inverse, source);
+    }
+
+    #[test]
+    fn model_style_rewrite_execution_rejects_each_limit_minus_one() {
+        let source = model(7, true);
+        let prepared =
+            prepare_table_model_style_rewrite(&source, 7, 129, options(&source)).unwrap();
+        let requirements = prepared.execution_requirements();
+
+        let mut limits = requirements.exact_limits();
+        limits.max_input_bytes = requirements.input_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::InputBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_output_bytes = requirements.output_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_fields = requirements.fields() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_work_bytes = requirements.work_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::WorkBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_depth = requirements.max_depth() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_allocations = requirements.allocations() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::Allocations { .. })
+        ));
+    }
+
+    #[test]
     fn model_style_edge_rewrite_preserves_unknown_bytes_and_reports_exact_limits() {
         let source = model(7, true);
         let (snapshot, _) = decode_table_model_with_report(&source, options(&source)).unwrap();
@@ -3339,6 +3426,99 @@ mod tests {
     }
 
     #[test]
+    fn canonical_variation_readback_rejects_each_limit_minus_one() {
+        let write = TableStyleVariationWrite {
+            parent_identifier: 7,
+            stylesheet_identifier: 8,
+            overrides: AppearanceOverrides {
+                row_banding: Some(true),
+                row_sizing: Some(true),
+                body_horizontal: Some(false),
+                body_vertical: Some(true),
+                header_columns_horizontal: Some(false),
+                header_rows_vertical: Some(true),
+                footer_rows_vertical: Some(false),
+            },
+        };
+        let base_options = DecodeOptions::for_source(&[])
+            .with_max_output_bytes(4096)
+            .with_max_fields(128)
+            .with_max_work_bytes(16_384)
+            .with_recursion_limit(16)
+            .with_max_allocations(32);
+        let payload = canonical_table_style_variation(write, base_options).unwrap();
+        let report = payload.report();
+        assert!(report.output_bytes() > 0);
+        assert!(report.fields() > 0);
+        assert!(report.work_bytes() > 0);
+        assert!(report.max_depth() > 0);
+        assert!(report.allocations() > 0);
+
+        let decoded = decode_table_style_with_report(payload.bytes(), options(payload.bytes()))
+            .unwrap()
+            .0;
+        assert_eq!(decoded.parent_identifier(), Some(write.parent_identifier));
+        assert_eq!(
+            decoded.stylesheet_identifier(),
+            Some(write.stylesheet_identifier)
+        );
+        assert_eq!(decoded.overrides(), write.overrides);
+
+        let exact_options = DecodeOptions::for_source(&[])
+            .with_max_output_bytes(report.output_bytes())
+            .with_max_fields(report.fields())
+            .with_max_work_bytes(report.work_bytes())
+            .with_recursion_limit(report.max_depth())
+            .with_max_allocations(report.allocations());
+        assert!(canonical_table_style_variation(write, exact_options).is_ok());
+
+        let mut limited = base_options;
+        limited.max_output_bytes = report.output_bytes() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+
+        let mut limited = base_options;
+        limited.max_fields = report.fields() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+
+        let mut limited = base_options;
+        limited.max_work_bytes = report.work_bytes() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::WorkBytes { .. })
+        ));
+
+        let mut limited = base_options;
+        limited.recursion_limit = report.max_depth() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+
+        let mut limited = base_options;
+        limited.max_allocations = report.allocations() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::Allocations { .. })
+        ));
+    }
+
+    #[test]
     fn stylesheet_append_preserves_source_and_checks_duplicate_style() {
         let source = vec![0x98, 0x03, 0x81, 0x80, 0x00];
         let append = StylesheetStyleAppend {
@@ -3366,6 +3546,116 @@ mod tests {
                 DecodeOptions::for_source(&candidate).with_max_output_bytes(1024)
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn stylesheet_append_execution_rejects_each_limit_minus_one_and_dependencies() {
+        let source = length_field(SHEET_STYLES_FIELD, &reference_payload(7));
+        let append = StylesheetStyleAppend {
+            style_identifier: 9,
+            parent_identifier: None,
+        };
+        let prepared = prepare_stylesheet_append(&source, append, options(&source)).unwrap();
+        let requirements = prepared.execution_requirements();
+        let (candidate, _) = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(
+            decode_stylesheet(&candidate, options(&candidate))
+                .unwrap()
+                .style_count(),
+            2
+        );
+        assert_eq!(
+            source,
+            length_field(SHEET_STYLES_FIELD, &reference_payload(7))
+        );
+
+        let mut limits = requirements.exact_limits();
+        limits.max_input_bytes = requirements.input_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::InputBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_output_bytes = requirements.output_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_fields = requirements.fields() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_work_bytes = requirements.work_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::WorkBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_depth = requirements.max_depth() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_allocations = requirements.allocations() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::Allocations { .. })
+        ));
+
+        assert!(
+            prepare_stylesheet_append(
+                &source,
+                StylesheetStyleAppend {
+                    style_identifier: 7,
+                    parent_identifier: None,
+                },
+                options(&source),
+            )
+            .unwrap_err()
+            .is_invalid()
+        );
+        assert!(
+            prepare_stylesheet_append(
+                &source,
+                StylesheetStyleAppend {
+                    style_identifier: 9,
+                    parent_identifier: Some(99),
+                },
+                options(&source),
+            )
+            .unwrap_err()
+            .is_invalid()
+        );
+
+        let parent_plan = prepare_stylesheet_append(
+            &source,
+            StylesheetStyleAppend {
+                style_identifier: 9,
+                parent_identifier: Some(7),
+            },
+            options(&source)
+                .with_max_output_bytes(1024)
+                .with_max_work_bytes(4096),
+        )
+        .unwrap();
+        let (parent_candidate, _) = parent_plan
+            .execute(parent_plan.execution_requirements().exact_limits())
+            .unwrap();
+        assert_eq!(
+            decode_stylesheet(&parent_candidate, options(&parent_candidate))
+                .unwrap()
+                .style_count(),
+            2
         );
     }
 

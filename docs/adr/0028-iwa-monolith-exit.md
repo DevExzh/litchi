@@ -6209,3 +6209,67 @@ migration debts (including debts 014, 016, and 017), generated-schema and
 normal Prost/Buffa owners, and the IWA monolith deletion gate remain
 unchanged. Wave102 retires no crate, edge, debt, manifest dependency, host
 adapter, generated owner, or monolith owner.
+
+## 2026-08-27 amendment: Wave103 Keynote selector-first slide-table appearance owner (not a monolith-exit gate)
+
+Wave103 moves the admitted Keynote slide-table appearance transaction to a
+selector-first `litchi-keynote` package owner. The public operations are
+`Package::slide_table_appearance`, `edit_slide_table_appearance`, and
+`apply_slide_table_appearance`; the semantic value remains archive-free. A
+changed direct, nonzero table style is updated through same-component
+copy-on-write, with the prepared table-appearance codecs and the strict
+metadata/UUID/external-edge/ArchiveInfo transition establishing the exact
+source, candidate, and locality proofs. Preset/network reads remain
+read-only; preset-only mutation is rejected fail-closed.
+
+Admission is canonical and rooted. Missing, malformed, duplicate,
+role-aliased, wrong-wire, cyclic, over-depth, ambiguous, or otherwise
+unproven style-graph routes fail closed, as do invalid metadata ownership,
+UUID, external-edge, ArchiveInfo, or locality facts. The owner performs
+candidate reopen and semantic verification, exact inverse application, and
+same-component locality checks. Existing generated TableInfo geometry and
+legacy/native mutation remain compatibility paths. This slice does not move
+rows or cells or mutate formula, storage, tile, or unrelated table graphs;
+changed commits delete stale previews instead of rewriting them.
+
+The owner resource ledger is conservative operation-local logical accounting;
+it is not allocator telemetry, cache-residency telemetry, RSS measurement, or
+a package-wide budget. No full generated-free owner, zero-copy, allocation-free,
+wall-clock performance, or broader Keynote graph claim follows.
+
+ArchiveInfo admission resolves every distinct referenced object and current
+data identifier while preserving native duplicate occurrences in unrelated
+producer FieldInfo lists; selected slide, model, and style routes remain
+exact-one checks.
+
+The focused appearance integration passed 19/19. The Keynote library check
+and strict library/test Clippy passed. The scoped host bridge, fuzz, and
+boundary coverage remains part of this owner slice; no broader workspace-green
+claim is made.
+
+Against the native source `/private/tmp/wave100-native-table-headers-source.key`
+(500,128 bytes, SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`), the
+package driver produced a changed 466,448-byte candidate (SHA-256
+`eb51188fefe44f13001bb2db24fdc4fde4f4bdc208dbc98f6e8b2e4a4a0b1b28`) and an
+inverse exactly equal to the source. A no-op remained exact. The changed
+candidate reopened semantically as banding enabled, fit-cell-content row
+sizing, and all gridline groups hidden; diagnostics were
+`changed=true`, `touched_components=3`, `deleted_previews=3`, and
+`full_reparse=true`. The candidate had 83 members after the three preview
+deletions.
+
+Computer Use opened a disposable copy of the changed candidate in Keynote
+without repair, recovery, or conversion UI. It showed alternating rows on,
+resize-to-fit on, and all five gridline checkboxes off. Keynote normalized
+only that disposable copy on close, changing the 466,448-byte copy from the
+candidate SHA-256 to 496,491 bytes with SHA-256
+`280c57e3e997ef2380edd7759fc2ff17f7df9ee09fbdcbec2978b4b4ce751f57`;
+the canonical source, candidate, and inverse remained untouched. This is not
+byte-exact native UI save, mutation, or reopen acceptance evidence.
+
+The migration host, `litchi-iwa -> litchi-keynote` edge, all 13 ordered
+migration debts (including debts 014, 015, and 017), generated/native
+compatibility owners, and the IWA monolith deletion gate remain unchanged.
+Wave103 retires no crate, edge, debt, manifest dependency, host adapter,
+generated owner, or monolith owner.

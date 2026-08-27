@@ -1112,6 +1112,56 @@ A separate writable disposable copy auto-persisted view state on close, so
 the byte-identity statement applies only to the immutable copy. No native
 appearance mutation, save, normalization, or post-save acceptance is claimed.
 
+#### Keynote slide-table appearance owner
+
+Selector-first `litchi-keynote` APIs now read and edit admitted slide-table
+appearance through `Package::slide_table_appearance`,
+`edit_slide_table_appearance`, and `apply_slide_table_appearance`. A direct
+nonzero style uses same-component copy-on-write with prepared appearance
+codecs and strict catalog/metadata/UUID/external-edge/ArchiveInfo checks,
+candidate reopen, exact inverse, and locality verification. Preset/network
+routes remain read-only; preset-only mutation fails closed.
+
+Missing, malformed, duplicate, role-aliased, wrong-wire, cyclic, over-depth,
+ambiguous, or otherwise unproven canonical routes fail closed. Existing
+generated TableInfo geometry, public compatibility APIs, and legacy/native
+mutation remain at their current owners. This boundary does not mutate
+physical rows, cells, formulas, storage, tiles, or unrelated table graphs;
+changed commits delete stale previews instead of rewriting them. Its resource
+ledger is operation-local logical accounting, not
+allocator, cache, RSS, or package-wide budget telemetry; it makes no claim of
+full generated-free ownership, zero-copy, allocation-free behavior, or
+wall-clock performance.
+
+ArchiveInfo admission resolves every distinct referenced object and current
+data identifier while preserving native duplicate occurrences in unrelated
+producer FieldInfo lists; the selected slide, model, and style routes remain
+exact-one checks.
+
+The focused appearance integration passed 19/19; the Keynote library check
+and strict library/test Clippy passed. Host bridge, fuzz, and boundary checks
+remain within the scoped coverage; this is not a full-workspace-green claim.
+
+The package driver used
+`/private/tmp/wave100-native-table-headers-source.key` (500,128 bytes,
+SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`) and
+produced a 466,448-byte candidate (SHA-256
+`eb51188fefe44f13001bb2db24fdc4fde4f4bdc208dbc98f6e8b2e4a4a0b1b28`), an
+exact inverse, and an exact no-op. The candidate reopened semantically as
+banding enabled, fit-cell-content row sizing, and all gridlines hidden;
+diagnostics were changed=true, touched_components=3, deleted_previews=3,
+and full_reparse=true, with 83 members after deleting three previews.
+
+Computer Use opened a disposable changed-candidate copy in Keynote without
+repair, recovery, or conversion UI and showed alternating rows on,
+resize-to-fit on, and all five gridline checkboxes off. Keynote normalized
+only that disposable copy on close, changing the 466,448-byte copy from the
+candidate SHA-256 to 496,491 bytes with SHA-256
+`280c57e3e997ef2380edd7759fc2ff17f7df9ee09fbdcbec2978b4b4ce751f57`.
+The canonical source, candidate, and inverse remained untouched. No native
+mutation, save, reopen acceptance, or byte-exact native UI-save claim follows.
+
 Numbers scalar cell writes are selector-first `litchi-numbers` package
 transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
 before publication, so any rejected coordinate, dependency, or cache update

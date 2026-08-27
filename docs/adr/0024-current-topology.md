@@ -2978,3 +2978,60 @@ The migration host, `litchi-iwa -> litchi-keynote` edge, all 13 ordered
 migration debts, generated-schema/normal Prost/Buffa owners, and the IWA
 monolith deletion gate remain unchanged. Wave102 retires no crate, edge,
 debt, manifest dependency, host adapter, generated owner, or monolith owner.
+
+## 2026-08-27 amendment: Wave103 current-topology Keynote selector-first slide-table appearance owner (not a monolith-exit gate)
+
+`litchi-keynote` now owns selector-first slide-table appearance reads and
+edits through `Package::slide_table_appearance`,
+`edit_slide_table_appearance`, and `apply_slide_table_appearance`. The
+changed direct nonzero style path uses same-component copy-on-write and a
+prepared table-appearance codec plus strict metadata, UUID, external-edge,
+ArchiveInfo, candidate-reopen, inverse, and locality validation. Preset and
+network routes are readable but not mutable; preset-only writes fail closed.
+
+Canonical rooted graph admission rejects missing, malformed, duplicate,
+role-aliased, wrong-wire, cyclic, over-depth, ambiguous, and otherwise
+unproven style routes. Existing generated TableInfo geometry, public
+compatibility surfaces, and legacy/native mutation remain at their owners.
+No row/cell/formula/storage/tile or unrelated table-graph rewrite is part of
+this boundary; changed commits delete stale previews instead of rewriting
+them. Its resource ledger is conservative operation-local
+logical accounting, not allocator, cache, RSS, or package-wide budget
+telemetry; no full generated-free, zero-copy, allocation-free, wall-clock, or
+broader Keynote graph claim is made.
+
+ArchiveInfo admission resolves every distinct referenced object and current
+data identifier while preserving native duplicate occurrences in unrelated
+producer FieldInfo lists; selected slide, model, and style routes remain
+exact-one checks.
+
+The focused appearance integration passed 19/19; the Keynote library check
+and strict library/test Clippy passed. Scoped host bridge, fuzz, and boundary
+coverage remains included in the owner slice, without a full-workspace-green
+claim.
+
+The package driver used
+`/private/tmp/wave100-native-table-headers-source.key` (500,128 bytes,
+SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`) and
+produced a 466,448-byte changed candidate (SHA-256
+`eb51188fefe44f13001bb2db24fdc4fde4f4bdc208dbc98f6e8b2e4a4a0b1b28`), an
+exact inverse, and an exact no-op. Candidate semantic reread matched banding
+enabled, fit-cell-content row sizing, and all gridlines hidden; diagnostics
+were changed=true, touched_components=3, deleted_previews=3, and
+full_reparse=true, with 83 members after deleting three previews.
+
+Computer Use opened a disposable candidate copy in Keynote without repair,
+recovery, or conversion UI and showed alternating rows on, resize-to-fit on,
+and all five gridline checkboxes off. Keynote normalized only that disposable
+copy on close, changing the 466,448-byte copy from the candidate SHA-256 to
+496,491 bytes with SHA-256
+`280c57e3e997ef2380edd7759fc2ff17f7df9ee09fbdcbec2978b4b4ce751f57`;
+the canonical source, candidate, and inverse stayed untouched. No native
+mutation/save/reopen acceptance or byte-exact UI-save claim follows.
+
+The migration host, `litchi-iwa -> litchi-keynote` edge, all 13 ordered
+migration debts (especially 014, 015, and 017), generated/native
+compatibility owners, and the IWA monolith deletion gate remain unchanged.
+Wave103 retires no crate, edge, debt, manifest dependency, host adapter,
+generated owner, or monolith owner.

@@ -6,6 +6,8 @@
 
 use litchi_core::Position;
 
+/// Effective appearance settings for a table's style graph.
+pub mod appearance;
 /// Formula values shared through the neutral iWork semantic model.
 pub mod formula;
 /// Lossless header, footer, freeze, and print-repetition settings.
