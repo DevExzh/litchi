@@ -1263,6 +1263,83 @@ def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_lock_state_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use litchi_iwa_common::table::lock::State;\n"
+        "pub mod transaction {\n"
+        "    pub use crate::package::slide_table_lock_state::{\n"
+        "        SlideTableLockStateCommit as Commit,\n"
+        "        SlideTableLockStateDiagnostics as Diagnostics,\n"
+        "        SlideTableLockStateEdit as Edit,\n"
+        "        SlideTableLockStateError as Error,\n"
+        "        SlideTableLockStateLimitKind as LimitKind,\n"
+        "        SlideTableLockStatePatch as Patch,\n"
+        "        SlideTableLockStatePath as Path,\n"
+        "    };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector {\n"
+        "    pub const fn index(index: usize) -> Self { let _ = index; Self }\n"
+        "    pub const fn position(position: Position) -> Self { let _ = position; Self }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES
+        )
+        + "struct LockBudget;\n"
+        + "fn strict() { table_info_codec; WireLimits; ExactArtifacts; }\n"
+        + "fn transaction() { budget; residual; candidate; reopen; verify_locality; inverse; let deleted_previews: usize = 0; }\n"
+        + "impl Package {\n"
+        + "pub fn slide_table_lock_state<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<State, SlideTableLockStateError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_lock_state<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableLockStateEdit, SlideTableLockStateError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_lock_state(&self, patch: &SlideTableLockStatePatch) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableLockStateEdit {\n"
+        + "pub fn before(&self) -> State { todo!() } pub fn after(&self) -> State { todo!() } pub fn state(&self) -> State { todo!() }\n"
+        + "pub fn set(self, state: State) -> Self { let _ = state; self } pub fn set_state(&mut self, state: State) -> &mut Self { let _ = state; self }\n"
+        + "pub fn lock(&mut self) -> &mut Self { self } pub fn unlock(&mut self) -> &mut Self { self } pub fn commit(self) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_lock_state;\n"
+        "pub use slide_table_lock_state::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES)
+        )
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES)
+        )
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n"
+        "pub use slide::table::lock::State;\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_table_headers_canonical_scaffold(
     root: Path,
     *,
@@ -13353,6 +13430,140 @@ fn rewrite_movie_title_operation(
         ):
             self.assertIn(expression, main_source)
 
+    def test_iwa_keynote_slide_table_title_requires_focused_package_route(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/title.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn slide_table_title_settings(&self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn set_slide_table_title_settings(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "fn raw() { editor.slide_table_title_settings(0, 7); editor.set_slide_table_title_settings(0, 7, settings); }\n"
+                "fn numbers() { crate::numbers::editor::table_title_settings_in_package(package, 7); }\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT / "create_keynote_table.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create() { editor.set_slide_table_title_settings(0, 7, settings); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_title_source_topology(root)
+            self.assertTrue(any("slide-table-title method" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-title call" in item for item in violations), violations)
+            self.assertTrue(any("Numbers persisted table-title" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-title example call" in item for item in violations), violations)
+
+            host.write_text(
+                "fn focused() { package.slide_table_title_settings(slide, table); }\n",
+                encoding="utf-8",
+            )
+            example.write_text(
+                "fn create() { package.edit_slide_table_title(slide, table); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_title_source_topology(root), []
+            )
+
+    def test_iwa_keynote_slide_table_title_requires_a_focused_call_and_masks_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor/title.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "// pub fn set_slide_table_title_settings(&mut self, model_id: u64) {}\n"
+                'const DOC: &str = "editor.set_slide_table_title_settings()";\n'
+                "#[cfg(test)]\n"
+                "pub fn decoy() { editor.set_slide_table_title_settings(); }\n"
+                "fn focused() { package.slide_table_title_settings(slide, table); }\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "numbers_only.rs").write_text(
+                "fn numbers_branch() { editor.set_slide_table_title_settings(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_title_source_topology(root), []
+            )
+
+            host.write_text("fn physical_only() {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_slide_table_title_source_topology(root)
+            self.assertTrue(any("must call the focused litchi-keynote Package" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_sort_preserves_physical_executor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn slide_table_sort_order(&self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn set_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64, order: Order) {}\n"
+                "pub fn clear_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn apply_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn apply_slide_table_sort_order_to_rows(&mut self, slide_index: usize, model_id: u64, rows: RowRange) {}\n"
+                "fn raw() { editor.slide_table_sort_order(0, 7); editor.set_slide_table_sort_order(0, 7, order); editor.clear_slide_table_sort_order(0, 7); editor.apply_slide_table_sort_order(0, 7); editor.apply_slide_table_sort_order_to_rows(0, 7, rows); }\n"
+                "fn numbers() { crate::numbers::editor::table_sort_order_in_package(package, 7); crate::numbers::editor::apply_table_sort_order_in_package(package, 7); }\n"
+                "fn focused() { package.slide_table_sort_order(slide, table); package.edit_slide_table_sort_order(slide, table); package.apply_slide_table_sort_order(&patch); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root)
+            self.assertTrue(any("slide-table-sort method" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-sort call" in item for item in violations), violations)
+            self.assertTrue(any("Numbers persisted table-sort" in item for item in violations), violations)
+            self.assertFalse(any("apply_slide_table_sort_order" in item for item in violations), violations)
+
+            host.write_text(
+                "pub fn apply_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn apply_slide_table_sort_order_to_rows(&mut self, slide_index: usize, model_id: u64, rows: RowRange) {}\n"
+                "fn physical() { editor.apply_slide_table_sort_order(0, 7); editor.apply_slide_table_sort_order_to_rows(0, 7, rows); }\n"
+                "fn focused() { package.slide_table_sort_order(slide, table); package.edit_slide_table_sort_order(slide, table); package.apply_slide_table_sort_order(&patch); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root), []
+            )
+
+    def test_iwa_keynote_slide_table_sort_requires_focused_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn apply_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "fn physical() { editor.apply_slide_table_sort_order(0, 7); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root)
+            self.assertTrue(any("must call the focused litchi-keynote Package" in item for item in violations), violations)
+
+            example = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT / "mixed_iwork.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn numbers_branch() { editor.set_slide_table_sort_order(); }\n"
+                "fn keynote_branch() { package.edit_slide_table_sort_order(slide, table); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root), []
+            )
+
+    def test_iwa_keynote_slide_table_config_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_slide_table_title_source_topology()",
+            "+ audit_iwa_keynote_slide_table_sort_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
     def test_keynote_slide_table_sort_facade_is_dormant_then_strict(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -13447,6 +13658,132 @@ fn rewrite_movie_title_operation(
         for expression in (
             "+ audit_keynote_slide_table_sort_facade_source_topology()",
             "+ audit_keynote_slide_table_sort_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_lock_state_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_lock_state_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_keynote_slide_table_lock_state_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_lock_state_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_table_lock_state_facade_rejects_public_physical_raw_and_flat(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_lock_state_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_lock(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n"
+                + "pub use self::SlideTableLockStateEdit as LockStateEdit;\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_lock_state_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_lock_state_retire_and_preserve_physical_sort(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_lock_state_canonical_scaffold(root)
+            retired = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_SOURCE
+            retired.parent.mkdir(parents=True, exist_ok=True)
+            retired.write_text(
+                "use crate::table_lock::{table_lock_state, set_table_lock_state};\n"
+                "pub fn slide_table_lock_state(&self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn set_slide_table_lock_state(&mut self, slide_index: usize, model_id: u64, state: State) {}\n"
+                "fn raw() { editor.slide_table_lock_state(0, 7); editor.set_slide_table_lock_state(0, 7, state); }\n",
+                encoding="utf-8",
+            )
+            sort = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
+            sort.parent.mkdir(parents=True, exist_ok=True)
+            sort.write_text(
+                "fn physical() { editor.apply_slide_table_sort_order(0, 7); }\n"
+                "fn focused() { package.slide_table_lock_state(slide, table); }\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXAMPLE_ROOT / "create_keynote_table_locks.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create() { keynote.set_slide_table_lock_state(0, 7, state); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_lock_state_source_topology(
+                root
+            )
+            self.assertTrue(any("source returned" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-lock method" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-lock call" in item for item in violations), violations)
+            self.assertTrue(any("raw helper/import" in item for item in violations), violations)
+            self.assertTrue(any("example call" in item for item in violations), violations)
+            self.assertFalse(any("apply_slide_table_sort_order" in item for item in violations), violations)
+
+            retired.unlink()
+            sort.write_text(
+                "fn physical() { editor.apply_slide_table_sort_order(0, 7); editor.apply_slide_table_sort_order_to_rows(0, 7, rows); }\n"
+                "fn focused() { package.slide_table_lock_state(slide, table); package.edit_slide_table_lock_state(slide, table); }\n",
+                encoding="utf-8",
+            )
+            example.write_text(
+                "fn create() { package.edit_slide_table_lock_state(slide, table); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_lock_state_source_topology(root),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_lock_state_requires_focused_call_and_checks_sort_helper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_lock_state_canonical_scaffold(root)
+            sort = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
+            sort.parent.mkdir(parents=True, exist_ok=True)
+            sort.write_text(
+                "fn physical() { editor.apply_slide_table_sort_order(0, 7); crate::table_lock::table_lock_state(package, name, 7, \"Keynote\"); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_lock_state_source_topology(
+                root
+            )
+            self.assertTrue(any("raw helper/import" in item for item in violations), violations)
+            self.assertTrue(any("must call the focused litchi-keynote Package" in item for item in violations), violations)
+            sort.write_text(
+                "fn physical() { editor.apply_slide_table_sort_order(0, 7); }\n"
+                "fn focused() { package.slide_table_lock_state(slide, table); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_lock_state_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_lock_state_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_lock_state_facade_source_topology()",
+            "+ audit_iwa_keynote_slide_table_lock_state_source_topology()",
         ):
             self.assertIn(expression, main_source)
 
@@ -13871,6 +14208,27 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("mixed_iwork.rs" in item for item in violations), violations)
             self.assertFalse(any("appearance.rs" in item or "graph.rs" in item or "tests.rs" in item or "numbers_branch" in item for item in violations), violations)
             self.assertFalse(any("test_only" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_appearance_ignores_retired_lock_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            retired_lock = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_SOURCE
+            retired_lock.parent.mkdir(parents=True, exist_ok=True)
+            retired_lock.write_text(
+                "pub fn slide_table_appearance(&self) {}\n"
+                "fn raw() { editor.set_slide_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(root),
+                [],
+            )
+            retired_lock.unlink()
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(root),
+                [],
+            )
 
     def test_keynote_slide_table_appearance_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)

@@ -2644,6 +2644,49 @@ placeholder, note, text-storage, shape, and slide-node payloads through
 schema-bounded wire paths, preserving unknown fields at every ancestor and
 inside the remapped references themselves.
 
+### Keynote slide-table persisted lock state uses the focused package owner
+
+Persisted slide-table lock reads and exact lock-state transactions are owned by
+`litchi-keynote::Package::{slide_table_lock_state,
+edit_slide_table_lock_state, apply_slide_table_lock_state}`. The public
+`State` and transaction values are archive-free; native IDs, Archive/ZIP/member
+values, raw wire views, and generated/Prost/Buffa types stay private. Strict
+`table_info_codec` admission and prepared lock rewriting preserve unrelated
+fields, admit exact lock and unlock transitions, and fail closed for malformed,
+ambiguous, or unsupported sources.
+
+Raw Keynote title, persisted-sort, and persisted-lock configuration methods and
+calls are retired from the legacy editor host. `litchi-iwa` retains the
+physical `Sort Now` row executor, but it runs only after focused Package
+persisted `Order` and lock admission. There is no lock fallback: every focused
+lock error propagates. Physical rows/cells, storage, formulas, tiles, and
+broader table compatibility remain legacy host responsibilities.
+
+The scoped gates are 17/17 for the lock codec, 9/9 for focused Keynote lock
+integration, 30/30 for the IWA slide-table suite, four migrated Keynote example
+checks, and 625/625 boundary tests with passing `py_compile`. Strict
+Keynote/protos checks and Clippy passed, as did both isolated fuzz checks with
+15 codec seeds and eight lifecycle command seeds. Scoped title/sort/lock audits
+are empty; the live full checker still reports only three unrelated untracked
+Pages table-lock violations. No full-workspace-green claim follows.
+
+One actual temporary-driver attempt used
+`/private/tmp/wave100-native-table-headers-source.key` (500,128 bytes,
+SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`, 86
+members). Strict Package lock read at slide 0/table 0 returned `InvalidSource`
+before mutation; source bytes/hash stayed exact, no candidate or inverse was
+emitted, and no UI run occurred. Native lock mutation/save/reopen acceptance is
+withheld.
+
+The operation ledger is conservative logical accounting, not Package or
+SourceCatalog cache/decompressed-Archive, allocator/RSS, or codec-internal
+allocator telemetry; no zero-copy or RSS claim follows. Wave105 closes no
+crate, manifest dependency, dependency edge, or migration debt. The
+`litchi-iwa -> litchi-keynote` edge, all 13 ordered debts (including 014, 015,
+016, and 017), generated/Prost/Buffa owners, and the IWA monolith deletion gate
+remain unchanged.
+
 ## Embedded media
 
 Single-file packages and in-memory bytes expose their `Data/*` members. The

@@ -61,9 +61,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    editor.set_slide_table_title_settings(
-        0,
-        table.model_object_id,
+    editor = set_focused_keynote_table_title(
+        editor,
         KeynoteTableTitleSettings::new(Some(true), Some(true)),
     )?;
     for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {
@@ -121,6 +120,23 @@ fn set_focused_keynote_table_headers(
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(KeynoteEditor::from_bytes(&bytes)?)
+}
+
+fn set_focused_keynote_table_title(
+    editor: KeynoteEditor,
+    settings: KeynoteTableTitleSettings,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_table_title(
             litchi_keynote::SlideSelector::index(0),
             litchi_keynote::TableSelector::index(0),
         )?

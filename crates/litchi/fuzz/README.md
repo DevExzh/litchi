@@ -42,6 +42,16 @@ package/semantic limits. The target uses no private native fixture and never
 writes a package to disk; the checked-in package corpora and command recipes
 under `corpus/keynote_slide_table_headers/` are deliberately small.
 
+`keynote_slide_table_lock_state` is the focused selector-first slide-table
+lock lifecycle target. It offers arbitrary bytes to bounded Keynote ingress
+and replays a bounded command prefix against the source-built and locked table
+packages used by the header target. It covers positional and name selectors,
+unlocked/locked reads, exact no-op and changed lock transactions, diagnostics,
+candidate reread, exact-source apply/conflict/inverse replay, and source-byte
+atomicity. The command recipes under
+`corpus/keynote_slide_table_lock_state/` contain no native package bytes; the
+small package inputs are reused from the checked-in header corpus.
+
 `keynote_slide_table_appearance` is the focused selector-first slide-table
 appearance target. It offers arbitrary bytes to bounded Keynote ingress and
 interprets a finite `hex:`-decodable command stream against source-built
@@ -427,6 +437,14 @@ packages and command recipes:
 ```sh
 cargo +nightly fuzz run keynote_slide_table_headers \
   corpus/keynote_slide_table_headers -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote slide-table-lock target with its command recipes:
+
+```sh
+cargo +nightly fuzz run keynote_slide_table_lock_state \
+  corpus/keynote_slide_table_lock_state -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 

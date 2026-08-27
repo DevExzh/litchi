@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut keynote = KeynoteDocumentBuilder::new()
         .title("Locked native table")
         .build()?;
-    let keynote_table = keynote.add_slide_table(
+    keynote.add_slide_table(
         0,
         "Locked Table",
         4,
@@ -73,15 +73,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 480.0,
         },
     )?;
-    keynote.set_slide_table_lock_state(
-        0,
-        keynote_table.drawable_object_id,
-        LegacyTableLockState::Locked,
+    let focused_keynote = litchi_keynote::Package::from_bytes(&keynote.to_bytes()?)?;
+    let mut lock = focused_keynote.edit_slide_table_lock_state(
+        litchi_keynote::SlideSelector::index(0),
+        litchi_keynote::TableSelector::index(0),
     )?;
+    lock.lock();
+    let locked_keynote = lock.commit()?;
+    let mut keynote_bytes = Vec::new();
+    locked_keynote.package().write_to(&mut keynote_bytes)?;
+    keynote = KeynoteEditor::from_bytes(&keynote_bytes)?;
     keynote.save(&keynote_path)?;
     assert_eq!(
-        KeynoteEditor::open(&keynote_path)?
-            .slide_table_lock_state(0, keynote_table.drawable_object_id)?,
+        litchi_keynote::Package::open(&keynote_path)?.slide_table_lock_state(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?,
         LegacyTableLockState::Locked
     );
     Ok(())

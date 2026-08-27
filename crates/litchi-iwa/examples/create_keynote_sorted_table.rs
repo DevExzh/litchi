@@ -74,9 +74,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         1,
         "Keynote keeps this thread intact",
     )?;
-    editor.set_slide_table_sort_order(
-        0,
-        table.model_object_id,
+    editor = set_focused_keynote_table_sort_order(
+        editor,
         Order::new([Rule::new(ColumnIndex::new(0)?, Direction::Ascending)])?,
     )?;
     if !editor.apply_slide_table_sort_order(0, table.model_object_id)? {
@@ -110,6 +109,23 @@ fn set_focused_keynote_table_headers(
             litchi_keynote::TableSelector::index(0),
         )?
         .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(KeynoteEditor::from_bytes(&bytes)?)
+}
+
+fn set_focused_keynote_table_sort_order(
+    editor: KeynoteEditor,
+    order: Order,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_table_sort_order(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?
+        .set(order)
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
