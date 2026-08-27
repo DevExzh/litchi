@@ -32,11 +32,13 @@ const MAX_TABLES: usize = 512;
 const MAX_REFERENCES: usize = 8 * 1024;
 const MAX_MATERIALIZED_CELLS: usize = 64 * 1024;
 const MAX_TEXT_BYTES: usize = 512 * 1024;
+const MAX_COMMAND_BYTES: usize = 1024;
 const PRIVATE_SELECTOR: &str = "__litchi_private_numbers_appearance_selector_80a1__";
 const PRIVATE_MALFORMED_INPUT: &[u8] = b"__litchi_private_numbers_appearance_input_80a1__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
 
 fuzz_target!(|data: &[u8]| {
+    let command = command_input(data);
     match Package::from_bytes_with_options(data, fuzz_options()) {
         Ok(package) => exercise_package(&package, data),
         Err(error) => observe_error(error),
@@ -44,10 +46,54 @@ fuzz_target!(|data: &[u8]| {
 
     // CRC-protected native bytes keep arbitrary package mutations shallow.
     // Always run the same bounded command sequence against the valid seed.
-    exercise_package(native_package(), data);
+    exercise_package(native_package(), &command);
     exercise_redacted_malformed_ingress();
     exercise_input_limit();
 });
+
+/// Decode checked-in command recipes without changing the package-ingress
+/// input.  A recipe is a command stream, never a package fixture; arbitrary
+/// bytes still take the normal bounded ingress path above.
+fn command_input(data: &[u8]) -> Vec<u8> {
+    if let Some(encoded) = data.strip_prefix(b"hex:") {
+        return decode_hex(encoded).unwrap_or_default();
+    }
+    data.get(..data.len().min(MAX_COMMAND_BYTES))
+        .unwrap_or(data)
+        .to_vec()
+}
+
+fn decode_hex(encoded: &[u8]) -> Option<Vec<u8>> {
+    if encoded.len() > MAX_COMMAND_BYTES.saturating_mul(2).saturating_add(16) {
+        return None;
+    }
+    let mut output = Vec::with_capacity(encoded.len() / 2);
+    let mut high = None;
+    for byte in encoded.iter().copied() {
+        if byte.is_ascii_whitespace() {
+            continue;
+        }
+        let nibble = hex_nibble(byte)?;
+        if let Some(high_nibble) = high.take() {
+            output.push((high_nibble << 4) | nibble);
+            if output.len() > MAX_COMMAND_BYTES {
+                return None;
+            }
+        } else {
+            high = Some(nibble);
+        }
+    }
+    high.is_none().then_some(output)
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
 
 fn fuzz_options() -> PackageReadOptions {
     static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();

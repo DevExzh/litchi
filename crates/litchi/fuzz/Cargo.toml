@@ -47,6 +47,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_slide_table_appearance"
+path = "fuzz_targets/keynote_slide_table_appearance.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_movie_playback"
 path = "fuzz_targets/keynote_movie_playback.rs"
 test = false

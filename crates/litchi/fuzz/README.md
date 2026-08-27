@@ -42,6 +42,16 @@ package/semantic limits. The target uses no private native fixture and never
 writes a package to disk; the checked-in package corpora and command recipes
 under `corpus/keynote_slide_table_headers/` are deliberately small.
 
+`keynote_slide_table_appearance` is the focused selector-first slide-table
+appearance target. It offers arbitrary bytes to bounded Keynote ingress and
+interprets a finite `hex:`-decodable command stream against source-built
+Keynote table packages. It covers archive-free appearance reads, no-op and
+complete set transactions, exact-source apply/conflict/inverse replay,
+candidate reopen/readback, positional/name selector failures, redacted
+errors, source-byte atomicity, and bounded package/semantic limits. The
+command recipes under `corpus/keynote_slide_table_appearance/` are not native
+package fixtures and the target never writes a package to disk.
+
 `keynote_chart_title` is the focused selector-first chart-title target. It
 drives tiny source-built packages through positional and exact-name chart
 selectors, visible-empty and hidden-stale title states, set/clear/no-op
@@ -230,6 +240,11 @@ semantic profile. Header commands consume only a fixed seven-field prefix;
 keep `-max_len` at 4 KiB so malformed ingress and both source-built package
 variants receive every command stream.
 
+`keynote_slide_table_appearance` uses the same finite Keynote physical and
+semantic profile. Appearance commands consume at most 1 KiB after optional
+`hex:` decoding; keep `-max_len` at 4 KiB so malformed ingress and each
+source-built package receive every command stream.
+
 `keynote_chart_title` uses the same finite Keynote physical and semantic
 profile. Chart-title command bytes consume at most 1 KiB; keep `-max_len` at
 1 KiB so malformed ingress and every source-built chart transaction receive
@@ -400,6 +415,14 @@ packages and command recipes:
 ```sh
 cargo +nightly fuzz run keynote_slide_table_headers \
   corpus/keynote_slide_table_headers -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote slide-table-appearance target with its command seeds:
+
+```sh
+cargo +nightly fuzz run keynote_slide_table_appearance \
+  corpus/keynote_slide_table_appearance -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 

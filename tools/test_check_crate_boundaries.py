@@ -1537,6 +1537,143 @@ def add_iwa_keynote_slide_table_listing_appearance_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_appearance_canonical_scaffold(
+    root: Path,
+    *,
+    include_codec: bool = True,
+    include_fuzz: bool = True,
+    include_tests: bool = True,
+) -> None:
+    """Install the smallest complete Wave103 appearance-owner fixture."""
+
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub use crate::package::slide_table_appearance::{\n"
+        "        SlideTableAppearanceCommit as Commit,\n"
+        "        SlideTableAppearanceDiagnostics as Diagnostics,\n"
+        "        SlideTableAppearanceEdit as Edit,\n"
+        "        SlideTableAppearanceError as Error,\n"
+        "        SlideTableAppearanceLimitKind as LimitKind,\n"
+        "        SlideTableAppearancePatch as Patch,\n"
+        "        SlideTableAppearancePath as Path,\n"
+        "    };\n"
+        "}\n"
+        "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, "
+        "GridlineVisibility, Gridlines, RowSizing};\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector { pub fn index(index: usize) -> Self { let _ = index; Self } }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES
+        )
+        + ""
+        + "".join(
+            f"fn marker_{index}() {{ {' '.join(markers)} }}\n"
+            for index, markers in enumerate(
+                boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_MARKER_GROUPS.values()
+            )
+        )
+        + "fn preserve_previews() { let deleted_previews = 0; }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_table_appearance<'slide, 'table>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector<'table>>) -> Result<Appearance, SlideTableAppearanceError> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn edit_slide_table_appearance<'slide, 'table>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector<'table>>) -> Result<SlideTableAppearanceEdit, SlideTableAppearanceError> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn apply_slide_table_appearance(&self, patch: &SlideTableAppearancePatch) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableAppearanceEdit {\n"
+        + "    pub fn path(&self) -> SlideTableAppearancePath { todo!() }\n"
+        + "    pub fn appearance(&self) -> Appearance { todo!() }\n"
+        + "    pub fn set(self, appearance: Appearance) -> Self { let _ = appearance; self }\n"
+        + "    pub fn commit(self) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    package = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_EXPORT_SOURCES[0]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_table_appearance;\n"
+        "pub use slide_table_appearance::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+    lib.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n",
+        encoding="utf-8",
+    )
+    if include_codec:
+        codec = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CODEC_SOURCE
+        codec.parent.mkdir(parents=True, exist_ok=True)
+        codec.write_text(
+            "pub struct DecodeOptions;\n"
+            "pub struct DecodeError;\n"
+            "pub struct AppearanceSnapshot;\n"
+            "pub struct TableModelSnapshot;\n"
+            "pub struct PreparedRewrite;\n"
+            "pub type PreparedTableModelStyleRewrite<'a> = PreparedRewrite;\n"
+            "pub struct RewriteExecutionRequirements;\n"
+            "pub struct RewriteExecutionLimits;\n"
+            "pub fn decode_table_model_with_report() {}\n"
+            "pub fn prepare_table_model_style_rewrite() {}\n"
+            "pub fn canonical_table_style_variation() {}\n"
+            "pub fn append_stylesheet_style() {}\n"
+            "pub fn resolve_table_style_appearance() {}\n"
+            "fn scan_group_fields() {}\n"
+            "fn find_group_end() {}\n"
+            "fn copy_from_slice() {}\n"
+            "fn prepare_execution_requirements_execute() {}\n"
+            "fn max_input_bytes() {} fn max_output_bytes() {} fn max_fields() {}\n"
+            "fn max_work_bytes() {} fn max_allocations() {}\n"
+            "#[cfg(test)]\n"
+            "mod tests { #[test] fn strict_appearance_roundtrip() {} }\n",
+            encoding="utf-8",
+        )
+        codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE
+        codec_lib.parent.mkdir(parents=True, exist_ok=True)
+        codec_lib.write_text(
+            "#[doc(hidden)]\n"
+            "pub mod table_appearance_codec;\n",
+            encoding="utf-8",
+        )
+    if include_tests:
+        integration = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_TEST_SOURCES[0]
+        integration.parent.mkdir(parents=True, exist_ok=True)
+        integration.write_text(
+            "#[test]\n"
+            "fn exercises_owner() { slide_table_appearance(); edit_slide_table_appearance(); apply_slide_table_appearance(); }\n",
+            encoding="utf-8",
+        )
+    if include_fuzz:
+        for fuzz_path in boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_FUZZ_SOURCES:
+            absolute = root / fuzz_path
+            absolute.parent.mkdir(parents=True, exist_ok=True)
+            absolute.write_text(
+                "#![no_main]\n"
+                "use libfuzzer_sys::fuzz_target;\n"
+                "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+                encoding="utf-8",
+            )
+        for corpus in boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_FUZZ_CORPORA:
+            (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -13421,6 +13558,196 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_keynote_slide_table_headers_source_topology()",
             "+ audit_keynote_slide_table_headers_facade_source_topology()",
             "+ audit_keynote_slide_table_headers_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_appearance_boundary_is_dormant_until_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_appearance_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_appearance_resource_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_appearance_boundary_accepts_complete_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_appearance_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_appearance_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_appearance_requires_selector_codec_and_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "SlideSelector<'slide>", "MissingSelector<'slide>", 1
+                ),
+                encoding="utf-8",
+            )
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "prepare_table_model_style_rewrite",
+                    "missing_prepare_table_model_style_rewrite",
+                ).replace(
+                    "scan_group_fields",
+                    "group_scan_disabled",
+                ),
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8").replace(
+                    "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};",
+                    "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines};",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("selector-first SlideSelector" in item for item in violations), violations)
+            self.assertTrue(any("prepare_table_model_style_rewrite" in item for item in violations), violations)
+            self.assertTrue(any("canonical unknown preservation" in item for item in violations), violations)
+            self.assertTrue(any("semantic API is missing RowSizing" in item for item in violations), violations)
+
+    def test_keynote_slide_table_appearance_rejects_public_leaks_and_masks_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableAppearanceEdit = Edit;\n"
+                + "pub fn raw_appearance(model_id: u64, source_bytes: &[u8], wire: WireView, archive: Archive, generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n"
+                + "// pub fn decoy(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub fn decoy(model_id: u64, bytes: &[u8])";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn test_only(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_appearance_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "flat alias TableAppearanceEdit",
+                "raw parameter model_id: u64",
+                "raw byte slice &[u8]",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), (fragment, violations))
+            self.assertFalse(any("decoy" in item or "test_only" in item for item in violations), violations)
+
+    def test_keynote_slide_table_appearance_resource_markers_and_scope_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_MARKER_GROUPS[
+                "metadata ownership"
+            ]:
+                source = source.replace(marker, "missing_marker")
+            source = source.replace("deleted_previews = 0", "deleted_previews = 1")
+            source += (
+                "fn move_rows() {}\n"
+                "fn rewrite_formula() {}\n"
+                "fn delete_previews() {}\n"
+                "fn rewrite_table_model_style() {}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_appearance_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("metadata ownership" in item for item in violations), violations)
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+            self.assertTrue(any("row/cell movement" in item for item in violations), violations)
+            self.assertTrue(any("formula/tile mutation" in item for item in violations), violations)
+            self.assertTrue(any("preview deletion" in item for item in violations), violations)
+            self.assertTrue(any("one-shot style rewrite" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_appearance_host_retirement_masks_and_scopes_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            # The focused bridge is the deliberate compatibility seam.  Its
+            # deprecated shell and package calls must remain admissible, as
+            # must the old read-only graph projection.
+            bridge = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/appearance.rs"
+            bridge.parent.mkdir(parents=True, exist_ok=True)
+            bridge.write_text(
+                "use crate::table_appearance::table_appearance;\n"
+                "pub fn slide_table_appearance(&self) {}\n"
+                "pub fn set_slide_table_appearance(&self) {}\n"
+                "fn bridge() { package.slide_table_appearance(); package.edit_slide_table_appearance(); }\n"
+                "// editor.set_table_appearance()\n"
+                'const DOC: &str = "editor.set_table_appearance()";\n'
+                "#[cfg(test)]\n"
+                "fn test_only() { editor.set_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            graph = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/graph.rs"
+            graph.write_text(
+                "fn compatibility_read() { let _ = crate::table_appearance::table_appearance(editor.package(), 1); }\n",
+                encoding="utf-8",
+            )
+            # A raw writer outside the bridge remains forbidden, including a
+            # call whose receiver happens to be named `package`.
+            legacy = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/raw.rs"
+            legacy.write_text(
+                "use crate::table_appearance::TableAppearance;\n"
+                "pub fn set_slide_table_appearance(&self) {}\n"
+                "fn production() { package.set_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            tests = root / "crates/litchi-iwa/src/keynote/editor/tests.rs"
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "fn compatibility() { editor.set_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_APPEARANCE_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "mixed_iwork.rs").write_text(
+                "fn keynote_branch() { keynote.set_table_appearance(); }\n"
+                "fn numbers_branch() { numbers.set_table_appearance(); }\n"
+                "fn package_branch() { package.slide_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_appearance_source_topology(root)
+            self.assertTrue(any("retired litchi-iwa Keynote slide-table-appearance method set_slide_table_appearance" in item for item in violations), violations)
+            self.assertTrue(any("raw.rs" in item and "call set_table_appearance" in item for item in violations), violations)
+            self.assertTrue(any("mixed_iwork.rs" in item for item in violations), violations)
+            self.assertFalse(any("appearance.rs" in item or "graph.rs" in item or "tests.rs" in item or "numbers_branch" in item for item in violations), violations)
+            self.assertFalse(any("test_only" in item for item in violations), violations)
+
+    def test_keynote_slide_table_appearance_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_slide_table_appearance_source_topology()",
+            "+ audit_keynote_slide_table_appearance_facade_source_topology()",
+            "+ audit_keynote_slide_table_appearance_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

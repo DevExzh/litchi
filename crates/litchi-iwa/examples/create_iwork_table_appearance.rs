@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut keynote = KeynoteDocumentBuilder::new()
         .title("Native table appearance")
         .build()?;
-    let keynote_table = keynote.add_slide_table(
+    let _keynote_table = keynote.add_slide_table(
         0,
         "Appearance",
         6,
@@ -107,11 +107,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    keynote.set_slide_table_appearance(0, keynote_table.model_object_id, APPEARANCE)?;
+    keynote = set_focused_keynote_table_appearance(keynote, APPEARANCE)?;
     keynote.save(&keynote_path)?;
+    let keynote_package =
+        litchi_keynote::Package::from_bytes(&KeynoteEditor::open(&keynote_path)?.to_bytes()?)?;
     assert_eq!(
-        KeynoteEditor::open(&keynote_path)?
-            .slide_table_appearance(0, keynote_table.model_object_id)?,
+        keynote_package.slide_table_appearance(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?,
         APPEARANCE
     );
     Ok(())
@@ -171,6 +175,23 @@ fn set_focused_keynote_table_headers(
             litchi_keynote::TableSelector::index(0),
         )?
         .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(KeynoteEditor::from_bytes(&bytes)?)
+}
+
+fn set_focused_keynote_table_appearance(
+    editor: KeynoteEditor,
+    appearance: Appearance,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_table_appearance(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?
+        .set(appearance)
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;

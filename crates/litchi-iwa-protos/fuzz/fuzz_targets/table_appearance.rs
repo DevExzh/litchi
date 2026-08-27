@@ -238,49 +238,57 @@ fn exercise_style_network(source: &[u8], before: &[u8]) {
 }
 
 fn exercise_preset_limits(source: &[u8], report: codec::DecodeReport) {
-    let fields = report.fields().saturating_sub(1);
-    let error = codec::decode_table_style_preset_with_report(
-        source,
-        options(source).with_max_fields(fields),
-    )
-    .expect_err("preset fields max-minus-one was accepted");
-    assert!(matches!(
-        error.resource_limit(),
-        Some(codec::DecodeLimit::Fields { .. })
-    ));
+    if report.fields() > 0 {
+        let fields = report.fields() - 1;
+        let error = codec::decode_table_style_preset_with_report(
+            source,
+            options(source).with_max_fields(fields),
+        )
+        .expect_err("preset fields max-minus-one was accepted");
+        assert!(matches!(
+            error.resource_limit(),
+            Some(codec::DecodeLimit::Fields { .. })
+        ));
+    }
 
-    let work = report.work_bytes().saturating_sub(1);
-    let error = codec::decode_table_style_preset_with_report(
-        source,
-        options(source).with_max_work_bytes(work),
-    )
-    .expect_err("preset work max-minus-one was accepted");
-    assert!(matches!(
-        error.resource_limit(),
-        Some(codec::DecodeLimit::WorkBytes { .. })
-    ));
+    if report.work_bytes() > 0 {
+        let work = report.work_bytes() - 1;
+        let error = codec::decode_table_style_preset_with_report(
+            source,
+            options(source).with_max_work_bytes(work),
+        )
+        .expect_err("preset work max-minus-one was accepted");
+        assert!(matches!(
+            error.resource_limit(),
+            Some(codec::DecodeLimit::WorkBytes { .. })
+        ));
+    }
 
-    let depth = report.max_depth().saturating_sub(1);
-    let error = codec::decode_table_style_preset_with_report(
-        source,
-        options(source).with_recursion_limit(depth),
-    )
-    .expect_err("preset nesting max-minus-one was accepted");
-    assert!(matches!(
-        error.resource_limit(),
-        Some(codec::DecodeLimit::Nesting { .. })
-    ));
+    if report.max_depth() > 0 {
+        let depth = report.max_depth() - 1;
+        let error = codec::decode_table_style_preset_with_report(
+            source,
+            options(source).with_recursion_limit(depth),
+        )
+        .expect_err("preset nesting max-minus-one was accepted");
+        assert!(matches!(
+            error.resource_limit(),
+            Some(codec::DecodeLimit::Nesting { .. })
+        ));
+    }
 
-    let input = source.len().saturating_sub(1);
-    let error = codec::decode_table_style_preset_with_report(
-        source,
-        options(source).with_max_input_bytes(input),
-    )
-    .expect_err("preset input max-minus-one was accepted");
-    assert!(matches!(
-        error.resource_limit(),
-        Some(codec::DecodeLimit::InputBytes { .. })
-    ));
+    if !source.is_empty() {
+        let input = source.len() - 1;
+        let error = codec::decode_table_style_preset_with_report(
+            source,
+            options(source).with_max_input_bytes(input),
+        )
+        .expect_err("preset input max-minus-one was accepted");
+        assert!(matches!(
+            error.resource_limit(),
+            Some(codec::DecodeLimit::InputBytes { .. })
+        ));
+    }
 }
 
 fn exercise_network_limits(source: &[u8], report: codec::DecodeReport) {

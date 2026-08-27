@@ -30,3 +30,9 @@ coverage
 !/corpus/numbers_table_cell_comment_reply/
 /corpus/numbers_table_cell_comment_reply/*
 !/corpus/numbers_table_cell_comment_reply/*.seed
+!/corpus/numbers_table_appearance/
+/corpus/numbers_table_appearance/*
+!/corpus/numbers_table_appearance/*.hex
+!/corpus/keynote_slide_table_appearance/
+/corpus/keynote_slide_table_appearance/*
+!/corpus/keynote_slide_table_appearance/*.hex
