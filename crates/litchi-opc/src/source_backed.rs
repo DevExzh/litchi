@@ -494,7 +494,7 @@ impl SourceTopologyPlan {
 #[derive(Debug)]
 struct TopologyRelationshipPublication {
     member_name: String,
-    xml: Arc<Vec<u8>>,
+    xml: Vec<u8>,
     existing_entry: Option<EntryId>,
     relationship_count: usize,
 }
@@ -511,7 +511,26 @@ struct PhysicalMemberLookup {
 
 struct ChangedOverlay {
     target: ChangedOverlayTarget,
-    replacement: Arc<Vec<u8>>,
+    replacement: ChangedOverlayPayload,
+}
+
+#[derive(Debug)]
+enum ChangedOverlayPayload {
+    Shared(Arc<Vec<u8>>),
+    Owned(Vec<u8>),
+}
+
+impl ChangedOverlayPayload {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Shared(bytes) => bytes.as_slice(),
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
 }
 
 enum ChangedOverlayTarget {
@@ -3078,6 +3097,9 @@ impl SourceBackedPackage {
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
         self.check_topology_progress()?;
+        if !additions.is_empty() && self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
         let (physical_members, _physical_member_memory) = self.build_physical_member_lookup()?;
         let content_types_key = folded_ascii_name(
             &self.content_types_member,
@@ -3120,6 +3142,23 @@ impl SourceBackedPackage {
                 .iter()
                 .map(|overlay| (overlay.target, overlay.replacement.len())),
         )?;
+        if additions.is_empty() {
+            let mut changed_replacement = false;
+            for (index, replacement) in pending_replacements.iter().enumerate() {
+                if index & 0x3f == 0 {
+                    self.check_topology_progress()?;
+                }
+                if self.read_part(replacement.target)?.as_bytes()
+                    != replacement.replacement.as_slice()
+                {
+                    changed_replacement = true;
+                    break;
+                }
+            }
+            if changed_replacement && self.has_signature_infrastructure() {
+                return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+            }
+        }
 
         // Build the source/new Part namespace with the same duplicate,
         // equivalent, and derived-name rules used by package ingestion.
@@ -3308,6 +3347,9 @@ impl SourceBackedPackage {
                             reltype,
                             &target_ref,
                         )?;
+                        if self.has_signature_infrastructure() {
+                            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+                        }
                         owner_relationships.try_add_relationship(
                             reltype.clone(),
                             target_ref,
@@ -3347,6 +3389,9 @@ impl SourceBackedPackage {
                         {
                             continue;
                         }
+                        if self.has_signature_infrastructure() {
+                            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+                        }
                         let removed = owner_relationships.remove(&relationship.r_id);
                         debug_assert!(removed.is_some());
                         owner_relationships.try_add_relationship(
@@ -3370,6 +3415,9 @@ impl SourceBackedPackage {
                                 "relationship '{}' does not have the required target mode",
                                 relationship.r_id
                             )));
+                        }
+                        if self.has_signature_infrastructure() {
+                            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
                         }
                         let removed = owner_relationships.remove(&relationship.r_id);
                         debug_assert!(removed.is_some());
@@ -3401,7 +3449,7 @@ impl SourceBackedPackage {
             }
             let existing_entry =
                 self.source_entry_id_case_insensitive(&member_name, &physical_members)?;
-            let xml = owner_relationships.to_xml().into_bytes();
+            let xml = owner_relationships.try_to_xml_bytes()?;
             self.limits.check(
                 ReadResource::RelationshipXmlBytes,
                 xml.len() as u64,
@@ -3415,13 +3463,13 @@ impl SourceBackedPackage {
                     .map_err(map_preservation_error)?;
                 self.source.ensure_current()?;
                 let canonical = if owner.as_str() == PACKAGE_URI {
-                    self.package_relationships.to_xml()
+                    self.package_relationships.try_to_xml_bytes()?
                 } else if let Some(index) = owner_index {
-                    self.parts[index].relationships.to_xml()
+                    self.parts[index].relationships.try_to_xml_bytes()?
                 } else {
-                    Relationships::for_source(&owner).to_xml()
+                    Relationships::for_source(&owner).try_to_xml_bytes()?
                 };
-                if original.as_slice() != canonical.as_bytes() {
+                if original.as_slice() != canonical.as_slice() {
                     return Err(overlay_unavailable(format!(
                         "existing relationships member '{}' is not canonical",
                         member_name
@@ -3430,7 +3478,7 @@ impl SourceBackedPackage {
             }
             relationship_publications.push(TopologyRelationshipPublication {
                 member_name,
-                xml: Arc::new(xml),
+                xml,
                 existing_entry,
                 relationship_count,
             });
@@ -3630,24 +3678,24 @@ impl SourceBackedPackage {
             }
             changed.push(ChangedOverlay {
                 target: ChangedOverlayTarget::Part(replacement.target),
-                replacement: Arc::clone(&replacement.replacement),
+                replacement: ChangedOverlayPayload::Shared(Arc::clone(&replacement.replacement)),
             });
         }
-        for (index, publication) in relationship_publications.iter().enumerate() {
+        for (index, publication) in relationship_publications.iter_mut().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
             if publication.existing_entry.is_some() {
                 changed.push(ChangedOverlay {
                     target: ChangedOverlayTarget::Member(publication.member_name.clone()),
-                    replacement: Arc::clone(&publication.xml),
+                    replacement: ChangedOverlayPayload::Owned(std::mem::take(&mut publication.xml)),
                 });
             }
         }
         if let Some(content_types) = &content_types_replacement {
             changed.push(ChangedOverlay {
                 target: ChangedOverlayTarget::Member(self.content_types_member.clone()),
-                replacement: Arc::clone(content_types),
+                replacement: ChangedOverlayPayload::Shared(Arc::clone(content_types)),
             });
         }
 
@@ -3704,21 +3752,18 @@ impl SourceBackedPackage {
                 .compression_method(soapberry_zip::CompressionMethod::Deflate),
             );
         }
-        for (index, publication) in relationship_publications.iter().enumerate() {
+        for (index, publication) in relationship_publications.into_iter().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
             if publication.existing_entry.is_none() {
                 appended.push(
-                    soapberry_zip::RegeneratedEntry::new_shared(
-                        &publication.member_name,
-                        Arc::clone(&publication.xml),
-                    )
-                    .compression_method(soapberry_zip::CompressionMethod::Deflate),
+                    soapberry_zip::RegeneratedEntry::new(publication.member_name, publication.xml)
+                        .compression_method(soapberry_zip::CompressionMethod::Deflate),
                 );
             }
         }
-        self.write_changed_overlays_with_appended(writer, &changed, &appended)
+        self.write_changed_overlays_with_appended(writer, &changed, appended)
     }
 
     fn topology_relationship_target_ref(
@@ -3902,13 +3947,13 @@ impl SourceBackedPackage {
 
         let changed = [ChangedOverlay {
             target: ChangedOverlayTarget::Part(target),
-            replacement,
+            replacement: ChangedOverlayPayload::Shared(replacement),
         }];
         match accounting {
             Some(accounting) => self.write_changed_overlays_with_appended_accounting(
                 writer,
                 &changed,
-                &[],
+                Vec::new(),
                 accounting,
             ),
             None => self.write_changed_overlays(writer, &changed),
@@ -4014,11 +4059,11 @@ impl SourceBackedPackage {
         let changed = [
             ChangedOverlay {
                 target: ChangedOverlayTarget::Part(target),
-                replacement: Arc::new(replacement),
+                replacement: ChangedOverlayPayload::Shared(Arc::new(replacement)),
             },
             ChangedOverlay {
                 target: ChangedOverlayTarget::Member(relationship_member),
-                replacement: Arc::new(relationship_xml),
+                replacement: ChangedOverlayPayload::Owned(relationship_xml),
             },
         ];
         self.write_changed_overlays(writer, &changed)
@@ -4210,7 +4255,7 @@ impl SourceBackedPackage {
         for (_, _, relationship_member, relationship_xml) in relationship_overlays {
             changed.push(ChangedOverlay {
                 target: ChangedOverlayTarget::Member(relationship_member),
-                replacement: Arc::new(relationship_xml),
+                replacement: ChangedOverlayPayload::Owned(relationship_xml),
             });
         }
 
@@ -4228,7 +4273,7 @@ impl SourceBackedPackage {
             if original.as_bytes() != overlay.replacement.as_slice() {
                 changed.push(ChangedOverlay {
                     target: ChangedOverlayTarget::Part(overlay.target),
-                    replacement: Arc::clone(&overlay.replacement),
+                    replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
                 });
             }
         }
@@ -4376,7 +4421,7 @@ impl SourceBackedPackage {
             }
             replacements.push(ChangedOverlay {
                 target: ChangedOverlayTarget::Part(overlay.target),
-                replacement: Arc::clone(&overlay.replacement),
+                replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
             });
         }
         self.write_changed_overlays(writer, &replacements)
@@ -5121,14 +5166,14 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
     ) -> Result<()> {
-        self.write_changed_overlays_with_appended(writer, replacements, &[])
+        self.write_changed_overlays_with_appended(writer, replacements, Vec::new())
     }
 
     fn write_changed_overlays_with_appended<W: Write>(
         self,
         writer: W,
         replacements: &[ChangedOverlay],
-        appended: &[soapberry_zip::RegeneratedEntry],
+        appended: Vec<soapberry_zip::RegeneratedEntry>,
     ) -> Result<()> {
         self.write_changed_overlays_with_appended_inner(writer, replacements, appended, None)
     }
@@ -5137,7 +5182,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: &[ChangedOverlay],
-        appended: &[soapberry_zip::RegeneratedEntry],
+        appended: Vec<soapberry_zip::RegeneratedEntry>,
         accounting: &mut OpcOperationAccounting,
     ) -> Result<()> {
         self.write_changed_overlays_with_appended_inner(
@@ -5152,7 +5197,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: &[ChangedOverlay],
-        appended: &[soapberry_zip::RegeneratedEntry],
+        appended: Vec<soapberry_zip::RegeneratedEntry>,
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
         self.source.monitor_publication();
@@ -5277,20 +5322,25 @@ impl SourceBackedPackage {
             {
                 let replacement = replacement_lookup[replacement_index].1;
                 let target_name = replacement_member_name(replacement, &self.parts);
+                let compression = entry.compression_method();
+                let regenerated = match &replacement.replacement {
+                    ChangedOverlayPayload::Shared(data) => {
+                        soapberry_zip::RegeneratedEntry::new_shared(target_name, Arc::clone(data))
+                    },
+                    ChangedOverlayPayload::Owned(data) => {
+                        regenerated_owned_entry(target_name, data, compression)?
+                    },
+                };
                 plan.push(soapberry_zip::PreservationAction::Regenerate {
                     id: entry.id(),
-                    entry: soapberry_zip::RegeneratedEntry::new_shared(
-                        target_name,
-                        Arc::clone(&replacement.replacement),
-                    )
-                    .compression_method(entry.compression_method()),
+                    entry: regenerated.compression_method(compression),
                 });
             } else {
                 plan.push(soapberry_zip::PreservationAction::Copy(entry.id()));
             }
         }
         for entry in appended {
-            plan.try_append(entry.clone())
+            plan.try_append(entry)
                 .map_err(|source| OpcError::Allocation {
                     resource: "source-backed OPC preservation appended member",
                     source,
@@ -5884,6 +5934,34 @@ fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(
         })?;
     output.extend_from_slice(bytes);
     Ok(())
+}
+
+fn regenerated_owned_entry(
+    name: &str,
+    bytes: &[u8],
+    compression: soapberry_zip::CompressionMethod,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    let mut owned_name = String::new();
+    owned_name
+        .try_reserve_exact(name.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC changed member name",
+            source,
+        })?;
+    owned_name.push_str(name);
+
+    let mut owned_bytes = Vec::new();
+    owned_bytes
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC changed member payload",
+            source,
+        })?;
+    owned_bytes.extend_from_slice(bytes);
+    Ok(
+        soapberry_zip::RegeneratedEntry::new(owned_name, owned_bytes)
+            .compression_method(compression),
+    )
 }
 
 fn push_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<()> {
@@ -7241,7 +7319,7 @@ mod tests {
                 )
                 .unwrap();
         }
-        relationships.to_xml().into_bytes()
+        relationships.try_to_xml_bytes().unwrap()
     }
 
     #[test]
@@ -7340,6 +7418,49 @@ mod tests {
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
         assert_eq!(output, source);
+    }
+
+    #[test]
+    fn topology_signed_noop_copies_and_mutation_refuses_before_output() {
+        const OFFICE_DOCUMENT: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
+        let source = signed_archive(b"<signed/>");
+        let owner = PackURI::new("/").unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut noop = SourceTopologyPlan::new();
+        noop.try_replace_internal_relationship(
+            owner.clone(),
+            "rId1",
+            OFFICE_DOCUMENT,
+            target.clone(),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
+            .unwrap()
+            .write_topology_to_stream(&mut output, noop)
+            .unwrap();
+        assert_eq!(output, source);
+
+        let mut mutation = SourceTopologyPlan::new();
+        mutation
+            .try_replace_internal_relationship(
+                owner,
+                "rId1",
+                OFFICE_DOCUMENT,
+                PackURI::new("/signature/origin.xml").unwrap(),
+            )
+            .unwrap();
+        output.clear();
+        let error = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source)))
+            .unwrap()
+            .write_topology_to_stream(&mut output, mutation)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]
