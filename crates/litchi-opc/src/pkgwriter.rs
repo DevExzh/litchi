@@ -2326,6 +2326,7 @@ mod tests {
         let mut prefixed = b"unsupported ZIP prelude".to_vec();
         prefixed.extend_from_slice(&source);
         let mut package = OpcPackage::from_vec(prefixed.clone()).expect("open prefixed OPC");
+        assert!(package.preservation_source().is_some());
         assert_eq!(
             PackageWriter::to_bytes(&package).expect("exact prefixed copy"),
             prefixed

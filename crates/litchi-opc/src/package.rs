@@ -1169,13 +1169,14 @@ impl PreservationProvenance {
             return None;
         }
 
-        let mut buffer = Vec::new();
-        buffer
-            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
-            .ok()?;
-        buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0_u8);
-        let indexed = archive.clone().into_zip_archive();
-        soapberry_zip::PreservationIndex::new(&indexed, &mut buffer).ok()?;
+        let mut actual_entry_count = 0usize;
+        for entry in archive.entries() {
+            entry.ok()?;
+            actual_entry_count = actual_entry_count.checked_add(1)?;
+        }
+        if actual_entry_count != entry_count {
+            return None;
+        }
 
         let mut parts = HashMap::new();
         parts.try_reserve(package.part_count()).ok()?;
