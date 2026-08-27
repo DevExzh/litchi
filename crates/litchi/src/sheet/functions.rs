@@ -40,6 +40,39 @@ fn checked_owned_xlsx_source_bytes(
     Ok(owned)
 }
 
+#[cfg(feature = "xlsb")]
+fn checked_owned_xlsb_source_bytes(
+    bytes: &[u8],
+    limits: &crate::xlsb::ReadLimits,
+) -> Result<std::sync::Arc<dyn litchi_core::ReadAt>> {
+    let input_bytes = u64::try_from(bytes.len()).map_err(|_| {
+        crate::map_ooxml_error(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: u64::MAX,
+            maximum: limits.max_input_bytes(),
+        })
+    })?;
+    if input_bytes > limits.max_input_bytes() {
+        return Err(Box::new(crate::map_ooxml_error(
+            crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                actual: input_bytes,
+                maximum: limits.max_input_bytes(),
+            },
+        )));
+    }
+
+    let mut owned = Vec::new();
+    owned.try_reserve_exact(bytes.len()).map_err(|source| {
+        crate::map_ooxml_error(crate::opc::OpcError::Allocation {
+            resource: "source-backed XLSB input bytes",
+            source,
+        })
+    })?;
+    owned.extend_from_slice(bytes);
+    Ok(std::sync::Arc::new(litchi_core::OwnedSource::new(owned)))
+}
+
 /// Open a workbook from a file path.
 ///
 /// On Unix and Windows, validates the XLSX OPC catalog and relationship graph
@@ -256,7 +289,13 @@ pub fn open_xlsb_workbook_from_bytes_dyn_with_limits(
     bytes: &[u8],
     limits: crate::xlsb::ReadLimits,
 ) -> Result<Box<dyn WorkbookTrait>> {
-    let workbook = open_xlsb_workbook_from_bytes_with_limits(bytes, limits)?;
+    let source = checked_owned_xlsb_source_bytes(bytes, &limits)?;
+    let workbook = crate::xlsb::SourceBackedWorkbook::from_read_at_with_limits(
+        std::sync::Arc::clone(&source),
+        limits,
+    )
+    .map_err(crate::map_ooxml_error)?;
+    let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook, source, limits)?;
     Ok(Box::new(workbook))
 }
 
