@@ -20,3 +20,13 @@ pub use litchi_iwa_common::table::sort::RowRange;
 pub use litchi_iwa_common::table::sort::Rule;
 /// Rows targeted by a persisted table sort configuration.
 pub use litchi_iwa_common::table::sort::Scope;
+
+/// Transaction types for persisted Keynote slide-table sort configuration.
+pub mod transaction {
+    pub use crate::package::slide_table_sort_order::{
+        SlideTableSortCommit as Commit, SlideTableSortDiagnostics as Diagnostics,
+        SlideTableSortEdit as Edit, SlideTableSortError as Error,
+        SlideTableSortLimitKind as LimitKind, SlideTableSortPatch as Patch,
+        SlideTableSortPath as Path,
+    };
+}

@@ -1542,6 +1542,189 @@ KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS = {
     "object/member locality": ("verify_locality",),
 }
 
+# Wave99 keeps Keynote's physical row-reordering executor in litchi-iwa while
+# moving only the persisted field-44 sort configuration behind a selector-first
+# package facade.  This is deliberately a separate ratchet from the title
+# owner above: a table sort edit must not accidentally become a row/tile/UID,
+# metadata, or physical ``Sort Now`` migration.
+KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "table" / "sort.rs"
+)
+KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table.rs"
+KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_sort_order.rs"
+)
+KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES = frozenset(
+    {
+        "SlideTableSortCommit",
+        "SlideTableSortDiagnostics",
+        "SlideTableSortEdit",
+        "SlideTableSortError",
+        "SlideTableSortLimitKind",
+        "SlideTableSortPatch",
+        "SlideTableSortPath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_TYPES = frozenset(
+    {"ColumnIndex", "Direction", "Order", "RowRange", "Rule", "Scope"}
+)
+KEYNOTE_SLIDE_TABLE_SORT_TRANSACTION_TYPES = frozenset(
+    {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"}
+)
+KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "TableSelector"}
+)
+KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_METHODS = frozenset(
+    {
+        "slide_table_sort_order",
+        "edit_slide_table_sort_order",
+        "apply_slide_table_sort_order",
+    }
+)
+KEYNOTE_SLIDE_TABLE_SORT_EDIT_METHODS = frozenset(
+    {"order", "set", "clear", "reset", "commit"}
+)
+KEYNOTE_SLIDE_TABLE_SORT_FLAT_ALIASES = frozenset(
+    {
+        "SortCommit",
+        "SortDiagnostics",
+        "SortEdit",
+        "SortError",
+        "SortLimitKind",
+        "SortPatch",
+        "SortPath",
+        "SortOrder",
+        "SortOrderCommit",
+        "SortOrderDiagnostics",
+        "SortOrderEdit",
+        "SortOrderError",
+        "SortOrderLimitKind",
+        "SortOrderPatch",
+        "SortOrderPath",
+        "TableSortCommit",
+        "TableSortDiagnostics",
+        "TableSortEdit",
+        "TableSortError",
+        "TableSortLimitKind",
+        "TableSortOrder",
+        "TableSortOrderCommit",
+        "TableSortOrderDiagnostics",
+        "TableSortOrderEdit",
+        "TableSortOrderError",
+        "TableSortOrderLimitKind",
+        "TableSortOrderPatch",
+        "TableSortOrderPath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_SORT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "SortRuleArchive",
+        "SortRuleReferenceTrackerArchive",
+        "TableInfoArchive",
+        "TableModelArchive",
+        "TableSortOrderArchive",
+        "TableSortOrderSnapshot",
+    }
+)
+KEYNOTE_SLIDE_TABLE_SORT_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TABLE_SORT_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tst", "tsp", "tsd"}
+)
+KEYNOTE_SLIDE_TABLE_SORT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_sort_order_codec.rs"
+)
+KEYNOTE_SLIDE_TABLE_SORT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_SLIDE_TABLE_SORT_CODEC_MODULES = (
+    "numbers_table_sort_order_codec",
+    "table_sort_order_codec",
+)
+KEYNOTE_SLIDE_TABLE_SORT_CODEC_REQUIRED_APIS = (
+    "SortOrderSnapshot",
+    "decode_table_model_sort_order_with_report",
+    "prepare_table_model_sort_order_rewrite",
+    "PreparedTableSortOrderRewrite",
+    "PreparedTableModelSortOrderRewrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "canonical_table_sort_order",
+    "rewrite_table_model_sort_order",
+)
+KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS = {
+    "aggregate transaction budget": (
+        "SortBudget",
+        "residual",
+        "budget",
+    ),
+    "strict neutral codec": (
+        "sort_order_codec",
+        "decode_table_model_sort_order_with_report",
+        "prepare_table_model_sort_order_rewrite",
+    ),
+    "prepared codec requirements": (
+        "execution_requirements",
+        "report()",
+        "execute",
+    ),
+    "field-44/field-45 authority": (
+        "TABLE_MODEL_MESSAGE_TYPE",
+        "sort_order",
+    ),
+    "raw-preserving rewrite": (
+        "replace_message_preserving_header_with_limits",
+    ),
+    "exact artifacts and inverse": (
+        "ExactArtifacts",
+        "inverse",
+        "is_noop",
+    ),
+    "prepared reassembly": ("prepare_reassembly",),
+    "candidate reopen": ("candidate", "reopen", "validate"),
+    "object/member locality": ("verify_locality", "same_content"),
+    "preview preservation": (
+        "deleted_previews",
+    ),
+}
+KEYNOTE_SLIDE_TABLE_SORT_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:slide_table_sort_order|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?sort)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+KEYNOTE_SLIDE_TABLE_SORT_PUBLIC_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -25797,6 +25980,295 @@ def audit_keynote_slide_table_title_resource_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_table_sort_owner_present(root: Path) -> bool:
+    """Return whether the Wave99 persisted-sort owner is active."""
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_sort_order\s*;",
+        package_source,
+    ) is not None
+
+
+def audit_keynote_slide_table_sort_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Keynote field-44 facade."""
+
+    if not _keynote_slide_table_sort_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[1]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+slide_table_sort_order\b",
+        code[package_path] + code[lib_path],
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table sort owner module must remain private: "
+            f"{KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]}"
+        )
+    if re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_sort_order\s*;",
+        code[package_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table sort owner module is missing: "
+            f"{KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table sort public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_TYPES - semantic_exports):
+        violations.append(
+            "focused litchi-keynote slide-table sort semantic API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE}"
+        )
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+transaction\b",
+        code[semantic_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table sort public API is missing "
+            f"slide::table::sort::transaction: {KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        sources[semantic_path], KEYNOTE_SLIDE_TABLE_SORT_TRANSACTION_TYPES
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_TRANSACTION_TYPES - transaction_exports):
+        violations.append(
+            "focused litchi-keynote slide-table sort transaction API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE}"
+        )
+
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote slide-table sort public API is missing selector "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[1]}"
+        )
+    if re.search(
+        r"impl[ \t\r\n]+(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*)?"
+        r"TableSelector\b[\s\S]*?\bpub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+        r"(?:index|position)\b",
+        code[selector_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table sort selector must expose checked "
+            f"TableSelector::index/position: {KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-table sort Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_table_sort_order":
+            for selector in ("SlideSelector", "TableSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-table sort Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+                    )
+        if "RowRange" in declaration:
+            violations.append(
+                "focused litchi-keynote slide-table sort Package method must not accept "
+                f"legacy RowRange: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+            )
+    apply_declaration = owner_methods.get("apply_slide_table_sort_order")
+    if apply_declaration is not None and "SlideTableSortPatch" not in apply_declaration:
+        violations.append(
+            "focused litchi-keynote slide-table sort apply method must accept "
+            f"SlideTableSortPatch: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+        )
+    for method_name, declaration in owner_methods.items():
+        if "RowRange" in declaration:
+            violations.append(
+                "focused litchi-keynote slide-table sort Package method must not accept "
+                f"legacy RowRange ({method_name}): {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "SlideTableSortEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-keynote slide-table sort edit is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_TABLE_SORT_FLAT_ALIASES
+    )
+    dedicated_sources = {owner_path, semantic_path}
+    for path in paths:
+        dedicated = path in dedicated_sources
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not identifiers.intersection(facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier == "litchi_iwa_common":
+                    reason = None
+                elif identifier in KEYNOTE_SLIDE_TABLE_SORT_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_SLIDE_TABLE_SORT_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_SLIDE_TABLE_SORT_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote slide-table sort public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_SLIDE_TABLE_SORT_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote slide-table sort public API retains flat alias "
+                        f"{identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote slide-table sort public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_TABLE_SORT_PUBLIC_RAW_ID_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table sort public API exposes raw "
+                    f"parameter {match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-table sort public API retains a glob re-export: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    codec_path = root / KEYNOTE_SLIDE_TABLE_SORT_CODEC_SOURCE
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-keynote slide-table sort public API is missing strict neutral "
+            f"codec source: {KEYNOTE_SLIDE_TABLE_SORT_CODEC_SOURCE}"
+        )
+    else:
+        codec_source = _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        codec_code = _mask_rust_non_code(codec_source)
+        for api in KEYNOTE_SLIDE_TABLE_SORT_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct|type)\s+{re.escape(api)}\b",
+                codec_code,
+            ) is None:
+                violations.append(
+                    "focused litchi-keynote slide-table sort hidden codec is missing "
+                    f"strict API {api}: {codec_path.relative_to(root)}"
+                )
+        codec_lib_path = root / KEYNOTE_SLIDE_TABLE_SORT_CODEC_PUBLIC_SOURCE
+        codec_lib_source = (
+            _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+            if codec_lib_path.is_file()
+            else ""
+        )
+        for codec_module in KEYNOTE_SLIDE_TABLE_SORT_CODEC_MODULES:
+            if re.search(
+                rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+                rf"pub\s+mod\s+{re.escape(codec_module)}\b",
+                codec_lib_source,
+            ) is None:
+                violations.append(
+                    "focused litchi-keynote slide-table sort public API is missing hidden codec "
+                    f"module {codec_module}: {KEYNOTE_SLIDE_TABLE_SORT_CODEC_PUBLIC_SOURCE}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_table_sort_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one bounded field-44 transaction and exact preview policy."""
+
+    if not _keynote_slide_table_sort_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    for label, markers in KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS.items():
+        if not all(marker in owner for marker in markers):
+            violations.append(
+                "focused litchi-keynote slide-table sort owner is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+            )
+    if re.search(
+        r"deleted_previews\s*:\s*(?:usize\s*=\s*)?0|deleted_previews\s*=\s*0",
+        owner,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table sort owner must preserve previews "
+            f"with deleted_previews = 0: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_movie_geometry_source_topology(root: Path = ROOT) -> list[str]:
     """Require a typed bridge while retaining the legacy geometry fallback.
 
@@ -28627,6 +29099,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_movie_geometry_resource_source_topology()
         + audit_keynote_slide_table_title_facade_source_topology()
         + audit_keynote_slide_table_title_resource_source_topology()
+        + audit_keynote_slide_table_sort_facade_source_topology()
+        + audit_keynote_slide_table_sort_resource_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_identity_boundary_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()

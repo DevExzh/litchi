@@ -18,6 +18,7 @@ mod slide_movie_playback;
 mod slide_movie_title;
 mod slide_notes;
 mod slide_order;
+pub(crate) mod slide_table_sort_order;
 mod slide_table_title;
 
 pub(crate) mod slide_placeholder_visibility;
@@ -107,6 +108,10 @@ pub use slide_notes::{
 pub use slide_order::{
     SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
     SlideOrderPatch,
+};
+pub use slide_table_sort_order::{
+    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
+    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath,
 };
 pub use slide_table_title::{
     SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
