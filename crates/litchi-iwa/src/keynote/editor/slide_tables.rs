@@ -3882,26 +3882,6 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Rename a reachable slide table.
-    pub fn rename_slide_table(
-        &mut self,
-        slide_index: usize,
-        model_object_id: u64,
-        name: &str,
-    ) -> Result<()> {
-        require_table_model(self, slide_index, model_object_id)?;
-        let mut staged = self.package().clone();
-        crate::numbers::editor::rename_table_in_package(&mut staged, model_object_id, name)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if require_table_model(&verified, slide_index, model_object_id)?.name != name {
-            return Err(Error::InvalidFormat(
-                "Keynote table rename failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Resize a reachable slide table while preserving retained cells.
     pub fn resize_slide_table(
         &mut self,

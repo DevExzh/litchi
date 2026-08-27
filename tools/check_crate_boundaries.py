@@ -1955,6 +1955,216 @@ KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_PATH = re.compile(
     r"[ \t\r\n]*(?:r#)?dimension)(?=[ \t\r\n]*(?:::|as\b|;|=))"
 )
 
+# Wave109 moves persisted Keynote slide-table display names behind the same
+# selector-first package boundary as the adjacent table configuration owners.
+# A name is semantic UTF-8 text; its owner may not expose the native model
+# identifier, archive/protobuf values, or a public raw-wire escape hatch.
+KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "table" / "name.rs"
+)
+KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table.rs"
+KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_name.rs"
+)
+KEYNOTE_SLIDE_TABLE_CORE_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_core.rs"
+)
+KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES = frozenset(
+    {
+        "SlideTableNameCommit",
+        "SlideTableNameDiagnostics",
+        "SlideTableNameEdit",
+        "SlideTableNameError",
+        "SlideTableNameLimitKind",
+        "SlideTableNamePatch",
+        "SlideTableNamePath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_TYPES = frozenset({"Error", "Name"})
+KEYNOTE_SLIDE_TABLE_NAME_TRANSACTION_TYPES = frozenset(
+    {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"}
+)
+KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "TableSelector"}
+)
+KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_METHODS = frozenset(
+    {
+        "slide_table_name",
+        "edit_slide_table_name",
+        "apply_slide_table_name",
+    }
+)
+KEYNOTE_SLIDE_TABLE_NAME_EDIT_METHODS = frozenset(
+    {"path", "before", "name", "set", "set_name", "commit"}
+)
+KEYNOTE_SLIDE_TABLE_NAME_FLAT_ALIASES = frozenset(
+    {
+        "TableName",
+        "TableNameCommit",
+        "TableNameDiagnostics",
+        "TableNameEdit",
+        "TableNameError",
+        "TableNameLimitKind",
+        "TableNamePatch",
+        "TableNamePath",
+        "NameCommit",
+        "NameDiagnostics",
+        "NameEdit",
+        "NameError",
+        "NameLimitKind",
+        "NamePatch",
+        "NamePath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_NAME_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ArchiveReferenceKind",
+        "ArchiveReferenceOccurrence",
+        "ArchiveReferencePolicy",
+        "ArchiveReferenceScope",
+        "ArchiveReferenceVisitor",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "FieldType",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableInfoArchive",
+        "TableModelArchive",
+        "TableModelSnapshot",
+    }
+)
+KEYNOTE_SLIDE_TABLE_NAME_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "TableModelNameRewriteLimits",
+        "TableModelNameRewriteOutput",
+        "TableModelNameRewriteReport",
+        "TableModelNameRewriteRequirements",
+        "TableModelNameWrite",
+        "PreparedTableModelNameRewrite",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TABLE_NAME_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tst", "tsp", "tsd", "tswp", "litchi_iwa_protos"}
+)
+KEYNOTE_SLIDE_TABLE_NAME_PUBLIC_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/table_model_discovery_codec.rs"
+)
+KEYNOTE_SLIDE_TABLE_NAME_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_SLIDE_TABLE_NAME_CODEC_MODULE = "table_model_discovery_codec"
+KEYNOTE_SLIDE_TABLE_NAME_CODEC_REQUIRED_APIS = (
+    "DecodeError",
+    "DecodeOptions",
+    "TableModelSnapshot",
+    "TableModelNameWrite",
+    "TableModelNameRewriteReport",
+    "TableModelNameRewriteRequirements",
+    "TableModelNameRewriteLimits",
+    "TableModelNameRewriteOutput",
+    "PreparedTableModelNameRewrite",
+    "decode_table_model_with_report",
+    "prepare_table_model_name_rewrite",
+    "table_model_source_fingerprint",
+)
+KEYNOTE_SLIDE_TABLE_NAME_CODEC_REQUIRED_MARKER_GROUPS = {
+    "field-8 name framing": ("TABLE_NAME_FIELD", "table_name"),
+    "canonical duplicate/wire checks": (
+        "known_field",
+        "duplicate(",
+        "noncanonical",
+        "require_wire",
+    ),
+    "unknown/group preservation": ("skip_unknown", "nested_wire", "extend_from_slice"),
+    "prepared execution contract": (
+        "prepare_table_model_name_rewrite",
+        "execution_requirements",
+        "execute",
+    ),
+    "readback/source fingerprint": ("readback", "source_fingerprint"),
+}
+KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_MARKER_GROUPS = {
+    "aggregate transaction budget": ("Budget", "residual", "budget"),
+    "prepared field-8 codec": (
+        "table_model_discovery_codec",
+        "prepare_table_model_name_rewrite",
+        "execution_requirements",
+        "execute",
+    ),
+    "field-8 authority": ("TABLE_MODEL_MESSAGE_TYPE", "table_name"),
+    "prepared execution accounting": (
+        "codec_report",
+        "requirements",
+        "exact_limits",
+    ),
+    "exact artifacts and inverse": (
+        "ExactArtifacts",
+        "source_fingerprint",
+        "inverse",
+        "is_noop",
+        "PatchConflict",
+    ),
+    "prepared reassembly": (
+        "prepare_reassembly",
+        "EntryEdit",
+        "execute",
+    ),
+    "candidate reopen and authority": (
+        "candidate",
+        "reopen",
+        "validate",
+        "authority",
+    ),
+    "object/member locality": ("verify_locality", "same_content"),
+    "preview invalidation": ("root_preview_deletions", "deleted_previews"),
+}
+KEYNOTE_SLIDE_TABLE_NAME_TEST_SOURCES = (
+    Path("crates/litchi-keynote/tests/slide_table_name.rs"),
+)
+KEYNOTE_SLIDE_TABLE_NAME_NOOP_PREVIEW_ZERO = re.compile(
+    r"\bis_noop\s*\(\)[\s\S]{0,600}?"
+    r"\bdeleted_previews\s*\(\)\s*,\s*0\b"
+)
+KEYNOTE_SLIDE_TABLE_NAME_CHANGED_PREVIEW_REPORT = re.compile(
+    r"\bchanged\s*\(\)[\s\S]{0,800}?"
+    r"\bdeleted_previews\s*\(\)\s*,\s*(?!0\b)"
+    r"[A-Za-z_][A-Za-z0-9_]*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_]*\s*\(\))?"
+)
+KEYNOTE_SLIDE_TABLE_NAME_FUZZ_SOURCES = (
+    Path("crates/litchi/fuzz/fuzz_targets/keynote_slide_table_name.rs"),
+)
+KEYNOTE_SLIDE_TABLE_NAME_FUZZ_CORPORA = (
+    Path("crates/litchi/fuzz/corpus/keynote_slide_table_name"),
+)
+
 RETIRED_IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_METHODS = frozenset(
     {"slide_table_lock_state", "set_slide_table_lock_state"}
 )
@@ -2632,6 +2842,34 @@ IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_SOURCE = (
 )
 IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 
+# Wave109 retires the last raw-ID Keynote table-name mutation.  Unlike the
+# table-lock owner, ``slide_tables.rs`` remains active for listing,
+# materialization, and other physical table operations, so this is an
+# item/call ratchet rather than a whole-file retirement.  The shared Numbers
+# helper is still valid for Numbers/Pages compatibility paths; only its use
+# from the Keynote host or a Keynote example is forbidden.
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_NAME_METHODS = frozenset({"rename_slide_table"})
+IWA_KEYNOTE_SLIDE_TABLE_NAME_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>rename_slide_table|"
+    r"slide_table_name|edit_slide_table_name|apply_slide_table_name)\b"
+    r"[ \t\r\n]*\(",
+)
+IWA_KEYNOTE_SLIDE_TABLE_NAME_NUMBERS_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*::[ \t\r\n]*)*(?:r#)?"
+    r"(?P<helper>rename_table_in_package)\b[ \t\r\n]*\(",
+)
+IWA_KEYNOTE_SLIDE_TABLE_NAME_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"\brename_table_in_package\b"
+    ),
+)
+IWA_KEYNOTE_SLIDE_TABLE_NAME_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs"
+)
+IWA_KEYNOTE_SLIDE_TABLE_NAME_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+
 IWA_KEYNOTE_SLIDE_TABLE_CONFIG_PACKAGE_RECEIVERS = frozenset(
     {
         "package",
@@ -2641,6 +2879,8 @@ IWA_KEYNOTE_SLIDE_TABLE_CONFIG_PACKAGE_RECEIVERS = frozenset(
         "sort_package",
         "title_package",
         "lock_package",
+        "name_package",
+        "table_name_package",
     }
 )
 IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
@@ -30232,6 +30472,401 @@ def audit_keynote_slide_table_dimension_facade_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_table_name_owner_present(root: Path) -> bool:
+    """Return whether the Wave109 slide-table-name owner is active."""
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        r"(?m)^(?:(?:pub(?:[ \t]*\([ \t]*crate[ \t]*\))?)[ \t]+)?"
+        r"mod[ \t]+slide_table_name\s*;",
+        package_source,
+    ) is not None
+
+
+def _keynote_slide_table_name_check_codec(root: Path) -> list[str]:
+    """Require the existing strict field-8 discovery/name codec seam."""
+
+    violations: list[str] = []
+    codec_path = root / KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE
+    if not codec_path.is_file():
+        return [
+            "focused litchi-keynote slide-table name public API is missing strict neutral "
+            f"codec source: {KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE}"
+        ]
+
+    codec_raw_source = codec_path.read_text(encoding="utf-8")
+    codec_source = _mask_rust_cfg_test_items(codec_raw_source)
+    codec_code = _mask_rust_non_code(codec_source)
+    for api in KEYNOTE_SLIDE_TABLE_NAME_CODEC_REQUIRED_APIS:
+        if re.search(
+            rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(api)}\b",
+            codec_code,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote slide-table name hidden codec is missing strict API "
+                f"{api}: {KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_SLIDE_TABLE_NAME_CODEC_REQUIRED_MARKER_GROUPS.items():
+        if not all(marker in codec_code for marker in markers):
+            violations.append(
+                "focused litchi-keynote slide-table name hidden codec is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE}"
+            )
+
+    codec_lib_path = root / KEYNOTE_SLIDE_TABLE_NAME_CODEC_PUBLIC_SOURCE
+    codec_lib_source = (
+        _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+        if codec_lib_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(KEYNOTE_SLIDE_TABLE_NAME_CODEC_MODULE)}\b",
+        codec_lib_source,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name public API is missing hidden codec "
+            f"module {KEYNOTE_SLIDE_TABLE_NAME_CODEC_MODULE}: "
+            f"{KEYNOTE_SLIDE_TABLE_NAME_CODEC_PUBLIC_SOURCE}"
+        )
+
+    # The neutral codec already owns malformed-wire fuzzing.  The focused
+    # Keynote owner additionally needs an integration lifecycle and a bounded
+    # command corpus once its gate activates.
+    if re.search(r"(?m)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]", codec_raw_source) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name hidden codec is missing cfg(test) coverage: "
+            f"{KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE}"
+        )
+    elif re.search(r"(?m)#\s*\[\s*test\s*\]", codec_raw_source) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name hidden codec is missing #[test] coverage: "
+            f"{KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE}"
+        )
+
+    for test_path in KEYNOTE_SLIDE_TABLE_NAME_TEST_SOURCES:
+        absolute = root / test_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote slide-table name boundary is missing integration test: "
+                f"{test_path}"
+            )
+            continue
+        test_source = absolute.read_text(encoding="utf-8")
+        test_code = _mask_rust_non_code(test_source)
+        if re.search(r"(?m)#\s*\[\s*test\s*\]", test_code) is None:
+            violations.append(
+                "focused litchi-keynote slide-table name integration test is missing #[test] coverage: "
+                f"{test_path}"
+            )
+        if not re.search(
+            r"\b(?:slide_table_name|edit_slide_table_name|apply_slide_table_name)\b",
+            test_code,
+        ):
+            violations.append(
+                "focused litchi-keynote slide-table name integration test does not exercise the owner: "
+                f"{test_path}"
+            )
+        if KEYNOTE_SLIDE_TABLE_NAME_NOOP_PREVIEW_ZERO.search(test_code) is None:
+            violations.append(
+                "focused litchi-keynote slide-table name integration test must prove "
+                "exact no-op deleted_previews == 0: "
+                f"{test_path}"
+            )
+        if KEYNOTE_SLIDE_TABLE_NAME_CHANGED_PREVIEW_REPORT.search(test_code) is None:
+            violations.append(
+                "focused litchi-keynote slide-table name integration test must report "
+                "root preview deletions for a changed rename: "
+                f"{test_path}"
+            )
+
+    for fuzz_path in KEYNOTE_SLIDE_TABLE_NAME_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote slide-table name boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-keynote slide-table name fuzz target is missing fuzz_target! harness: "
+                f"{fuzz_path}"
+            )
+    for corpus in KEYNOTE_SLIDE_TABLE_NAME_FUZZ_CORPORA:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-keynote slide-table name boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+    return violations
+
+
+def audit_keynote_slide_table_name_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Keynote table-name facade."""
+
+    if not _keynote_slide_table_name_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[1]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+slide_table_name\b",
+        code[package_path] + code[lib_path],
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table name owner module must remain private: "
+            f"{KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]}"
+        )
+    if re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_name\s*;",
+        code[package_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name owner module is missing: "
+            f"{KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table name public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_TYPES - semantic_exports):
+        violations.append(
+            "focused litchi-keynote slide-table name semantic API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE}"
+        )
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+transaction\b",
+        code[semantic_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name semantic API is missing "
+            f"slide::table::name::transaction: {KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        sources[semantic_path], KEYNOTE_SLIDE_TABLE_NAME_TRANSACTION_TYPES
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_NAME_TRANSACTION_TYPES - transaction_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table name transaction API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE}"
+        )
+
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_TYPES,
+    )
+    for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote slide-table name public API is missing selector "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[1]}"
+        )
+    if re.search(
+        r"impl[ \t\r\n]+(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*)?"
+        r"TableSelector\b[\s\S]*?\bpub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+        r"(?:index|position)\b",
+        code[selector_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name selector must expose checked "
+            f"TableSelector::index/position: {KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-table name Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_table_name":
+            for selector in ("SlideSelector", "TableSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-table name Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+                    )
+        elif "SlideTableNamePatch" not in declaration:
+            violations.append(
+                "focused litchi-keynote slide-table name apply method must accept "
+                f"SlideTableNamePatch: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "SlideTableNameEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-keynote slide-table name edit is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_TABLE_NAME_FLAT_ALIASES
+    )
+    dedicated_sources = {owner_path, semantic_path}
+    for path in paths:
+        dedicated = path in dedicated_sources
+        # ``Error`` is ubiquitous in unrelated package errors.  It remains a
+        # required semantic export, but alone must not select every public
+        # declaration in the package/lib facade leak scan.
+        selection_names = facade_names if dedicated else facade_names - {"Error"}
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not identifiers.intersection(selection_names):
+                continue
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-table name public API retains a glob "
+                    f"re-export: {path.relative_to(root)}:{line_number}"
+                )
+            for identifier in sorted(identifiers):
+                if identifier == "litchi_iwa_common":
+                    reason = None
+                elif identifier in KEYNOTE_SLIDE_TABLE_NAME_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_SLIDE_TABLE_NAME_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif (
+                    identifier == "wire"
+                    or identifier in KEYNOTE_SLIDE_TABLE_NAME_WIRE_TYPES
+                ):
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote slide-table name public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_SLIDE_TABLE_NAME_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote slide-table name public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote slide-table name public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_TABLE_NAME_PUBLIC_RAW_ID_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table name public API exposes raw "
+                    f"parameter {match.group(0).strip()}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    violations.extend(_keynote_slide_table_name_check_codec(root))
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_table_name_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require bounded field-8 rewriting, authority, and exact locality."""
+
+    if not _keynote_slide_table_name_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(
+        owner_path.read_text(encoding="utf-8")
+    )
+    owner = _mask_rust_non_code(owner_source)
+    core_path = root / KEYNOTE_SLIDE_TABLE_CORE_SOURCE
+    if core_path.is_file():
+        core_source = _mask_rust_cfg_test_items(
+            core_path.read_text(encoding="utf-8")
+        )
+        owner = f"{owner}\n{_mask_rust_non_code(core_source)}"
+    violations: list[str] = []
+    for label, markers in KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_MARKER_GROUPS.items():
+        if not all(marker in owner for marker in markers):
+            violations.append(
+                "focused litchi-keynote slide-table name owner is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+            )
+    for label, pattern in (
+        (
+            "one-shot table-model name rewrite",
+            re.compile(r"\brewrite_table_model_name(?:_with_report)?\s*\("),
+        ),
+        (
+            "legacy Numbers name helper",
+            re.compile(r"\brename_table_in_package\s*\("),
+        ),
+    ):
+        match = pattern.search(owner)
+        if match is not None:
+            line_number = owner.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote slide-table name owner must not perform "
+                f"{label}: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}:{line_number}"
+            )
+    if re.search(
+        r"deleted_previews\s*:\s*(?:usize\s*=\s*)?0|deleted_previews\s*=\s*0",
+        owner,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table name owner must preserve previews "
+            f"with deleted_previews = 0: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
 def _keynote_slide_table_headers_owner_present(root: Path) -> bool:
     """Return whether the Wave100 slide-table-header owner is active.
 
@@ -30777,7 +31412,8 @@ def _iwa_keynote_config_call_is_legacy(source: str, match_start: int) -> bool:
     prefix = source[line_start:match_start]
     if re.search(
         r"\b(?:package|keynote_package|focused_package|sort_package|"
-        r"title_package|lock_package|focused_keynote)\s*(?:\(\))?\s*\.\s*$",
+        r"title_package|lock_package|name_package|table_name_package|"
+        r"focused_keynote)\s*(?:\(\))?\s*\.\s*$",
         prefix,
     ):
         return False
@@ -30787,7 +31423,8 @@ def _iwa_keynote_config_call_is_legacy(source: str, match_start: int) -> bool:
     lookback = source[max(0, match_start - 240) : match_start]
     if re.search(
         r"\b(?:package|keynote_package|focused_package|sort_package|"
-        r"title_package|lock_package|focused_keynote)\s*\n[ \t]*\.\s*$",
+        r"title_package|lock_package|name_package|table_name_package|"
+        r"focused_keynote)\s*\n[ \t]*\.\s*$",
         lookback,
     ):
         return False
@@ -30998,6 +31635,140 @@ def audit_iwa_keynote_slide_table_dimension_source_topology(
     return _audit_iwa_keynote_slide_table_config_source_topology(
         root, feature="dimension"
     )
+
+
+def audit_iwa_keynote_slide_table_name_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Keynote table-name mutation in favor of Package calls.
+
+    ``KeynoteEditor::rename_slide_table`` and the shared Numbers
+    ``rename_table_in_package`` helper both accept native model identity.  A
+    focused ``litchi_keynote::Package`` call remains valid, while editor/self
+    calls, helper imports, and helper invocations disappear from production
+    Keynote code and Keynote branches of shared examples.  Test modules,
+    comments, and strings remain compatibility/fixture material.
+    """
+
+    if not _keynote_slide_table_name_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    focused_call_seen = False
+    scanned_source = False
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+
+    def inspect_source(path: Path, *, example: bool) -> None:
+        nonlocal focused_call_seen, scanned_source
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        code = _mask_rust_non_code(production_source)
+        scanned_source = True
+        relative = path.relative_to(root)
+
+        for match in declaration.finditer(code):
+            name = match.group(1)
+            if name not in RETIRED_IWA_KEYNOTE_SLIDE_TABLE_NAME_METHODS:
+                continue
+            line_number = code.count("\n", 0, match.start()) + 1
+            scope = "example " if example else ""
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-name "
+                f"{scope}method {name}: {relative}:{line_number}"
+            )
+
+        for pattern in IWA_KEYNOTE_SLIDE_TABLE_NAME_IMPORTS:
+            for match in pattern.finditer(code):
+                if example and not _iwa_keynote_config_example_is_keynote(
+                    path, code, match.start()
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start()) + 1
+                scope = "example " if example else ""
+                violations.append(
+                    "retired litchi-iwa Keynote slide-table-name "
+                    f"{scope}helper import: {relative}:{line_number}"
+                )
+
+        for match in IWA_KEYNOTE_SLIDE_TABLE_NAME_NUMBERS_HELPER.finditer(code):
+            if example and not _iwa_keynote_config_example_is_keynote(
+                path, code, match.start()
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start("helper")) + 1
+            scope = "example " if example else ""
+            violations.append(
+                "retired litchi-iwa Numbers persisted table-name "
+                f"{scope}helper {match.group('helper')}: {relative}:{line_number}"
+            )
+
+        for match in IWA_KEYNOTE_SLIDE_TABLE_NAME_CALL.finditer(code):
+            method = match.group("method")
+            if example and method != "rename_slide_table":
+                if not _iwa_keynote_config_example_is_keynote(
+                    path, code, match.start()
+                ):
+                    continue
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            line_end = code.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(code)
+            line = code[line_start:line_end]
+            if re.search(rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line):
+                continue
+            focused = not _iwa_keynote_config_call_is_legacy(code, match.start())
+            if focused:
+                focused_call_seen = True
+                continue
+            line_number = code.count("\n", 0, match.start("method")) + 1
+            scope = "example " if example else ""
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-name "
+                f"{scope}call {method}: {relative}:{line_number}"
+            )
+
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name == "tests.rs" or "tests" in path.parts:
+                continue
+            inspect_source(path, example=False)
+
+    example_root = root / IWA_KEYNOTE_SLIDE_TABLE_NAME_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for path in sorted(example_root.rglob("*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            production_source = _mask_rust_cfg_test_items(raw_source)
+            code = _mask_rust_non_code(production_source)
+            relevant = "keynote" in path.stem.lower()
+            if not relevant:
+                relevant = any(
+                    method == "rename_slide_table"
+                    or _iwa_keynote_config_example_is_keynote(
+                        path, code, match.start()
+                    )
+                    for match in IWA_KEYNOTE_SLIDE_TABLE_NAME_CALL.finditer(code)
+                    for method in (match.group("method"),)
+                )
+            if not relevant:
+                relevant = any(
+                    _iwa_keynote_config_example_is_keynote(path, code, match.start())
+                    for match in IWA_KEYNOTE_SLIDE_TABLE_NAME_NUMBERS_HELPER.finditer(
+                        code
+                    )
+                )
+            if not relevant:
+                continue
+            inspect_source(path, example=True)
+
+    # The legacy editor no longer exposes persisted table-name configuration.
+    # Focused Package calls are allowed when a Keynote host/example needs that
+    # operation, but their absence is also a valid complete retirement.
+    return sorted(set(violations))
 
 
 def audit_iwa_keynote_slide_table_lock_state_source_topology(
@@ -33959,6 +34730,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_table_sort_source_topology()
         + audit_keynote_slide_table_dimension_facade_source_topology()
         + audit_iwa_keynote_slide_table_dimension_source_topology()
+        + audit_keynote_slide_table_name_facade_source_topology()
+        + audit_keynote_slide_table_name_resource_source_topology()
+        + audit_iwa_keynote_slide_table_name_source_topology()
         + audit_keynote_slide_table_lock_state_facade_source_topology()
         + audit_iwa_keynote_slide_table_lock_state_source_topology()
         + audit_iwa_keynote_slide_table_headers_source_topology()

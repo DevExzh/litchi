@@ -14710,3 +14710,51 @@ allocator/RSS, or package-wide performance claim follows. The
 generated/Prost/Buffa ownership, and the IWA monolith deletion gate remain
 unchanged. Wave107 closes no crate, manifest dependency, edge, debt, host
 owner, generated owner, or monolith gate.
+
+## 2026-08-28 amendment: Wave109 Keynote slide-table name owner (not a monolith-exit gate)
+
+Wave109 gives selector-first litchi_keynote::Package ownership of existing
+slide-table name reads and exact name transactions through
+Package::{slide_table_name, edit_slide_table_name, apply_slide_table_name}.
+The public value is the archive-free slide::table::name::Name; transaction
+values are archive-free and typed. Native identifiers, Archive/ZIP/member data,
+wire views, and generated/Prost/Buffa values remain private. The strict
+table_model_discovery_codec field-8 prepared rewrite preserves unknown
+canonical fields/groups and rejects malformed, duplicate-known, noncanonical,
+or wrong-wire input before publication.
+
+The owner admits only a rooted, uniquely selected slide -> table-info -> model
+-> storage/name route. Strict storage-route, role, ArchiveInfo,
+metadata/current-component, UUID, and global-inbound authority checks run
+before staging; unsupported, ambiguous, aliased, locked, malformed, or
+otherwise unproven routes fail closed. Focused transaction tests verify changed
+commits preserve the selected source and unrelated bytes, validate candidate
+semantic readback and locality, and apply an exact inverse that restores the
+original package, including canonical preview state. The raw Keynote rename
+mutation path is retired; no legacy fallback remains. Physical rows/cells,
+storage, formulas, tiles, and broader table compatibility remain in
+litchi-iwa.
+
+Wave109 verification records 18/18 focused slide-table-name tests; strict
+litchi-keynote library and test Clippy PASS; 30/30 IWA host slide-table tests
+and litchi-iwa library check PASS; a passing slide-table-name fuzz-target
+check and strict target Clippy with 10 command-only hex seeds; 662/662
+boundary unit tests; py_compile PASS; full checker PASS; and live
+FACADE=[]; RESOURCE=[]; HOST=[] audits. These are the recorded scoped gates.
+
+No positive native Keynote name/rename acceptance is claimed. The strict read
+used /private/tmp/wave100-native-table-headers-source.key (500,128 bytes,
+SHA-256 47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b,
+86 members) and returned InvalidSource. The source remained exact; no
+candidate or inverse was produced and no UI run occurred. Native name
+mutation, save, reopen, and UI acceptance evidence is withheld.
+
+One conservative logical operation ledger covers the owner’s work; Package
+cache, decompressed-Archive, OS/process allocator, and RSS telemetry are
+unobservable. No zero-copy, allocator/RSS, or package-wide performance claim
+follows. Wave109 closes no crate, manifest, dependency edge, debt, host owner,
+generated owner, or monolith gate. The authoritative topology remains 64
+packages, 239 internal dependency declarations, one migration host, and 13
+ordered debts; the litchi-iwa -> litchi-keynote edge/debt 014, all other
+edges/debts, generated/Prost/Buffa ownership, and the IWA monolith deletion
+gate remain unchanged.

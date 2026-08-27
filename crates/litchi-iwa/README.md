@@ -2925,3 +2925,48 @@ via `prost-build`; the `protoc` compiler must be available on `PATH`:
 ## License
 
 Licensed under the Apache License, Version 2.0. Part of the [Litchi](https://github.com/DevExzh/litchi) workspace.
+
+## Wave109 amendment: Keynote slide-table names remain a focused package owner
+
+Selector-first litchi_keynote::Package owns archive-free slide-table name
+reads and exact name transactions through
+Package::{slide_table_name, edit_slide_table_name, apply_slide_table_name}.
+The public value is slide::table::name::Name. The strict
+table_model_discovery_codec field-8 prepared rewrite preserves unknown
+canonical fields/groups and rejects malformed, duplicate-known, noncanonical,
+or wrong-wire input before publication; native identifiers, Archive/ZIP/member
+data, wire views, and generated/Prost/Buffa values remain private.
+
+The admitted route is a rooted, unique slide -> table-info -> model ->
+storage/name route. Strict storage-route, role, ArchiveInfo,
+metadata/current-component, UUID, and global-inbound authority checks precede
+staging, with fail-closed behavior for unsupported, ambiguous, aliased,
+locked, malformed, or otherwise unproven routes. Focused transaction tests
+verify source and unrelated-byte preservation, semantic readback/locality, and
+exact inverse restoration including canonical preview state. The raw Keynote
+rename mutation path is retired; no fallback remains. IWA continues to own
+physical rows/cells, storage, formulas, tiles, and broader table compatibility.
+
+Wave109 verification: 18/18 focused slide-table-name tests; strict
+litchi-keynote library and test Clippy PASS; 30/30 IWA host slide-table tests
+and litchi-iwa library check PASS; slide-table-name fuzz-target check and
+strict target Clippy PASS with 10 command-only hex seeds; 662/662 boundary
+unit tests; py_compile PASS; full checker PASS; live
+FACADE=[]; RESOURCE=[]; HOST=[].
+
+No positive native Keynote name/rename acceptance is claimed. The strict read
+of /private/tmp/wave100-native-table-headers-source.key (500,128 bytes,
+SHA-256 47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b,
+86 members) returned InvalidSource. The source remained exact; no candidate
+or inverse was produced and no UI run occurred. Native mutation, save,
+reopen, and UI acceptance evidence is withheld.
+
+One conservative logical operation ledger is recorded; Package cache,
+decompressed-Archive, OS/process allocator, and RSS telemetry are
+unobservable. No zero-copy, allocator/RSS, or package-wide performance claim
+is made. This amendment changes no crate, manifest, dependency edge, debt,
+host owner, generated owner, or monolith gate. The topology remains 64
+packages, 239 internal dependency declarations, one migration host, and 13
+ordered debts; litchi-iwa -> litchi-keynote/debt 014, all other edges/debts,
+generated/Prost/Buffa ownership, and the IWA monolith deletion gate remain
+unchanged.

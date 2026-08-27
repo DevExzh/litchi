@@ -68,6 +68,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_slide_table_name"
+path = "fuzz_targets/keynote_slide_table_name.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_movie_playback"
 path = "fuzz_targets/keynote_movie_playback.rs"
 test = false
