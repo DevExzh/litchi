@@ -114,12 +114,12 @@ fn conditional_value_mut(
     }
 }
 
-pub(crate) fn formula_requires_workbook_context(error: &Error) -> bool {
-    matches!(
-        error,
-        Error::UnsupportedFeature(message)
-            if message.ends_with("requires workbook compilation context")
-    )
+/// Whether a context-free authoring fallback may preserve the source text.
+///
+/// This predicate is only valid for the context-free `set_*_formula` paths.
+/// Full-context compilation must propagate every error instead of falling back.
+pub(crate) fn formula_requires_context_free_authoring(error: &Error) -> bool {
+    matches!(error, Error::UnresolvedDependency(_))
 }
 
 impl MutableWorksheet {
@@ -163,11 +163,17 @@ impl MutableWorksheet {
                 .formula_groups
                 .iter()
                 .any(|group| group.range.contains(position.0, position.1));
-            let is_array_anchor = *is_array
-                && array_range
-                    .as_deref()
-                    .and_then(|range| Range::parse_a1(range).ok())
-                    .is_some_and(|range| range.top_left() == position);
+            let is_array_anchor = if *is_array && cell.formula_binary.is_none() {
+                let range_text = array_range.as_deref().ok_or_else(|| {
+                    Error::InvalidFormula(format!(
+                        "array formula at row {}, column {} is missing its range",
+                        position.0, position.1
+                    ))
+                })?;
+                Range::parse_a1(range_text)?.top_left() == position
+            } else {
+                false
+            };
             if cell.formula_binary.is_none() && (!is_array || is_array_anchor) && !is_grouped {
                 compiled.push((
                     position,

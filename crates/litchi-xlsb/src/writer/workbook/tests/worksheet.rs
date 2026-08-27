@@ -661,6 +661,193 @@ fn contextual_grouped_formulas_survive_package_roundtrip() {
 }
 
 #[test]
+fn contextual_group_setters_defer_until_workbook_context_and_roundtrip() {
+    let mut summary = MutableWorksheet::new("Summary");
+    summary.set_array_formula(0, 0, 0, 1, "Data!A1").unwrap();
+    summary.set_shared_formula(1, 0, 1, 0, "Rate").unwrap();
+    assert_eq!(summary.formula_groups.len(), 2);
+
+    let mut workbook = WorkbookWriter::new();
+    workbook.add_worksheet(MutableWorksheet::new("Data"));
+    workbook.add_named_range(
+        Definition::new("Rate".to_string(), None)
+            .with_formula(area3d_formula(0, 0, 0, 0, 0).unwrap()),
+    );
+    workbook.add_worksheet(summary);
+
+    let mut output = Cursor::new(Vec::new());
+    workbook.save(&mut output).unwrap();
+    let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let worksheet = reader.worksheet_by_index(1).unwrap();
+    for col in 0..=1 {
+        assert!(matches!(
+            worksheet.cell_value(0, col).unwrap().as_ref(),
+            CellValue::Formula {
+                formula,
+                is_array: true,
+                array_range: Some(range),
+                ..
+            } if formula == "Data!A1" && range == "A1:B1"
+        ));
+    }
+    assert!(matches!(
+        worksheet.cell_value(1, 0).unwrap().as_ref(),
+        CellValue::Formula {
+            formula,
+            is_array: false,
+            ..
+        } if formula == "Rate"
+    ));
+}
+
+#[test]
+fn contextual_formula_missing_dependency_is_typed_and_transactional() {
+    let mut workbook = WorkbookWriter::new();
+    workbook.add_worksheet(MutableWorksheet::new("Data"));
+    let mut summary = MutableWorksheet::new("Summary");
+    summary.set_array_formula(0, 0, 0, 0, "Data!A1").unwrap();
+    summary
+        .set_shared_formula(1, 0, 1, 0, "Missing!A1")
+        .unwrap();
+    workbook.add_worksheet(summary);
+
+    let before = format!("{:?}", workbook.worksheets[1]);
+    let mut output = Cursor::new(Vec::new());
+    let error = workbook.save(&mut output).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::UnresolvedDependency(_)
+    ));
+    assert!(output.get_ref().is_empty());
+    assert_eq!(format!("{:?}", workbook.worksheets[1]), before);
+}
+
+#[test]
+fn formula_group_setters_reject_malformed_and_unsupported_inputs_without_installing() {
+    let mut malformed_array = MutableWorksheet::new("Malformed array");
+    let error = malformed_array
+        .set_array_formula(0, 0, 0, 0, "(")
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::InvalidFormula(_)
+    ));
+    assert!(malformed_array.formula_groups.is_empty());
+
+    let mut malformed_shared = MutableWorksheet::new("Malformed shared");
+    let error = malformed_shared
+        .set_shared_formula(0, 0, 0, 0, "(")
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::InvalidFormula(_)
+    ));
+    assert!(malformed_shared.formula_groups.is_empty());
+
+    let mut unsupported_array = MutableWorksheet::new("Unsupported array");
+    let error = unsupported_array
+        .set_array_formula(0, 0, 0, 0, "NOT_A_REAL_FUNCTION(1)")
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::UnsupportedFeature(_)
+    ));
+    assert!(unsupported_array.formula_groups.is_empty());
+
+    let mut unsupported_shared = MutableWorksheet::new("Unsupported shared");
+    let error = unsupported_shared
+        .set_shared_formula(0, 0, 0, 0, "NOT_A_REAL_FUNCTION(1)")
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::UnsupportedFeature(_)
+    ));
+    assert!(unsupported_shared.formula_groups.is_empty());
+}
+
+#[test]
+fn malformed_array_formula_ranges_fail_contextual_compilation() {
+    for array_range in [None, Some("not-a-range".to_string())] {
+        let mut workbook = WorkbookWriter::new();
+        let mut sheet = MutableWorksheet::new("Sheet1");
+        sheet.set_cell(
+            0,
+            0,
+            CellValue::Formula {
+                formula: "1+1".to_string(),
+                cached_value: None,
+                is_array: true,
+                array_range,
+            },
+        );
+        workbook.add_worksheet(sheet);
+
+        let before = format!("{:?}", workbook.worksheets[0]);
+        let mut output = Cursor::new(Vec::new());
+        let error = workbook.save(&mut output).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::package::error::Error::InvalidFormula(_)
+                | crate::package::error::Error::InvalidCellReference(_)
+        ));
+        assert!(output.get_ref().is_empty());
+        assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
+    }
+}
+
+#[test]
+fn contextual_formula_dependency_can_be_added_after_failed_save() {
+    let mut workbook = WorkbookWriter::new();
+    let mut summary = MutableWorksheet::new("Summary");
+    summary
+        .set_array_formula(0, 0, 0, 0, "Missing!A1+1")
+        .unwrap();
+    summary
+        .set_shared_formula(1, 0, 1, 0, "Missing!A1+2")
+        .unwrap();
+    workbook.add_worksheet(summary);
+
+    let before = format!("{:?}", workbook.worksheets[0]);
+    let mut failed = Cursor::new(Vec::new());
+    let error = workbook.save(&mut failed).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::error::Error::UnresolvedDependency(_)
+    ));
+    assert!(failed.get_ref().is_empty());
+    assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
+
+    workbook.add_worksheet(MutableWorksheet::new("Missing"));
+    let mut output = Cursor::new(Vec::new());
+    workbook.save(&mut output).unwrap();
+    let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let worksheet = reader.worksheet_by_index(0).unwrap();
+    let array = worksheet.cell_value(0, 0).unwrap();
+    let CellValue::Formula {
+        formula,
+        is_array,
+        array_range,
+        ..
+    } = array.as_ref()
+    else {
+        panic!("expected array formula after retry, got {array:?}");
+    };
+    assert_eq!(formula, "(Missing!A1+1)");
+    assert!(*is_array);
+    assert_eq!(array_range.as_deref(), Some("A1:A1"));
+
+    let shared = worksheet.cell_value(1, 0).unwrap();
+    let CellValue::Formula {
+        formula, is_array, ..
+    } = shared.as_ref()
+    else {
+        panic!("expected shared formula after retry, got {shared:?}");
+    };
+    assert_eq!(formula, "(Missing!A1+2)");
+    assert!(!is_array);
+}
+
+#[test]
 fn rejects_ambiguous_formula_metadata_before_writing() {
     let mut duplicate_sheets = WorkbookWriter::new();
     duplicate_sheets.add_worksheet(MutableWorksheet::new("Data"));
