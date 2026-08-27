@@ -1725,6 +1725,122 @@ KEYNOTE_SLIDE_TABLE_SORT_PUBLIC_RAW_ID_PARAMETER = re.compile(
     r"(?=$|[^A-Za-z0-9_])"
 )
 
+# Wave105 exposes persisted Keynote slide-table lock state through the same
+# selector-first package boundary as title and sort.  The native editor lock
+# module is retired; physical sort executors remain in litchi-iwa, but they
+# must not reach the retired raw lock helper while doing so.
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "table" / "lock.rs"
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table.rs"
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_lock_state.rs"
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES = frozenset(
+    {
+        "SlideTableLockStateCommit",
+        "SlideTableLockStateDiagnostics",
+        "SlideTableLockStateEdit",
+        "SlideTableLockStateError",
+        "SlideTableLockStateLimitKind",
+        "SlideTableLockStatePatch",
+        "SlideTableLockStatePath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_TYPES = frozenset({"State"})
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_TRANSACTION_TYPES = frozenset(
+    {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"}
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "TableSelector"}
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_PACKAGE_METHODS = frozenset(
+    {
+        "slide_table_lock_state",
+        "edit_slide_table_lock_state",
+        "apply_slide_table_lock_state",
+    }
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_EDIT_METHODS = frozenset(
+    {"before", "after", "state", "set", "set_state", "lock", "unlock", "commit"}
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_FLAT_ALIASES = frozenset(
+    {
+        "TableLockStateCommit",
+        "TableLockStateDiagnostics",
+        "TableLockStateEdit",
+        "TableLockStateError",
+        "TableLockStateLimitKind",
+        "TableLockStatePatch",
+        "TableLockStatePath",
+        "LockStateCommit",
+        "LockStateDiagnostics",
+        "LockStateEdit",
+        "LockStateError",
+        "LockStateLimitKind",
+        "LockStatePatch",
+        "LockStatePath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tst", "tsp", "tsd"}
+)
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_PUBLIC_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_METHODS = frozenset(
+    {"slide_table_lock_state", "set_slide_table_lock_state"}
+)
+IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_table_lock_state|"
+    r"set_slide_table_lock_state|edit_slide_table_lock_state|"
+    r"apply_slide_table_lock_state)\b[ \t\r\n]*\(",
+)
+IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_RAW_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:crate\s*::\s*table_lock\s*::\s*|"
+    r"table_lock\s*::\s*)?(?:set_)?table_lock_state\b"
+)
+IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "lock.rs"
+)
+IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+
 # Wave100 owns only the seven persisted header/footer/freeze/repetition scalar
 # fields of a Keynote slide table.  The package owner is deliberately separate
 # from the legacy editor: the latter still knows how to move rows/cells and
@@ -2310,6 +2426,55 @@ IWA_KEYNOTE_SLIDE_TABLE_HEADERS_IMPORTS = (
     ),
 )
 IWA_KEYNOTE_SLIDE_TABLE_HEADERS_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+
+# Wave105 moves persisted Keynote slide-table title and sort configuration to
+# the selector-first litchi-keynote package.  The IWA compatibility host keeps
+# only the physical Sort Now executor; its raw-ID persisted configuration
+# methods and direct Numbers editor helpers are retired from production and
+# Keynote examples.  Calls on an explicitly named package receiver remain the
+# focused route, while calls on editor/self receivers remain legacy host use.
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_METHODS = frozenset(
+    {"slide_table_title_settings", "set_slide_table_title_settings"}
+)
+IWA_KEYNOTE_SLIDE_TABLE_TITLE_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_table_title_settings|"
+    r"set_slide_table_title_settings|edit_slide_table_title|"
+    r"apply_slide_table_title)\b[ \t\r\n]*\(",
+)
+IWA_KEYNOTE_SLIDE_TABLE_TITLE_NUMBERS_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:table_title_settings_in_package|"
+    r"set_table_title_settings_in_package)\b"
+)
+
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_SORT_METHODS = frozenset(
+    {
+        "slide_table_sort_order",
+        "set_slide_table_sort_order",
+        "clear_slide_table_sort_order",
+    }
+)
+IWA_KEYNOTE_SLIDE_TABLE_SORT_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_table_sort_order|"
+    r"set_slide_table_sort_order|clear_slide_table_sort_order|"
+    r"edit_slide_table_sort_order|apply_slide_table_sort_order|"
+    r"apply_slide_table_sort_order_to_rows)\b[ \t\r\n]*\(",
+)
+IWA_KEYNOTE_SLIDE_TABLE_SORT_NUMBERS_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:table_sort_order_in_package|"
+    r"set_table_sort_order_in_package|clear_table_sort_order_in_package)\b"
+)
+IWA_KEYNOTE_SLIDE_TABLE_CONFIG_PACKAGE_RECEIVERS = frozenset(
+    {
+        "package",
+        "keynote_package",
+        "focused_package",
+        "focused_keynote",
+        "sort_package",
+        "title_package",
+        "lock_package",
+    }
+)
+IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 
 # Wave101 moves only the Keynote slide-table *listing* discovery boundary onto
 # a bounded catalog and a neutral, borrowed projection.  The native editor
@@ -23456,6 +23621,15 @@ def audit_iwa_keynote_slide_table_appearance_source_topology(
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     if source_root.is_dir():
         for path in sorted(source_root.rglob("*.rs")):
+            # The lock owner is retired independently of appearance.  It may
+            # be present while a migration is in flight, and it may disappear
+            # between rglob() and read_text() when another checkout edit
+            # removes it.  Do not let the appearance audit inspect that owner
+            # or turn a normal concurrent deletion into a checker crash.
+            if path == root / IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_SOURCE:
+                continue
+            if not path.is_file():
+                continue
             # Included test modules are compatibility oracles even when the
             # standalone file has no local cfg(test) attribute.
             if path.name == "tests.rs" or "tests" in path.parts:
@@ -23466,7 +23640,13 @@ def audit_iwa_keynote_slide_table_appearance_source_topology(
             # import, or package call would reject the migration itself.
             if path.relative_to(root) == IWA_KEYNOTE_SLIDE_TABLE_APPEARANCE_COMPATIBILITY_BRIDGE:
                 continue
-            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            try:
+                source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                # A concurrent migration edit can remove a file after the
+                # regular-file check above.  The next audit observes the
+                # resulting tree; this pass should remain deterministic.
+                continue
             code = _mask_rust_non_code(source)
             for name, line_number in _rust_function_declarations(code):
                 if name in RETIRED_IWA_KEYNOTE_SLIDE_TABLE_APPEARANCE_METHODS:
@@ -23494,7 +23674,14 @@ def audit_iwa_keynote_slide_table_appearance_source_topology(
     example_root = root / IWA_KEYNOTE_SLIDE_TABLE_APPEARANCE_EXAMPLE_ROOT
     if example_root.is_dir():
         for example_path in sorted(example_root.rglob("*.rs")):
-            source = _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+            if not example_path.is_file():
+                continue
+            try:
+                source = _mask_rust_cfg_test_items(
+                    example_path.read_text(encoding="utf-8")
+                )
+            except FileNotFoundError:
+                continue
             code = _mask_rust_non_code(source)
             for match in IWA_KEYNOTE_SLIDE_TABLE_APPEARANCE_CALL.finditer(code):
                 if not _keynote_slide_table_appearance_example_is_keynote(
@@ -28939,6 +29126,232 @@ def audit_keynote_slide_table_sort_resource_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_table_lock_state_owner_present(root: Path) -> bool:
+    """Return whether the Wave105 persisted lock owner is active."""
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_lock_state\s*;",
+        package_source,
+    ) is not None
+
+
+def audit_keynote_slide_table_lock_state_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Keynote lock-state facade."""
+
+    if not _keynote_slide_table_lock_state_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[1]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+slide_table_lock_state\b",
+        code[package_path] + code[lib_path],
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table lock owner module must remain private: "
+            f"{KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[0]}"
+        )
+    if re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_lock_state\s*;",
+        code[package_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table lock owner module is missing: "
+            f"{KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table lock public API is missing "
+                    f"canonical type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_TYPES,
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_TYPES - semantic_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table lock semantic API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE}"
+        )
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+transaction\b",
+        code[semantic_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table lock public API is missing "
+            f"slide::table::lock::transaction: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        sources[semantic_path], KEYNOTE_SLIDE_TABLE_LOCK_STATE_TRANSACTION_TYPES
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_TRANSACTION_TYPES - transaction_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table lock transaction API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE}"
+        )
+
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_TYPES,
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_TYPES - selector_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table lock public API is missing selector "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES[1]}"
+        )
+    if re.search(
+        r"impl[ \t\r\n]+(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*)?"
+        r"TableSelector\b[\s\S]*?\bpub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+        r"(?:index|position)\b",
+        code[selector_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table lock selector must expose checked "
+            f"TableSelector::index/position: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_SOURCE}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_LOCK_STATE_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-table lock Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_table_lock_state":
+            for selector in ("SlideSelector", "TableSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-table lock Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
+                    )
+        if name == "apply_slide_table_lock_state" and (
+            "SlideTableLockStatePatch" not in declaration
+        ):
+            violations.append(
+                "focused litchi-keynote slide-table lock apply method must accept "
+                f"SlideTableLockStatePatch: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "SlideTableLockStateEdit"
+        )
+    }
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_EDIT_METHODS - edit_methods
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table lock edit is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_TABLE_LOCK_STATE_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_TABLE_LOCK_STATE_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_TABLE_LOCK_STATE_FLAT_ALIASES
+    )
+    dedicated_sources = {owner_path, semantic_path}
+    for path in paths:
+        dedicated = path in dedicated_sources
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not identifiers.intersection(facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier == "litchi_iwa_common":
+                    reason = None
+                elif identifier in KEYNOTE_SLIDE_TABLE_LOCK_STATE_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_SLIDE_TABLE_LOCK_STATE_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_SLIDE_TABLE_LOCK_STATE_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    identifier_line = line_number + declaration.count(
+                        "\n", 0, declaration.find(identifier)
+                    )
+                    violations.append(
+                        "focused litchi-keynote slide-table lock public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                if identifier in KEYNOTE_SLIDE_TABLE_LOCK_STATE_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote slide-table lock public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote slide-table lock public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_TABLE_LOCK_STATE_PUBLIC_RAW_ID_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table lock public API exposes raw parameter "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-table lock public API retains a glob "
+                    f"re-export: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def _keynote_slide_table_headers_owner_present(root: Path) -> bool:
     """Return whether the Wave100 slide-table-header owner is active.
 
@@ -29474,6 +29887,330 @@ def audit_iwa_keynote_slide_table_headers_source_topology(
                     "retired litchi-iwa Keynote slide-table-header example call "
                     f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
                 )
+    return sorted(set(violations))
+
+
+def _iwa_keynote_config_call_is_legacy(source: str, match_start: int) -> bool:
+    """Classify a same-spelled call as editor/legacy or focused Package use."""
+
+    line_start = source.rfind("\n", 0, match_start) + 1
+    prefix = source[line_start:match_start]
+    if re.search(
+        r"\b(?:package|keynote_package|focused_package|sort_package|"
+        r"title_package|lock_package|focused_keynote)\s*(?:\(\))?\s*\.\s*$",
+        prefix,
+    ):
+        return False
+    # Rust method chains are commonly formatted with the receiver on the
+    # preceding line (`let patch = package\n    .edit_...`).  Keep the
+    # receiver-aware distinction across that formatting boundary too.
+    lookback = source[max(0, match_start - 240) : match_start]
+    if re.search(
+        r"\b(?:package|keynote_package|focused_package|sort_package|"
+        r"title_package|lock_package|focused_keynote)\s*\n[ \t]*\.\s*$",
+        lookback,
+    ):
+        return False
+    # Permit a visible fully qualified constructor chain such as
+    # `litchi_keynote::Package::from_bytes(...).edit_...(...)` as well.
+    if re.search(
+        r"(?:litchi_keynote\s*::\s*)?Package\s*::[^;{}]*\.\s*$",
+        prefix,
+    ):
+        return False
+    return True
+
+
+def _iwa_keynote_config_example_is_keynote(
+    path: Path,
+    source: str,
+    match_start: int,
+) -> bool:
+    """Identify a Keynote branch in the shared IWA example directory."""
+
+    if "keynote" in path.stem.lower():
+        return True
+    line_start = source.rfind("\n", 0, match_start) + 1
+    line_end = source.find("\n", match_start)
+    if line_end < 0:
+        line_end = len(source)
+    line = source[line_start:line_end].lower()
+    if "keynote" in line:
+        return True
+    prefix = source[:match_start]
+    function_matches = list(
+        re.finditer(r"\bfn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b", prefix)
+    )
+    return bool(function_matches and "keynote" in function_matches[-1].group(1).lower())
+
+
+def _audit_iwa_keynote_slide_table_config_source_topology(
+    root: Path,
+    *,
+    feature: str,
+) -> list[str]:
+    """Audit the retired IWA title/sort config routes for one feature."""
+
+    if feature == "title":
+        owner_present = _keynote_slide_table_title_owner_present(root)
+        retired_methods = RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_METHODS
+        call_pattern = IWA_KEYNOTE_SLIDE_TABLE_TITLE_CALL
+        numbers_helper = IWA_KEYNOTE_SLIDE_TABLE_TITLE_NUMBERS_HELPER
+        label = "title"
+        physical_methods: frozenset[str] = frozenset()
+    elif feature == "sort":
+        owner_present = _keynote_slide_table_sort_owner_present(root)
+        retired_methods = RETIRED_IWA_KEYNOTE_SLIDE_TABLE_SORT_METHODS
+        call_pattern = IWA_KEYNOTE_SLIDE_TABLE_SORT_CALL
+        numbers_helper = IWA_KEYNOTE_SLIDE_TABLE_SORT_NUMBERS_HELPER
+        label = "sort"
+        physical_methods = frozenset(
+            {"apply_slide_table_sort_order", "apply_slide_table_sort_order_to_rows"}
+        )
+    else:  # pragma: no cover - private helper is called with fixed features.
+        raise ValueError(f"unknown Keynote table-config feature: {feature}")
+
+    if not owner_present:
+        return []
+
+    violations: list[str] = []
+    focused_call_seen = False
+    scanned_source = False
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+
+    def inspect_source(path: Path, *, example: bool) -> None:
+        nonlocal focused_call_seen, scanned_source
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        code = _mask_rust_non_code(production_source)
+        scanned_source = True
+        relative = path.relative_to(root)
+        for match in declaration.finditer(code):
+            name = match.group(1)
+            if name in retired_methods:
+                line_number = code.count("\n", 0, match.start()) + 1
+                scope = "example " if example else ""
+                violations.append(
+                    f"retired litchi-iwa Keynote slide-table-{label} {scope}method "
+                    f"{name}: {relative}:{line_number}"
+                )
+
+        for match in numbers_helper.finditer(code):
+            if example and not _iwa_keynote_config_example_is_keynote(
+                path, code, match.start()
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start()) + 1
+            scope = "example " if example else ""
+            violations.append(
+                f"retired litchi-iwa Numbers persisted table-{label} {scope}helper "
+                f"{match.group(0)}: {relative}:{line_number}"
+            )
+
+        for match in call_pattern.finditer(code):
+            if example and not _iwa_keynote_config_example_is_keynote(
+                path, code, match.start()
+            ):
+                continue
+            method = match.group("method")
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            line_end = code.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(code)
+            line = code[line_start:line_end]
+            if re.search(rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line):
+                continue
+            focused = not _iwa_keynote_config_call_is_legacy(code, match.start())
+            if focused:
+                focused_call_seen = True
+                continue
+            # The sort method has one intentionally retained raw-ID route:
+            # physical Sort Now and its row-range executor.  Its Numbers
+            # helpers have distinct `apply_*` names and are not matched by
+            # the persisted-helper regex above.
+            if method in physical_methods:
+                continue
+            line_number = code.count("\n", 0, match.start("method")) + 1
+            scope = "example " if example else ""
+            violations.append(
+                f"retired litchi-iwa Keynote slide-table-{label} {scope}call "
+                f"{method}: {relative}:{line_number}"
+            )
+
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name == "tests.rs" or "tests" in path.parts:
+                continue
+            inspect_source(path, example=False)
+
+    example_root = root / IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for path in sorted(example_root.rglob("*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            production_source = _mask_rust_cfg_test_items(raw_source)
+            code = _mask_rust_non_code(production_source)
+            relevant = "keynote" in path.stem.lower()
+            if not relevant:
+                relevant = any(
+                    _iwa_keynote_config_example_is_keynote(path, code, match.start())
+                    for match in (
+                        *call_pattern.finditer(code),
+                        *numbers_helper.finditer(code),
+                    )
+                )
+            if not relevant:
+                continue
+            inspect_source(path, example=True)
+
+    if scanned_source and not focused_call_seen:
+        violations.append(
+            f"litchi-iwa Keynote slide-table-{label} persisted configuration must "
+            "call the focused litchi-keynote Package"
+        )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_slide_table_title_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Keynote title configuration in favor of Package calls."""
+
+    return _audit_iwa_keynote_slide_table_config_source_topology(root, feature="title")
+
+
+def audit_iwa_keynote_slide_table_sort_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire persisted raw sort routes while preserving physical Sort Now."""
+
+    return _audit_iwa_keynote_slide_table_config_source_topology(root, feature="sort")
+
+
+def audit_iwa_keynote_slide_table_lock_state_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Keynote lock state while preserving physical sort executors.
+
+    Persisted lock state belongs to the selector-first ``litchi-keynote``
+    package.  The former editor module and its raw ``crate::table_lock``
+    bridge must disappear from production.  This audit intentionally scans
+    the whole Keynote host, including the physical sort executor, so a Sort
+    Now implementation cannot acquire a hidden dependency on that retired
+    helper.  The sort executor's ``apply_slide_table_sort_order*`` methods
+    themselves remain allowed by the separate sort ratchet.
+    """
+
+    if not _keynote_slide_table_lock_state_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    focused_call_seen = False
+    scanned_source = False
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    raw_module = re.compile(
+        r"(?<![A-Za-z0-9_])(?:crate\s*::\s*)?table_lock\s*::"
+    )
+
+    def inspect_source(path: Path, *, example: bool) -> None:
+        nonlocal focused_call_seen, scanned_source
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        code = _mask_rust_non_code(production_source)
+        scanned_source = True
+        relative = path.relative_to(root)
+
+        if not example and path == root / IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_SOURCE:
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-lock source returned: "
+                f"{relative}"
+            )
+
+        for match in declaration.finditer(code):
+            name = match.group(1)
+            if name not in RETIRED_IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_METHODS:
+                continue
+            line_number = code.count("\n", 0, match.start()) + 1
+            scope = "example " if example else ""
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-lock "
+                f"{scope}method {name}: {relative}:{line_number}"
+            )
+
+        for match in raw_module.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-lock raw helper/import "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+
+        for match in IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_RAW_HELPER.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-lock raw helper/import "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+
+        for match in IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_CALL.finditer(code):
+            if example and not _iwa_keynote_config_example_is_keynote(
+                path, code, match.start()
+            ):
+                continue
+            method = match.group("method")
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            line_end = code.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(code)
+            line = code[line_start:line_end]
+            if re.search(rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line):
+                continue
+            focused = not _iwa_keynote_config_call_is_legacy(code, match.start())
+            if focused:
+                focused_call_seen = True
+                continue
+            line_number = code.count("\n", 0, match.start("method")) + 1
+            scope = "example " if example else ""
+            violations.append(
+                "retired litchi-iwa Keynote slide-table-lock "
+                f"{scope}call {method}: {relative}:{line_number}"
+            )
+
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name == "tests.rs" or "tests" in path.parts:
+                continue
+            inspect_source(path, example=False)
+
+    example_root = root / IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for path in sorted(example_root.rglob("*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            production_source = _mask_rust_cfg_test_items(raw_source)
+            code = _mask_rust_non_code(production_source)
+            relevant = "keynote" in path.stem.lower()
+            if not relevant:
+                relevant = any(
+                    _iwa_keynote_config_example_is_keynote(path, code, match.start())
+                    for match in IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_CALL.finditer(code)
+                )
+            if not relevant:
+                continue
+            inspect_source(path, example=True)
+
+    if scanned_source and not focused_call_seen:
+        violations.append(
+            "litchi-iwa Keynote slide-table-lock persisted state must call the "
+            "focused litchi-keynote Package"
+        )
     return sorted(set(violations))
 
 
@@ -32307,8 +33044,12 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_movie_geometry_resource_source_topology()
         + audit_keynote_slide_table_title_facade_source_topology()
         + audit_keynote_slide_table_title_resource_source_topology()
+        + audit_iwa_keynote_slide_table_title_source_topology()
         + audit_keynote_slide_table_sort_facade_source_topology()
         + audit_keynote_slide_table_sort_resource_source_topology()
+        + audit_iwa_keynote_slide_table_sort_source_topology()
+        + audit_keynote_slide_table_lock_state_facade_source_topology()
+        + audit_iwa_keynote_slide_table_lock_state_source_topology()
         + audit_iwa_keynote_slide_table_headers_source_topology()
         + audit_keynote_slide_table_headers_facade_source_topology()
         + audit_keynote_slide_table_headers_resource_source_topology()

@@ -126,12 +126,12 @@ pub(super) fn slide_table_graph_from_graph(
                 "Keynote slide component {slide_archive} is not registered"
             ))
         })?;
-    let lock_state = crate::table_lock::table_lock_state(
-        editor.package(),
-        &table_archive,
-        drawable_object_id,
-        "Keynote",
-    )?;
+    // The generated graph wrapper is retained for legacy native mutation
+    // paths.  Those editor snapshots are not necessarily admitted by the
+    // strict package lock owner, so project the already-decoded drawable
+    // lock bit here.  Public persisted lock reads/writes and Sort Now's
+    // safety gate use the focused package APIs below.
+    let lock_state = TableLockState::from_locked(table_info.super_.locked.unwrap_or(false));
     Ok(SlideTableGraph {
         info: KeynoteSlideTableInfo {
             slide_index,

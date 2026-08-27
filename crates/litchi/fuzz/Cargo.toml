@@ -47,6 +47,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_slide_table_lock_state"
+path = "fuzz_targets/keynote_slide_table_lock_state.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_slide_table_appearance"
 path = "fuzz_targets/keynote_slide_table_appearance.rs"
 test = false

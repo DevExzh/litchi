@@ -15,7 +15,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 litchi_keynote::SlideSelector::index(slide.index),
                 litchi_keynote::TableSelector::index(table_index),
             )?;
-            let title = editor.slide_table_title_settings(slide.index, info.model_object_id)?;
+            let title = package.slide_table_title_settings(
+                litchi_keynote::SlideSelector::index(slide.index),
+                litchi_keynote::TableSelector::index(table_index),
+            )?;
             let row_heights = (0..info.rows)
                 .map(|row| editor.slide_table_row_height(slide.index, info.model_object_id, row))
                 .collect::<Result<Vec<_>, _>>()?;

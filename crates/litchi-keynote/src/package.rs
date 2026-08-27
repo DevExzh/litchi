@@ -20,6 +20,7 @@ mod slide_notes;
 mod slide_order;
 pub(crate) mod slide_table_appearance;
 pub(crate) mod slide_table_headers;
+pub(crate) mod slide_table_lock_state;
 pub(crate) mod slide_table_sort_order;
 mod slide_table_title;
 
@@ -120,6 +121,11 @@ pub use slide_table_headers::{
     SlideTableHeaderCommit, SlideTableHeaderDiagnostics, SlideTableHeaderEdit,
     SlideTableHeaderError, SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind,
     SlideTableHeaderPatch, SlideTableHeaderPath,
+};
+pub use slide_table_lock_state::{
+    SlideTableLockStateCommit, SlideTableLockStateDiagnostics, SlideTableLockStateEdit,
+    SlideTableLockStateError, SlideTableLockStateLimitKind, SlideTableLockStatePatch,
+    SlideTableLockStatePath,
 };
 pub use slide_table_sort_order::{
     SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,

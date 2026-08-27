@@ -28,7 +28,6 @@ mod conditional_highlight;
 mod formula;
 mod graph;
 mod hidden_axes;
-mod lock;
 mod sort;
 mod storage;
 mod title;

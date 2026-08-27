@@ -12,6 +12,8 @@ pub mod appearance;
 pub mod formula;
 /// Lossless header, footer, freeze, and print-repetition settings.
 pub mod headers;
+/// Interactive lock state for a table.
+pub mod lock;
 /// Sort values shared through the neutral iWork semantic model.
 pub mod sort;
 /// Lossless visibility and outline settings for a table title.

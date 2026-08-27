@@ -57,6 +57,158 @@ impl KeynoteEditor {
     }
 }
 
+fn focused_table_index(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<usize> {
+    let tables = editor.slide_tables(slide_index)?;
+    let mut table_index = None;
+    for (index, table) in tables.iter().enumerate() {
+        if table.model_object_id != model_object_id {
+            continue;
+        }
+        if table_index.replace(index).is_some() {
+            return Err(Error::ParseError(format!(
+                "Keynote object {model_object_id} has ambiguous table ownership on slide {slide_index}"
+            )));
+        }
+    }
+    table_index.ok_or_else(|| {
+        Error::ParseError(format!(
+            "Keynote table model {model_object_id} is not owned by slide {slide_index}"
+        ))
+    })
+}
+
+fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
+    litchi_keynote::Package::from_bytes(&editor.to_bytes()?).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
+    })
+}
+
+fn focused_table_title_settings(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<KeynoteTableTitleSettings> {
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    focused_table_package(editor)?
+        .slide_table_title_settings(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote title read failed: {error}"))
+        })
+}
+
+fn set_focused_table_title_settings(
+    editor: &mut KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+    settings: KeynoteTableTitleSettings,
+) -> Result<()> {
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    let commit = focused_table_package(editor)?
+        .edit_slide_table_title(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote title edit failed: {error}"))
+        })?
+        .set(settings)
+        .commit()
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote title commit failed: {error}"))
+        })?;
+    if commit.patch().is_noop() {
+        return Ok(());
+    }
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote title write failed: {error}"))
+    })?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn focused_table_sort_order(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<Option<Order>> {
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    focused_table_package(editor)?
+        .slide_table_sort_order(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .map_err(|error| Error::InvalidFormat(format!("focused Keynote sort read failed: {error}")))
+}
+
+fn set_focused_table_sort_order(
+    editor: &mut KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+    order: Order,
+) -> Result<()> {
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    let commit = focused_table_package(editor)?
+        .edit_slide_table_sort_order(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote sort edit failed: {error}"))
+        })?
+        .set(order)
+        .commit()
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote sort commit failed: {error}"))
+        })?;
+    if commit.patch().is_noop() {
+        return Ok(());
+    }
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote sort write failed: {error}"))
+    })?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn clear_focused_table_sort_order(
+    editor: &mut KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<()> {
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    let commit = focused_table_package(editor)?
+        .edit_slide_table_sort_order(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote sort edit failed: {error}"))
+        })?
+        .clear()
+        .commit()
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote sort clear failed: {error}"))
+        })?;
+    if commit.patch().is_noop() {
+        return Ok(());
+    }
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote sort write failed: {error}"))
+    })?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
         DrawablePoint { x: 120.0, y: 180.0 },
@@ -1227,12 +1379,13 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     )])
     .unwrap();
 
-    assert_eq!(editor.slide_table_sort_order(0, model_id).unwrap(), None);
-    editor
-        .set_slide_table_sort_order(0, model_id, order.clone())
-        .unwrap();
     assert_eq!(
-        editor.slide_table_sort_order(0, model_id).unwrap(),
+        focused_table_sort_order(&editor, 0, model_id).unwrap(),
+        None
+    );
+    set_focused_table_sort_order(&mut editor, 0, model_id, order.clone()).unwrap();
+    assert_eq!(
+        focused_table_sort_order(&editor, 0, model_id).unwrap(),
         Some(order.clone())
     );
     assert!(editor.apply_slide_table_sort_order(0, model_id).unwrap());
@@ -1287,7 +1440,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reopened.slide_table_sort_order(0, model_id).unwrap(),
+        focused_table_sort_order(&reopened, 0, model_id).unwrap(),
         Some(order.clone())
     );
     assert_eq!(
@@ -1310,9 +1463,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         hidden
     );
     let unchanged = reopened.to_bytes().unwrap();
-    reopened
-        .set_slide_table_sort_order(0, model_id, order)
-        .unwrap();
+    set_focused_table_sort_order(&mut reopened, 0, model_id, order).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
     let invalid = Order::new([SortRule::new(
@@ -1321,11 +1472,7 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     )])
     .unwrap();
     let before_invalid = reopened.to_bytes().unwrap();
-    assert!(
-        reopened
-            .set_slide_table_sort_order(0, model_id, invalid)
-            .is_err()
-    );
+    assert!(set_focused_table_sort_order(&mut reopened, 0, model_id, invalid).is_err());
     assert_eq!(reopened.to_bytes().unwrap(), before_invalid);
 
     let selected_order = Order::selected_rows([SortRule::new(
@@ -1333,11 +1480,9 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         Direction::Descending,
     )])
     .unwrap();
-    reopened
-        .set_slide_table_sort_order(0, model_id, selected_order.clone())
-        .unwrap();
+    set_focused_table_sort_order(&mut reopened, 0, model_id, selected_order.clone()).unwrap();
     assert_eq!(
-        reopened.slide_table_sort_order(0, model_id).unwrap(),
+        focused_table_sort_order(&reopened, 0, model_id).unwrap(),
         Some(selected_order)
     );
     let before_wrong_executor = reopened.to_bytes().unwrap();
@@ -1391,10 +1536,13 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         hidden
     );
 
-    reopened.clear_slide_table_sort_order(0, model_id).unwrap();
-    assert_eq!(reopened.slide_table_sort_order(0, model_id).unwrap(), None);
+    clear_focused_table_sort_order(&mut reopened, 0, model_id).unwrap();
+    assert_eq!(
+        focused_table_sort_order(&reopened, 0, model_id).unwrap(),
+        None
+    );
     let unchanged = reopened.to_bytes().unwrap();
-    reopened.clear_slide_table_sort_order(0, model_id).unwrap();
+    clear_focused_table_sort_order(&mut reopened, 0, model_id).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
     assert!(reopened.apply_slide_table_sort_order(0, model_id).is_err());
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
@@ -1757,57 +1905,42 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     let visible = KeynoteTableTitleSettings::new(Some(true), Some(true));
     let initially_hidden = KeynoteTableTitleSettings::new(Some(false), None);
     assert_eq!(
-        editor
-            .slide_table_title_settings(0, table.model_object_id)
-            .unwrap(),
+        focused_table_title_settings(&editor, 0, table.model_object_id).unwrap(),
         initially_hidden
     );
-    editor
-        .set_slide_table_title_settings(0, table.model_object_id, visible)
-        .unwrap();
+    set_focused_table_title_settings(&mut editor, 0, table.model_object_id, visible).unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        reopened
-            .slide_table_title_settings(0, table.model_object_id)
-            .unwrap(),
+        focused_table_title_settings(&reopened, 0, table.model_object_id).unwrap(),
         visible
     );
     let unchanged = reopened.to_bytes().unwrap();
-    reopened
-        .set_slide_table_title_settings(0, table.model_object_id, visible)
-        .unwrap();
+    set_focused_table_title_settings(&mut reopened, 0, table.model_object_id, visible).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
     let explicit_hidden = KeynoteTableTitleSettings::new(Some(false), Some(false));
-    reopened
-        .set_slide_table_title_settings(0, table.model_object_id, explicit_hidden)
+    set_focused_table_title_settings(&mut reopened, 0, table.model_object_id, explicit_hidden)
         .unwrap();
     assert_eq!(
-        reopened
-            .slide_table_title_settings(0, table.model_object_id)
-            .unwrap(),
+        focused_table_title_settings(&reopened, 0, table.model_object_id).unwrap(),
         explicit_hidden
     );
-    reopened
-        .set_slide_table_title_settings(
-            0,
-            table.model_object_id,
-            KeynoteTableTitleSettings::default(),
-        )
-        .unwrap();
+    set_focused_table_title_settings(
+        &mut reopened,
+        0,
+        table.model_object_id,
+        KeynoteTableTitleSettings::default(),
+    )
+    .unwrap();
     assert_eq!(
-        reopened
-            .slide_table_title_settings(0, table.model_object_id)
-            .unwrap(),
+        focused_table_title_settings(&reopened, 0, table.model_object_id).unwrap(),
         KeynoteTableTitleSettings::default()
     );
 
     let before_error = reopened.to_bytes().unwrap();
     assert!(
-        reopened
-            .set_slide_table_title_settings(1, table.model_object_id, visible)
-            .is_err()
+        set_focused_table_title_settings(&mut reopened, 1, table.model_object_id, visible).is_err()
     );
     assert_eq!(reopened.to_bytes().unwrap(), before_error);
 }

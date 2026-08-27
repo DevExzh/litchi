@@ -375,6 +375,60 @@ cargo +nightly fuzz list
 cargo +nightly fuzz check movie_playback_codec
 ```
 
+## Format-neutral TableInfo ownership and lock codec
+
+`table_info_codec` fuzzes the strict generated-free `TST.TableInfoArchive`
+projection used by the Pages and Keynote table owners. It replays the complete
+lock-aware snapshot and the model-reference convenience decoder against the
+same caller-owned bytes, covering absent, explicit `locked=false`, and
+`locked=true` envelopes. Required `super`, table-model, and nested identifier
+routes are checked alongside zero identifiers, duplicate singular fields,
+wrong-wire fields, non-canonical framing, truncated payloads, and malformed or
+mismatched unknown groups. A successful decode must leave the source bytes
+unchanged and both public decoder entry points must agree.
+
+For every valid source, the target also exercises the prepared
+`prepare_table_info_lock_rewrite` contract for absent, explicit false, and
+explicit true lock representations. It checks prepare-report and execution-
+requirement parity, exact execution, strict candidate reread, no-op byte
+identity, inverse restoration, one-shot parity, and stale-fingerprint
+rejection. Each prepared input and execution ceiling is probed at
+max-minus-one for input bytes, output bytes, fields, work bytes, nesting,
+logical allocations, retained bytes, and scratch bytes; rejected probes must
+leave the caller-owned source unchanged. The rewrite path is raw-preserving:
+unknown canonical scalars, fixed-width values, length-delimited values, and
+balanced groups remain in the source framing while only the selected lock
+field may change.
+
+The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
+fields, 256 KiB of strict-plus-projection work, and recursion depth 64. The
+checked-in recipes under `corpus/table_info_codec/` are hand-authored `hex:`
+protobuf payloads, not native package archives. The prepared rewrite keeps all
+candidate bytes in the codec-owned output and applies its exact requirements
+before execution; this target reports codec-owned logical limits rather than
+allocator/RSS telemetry.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check table_info_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-info-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/table_info_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  table_info_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Format-neutral table-appearance codec
 
 `table_appearance` drives the generated-free `table_appearance_codec` facade

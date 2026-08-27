@@ -350,12 +350,15 @@ pub use package::{
     SlideTableAppearanceError, SlideTableAppearanceLimitKind, SlideTableAppearancePatch,
     SlideTableAppearancePath, SlideTableHeaderCommit, SlideTableHeaderDiagnostics,
     SlideTableHeaderEdit, SlideTableHeaderError, SlideTableHeaderInvalidReason,
-    SlideTableHeaderLimitKind, SlideTableHeaderPatch, SlideTableHeaderPath, SlideTableSortCommit,
-    SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind,
-    SlideTableSortPatch, SlideTableSortPath, SlideTableTitleCommit, SlideTableTitleDiagnostics,
-    SlideTableTitleEdit, SlideTableTitleError, SlideTableTitleLimitKind, SlideTableTitlePatch,
-    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch, Stats, TextStorageFailure, WriteError,
+    SlideTableHeaderLimitKind, SlideTableHeaderPatch, SlideTableHeaderPath,
+    SlideTableLockStateCommit, SlideTableLockStateDiagnostics, SlideTableLockStateEdit,
+    SlideTableLockStateError, SlideTableLockStateLimitKind, SlideTableLockStatePatch,
+    SlideTableLockStatePath, SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit,
+    SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath,
+    SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
+    SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit, SlideTextDiagnostics,
+    SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure,
+    WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};

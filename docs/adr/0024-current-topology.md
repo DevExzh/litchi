@@ -3077,3 +3077,45 @@ The `litchi-iwa -> litchi-pages` edge, all 13 ordered migration debts
 (including 017), generated/Prost/Buffa owners, and the monolith deletion gate
 remain unchanged. Wave104 retires no crate, edge, debt, manifest dependency,
 host adapter, generated owner, or monolith owner.
+
+## 2026-08-28 amendment: Wave105 current-topology Keynote slide-table persisted lock owner (not a monolith-exit gate)
+
+`litchi-keynote::Package` is now the selector-first owner for persisted
+slide-table lock reads and lock-state read/edit/apply transactions. Its public
+`State`, patch, edit, commit, diagnostics, error, limit, path, and selector
+values are archive-free and do not expose native IDs, Archive/ZIP/member data,
+wire views, or generated/Prost/Buffa types. Strict `table_info_codec` parsing
+and prepared lock rewriting preserve unrelated fields and fail closed on
+malformed, ambiguous, or unsupported sources while admitting exact lock and
+unlock transitions.
+
+The legacy Keynote editor no longer owns persisted title, sort, or lock
+configuration methods/calls. `litchi-iwa` retains the physical `Sort Now` row
+executor only; it may run after focused Package persisted `Order` and lock
+admission, and it has no lock fallback. Every focused lock error propagates.
+Physical row/cell/storage/formula/tile and broader table compatibility remain
+in the legacy host.
+
+Wave105 gates are 17/17 for the lock codec, 9/9 for focused Keynote lock
+integration, 30/30 for the IWA slide-table suite, four migrated Keynote
+example checks, and 625/625 boundary tests with passing `py_compile`. Strict
+Keynote/protos checks and Clippy passed, as did both isolated fuzz checks (15
+codec seeds and eight lifecycle command seeds). Scoped title/sort/lock audits
+are empty; the live full checker reports only three unrelated untracked Pages
+table-lock violations. No full-workspace result is implied.
+
+The only lock driver attempt used the temporary-only compiled driver against
+`/private/tmp/wave100-native-table-headers-source.key` (500,128 bytes,
+SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`, 86
+members). Strict Package read at slide 0/table 0 returned `InvalidSource`
+before mutation; source bytes/hash stayed exact, with no candidate, inverse,
+or UI run. Native mutation/save/reopen acceptance is withheld.
+
+This is a topology and scoped-gate record, not allocator/RSS telemetry: the
+Package/SourceCatalog cache, decompressed Archives, process allocator, and
+codec-internal allocator behavior are not observable, and no zero-copy or RSS
+claim follows. No crate, manifest dependency, dependency edge, or migration
+debt is closed. The `litchi-iwa -> litchi-keynote` edge, all 13 ordered debts
+(including 014, 015, 016, and 017), generated/Prost/Buffa owners, and the IWA
+monolith deletion gate remain unchanged.
