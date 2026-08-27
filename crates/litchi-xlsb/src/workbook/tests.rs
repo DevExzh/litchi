@@ -47,6 +47,8 @@ fn empty_workbook() -> Workbook {
     Workbook {
         package: OpcPackage::new(),
         worksheets: Vec::new(),
+        worksheet_names: Vec::new(),
+        worksheet_positions: Vec::new(),
         worksheet_rel_ids: Vec::new(),
         formula_context: Context::default(),
         shared_strings: Vec::new(),
@@ -193,6 +195,8 @@ fn parse_external_link_with_relationship_type(
     let workbook = Workbook {
         package,
         worksheets: Vec::new(),
+        worksheet_names: Vec::new(),
+        worksheet_positions: Vec::new(),
         worksheet_rel_ids: Vec::new(),
         formula_context: Context::default(),
         shared_strings: Vec::new(),
@@ -337,7 +341,7 @@ fn reads_formula_records_from_real_workbook_fixture() {
     );
     let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
     let mut formula_cells = Vec::new();
-    for index in 0..workbook.formula_context.worksheet_names.len() {
+    for index in 0..workbook.worksheet_names.len() {
         let worksheet = workbook.worksheet(index).unwrap();
         if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
             for row in min_row..=max_row {
@@ -421,7 +425,7 @@ fn reads_rich_and_phonetic_shared_strings_from_local_fixtures() {
     assert_eq!(rich.text, "hello, xssf");
     assert_eq!(rich.runs[0].character_index, 0);
     let mut found_cell_text = false;
-    for index in 0..workbook.formula_context.worksheet_names.len() {
+    for index in 0..workbook.worksheet_names.len() {
         let worksheet = workbook.worksheet(index).unwrap();
         let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() else {
             continue;
@@ -542,7 +546,7 @@ fn resolves_cell_style_references_from_real_fixtures() {
         let workbook = Workbook::new(File::open(path).unwrap())
             .unwrap_or_else(|error| panic!("{fixture}: {error}"));
         assert!(!workbook.styles().cell_xfs.is_empty(), "{fixture}");
-        for index in 0..workbook.formula_context.worksheet_names.len() {
+        for index in 0..workbook.worksheet_names.len() {
             let worksheet = workbook.worksheet(index).unwrap();
             if let Some((min_row, min_col, max_row, max_col)) = worksheet.dimensions() {
                 for row in min_row..=max_row {
@@ -583,6 +587,8 @@ fn reads_external_book_metadata_from_local_fixture() {
     let workbook = Workbook {
         package,
         worksheets: Vec::new(),
+        worksheet_names: Vec::new(),
+        worksheet_positions: Vec::new(),
         worksheet_rel_ids: Vec::new(),
         formula_context: Context::default(),
         shared_strings: Vec::new(),

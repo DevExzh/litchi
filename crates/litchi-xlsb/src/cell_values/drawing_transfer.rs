@@ -285,9 +285,12 @@ fn plan_source(source: &Workbook, source_sheet: usize, source_anchor: usize) -> 
     let source_location = locate_drawing(source, source_sheet)?
         .ok_or_else(|| refused(DrawingTransferRefusal::SourceDrawingMissing))?;
     let source_part = source.package.get_part(&source_location.uri)?;
-    let source_inventory = source.sheet_drawing(source_sheet).ok_or_else(|| {
-        Error::InvalidFormat("source BrtDrawing has no decoded drawing inventory".to_string())
-    })?;
+    let source_catalog_position = source.catalog_position_for_worksheet(source_sheet)?;
+    let source_inventory = source
+        .sheet_drawing(source_catalog_position)
+        .ok_or_else(|| {
+            Error::InvalidFormat("source BrtDrawing has no decoded drawing inventory".to_string())
+        })?;
     let source_xml = effective_drawing_xml(source_part.blob())?;
     let layout = drawing_layout(&source_xml)?;
     if layout.anchors.len() != source_inventory.drawing.anchors.len() {
@@ -739,9 +742,12 @@ fn validate_readback(
     plan: &TargetPlan,
     added: usize,
 ) -> Result<()> {
-    let after = target.sheet_drawing(target_sheet).ok_or_else(|| {
-        Error::InvalidFormat("transferred drawing failed semantic readback".to_string())
-    })?;
+    let target_catalog_position = target.catalog_position_for_worksheet(target_sheet)?;
+    let after = target
+        .sheet_drawing(target_catalog_position)
+        .ok_or_else(|| {
+            Error::InvalidFormat("transferred drawing failed semantic readback".to_string())
+        })?;
     let expected = plan
         .layout
         .anchors

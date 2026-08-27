@@ -114,6 +114,7 @@ pub(crate) struct Workbook {
     date1904: bool,
     eager: OnceLock<xlsb::Workbook>,
     eager_init: Mutex<()>,
+    worksheet_ordinals: Box<[Option<usize>]>,
     worksheets: Box<[OnceLock<Arc<xlsb::Worksheet>>]>,
     worksheet_init: Box<[Mutex<()>]>,
 }
@@ -142,6 +143,30 @@ impl Workbook {
             .map_err(boxed_xlsb_error)?
             .into_boxed_slice();
         let catalog_count = workbook.sheet_count().map_err(boxed_xlsb_error)?;
+        let source_worksheets = workbook.worksheets().map_err(boxed_xlsb_error)?;
+        let mut worksheet_ordinals = Vec::new();
+        worksheet_ordinals
+            .try_reserve_exact(catalog_count)
+            .map_err(|source| {
+                Box::new(litchi_core::Error::Allocation {
+                    resource: "XLSB worksheet ordinal map",
+                    source,
+                }) as BoxError
+            })?;
+        worksheet_ordinals.resize(catalog_count, None);
+        for (worksheet_index, worksheet) in source_worksheets.iter().enumerate() {
+            let catalog_position = worksheet.workbook_position().map_err(boxed_xlsb_error)?;
+            let ordinal = worksheet_ordinals
+                .get_mut(catalog_position)
+                .ok_or_else(|| {
+                    boxed_error("XLSB worksheet ordinal map position is out of bounds")
+                })?;
+            if ordinal.replace(worksheet_index).is_some() {
+                return Err(boxed_error(
+                    "XLSB worksheet ordinal map contains a duplicate catalog position",
+                ));
+            }
+        }
         let date1904 = workbook.is_1904_date_system().map_err(boxed_xlsb_error)?;
         let worksheets = std::iter::repeat_with(OnceLock::new)
             .take(catalog_count)
@@ -159,6 +184,7 @@ impl Workbook {
             date1904,
             eager: OnceLock::new(),
             eager_init: Mutex::new(()),
+            worksheet_ordinals: worksheet_ordinals.into_boxed_slice(),
             worksheets,
             worksheet_init,
         })
@@ -215,7 +241,19 @@ impl Workbook {
         if let Some(worksheet) = source.get() {
             return Ok(Arc::clone(worksheet));
         }
-        let worksheet = Arc::new(workbook.worksheet(index).map_err(boxed_xlsb_error)?);
+        let worksheet_index = self
+            .worksheet_ordinals
+            .get(index)
+            .copied()
+            .flatten()
+            .ok_or_else(|| {
+                boxed_error("XLSB eager worksheet catalog position is not a worksheet")
+            })?;
+        let worksheet = Arc::new(
+            workbook
+                .worksheet(worksheet_index)
+                .map_err(boxed_xlsb_error)?,
+        );
         self.ensure_source_current()?;
         source.set(Arc::clone(&worksheet)).map_err(|error| {
             drop(error);

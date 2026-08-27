@@ -20,6 +20,11 @@ use litchi_opc::OpcPackage;
 pub struct Workbook {
     pub(crate) package: OpcPackage,
     pub(super) worksheets: Vec<Worksheet>,
+    /// Worksheet-only names in public worksheet ordinal order.
+    pub(super) worksheet_names: Vec<String>,
+    /// Worksheet ordinal to workbook sheet-catalog position.
+    pub(super) worksheet_positions: Vec<usize>,
+    /// Relationship identifiers in full workbook sheet-catalog order.
     pub(super) worksheet_rel_ids: Vec<Option<String>>,
     pub(crate) formula_context: Context,
     pub(super) shared_strings: Vec<SharedString>,
@@ -47,6 +52,19 @@ impl std::fmt::Debug for Workbook {
 }
 
 impl Workbook {
+    /// Translate a public worksheet ordinal to the full workbook sheet-catalog
+    /// position used by formula and package metadata.
+    pub(crate) fn catalog_position_for_worksheet(
+        &self,
+        index: usize,
+    ) -> crate::package::error::Result<usize> {
+        self.worksheet_positions.get(index).copied().ok_or_else(|| {
+            crate::package::error::Error::InvalidFormat(format!(
+                "Worksheet index {index} out of bounds"
+            ))
+        })
+    }
+
     /// Workbook and sheet-scoped defined names in `PtgName` index order.
     pub fn defined_names(&self) -> &[String] {
         &self.formula_context.defined_names
@@ -119,7 +137,7 @@ impl Workbook {
             .map(|(_, definition)| definition)
     }
     /// Typed structured-table (ListObject) definitions paired with their
-    /// worksheet indexes, in worksheet discovery order (MS-XLSB 2.1.7.51).
+    /// public worksheet ordinals, in worksheet discovery order (MS-XLSB 2.1.7.51).
     ///
     /// These are inert data snapshots: relationship identifiers, external
     /// connection identifiers, differential-formatting identifiers, and
@@ -216,12 +234,12 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
     }
 
     fn worksheet_count(&self) -> usize {
-        self.formula_context.worksheet_names.len()
+        self.worksheet_names.len()
     }
 
     fn worksheet_names(&self) -> &[String] {
         // Return slice reference - zero-copy!
-        &self.formula_context.worksheet_names
+        &self.worksheet_names
     }
 
     fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn SheetTrait + '_>> {
@@ -230,7 +248,7 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
     }
 
     fn worksheet_by_name(&self, name: &str) -> SheetResult<Box<dyn SheetTrait + '_>> {
-        for (i, ws_name) in self.formula_context.worksheet_names.iter().enumerate() {
+        for (i, ws_name) in self.worksheet_names.iter().enumerate() {
             if ws_name == name {
                 return self.worksheet_by_index(i);
             }
@@ -259,7 +277,7 @@ pub struct WorksheetIterator<'a> {
 
 impl<'a> SheetIterator<'a> for WorksheetIterator<'a> {
     fn next(&mut self) -> Option<SheetResult<Box<dyn SheetTrait + 'a>>> {
-        if self.index < self.workbook.formula_context.worksheet_names.len() {
+        if self.index < self.workbook.worksheet_names.len() {
             match self.workbook.worksheet(self.index) {
                 Ok(worksheet) => {
                     self.index += 1;

@@ -10,7 +10,7 @@ use crate::calc::{Delta, Mode, Opts, Threads};
 use crate::comments::{Record, Run};
 use crate::raw::kind;
 use crate::writer::{MutableChartSheet, MutableWorksheet};
-use litchi_core::sheet::WorkbookTrait;
+use litchi_core::sheet::{CellValue, WorkbookTrait};
 use litchi_opc::constants::relationship_type as rel;
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Cursor;
@@ -328,9 +328,23 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
         .unwrap();
 
     let mut workbook = WorkbookWriter::new();
-    workbook.add_worksheet(MutableWorksheet::new("Data"));
+    let mut data = MutableWorksheet::new("Data");
+    data.set_cell(0, 0, 42.0);
+    workbook.add_worksheet(data);
     workbook.add_chart_sheet(chart_sheet).unwrap();
-    workbook.add_worksheet(MutableWorksheet::new("Tail"));
+    let mut tail = MutableWorksheet::new("Tail");
+    tail.set_cell(0, 0, "tail marker");
+    tail.set_cell(
+        0,
+        1,
+        CellValue::Formula {
+            formula: "Data!A1".to_string(),
+            cached_value: Some(Box::new(CellValue::Float(42.0))),
+            is_array: false,
+            array_range: None,
+        },
+    );
+    workbook.add_worksheet(tail);
     assert_eq!(workbook.chart_sheet_count(), 1);
 
     let mut output = Cursor::new(Vec::new());
@@ -340,12 +354,70 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     let reader = crate::Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         reader.worksheet_names(),
-        &[
-            "Data".to_string(),
-            "Sales Chart".to_string(),
-            "Tail".to_string()
-        ]
+        &["Data".to_string(), "Tail".to_string()]
     );
+    assert_eq!(reader.worksheet_count(), 2);
+    assert_eq!(reader.active_sheet_index(), 0);
+    assert_eq!(reader.active_worksheet().unwrap().name(), "Data");
+
+    let data = reader.worksheet_by_index(0).unwrap();
+    assert_eq!(data.name(), "Data");
+    let tail = reader.worksheet_by_index(1).unwrap();
+    assert_eq!(tail.name(), "Tail");
+    assert!(matches!(
+        tail.cell_value(0, 0).unwrap().as_ref(),
+        CellValue::String(value) if value == "tail marker"
+    ));
+    assert!(matches!(
+        tail.cell_value(0, 1).unwrap().as_ref(),
+        CellValue::Formula { formula, .. } if formula == "Data!A1"
+    ));
+    assert!(reader.worksheet_by_name("Data").is_ok());
+    assert!(reader.worksheet_by_name("Tail").is_ok());
+    let chart_name_error = reader
+        .worksheet_by_name("Sales Chart")
+        .err()
+        .expect("chart sheet must not be exposed as a worksheet");
+    assert!(
+        chart_name_error
+            .downcast_ref::<crate::package::error::Error>()
+            .is_some(),
+        "chart-sheet lookup must retain the typed package error"
+    );
+
+    let index_error = reader
+        .worksheet_by_index(2)
+        .err()
+        .expect("worksheet index after Tail must be out of range");
+    assert!(
+        index_error
+            .downcast_ref::<crate::package::error::Error>()
+            .is_some(),
+        "worksheet index failure must retain the typed package error"
+    );
+    let direct_error = match reader.worksheet(2) {
+        Ok(_) => panic!("direct worksheet index after Tail must be out of range"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        direct_error,
+        crate::package::error::Error::InvalidFormat(_)
+    ));
+
+    let mut worksheets = reader.worksheets();
+    let first = worksheets.next().expect("first worksheet").unwrap();
+    assert_eq!(first.name(), "Data");
+    drop(first);
+    let second = worksheets.next().expect("second worksheet").unwrap();
+    assert_eq!(second.name(), "Tail");
+    drop(second);
+    assert!(worksheets.next().is_none());
+
+    assert_eq!(reader.chart_sheets().len(), 1);
+    assert_eq!(reader.chart_sheets()[0].0, 1);
+    assert!(reader.chart_sheet(0).is_none());
+    assert!(reader.chart_sheet(1).is_some());
+    assert!(reader.chart_sheet(2).is_none());
     let parsed = reader.chart_sheet(1).expect("chart sheet missing");
     assert_eq!(parsed.state, State::Hidden);
     assert_eq!(parsed.code_name, "ChartCode");
@@ -364,6 +436,8 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     let drawing = reader.sheet_drawing(1).expect("chart drawing missing");
     assert_eq!(drawing.drawing.anchors.len(), 1);
     assert_eq!(drawing.charts.len(), 1);
+    assert!(reader.sheet_drawing(0).is_none());
+    assert!(reader.sheet_drawing(2).is_none());
     let printer = package
         .get_part(&PackURI::new("/xl/printerSettings/printerSettings1.bin").unwrap())
         .unwrap();

@@ -25,7 +25,6 @@ use crate::formula::{Parser, Resolution, TableReference, Token};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, SupportingLink};
 use crate::raw::{Records, kind};
-use litchi_core::sheet::WorkbookTrait;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NameIdentity {
@@ -49,8 +48,12 @@ pub(super) fn remap(
     target_sheet: usize,
     formula: &CellFormula,
 ) -> Result<CellFormula> {
-    let source_context = source.formula_context.for_sheet(source_sheet);
-    let target_context = target.formula_context.for_sheet(target_sheet);
+    let source_context = source
+        .formula_context
+        .for_sheet(source.catalog_position_for_worksheet(source_sheet)?);
+    let target_context = target
+        .formula_context
+        .for_sheet(target.catalog_position_for_worksheet(target_sheet)?);
     let mut tokens = formula.tokens().to_vec();
     let parsed = Parser::with_extra(formula.tokens(), formula.ancillary())
         .parse_spanned()
@@ -190,7 +193,7 @@ fn defined_names(workbook: &Workbook) -> Result<Vec<NameIdentity>> {
             .map(|sheet| {
                 usize::try_from(sheet)
                     .ok()
-                    .and_then(|sheet| workbook.worksheet_names().get(sheet))
+                    .and_then(|sheet| workbook.formula_context.worksheet_names.get(sheet))
                     .cloned()
                     .ok_or_else(|| {
                         Error::InvalidFormula(format!(
