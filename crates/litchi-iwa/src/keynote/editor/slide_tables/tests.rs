@@ -26,6 +26,37 @@ use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text as TextFormat};
 use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
 
+// Raw-ID header access remains only as compatibility coverage inside the
+// host's cfg(test) module. Production callers use litchi-keynote's checked
+// slide/table selectors and package transactions.
+impl KeynoteEditor {
+    fn slide_table_header_settings(
+        &self,
+        slide_index: usize,
+        model_object_id: u64,
+    ) -> Result<HeaderSettings> {
+        require_table_model(self, slide_index, model_object_id)?;
+        crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
+    }
+
+    fn set_slide_table_header_settings(
+        &mut self,
+        slide_index: usize,
+        model_object_id: u64,
+        settings: HeaderSettings,
+    ) -> Result<()> {
+        require_table_model(self, slide_index, model_object_id)?;
+        let mut staged = self.package().clone();
+        crate::numbers::editor::set_table_header_settings_in_package(
+            &mut staged,
+            model_object_id,
+            settings,
+        )?;
+        *self = KeynoteEditor::from_package(staged)?;
+        Ok(())
+    }
+}
+
 fn table_geometry() -> (DrawablePoint, DrawableSize) {
     (
         DrawablePoint { x: 120.0, y: 180.0 },

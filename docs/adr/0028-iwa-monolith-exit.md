@@ -6044,3 +6044,42 @@ The migration host, generated-schema owners, `litchi-iwa -> litchi-keynote`
 edge, debt 014, debt 016, all other current migration debts, and the IWA
 monolith deletion gate remain unchanged. No crate, dependency edge, debt
 item, host adapter, or monolith is retired by Wave99.
+
+## 2026-08-27 amendment: Wave100 Keynote slide-table headers remains a conservative host cut
+
+Wave100 records a focused `litchi-keynote` package owner for one existing,
+uniquely rooted canonical type-6001 slide table. Its selector-first API uses
+`SlideSelector` and checked z-order `TableSelector`, with archive-free
+`slide::table::headers` semantics and Keynote-prefixed transaction types. A
+strict prepared neutral `numbers_table_header_settings_codec` rewrites one
+canonical table-model message and only the following seven persisted
+header/footer/freeze/repeat settings:
+`header_rows`, `header_columns`,
+`footer_rows`, `header_rows_frozen`, `header_columns_frozen`,
+`repeating_header_rows_enabled`, and `repeating_header_columns_enabled`.
+Unknown raw spans remain authoritative; duplicate, wrong-wire,
+noncanonical, malformed, ambiguous, locked, unsupported, and legacy-6000
+routes fail closed. Candidate reopen/readback, exact inverse, locality, and
+bounded input/output/fields/work/nesting/references/allocation/retained/
+scratch accounting are part of the owner contract.
+
+This cut is not an IWA-monolith exit. It does not move rows or cells, mutate
+formulas or table storage, change metadata/UUIDs/save tokens, delete or
+rewrite previews, or alter dimensions, topology, appearance, or sort state.
+The legacy-call retirement is only for production Keynote host branches and
+Keynote branches in shared examples; compatibility tests and Numbers/Pages
+branches are intentionally retained. Native Keynote 14.4 acceptance covers
+the safe four-flag subset on a real dependency-bearing table: counts remain
+2/1/1, the source/candidate are 500,128/500,134 bytes, the inverse is
+byte-identical to the source, and only `Index/CalculationEngine.iwa` changes.
+Keynote opens the candidate without repair, renders the preserved 5-by-4
+table, and closes and reopens a separately saved normalized copy without
+repair. This is not evidence that count edits are safe in the presence of
+`HauntedOwner`, rooted `HeaderNameMgr`, pivot, category, or grouping
+dependencies; those routes fail closed.
+
+Debt 014, debt 016, the `litchi-iwa -> litchi-keynote` edge, every other
+migration debt, the migration host, generated-schema/normal Prost and Buffa
+owners, and the monolith deletion gate remain. Wave100 retires no crate,
+dependency edge, manifest dependency, host adapter, debt item, generated
+owner, or monolith owner.

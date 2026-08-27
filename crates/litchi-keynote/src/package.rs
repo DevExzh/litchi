@@ -18,6 +18,7 @@ mod slide_movie_playback;
 mod slide_movie_title;
 mod slide_notes;
 mod slide_order;
+pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_sort_order;
 mod slide_table_title;
 
@@ -108,6 +109,11 @@ pub use slide_notes::{
 pub use slide_order::{
     SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
     SlideOrderPatch,
+};
+pub use slide_table_headers::{
+    SlideTableHeaderCommit, SlideTableHeaderDiagnostics, SlideTableHeaderEdit,
+    SlideTableHeaderError, SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind,
+    SlideTableHeaderPatch, SlideTableHeaderPath,
 };
 pub use slide_table_sort_order::{
     SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,

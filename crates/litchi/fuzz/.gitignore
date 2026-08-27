@@ -23,6 +23,8 @@ target
 !/corpus/keynote_movie_playback/*
 !/corpus/keynote_slide_movie_geometry/
 !/corpus/keynote_slide_movie_geometry/*
+!/corpus/keynote_slide_table_headers/
+!/corpus/keynote_slide_table_headers/*
 artifacts
 coverage
 !/corpus/numbers_table_cell_comment_reply/

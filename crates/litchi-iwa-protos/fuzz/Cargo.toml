@@ -106,6 +106,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "numbers_table_header_settings_codec"
+path = "fuzz_targets/numbers_table_header_settings_codec.rs"
+test = false
+doc = false
+bench = false
+
 
 [[bin]]
 name = "comment_storage_codec"

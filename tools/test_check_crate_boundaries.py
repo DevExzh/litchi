@@ -1262,6 +1262,186 @@ def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_headers_canonical_scaffold(
+    root: Path,
+    *,
+    include_codec: bool = True,
+    include_fuzz: bool = True,
+    include_tests: bool = True,
+) -> None:
+    """Install the smallest complete Wave100 header-owner fixture.
+
+    This fixture deliberately models the source topology rather than the
+    native implementation.  It is used to prove that the checker has a
+    dormant gate, a private package owner, selector-first methods, a strict
+    prepared codec seam, and test/fuzz inventory checks without copying any
+    production Rust into the policy suite.
+    """
+
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub use crate::package::slide_table_headers::{\n"
+        "        SlideTableHeaderCommit as Commit,\n"
+        "        SlideTableHeaderDiagnostics as Diagnostics,\n"
+        "        SlideTableHeaderEdit as Edit,\n"
+        "        SlideTableHeaderError as Error,\n"
+        "        SlideTableHeaderInvalidReason as InvalidReason,\n"
+        "        SlideTableHeaderLimitKind as LimitKind,\n"
+        "        SlideTableHeaderPatch as Patch,\n"
+        "        SlideTableHeaderPath as Path,\n"
+        "    };\n"
+        "}\n"
+        "pub use litchi_iwa_common::table::headers::{Count, Error, Settings};\n",
+        encoding="utf-8",
+    )
+
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector {\n"
+        "    pub fn index(index: usize) -> Self { let _ = index; Self }\n"
+        "    pub fn position(index: usize) -> Self { let _ = index; Self }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES
+        )
+        + "struct HeaderBudget;\n"
+        + "enum TransactionWork { One }\n"
+        + "fn budget_residual() { let budget = HeaderBudget; let residual = budget; }\n"
+        + "fn strict_codec() { header_codec; decode_header; prepare_table_header_settings_rewrite; RewriteExecutionRequirements; }\n"
+        + "fn model_rewrite() { TABLE_MODEL_MESSAGE_TYPE; 6_001; rewrite_headers; }\n"
+        + "fn prepared_execution() { execution_requirements; exact_limits; execute; codec_report; }\n"
+        + "fn exact_transaction() { ExactArtifacts; inverse; is_noop; PatchConflict; }\n"
+        + "fn candidate_checks() { candidate.validate; reopen; verify_locality; same_selection; }\n"
+        + "fn preserve_previews() { let diagnostics = Diagnostics { deleted_previews: 0 }; }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_table_header_settings<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Settings, SlideTableHeaderError> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn edit_slide_table_headers<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableHeaderEdit, SlideTableHeaderError> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn apply_slide_table_headers(&self, patch: &SlideTableHeaderPatch) -> Result<SlideTableHeaderCommit, SlideTableHeaderError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableHeaderEdit {\n"
+        + "    pub fn slide_position(&self) -> Position { todo!() }\n"
+        + "    pub fn table_position(&self) -> Position { todo!() }\n"
+        + "    pub fn path(&self) -> SlideTableHeaderPath { todo!() }\n"
+        + "    pub fn before(&self) -> Settings { todo!() }\n"
+        + "    pub fn after(&self) -> Settings { todo!() }\n"
+        + "    pub fn settings(&self) -> Settings { todo!() }\n"
+        + "    pub fn set(self, settings: Settings) -> Self { let _ = settings; self }\n"
+        + "    pub fn commit(self) -> Result<SlideTableHeaderCommit, SlideTableHeaderError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_headers;\n"
+        "pub use slide_table_headers::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n",
+        encoding="utf-8",
+    )
+
+    if include_codec:
+        codec = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_SOURCE
+        codec.parent.mkdir(parents=True, exist_ok=True)
+        codec.write_text(
+            "pub const HEADER_ROWS_FIELD: u32 = 9;\n"
+            "pub const HEADER_COLUMNS_FIELD: u32 = 10;\n"
+            "pub const FOOTER_ROWS_FIELD: u32 = 11;\n"
+            "pub const HEADER_ROWS_FROZEN_FIELD: u32 = 12;\n"
+            "pub const HEADER_COLUMNS_FROZEN_FIELD: u32 = 13;\n"
+            "pub const REPEATING_HEADER_ROWS_FIELD: u32 = 29;\n"
+            "pub const REPEATING_HEADER_COLUMNS_FIELD: u32 = 32;\n"
+            "pub struct DecodeOptions;\n"
+            "pub enum DecodeError { WireTypeMismatch }\n"
+            "pub struct TableHeaderSettingsSnapshot;\n"
+            "pub struct TableHeaderSettingsWrite;\n"
+            "pub struct RewriteReport;\n"
+            "pub struct RewriteOutput;\n"
+            "pub struct PreparedTableHeaderSettingsRewrite<'a>(&'a [u8]);\n"
+            "pub struct RewriteExecutionRequirements;\n"
+            "pub struct RewriteExecutionLimits;\n"
+            "pub fn decode_table_header_settings() {}\n"
+            "pub fn prepare_table_header_settings_rewrite() {}\n"
+            "pub fn rewrite_table_header_settings() {}\n"
+            "pub fn rewrite_table_header_settings_with_report() {}\n"
+            "fn known_field() {}\n"
+            "fn duplicate() {}\n"
+            "fn noncanonical() {}\n"
+            "fn strict_unknown() {}\n"
+            "fn unknown() {}\n"
+            "fn group() {}\n"
+            "fn preserv() {}\n"
+            "fn check_execution_limits() {}\n"
+            "fn execution_requirements() {}\n"
+            "fn execute() {}\n"
+            "fn with_max_output_bytes() {}\n"
+            "fn with_max_allocations() {}\n"
+            "fn with_max_retained_bytes() {}\n"
+            "fn with_max_scratch_bytes() {}\n"
+            "fn readback() {}\n"
+            "fn optional_write() {}\n"
+            "fn source() {}\n"
+            "// noncanonical duplicate(wire) group policy preserves unknown spans\n"
+            "#[cfg(test)]\n"
+            "mod tests { #[test] fn strict_codec_roundtrip() {} }\n",
+            encoding="utf-8",
+        )
+        codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_PUBLIC_SOURCE
+        codec_lib.parent.mkdir(parents=True, exist_ok=True)
+        codec_lib.write_text(
+            "#[doc(hidden)]\n"
+            "pub mod numbers_table_header_settings_codec;\n"
+            "#[doc(hidden)]\n"
+            "pub mod table_header_settings_codec;\n",
+            encoding="utf-8",
+        )
+
+    if include_tests:
+        integration = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_TEST_SOURCES[0]
+        integration.parent.mkdir(parents=True, exist_ok=True)
+        integration.write_text(
+            "#[test]\n"
+            "fn exercises_owner() { slide_table_header_settings(); }\n",
+            encoding="utf-8",
+        )
+
+    if include_fuzz:
+        for fuzz_path in boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_SOURCES:
+            absolute = root / fuzz_path
+            absolute.parent.mkdir(parents=True, exist_ok=True)
+            absolute.write_text(
+                "#![no_main]\n"
+                "use libfuzzer_sys::fuzz_target;\n"
+                "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+                encoding="utf-8",
+            )
+        for corpus in boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_CORPORA:
+            (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -12905,6 +13085,247 @@ fn rewrite_movie_title_operation(
         for expression in (
             "+ audit_keynote_slide_table_sort_facade_source_topology()",
             "+ audit_keynote_slide_table_sort_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_headers_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_resource_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_headers_source_topology(root),
+                [],
+            )
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_headers_rejects_public_physical_raw_and_flat_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_header(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n"
+                + "pub use self::SlideTableHeaderEdit as HeaderEdit;\n"
+                + "#[cfg(test)]\n"
+                + "pub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use slide_table_headers::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_headers_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertTrue(any("glob re-export" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_headers_masks_non_code_and_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "// pub fn raw_header(bytes: &[u8], model_id: u64) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub use crate::ArchiveObject; model_id: u64";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn decoy(bytes: &[u8], model_id: u64) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_headers_requires_prepared_codec_and_hidden_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "pub fn prepare_table_header_settings_rewrite",
+                    "pub fn missing_prepare_table_header_settings_rewrite",
+                ).replace(
+                    "pub struct RewriteExecutionRequirements;",
+                    "pub struct MissingExecutionRequirements;",
+                ),
+                encoding="utf-8",
+            )
+            codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text(
+                "#[doc(hidden)]\n"
+                "pub mod numbers_table_header_settings_codec;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_headers_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("prepare_table_header_settings_rewrite" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("RewriteExecutionRequirements" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("hidden codec module table_header_settings_codec" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_table_headers_requires_test_fuzz_and_corpus_inventory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace("#[test]", ""),
+                encoding="utf-8",
+            )
+            test_path = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_TEST_SOURCES[0]
+            test_path.unlink()
+            fuzz_path = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_SOURCES[0]
+            fuzz_path.unlink()
+            corpus = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_CORPORA[1]
+            corpus.rmdir()
+            violations = boundaries.audit_keynote_slide_table_headers_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing #[test] coverage" in item for item in violations), violations)
+            self.assertTrue(any("missing integration test" in item for item in violations), violations)
+            self.assertTrue(any(str(fuzz_path.relative_to(root)) in item for item in violations), violations)
+            self.assertTrue(any(str(corpus.relative_to(root)) in item for item in violations), violations)
+
+    def test_keynote_slide_table_headers_resource_markers_and_mutation_scope_are_required(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8").replace("HeaderBudget", "MissingBudget")
+            source = source.replace("deleted_previews: 0", "deleted_previews: 1")
+            source += (
+                "fn move_rows() {}\n"
+                "fn rewrite_formula() {}\n"
+                "fn metadata_update() {}\n"
+                "fn preview_delete() {}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_headers_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("aggregate transaction budget" in item for item in violations), violations)
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+            self.assertTrue(any("row movement" in item for item in violations), violations)
+            self.assertTrue(any("cell/formula mutation" in item for item in violations), violations)
+            self.assertTrue(any("metadata mutation" in item for item in violations), violations)
+            self.assertTrue(any("preview deletion" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_headers_host_retirement_is_scoped_to_keynote_branches(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor/headers.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_numbers::table::headers::HeaderSettings;\n"
+                "pub fn slide_table_header_settings(&self) {}\n"
+                "fn production_call() { editor.set_slide_table_header_settings(); }\n",
+                encoding="utf-8",
+            )
+            tests = root / "crates/litchi-iwa/src/keynote/editor/tests.rs"
+            tests.write_text(
+                "use litchi_numbers::table::headers::HeaderSettings;\n"
+                "pub fn slide_table_header_settings(&self) {}\n"
+                "fn compatibility_call() { editor.set_slide_table_header_settings(); }\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_HEADERS_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            mixed = examples / "mixed_iwork.rs"
+            mixed.write_text(
+                "fn numbers_branch() { editor.set_slide_table_header_settings(); }\n"
+                "fn keynote_facade() { package.slide_table_header_settings(); }\n"
+                "fn keynote_branch() { keynote.set_slide_table_header_settings(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_headers_source_topology(root)
+            self.assertTrue(any("retired litchi-iwa Keynote slide-table-header method" in item for item in violations), violations)
+            self.assertTrue(any("production_call" not in item and "set_slide_table_header_settings" in item for item in violations), violations)
+            example_findings = [item for item in violations if "mixed_iwork.rs" in item]
+            self.assertEqual(len(example_findings), 1, violations)
+            self.assertFalse(any("tests.rs" in item for item in violations), violations)
+            self.assertFalse(any("numbers_branch" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_headers_masks_cfg_and_non_code_host_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            host = root / "crates/litchi-iwa/src/keynote/editor/headers.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "// pub fn slide_table_header_settings(&self) {}\n"
+                'const DOC: &str = "editor.set_slide_table_header_settings()";\n'
+                "#[cfg(test)]\n"
+                "pub fn decoy() { editor.set_slide_table_header_settings(); }\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_HEADERS_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "numbers_only.rs").write_text(
+                "// keynote.set_slide_table_header_settings()\n"
+                'const DOC: &str = "keynote.set_slide_table_header_settings()";\n'
+                "fn numbers_branch() { editor.set_slide_table_header_settings(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_headers_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_headers_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_keynote_slide_table_headers_source_topology()",
+            "+ audit_keynote_slide_table_headers_facade_source_topology()",
+            "+ audit_keynote_slide_table_headers_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 
