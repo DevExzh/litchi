@@ -251,6 +251,245 @@ mod tests {
     }
 
     #[test]
+    fn text_compiler_classifies_context_dependencies_without_silent_fallback() {
+        let worksheet_names = vec!["Data".to_string()];
+        let tables = vec![Definition::try_new(7, 0, "Sales", vec!["Item".to_string()]).unwrap()];
+        let defined_names = vec![DefinedName {
+            name: "Rate".to_string(),
+            sheet_id: None,
+        }];
+        let supporting_links = Vec::new();
+        let external_sheets = Vec::new();
+        let external_books = Vec::new();
+        let sheet_ranges = std::cell::RefCell::new(Vec::new());
+        let context = CompilationContext {
+            worksheet_names: &worksheet_names,
+            defined_names: &defined_names,
+            tables: &tables,
+            supporting_links: &supporting_links,
+            external_sheets: &external_sheets,
+            external_books: &external_books,
+            sheet_ranges: &sheet_ranges,
+            current_sheet: 0,
+        };
+
+        for source in ["Data!A1", "Sales[Item]", "Rate"] {
+            assert!(matches!(
+                text::Compiler::compile(source),
+                Err(Error::UnresolvedDependency(_))
+            ));
+        }
+
+        let missing_sheet_names = vec!["Other".to_string()];
+        let missing_sheet_context = CompilationContext {
+            worksheet_names: &missing_sheet_names,
+            ..context
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context("Missing!A1", &missing_sheet_context),
+            Err(Error::UnresolvedDependency(_))
+        ));
+
+        let missing_table_context = CompilationContext {
+            tables: &[],
+            ..context
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context("Missing[Item]", &missing_table_context),
+            Err(Error::UnresolvedDependency(_))
+        ));
+
+        let missing_name_context = CompilationContext {
+            defined_names: &[],
+            ..context
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context("MissingName", &missing_name_context),
+            Err(Error::UnresolvedDependency(_))
+        ));
+
+        let ambiguous_sheet_names = vec!["Data".to_string(), "data".to_string()];
+        let ambiguous_sheet_context = CompilationContext {
+            worksheet_names: &ambiguous_sheet_names,
+            ..context
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context("Data!A1", &ambiguous_sheet_context),
+            Err(Error::UnresolvedDependency(_))
+        ));
+
+        let ambiguous_tables = vec![
+            tables[0].clone(),
+            Definition::try_new(8, 0, "sales", vec!["Item".to_string()]).unwrap(),
+        ];
+        let ambiguous_table_context = CompilationContext {
+            tables: &ambiguous_tables,
+            ..context
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context("Sales[Item]", &ambiguous_table_context),
+            Err(Error::UnresolvedDependency(_))
+        ));
+
+        let ambiguous_names = vec![
+            DefinedName {
+                name: "Rate".to_string(),
+                sheet_id: None,
+            },
+            DefinedName {
+                name: "rate".to_string(),
+                sheet_id: None,
+            },
+        ];
+        let ambiguous_name_context = CompilationContext {
+            defined_names: &ambiguous_names,
+            ..context
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context("Rate", &ambiguous_name_context),
+            Err(Error::UnresolvedDependency(_))
+        ));
+
+        assert!(matches!(
+            text::Compiler::compile("'Data'"),
+            Err(Error::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            text::Compiler::compile_with_context("Data!A0", &context),
+            Err(Error::InvalidFormula(_))
+        ));
+        assert!(matches!(
+            text::Compiler::compile_shared("A1", 1_048_576, 0),
+            Err(Error::InvalidCellReference(_))
+        ));
+        assert!(matches!(
+            text::Compiler::compile("NOT_A_REAL_FUNCTION(1)"),
+            Err(Error::UnsupportedFeature(_))
+        ));
+        assert!(matches!(
+            text::Compiler::compile("'[Book.xlsx]Data Sheet'!A1"),
+            Err(Error::UnsupportedFeature(_))
+        ));
+
+        let compiled =
+            text::Compiler::compile_with_context("Data!A1+Sales[Item]+Rate", &context).unwrap();
+        assert!(!compiled.rgce.is_empty());
+    }
+
+    #[test]
+    fn text_compiler_rejects_malformed_external_metadata_before_context_lookup() {
+        assert!(matches!(
+            text::Compiler::compile("'[[Book.xlsx]Data Sheet'!Remote[Amount]"),
+            Err(Error::InvalidFormula(_))
+        ));
+
+        let worksheet_names = Vec::new();
+        let defined_names = Vec::new();
+        let tables = Vec::new();
+        let external_books = vec![ExternalBook {
+            metadata: Link::workbook("Book.xlsx", vec!["Data Sheet".to_string()], Vec::new())
+                .unwrap(),
+        }];
+        let sheet_ranges = std::cell::RefCell::new(Vec::new());
+        let malformed_bounds = [
+            ExternalSheet {
+                external_link: 0,
+                first_sheet: -1,
+                last_sheet: -1,
+            },
+            ExternalSheet {
+                external_link: 0,
+                first_sheet: 1,
+                last_sheet: 0,
+            },
+        ];
+        for external_sheets in malformed_bounds.each_ref() {
+            let supporting_links = vec![SupportingLink::ExternalWorkbook(0)];
+            let context = CompilationContext {
+                worksheet_names: &worksheet_names,
+                defined_names: &defined_names,
+                tables: &tables,
+                supporting_links: &supporting_links,
+                external_sheets: std::slice::from_ref(external_sheets),
+                external_books: &external_books,
+                sheet_ranges: &sheet_ranges,
+                current_sheet: 0,
+            };
+            assert!(matches!(
+                text::Compiler::compile_with_context(
+                    "'[Book.xlsx]Data Sheet'!Remote[Amount]",
+                    &context,
+                ),
+                Err(Error::InvalidFormula(_))
+            ));
+        }
+
+        let supporting_links = vec![
+            SupportingLink::SelfWorkbook,
+            SupportingLink::AddIn,
+            SupportingLink::ExternalWorkbook(0),
+        ];
+        let external_sheets = vec![
+            ExternalSheet {
+                external_link: 0,
+                first_sheet: 0,
+                last_sheet: 0,
+            },
+            ExternalSheet {
+                external_link: 1,
+                first_sheet: 0,
+                last_sheet: 0,
+            },
+            ExternalSheet {
+                external_link: 2,
+                first_sheet: 0,
+                last_sheet: 0,
+            },
+        ];
+        let context = CompilationContext {
+            worksheet_names: &worksheet_names,
+            defined_names: &defined_names,
+            tables: &tables,
+            supporting_links: &supporting_links,
+            external_sheets: &external_sheets,
+            external_books: &external_books,
+            sheet_ranges: &sheet_ranges,
+            current_sheet: 0,
+        };
+        assert!(
+            text::Compiler::compile_with_context(
+                "'[Book.xlsx]Data Sheet'!Remote[Amount]",
+                &context,
+            )
+            .is_ok()
+        );
+
+        let supporting_links = vec![SupportingLink::AddIn];
+        let external_sheets = vec![ExternalSheet {
+            external_link: 0,
+            first_sheet: 0,
+            last_sheet: 0,
+        }];
+        let context = CompilationContext {
+            worksheet_names: &worksheet_names,
+            defined_names: &defined_names,
+            tables: &tables,
+            supporting_links: &supporting_links,
+            external_sheets: &external_sheets,
+            external_books: &external_books,
+            sheet_ranges: &sheet_ranges,
+            current_sheet: 0,
+        };
+        assert!(matches!(
+            text::Compiler::compile_with_context(
+                "'[Missing.xlsx]Missing Sheet'!Remote[Amount]",
+                &context,
+            ),
+            Err(Error::UnresolvedDependency(_))
+        ));
+    }
+
+    #[test]
     fn builtin_function_table_is_sorted_unique_and_non_macro() {
         assert_eq!(function_table::BUILTIN_FUNCTIONS.len(), 363);
         assert!(

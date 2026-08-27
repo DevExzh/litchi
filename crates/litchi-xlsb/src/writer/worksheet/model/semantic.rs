@@ -18,7 +18,7 @@ use litchi_sheet::view::{Pane, Position, Selection, Split, State, View};
 use litchi_sheet::{Cell, Rect};
 use std::collections::{BTreeMap, HashSet};
 
-use super::wire::{CellData, ColumnInfo, RowInfo, formula_requires_workbook_context};
+use super::wire::{CellData, ColumnInfo, RowInfo, formula_requires_context_free_authoring};
 
 /// Auto-filter configuration for a rectangular range.
 ///
@@ -267,7 +267,7 @@ impl MutableWorksheet {
         let range = Range::new(row_first, row_last, col_first, col_last)?;
         let definition = match crate::package::formula::text::Compiler::compile(formula) {
             Ok(definition) => definition,
-            Err(error) if formula_requires_workbook_context(&error) => {
+            Err(error) if formula_requires_context_free_authoring(&error) => {
                 crate::package::formula::text::Compiler::compile("0")?
             },
             Err(error) => return Err(error),
@@ -301,7 +301,7 @@ impl MutableWorksheet {
             formula, row_first, col_first,
         ) {
             Ok(definition) => definition,
-            Err(error) if formula_requires_workbook_context(&error) => {
+            Err(error) if formula_requires_context_free_authoring(&error) => {
                 crate::package::formula::text::Compiler::compile_shared("0", row_first, col_first)?
             },
             Err(error) => return Err(error),
