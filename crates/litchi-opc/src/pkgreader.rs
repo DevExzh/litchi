@@ -773,12 +773,24 @@ impl PackageReader {
                 .map(|(partname, _)| partname.membername()),
         );
         let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)?;
-        let mut decompressed: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
-        decompressed
-            .try_reserve(typed_parts.len())
-            .map_err(|source| allocation("OPC decompressed parts", source))?;
+        // Reserve both output structures before any payload result is
+        // processed. The ordered slots replace the old name-keyed map: they
+        // retain the bulk reader's short/extra and duplicate-name behavior
+        // without allocating an owned String for every successful result.
+        let mut sparts = Vec::new();
+        sparts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC serialized parts", source))?;
+        let mut ordered_blobs: Vec<Option<Arc<Vec<u8>>>> = Vec::new();
+        ordered_blobs
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC ordered part payloads", source))?;
+        ordered_blobs.resize_with(typed_parts.len(), || None);
+
         let mut retained_part_bytes = 0u64;
-        for (member_name, result) in read_many(&member_names)? {
+        for (result_index, (member_name, result)) in
+            read_many(&member_names)?.into_iter().enumerate()
+        {
             let blob = result?;
             limits.check(
                 ReadResource::PartBytes,
@@ -791,22 +803,34 @@ impl PackageReader {
                 ReadResource::TotalPartBytes,
                 limits.max_total_part_bytes(),
             )?;
-            decompressed.insert(member_name.to_string(), blob);
+
+            // Normal readers return results in request order. Resolve by name
+            // as a compatibility guard so a short, extra, reordered, or
+            // duplicate result set has the same last-write-wins behavior as
+            // the former decompressed map. The fast path avoids a scan for
+            // the normal ordered result set.
+            let payload_index = if member_names.get(result_index).copied() == Some(member_name) {
+                Some(result_index)
+            } else {
+                member_names
+                    .iter()
+                    .position(|candidate| *candidate == member_name)
+            };
+            if let Some(payload_index) = payload_index {
+                ordered_blobs[payload_index] = Some(blob);
+            }
         }
 
-        // Phase 5: build SerializedPart structures (take ownership, no cloning)
-        let mut sparts = Vec::new();
-        sparts
-            .try_reserve_exact(typed_parts.len())
-            .map_err(|source| allocation("OPC serialized parts", source))?;
-        for (partname, content_type) in typed_parts {
+        // Phase 5: build SerializedPart structures (take ownership, no cloning).
+        // All bulk results have been checked above before a lazy relationship
+        // read can fail, preserving payload-error precedence.
+        for (part_index, (partname, content_type)) in typed_parts.into_iter().enumerate() {
             let srels = match relationships.remove(partname.as_str()) {
                 Some(srels) => srels,
                 None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
             };
-            // Remove from map to take ownership instead of cloning
-            let blob = decompressed
-                .remove(partname.membername())
+            let blob = ordered_blobs[part_index]
+                .take()
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
             sparts.push(SerializedPart {
                 partname,
@@ -1604,6 +1628,8 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::*;
+    use std::cell::Cell;
+    use std::sync::Arc;
 
     fn package_bytes(root_relationships: &[u8], document: &[u8]) -> Vec<u8> {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
@@ -1797,6 +1823,80 @@ mod tests {
         writer.write_stored(first, b"first").unwrap();
         writer.write_stored(second, b"second").unwrap();
         writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn eager_serialized_parts_follow_physical_order_and_reuse_archive_payloads() {
+        let bytes = package_with_physical_parts("z/second.xml", "a/first.xml");
+        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let reader = PackageReader::from_phys_reader(&physical).unwrap();
+
+        let names = reader
+            .iter_sparts()
+            .map(|spart| spart.partname.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["/z/second.xml", "/a/first.xml"]);
+
+        for spart in reader.iter_sparts() {
+            let archive_blob = physical
+                .archive()
+                .read_shared(spart.partname.membername())
+                .unwrap();
+            assert!(Arc::ptr_eq(&archive_blob, &spart.blob));
+        }
+    }
+
+    #[test]
+    fn eager_declared_part_preflight_rejects_before_bulk_reader_invocation() {
+        let bytes = package_with_physical_parts("z/second.xml", "a/first.xml");
+        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let archive = physical.archive();
+        let content_types_member = PackageReader::locate_content_types_member(archive).unwrap();
+        let content_types_xml = read_structural_member(archive, content_types_member).unwrap();
+        let content_types =
+            ContentTypeMap::from_xml(content_types_xml.as_bytes(), ReadLimits::default()).unwrap();
+        let package_uri = PackURI::new(PACKAGE_URI).unwrap();
+        let mut ledger = RelationshipLedger::default();
+        let pkg_srels = PackageReader::load_rels_lazy(
+            archive,
+            &package_uri,
+            ReadLimits::default(),
+            &mut ledger,
+        )
+        .unwrap();
+        let mut non_part_members = Vec::new();
+        let limits = ReadLimits::builder()
+            .max_part_bytes(4)
+            .unwrap()
+            .build()
+            .unwrap();
+        let called = Cell::new(false);
+
+        let error = PackageReader::load_parts_eager(
+            archive,
+            content_types_member,
+            &pkg_srels,
+            &content_types,
+            &mut non_part_members,
+            limits,
+            &mut ledger,
+            |_names| {
+                called.set(true);
+                Err(OpcError::ZipError(
+                    "eager bulk reader was called after preflight failure".to_string(),
+                ))
+            },
+        )
+        .unwrap_err();
+
+        assert!(!called.get());
+        assert!(matches!(
+            error,
+            OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                ..
+            }
+        ));
     }
 
     #[test]
