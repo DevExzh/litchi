@@ -359,8 +359,13 @@ impl OpcPackage {
         package.non_part_members = pkg_reader.take_non_part_members();
 
         // Pre-allocate with known capacity to avoid reallocations
-        let mut parts_map: HashMap<PackURI, Box<dyn Part + Send + Sync>> =
-            HashMap::with_capacity(sparts.len());
+        let mut parts_map: HashMap<PackURI, Box<dyn Part + Send + Sync>> = HashMap::new();
+        parts_map
+            .try_reserve(sparts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC package parts",
+                source,
+            })?;
         let mut source_xml_parts = HashMap::new();
 
         // Create all parts - move data instead of cloning
@@ -371,6 +376,12 @@ impl OpcPackage {
                 spart.content_type, // Move
                 spart.blob,         // Move the shared decompressed payload
             )?;
+
+            // Reserve the complete incoming relationship collection before
+            // moving serialized edges into the part. This keeps the eager
+            // unmarshal boundary fallible instead of allowing the map to
+            // grow during insertion.
+            part.rels_mut().try_reserve(spart.srels.len())?;
 
             // Load part relationships
             for srel in spart.srels {
@@ -396,6 +407,7 @@ impl OpcPackage {
         }
 
         // Load package relationships - move instead of clone
+        package.rels.try_reserve(pkg_srels.len())?;
         for srel in pkg_srels {
             package.rels.try_add_relationship(
                 srel.reltype,    // Move
@@ -556,6 +568,12 @@ impl OpcPackage {
         self.signature_graph_tracked = true;
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
+        self.parts
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC package parts",
+                source,
+            })?;
         self.parts.insert(partname, part);
         Ok(())
     }

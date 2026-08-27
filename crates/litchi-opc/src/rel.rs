@@ -298,6 +298,10 @@ impl Relationships {
         r_id: String,
         target_mode: TargetMode,
     ) -> Result<&Relationship> {
+        if self.rels.contains_key(&r_id) {
+            return Err(OpcError::DuplicateRelationshipId(r_id));
+        }
+        self.try_reserve(1)?;
         let base_uri = self.base_uri.clone();
         let source_uri = self.source_uri.clone();
         match self.rels.entry(r_id) {
@@ -314,6 +318,20 @@ impl Relationships {
                 )))
             },
         }
+    }
+
+    /// Reserve capacity for a bounded batch of relationship insertions.
+    ///
+    /// Eager package unmarshal uses this before moving its validated source
+    /// relationships into the in-memory collection, so map growth remains a
+    /// typed allocation error rather than an infallible insertion side effect.
+    pub(crate) fn try_reserve(&mut self, additional: usize) -> Result<()> {
+        self.rels
+            .try_reserve(additional)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationships",
+                source,
+            })
     }
 
     /// Get a relationship by its ID.
