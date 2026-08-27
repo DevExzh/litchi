@@ -57,7 +57,7 @@ struct PublicationPlan<'package> {
     content_types_uri: PackURI,
     content_types_xml: String,
     package_rels_uri: PackURI,
-    package_rels_xml: String,
+    package_rels_xml: Vec<u8>,
     parts: Vec<PlannedPart<'package>>,
 }
 
@@ -73,7 +73,7 @@ struct PlannedPart<'package> {
 
 struct PlannedRelationships {
     uri: PackURI,
-    xml: String,
+    xml: Vec<u8>,
 }
 
 enum PlannedAppend<'package> {
@@ -141,8 +141,8 @@ impl<'package> PublicationPlan<'package> {
         let package_rels_uri = package_uri
             .rels_uri()
             .map_err(crate::OpcError::InvalidPackUri)?;
-        let package_rels_xml = package.rels().to_xml();
-        PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_bytes())?;
+        let package_rels_xml = package.rels().try_to_xml_bytes()?;
+        PackageWriter::validate_authored_xml("_rels/.rels", package_rels_xml.as_slice())?;
 
         for part in &mut parts {
             if part.authored_xml {
@@ -153,8 +153,8 @@ impl<'package> PublicationPlan<'package> {
                     .partname
                     .rels_uri()
                     .map_err(crate::OpcError::InvalidPackUri)?;
-                let xml = part.rels.to_xml();
-                PackageWriter::validate_authored_xml(uri.as_str(), xml.as_bytes())?;
+                let xml = part.rels.try_to_xml_bytes()?;
+                PackageWriter::validate_authored_xml(uri.as_str(), xml.as_slice())?;
                 part.relationships = Some(PlannedRelationships { uri, xml });
             }
         }
@@ -170,11 +170,11 @@ impl<'package> PublicationPlan<'package> {
 
     fn write<W: Write>(&self, physical: &mut PhysPkgWriter<W>) -> Result<()> {
         physical.write(&self.content_types_uri, self.content_types_xml.as_bytes())?;
-        physical.write(&self.package_rels_uri, self.package_rels_xml.as_bytes())?;
+        physical.write(&self.package_rels_uri, self.package_rels_xml.as_slice())?;
         for part in &self.parts {
             physical.write(part.partname, part.blob)?;
             if let Some(relationships) = &part.relationships {
-                physical.write(&relationships.uri, relationships.xml.as_bytes())?;
+                physical.write(&relationships.uri, relationships.xml.as_slice())?;
             }
         }
         Ok(())
@@ -528,7 +528,7 @@ fn try_write_preserved<W: Write>(
             },
             SourceMemberKind::PackageRelationships
                 if provenance.package_relationships_xml.as_bytes()
-                    != publication.package_rels_xml.as_bytes() =>
+                    != publication.package_rels_xml.as_slice() =>
             {
                 Some(publication.package_rels_xml.len())
             },
@@ -551,7 +551,7 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                (source_part.relationships_xml.as_bytes() != relationships.xml.as_bytes())
+                (source_part.relationships_xml.as_bytes() != relationships.xml.as_slice())
                     .then_some(relationships.xml.len())
             },
             SourceMemberKind::ContentTypes
@@ -625,12 +625,12 @@ fn try_write_preserved<W: Write>(
                 )?,
                 SourceMemberKind::PackageRelationships
                     if provenance.package_relationships_xml.as_bytes()
-                        != publication.package_rels_xml.as_bytes() =>
+                        != publication.package_rels_xml.as_slice() =>
                 {
                     regenerated_action(
                         indexed_entry.id(),
                         preservation_member_name(source_member, indexed_entry),
-                        publication.package_rels_xml.as_bytes(),
+                        publication.package_rels_xml.as_slice(),
                     )?
                 },
                 SourceMemberKind::Part(partname) => {
@@ -660,13 +660,13 @@ fn try_write_preserved<W: Write>(
                     let Some(source_part) = provenance.parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if source_part.relationships_xml.as_bytes() == relationships.xml.as_bytes() {
+                    if source_part.relationships_xml.as_bytes() == relationships.xml.as_slice() {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
                         regenerated_action(
                             indexed_entry.id(),
                             preservation_member_name(source_member, indexed_entry),
-                            relationships.xml.as_bytes(),
+                            relationships.xml.as_slice(),
                         )?
                     }
                 },
@@ -691,7 +691,7 @@ fn try_write_preserved<W: Write>(
                 };
                 regenerated_entry(
                     relationships.uri.membername(),
-                    relationships.xml.as_bytes(),
+                    relationships.xml.as_slice(),
                     "OPC appended relationship payload",
                 )?
             },

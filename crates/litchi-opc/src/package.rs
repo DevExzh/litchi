@@ -73,22 +73,22 @@ const EMPTY_RELATIONSHIPS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" 
 #[derive(Debug)]
 pub(crate) enum CanonicalRelationshipsXml {
     Empty,
-    Owned(Box<[u8]>),
+    Owned(Vec<u8>),
 }
 
 impl CanonicalRelationshipsXml {
-    pub(crate) fn from_relationships(relationships: &Relationships) -> Self {
+    pub(crate) fn from_relationships(relationships: &Relationships) -> Option<Self> {
         if relationships.is_empty() {
-            Self::Empty
+            Some(Self::Empty)
         } else {
-            Self::Owned(relationships.to_xml().into_bytes().into_boxed_slice())
+            Some(Self::Owned(relationships.try_to_xml_bytes().ok()?))
         }
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Empty => EMPTY_RELATIONSHIPS_XML,
-            Self::Owned(bytes) => bytes,
+            Self::Owned(bytes) => bytes.as_slice(),
         }
     }
 }
@@ -1207,7 +1207,7 @@ impl PreservationProvenance {
                 SourcePart {
                     content_type: try_owned_string(part.content_type())?,
                     blob: part.blob_arc(),
-                    relationships_xml: CanonicalRelationshipsXml::from_relationships(part.rels()),
+                    relationships_xml: CanonicalRelationshipsXml::from_relationships(part.rels())?,
                     member_present: false,
                     relationships_member_present: false,
                 },
@@ -1280,7 +1280,7 @@ impl PreservationProvenance {
             parts,
             package_relationships_xml: CanonicalRelationshipsXml::from_relationships(
                 package.rels(),
-            ),
+            )?,
         })
     }
 }
@@ -1468,7 +1468,7 @@ mod tests {
     #[test]
     fn relationship_provenance_uses_empty_sentinel_and_exact_owned_bytes() {
         let empty_relationships = Relationships::new(PACKAGE_URI.to_owned());
-        let empty = CanonicalRelationshipsXml::from_relationships(&empty_relationships);
+        let empty = CanonicalRelationshipsXml::from_relationships(&empty_relationships).unwrap();
         assert!(matches!(empty, CanonicalRelationshipsXml::Empty));
         assert_eq!(empty.as_bytes(), EMPTY_RELATIONSHIPS_XML);
 
@@ -1481,10 +1481,10 @@ mod tests {
                 crate::TargetMode::Internal,
             )
             .unwrap();
-        let expected = relationships.to_xml();
-        let owned = CanonicalRelationshipsXml::from_relationships(&relationships);
+        let expected = relationships.try_to_xml_bytes().unwrap();
+        let owned = CanonicalRelationshipsXml::from_relationships(&relationships).unwrap();
         assert!(matches!(&owned, CanonicalRelationshipsXml::Owned(_)));
-        assert_eq!(owned.as_bytes(), expected.as_bytes());
+        assert_eq!(owned.as_bytes(), expected.as_slice());
     }
 
     #[test]

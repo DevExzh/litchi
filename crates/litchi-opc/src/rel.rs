@@ -536,6 +536,75 @@ impl Relationships {
 
         xml
     }
+
+    /// Serialize relationships to XML bytes through fallible allocation paths.
+    ///
+    /// This crate-private form is used by publication and source-preservation
+    /// code. It preserves the byte output of [`Self::to_xml`] without relying on
+    /// infallible `String` growth or temporary escaped strings.
+    pub(crate) fn try_to_xml_bytes(&self) -> Result<Vec<u8>> {
+        const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
+        const FOOTER: &[u8] = b"</Relationships>";
+
+        let mut rels = Vec::new();
+        rels.try_reserve_exact(self.rels.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship XML references",
+                source,
+            })?;
+        rels.extend(self.rels.values());
+        rels.sort_unstable_by_key(|rel| rel.r_id());
+
+        let mut xml = Vec::new();
+        append_relationship_xml_bytes(&mut xml, HEADER)?;
+        for rel in rels {
+            append_relationship_xml_bytes(&mut xml, br#"<Relationship Id=""#)?;
+            append_relationship_xml_escaped(&mut xml, rel.r_id())?;
+            append_relationship_xml_bytes(&mut xml, br#"" Type=""#)?;
+            append_relationship_xml_escaped(&mut xml, rel.reltype())?;
+            append_relationship_xml_bytes(&mut xml, br#"" Target=""#)?;
+            append_relationship_xml_escaped(&mut xml, rel.target_ref())?;
+            if rel.target_mode() == TargetMode::External {
+                append_relationship_xml_bytes(&mut xml, br#"" TargetMode="External"/>"#)?;
+            } else {
+                append_relationship_xml_bytes(&mut xml, br#""/>"#)?;
+            }
+        }
+        append_relationship_xml_bytes(&mut xml, FOOTER)?;
+        Ok(xml)
+    }
+}
+
+fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC relationship XML",
+            source,
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn append_relationship_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<()> {
+    let bytes = value.as_bytes();
+    let mut cursor = 0;
+    for (index, byte) in bytes.iter().enumerate() {
+        let escaped = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            append_relationship_xml_bytes(output, &bytes[cursor..index])?;
+            append_relationship_xml_bytes(output, escaped)?;
+            cursor = index + 1;
+        }
+    }
+    append_relationship_xml_bytes(output, &bytes[cursor..])
 }
 
 impl Default for Relationships {
@@ -659,5 +728,82 @@ mod tests {
             Err(OpcError::DuplicateRelationshipId(id)) if id == "rId1"
         ));
         assert_eq!(relationships.get("rId1").unwrap().target_ref(), "first.xml");
+    }
+
+    #[test]
+    fn fallible_relationship_xml_matches_the_canonical_literal() {
+        let mut relationships = Relationships::new("/word".to_string());
+        relationships
+            .try_add_relationship(
+                "urn:test:type<&>\"'".to_string(),
+                "target<&>\"'".to_string(),
+                "rId1".to_string(),
+                TargetMode::External,
+            )
+            .unwrap();
+
+        assert_eq!(
+            relationships.try_to_xml_bytes().unwrap(),
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test:type&lt;&amp;&gt;&quot;&apos;" Target="target&lt;&amp;&gt;&quot;&apos;" TargetMode="External"/></Relationships>"#
+        );
+    }
+
+    #[test]
+    fn fallible_relationship_xml_is_deterministic_across_insertion_order() {
+        let mut first = Relationships::new("/word".to_string());
+        first
+            .try_add_relationship(
+                "urn:type:two".to_string(),
+                "two.xml".to_string(),
+                "rId2".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        first
+            .try_add_relationship(
+                "urn:type:one".to_string(),
+                "one.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+
+        let mut second = Relationships::new("/word".to_string());
+        second
+            .try_add_relationship(
+                "urn:type:one".to_string(),
+                "one.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        second
+            .try_add_relationship(
+                "urn:type:two".to_string(),
+                "two.xml".to_string(),
+                "rId2".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+
+        assert_eq!(
+            first.try_to_xml_bytes().unwrap(),
+            second.try_to_xml_bytes().unwrap()
+        );
+        assert_eq!(first.try_to_xml_bytes().unwrap(), first.to_xml().as_bytes());
+    }
+
+    #[test]
+    fn fallible_relationship_xml_preserves_empty_output() {
+        let relationships = Relationships::new("/word".to_string());
+
+        assert_eq!(
+            relationships.try_to_xml_bytes().unwrap(),
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#
+        );
+        assert_eq!(
+            relationships.try_to_xml_bytes().unwrap(),
+            relationships.to_xml().as_bytes()
+        );
     }
 }
