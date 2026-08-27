@@ -483,6 +483,7 @@ impl HeaderBudget {
         self.allocations(other.allocations)?;
         self.retained(other.retained)?;
         self.scratch(other.scratch)?;
+        self.transaction_work(other.transaction_work)?;
         self.nesting = self.nesting.max(other.nesting);
         if self.nesting > self.max_nesting {
             return Err(SlideTableHeaderError::LimitExceeded {
