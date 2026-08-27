@@ -963,6 +963,29 @@ fn duplicate_cached_formula_keeps_the_latest_value_like_eager_workbook() {
 }
 
 #[test]
+fn out_of_order_late_packed_duplicate_keeps_the_latest_value() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut inserted = number_frame(0, 0, 0, 7.0);
+    inserted.extend_from_slice(&number_frame(1, 0, 0, 8.0));
+    inserted.extend_from_slice(&mul_rk_frame(0, 0, &[99, 101]));
+    let modified = insert_before_worksheet_eof(&original, &inserted);
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
+    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let expected = eager
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(0, 0)
+        .map(CellTrait::value);
+
+    assert_eq!(
+        owner.cell_value_by_index(0, 0, 0).unwrap().as_ref(),
+        expected
+    );
+}
+
+#[test]
 fn synthetic_supported_cell_families_match_eager_values() {
     let original = workbook_stream(fixture("Simple.xls"), "Workbook");
     let mut extra = Vec::new();
@@ -1062,6 +1085,27 @@ fn truncated_tail_is_refused_after_a_matching_cell() {
     assert!(matches!(
         owner.cell_by_index(0, 0, 0),
         Err(SourceBackedError::InvalidData(_))
+    ));
+}
+
+#[test]
+fn malformed_unselected_cell_after_a_match_is_refused() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut inserted = number_frame(0, 0, 7, 7.0);
+    let mut malformed_payload = Vec::new();
+    malformed_payload.extend_from_slice(&60_006_u16.to_le_bytes());
+    malformed_payload.extend_from_slice(&7_u16.to_le_bytes());
+    malformed_payload.extend_from_slice(&0_u16.to_le_bytes());
+    malformed_payload.extend_from_slice(&1_u16.to_le_bytes());
+    malformed_payload.push(0);
+    inserted.extend_from_slice(&frame_bytes(0x0204, &malformed_payload));
+    let modified = insert_before_worksheet_eof(&original, &inserted);
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+
+    assert!(matches!(
+        owner.cell_by_index(0, 0, 0),
+        Err(SourceBackedError::Parse(_))
     ));
 }
 

@@ -1496,6 +1496,7 @@ struct WorksheetScan<'a> {
     scanned_records: usize,
     limits: SourceBackedLimits,
     execution: Option<&'a ExecutionContext>,
+    scratch: Vec<u8>,
 }
 
 impl<'a> WorksheetScan<'a> {
@@ -1517,6 +1518,7 @@ impl<'a> WorksheetScan<'a> {
             scanned_records: 0,
             limits,
             execution,
+            scratch: Vec::new(),
         })
     }
 
@@ -1588,20 +1590,31 @@ impl<'a> WorksheetScan<'a> {
         Ok(WorksheetFrame { kind, payload_len })
     }
 
-    fn read_payload(&mut self, frame: &WorksheetFrame) -> Result<Vec<u8>> {
+    fn read_payload(&mut self, frame: &WorksheetFrame) -> Result<&[u8]> {
         self.check_execution()?;
-        let mut payload = Vec::new();
-        payload
-            .try_reserve_exact(frame.payload_len)
-            .map_err(|_error| SourceBackedError::Allocation {
-                resource: "source-backed worksheet payload",
-                requested: frame.payload_len as u64,
-            })?;
-        payload.resize(frame.payload_len, 0);
+        self.scratch.clear();
+        if self.scratch.capacity() < frame.payload_len {
+            self.scratch
+                .try_reserve_exact(frame.payload_len)
+                .map_err(|_error| SourceBackedError::Allocation {
+                    resource: "source-backed worksheet payload",
+                    requested: frame.payload_len as u64,
+                })?;
+        }
+        self.scratch.resize(frame.payload_len, 0);
         self.cursor
-            .read_exact(&mut payload)
+            .read_exact(&mut self.scratch)
             .map_err(SourceBackedError::from)?;
-        Ok(payload)
+        Ok(&self.scratch)
+    }
+
+    fn take_payload(&mut self, frame: &WorksheetFrame) -> Result<Vec<u8>> {
+        self.read_payload(frame)?;
+        Ok(std::mem::take(&mut self.scratch))
+    }
+
+    fn recycle_payload(&mut self, payload: Vec<u8>) {
+        self.scratch = payload;
     }
 
     fn skip_payload(&mut self, frame: &WorksheetFrame) -> Result<()> {
@@ -1688,7 +1701,7 @@ fn query_cell(
                 ));
             }
             let payload = scan.read_payload(&frame)?;
-            validate_worksheet_bof(&payload)?;
+            validate_worksheet_bof(payload)?;
             continue;
         }
         if frame.kind == EOF {
@@ -1706,7 +1719,7 @@ fn query_cell(
         }
         if let Some(mut formula) = pending_formula.take() {
             if frame.kind == STRING {
-                let payload = scan.read_payload(&frame)?;
+                let payload = scan.take_payload(&frame)?;
                 let mut continues = Vec::new();
                 let text = loop {
                     match crate::utils::decode_string_record(&payload, &continues)
@@ -1720,10 +1733,11 @@ fn query_cell(
                                     "FORMULA string result continuation is not CONTINUE".into(),
                                 ));
                             }
-                            continues.push(scan.read_payload(&next)?);
+                            continues.push(scan.take_payload(&next)?);
                         },
                     }
                 };
+                scan.recycle_payload(payload);
                 if let CellRecord::Formula { value, .. } = &mut formula {
                     *value = FormulaValue::String(text);
                 }
@@ -1749,7 +1763,7 @@ fn query_cell(
         match frame.kind {
             0x0006 => {
                 let payload = scan.read_payload(&frame)?;
-                let cell = CellRecord::parse(frame.kind, &payload, &owner.encoding)
+                let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
                 if matches!(
                     cell,
@@ -1785,7 +1799,7 @@ fn query_cell(
             },
             0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
                 let payload = scan.read_payload(&frame)?;
-                let cell = CellRecord::parse(frame.kind, &payload, &owner.encoding)
+                let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
                     .map_err(SourceBackedError::Parse)?;
                 process_cell(
                     &cell,
@@ -1799,33 +1813,41 @@ fn query_cell(
             },
             0x00BD => {
                 let payload = scan.read_payload(&frame)?;
-                for cell in CellRecord::parse_mul_rk(&payload).map_err(SourceBackedError::Parse)? {
-                    process_cell(
-                        &cell,
-                        owner,
-                        sheet_format,
-                        target_row,
-                        target_column,
-                        execution,
-                        &mut found,
-                    )?;
-                }
+                let mut processing = Ok(());
+                CellRecord::visit_mul_rk(payload, |cell| {
+                    if processing.is_ok() {
+                        processing = process_cell(
+                            &cell,
+                            owner,
+                            sheet_format,
+                            target_row,
+                            target_column,
+                            execution,
+                            &mut found,
+                        );
+                    }
+                })
+                .map_err(SourceBackedError::Parse)?;
+                processing?;
             },
             0x00BE => {
                 let payload = scan.read_payload(&frame)?;
-                for cell in
-                    CellRecord::parse_mul_blank(&payload).map_err(SourceBackedError::Parse)?
-                {
-                    process_cell(
-                        &cell,
-                        owner,
-                        sheet_format,
-                        target_row,
-                        target_column,
-                        execution,
-                        &mut found,
-                    )?;
-                }
+                let mut processing = Ok(());
+                CellRecord::visit_mul_blank(payload, |cell| {
+                    if processing.is_ok() {
+                        processing = process_cell(
+                            &cell,
+                            owner,
+                            sheet_format,
+                            target_row,
+                            target_column,
+                            execution,
+                            &mut found,
+                        );
+                    }
+                })
+                .map_err(SourceBackedError::Parse)?;
+                processing?;
             },
             _ => scan.skip_payload(&frame)?,
         }

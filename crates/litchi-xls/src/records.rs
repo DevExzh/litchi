@@ -1422,31 +1422,43 @@ impl CellRecord {
     }
 
     pub(crate) fn parse_mul_rk(data: &[u8]) -> Result<Vec<Self>> {
-        let (row, first_col, count) = Self::packed_cell_range(data, 6, "MulRk")?;
+        let (_, _, count) = Self::packed_cell_range(data, 6, "MulRk")?;
         let mut cells = Vec::with_capacity(count);
+        Self::visit_mul_rk(data, |cell| cells.push(cell))?;
+        Ok(cells)
+    }
+
+    pub(crate) fn parse_mul_blank(data: &[u8]) -> Result<Vec<Self>> {
+        let (_, _, count) = Self::packed_cell_range(data, 2, "MulBlank")?;
+        let mut cells = Vec::with_capacity(count);
+        Self::visit_mul_blank(data, |cell| cells.push(cell))?;
+        Ok(cells)
+    }
+
+    pub(crate) fn visit_mul_rk(data: &[u8], mut visitor: impl FnMut(Self)) -> Result<()> {
+        let (row, first_col, count) = Self::packed_cell_range(data, 6, "MulRk")?;
         for index in 0..count {
             let offset = 4 + index * 6;
-            cells.push(Self::Rk {
+            visitor(Self::Rk {
                 row,
                 col: first_col + utils::truncate_usize_to_u16(index),
                 xf_index: binary::read_u16_le_at(data, offset)?,
                 value: utils::rk_to_f64(binary::read_u32_le_at(data, offset + 2)?),
             });
         }
-        Ok(cells)
+        Ok(())
     }
 
-    pub(crate) fn parse_mul_blank(data: &[u8]) -> Result<Vec<Self>> {
+    pub(crate) fn visit_mul_blank(data: &[u8], mut visitor: impl FnMut(Self)) -> Result<()> {
         let (row, first_col, count) = Self::packed_cell_range(data, 2, "MulBlank")?;
-        let mut cells = Vec::with_capacity(count);
         for index in 0..count {
-            cells.push(Self::Blank {
+            visitor(Self::Blank {
                 row,
                 col: first_col + utils::truncate_usize_to_u16(index),
                 xf_index: binary::read_u16_le_at(data, 4 + index * 2)?,
             });
         }
-        Ok(cells)
+        Ok(())
     }
 
     fn packed_cell_range(
