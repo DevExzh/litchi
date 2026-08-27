@@ -30,6 +30,29 @@ const CHART_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
     "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
 ];
 
+const DIALOG_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+];
+
+const MACRO_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
+    "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+    "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+];
+
+fn is_worksheet_relationship(reltype: &str) -> bool {
+    matches!(
+        reltype,
+        relationship_type::WORKSHEET | relationship_type::STRICT_WORKSHEET
+    )
+}
+
+fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
+    CHART_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
+        || DIALOG_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
+        || MACRO_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
+}
+
 impl Workbook {
     /// Start a detached, exact-source transaction spanning sheet metadata and
     /// dependency-managed cross-workbook cell transfer.
@@ -710,6 +733,8 @@ impl Workbook {
         let mut workbook = Workbook {
             package,
             worksheets: Vec::new(),
+            worksheet_names: Vec::new(),
+            worksheet_positions: Vec::new(),
             worksheet_rel_ids: Vec::new(),
             formula_context: Context::default(),
             shared_strings: Vec::new(),
@@ -799,13 +824,101 @@ impl Workbook {
         let mut structured_tables = Vec::new();
         let mut chart_sheets = Vec::new();
         let mut sheet_drawings = Vec::new();
+        let mut worksheet_positions = Vec::new();
+        worksheet_positions
+            .try_reserve_exact(info.worksheet_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB worksheet position map",
+                source,
+            })?;
+        let mut worksheet_names = Vec::new();
+        worksheet_names
+            .try_reserve_exact(info.worksheet_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB worksheet-name map",
+                source,
+            })?;
+        for (catalog_position, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
+            let rel_id = rel_id.as_deref().ok_or_else(|| {
+                crate::package::error::Error::Unrecognized {
+                    typ: "sheet relationship".to_string(),
+                    val: format!(
+                        "sheet catalog position {catalog_position} has no relationship identifier"
+                    ),
+                }
+            })?;
+            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+                crate::package::error::Error::Unrecognized {
+                    typ: "sheet relationship".to_string(),
+                    val: format!(
+                        "relationship {rel_id:?} for sheet catalog position {catalog_position} is missing"
+                    ),
+                }
+            })?;
+            if relationship.is_external() {
+                return Err(crate::package::error::Error::UnsupportedFeature(format!(
+                    "sheet catalog position {catalog_position} has an external relationship"
+                )));
+            }
+            if !is_worksheet_relationship(relationship.reltype()) {
+                if is_known_non_worksheet_relationship(relationship.reltype()) {
+                    continue;
+                }
+                return Err(crate::package::error::Error::Unrecognized {
+                    typ: "sheet relationship".to_string(),
+                    val: format!(
+                        "relationship {rel_id:?} for sheet catalog position {catalog_position} has unsupported type {:?}",
+                        relationship.reltype()
+                    ),
+                });
+            }
+            let name = info
+                .worksheet_names
+                .get(catalog_position)
+                .cloned()
+                .ok_or_else(|| crate::package::error::Error::Unrecognized {
+                    typ: "worksheet catalog".to_string(),
+                    val: format!("missing worksheet name for catalog position {catalog_position}"),
+                })?;
+            worksheet_positions.push(catalog_position);
+            worksheet_names.push(name);
+        }
         for (sheet_index, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
-            let Some(rel_id) = rel_id else { continue };
-            let Some(sheet_relationship) = workbook_part.rels().get(rel_id) else {
-                continue;
-            };
+            let rel_id =
+                rel_id
+                    .as_deref()
+                    .ok_or_else(|| crate::package::error::Error::Unrecognized {
+                        typ: "sheet relationship".to_string(),
+                        val: format!(
+                            "sheet catalog position {sheet_index} has no relationship identifier"
+                        ),
+                    })?;
+            let sheet_relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+                crate::package::error::Error::Unrecognized {
+                    typ: "sheet relationship".to_string(),
+                    val: format!(
+                        "relationship {rel_id:?} for sheet catalog position {sheet_index} is missing"
+                    ),
+                }
+            })?;
             if sheet_relationship.is_external() {
-                continue;
+                return Err(crate::package::error::Error::UnsupportedFeature(format!(
+                    "sheet catalog position {sheet_index} has an external relationship"
+                )));
+            }
+            let reltype = sheet_relationship.reltype();
+            if !is_worksheet_relationship(reltype)
+                && !CHART_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
+            {
+                if is_known_non_worksheet_relationship(reltype) {
+                    continue;
+                }
+                return Err(crate::package::error::Error::Unrecognized {
+                    typ: "sheet relationship".to_string(),
+                    val: format!(
+                        "relationship {rel_id:?} for sheet catalog position {sheet_index} has unsupported type {reltype:?}"
+                    ),
+                });
             }
             let sheet_part = self
                 .package
@@ -852,25 +965,33 @@ impl Workbook {
                     sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
                 }
                 chart_sheets.push((sheet_index, chart_sheet));
-            } else {
-                // Worksheet Drawings parts (MS-XLSB 2.1.7.23) are standard
-                // SpreadsheetDrawing XML parts discovered through the sheet's
-                // drawing relationships.
-                for relationship in sheet_part.rels().iter().filter(|relationship| {
-                    matches!(
-                        relationship.reltype(),
-                        relationship_type::DRAWING | relationship_type::STRICT_DRAWING
-                    )
-                }) {
-                    if relationship.is_external() {
-                        return Err(crate::package::error::Error::Unrecognized {
-                            typ: "worksheet drawing relationship".to_string(),
-                            val: "external Drawings part".to_string(),
-                        });
-                    }
-                    let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
-                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                continue;
+            }
+            let worksheet_index = worksheet_positions
+                .binary_search(&sheet_index)
+                .map_err(|_missing_worksheet_position| crate::package::error::Error::Unrecognized {
+                    typ: "worksheet catalog".to_string(),
+                    val: format!(
+                        "worksheet relationship at catalog position {sheet_index} has no public worksheet ordinal"
+                    ),
+                })?;
+            // Worksheet Drawings parts (MS-XLSB 2.1.7.23) are standard
+            // SpreadsheetDrawing XML parts discovered through the sheet's
+            // drawing relationships.
+            for relationship in sheet_part.rels().iter().filter(|relationship| {
+                matches!(
+                    relationship.reltype(),
+                    relationship_type::DRAWING | relationship_type::STRICT_DRAWING
+                )
+            }) {
+                if relationship.is_external() {
+                    return Err(crate::package::error::Error::Unrecognized {
+                        typ: "worksheet drawing relationship".to_string(),
+                        val: "external Drawings part".to_string(),
+                    });
                 }
+                let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
+                sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
             }
             for table_rel_id in crate::package::table::parse_table_part_rel_ids(sheet_part.blob())?
             {
@@ -886,7 +1007,7 @@ impl Workbook {
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
                 let table = crate::package::table::parse_table_part(part.blob())?;
-                structured_tables.push((sheet_index, table));
+                structured_tables.push((worksheet_index, table));
             }
             for relationship in sheet_part.rels().iter().filter(|relationship| {
                 matches!(
@@ -969,6 +1090,8 @@ impl Workbook {
             active_pivot_scope: None,
             current_sheet: None,
         };
+        self.worksheet_names = worksheet_names;
+        self.worksheet_positions = worksheet_positions;
         self.worksheet_rel_ids = info.worksheet_rel_ids;
         self.is_1904 = info.is_1904;
         self.calc = info.calc.unwrap_or_default();

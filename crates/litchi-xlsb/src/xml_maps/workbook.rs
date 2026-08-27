@@ -12,6 +12,7 @@ use litchi_opc::PackURI;
 
 use super::{Commit, Patch, ReadLimits, Snapshot};
 use crate::package::error::Result;
+use litchi_core::sheet::WorkbookTrait;
 
 impl crate::Workbook {
     /// Read the workbook Custom XML Maps catalog and inert BIFF12 bindings.
@@ -49,7 +50,7 @@ impl crate::Workbook {
     }
 
     pub(crate) fn xml_maps_worksheet_parts(&self) -> Result<Vec<PackURI>> {
-        (0..self.formula_context.worksheet_names.len())
+        (0..self.worksheet_count())
             .map(|index| self.worksheet_uri(index))
             .collect()
     }

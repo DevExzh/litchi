@@ -324,8 +324,7 @@ impl Workbook {
 
     /// Open an XLSB workbook from a reader
     pub(in crate::workbook) fn worksheet_index(&self, worksheet_name: &str) -> Result<usize> {
-        self.formula_context
-            .worksheet_names
+        self.worksheet_names
             .iter()
             .position(|name| name == worksheet_name)
             .ok_or_else(|| {
@@ -334,18 +333,19 @@ impl Workbook {
     }
 
     pub(crate) fn worksheet_uri(&self, index: usize) -> Result<litchi_opc::PackURI> {
+        let catalog_position = self.catalog_position_for_worksheet(index)?;
         let name = self
             .formula_context
             .worksheet_names
-            .get(index)
+            .get(catalog_position)
             .ok_or_else(|| {
                 crate::package::error::Error::InvalidFormat(format!(
-                    "Worksheet index {index} out of bounds"
+                    "Worksheet catalog position {catalog_position} out of bounds"
                 ))
             })?;
         let rel_id = self
             .worksheet_rel_ids
-            .get(index)
+            .get(catalog_position)
             .and_then(Option::as_deref)
             .ok_or_else(|| {
                 crate::package::error::Error::UnsupportedFeature(format!(

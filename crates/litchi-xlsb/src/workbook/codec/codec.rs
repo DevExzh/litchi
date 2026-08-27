@@ -12,18 +12,19 @@ use std::io::Cursor;
 
 impl Workbook {
     pub fn worksheet(&self, index: usize) -> Result<Worksheet> {
-        if index >= self.formula_context.worksheet_names.len() {
-            return Err(crate::package::error::Error::InvalidFormat(format!(
-                "Worksheet index {} out of bounds",
-                index
-            ))
-            .into());
-        }
-
-        let name = &self.formula_context.worksheet_names[index];
+        let catalog_position = self.catalog_position_for_worksheet(index)?;
+        let name = self
+            .formula_context
+            .worksheet_names
+            .get(catalog_position)
+            .ok_or_else(|| {
+                crate::package::error::Error::InvalidFormat(format!(
+                    "Worksheet catalog position {catalog_position} out of bounds"
+                ))
+            })?;
         let rel_id = self
             .worksheet_rel_ids
-            .get(index)
+            .get(catalog_position)
             .and_then(Option::as_deref)
             .ok_or_else(|| {
                 crate::package::error::Error::UnsupportedFeature(format!(
@@ -74,7 +75,7 @@ impl Workbook {
             name.clone(),
             &self.shared_strings,
             &self.formula_context,
-            index,
+            catalog_position,
             self.styles.cell_xfs.len(),
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);

@@ -324,11 +324,14 @@ impl WorkbookEdit {
         target_sheet: usize,
         target_anchor: crate::chart::Anchor,
     ) -> Result<()> {
-        let drawing = source.sheet_drawing(source_sheet).ok_or_else(|| {
-            Error::UnsupportedFeature(format!(
-                "source sheet {source_sheet} has no decoded drawing"
-            ))
-        })?;
+        let source_catalog_position = source.catalog_position_for_worksheet(source_sheet)?;
+        let drawing = source
+            .sheet_drawing(source_catalog_position)
+            .ok_or_else(|| {
+                Error::UnsupportedFeature(format!(
+                    "source sheet {source_sheet} has no decoded drawing"
+                ))
+            })?;
         let embedded = drawing.images.get(image_index).ok_or_else(|| {
             Error::UnsupportedFeature(format!(
                 "source sheet {source_sheet} has no embedded image {image_index}"
@@ -1078,7 +1081,8 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         .set_blob(worksheet_output);
     package.unsign();
     *workbook = Workbook::from_opc_package(package)?;
-    if workbook.sheet_drawing(sheet).is_none() {
+    let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
+    if workbook.sheet_drawing(catalog_position).is_none() {
         return Err(Error::InvalidFormat(
             "authored worksheet drawing failed semantic readback".to_string(),
         ));
@@ -1112,7 +1116,8 @@ fn append_image(
         ));
     }
     let drawing_uri = relationship.target_partname()?;
-    let drawing = workbook.sheet_drawing(sheet).ok_or_else(|| {
+    let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
+    let drawing = workbook.sheet_drawing(catalog_position).ok_or_else(|| {
         Error::InvalidFormat("BrtDrawing has no decoded DrawingML inventory".to_string())
     })?;
     let before_images = drawing.images.len();
@@ -1149,7 +1154,8 @@ fn append_image(
     drawing_part.set_blob(drawing_xml);
     package.unsign();
     *workbook = Workbook::from_opc_package(package)?;
-    let drawing = workbook.sheet_drawing(sheet).ok_or_else(|| {
+    let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
+    let drawing = workbook.sheet_drawing(catalog_position).ok_or_else(|| {
         Error::InvalidFormat("appended worksheet drawing failed semantic readback".to_string())
     })?;
     let expected_images = before_images
@@ -1274,6 +1280,7 @@ fn transfer_cell(
 
 fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<()> {
     validate_sheet_name(workbook, sheet, name)?;
+    let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     let uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&uri)?.blob().to_vec();
     let mut output = Vec::new();
@@ -1281,7 +1288,7 @@ fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<()>
     let mut replaced = false;
     for item in Records::new(&source) {
         let record = item?;
-        if record.kind() == kind::BUNDLE_SH && index == sheet {
+        if record.kind() == kind::BUNDLE_SH && index == catalog_position {
             let payload = renamed_bundle_payload(record.payload(), name)?;
             Writer::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
             replaced = true;

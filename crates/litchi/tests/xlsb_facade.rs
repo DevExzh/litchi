@@ -22,7 +22,16 @@ fn fixture_file(bytes: &[u8]) -> tempfile::NamedTempFile {
 }
 
 fn mixed_chart_tabs_bytes() -> Vec<u8> {
+    mixed_chart_tabs_bytes_with_sparkline(false)
+}
+
+fn mixed_chart_tabs_with_sparkline_bytes() -> Vec<u8> {
+    mixed_chart_tabs_bytes_with_sparkline(true)
+}
+
+fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
     use xlsb::chart::{Anchor, Chart};
+    use xlsb::sparkline::{Color as SparkColor, Colors, Group, Groups, Location, Sparkline};
     use xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
 
     let chart = Chart::bar_chart_with_cache(
@@ -38,6 +47,18 @@ fn mixed_chart_tabs_bytes() -> Vec<u8> {
     data.set_cell(0, 0, "DATA");
     let mut tail = MutableWorksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
+    if with_sparkline {
+        let groups = Groups::new(vec![
+            Group::new(
+                xlsb::sparkline::SparklineType::Stacked,
+                Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+                vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        tail.set_sparkline_groups(groups).unwrap();
+    }
 
     let mut writer = WorkbookWriter::new();
     writer.add_worksheet(data);
@@ -255,6 +276,41 @@ fn source_backed_facade_text_skips_chart_tabs() {
         workbook.text().expect("source-backed XLSB text"),
         "DATA\nTAIL\n"
     );
+}
+
+#[test]
+fn source_backed_facade_eager_fallback_keeps_tail_after_chart_tab() {
+    let bytes = mixed_chart_tabs_with_sparkline_bytes();
+    let file = fixture_file(&bytes);
+    let workbook =
+        litchi::sheet::open_xlsb_workbook_dyn(file.path()).expect("source-backed XLSB facade open");
+
+    let tail =
+        WorkbookTrait::worksheet_by_index(workbook.as_ref(), 1).expect("logical second worksheet");
+    assert_eq!(tail.name(), "Tail");
+    assert_eq!(
+        tail.cell_by_coordinate("A1")
+            .expect("tail worksheet cell")
+            .value(),
+        &CellValue::String("TAIL".to_string())
+    );
+
+    let named_tail =
+        WorkbookTrait::worksheet_by_name(workbook.as_ref(), "Tail").expect("named tail worksheet");
+    assert_eq!(named_tail.name(), "Tail");
+    assert_eq!(
+        named_tail
+            .cell_by_coordinate("A1")
+            .expect("named tail worksheet cell")
+            .value(),
+        &CellValue::String("TAIL".to_string())
+    );
+
+    let text = Workbook::open(file.path())
+        .expect("lazy XLSB facade open")
+        .text()
+        .expect("eager fallback XLSB text");
+    assert_eq!(text, "DATA\nTAIL\n");
 }
 
 #[test]
