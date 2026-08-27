@@ -2129,6 +2129,32 @@ def add_pages_table_title_canonical_scaffold(root: Path) -> None:
     selector.write_text("pub enum BodyTableSelector<'a> { Name(&'a str) }\n", encoding="utf-8")
 
 
+def add_pages_table_name_owner_scaffold(root: Path) -> None:
+    """Install the minimum future owner needed to activate name retirement."""
+
+    owner = root / boundaries.PAGES_TABLE_NAME_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        "    pub fn body_table_name(selector: BodyTableSelector) {}\n"
+        "    pub fn edit_body_table_name(selector: BodyTableSelector) {}\n"
+        "    pub fn apply_body_table_name(patch: BodyTableNamePatch) {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    package = root / boundaries.PAGES_TABLE_NAME_EXPORT_SOURCES[1]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text("mod body_table_name;\n", encoding="utf-8")
+    lib = root / boundaries.PAGES_TABLE_NAME_EXPORT_SOURCES[0]
+    lib.write_text(
+        "pub use selector::BodyTableSelector;\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.PAGES_TABLE_NAME_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
+
+
 def add_pages_table_headers_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_TABLE_HEADERS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -21200,6 +21226,170 @@ fn rewrite_movie_title_operation(
         self.assertIn(
             "+ audit_pages_table_title_facade_source_topology()", main_source
         )
+
+    def test_pages_table_name_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_NAME_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_NAME_METHODS,
+            ("rename_table",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_NAME_HELPER,
+            "rename_table_in_package",
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_NAME_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_table_name.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_NAME_PACKAGE_METHODS,
+            (
+                "body_table_name",
+                "edit_body_table_name",
+                "apply_body_table_name",
+            ),
+        )
+
+    def test_iwa_pages_table_name_audit_is_dormant_until_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.RETIRED_IWA_PAGES_TABLE_NAME_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn rename_table(&mut self, model_object_id: u64, name: &str) {}\n"
+                "fn rewrite(staged: &mut Package, model_object_id: u64, name: &str) {\n"
+                "    crate::numbers::editor::rename_table_in_package(staged, model_object_id, name);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_name_source_topology(root), []
+            )
+
+            add_pages_table_name_owner_scaffold(root)
+            violations = boundaries.audit_iwa_pages_table_name_source_topology(root)
+            self.assertTrue(
+                any("method rename_table:" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("helper call rename_table_in_package:" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_table_name_audit_allows_typed_selector_calls_and_masks_scopes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_name_owner_scaffold(root)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/storage.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_pages::Package as PagesPackage;\n"
+                "fn focused() {\n"
+                "    let pages_package: PagesPackage = make_package();\n"
+                "    pages_package.body_table_name(BodyTableSelector::index(0));\n"
+                "    let package: litchi_pages::Package = make_package();\n"
+                "    package.edit_body_table_name(BodyTableSelector::index(0));\n"
+                "    Package::apply_body_table_name(patch);\n"
+                "}\n"
+                "fn raw() {\n"
+                "    let pages_package = editor.package();\n"
+                "    pages_package.body_table_name(selector);\n"
+                "    editor.rename_table(model_object_id, name);\n"
+                "    crate::numbers::editor::rename_table_in_package(&mut staged, model_object_id, name);\n"
+                "}\n"
+                "// editor.rename_table(model_object_id, name);\n"
+                'const DOC: &str = "crate::numbers::editor::rename_table_in_package(x, id, name)";\n'
+                "#[cfg(test)]\n"
+                "fn test_only() { editor.rename_table(model_object_id, name); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_table_name_source_topology(root)
+
+            self.assertTrue(any("call rename_table:" in item for item in violations), violations)
+            self.assertTrue(
+                any("helper call rename_table_in_package:" in item for item in violations),
+                violations,
+            )
+            self.assertEqual(
+                sum("call body_table_name:" in item for item in violations),
+                1,
+                violations,
+            )
+            self.assertFalse(any("DOC" in item or "test_only" in item for item in violations))
+
+            pages_example = root / boundaries.IWA_PAGES_TABLE_NAME_EXAMPLE_ROOT / "edit_pages_table.rs"
+            pages_example.parent.mkdir(parents=True, exist_ok=True)
+            pages_example.write_text(
+                "fn raw() { editor.rename_table(model_object_id, name); }\n"
+                "fn helper() { crate::numbers::editor::rename_table_in_package(&mut staged, model_object_id, name); }\n"
+                "fn focused() { let package: litchi_pages::Package = make_package(); package.body_table_name(BodyTableSelector::index(0)); }\n",
+                encoding="utf-8",
+            )
+            numbers_example = root / boundaries.IWA_PAGES_TABLE_NAME_EXAMPLE_ROOT / "edit_numbers_table.rs"
+            numbers_example.write_text(
+                "fn numbers_only() { numbers.rename_table(model_object_id, name); }\n",
+                encoding="utf-8",
+            )
+            example_violations = boundaries.audit_iwa_pages_table_name_source_topology(root)
+            self.assertTrue(
+                any("edit_pages_table.rs" in item and "rename_table" in item for item in example_violations),
+                example_violations,
+            )
+            self.assertTrue(
+                any("edit_pages_table.rs" in item and "rename_table_in_package" in item for item in example_violations),
+                example_violations,
+            )
+            self.assertFalse(any("edit_numbers_table.rs" in item for item in example_violations))
+
+    def test_iwa_pages_table_name_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_table_name_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_pages_table_name_facade_source_topology()", main_source
+        )
+
+    def test_focused_pages_table_name_requires_selector_methods_and_root_export(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_name_owner_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_pages_table_name_facade_source_topology(root), []
+            )
+
+            owner = root / boundaries.PAGES_TABLE_NAME_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn body_table_name() {}\n"
+                "    pub fn edit_body_table_name() {}\n"
+                "    pub fn rename_table() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_NAME_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_NAME_EXPORT_SOURCES[0]
+            lib.write_text("pub use selector::OtherSelector;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_name_facade_source_topology(root)
+            for fragment in (
+                "missing Package method apply_body_table_name",
+                "must accept selector-first BodyTableSelector",
+                "retains flat Package method rename_table",
+                "missing canonical BodyTableSelector",
+                "missing root BodyTableSelector re-export",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), (fragment, violations))
 
     def test_retired_iwa_pages_document_settings_method_inventory_is_exact(
         self,

@@ -138,6 +138,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pages_body_table_name"
+path = "fuzz_targets/pages_body_table_name.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_cell_pop_up_menu"
 path = "fuzz_targets/numbers_table_cell_pop_up_menu.rs"
 test = false

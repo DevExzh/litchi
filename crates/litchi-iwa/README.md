@@ -361,6 +361,7 @@ shrinking rejects any operation that would discard stored cells:
 ```rust
 use litchi_iwa::numbers::CellValue;
 use litchi_iwa::pages::PagesEditor;
+use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 
 let mut pages = PagesEditor::create_with_text("Quarterly revenue\n")?;
 let first_anchor = pages.body_text()?.encode_utf16().count();
@@ -371,7 +372,15 @@ pages.set_table_cell(
     0,
     CellValue::Text("Quarter".to_owned()),
 )?;
-pages.rename_table(table.model_object_id, "Revenue by Quarter")?;
+let selector = BodyTableSelector::index(0);
+let focused = PagesPackage::from_bytes(&pages.to_bytes()?)?;
+let renamed = focused
+    .edit_body_table_name(selector)?
+    .set_name("Revenue by Quarter")?
+    .commit()?;
+let mut renamed_bytes = Vec::new();
+renamed.package().write_to(&mut renamed_bytes)?;
+pages = PagesEditor::from_bytes(&renamed_bytes)?;
 pages.resize_table(table.model_object_id, 5, 4)?;
 let second_anchor = pages.body_text()?.encode_utf16().count();
 let notes = pages.add_table(second_anchor, "Notes", 2, 2)?;
@@ -382,7 +391,7 @@ pages.set_table_cell(
     CellValue::Text("Generated independently".to_owned()),
 )?;
 pages.save("created-with-table.pages")?;
-# Ok::<(), litchi_iwa::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 `PagesEditor::add_table` bootstraps the first native table in a scratch-created
@@ -2736,6 +2745,51 @@ physical table, tile, dependency, clone, and merge paths. Wave106 closes no
 crate, manifest dependency, edge, or migration debt; all 13 ordered debts,
 the generated/Prost/Buffa owners, and the IWA monolith deletion gate remain
 unchanged.
+
+### Pages body-table names use the focused package owner
+
+Pages body-table name reads and rename transactions are owned by the
+selector-first `litchi_pages::Package` APIs
+`body_table_name`, `edit_body_table_name`, and `apply_body_table_name`. The
+public `table::name::Name` and transaction values are archive-free. The strict
+`table_model_discovery_codec` field-8 projection/prepared rewrite preserves
+unknown canonical fields and groups while rejecting malformed, duplicate,
+noncanonical, and wrong-wire input.
+
+Raw `PagesEditor` rename mutation is retired and the example uses the focused
+package owner. `PagesEditor::tables()` retains a legacy generated read-only
+name-listing compatibility path outside focused owner admission; it has no
+mutation fallback. Physical Pages table/content, storage, formula, and other
+compatibility duties remain in `litchi-iwa`.
+
+Wave107 gates are 22/22 for focused Pages body-table-name integration, 38/38
+for host Pages table tests, 9/9 for the focused codec, and 565/565 for the
+full `litchi-iwa-protos` library suite. Strict Pages owner/test Clippy passed;
+the `edit_pages_table` example check passed; lifecycle fuzz check and strict
+target Clippy passed with 10 command seeds. Boundary unit tests passed
+648/648 and live name HOST/FACADE audits are empty. The full checker remains
+blocked only by an unrelated pre-existing untracked Pages table-lock file.
+These are scoped gates, not a full-workspace result.
+
+The name owner proves the selected model's unique current component and
+locator and rejects unknown, external, data, ambiguous, and root-map metadata
+routes. Unrelated UUID bits and component assignments remain
+opaque-preserved, not independently verifiable here.
+
+No positive native Pages name/rename acceptance is claimed. The only available
+body-table source,
+`/private/tmp/wave104-pages-native-source.pages` (108,776 bytes, SHA-256
+`997509fda639f5dcdabd4546c392b9ebdc3d8c7e9c1d967f35b9f2a0aca38359`, 43
+members), was rejected by strict selector read with
+`InvalidSource { path: Table { table: 0 } }`. Its source bytes remained exact;
+no candidate or inverse was produced and no UI run occurred.
+
+The operation ledger is conservative logical accounting. It does not measure
+Package/SourceCatalog caches, decompressed Archives, process allocator/RSS,
+or codec-internal allocator telemetry; no zero-copy, allocator/RSS, or
+package-wide performance claim follows. The `litchi-iwa -> litchi-pages` edge,
+debt 017 and all 13 ordered debts, generated/Prost/Buffa ownership, and the
+IWA monolith deletion gate remain unchanged.
 
 ## Embedded media
 

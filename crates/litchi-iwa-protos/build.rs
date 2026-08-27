@@ -2643,6 +2643,29 @@ required string table_name = 8;\n\
         "#[doc(hidden)]\nmod buffa_numbers_names_generated {",
         "\"/buffa-numbers-names/iwa_numbers_names_buffa_protos.rs\"",
     ];
+    // `table_model_discovery_codec` deliberately reuses the existing
+    // singular-name projection for `table_name` instead of introducing a
+    // second Buffa schema. Keep that dependency explicit: a future edit must
+    // not silently fall back to an eager generated TableModel or drift field 8
+    // away from the canonical TST declaration.
+    const TABLE_MODEL_DISCOVERY_DECLARATIONS: [&str; 16] = [
+        "const TABLE_NAME_FIELD: u32 = 8;",
+        "pub const fn table_name(self)",
+        "pub fn decode_table_model(",
+        "pub fn decode_table_model_with_report(",
+        "names_projection::NumbersTableModelArchiveLazyView<'_>",
+        "names.table_name",
+        "pub struct TableModelNameWrite<'name>",
+        "pub struct TableModelNameRewriteReport",
+        "pub struct TableModelNameRewriteRequirements",
+        "pub struct TableModelNameRewriteLimits",
+        "pub struct TableModelNameRewriteOutput",
+        "pub struct PreparedTableModelNameRewrite<'source, 'name>",
+        "pub fn prepare_table_model_name_rewrite<'source, 'name>(",
+        "pub fn rewrite_table_model_name(",
+        "pub fn rewrite_table_model_name_with_report(",
+        "pub fn table_model_source_fingerprint(",
+    ];
 
     let numbers = fs::read_to_string(proto_directory.join("TNArchives.proto"))?;
     let tables = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
@@ -2655,6 +2678,8 @@ required string table_name = 8;\n\
         .join("\n");
     let codec = fs::read_to_string("src/numbers_names_codec.rs")?;
     let production_codec = production_codec_source(&codec);
+    let discovery_codec = fs::read_to_string("src/table_model_discovery_codec.rs")?;
+    let discovery_production = production_codec_source(&discovery_codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if numbers.matches(TN_SHEET_NAME).count() != 1
         || numbers.matches(TN_FORM_SHEET_SUPER).count() != 1
@@ -2670,13 +2695,25 @@ required string table_name = 8;\n\
         || !PRIVATE_MODULE_DECLARATIONS
             .iter()
             .all(|declaration| lib.matches(declaration).count() == 1)
+        || !TABLE_MODEL_DISCOVERY_DECLARATIONS
+            .iter()
+            .all(|declaration| discovery_production.matches(declaration).count() == 1)
+        || !discovery_production.contains(
+            "crate::buffa_numbers_names_generated::LitchiIwaProjection as names_projection;",
+        )
+        || FORBIDDEN_PROST_CODEC_MARKERS
+            .iter()
+            .any(|marker| discovery_production.contains(marker))
+        || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
+            .iter()
+            .any(|marker| discovery_production.contains(marker))
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
         || production_codec.contains("try_encode")
         || production_codec.contains(".encode(")
     {
         return Err(
-            "derived Numbers names projection/codec drifted from TN sheet/form or TST table-model fields, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
+            "derived Numbers names/table-model discovery projection or codec drifted from TN sheet/form or TST table-model fields, exposed an eager/generated owner, exceeded its 1 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
     }

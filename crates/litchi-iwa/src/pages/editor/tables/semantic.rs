@@ -3320,22 +3320,6 @@ impl PagesEditor {
         Ok(true)
     }
 
-    /// Rename a reachable body table transactionally.
-    pub fn rename_table(&mut self, model_object_id: u64, name: &str) -> Result<()> {
-        self.require_body_table(model_object_id)?;
-        let mut staged = self.package().clone();
-        crate::numbers::editor::rename_table_in_package(&mut staged, model_object_id, name)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        let renamed = verified.require_body_table(model_object_id)?;
-        if renamed.info.name != name {
-            return Err(Error::InvalidFormat(
-                "Pages table rename failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Resize a reachable body table while preserving existing cells and UIDs.
     ///
     /// Growth creates blank trailing rows or columns. Shrinkage is rejected if

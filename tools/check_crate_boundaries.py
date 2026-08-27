@@ -7661,6 +7661,56 @@ PAGES_TABLE_TITLE_WIRE_TYPES = frozenset(
 PAGES_TABLE_TITLE_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
 )
+# Body-table display names are a separate ownership seam from title visibility
+# settings.  The current Pages host still exposes ``PagesEditor::rename_table``
+# and routes it through the shared Numbers raw-ID helper; keep that migration
+# baseline dormant until the selector-first package owner is actually wired.
+RETIRED_IWA_PAGES_TABLE_NAME_METHODS = ("rename_table",)
+RETIRED_IWA_PAGES_TABLE_NAME_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_NAME_METHODS
+)
+RETIRED_IWA_PAGES_TABLE_NAME_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "semantic.rs"
+)
+RETIRED_IWA_PAGES_TABLE_NAME_HELPER = "rename_table_in_package"
+IWA_PAGES_TABLE_NAME_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*)?"
+    r"(?:r#)?(?P<method>rename_table|body_table_name|"
+    r"edit_body_table_name|apply_body_table_name)\b[ \t\r\n]*\(",
+)
+IWA_PAGES_TABLE_NAME_HELPER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*::[ \t\r\n]*)*"
+    r"(?:r#)?(?P<helper>rename_table_in_package)\b"
+    r"[ \t\r\n]*\(",
+)
+IWA_PAGES_TABLE_NAME_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_TABLE_NAME_README_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor|editor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>rename_table|body_table_name|edit_body_table_name|"
+        r"apply_body_table_name)\b[ \t\r\n]*\(",
+    ),
+)
+PAGES_TABLE_NAME_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "body_table_name.rs"
+PAGES_TABLE_NAME_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_NAME_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_PACKAGE_TABLE_NAME_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_table_name\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_TABLE_NAME_PACKAGE_METHODS = (
+    "body_table_name",
+    "edit_body_table_name",
+    "apply_body_table_name",
+)
 PAGES_TABLE_HEADERS_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "headers.rs"
 PAGES_TABLE_HEADERS_OWNER_SOURCE = (
     PAGES_SOURCE_ROOT / "package" / "body_table_headers.rs"
@@ -19187,6 +19237,235 @@ def audit_iwa_pages_table_title_source_topology(root: Path = ROOT) -> list[str]:
                     f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
                 )
 
+    return sorted(set(violations))
+
+
+def _pages_table_name_owner_present(root: Path) -> bool:
+    """Activate body-table name retirement only after its package owner lands."""
+
+    owner_path = root / PAGES_TABLE_NAME_OWNER_SOURCE
+    package_path = root / PAGES_TABLE_NAME_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and (
+        PAGES_PACKAGE_TABLE_NAME_MODULE.search(package_source) is not None
+    )
+
+
+def _pages_table_name_example_is_pages(
+    path: Path, source: str, match_start: int
+) -> bool:
+    """Identify Pages branches before applying the shared rename ratchet."""
+
+    stem = path.stem.lower()
+    if "pages" in stem and "numbers" not in stem and "keynote" not in stem:
+        return True
+    if "numbers" in stem or "keynote" in stem:
+        return False
+    line_start = source.rfind("\n", 0, match_start) + 1
+    line_end = source.find("\n", match_start)
+    if line_end < 0:
+        line_end = len(source)
+    line = source[line_start:line_end].lower()
+    if "pages" in line or "pageseditor" in line or "pages_editor" in line:
+        return True
+    function_matches = list(
+        re.finditer(
+            r"\bfn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+            source[:match_start],
+        )
+    )
+    return bool(function_matches and "pages" in function_matches[-1].group(1).lower())
+
+
+def _pages_table_name_focused_package_call(
+    source: str, match: re.Match[str]
+) -> bool:
+    """Allow only typed selector-first Pages package name calls."""
+
+    return _pages_table_appearance_focused_package_call(source, match)
+
+
+def audit_iwa_pages_table_name_source_topology(root: Path = ROOT) -> list[str]:
+    """Retire raw Pages body-table renames once the focused owner is wired.
+
+    ``PagesEditor::rename_table`` and the shared
+    ``crate::numbers::editor::rename_table_in_package`` helper both accept a
+    native model identifier.  They must disappear from production Pages host
+    code when ``body_table_name.rs`` is present.  A typed
+    ``litchi_pages::Package`` call with a ``BodyTableSelector`` remains the
+    focused route; test items, comments, and string literals are masked.
+    Numbers and Keynote examples retain their own name compatibility paths,
+    so only Pages branches in shared examples are inspected.
+    """
+
+    if not _pages_table_name_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name == "tests.rs" or "tests" in path.parts:
+                continue
+            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            code = _mask_rust_non_code(source)
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_TABLE_NAME_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages table-name method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_PAGES_TABLE_NAME_CALL.finditer(code):
+                method = match.group("method")
+                if method != "rename_table" and _pages_table_name_focused_package_call(
+                    code, match
+                ):
+                    continue
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                line = code[line_start:line_end]
+                if re.search(rf"\bfn[ \t\r\n]+{re.escape(method)}\b", line):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-name call "
+                    f"{method}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_PAGES_TABLE_NAME_HELPER_CALL.finditer(code):
+                line_number = code.count("\n", 0, match.start("helper")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-name helper call "
+                    f"{match.group('helper')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_TABLE_NAME_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(
+                example_path.read_text(encoding="utf-8")
+            )
+            code = _mask_rust_non_code(source)
+            for match in IWA_PAGES_TABLE_NAME_CALL.finditer(code):
+                if method := match.group("method"):
+                    if method != "rename_table" and _pages_table_name_focused_package_call(
+                        code, match
+                    ):
+                        continue
+                if not _pages_table_name_example_is_pages(
+                    example_path, code, match.start()
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-name example call "
+                    f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_PAGES_TABLE_NAME_HELPER_CALL.finditer(code):
+                if not _pages_table_name_example_is_pages(
+                    example_path, code, match.start()
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("helper")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-name example helper call "
+                    f"{match.group('helper')}: {example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = _mask_rust_non_code(readme_path.read_text(encoding="utf-8"))
+        for pattern in IWA_PAGES_TABLE_NAME_README_CALLS:
+            for match in pattern.finditer(source):
+                if match.group("method") != "rename_table" and _pages_table_name_focused_package_call(
+                    source, match
+                ):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-name README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+        for match in IWA_PAGES_TABLE_NAME_HELPER_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("helper")) + 1
+            violations.append(
+                "retired litchi-iwa Pages table-name README helper call "
+                f"{match.group('helper')}: {IWA_PAGES_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_name_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Require the selector-first Pages package name seam once it lands."""
+
+    if not _pages_table_name_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    owner_path = root / PAGES_TABLE_NAME_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(
+        owner_path.read_text(encoding="utf-8")
+    )
+    methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for method in PAGES_TABLE_NAME_PACKAGE_METHODS:
+        declaration = methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-pages table-name public API is missing Package "
+                f"method {method}: {PAGES_TABLE_NAME_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_body_table_name" and "BodyTableSelector" not in declaration:
+            violations.append(
+                "focused litchi-pages table-name Package method "
+                f"{method} must accept selector-first BodyTableSelector: "
+                f"{PAGES_TABLE_NAME_OWNER_SOURCE}"
+            )
+    if "rename_table" in methods:
+        violations.append(
+            "focused litchi-pages table-name public API retains flat Package "
+            f"method rename_table: {PAGES_TABLE_NAME_OWNER_SOURCE}"
+        )
+
+    selector_path = root / PAGES_TABLE_NAME_SELECTOR_SOURCE
+    selector_source = (
+        _mask_rust_non_code(selector_path.read_text(encoding="utf-8"))
+        if selector_path.is_file()
+        else ""
+    )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        selector_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-name public API is missing canonical "
+            f"BodyTableSelector: {PAGES_TABLE_NAME_SELECTOR_SOURCE}"
+        )
+
+    lib_path = root / PAGES_TABLE_NAME_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        lib_source, frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages table-name public API is missing root "
+            f"BodyTableSelector re-export: {PAGES_TABLE_NAME_EXPORT_SOURCES[0]}"
+        )
     return sorted(set(violations))
 
 
@@ -33322,6 +33601,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_lock_facade_source_topology()
         + audit_iwa_pages_table_title_source_topology()
         + audit_pages_table_title_facade_source_topology()
+        + audit_iwa_pages_table_name_source_topology()
+        + audit_pages_table_name_facade_source_topology()
         + audit_iwa_pages_table_headers_source_topology()
         + audit_pages_table_headers_facade_source_topology()
         + audit_iwa_pages_table_dimension_source_topology()

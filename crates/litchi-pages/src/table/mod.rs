@@ -8,6 +8,8 @@ pub mod dimension;
 pub mod headers;
 /// Interactive lock state for a body-attached table.
 pub mod lock;
+/// Validated, archive-free names for Pages body tables.
+pub mod name;
 /// Persisted row-order rules for a body-attached table.
 pub mod sort;
 pub mod title;

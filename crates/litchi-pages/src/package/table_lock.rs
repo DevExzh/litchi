@@ -13,6 +13,7 @@ use litchi_iwa_common::{
     wire::{WireFieldView, WireView, patch_varint_field, transform_length_delimited_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_protos::table_model_discovery_codec;
 use thiserror::Error;
 
 use super::{
@@ -38,7 +39,6 @@ const DRAWABLE_PARENT_FIELD: u32 = 2;
 const TABLE_INFO_SUPER_FIELD: u32 = 1;
 const TABLE_INFO_MODEL_FIELD: u32 = 2;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
-const TABLE_MODEL_NAME_FIELD: u32 = 8;
 const OBJECT_REPLACEMENT_CHARACTER: u16 = 0xfffc;
 const MAX_BODY_TABLES: usize = 4_096;
 const SNAPPY_RAW_MAX_OVERHEAD: usize = 32;
@@ -931,11 +931,20 @@ fn decode_table_model_name(
     budget: &mut WireBudget,
     source: &[u8],
 ) -> Result<Box<str>, BodyTableLockError> {
-    let view = budget.parse(source, 1)?;
-    let name = unique_field(budget, &view, TABLE_MODEL_NAME_FIELD, 2)?
-        .ok_or(BodyTableLockError::InvalidSource)?;
-    let text =
-        std::str::from_utf8(name.payload()).map_err(|_| BodyTableLockError::InvalidSource)?;
+    let limits = budget.wire_limits();
+    let options = table_model_discovery_codec::DecodeOptions::new(
+        source.len().max(1).min(limits.max_input_bytes()),
+        budget.remaining_wire_fields(),
+        budget.remaining_wire_work(),
+        u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX),
+    )
+    .with_max_text_bytes(limits.max_input_bytes());
+    let (snapshot, report) =
+        table_model_discovery_codec::decode_table_model_with_report(source, options)
+            .map_err(map_table_model_codec_error)?;
+    budget.charge_codec_report(report.fields(), report.work_bytes(), report.max_depth(), 0)?;
+    budget.charge_payload_work(report.text_bytes())?;
+    let text = snapshot.table_name();
     let mut owned = String::new();
     budget.charge_payload_items(text.len())?;
     budget.charge_payload_work(text.len())?;
@@ -944,6 +953,51 @@ fn decode_table_model_name(
         .map_err(|_| BodyTableLockError::Allocation { amount: text.len() })?;
     owned.push_str(text);
     Ok(owned.into_boxed_str())
+}
+
+fn map_table_model_codec_error(
+    error: table_model_discovery_codec::DecodeError,
+) -> BodyTableLockError {
+    let Some(limit) = error.resource_limit() else {
+        return BodyTableLockError::InvalidSource;
+    };
+    let (kind, observed, maximum) = match limit {
+        table_model_discovery_codec::DecodeLimit::Bytes { observed, maximum } => (
+            BodyTableLockLimitKind::WireBytes,
+            usize_as_u64(observed),
+            usize_as_u64(maximum),
+        ),
+        table_model_discovery_codec::DecodeLimit::Fields { observed, maximum } => (
+            BodyTableLockLimitKind::WireFields,
+            usize_as_u64(observed),
+            usize_as_u64(maximum),
+        ),
+        table_model_discovery_codec::DecodeLimit::Work { observed, maximum } => (
+            BodyTableLockLimitKind::WireWork,
+            usize_as_u64(observed),
+            usize_as_u64(maximum),
+        ),
+        table_model_discovery_codec::DecodeLimit::Text { observed, maximum }
+        | table_model_discovery_codec::DecodeLimit::Allocations { observed, maximum }
+        | table_model_discovery_codec::DecodeLimit::Retained { observed, maximum }
+        | table_model_discovery_codec::DecodeLimit::Scratch { observed, maximum }
+        | table_model_discovery_codec::DecodeLimit::Output { observed, maximum } => (
+            BodyTableLockLimitKind::PayloadItems,
+            usize_as_u64(observed),
+            usize_as_u64(maximum),
+        ),
+        table_model_discovery_codec::DecodeLimit::Nesting { observed, maximum } => (
+            BodyTableLockLimitKind::WireNesting,
+            u64::from(observed),
+            u64::from(maximum),
+        ),
+        _ => return BodyTableLockError::InvalidSource,
+    };
+    BodyTableLockError::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    }
 }
 
 pub(crate) fn parse_local_reference(
@@ -2511,7 +2565,10 @@ impl WireBudget {
         )
     }
 
-    fn charge_payload_objects(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_objects(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), BodyTableLockError> {
         let limits = self
             .physical_limits
             .effective_archive_limits()
@@ -2524,7 +2581,10 @@ impl WireBudget {
         )
     }
 
-    fn charge_payload_messages(&mut self, amount: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_payload_messages(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), BodyTableLockError> {
         let limits = self
             .physical_limits
             .effective_archive_limits()

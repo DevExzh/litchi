@@ -21,6 +21,9 @@ target
 !/corpus/pages_body_table_sort_order/*
 !/corpus/pages_body_table_appearance/
 !/corpus/pages_body_table_appearance/*
+!/corpus/pages_body_table_name/
+/corpus/pages_body_table_name/*
+!/corpus/pages_body_table_name/*.hex
 !/corpus/keynote_movie_playback/
 !/corpus/keynote_movie_playback/*
 !/corpus/keynote_slide_movie_geometry/

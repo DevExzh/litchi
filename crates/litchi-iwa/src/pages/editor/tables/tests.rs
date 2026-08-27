@@ -74,6 +74,48 @@ fn set_pages_table_header_settings(
     Ok(())
 }
 
+fn set_pages_table_name(editor: &mut PagesEditor, model_object_id: u64, name: &str) -> Result<()> {
+    let table_position = editor
+        .tables()?
+        .iter()
+        .position(|table| table.model_object_id == model_object_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Pages table model {model_object_id} is not attached to the body"
+            ))
+        })?;
+    let selector = BodyTableSelector::index(table_position);
+    let bytes = {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages table name package: {error}")))?;
+        let commit = package
+            .edit_body_table_name(selector)
+            .map_err(|error| Error::InvalidFormat(format!("Pages table name: {error}")))?
+            .set_name(name)
+            .map_err(|error| Error::InvalidFormat(format!("Pages table name: {error}")))?
+            .commit()
+            .map_err(|error| Error::InvalidFormat(format!("Pages table name: {error}")))?;
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        bytes
+    };
+    let verified = PagesPackage::from_bytes(&bytes)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table name reopen: {error}")))?;
+    let actual = verified
+        .body_table_name(selector)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table name reread: {error}")))?;
+    if actual.as_str() != name {
+        return Err(Error::InvalidFormat(
+            "Pages table name failed focused-package verification".to_owned(),
+        ));
+    }
+    *editor = PagesEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
 fn pages_table_dimension_size(
     editor: &PagesEditor,
     selector: BodyTableSelector<'_>,
@@ -1742,7 +1784,7 @@ fn out_of_bounds_cell_update_is_transactional() {
 }
 
 #[test]
-fn source_built_table_roundtrips_rename_and_resize() {
+fn source_built_table_rejects_unsupported_focused_rename_and_roundtrips_resize() {
     let mut editor = PagesDocumentBuilder::new()
         .body_table("Original", 3, 2)
         .build()
@@ -1752,11 +1794,16 @@ fn source_built_table_roundtrips_rename_and_resize() {
         .set_table_cell(model_id, 1, 1, CellValue::Text("kept".to_owned()))
         .unwrap();
 
-    editor.rename_table(model_id, "Renamed").unwrap();
+    // Builder snapshots are not admitted by the strict focused package
+    // owner.  Keep this host path fail-closed rather than reviving the raw
+    // rename setter as a compatibility fallback.
+    let before_rename = editor.to_bytes().unwrap();
+    assert!(set_pages_table_name(&mut editor, model_id, "Renamed").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before_rename);
     editor.resize_table(model_id, 5, 4).unwrap();
     let mut reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let info = reopened.tables().unwrap().remove(0);
-    assert_eq!(info.name, "Renamed");
+    assert_eq!(info.name, "Original");
     assert_eq!((info.rows, info.columns), (5, 4));
     assert_eq!(
         reopened.table(model_id).unwrap().get_cell(1, 1),
@@ -1857,7 +1904,7 @@ fn source_built_table_roundtrips_layout_crud_transactionally() {
 }
 
 #[test]
-fn table_rename_and_occupied_shrink_are_transactional() {
+fn table_occupied_shrink_is_transactional() {
     let mut editor = PagesDocumentBuilder::new()
         .body_table("Protected", 3, 3)
         .build()
@@ -1873,8 +1920,6 @@ fn table_rename_and_occupied_shrink_are_transactional() {
         .unwrap();
 
     let before = editor.to_bytes().unwrap();
-    assert!(editor.rename_table(model_id, "").is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(editor.resize_table(model_id, 2, 2).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
