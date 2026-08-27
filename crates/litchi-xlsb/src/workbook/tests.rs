@@ -9,7 +9,7 @@
 
 use super::model::Workbook;
 use crate::calc::Props;
-use crate::external_link::Kind;
+use crate::external_link::{ExternalLinkLimits, ExternalLinkResource, Kind};
 use crate::package::error::Result;
 use crate::package::formula::{Compiler, Context, ExternalBook, Parser};
 use crate::package::shared_strings::SharedString;
@@ -52,6 +52,7 @@ fn empty_workbook() -> Workbook {
         worksheet_rel_ids: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
+        external_link_limits: ExternalLinkLimits::default(),
         shared_strings: Vec::new(),
         styles: StylesTable::default(),
         calc: Props::default(),
@@ -201,6 +202,7 @@ fn parse_external_link_with_relationship_type(
         worksheet_rel_ids: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
+        external_link_limits: ExternalLinkLimits::default(),
         shared_strings: Vec::new(),
         styles: StylesTable::default(),
         calc: Props::default(),
@@ -211,7 +213,8 @@ fn parse_external_link_with_relationship_type(
         sheet_drawings: Vec::new(),
         connections: None,
     };
-    workbook.load_external_book(&uri)
+    let mut budget = ExternalLinkLimits::default().budget();
+    workbook.load_external_book_with_budget(&uri, &mut budget)
 }
 
 fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<SharedString>> {
@@ -333,6 +336,531 @@ fn external_data_source_records(
         (kind::SUP_NAME_END, Vec::new()),
         (kind::END_SUP_BOOK, Vec::new()),
     ]
+}
+
+fn external_data_source_records_with_cache(
+    external_kind: u16,
+    source: &str,
+    detail: &str,
+    item_name: &str,
+    value_kind: RawKind,
+    value: Vec<u8>,
+) -> Vec<(RawKind, Vec<u8>)> {
+    let mut records = external_data_source_records(external_kind, source, detail, item_name);
+    let end = records
+        .iter()
+        .position(|(record_type, _)| *record_type == kind::SUP_NAME_END)
+        .unwrap();
+    records.splice(
+        end..end,
+        [
+            (
+                kind::SUP_NAME_VALUE_START,
+                [1u32.to_le_bytes(), 1u32.to_le_bytes()].concat(),
+            ),
+            (value_kind, value),
+            (kind::SUP_NAME_VALUE_END, Vec::new()),
+        ],
+    );
+    records
+}
+
+type ExternalLinkRelationship<'a> = (&'a str, &'a str, &'a str);
+type ExternalLinkFixture<'a> = (
+    &'a str,
+    Vec<(RawKind, Vec<u8>)>,
+    Option<ExternalLinkRelationship<'a>>,
+);
+
+fn package_with_external_links<'a>(links: &[ExternalLinkFixture<'a>]) -> OpcPackage {
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let mut workbook_data = Vec::new();
+    {
+        let mut writer = Writer::new(&mut workbook_data);
+        for (workbook_relationship_id, _, _) in links {
+            writer
+                .write_record(kind::SUP_BOOK_SRC, &wide_string(workbook_relationship_id))
+                .unwrap();
+        }
+    }
+    let mut workbook_part = BlobPart::new(
+        workbook_uri,
+        "application/vnd.ms-excel.sheet.binary.macroEnabled.main".to_string(),
+        workbook_data,
+    );
+
+    for (index, (workbook_relationship_id, _, _)) in links.iter().enumerate() {
+        let external_target = format!("externalLinks/externalLink{}.bin", index + 1);
+        workbook_part.rels_mut().add_relationship(
+            relationship_type::EXTERNAL_LINK.to_string(),
+            external_target,
+            (*workbook_relationship_id).to_string(),
+            false,
+        );
+    }
+
+    let workbook_target = workbook_part
+        .partname()
+        .as_str()
+        .trim_start_matches('/')
+        .to_owned();
+    let mut package = OpcPackage::new();
+    package.rels_mut().add_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+            .to_owned(),
+        workbook_target,
+        "rIdWorkbook".to_owned(),
+        false,
+    );
+    package.add_part(Box::new(workbook_part));
+
+    for (index, (_, records, relationship)) in links.iter().enumerate() {
+        let external_uri =
+            PackURI::new(format!("/xl/externalLinks/externalLink{}.bin", index + 1)).unwrap();
+        let mut external_part = BlobPart::new(
+            external_uri,
+            "application/vnd.ms-excel.externalLink".to_string(),
+            external_link_records(records),
+        );
+        if let Some((relationship_id, relationship_type, target)) = relationship {
+            external_part.rels_mut().add_relationship(
+                (*relationship_type).to_string(),
+                (*target).to_string(),
+                (*relationship_id).to_string(),
+                true,
+            );
+        }
+        package.add_part(Box::new(external_part));
+    }
+    package
+}
+
+fn assert_external_link_limit(
+    error: crate::package::error::Error,
+    resource: ExternalLinkResource,
+    actual: usize,
+    maximum: usize,
+) {
+    match error {
+        crate::package::error::Error::ExternalLinkLimitExceeded {
+            resource: found_resource,
+            actual: found_actual,
+            maximum: found_maximum,
+        } => {
+            assert_eq!(found_resource, resource);
+            assert_eq!(found_actual, actual);
+            assert_eq!(found_maximum, maximum);
+        },
+        other => panic!("expected external-link limit error, got {other:?}"),
+    }
+}
+
+#[test]
+fn default_external_link_constructors_match_explicit_default_policy() {
+    let records = external_workbook_records();
+    let links = [(
+        "rIdExternal1",
+        records,
+        Some((
+            "rIdPath",
+            relationship_type::EXTERNAL_LINK_PATH,
+            "Book.xlsx",
+        )),
+    )];
+
+    let default_workbook = Workbook::from_opc_package(package_with_external_links(&links)).unwrap();
+    let explicit_workbook = Workbook::from_opc_package_with_external_link_limits(
+        package_with_external_links(&links),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(
+        default_workbook.external_link_limits(),
+        ExternalLinkLimits::DEFAULT
+    );
+    assert_eq!(
+        default_workbook.external_links(),
+        explicit_workbook.external_links()
+    );
+
+    let default_package = crate::Package::from_opc(package_with_external_links(&links)).unwrap();
+    let explicit_package = crate::Package::from_opc_with_external_link_limits(
+        package_with_external_links(&links),
+        ExternalLinkLimits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(
+        default_package.external_link_limits(),
+        explicit_package.external_link_limits()
+    );
+    assert_eq!(
+        default_package.workbook().unwrap().external_links(),
+        explicit_package.workbook().unwrap().external_links()
+    );
+}
+
+#[test]
+fn eager_external_link_part_bytes_are_aggregated_across_parts() {
+    let records = external_workbook_records();
+    let part_bytes = external_link_records(&records).len();
+    let links = [
+        (
+            "rIdExternal1",
+            records.clone(),
+            Some((
+                "rIdPath",
+                relationship_type::EXTERNAL_LINK_PATH,
+                "Book1.xlsx",
+            )),
+        ),
+        (
+            "rIdExternal2",
+            records,
+            Some((
+                "rIdPath",
+                relationship_type::EXTERNAL_LINK_PATH,
+                "Book2.xlsx",
+            )),
+        ),
+    ];
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes)
+        .build()
+        .unwrap();
+
+    let source_package = package_with_external_links(&links);
+    let error =
+        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), limits)
+            .unwrap_err();
+    assert_external_link_limit(
+        error,
+        ExternalLinkResource::TotalPartBytes,
+        part_bytes * 2,
+        part_bytes,
+    );
+
+    let error = crate::Package::from_opc_with_external_link_limits(source_package.clone(), limits)
+        .unwrap_err();
+    assert_external_link_limit(
+        error,
+        ExternalLinkResource::TotalPartBytes,
+        part_bytes * 2,
+        part_bytes,
+    );
+
+    let larger_limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes * 2)
+        .build()
+        .unwrap();
+    let workbook =
+        Workbook::from_opc_package_with_external_link_limits(source_package, larger_limits)
+            .unwrap();
+    assert_eq!(workbook.external_link_limits(), larger_limits);
+    assert_eq!(workbook.external_link_count(), 2);
+    assert_eq!(
+        workbook
+            .external_link_iter()
+            .map(|link| link.source())
+            .collect::<Vec<_>>(),
+        vec!["Book1.xlsx", "Book2.xlsx"]
+    );
+}
+
+#[test]
+fn eager_external_link_limits_are_atomic_and_reconstruct_with_policy() {
+    let records = external_workbook_records();
+    let links = [
+        (
+            "rIdExternal1",
+            records.clone(),
+            Some((
+                "rIdPath",
+                relationship_type::EXTERNAL_LINK_PATH,
+                "Book1.xlsx",
+            )),
+        ),
+        (
+            "rIdExternal2",
+            records,
+            Some((
+                "rIdPath",
+                relationship_type::EXTERNAL_LINK_PATH,
+                "Book2.xlsx",
+            )),
+        ),
+    ];
+    let restrictive = ExternalLinkLimits::builder().max_links(1).build().unwrap();
+
+    let source_package = package_with_external_links(&links);
+    let error =
+        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), restrictive)
+            .unwrap_err();
+    assert_external_link_limit(error, ExternalLinkResource::Links, 2, 1);
+
+    let error =
+        crate::Package::from_opc_with_external_link_limits(source_package.clone(), restrictive)
+            .unwrap_err();
+    assert_external_link_limit(error, ExternalLinkResource::Links, 2, 1);
+
+    let permissive = ExternalLinkLimits::builder().max_links(2).build().unwrap();
+    let package =
+        crate::Package::from_opc_with_external_link_limits(source_package, permissive).unwrap();
+    assert_eq!(package.external_link_limits(), permissive);
+
+    let workbook = package.workbook().unwrap();
+    assert_eq!(workbook.external_link_limits(), permissive);
+    assert_eq!(
+        workbook
+            .external_link_iter()
+            .map(|link| link.source())
+            .collect::<Vec<_>>(),
+        vec!["Book1.xlsx", "Book2.xlsx"]
+    );
+
+    let reconstructed = package.clone().into_workbook().unwrap();
+    assert_eq!(reconstructed.external_link_limits(), permissive);
+    assert_eq!(
+        reconstructed
+            .external_link_iter()
+            .map(|link| link.source())
+            .collect::<Vec<_>>(),
+        vec!["Book1.xlsx", "Book2.xlsx"]
+    );
+}
+
+#[test]
+fn custom_external_link_limits_survive_unrelated_opc_reparse() {
+    let records = external_workbook_records();
+    let links = [
+        (
+            "rIdExternal1",
+            records.clone(),
+            Some((
+                "rIdPath",
+                relationship_type::EXTERNAL_LINK_PATH,
+                "Book1.xlsx",
+            )),
+        ),
+        (
+            "rIdExternal2",
+            records,
+            Some((
+                "rIdPath",
+                relationship_type::EXTERNAL_LINK_PATH,
+                "Book2.xlsx",
+            )),
+        ),
+    ];
+    let part_bytes = external_link_records(&links[0].1).len();
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes * 2)
+        .max_links(2)
+        .build()
+        .unwrap();
+    let mut workbook = Workbook::from_opc_package_with_external_link_limits(
+        package_with_external_links(&links),
+        limits,
+    )
+    .unwrap();
+    let marker = PackURI::new("/xl/raw-edit-marker.bin").unwrap();
+    workbook
+        .edit_opc(|package| {
+            package.try_add_part(Box::new(BlobPart::new(
+                marker.clone(),
+                "application/octet-stream".to_string(),
+                b"unrelated mutation".to_vec(),
+            )))?;
+            Ok::<_, crate::package::error::Error>(())
+        })
+        .unwrap();
+
+    assert_eq!(workbook.external_link_limits(), limits);
+    assert_eq!(workbook.external_link_count(), 2);
+    assert_eq!(
+        workbook
+            .external_link_iter()
+            .map(|link| link.source())
+            .collect::<Vec<_>>(),
+        vec!["Book1.xlsx", "Book2.xlsx"]
+    );
+    assert_eq!(
+        workbook.opc_package().get_part(&marker).unwrap().blob(),
+        b"unrelated mutation"
+    );
+}
+
+#[test]
+fn eager_external_link_item_limits_are_aggregated_across_parts() {
+    let links = [
+        (
+            "rIdExternal1",
+            external_data_source_records(1, "Excel", "System", "Item1"),
+            None,
+        ),
+        (
+            "rIdExternal2",
+            external_data_source_records(1, "Excel", "System", "Item2"),
+            None,
+        ),
+    ];
+    let limits = ExternalLinkLimits::builder().max_items(1).build().unwrap();
+    let source_package = package_with_external_links(&links);
+    let error =
+        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), limits)
+            .unwrap_err();
+    assert_external_link_limit(error, ExternalLinkResource::Items, 2, 1);
+
+    let larger_limits = ExternalLinkLimits::builder().max_items(2).build().unwrap();
+    let workbook =
+        Workbook::from_opc_package_with_external_link_limits(source_package, larger_limits)
+            .unwrap();
+    assert_eq!(workbook.external_link_limits(), larger_limits);
+    assert_eq!(workbook.external_link_count(), 2);
+}
+
+#[test]
+fn eager_external_link_cell_limits_are_aggregated_across_parts() {
+    let links = [
+        (
+            "rIdExternal1",
+            external_data_source_records_with_cache(
+                1,
+                "Excel",
+                "System",
+                "Item1",
+                kind::SUP_NAME_NUM,
+                1.0f64.to_le_bytes().to_vec(),
+            ),
+            None,
+        ),
+        (
+            "rIdExternal2",
+            external_data_source_records_with_cache(
+                1,
+                "Excel",
+                "System",
+                "Item2",
+                kind::SUP_NAME_NUM,
+                2.0f64.to_le_bytes().to_vec(),
+            ),
+            None,
+        ),
+    ];
+    let limits = ExternalLinkLimits::builder().max_cells(1).build().unwrap();
+    let source_package = package_with_external_links(&links);
+    let error =
+        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), limits)
+            .unwrap_err();
+    assert_external_link_limit(error, ExternalLinkResource::Cells, 2, 1);
+
+    let larger_limits = ExternalLinkLimits::builder().max_cells(2).build().unwrap();
+    let workbook =
+        Workbook::from_opc_package_with_external_link_limits(source_package, larger_limits)
+            .unwrap();
+    assert_eq!(workbook.external_link_limits(), larger_limits);
+    assert_eq!(workbook.external_link_count(), 2);
+}
+
+#[test]
+fn eager_external_link_aggregate_boundaries_are_inclusive() {
+    let links = [
+        (
+            "rIdExternal1",
+            external_data_source_records_with_cache(
+                1,
+                "Excel",
+                "System",
+                "Item1",
+                kind::SUP_NAME_NUM,
+                1.0f64.to_le_bytes().to_vec(),
+            ),
+            None,
+        ),
+        (
+            "rIdExternal2",
+            external_data_source_records_with_cache(
+                1,
+                "Excel",
+                "System",
+                "Item2",
+                kind::SUP_NAME_NUM,
+                2.0f64.to_le_bytes().to_vec(),
+            ),
+            None,
+        ),
+    ];
+    let part_bytes = external_link_records(&links[0].1).len();
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes * 2)
+        .max_links(2)
+        .max_items(2)
+        .max_matrices(2)
+        .max_cells(2)
+        .build()
+        .unwrap();
+    let workbook = Workbook::from_opc_package_with_external_link_limits(
+        package_with_external_links(&links),
+        limits,
+    )
+    .unwrap();
+    assert_eq!(workbook.external_link_count(), 2);
+    assert_eq!(workbook.external_link_limits(), limits);
+    assert_eq!(
+        workbook.external_link(0).unwrap().dde_items()[0].name(),
+        "Item1"
+    );
+    assert_eq!(
+        workbook.external_link(1).unwrap().dde_items()[0].name(),
+        "Item2"
+    );
+    assert_eq!(
+        workbook.external_link(0).unwrap().dde_items()[0]
+            .cached_values()
+            .unwrap()
+            .values(),
+        &[crate::external_link::CachedValue::Number(1.0)]
+    );
+}
+
+#[test]
+fn eager_dde_and_ole_targets_remain_inert() {
+    let links = [
+        (
+            "rIdExternal1",
+            external_data_source_records(1, "Excel", "System", "RatesItem"),
+            None,
+        ),
+        (
+            "rIdExternal2",
+            external_data_source_records(2, "rIdPath", "Acme.Server", "ReportItem"),
+            Some(("rIdPath", relationship_type::OLE_OBJECT, "Book.xlsx")),
+        ),
+    ];
+    let limits = ExternalLinkLimits::builder()
+        .max_links(2)
+        .max_items(2)
+        .build()
+        .unwrap();
+    let workbook = Workbook::from_opc_package_with_external_link_limits(
+        package_with_external_links(&links),
+        limits,
+    )
+    .unwrap();
+    let dde = workbook.external_link(0).unwrap();
+    assert_eq!(dde.kind(), Kind::Dde);
+    assert_eq!(dde.source(), "Excel");
+    assert_eq!(dde.dde_topic(), Some("System"));
+    assert_eq!(dde.dde_items()[0].name(), "RatesItem");
+
+    let ole = workbook.external_link(1).unwrap();
+    assert_eq!(ole.kind(), Kind::Ole);
+    assert_eq!(ole.source(), "Book.xlsx");
+    assert_eq!(ole.ole_program_id(), Some("Acme.Server"));
+    assert_eq!(ole.ole_items()[0].name(), "ReportItem");
 }
 
 #[test]
@@ -613,6 +1141,7 @@ fn reads_external_book_metadata_from_local_fixture() {
         worksheet_rel_ids: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
+        external_link_limits: ExternalLinkLimits::default(),
         shared_strings: Vec::new(),
         styles: StylesTable::default(),
         calc: Props::default(),
@@ -624,7 +1153,10 @@ fn reads_external_book_metadata_from_local_fixture() {
         connections: None,
     };
     let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
-    let book = workbook.load_external_book(&uri).unwrap();
+    let mut budget = ExternalLinkLimits::default().budget();
+    let book = workbook
+        .load_external_book_with_budget(&uri, &mut budget)
+        .unwrap();
     assert!(book.metadata.is_workbook());
     assert_eq!(book.metadata.source(), "ab");
     assert_eq!(book.metadata.sheet_names(), &["ab"]);

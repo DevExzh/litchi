@@ -913,10 +913,16 @@ impl Link {
         sheet_names: Vec<String>,
         declared_names: Vec<String>,
     ) -> Result<Self> {
-        let names = declared_names
-            .into_iter()
-            .map(DefinedName::new)
-            .collect::<Result<Vec<_>>>()?;
+        let mut names = Vec::new();
+        names
+            .try_reserve_exact(declared_names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "external workbook defined names",
+                source,
+            })?;
+        for name in declared_names {
+            names.push(DefinedName::new(name)?);
+        }
         Self::workbook_with_defined_names(source, sheet_names, names)
     }
 
@@ -941,10 +947,16 @@ impl Link {
         topic: impl Into<String>,
         item_names: Vec<String>,
     ) -> Result<Self> {
-        let items = item_names
-            .into_iter()
-            .map(DdeItem::new)
-            .collect::<Result<Vec<_>>>()?;
+        let mut items = Vec::new();
+        items
+            .try_reserve_exact(item_names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "external DDE items",
+                source,
+            })?;
+        for name in item_names {
+            items.push(DdeItem::new(name)?);
+        }
         Self::dde_with_items(server, topic, items)
     }
 
@@ -969,10 +981,16 @@ impl Link {
         program_id: impl Into<String>,
         item_names: Vec<String>,
     ) -> Result<Self> {
-        let items = item_names
-            .into_iter()
-            .map(OleItem::new)
-            .collect::<Result<Vec<_>>>()?;
+        let mut items = Vec::new();
+        items
+            .try_reserve_exact(item_names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "external OLE items",
+                source,
+            })?;
+        for name in item_names {
+            items.push(OleItem::new(name)?);
+        }
         Self::ole_with_items(source, program_id, items)
     }
 
@@ -1052,10 +1070,19 @@ impl Link {
                 "external-link collection exceeds 65,535 items".to_string(),
             ));
         }
-        let mut folded_sheet_names = HashSet::with_capacity(self.sheet_names.len());
+        let mut folded_sheet_names = HashSet::new();
+        folded_sheet_names
+            .try_reserve(self.sheet_names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "external sheet-name uniqueness",
+                source,
+            })?;
         for sheet_name in &self.sheet_names {
             validate_wide_string(sheet_name, "external sheet name")?;
-            if !folded_sheet_names.insert(sheet_name.to_lowercase()) {
+            if !folded_sheet_names.insert(lowercase_key(
+                sheet_name,
+                "external sheet-name lowercase keys",
+            )?) {
                 return Err(Error::InvalidFormula(format!(
                     "duplicate external sheet name {sheet_name:?}"
                 )));
@@ -1068,21 +1095,21 @@ impl Link {
                         "external workbook link cannot have DDE/OLE detail".to_string(),
                     ));
                 }
-                validate_unique_entries(entries.iter().map(DefinedName::name))?;
+                validate_unique_entries(entries.iter().map(DefinedName::name), entries.len())?;
                 for entry in entries {
                     entry.validate(self.sheet_names.len(), true)?;
                 }
             },
             (Kind::Dde, Entries::Dde(entries)) => {
                 self.validate_data_source_detail("DDE topic")?;
-                validate_unique_entries(entries.iter().map(DdeItem::name))?;
+                validate_unique_entries(entries.iter().map(DdeItem::name), entries.len())?;
                 for entry in entries {
                     entry.validate()?;
                 }
             },
             (Kind::Ole, Entries::Ole(entries)) => {
                 self.validate_data_source_detail("OLE program ID")?;
-                validate_unique_entries(entries.iter().map(OleItem::name))?;
+                validate_unique_entries(entries.iter().map(OleItem::name), entries.len())?;
                 for entry in entries {
                     entry.validate()?;
                 }
@@ -1161,16 +1188,45 @@ impl Parsed {
     }
 }
 
-fn validate_unique_entries<'a>(names: impl Iterator<Item = &'a str>) -> Result<()> {
+fn validate_unique_entries<'a>(
+    names: impl Iterator<Item = &'a str>,
+    expected_count: usize,
+) -> Result<()> {
     let mut seen = HashSet::new();
+    seen.try_reserve(expected_count)
+        .map_err(|source| Error::Allocation {
+            resource: "external entry-name uniqueness",
+            source,
+        })?;
     for name in names {
-        if !seen.insert(name.to_lowercase()) {
+        if !seen.insert(lowercase_key(name, "external entry-name lowercase keys")?) {
             return Err(Error::InvalidFormula(format!(
                 "duplicate external entry name {name:?}"
             )));
         }
     }
     Ok(())
+}
+
+fn lowercase_key(value: &str, resource: &'static str) -> Result<String> {
+    let mut byte_len = 0usize;
+    for character in value.chars() {
+        for lowercase in character.to_lowercase() {
+            byte_len = byte_len.checked_add(lowercase.len_utf8()).ok_or_else(|| {
+                Error::InvalidFormula("lowercase external-link key length overflow".to_string())
+            })?;
+        }
+    }
+
+    let mut key = String::new();
+    key.try_reserve_exact(byte_len)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    for character in value.chars() {
+        for lowercase in character.to_lowercase() {
+            key.push(lowercase);
+        }
+    }
+    Ok(key)
 }
 
 fn validate_wide_string(value: &str, context: &str) -> Result<()> {

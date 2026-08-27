@@ -1,7 +1,7 @@
 //! Typed XLSB workbook state and its public model accessors.
 
 use crate::calc::Props;
-use crate::external_link::Link;
+use crate::external_link::{ExternalLinkLimits, Link};
 use crate::package::Cell;
 use crate::package::formula::{Context, ExternalBook, View, table::Definition as TableDefinition};
 use crate::package::shared_strings::SharedString;
@@ -29,6 +29,7 @@ pub struct Workbook {
     /// Primary `BrtBookView.itabCur` position in full workbook sheet order.
     pub(super) active_catalog_position: Option<usize>,
     pub(crate) formula_context: Context,
+    pub(super) external_link_limits: ExternalLinkLimits,
     pub(super) shared_strings: Vec<SharedString>,
     pub(super) styles: StylesTable,
     pub(super) calc: Props,
@@ -75,6 +76,14 @@ impl Workbook {
     /// Number of stored external-workbook, DDE, and OLE links.
     pub fn external_link_count(&self) -> usize {
         self.formula_context.external_books.len()
+    }
+
+    /// Return the external-link resource policy used to construct this
+    /// workbook. Each eager reconstruction starts fresh counters from this
+    /// plain policy.
+    #[must_use]
+    pub const fn external_link_limits(&self) -> ExternalLinkLimits {
+        self.external_link_limits
     }
 
     /// Borrow one stored external link without cloning its cached values.

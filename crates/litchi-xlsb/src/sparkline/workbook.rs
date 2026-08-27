@@ -8,6 +8,7 @@
 
 use super::worksheet::{self, Commit, Snapshot};
 use super::{Formula, FormulaKind, Groups, Limits};
+use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, SupportingLink};
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -26,10 +27,11 @@ pub(crate) fn read_with_limits(
 }
 
 /// Apply an exact-source commit atomically to one worksheet part.
-pub(crate) fn apply(
+pub(crate) fn apply_with_external_link_limits(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     commit: Commit,
+    external_link_limits: ExternalLinkLimits,
 ) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -44,7 +46,10 @@ pub(crate) fn apply(
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
-    crate::Workbook::from_opc_package(candidate.clone())?;
+    crate::Workbook::from_opc_package_with_external_link_limits(
+        candidate.clone(),
+        external_link_limits,
+    )?;
     *package = candidate;
     Ok(snapshot)
 }

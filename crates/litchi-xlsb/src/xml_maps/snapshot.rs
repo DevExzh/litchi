@@ -17,6 +17,7 @@ use super::{
     Limits, MappedTable, SingleCellBinding, SingleCellTable, XmlMapConformance, XmlMapInfo,
     XmlMapLimits,
 };
+use crate::external_link::ExternalLinkLimits;
 use crate::package::error::Result;
 
 /// Finite package and codec ceilings for one XLSB XML Maps snapshot.
@@ -80,8 +81,25 @@ impl Snapshot {
 
     /// Read an XLSB XML Maps snapshot with explicit finite limits.
     pub fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+        Self::read_with_limits_and_external_link_limits(
+            package,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read an XLSB XML Maps snapshot with independent XML Maps and
+    /// external-link resource policies.
+    pub fn read_with_limits_and_external_link_limits(
+        package: &OpcPackage,
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
         super::package::preflight(package, limits)?;
-        let workbook = crate::Workbook::from_opc_package(package.clone())?;
+        let workbook = crate::Workbook::from_opc_package_with_external_link_limits(
+            package.clone(),
+            external_link_limits,
+        )?;
         let worksheets = workbook.xml_maps_worksheet_parts()?;
         Self::read_for_worksheets(package, worksheets, limits)
     }

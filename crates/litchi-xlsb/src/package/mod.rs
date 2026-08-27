@@ -12,6 +12,7 @@ use litchi_core::sheet::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackageWriter, ReadLimits};
 
 use crate::Workbook;
+use crate::external_link::ExternalLinkLimits;
 use crate::package::error::Result;
 use crate::writer::{MutableWorksheet, WorkbookWriter};
 
@@ -105,7 +106,7 @@ pub use shared_strings::{
 /// only the XLSB package boundary and validates the workbook graph before a
 /// package is handed to callers.
 #[derive(Debug, Clone)]
-pub struct Package(OpcPackage);
+pub struct Package(OpcPackage, ExternalLinkLimits);
 
 impl Package {
     /// Create a deterministic workbook containing one visible worksheet.
@@ -164,7 +165,7 @@ impl Package {
     pub fn apply_slicer_patch(&self, patch: &crate::slicer::Patch) -> Result<Self> {
         let mut candidate = self.0.clone();
         crate::slicer::transaction::apply(&mut candidate, patch)?;
-        Self::from_opc(candidate)
+        Self::from_opc_with_external_link_limits(candidate, self.1)
     }
 
     /// Read workbook timeline caches as an immutable, source-bound snapshot.
@@ -217,57 +218,201 @@ impl Package {
     pub fn apply_timeline_patch(&self, patch: &crate::timeline::Patch) -> Result<Self> {
         let mut candidate = self.0.clone();
         crate::timeline::transaction::apply(&mut candidate, patch)?;
-        Self::from_opc(candidate)
+        Self::from_opc_with_external_link_limits(candidate, self.1)
     }
 
     /// Open and validate an XLSB package from a filesystem path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, ReadLimits::default())
+        Self::open_with_limits_and_external_link_limits(
+            path,
+            ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
     }
 
     /// Open and validate an XLSB package from a filesystem path with explicit
     /// OPC resource limits.
     pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_opc(OpcPackage::open_with_limits(path, limits)?)
+        Self::open_with_limits_and_external_link_limits(path, limits, ExternalLinkLimits::default())
+    }
+
+    /// Open and validate an XLSB package with explicit external-link
+    /// resource limits and default OPC limits.
+    pub fn open_with_external_link_limits(
+        path: impl AsRef<Path>,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::open_with_limits_and_external_link_limits(
+            path,
+            ReadLimits::default(),
+            external_link_limits,
+        )
+    }
+
+    /// Open and validate an XLSB package with independent OPC and
+    /// external-link resource limits.
+    pub fn open_with_limits_and_external_link_limits(
+        path: impl AsRef<Path>,
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_opc_with_external_link_limits(
+            OpcPackage::open_with_limits(path, limits)?,
+            external_link_limits,
+        )
     }
 
     /// Read and validate an XLSB package from an owned byte vector.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, ReadLimits::default())
+        Self::from_bytes_with_limits_and_external_link_limits(
+            bytes,
+            ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
     }
 
     /// Read and validate an XLSB package from an owned byte vector with
     /// explicit OPC resource limits.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: ReadLimits) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_vec_with_limits(bytes, limits)?)
+        Self::from_bytes_with_limits_and_external_link_limits(
+            bytes,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read and validate an XLSB package from owned bytes with explicit
+    /// external-link resource limits and default OPC limits.
+    pub fn from_bytes_with_external_link_limits(
+        bytes: Vec<u8>,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_bytes_with_limits_and_external_link_limits(
+            bytes,
+            ReadLimits::default(),
+            external_link_limits,
+        )
+    }
+
+    /// Read and validate an XLSB package from owned bytes with independent
+    /// OPC and external-link resource limits.
+    pub fn from_bytes_with_limits_and_external_link_limits(
+        bytes: Vec<u8>,
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_opc_with_external_link_limits(
+            OpcPackage::from_vec_with_limits(bytes, limits)?,
+            external_link_limits,
+        )
     }
 
     /// Read and validate an XLSB package from a borrowed byte slice.
     pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_slice_with_limits(bytes, ReadLimits::default())
+        Self::from_slice_with_limits_and_external_link_limits(
+            bytes,
+            ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
     }
 
     /// Read and validate an XLSB package from a borrowed byte slice with
     /// explicit OPC resource limits.
     pub fn from_slice_with_limits(bytes: &[u8], limits: ReadLimits) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_bytes_with_limits(bytes, limits)?)
+        Self::from_slice_with_limits_and_external_link_limits(
+            bytes,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read and validate an XLSB package from a borrowed slice with explicit
+    /// external-link resource limits and default OPC limits.
+    pub fn from_slice_with_external_link_limits(
+        bytes: &[u8],
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_slice_with_limits_and_external_link_limits(
+            bytes,
+            ReadLimits::default(),
+            external_link_limits,
+        )
+    }
+
+    /// Read and validate an XLSB package from a borrowed slice with
+    /// independent OPC and external-link resource limits.
+    pub fn from_slice_with_limits_and_external_link_limits(
+        bytes: &[u8],
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_opc_with_external_link_limits(
+            OpcPackage::from_bytes_with_limits(bytes, limits)?,
+            external_link_limits,
+        )
     }
 
     /// Read and validate an XLSB package from a synchronous reader.
     pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, ReadLimits::default())
+        Self::from_reader_with_limits_and_external_link_limits(
+            reader,
+            ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
     }
 
     /// Read and validate an XLSB package from a synchronous reader with
     /// explicit OPC resource limits.
     pub fn from_reader_with_limits(reader: impl Read, limits: ReadLimits) -> Result<Self> {
-        Self::from_opc(OpcPackage::from_reader_with_limits(reader, limits)?)
+        Self::from_reader_with_limits_and_external_link_limits(
+            reader,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read and validate an XLSB package from a reader with explicit
+    /// external-link resource limits and default OPC limits.
+    pub fn from_reader_with_external_link_limits(
+        reader: impl Read,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_reader_with_limits_and_external_link_limits(
+            reader,
+            ReadLimits::default(),
+            external_link_limits,
+        )
+    }
+
+    /// Read and validate an XLSB package from a reader with independent OPC
+    /// and external-link resource limits.
+    pub fn from_reader_with_limits_and_external_link_limits(
+        reader: impl Read,
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_opc_with_external_link_limits(
+            OpcPackage::from_reader_with_limits(reader, limits)?,
+            external_link_limits,
+        )
     }
 
     /// Validate and adopt an already parsed OPC package.
     pub fn from_opc(package: OpcPackage) -> Result<Self> {
-        Workbook::from_opc_package(package.clone())?;
-        Ok(Self(package))
+        Self::from_opc_with_external_link_limits(package, ExternalLinkLimits::default())
+    }
+
+    /// Validate and adopt an already parsed OPC package using explicit
+    /// external-link resource limits.
+    pub fn from_opc_with_external_link_limits(
+        package: OpcPackage,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Workbook::from_opc_package_with_external_link_limits(
+            package.clone(),
+            external_link_limits,
+        )?;
+        Ok(Self(package, external_link_limits))
     }
 
     /// Borrow the validated OPC package for lower-level package services.
@@ -275,14 +420,21 @@ impl Package {
         &self.0
     }
 
+    /// Return the external-link resource policy retained for workbook
+    /// reconstructions from this package.
+    #[must_use]
+    pub const fn external_link_limits(&self) -> ExternalLinkLimits {
+        self.1
+    }
+
     /// Materialize a workbook handle from this package.
     pub fn workbook(&self) -> Result<Workbook> {
-        Workbook::from_opc_package(self.0.clone())
+        Workbook::from_opc_package_with_external_link_limits(self.0.clone(), self.1)
     }
 
     /// Consume this package and materialize its workbook handle.
     pub fn into_workbook(self) -> Result<Workbook> {
-        Workbook::from_opc_package(self.0)
+        Workbook::from_opc_package_with_external_link_limits(self.0, self.1)
     }
 
     /// Consume this package and return its underlying OPC graph.
@@ -338,7 +490,7 @@ impl From<Package> for OpcPackage {
 
 impl From<OpcPackage> for Package {
     fn from(package: OpcPackage) -> Self {
-        Self(package)
+        Self(package, ExternalLinkLimits::default())
     }
 }
 
