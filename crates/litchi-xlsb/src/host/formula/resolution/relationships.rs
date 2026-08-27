@@ -25,9 +25,10 @@ impl Context {
         let Some(xti) = self.external_sheets.get(usize::from(index)) else {
             return false;
         };
-        let Some(SupportingLink::SelfWorkbook) =
-            self.supporting_links.get(xti.external_link as usize)
-        else {
+        let Some(link_index) = usize::try_from(xti.external_link).ok() else {
+            return false;
+        };
+        let Some(SupportingLink::SelfWorkbook) = self.supporting_links.get(link_index) else {
             return false;
         };
         xti.first_sheet >= 0
@@ -46,7 +47,7 @@ impl Context {
             .external_sheets
             .get(usize::from(index))
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "structured-reference Xti index {index} exceeds {} entries",
                     self.external_sheets.len()
                 ))
@@ -57,7 +58,7 @@ impl Context {
                 Error::InvalidFormula("table external-link index overflow".to_string())
             })?)
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "structured-reference Xti {index} refers to missing supporting link {}",
                     xti.external_link
                 ))
@@ -73,7 +74,7 @@ impl Context {
                     Error::InvalidFormula("table worksheet index overflow".to_string())
                 })?;
                 if sheet >= self.worksheet_names.len() {
-                    return Err(Error::InvalidFormula(format!(
+                    return Err(Error::UnresolvedDependency(format!(
                         "structured-reference worksheet {} exceeds {} worksheets",
                         xti.first_sheet,
                         self.worksheet_names.len()
@@ -88,7 +89,7 @@ impl Context {
                     )));
                 }
                 self.current_sheet.ok_or_else(|| {
-                    Error::InvalidFormula(
+                    Error::UnresolvedDependency(
                         "same-sheet structured reference has no consuming worksheet".to_string(),
                     )
                 })
@@ -96,7 +97,7 @@ impl Context {
             SupportingLink::ExternalWorkbook(_) => Err(Error::InvalidFormula(
                 "resident structured reference points to an external workbook".to_string(),
             )),
-            SupportingLink::AddIn => Err(Error::InvalidFormula(
+            SupportingLink::AddIn => Err(Error::UnsupportedFeature(
                 "structured reference points to an add-in".to_string(),
             )),
         }
@@ -107,7 +108,7 @@ impl Context {
             .external_sheets
             .get(usize::from(index))
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "external structured-reference Xti index {index} exceeds {} entries",
                     self.external_sheets.len()
                 ))
@@ -118,17 +119,20 @@ impl Context {
                 Error::InvalidFormula("table external-link index overflow".to_string())
             })?)
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "external structured-reference Xti {index} has no supporting link"
                 ))
             })?;
-        if !matches!(link, SupportingLink::ExternalWorkbook(_)) {
-            return Err(Error::InvalidFormula(
+        match link {
+            SupportingLink::ExternalWorkbook(_) => self.resolve_sheet_prefix(index),
+            SupportingLink::AddIn => Err(Error::UnsupportedFeature(
+                "nonresident structured reference points to an add-in".to_string(),
+            )),
+            SupportingLink::SelfWorkbook | SupportingLink::SameSheet => Err(Error::InvalidFormula(
                 "nonresident structured reference does not point to an external workbook"
                     .to_string(),
-            ));
+            )),
         }
-        self.resolve_sheet_prefix(index)
     }
 
     pub(super) fn resolve_sheet_prefix(&self, index: u16) -> Result<String> {
@@ -141,7 +145,7 @@ impl Context {
             .external_sheets
             .get(usize::from(index))
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "Xti index {index} exceeds {} extern-sheet entries",
                     self.external_sheets.len()
                 ))
@@ -149,7 +153,7 @@ impl Context {
         let link_index = usize::try_from(xti.external_link)
             .map_err(|_| Error::InvalidFormula("external-link index overflow".to_string()))?;
         let supporting_link = self.supporting_links.get(link_index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "Xti index {index} refers to missing supporting link {}",
                 xti.external_link
             ))
@@ -178,7 +182,7 @@ impl Context {
                     )));
                 }
                 let sheet = self.current_sheet.ok_or_else(|| {
-                    Error::UnsupportedFeature(
+                    Error::UnresolvedDependency(
                         "same-sheet reference requires a consuming worksheet".to_string(),
                     )
                 })?;
@@ -200,14 +204,14 @@ impl Context {
             )));
         }
         let first = self.worksheet_names.get(first_index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "Xti first sheet {} exceeds {} worksheets",
                 xti.first_sheet,
                 self.worksheet_names.len()
             ))
         })?;
         let last = self.worksheet_names.get(last_index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "Xti last sheet {} exceeds {} worksheets",
                 xti.last_sheet,
                 self.worksheet_names.len()
@@ -230,7 +234,7 @@ impl Context {
         let book_index = usize::try_from(book_index)
             .map_err(|_| Error::InvalidFormula("external book index overflow".to_string()))?;
         let book = self.external_books.get(book_index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "Xti index {xti_index} refers to missing external book {book_index}"
             ))
         })?;
@@ -254,14 +258,14 @@ impl Context {
             .sheet_names()
             .get(first_index)
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "external sheet {} exceeds {} cached names",
                     xti.first_sheet,
                     book.metadata.sheet_names().len()
                 ))
             })?;
         let last = book.metadata.sheet_names().get(last_index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "external sheet {} exceeds {} cached names",
                 xti.last_sheet,
                 book.metadata.sheet_names().len()

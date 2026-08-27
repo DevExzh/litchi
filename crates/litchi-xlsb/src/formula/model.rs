@@ -82,11 +82,12 @@ impl Range {
     }
 
     pub fn to_a1(self) -> String {
-        format!(
-            "{}:{}",
-            cell_reference(self.row_first, self.col_first),
-            cell_reference(self.row_last, self.col_last)
-        )
+        self.to_a1_checked().unwrap_or_else(|_| {
+            format!(
+                "rows {}..={} columns {}..={}",
+                self.row_first, self.row_last, self.col_first, self.col_last
+            )
+        })
     }
 
     pub(crate) fn validate(self) -> Result<()> {
@@ -95,9 +96,20 @@ impl Range {
             || self.row_last >= 1_048_576
             || self.col_last >= 16_384
         {
-            return Err(Error::InvalidCellReference(self.to_a1()));
+            return Err(match self.to_a1_checked() {
+                Ok(reference) => Error::InvalidCellReference(reference),
+                Err(error) => error,
+            });
         }
         Ok(())
+    }
+
+    fn to_a1_checked(self) -> Result<String> {
+        Ok(format!(
+            "{}:{}",
+            cell_reference(self.row_first, self.col_first)?,
+            cell_reference(self.row_last, self.col_last)?
+        ))
     }
 }
 
@@ -114,8 +126,18 @@ pub(super) fn column_index_to_name(mut column: u32) -> String {
     name
 }
 
-fn cell_reference(row: u32, column: u32) -> String {
-    format!("{}{}", column_index_to_name(column + 1), row + 1)
+fn cell_reference(row: u32, column: u32) -> Result<String> {
+    let row = row.checked_add(1).ok_or_else(|| {
+        Error::InvalidCellReference(format!(
+            "row coordinate {row} cannot be represented in an A1 reference"
+        ))
+    })?;
+    let column = column.checked_add(1).ok_or_else(|| {
+        Error::InvalidCellReference(format!(
+            "column coordinate {column} cannot be represented in an A1 reference"
+        ))
+    })?;
+    Ok(format!("{}{}", column_index_to_name(column), row))
 }
 
 fn parse_cell_reference(value: &str) -> Result<(u32, u32)> {
@@ -417,4 +439,49 @@ pub mod ptg_types {
     pub const PTG_ARRAY: u8 = 0x20;
     pub const EPTG_LIST: u8 = 0x19;
     pub const EPTG_SX_NAME: u8 = 0x1D;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, Range};
+
+    #[test]
+    fn rejects_maximum_coordinates_without_panicking_or_wrapping() {
+        let cases = [
+            (
+                Range {
+                    row_first: u32::MAX,
+                    row_last: u32::MAX,
+                    col_first: 0,
+                    col_last: 0,
+                },
+                "row coordinate",
+            ),
+            (
+                Range {
+                    row_first: 0,
+                    row_last: 0,
+                    col_first: u32::MAX,
+                    col_last: u32::MAX,
+                },
+                "column coordinate",
+            ),
+        ];
+
+        for (range, coordinate) in cases {
+            assert!(matches!(
+                range.validate(),
+                Err(Error::InvalidCellReference(message)) if message.contains(coordinate)
+            ));
+
+            let a1 = std::panic::catch_unwind(|| range.to_a1());
+            assert!(
+                a1.is_ok(),
+                "invalid coordinates must not panic while formatting A1"
+            );
+            let a1 = a1.unwrap_or_default();
+            assert!(a1.contains("4294967295"));
+            assert!(!a1.contains("A0"));
+        }
+    }
 }

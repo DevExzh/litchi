@@ -138,8 +138,8 @@ pub mod writer;
 
 pub use raw::Error;
 
-pub use package::Package;
 pub use package::scenarios;
+pub use package::{Cell, FormulaOpacityReason, FormulaResolutionStatus, Package};
 pub use sheet::Worksheet;
 pub use workbook::{SourceBackedWorkbook, SourceBackedWorksheet, Workbook};
 

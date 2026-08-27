@@ -357,6 +357,9 @@ fn reads_formula_records_from_real_workbook_fixture() {
                             cell.coordinate(),
                             cell.value().clone(),
                             cell.formula_bytes().unwrap().to_vec(),
+                            cell.formula_resolution_status(),
+                            cell.cached_value().cloned(),
+                            cell.raw_formula_bytes().map(|bytes| bytes.to_vec()),
                         ));
                     }
                 }
@@ -385,6 +388,22 @@ fn reads_formula_records_from_real_workbook_fixture() {
         Some(litchi_core::sheet::CellValue::Float(11.0))
     ));
     assert!(formula_cells.iter().all(|cell| !cell.3.is_empty()));
+    assert!(
+        formula_cells
+            .iter()
+            .all(|cell| cell.4 == Some(crate::FormulaResolutionStatus::Resolved))
+    );
+    for (_, _, value, _, _, cached_value, raw_formula_bytes) in &formula_cells {
+        let litchi_core::sheet::CellValue::Formula {
+            cached_value: nested_cached_value,
+            ..
+        } = value
+        else {
+            panic!("expected decoded formula, found {value:?}");
+        };
+        assert_eq!(nested_cached_value.as_deref(), cached_value.as_ref());
+        assert!(raw_formula_bytes.is_none());
+    }
 }
 
 #[test]

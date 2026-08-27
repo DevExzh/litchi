@@ -5,10 +5,16 @@
     reason = "integration tests use panic-on-failure extraction and exact fixture comparisons"
 )]
 
+use litchi_core::sheet::CellValue;
 use litchi_xlsb::formula::{
     ExternalTableReference, Parser, TableColumns, TableDataType, TableNamedColumns, TableReference,
     TableRowType, Token,
 };
+use litchi_xlsb::package::{
+    Cell as PackageCell, FormulaOpacityReason as PackageFormulaOpacityReason,
+    FormulaResolutionStatus as PackageFormulaResolutionStatus,
+};
+use litchi_xlsb::{Cell, FormulaOpacityReason, FormulaResolutionStatus};
 
 fn utf16(value: &str) -> Vec<u8> {
     value.encode_utf16().flat_map(u16::to_le_bytes).collect()
@@ -92,4 +98,47 @@ fn parses_ptg_sx_name_and_rejects_reserved_extended_fields() {
     ] {
         assert!(Parser::new(&malformed).parse().is_err());
     }
+}
+
+fn assert_formula_metadata_derives<T>()
+where
+    T: std::fmt::Debug + Clone + Copy + Eq + std::hash::Hash,
+{
+}
+
+#[test]
+fn public_cell_formula_metadata_reexports_are_usable() {
+    assert_formula_metadata_derives::<FormulaOpacityReason>();
+    assert_formula_metadata_derives::<FormulaResolutionStatus>();
+    assert_formula_metadata_derives::<PackageFormulaOpacityReason>();
+    assert_formula_metadata_derives::<PackageFormulaResolutionStatus>();
+
+    let cached_value = CellValue::Float(2.0);
+    let value = CellValue::Formula {
+        formula: "1+1".to_string(),
+        cached_value: Some(Box::new(cached_value.clone())),
+        is_array: false,
+        array_range: None,
+    };
+    let root_cell = Cell::new_formula(0, 0, value.clone());
+    let package_cell = PackageCell::new_formula(0, 0, value);
+
+    assert_eq!(
+        root_cell.formula_resolution_status(),
+        Some(FormulaResolutionStatus::Resolved)
+    );
+    assert_eq!(
+        package_cell.formula_resolution_status(),
+        Some(PackageFormulaResolutionStatus::Resolved)
+    );
+    assert_eq!(root_cell.cached_value(), Some(&cached_value));
+    assert_eq!(package_cell.cached_value(), Some(&cached_value));
+    assert!(root_cell.formula_bytes().is_none());
+    assert!(package_cell.formula_bytes().is_none());
+    assert!(root_cell.raw_formula_bytes().is_none());
+    assert!(package_cell.raw_formula_bytes().is_none());
+    assert_eq!(
+        FormulaResolutionStatus::Opaque(FormulaOpacityReason::Unvalidated),
+        PackageFormulaResolutionStatus::Opaque(PackageFormulaOpacityReason::Unvalidated)
+    );
 }

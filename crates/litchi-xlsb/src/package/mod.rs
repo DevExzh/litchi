@@ -93,7 +93,7 @@ pub(crate) mod walker;
 #[path = "../host/web_extension_bindings.rs"]
 pub mod web_extension_bindings;
 
-pub use cell::Cell;
+pub use cell::{Cell, FormulaOpacityReason, FormulaResolutionStatus};
 pub use error::{Error as PackageError, Result as PackageResult};
 pub use shared_strings::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedString, SharedStringRun,

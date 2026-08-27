@@ -12,10 +12,67 @@ use crate::conditional_formatting::{
 };
 use crate::package::cell::CellHeader;
 use crate::package::error::Error;
-use crate::package::formula::Context;
+use crate::package::formula::{Context, ParsedFormula, ptg_types};
 use crate::package::records::Stream;
+use crate::package::{FormulaOpacityReason, FormulaResolutionStatus};
 use crate::raw::{Writer, kind};
 use litchi_core::sheet::{Cell, CellValue};
+
+fn bool_formula_worksheet(formula: &ParsedFormula) -> Vec<u8> {
+    let mut worksheet = Vec::new();
+    let mut writer = Writer::new(&mut worksheet);
+    writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
+    writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+
+    let mut row = 0u32.to_le_bytes().to_vec();
+    row.extend_from_slice(&0u32.to_le_bytes());
+    row.extend_from_slice(&0u16.to_le_bytes());
+    row.extend_from_slice(&[0, 0, 0]);
+    row.extend_from_slice(&0u32.to_le_bytes());
+    writer.write_record(kind::ROW_HDR, &row).unwrap();
+
+    let mut cell = vec![0; 8];
+    cell.push(1);
+    cell.extend_from_slice(&0u16.to_le_bytes());
+    cell.extend_from_slice(&formula.to_bytes().unwrap());
+    writer.write_record(kind::FMLA_BOOL, &cell).unwrap();
+    writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
+    writer.write_record(kind::END_SHEET, &[]).unwrap();
+    worksheet
+}
+
+#[test]
+fn propagates_opaque_formula_status_through_cells_reader() {
+    let formula = ParsedFormula {
+        rgce: vec![ptg_types::PTG_NAME, 2, 0, 0, 0],
+        rgcb: Vec::new(),
+    };
+    let expected_rgce = formula.rgce.clone();
+    let context = Context::default();
+    let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
+    let mut reader = CellsReader::new(iter, &[], &context, 1).unwrap();
+
+    let cell = reader.next_cell().unwrap().unwrap();
+    assert_eq!(
+        cell.formula_resolution_status(),
+        Some(FormulaResolutionStatus::Opaque(
+            FormulaOpacityReason::Unresolved
+        ))
+    );
+    assert_eq!(cell.value(), &CellValue::Bool(true));
+    assert_eq!(cell.cached_value(), Some(&CellValue::Bool(true)));
+    assert_eq!(cell.formula_bytes(), Some(expected_rgce.as_slice()));
+}
+
+#[test]
+fn propagates_missing_group_definition_as_structural_error() {
+    let formula = ParsedFormula::exp(0, 0).unwrap();
+    let context = Context::default();
+    let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
+    let mut reader = CellsReader::new(iter, &[], &context, 1).unwrap();
+
+    assert!(matches!(reader.next_cell(), Err(Error::InvalidFormula(_))));
+}
 
 fn rich_string_worksheet() -> Vec<u8> {
     let mut bytes = Vec::new();

@@ -489,7 +489,7 @@ mod tests {
         let tokens = Parser::new(&invalid_xti).parse().unwrap();
         assert!(matches!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context),
-            Err(crate::formula::Error::InvalidFormula(_))
+            Err(crate::formula::Error::UnresolvedDependency(_))
         ));
         assert!(matches!(
             Parser::new(&[0x43, 0, 0, 0, 0]).parse(),
@@ -607,11 +607,19 @@ mod tests {
         let tokens = Parser::new(&invalid_name).parse().unwrap();
         assert!(matches!(
             Compiler::try_tokens_to_string_with_resolution(&tokens, &context),
-            Err(crate::formula::Error::InvalidFormula(_))
+            Err(crate::formula::Error::UnresolvedDependency(_))
         ));
         assert!(matches!(
             Parser::new(&[0x59, 0, 0, 0, 0, 0, 0]).parse(),
             Err(crate::formula::Error::InvalidFormula(_))
+        ));
+
+        let mut add_in = context.clone();
+        add_in.supporting_links = vec![SupportingLink::AddIn].into();
+        let tokens = Parser::new(&name).parse().unwrap();
+        assert!(matches!(
+            Compiler::try_tokens_to_string_with_resolution(&tokens, &add_in),
+            Err(crate::formula::Error::UnsupportedFeature(_))
         ));
     }
 
@@ -1073,6 +1081,57 @@ mod tests {
             .is_err()
         );
 
+        let mut missing_sheet = table_context();
+        missing_sheet.external_sheets = vec![ExternalSheet {
+            external_link: 0,
+            first_sheet: 1,
+            last_sheet: 1,
+        }]
+        .into();
+        assert!(matches!(
+            Compiler::try_tokens_to_string_with_resolution(
+                &[resident_table_reference(
+                    TableRowType::Data,
+                    TableColumns::All,
+                )],
+                &missing_sheet,
+            ),
+            Err(crate::formula::Error::UnresolvedDependency(_))
+        ));
+
+        let mut add_in = table_context();
+        add_in.supporting_links = vec![SupportingLink::AddIn].into();
+        assert!(matches!(
+            Compiler::try_tokens_to_string_with_resolution(
+                &[resident_table_reference(
+                    TableRowType::Data,
+                    TableColumns::All,
+                )],
+                &add_in,
+            ),
+            Err(crate::formula::Error::UnsupportedFeature(_))
+        ));
+
+        let nonresident = Token::TableReference(TableReference {
+            sheet_index: 0,
+            row_type: None,
+            columns: None,
+            square_bracket_space: false,
+            comma_space: false,
+            data_type: TableDataType::Reference,
+            invalid: false,
+            list_index: None,
+            external: Some(ExternalTableReference {
+                table: "Remote".to_string(),
+                row_type: TableRowType::Totals,
+                columns: TableNamedColumns::One("Amount".to_string()),
+            }),
+        });
+        assert!(matches!(
+            Compiler::try_tokens_to_string_with_resolution(&[nonresident], &add_in),
+            Err(crate::formula::Error::UnsupportedFeature(_))
+        ));
+
         let mut ambiguous = table_context();
         ambiguous.tables = vec![
             ambiguous.tables[0].clone(),
@@ -1367,6 +1426,13 @@ mod pivot_name_resolution_tests {
         context.pivot_name_scopes =
             vec![Scope::try_new(8, 1, "Sales Pivot".to_string(), references()).unwrap()].into();
         assert!(render(0, &context).is_err());
+
+        let mut context = pivot_context();
+        context.worksheet_names = vec!["Data".to_string()].into();
+        assert!(matches!(
+            render(0, &context),
+            Err(Error::UnresolvedDependency(_))
+        ));
     }
 
     #[test]

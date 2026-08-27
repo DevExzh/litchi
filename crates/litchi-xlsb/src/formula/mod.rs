@@ -31,6 +31,9 @@ pub enum Error {
     /// A formula feature is valid but not supported by this codec.
     #[error("unsupported formula feature: {0}")]
     UnsupportedFeature(String),
+    /// Formula text requires workbook metadata that is missing or ambiguous.
+    #[error("unresolved formula dependency: {0}")]
+    UnresolvedDependency(String),
     /// Text or primitive binary decoding failed.
     #[error("formula encoding: {0}")]
     Encoding(String),
