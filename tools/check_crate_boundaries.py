@@ -2114,6 +2114,72 @@ IWA_KEYNOTE_SLIDE_DISCOVERY_STRICT_INFO_PROJECTION = re.compile(
     r"\btable_info_codec\s*::\s*decode_table_info\s*\("
 )
 
+# Wave102 keeps listing-time table appearance reads on the bounded, borrowed
+# catalog path. The native table_appearance module remains an intentional
+# compatibility/mutation owner, so this ratchet follows only helpers reachable
+# from the production ``slide_tables`` listing root. It is dormant until the
+# listing path claims the strict appearance projection.
+IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "graph.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "appearance.rs",
+    IWA_KEYNOTE_SOURCE_ROOT.parent / "table_appearance.rs",
+)
+IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ROOT_FUNCTION = "slide_tables"
+IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ACTIVATION = re.compile(
+    r"\b(?:keynote_table_appearance_codec|table_appearance_codec|"
+    r"Keynote(?:Slide)?TableAppearance(?:Listing|Projection|Snapshot|Facts)|"
+    r"TableAppearance(?:Projection|Snapshot|Facts))\b"
+)
+IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_STRICT_MARKERS = (
+    (
+        "strict appearance codec",
+        re.compile(
+            r"\b(?:keynote_table_appearance_codec|table_appearance_codec)"
+            r"\s*::\s*(?:decode|prepare|rewrite|project)\w*\s*\(|"
+            r"\b(?:decode|prepare|rewrite|project)_table_appearance"
+            r"(?:_with_report|_snapshot|_facts|_projection)?\b|"
+            r"\bTableAppearance(?:Projection|Snapshot|Facts)\b"
+        ),
+    ),
+)
+IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_FORBIDDEN_PATTERNS = (
+    (
+        "legacy table_appearance reader",
+        re.compile(
+            r"(?<![A-Za-z0-9_])(?:r#)?(?:table_appearance|"
+            r"read_native_table_appearance|read_table_appearance)"
+            r"\s*\("
+        ),
+    ),
+    (
+        "legacy package.archive read",
+        re.compile(
+            r"(?:\b[A-Za-z_][A-Za-z0-9_]*|\))"
+            r"\s*(?:\.|::)\s*archive\s*\(",
+        ),
+    ),
+    (
+        "generated table appearance/model/style decode",
+        re.compile(
+            r"\b(?:TableModelArchive|TableAppearanceArchive|"
+            r"TableStyleArchive|TableStylePresetArchive|"
+            r"TableStyleNetworkArchive|TableStylePropertiesArchive|"
+            r"StyleArchive)\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*(?:[^>]*::\s*)?(?:"
+            r"TableModelArchive|TableAppearanceArchive|"
+            r"TableStyleArchive|TableStylePresetArchive|"
+            r"TableStyleNetworkArchive|TableStylePropertiesArchive|"
+            r"StyleArchive)\b|"
+            r"\bdecode_unique(?:_any)?\s*::<\s*(?:[^>]*::\s*)?(?:"
+            r"TableModelArchive|TableAppearanceArchive|"
+            r"TableStyleArchive|TableStylePresetArchive|"
+            r"TableStyleNetworkArchive|TableStylePropertiesArchive|"
+            r"StyleArchive)\b"
+        ),
+    ),
+)
+
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -21485,6 +21551,196 @@ def audit_iwa_keynote_slide_table_discovery_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep listing-time table appearance reads on the bounded codec seam.
+
+    The native ``table_appearance`` module remains a compatibility/mutation
+    owner. This ratchet follows only local helpers reachable from the
+    production ``slide_tables`` listing root, after masking comments, strings,
+    and cfg(test) items. It activates when the listing path claims the strict
+    appearance projection and then rejects legacy readers, package archive
+    clones, and generated table-model/style decodes.
+    """
+
+    existing_paths = [
+        root / relative
+        for relative in IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES
+        if (root / relative).is_file()
+    ]
+    if not existing_paths:
+        return []
+
+    production: dict[Path, str] = {}
+    functions: dict[str, list[tuple[Path, str, int]]] = {}
+
+    def records(path: Path, source: str) -> None:
+        code = _mask_rust_non_code(source)
+        for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+            opening = code.find("{", declaration.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            functions.setdefault(declaration.group(1), []).append(
+                (path, code[opening + 1 : cursor - 1], opening + 1)
+            )
+
+    for relative in IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        production[path] = source
+        records(path, source)
+
+    def local_calls(body: str, helper_name: str) -> bool:
+        call = re.compile(
+            rf"(?<![A-Za-z0-9_])(?:r#)?{re.escape(helper_name)}"
+            r"[ \t\r\n]*\("
+        )
+        for match in call.finditer(body):
+            prefix = body[: match.start()]
+            qualifier = re.search(
+                r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+                r"[ \t\r\n]*::[ \t\r\n]*)+$",
+                prefix,
+            )
+            if qualifier:
+                segments = re.findall(
+                    r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)"
+                    r"[ \t\r\n]*::",
+                    qualifier.group(0),
+                )
+                if any(segment.endswith("_codec") for segment in segments):
+                    continue
+            return True
+        return False
+
+    roots = functions.get(IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ROOT_FUNCTION, [])
+    if not roots:
+        return []
+
+    reachable: list[tuple[str, Path, str, int]] = []
+    pending = [
+        (
+            IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ROOT_FUNCTION,
+            path,
+            body,
+            offset,
+        )
+        for path, body, offset in roots
+    ]
+    visited: set[tuple[str, Path, int]] = set()
+    while pending:
+        name, path, body, offset = pending.pop()
+        key = (name, path, offset)
+        if key in visited:
+            continue
+        visited.add(key)
+        reachable.append((name, path, body, offset))
+        for helper_name, helper_records in functions.items():
+            if helper_name == name or not local_calls(body, helper_name):
+                continue
+            pending.extend(
+                (helper_name, helper_path, helper_body, helper_offset)
+                for helper_path, helper_body, helper_offset in helper_records
+            )
+
+    reachable_source = "\n".join(body for _name, _path, body, _offset in reachable)
+    # Do not enforce the new boundary against a pre-owner source tree. The
+    # strict projection marker is the explicit production opt-in.
+    if IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_ACTIVATION.search(
+        reachable_source
+    ) is None:
+        return []
+
+    violations: list[str] = []
+    if IWA_KEYNOTE_SLIDE_DISCOVERY_CATALOG_MARKERS[0][1].search(
+        reachable_source
+    ) is None:
+        violations.append(
+            "legacy iwa Keynote slide-table listing appearance is missing "
+            "bounded catalog marker on the claimed listing path: "
+            f"{IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[0]}"
+        )
+    if IWA_KEYNOTE_SLIDE_DISCOVERY_CATALOG_MARKERS[1][1].search(
+        reachable_source
+    ) is None:
+        violations.append(
+            "legacy iwa Keynote slide-table listing appearance is missing "
+            "catalog limits marker on the claimed listing path: "
+            f"{IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[0]}"
+        )
+    for label, marker in IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_STRICT_MARKERS:
+        if marker.search(reachable_source) is None:
+            violations.append(
+                "legacy iwa Keynote slide-table listing appearance is missing "
+                f"{label} marker on the claimed listing path: "
+                f"{IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[0]}"
+            )
+
+    forbidden = list(IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_FORBIDDEN_PATTERNS)
+    for source in production.values():
+        code = _mask_rust_non_code(source)
+        for match in re.finditer(
+            r"\b(?:table_appearance|read_native_table_appearance|"
+            r"read_table_appearance)\b"
+            r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+            r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            code,
+        ):
+            alias = match.group("alias")
+            forbidden.append(
+                (
+                    f"legacy table appearance alias {alias}",
+                    re.compile(rf"\b(?:r#)?{re.escape(alias)}\s*\(\s*"),
+                )
+            )
+        for match in re.finditer(
+            r"\b(?:TableModelArchive|TableStyleArchive|"
+            r"TableStylePresetArchive|TableStyleNetworkArchive|"
+            r"TableStylePropertiesArchive|TableAppearanceArchive|StyleArchive)\b"
+            r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+            r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            code,
+        ):
+            original = match.group(0).split()[0]
+            alias = match.group("alias")
+            forbidden.append(
+                (
+                    f"generated {original} alias {alias} decode",
+                    re.compile(
+                        rf"\b(?:r#)?{re.escape(alias)}\s*::\s*decode\s*\(|"
+                        rf"\b(?:decode_type|decode_unique(?:_any)?)\s*::<\s*"
+                        rf"(?:[^>]*::\s*)?{re.escape(alias)}\b"
+                    ),
+                )
+            )
+
+    for name, path, body, offset in reachable:
+        source = production[path]
+        for label, pattern in forbidden:
+            for match in pattern.finditer(body):
+                line_number = source.count("\n", 0, offset + match.start()) + 1
+                violations.append(
+                    "legacy iwa Keynote slide-table listing appearance production "
+                    f"path uses {label} via {name}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_extractor_no_eager_table_data_list_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -30286,6 +30542,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_keynote_slide_table_discovery_source_topology()
+        + audit_iwa_keynote_slide_table_listing_appearance_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_iwa_numbers_table_cell_storage_source_topology()
         + audit_iwa_package_metadata_read_source_topology()

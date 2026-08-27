@@ -2931,3 +2931,50 @@ The migration host, `litchi-iwa -> litchi-keynote`, all 13 ordered migration
 debts (including 014, 016, and 017), generated-schema/Prost/Buffa owners, and
 the IWA monolith remain unchanged. Wave101 retires no crate, edge, debt,
 manifest dependency, host adapter, or generated owner.
+
+## 2026-08-27 amendment: Wave102 current-topology Keynote slide-table appearance listing (not a monolith-exit gate)
+
+The Keynote slide-table listing now adds a bounded, borrowed appearance
+projection on top of the Wave101 `KeynoteObjectCatalog`. One
+operation-scoped catalog and decoded slide context are reused. Strict
+`table_appearance_codec` views resolve the model
+style or preset, preset-to-network, network-to-style, and bounded full parent
+inheritance; a direct nonzero style keeps legacy precedence. Appearance
+payloads are borrowed for the projection and are not retained in the catalog.
+
+Missing, malformed, duplicate, role-alias, cyclic, and over-depth facts on
+the projected model/style/preset/network and traversed parent routes fail
+closed. Stylesheet-registry ownership and unprojected style-property fields
+remain compatibility-owned. This remains listing-only: existing public APIs
+and writers, legacy mutation, and the selected generated TableInfo geometry
+path are unchanged. It adds no metadata, UUID, save-token, global-ownership,
+or package-wide transaction behavior and exposes no native identifiers,
+archives, ZIP entries, wire values, generated models, Prost, or Buffa values.
+The bounded limits apply to this discovery operation only; no package-wide
+budget, zero-copy, allocation-free, RSS, or wall-clock performance claim is
+made.
+
+Wave102 evidence is 14/14 for the appearance codec, 50/50 for the focused
+Keynote slide-table tests, 598/598 for the boundary suite, and an empty live
+audit. Protos and IWA library checks, strict scoped Clippy (with existing
+Pages warnings allowed for IWA), the isolated appearance fuzz check, and
+format/diff checks passed.
+
+The external read-only driver replayed the Wave99 and Wave100 sources
+(`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef` and
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`). Each
+contained one 5-by-4 `Table 1` and reported disabled row banding, fixed row
+sizing, and all five gridline classes visible. Fresh replay was exact across
+all 86/86 ZIP members: no member changed, was added, or was removed.
+Computer Use opened an immutable disposable Wave100 copy in Keynote 14.4
+without repair, recovery, or conversion UI and rendered the selected 5-by-4
+table with alternating row color and resize-to-fit off, all five gridline
+toggles on, and 1/2/1 header-column/header-row/footer counts. Its original
+500,128-byte hash remained exact after close. A separate writable disposable
+copy auto-persisted view state on close; no native appearance mutation,
+save, normalization, or post-save acceptance is claimed.
+
+The migration host, `litchi-iwa -> litchi-keynote` edge, all 13 ordered
+migration debts, generated-schema/normal Prost/Buffa owners, and the IWA
+monolith deletion gate remain unchanged. Wave102 retires no crate, edge,
+debt, manifest dependency, host adapter, generated owner, or monolith owner.

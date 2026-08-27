@@ -1077,6 +1077,41 @@ exact. This is bounded read-only semantic and open/render evidence only: no
 Keynote save/normalization/mutation, performance/RSS, or public
 catalog-statistics claim follows.
 
+#### Keynote slide-table appearance listing boundary
+
+The same bounded catalog-backed listing path now projects table appearance
+through strict borrowed `table_appearance_codec` views. It follows the model
+style/preset, preset-to-network, network-to-style, and bounded full
+parent-inheritance routes; a direct nonzero style retains legacy precedence.
+Missing, malformed, duplicate, role-aliased, cyclic, and over-depth facts on
+the projected model/style/preset/network and traversed parent routes fail
+closed. Stylesheet-registry ownership and unprojected style-property fields
+remain compatibility-owned. Appearance is listing support only: existing
+public APIs and writers, legacy mutation, and generated TableInfo geometry
+remain at their current owners. No metadata, UUID, save-token,
+global-ownership, or full-package budget behavior is added, and the
+catalog/projection does not claim zero-copy, allocation-free operation, RSS,
+or wall-clock performance.
+
+The focused gates are 14/14 for the appearance codec, 50/50 for the
+Keynote slide-table suite, 598/598 for the boundary suite, and an empty live
+audit; protos/IWA checks, strict scoped Clippy (with existing Pages warnings
+allowed for IWA), isolated appearance fuzz checking, Rust 2024 formatting,
+and diff checks passed.
+
+An external read-only `KeynoteEditor` driver replayed the Wave99 and Wave100
+sources and found one 5-by-4 `Table 1` in each. Both reported row banding
+disabled, fixed row sizing, and all five gridline classes visible; fresh
+replay was exact across all 86/86 ZIP members, with no changed, added, or
+removed member. Computer Use opened and rendered an immutable disposable
+Wave100 copy in Keynote 14.4 without repair, recovery, or conversion UI; the
+selected table showed alternating row color off, resize rows to fit off, all
+five gridline toggles on, 1 header column, 2 header rows, 1 footer row, and
+5-by-4 dimensions. Its 500,128-byte source hash remained exact after close.
+A separate writable disposable copy auto-persisted view state on close, so
+the byte-identity statement applies only to the immutable copy. No native
+appearance mutation, save, normalization, or post-save acceptance is claimed.
+
 Numbers scalar cell writes are selector-first `litchi-numbers` package
 transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
 before publication, so any rejected coordinate, dependency, or cache update

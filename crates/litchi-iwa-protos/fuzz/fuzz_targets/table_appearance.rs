@@ -42,6 +42,44 @@ const FIXED_CASES: &[&[u8]] = &[
     &[0x1a, 0x03, 0x08, 0x87, 0x00],
     // Unterminated unknown group.
     &[0x1a, 0x06, 0x08, 0x07, 0x93, 0x03, 0x08, 0x01],
+    // TableStylePresetArchive: index, image, style-network, and a balanced
+    // unknown group.  The unknown group is intentionally outside the known
+    // three-field projection and remains source-authoritative.
+    &[
+        0x08, 0x01, 0x12, 0x02, 0x08, 0x07, 0x1a, 0x02, 0x08, 0x08, 0xd3, 0x05, 0xd8, 0x05, 0x01,
+        0xd4, 0x05,
+    ],
+    // TableStyleNetworkArchive: all nine required references plus a balanced
+    // unknown group.
+    &[
+        0x0a, 0x02, 0x08, 0x01, 0x12, 0x02, 0x08, 0x02, 0x1a, 0x02, 0x08, 0x03, 0x22, 0x02, 0x08,
+        0x04, 0x2a, 0x02, 0x08, 0x05, 0x32, 0x02, 0x08, 0x06, 0x3a, 0x02, 0x08, 0x07, 0x42, 0x02,
+        0x08, 0x08, 0x4a, 0x02, 0x08, 0x09, 0xd3, 0x05, 0xd8, 0x05, 0x01, 0xd4, 0x05,
+    ],
+    // Duplicate known preset network reference.
+    &[
+        0x08, 0x01, 0x12, 0x02, 0x08, 0x07, 0x1a, 0x02, 0x08, 0x08, 0x1a, 0x02, 0x08, 0x09,
+    ],
+    // Wrong wire for the known preset image reference.
+    &[0x08, 0x01, 0x10, 0x07, 0x1a, 0x02, 0x08, 0x08],
+    // Non-canonical known preset network reference identifier.
+    &[
+        0x08, 0x01, 0x12, 0x02, 0x08, 0x07, 0x1a, 0x03, 0x08, 0x87, 0x00,
+    ],
+    // Duplicate required network reference.
+    &[
+        0x0a, 0x02, 0x08, 0x01, 0x12, 0x02, 0x08, 0x02, 0x1a, 0x02, 0x08, 0x03, 0x22, 0x02, 0x08,
+        0x04, 0x2a, 0x02, 0x08, 0x05, 0x32, 0x02, 0x08, 0x06, 0x3a, 0x02, 0x08, 0x07, 0x42, 0x02,
+        0x08, 0x08, 0x4a, 0x02, 0x08, 0x09, 0x0a, 0x02, 0x08, 0x0a,
+    ],
+    // Wrong wire for a required network reference.
+    &[0x08, 0x01],
+    // Non-canonical required network reference identifier.
+    &[
+        0x0a, 0x03, 0x08, 0x81, 0x00, 0x12, 0x02, 0x08, 0x02, 0x1a, 0x02, 0x08, 0x03, 0x22, 0x02,
+        0x08, 0x04, 0x2a, 0x02, 0x08, 0x05, 0x32, 0x02, 0x08, 0x06, 0x3a, 0x02, 0x08, 0x07, 0x42,
+        0x02, 0x08, 0x08, 0x4a, 0x02, 0x08, 0x09,
+    ],
 ];
 
 fuzz_target!(|data: &[u8]| {
@@ -140,6 +178,9 @@ fn exercise_source(source: &[u8], data: &[u8]) {
         Err(error) => observe_error(error),
     }
 
+    exercise_style_preset(source, &before);
+    exercise_style_network(source, &before);
+
     match codec::decode_stylesheet_with_report(source, decode_options) {
         Ok((snapshot, report)) => {
             assert_eq!(
@@ -160,6 +201,132 @@ fn exercise_source(source: &[u8], data: &[u8]) {
         before.as_slice(),
         "appearance fuzzing modified source"
     );
+}
+
+fn exercise_style_preset(source: &[u8], before: &[u8]) {
+    let decode_options = options(source);
+    match codec::decode_table_style_preset_with_report(source, decode_options) {
+        Ok((snapshot, report)) => {
+            assert_eq!(source, before, "preset decode modified source");
+            assert_eq!(snapshot.raw(), source);
+            assert!(report.input_bytes() <= MAX_INPUT_BYTES.max(source.len()));
+            let replay = codec::decode_table_style_preset(source, decode_options)
+                .unwrap_or_else(|error| panic!("preset replay failed: {error}"));
+            assert_eq!(replay, snapshot);
+            black_box((snapshot.style_network_identifier(), report));
+            exercise_preset_limits(source, report);
+        },
+        Err(error) => observe_error(error),
+    }
+}
+
+fn exercise_style_network(source: &[u8], before: &[u8]) {
+    let decode_options = options(source);
+    match codec::decode_table_style_network_with_report(source, decode_options) {
+        Ok((snapshot, report)) => {
+            assert_eq!(source, before, "network decode modified source");
+            assert_eq!(snapshot.raw(), source);
+            assert!(report.input_bytes() <= MAX_INPUT_BYTES.max(source.len()));
+            let replay = codec::decode_table_style_network(source, decode_options)
+                .unwrap_or_else(|error| panic!("network replay failed: {error}"));
+            assert_eq!(replay, snapshot);
+            black_box((snapshot.table_style_identifier(), report));
+            exercise_network_limits(source, report);
+        },
+        Err(error) => observe_error(error),
+    }
+}
+
+fn exercise_preset_limits(source: &[u8], report: codec::DecodeReport) {
+    let fields = report.fields().saturating_sub(1);
+    let error = codec::decode_table_style_preset_with_report(
+        source,
+        options(source).with_max_fields(fields),
+    )
+    .expect_err("preset fields max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::Fields { .. })
+    ));
+
+    let work = report.work_bytes().saturating_sub(1);
+    let error = codec::decode_table_style_preset_with_report(
+        source,
+        options(source).with_max_work_bytes(work),
+    )
+    .expect_err("preset work max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::WorkBytes { .. })
+    ));
+
+    let depth = report.max_depth().saturating_sub(1);
+    let error = codec::decode_table_style_preset_with_report(
+        source,
+        options(source).with_recursion_limit(depth),
+    )
+    .expect_err("preset nesting max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::Nesting { .. })
+    ));
+
+    let input = source.len().saturating_sub(1);
+    let error = codec::decode_table_style_preset_with_report(
+        source,
+        options(source).with_max_input_bytes(input),
+    )
+    .expect_err("preset input max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::InputBytes { .. })
+    ));
+}
+
+fn exercise_network_limits(source: &[u8], report: codec::DecodeReport) {
+    let fields = report.fields().saturating_sub(1);
+    let error = codec::decode_table_style_network_with_report(
+        source,
+        options(source).with_max_fields(fields),
+    )
+    .expect_err("network fields max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::Fields { .. })
+    ));
+
+    let work = report.work_bytes().saturating_sub(1);
+    let error = codec::decode_table_style_network_with_report(
+        source,
+        options(source).with_max_work_bytes(work),
+    )
+    .expect_err("network work max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::WorkBytes { .. })
+    ));
+
+    let depth = report.max_depth().saturating_sub(1);
+    let error = codec::decode_table_style_network_with_report(
+        source,
+        options(source).with_recursion_limit(depth),
+    )
+    .expect_err("network nesting max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::Nesting { .. })
+    ));
+
+    let input = source.len().saturating_sub(1);
+    let error = codec::decode_table_style_network_with_report(
+        source,
+        options(source).with_max_input_bytes(input),
+    )
+    .expect_err("network input max-minus-one was accepted");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::InputBytes { .. })
+    ));
 }
 
 fn exercise_model_rewrite(source: &[u8], old: u64, data: &[u8], before: &[u8]) {

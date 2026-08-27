@@ -8,7 +8,10 @@ use super::super::keynote_object_catalog::{
 use super::*;
 use crate::protobuf::tst::{TableInfoArchive, TableModelArchive};
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_protos::{table_info_codec, table_model_discovery_codec};
+use litchi_iwa_common::table::appearance::{
+    Appearance as CommonTableAppearance, Banding, GridlineVisibility, Gridlines, RowSizing,
+};
+use litchi_iwa_protos::{table_appearance_codec, table_info_codec, table_model_discovery_codec};
 
 #[derive(Debug, Clone)]
 pub(super) struct SlideTableGraph {
@@ -29,6 +32,8 @@ struct CatalogTableModelFacts {
     name: String,
     rows: u32,
     columns: u32,
+    style_identifier: u64,
+    style_preset_identifier: Option<u64>,
 }
 
 pub(super) fn require_table_model(
@@ -259,6 +264,12 @@ pub(super) fn slide_table_graph_from_catalog_context(
             ))
         })?;
     let lock_state = TableLockState::from_locked(table_info_projection.locked().unwrap_or(false));
+    let appearance = catalog_table_appearance(
+        package,
+        catalog,
+        model.style_identifier,
+        model.style_preset_identifier,
+    )?;
     Ok(SlideTableGraph {
         info: KeynoteSlideTableInfo {
             slide_index,
@@ -269,7 +280,7 @@ pub(super) fn slide_table_graph_from_catalog_context(
             rows: model.rows as usize,
             columns: model.columns as usize,
             geometry: crate::shapes::geometry_from_drawable(&table_info.super_)?,
-            appearance: crate::table_appearance::table_appearance(package, model_id)?,
+            appearance,
             lock_state,
         },
         table_archive,
@@ -360,14 +371,21 @@ fn catalog_table_model_facts(
     let legacy_count = catalog
         .message_type_count(model_id, 6_000)
         .map_err(map_catalog_error)?;
-    if catalog
-        .message_type_count(model_id, TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE)
-        .map_err(map_catalog_error)?
-        != 0
-    {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote table model {model_id} contains a historical table-model role alias"
-        )));
+    for role in [
+        TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE,
+        TABLE_STYLE_MESSAGE_TYPE,
+        TABLE_STYLE_PRESET_MESSAGE_TYPE,
+        TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+    ] {
+        if catalog
+            .message_type_count(model_id, role)
+            .map_err(map_catalog_error)?
+            != 0
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote table model {model_id} contains a model or appearance role alias"
+            )));
+        }
     }
     let message_type = match (canonical_count, legacy_count) {
         (0, 1) => 6_000,
@@ -401,6 +419,11 @@ fn catalog_table_model_facts(
                     table_model_options(source),
                 )
                 .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
+                let appearance_model = table_appearance_codec::decode_table_model(
+                    source,
+                    table_appearance_options(source),
+                )
+                .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
                 let table_name = facts.table_name();
                 let mut name = String::new();
                 name.try_reserve_exact(table_name.len()).map_err(|_| {
@@ -414,10 +437,279 @@ fn catalog_table_model_facts(
                     name,
                     rows: facts.number_of_rows(),
                     columns: facts.number_of_columns(),
+                    style_identifier: appearance_model.style_identifier(),
+                    style_preset_identifier: appearance_model.style_preset_identifier(),
                 })
             },
         )
         .map_err(map_catalog_error)
+}
+
+const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
+const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
+const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const MAX_CATALOG_STYLE_INHERITANCE_DEPTH: usize = 64;
+
+/// Resolve a table's appearance using the already-built object catalog.
+///
+/// The older `crate::table_appearance::table_appearance` helper intentionally
+/// returns owned archives for its compatibility callers.  Listing is a much
+/// hotter path: calling it for every drawable would clone the cached archive
+/// for the model, then scan every IWA member again for each style hop.  Keep
+/// this path catalog-backed and borrow each selected payload only for the
+/// duration of its strict codec callback.  The catalog therefore remains the
+/// single package scan and no parsed archive is retained by this operation.
+fn catalog_table_appearance(
+    package: &IWorkPackage,
+    catalog: &mut KeynoteObjectCatalog,
+    style_identifier: u64,
+    style_preset_identifier: Option<u64>,
+) -> Result<CommonTableAppearance> {
+    let Some(first_style_identifier) = catalog_effective_style_identifier(
+        package,
+        catalog,
+        style_identifier,
+        style_preset_identifier,
+    )?
+    else {
+        return Ok(CommonTableAppearance::default());
+    };
+
+    let mut visited = [0_u64; MAX_CATALOG_STYLE_INHERITANCE_DEPTH];
+    let mut current = Some(first_style_identifier);
+    let mut row_banding = None;
+    let mut row_sizing = None;
+    let mut body_horizontal = None;
+    let mut body_vertical = None;
+    let mut header_columns_horizontal = None;
+    let mut header_rows_vertical = None;
+    let mut footer_rows_vertical = None;
+
+    for visited_len in 0..=MAX_CATALOG_STYLE_INHERITANCE_DEPTH {
+        let Some(identifier) = current else {
+            return Ok(catalog_appearance_from_overrides(
+                row_banding,
+                row_sizing,
+                body_horizontal,
+                body_vertical,
+                header_columns_horizontal,
+                header_rows_vertical,
+                footer_rows_vertical,
+            ));
+        };
+        if visited[..visited_len].contains(&identifier) {
+            return Err(Error::InvalidFormat(format!(
+                "iWork table style inheritance cycles at {identifier}"
+            )));
+        }
+        if visited_len == visited.len() {
+            return Err(Error::InvalidFormat(format!(
+                "iWork table style inheritance exceeds {MAX_CATALOG_STYLE_INHERITANCE_DEPTH} levels"
+            )));
+        }
+        visited[visited_len] = identifier;
+
+        validate_catalog_appearance_role(
+            catalog,
+            identifier,
+            TABLE_STYLE_MESSAGE_TYPE,
+            "table style",
+        )?;
+
+        let (parent_identifier, overrides) = catalog
+            .with_message_data_type(
+                package,
+                identifier,
+                TABLE_STYLE_MESSAGE_TYPE,
+                "TableStyleArchive",
+                |source| {
+                    let style = table_appearance_codec::decode_table_style(
+                        source,
+                        table_appearance_options(source),
+                    )
+                    .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
+                    Ok((style.parent_identifier(), style.overrides()))
+                },
+            )
+            .map_err(map_catalog_error)?;
+
+        row_banding = row_banding.or(overrides.row_banding);
+        row_sizing = row_sizing.or(overrides.row_sizing);
+        body_horizontal = body_horizontal.or(overrides.body_horizontal);
+        body_vertical = body_vertical.or(overrides.body_vertical);
+        header_columns_horizontal =
+            header_columns_horizontal.or(overrides.header_columns_horizontal);
+        header_rows_vertical = header_rows_vertical.or(overrides.header_rows_vertical);
+        footer_rows_vertical = footer_rows_vertical.or(overrides.footer_rows_vertical);
+
+        current = parent_identifier.filter(|identifier| *identifier != 0);
+    }
+
+    Err(Error::InvalidFormat(format!(
+        "iWork table style inheritance exceeds {MAX_CATALOG_STYLE_INHERITANCE_DEPTH} levels"
+    )))
+}
+
+fn catalog_effective_style_identifier(
+    package: &IWorkPackage,
+    catalog: &mut KeynoteObjectCatalog,
+    style_identifier: u64,
+    style_preset_identifier: Option<u64>,
+) -> Result<Option<u64>> {
+    if style_identifier != 0 {
+        // Match the legacy resolver: a concrete model style wins over the
+        // optional preset, so an unused malformed preset cannot poison it.
+        return Ok(Some(style_identifier));
+    }
+    let Some(preset_identifier) = style_preset_identifier else {
+        return Ok(None);
+    };
+    validate_catalog_appearance_role(
+        catalog,
+        preset_identifier,
+        TABLE_STYLE_PRESET_MESSAGE_TYPE,
+        "table style preset",
+    )?;
+    let network_identifier = catalog
+        .with_message_data_type(
+            package,
+            preset_identifier,
+            TABLE_STYLE_PRESET_MESSAGE_TYPE,
+            "TableStylePresetArchive",
+            |source| {
+                let preset = table_appearance_codec::decode_table_style_preset(
+                    source,
+                    table_appearance_options(source),
+                )
+                .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
+                Ok(preset.style_network_identifier())
+            },
+        )
+        .map_err(map_catalog_error)?
+        .filter(|identifier| *identifier != 0)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork table style preset {preset_identifier} has no style network"
+            ))
+        })?;
+    validate_catalog_appearance_role(
+        catalog,
+        network_identifier,
+        TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+        "table style network",
+    )?;
+    let table_style_identifier = catalog
+        .with_message_data_type(
+            package,
+            network_identifier,
+            TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+            "TableStyleNetworkArchive",
+            |source| {
+                let network = table_appearance_codec::decode_table_style_network(
+                    source,
+                    table_appearance_options(source),
+                )
+                .map_err(|error| KeynoteObjectCatalogError::InvalidSource(error.to_string()))?;
+                Ok(network.table_style_identifier())
+            },
+        )
+        .map_err(map_catalog_error)?;
+    if table_style_identifier == 0 {
+        return Err(Error::InvalidFormat(format!(
+            "iWork table style network {network_identifier} has no table style"
+        )));
+    }
+    Ok(Some(table_style_identifier))
+}
+
+fn validate_catalog_appearance_role(
+    catalog: &KeynoteObjectCatalog,
+    identifier: u64,
+    expected_type: u32,
+    expected_name: &str,
+) -> Result<()> {
+    if catalog
+        .message_type_count(identifier, expected_type)
+        .map_err(map_catalog_error)?
+        != 1
+    {
+        return Err(Error::InvalidFormat(format!(
+            "iWork {expected_name} {identifier} must contain exactly one role payload"
+        )));
+    }
+    for role in [
+        TABLE_STYLE_MESSAGE_TYPE,
+        TABLE_STYLE_PRESET_MESSAGE_TYPE,
+        TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+        TABLE_MODEL_MESSAGE_TYPE,
+    ] {
+        if role != expected_type
+            && catalog
+                .message_type_count(identifier, role)
+                .map_err(map_catalog_error)?
+                != 0
+        {
+            return Err(Error::InvalidFormat(format!(
+                "iWork {expected_name} {identifier} contains an appearance role alias"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn catalog_appearance_from_overrides(
+    row_banding: Option<bool>,
+    row_sizing: Option<bool>,
+    body_horizontal: Option<bool>,
+    body_vertical: Option<bool>,
+    header_columns_horizontal: Option<bool>,
+    header_rows_vertical: Option<bool>,
+    footer_rows_vertical: Option<bool>,
+) -> CommonTableAppearance {
+    CommonTableAppearance {
+        row_banding: if row_banding.unwrap_or(false) {
+            Banding::Enabled
+        } else {
+            Banding::Disabled
+        },
+        row_sizing: if row_sizing.unwrap_or(false) {
+            RowSizing::FitCellContents
+        } else {
+            RowSizing::Fixed
+        },
+        gridlines: Gridlines {
+            body_horizontal: if body_horizontal.unwrap_or(true) {
+                GridlineVisibility::Visible
+            } else {
+                GridlineVisibility::Hidden
+            },
+            header_columns_horizontal: if header_columns_horizontal.unwrap_or(true) {
+                GridlineVisibility::Visible
+            } else {
+                GridlineVisibility::Hidden
+            },
+            body_vertical: if body_vertical.unwrap_or(true) {
+                GridlineVisibility::Visible
+            } else {
+                GridlineVisibility::Hidden
+            },
+            header_rows_vertical: if header_rows_vertical.unwrap_or(true) {
+                GridlineVisibility::Visible
+            } else {
+                GridlineVisibility::Hidden
+            },
+            footer_rows_vertical: if footer_rows_vertical.unwrap_or(true) {
+                GridlineVisibility::Visible
+            } else {
+                GridlineVisibility::Hidden
+            },
+        },
+    }
+}
+
+fn table_appearance_options(source: &[u8]) -> table_appearance_codec::DecodeOptions {
+    table_appearance_codec::DecodeOptions::for_source(source)
 }
 
 fn table_info_options(source: &[u8]) -> table_info_codec::DecodeOptions {
@@ -558,6 +850,8 @@ pub(super) fn table_template_from_graph(graph: &ObjectGraph) -> Result<(u64, u64
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::protobuf::{tsp, tss, tst};
+    use prost::Message;
 
     const MODEL_TYPE: u32 = 6_001;
     const LEGACY_MODEL_TYPE: u32 = 6_000;
@@ -576,7 +870,7 @@ mod tests {
     fn model_payload() -> Vec<u8> {
         let mut output = Vec::new();
         bytes_field(1, b"id", &mut output);
-        bytes_field(3, &[0x0a, 0x01, 0x08, 0x01], &mut output);
+        bytes_field(3, &reference_payload(1), &mut output);
         bytes_field(4, &[0x0a, 0x00], &mut output);
         varint_field(6, 3, &mut output);
         varint_field(7, 4, &mut output);
@@ -584,10 +878,18 @@ mod tests {
         fixed64_field(16, &mut output);
         fixed64_field(17, &mut output);
         for field in 18..=21 {
-            bytes_field(field, &[0x0a, 0x01, 0x08, field as u8 - 17], &mut output);
+            bytes_field(
+                field,
+                &reference_payload(u64::from(field - 17)),
+                &mut output,
+            );
         }
         for field in 24..=27 {
-            bytes_field(field, &[0x0a, 0x01, 0x08, field as u8 - 23], &mut output);
+            bytes_field(
+                field,
+                &reference_payload(u64::from(field - 23)),
+                &mut output,
+            );
         }
         output
     }
@@ -635,6 +937,223 @@ mod tests {
             )
             .expect("synthetic archive");
         package
+    }
+
+    fn reference(identifier: u64) -> tsp::Reference {
+        tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn reference_payload(identifier: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        varint_field(1, identifier, &mut output);
+        output
+    }
+
+    fn appearance_model_payload(
+        style_identifier: u64,
+        style_preset_identifier: Option<u64>,
+    ) -> Vec<u8> {
+        let mut output = Vec::new();
+        bytes_field(1, b"model", &mut output);
+        bytes_field(3, &reference_payload(style_identifier), &mut output);
+        if let Some(identifier) = style_preset_identifier {
+            bytes_field(48, &reference_payload(identifier), &mut output);
+        }
+        // DataStore is a required nested envelope.  Discovery only needs its
+        // presence, so the smallest valid empty envelope is sufficient here.
+        bytes_field(4, &[0x0a, 0x00], &mut output);
+        varint_field(6, 3, &mut output);
+        varint_field(7, 4, &mut output);
+        bytes_field(8, b"Table", &mut output);
+        fixed64_field(16, &mut output);
+        fixed64_field(17, &mut output);
+        for field in 18..=21 {
+            bytes_field(
+                field,
+                &reference_payload(u64::from(field - 17)),
+                &mut output,
+            );
+        }
+        for field in 24..=27 {
+            bytes_field(
+                field,
+                &reference_payload(u64::from(field - 23)),
+                &mut output,
+            );
+        }
+        output
+    }
+
+    fn appearance_model_object(
+        identifier: u64,
+        style_identifier: u64,
+        style_preset_identifier: Option<u64>,
+    ) -> ArchiveObject {
+        raw_object(
+            identifier,
+            vec![(
+                MODEL_TYPE,
+                appearance_model_payload(style_identifier, style_preset_identifier),
+            )],
+        )
+    }
+
+    fn appearance_style_payload(
+        identifier: u64,
+        parent_identifier: Option<u64>,
+        overrides: [Option<bool>; 7],
+        with_unknown_group: bool,
+    ) -> Vec<u8> {
+        let properties =
+            overrides
+                .iter()
+                .any(Option::is_some)
+                .then(|| tst::TableStylePropertiesArchive {
+                    banded_rows: overrides[0],
+                    auto_resize: overrides[1],
+                    v_strokes_visible: overrides[2],
+                    h_strokes_visible: overrides[3],
+                    table_hc_divider_visible: overrides[4],
+                    table_hr_divider_visible: overrides[5],
+                    table_footer_divider_visible: overrides[6],
+                    ..Default::default()
+                });
+        let mut output = tst::TableStyleArchive {
+            super_: tss::StyleArchive {
+                style_identifier: Some(format!("style-{identifier}")),
+                parent: parent_identifier.map(reference),
+                ..Default::default()
+            },
+            table_properties: properties,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        if with_unknown_group {
+            append_key(90, 3, &mut output);
+            varint_field(91, 1, &mut output);
+            append_key(90, 4, &mut output);
+        }
+        output
+    }
+
+    fn appearance_style_object(
+        identifier: u64,
+        parent_identifier: Option<u64>,
+        overrides: [Option<bool>; 7],
+        with_unknown_group: bool,
+    ) -> ArchiveObject {
+        raw_object(
+            identifier,
+            vec![(
+                TABLE_STYLE_MESSAGE_TYPE,
+                appearance_style_payload(
+                    identifier,
+                    parent_identifier,
+                    overrides,
+                    with_unknown_group,
+                ),
+            )],
+        )
+    }
+
+    fn appearance_preset_payload(network_identifier: u64) -> Vec<u8> {
+        tst::TableStylePresetArchive {
+            style_network: Some(reference(network_identifier)),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn appearance_network_payload(table_style_identifier: u64) -> Vec<u8> {
+        tst::TableStyleNetworkArchive {
+            body_text_style: reference(1),
+            header_row_text_style: reference(1),
+            header_column_text_style: reference(1),
+            footer_row_text_style: reference(1),
+            body_cell_style: reference(1),
+            header_row_style: reference(1),
+            header_column_style: reference(1),
+            footer_row_style: reference(1),
+            table_style: reference(table_style_identifier),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn appearance_package(objects: Vec<ArchiveObject>) -> IWorkPackage {
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive("Index/CalculationEngine.iwa", &Archive { objects })
+            .expect("synthetic appearance archive");
+        package
+    }
+
+    fn appearance_package_in_members(
+        calculation_objects: Vec<ArchiveObject>,
+        stylesheet_objects: Vec<ArchiveObject>,
+    ) -> IWorkPackage {
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/CalculationEngine.iwa",
+                &Archive {
+                    objects: calculation_objects,
+                },
+            )
+            .expect("synthetic calculation archive");
+        package
+            .replace_archive(
+                "Index/DocumentStylesheet.iwa",
+                &Archive {
+                    objects: stylesheet_objects,
+                },
+            )
+            .expect("synthetic stylesheet archive");
+        package
+    }
+
+    fn assert_catalog_appearance_matches_legacy(
+        package: &IWorkPackage,
+        model_identifier: u64,
+    ) -> CommonTableAppearance {
+        let before = package.to_bytes().expect("source bytes");
+        let expected = crate::table_appearance::table_appearance(package, model_identifier)
+            .expect("legacy appearance");
+        let mut catalog = KeynoteObjectCatalog::build(package).expect("catalog");
+        let facts = catalog_table_model_facts(package, &mut catalog, model_identifier)
+            .expect("appearance model facts");
+        let actual = catalog_table_appearance(
+            package,
+            &mut catalog,
+            facts.style_identifier,
+            facts.style_preset_identifier,
+        )
+        .expect("catalog appearance");
+        assert_eq!(actual, expected);
+        assert_eq!(package.to_bytes().expect("source bytes"), before);
+        actual
+    }
+
+    fn assert_catalog_appearance_rejected(
+        package: &IWorkPackage,
+        style_identifier: u64,
+        style_preset_identifier: Option<u64>,
+    ) {
+        let before = package.to_bytes().expect("source bytes");
+        let mut catalog = KeynoteObjectCatalog::build(package).expect("catalog");
+        assert!(
+            catalog_table_appearance(
+                package,
+                &mut catalog,
+                style_identifier,
+                style_preset_identifier,
+            )
+            .is_err()
+        );
+        assert_eq!(package.to_bytes().expect("source bytes"), before);
     }
 
     fn append_varint(value: u64, output: &mut Vec<u8>) {
@@ -756,6 +1275,21 @@ mod tests {
     }
 
     #[test]
+    fn table_model_appearance_role_aliases_are_rejected_atomically() {
+        let payload = model_payload();
+        for alias in [
+            TABLE_STYLE_MESSAGE_TYPE,
+            TABLE_STYLE_PRESET_MESSAGE_TYPE,
+            TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+        ] {
+            assert_model_rejected_without_fallback(vec![
+                (MODEL_TYPE, payload.clone()),
+                (alias, Vec::new()),
+            ]);
+        }
+    }
+
+    #[test]
     fn historical_table_info_role_alias_is_rejected() {
         let package = table_template_package_with_info_messages(
             vec![
@@ -791,5 +1325,343 @@ mod tests {
         let mut catalog = KeynoteObjectCatalog::build(&package).expect("catalog");
         assert!(table_template_from_catalog(&package, &mut catalog).is_err());
         assert_eq!(package.to_bytes().expect("package bytes"), before);
+    }
+
+    #[test]
+    fn catalog_appearance_direct_preset_inherited_and_default_match_legacy() {
+        let direct = [
+            Some(true),
+            Some(true),
+            Some(false),
+            Some(false),
+            Some(true),
+            Some(false),
+            Some(true),
+        ];
+        let parent = [
+            Some(false),
+            Some(true),
+            Some(true),
+            Some(false),
+            Some(false),
+            Some(true),
+            Some(false),
+        ];
+        let child = [Some(true), None, None, Some(true), None, None, None];
+        let package = appearance_package(vec![
+            appearance_model_object(42, 100, None),
+            appearance_model_object(43, 0, Some(200)),
+            appearance_model_object(44, 102, None),
+            appearance_model_object(45, 0, None),
+            appearance_style_object(100, None, direct, false),
+            appearance_style_object(101, None, parent, false),
+            appearance_style_object(102, Some(101), child, false),
+            raw_object(
+                200,
+                vec![(
+                    TABLE_STYLE_PRESET_MESSAGE_TYPE,
+                    appearance_preset_payload(300),
+                )],
+            ),
+            raw_object(
+                300,
+                vec![(
+                    TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+                    appearance_network_payload(102),
+                )],
+            ),
+        ]);
+        for model_identifier in [42, 43, 44, 45] {
+            assert_catalog_appearance_matches_legacy(&package, model_identifier);
+        }
+    }
+
+    #[test]
+    fn catalog_appearance_accepts_unknown_groups_and_cross_member_style_routes() {
+        let package = appearance_package_in_members(
+            vec![appearance_model_object(42, 100, None)],
+            vec![appearance_style_object(
+                100,
+                None,
+                [
+                    Some(true),
+                    Some(false),
+                    Some(false),
+                    Some(true),
+                    Some(true),
+                    Some(false),
+                    Some(true),
+                ],
+                true,
+            )],
+        );
+        let before = package.to_bytes().expect("source bytes");
+        let mut catalog = KeynoteObjectCatalog::build(&package).expect("catalog");
+        let initial = catalog.stats();
+        let facts =
+            catalog_table_model_facts(&package, &mut catalog, 42).expect("appearance model facts");
+        let actual = catalog_table_appearance(
+            &package,
+            &mut catalog,
+            facts.style_identifier,
+            facts.style_preset_identifier,
+        )
+        .expect("cross-member appearance");
+        assert_eq!(
+            actual,
+            CommonTableAppearance {
+                row_banding: Banding::Enabled,
+                row_sizing: RowSizing::Fixed,
+                gridlines: Gridlines {
+                    body_horizontal: GridlineVisibility::Hidden,
+                    header_columns_horizontal: GridlineVisibility::Visible,
+                    body_vertical: GridlineVisibility::Visible,
+                    header_rows_vertical: GridlineVisibility::Hidden,
+                    footer_rows_vertical: GridlineVisibility::Visible,
+                },
+            }
+        );
+        assert_eq!(package.to_bytes().expect("source bytes"), before);
+        let final_stats = catalog.stats();
+        assert_eq!(initial.archives_scanned, final_stats.archives_scanned);
+        assert_eq!(initial.archives_scanned, 2);
+        assert_eq!(
+            final_stats.archive_reads,
+            initial.archive_reads.saturating_add(2)
+        );
+        assert_eq!(
+            final_stats.semantic_decodes,
+            initial.semantic_decodes.saturating_add(2)
+        );
+        assert_eq!(final_stats.peak_live_archives, 1);
+        assert_eq!(final_stats.retained_payload_bytes, 0);
+    }
+
+    #[test]
+    fn catalog_appearance_rejects_missing_wrong_duplicate_malformed_and_cycles_atomically() {
+        let cases = [
+            (appearance_package(vec![]), 100, None, "missing style"),
+            (
+                appearance_package(vec![raw_object(
+                    100,
+                    vec![(
+                        TABLE_STYLE_PRESET_MESSAGE_TYPE,
+                        appearance_preset_payload(300),
+                    )],
+                )]),
+                100,
+                None,
+                "wrong style type",
+            ),
+            (
+                appearance_package(vec![raw_object(
+                    100,
+                    vec![
+                        (
+                            TABLE_STYLE_MESSAGE_TYPE,
+                            appearance_style_payload(100, None, [None; 7], false),
+                        ),
+                        (
+                            TABLE_STYLE_MESSAGE_TYPE,
+                            appearance_style_payload(100, None, [None; 7], false),
+                        ),
+                    ],
+                )]),
+                100,
+                None,
+                "duplicate style",
+            ),
+            (
+                appearance_package(vec![raw_object(
+                    100,
+                    vec![(TABLE_STYLE_MESSAGE_TYPE, vec![0x0a])],
+                )]),
+                100,
+                None,
+                "malformed style",
+            ),
+            (
+                appearance_package(vec![appearance_style_object(
+                    100,
+                    Some(101),
+                    [None; 7],
+                    false,
+                )]),
+                100,
+                None,
+                "missing parent",
+            ),
+            (
+                appearance_package(vec![
+                    appearance_style_object(100, Some(101), [None; 7], false),
+                    appearance_style_object(101, Some(100), [None; 7], false),
+                ]),
+                100,
+                None,
+                "style cycle",
+            ),
+            (
+                appearance_package(vec![
+                    raw_object(
+                        200,
+                        vec![(
+                            TABLE_STYLE_PRESET_MESSAGE_TYPE,
+                            appearance_preset_payload(300),
+                        )],
+                    ),
+                    raw_object(
+                        300,
+                        vec![(
+                            TABLE_STYLE_MESSAGE_TYPE,
+                            appearance_style_payload(300, None, [None; 7], false),
+                        )],
+                    ),
+                ]),
+                0,
+                Some(200),
+                "wrong network type",
+            ),
+            (
+                appearance_package(vec![raw_object(
+                    200,
+                    vec![(
+                        TABLE_STYLE_PRESET_MESSAGE_TYPE,
+                        appearance_preset_payload(300),
+                    )],
+                )]),
+                0,
+                Some(200),
+                "missing network",
+            ),
+            (
+                appearance_package(vec![
+                    raw_object(
+                        200,
+                        vec![(
+                            TABLE_STYLE_PRESET_MESSAGE_TYPE,
+                            appearance_preset_payload(300),
+                        )],
+                    ),
+                    raw_object(300, vec![(TABLE_STYLE_NETWORK_MESSAGE_TYPE, Vec::new())]),
+                ]),
+                0,
+                Some(200),
+                "malformed network",
+            ),
+        ];
+        for (package, style_identifier, style_preset_identifier, _label) in cases {
+            assert_catalog_appearance_rejected(&package, style_identifier, style_preset_identifier);
+        }
+    }
+
+    #[test]
+    fn catalog_appearance_rejects_style_preset_and_network_role_aliases_atomically() {
+        let style_payload = appearance_style_payload(100, None, [None; 7], false);
+        let preset_payload = appearance_preset_payload(300);
+        let network_payload = appearance_network_payload(100);
+        let style_alias = appearance_package(vec![raw_object(
+            100,
+            vec![
+                (TABLE_STYLE_MESSAGE_TYPE, style_payload.clone()),
+                (TABLE_STYLE_PRESET_MESSAGE_TYPE, preset_payload.clone()),
+            ],
+        )]);
+        assert_catalog_appearance_rejected(&style_alias, 100, None);
+        let preset_alias = appearance_package(vec![
+            raw_object(100, vec![(TABLE_STYLE_MESSAGE_TYPE, style_payload.clone())]),
+            raw_object(
+                200,
+                vec![
+                    (TABLE_STYLE_PRESET_MESSAGE_TYPE, preset_payload.clone()),
+                    (TABLE_STYLE_MESSAGE_TYPE, style_payload.clone()),
+                ],
+            ),
+            raw_object(
+                300,
+                vec![(TABLE_STYLE_NETWORK_MESSAGE_TYPE, network_payload.clone())],
+            ),
+        ]);
+        assert_catalog_appearance_rejected(&preset_alias, 0, Some(200));
+        let network_alias = appearance_package(vec![
+            raw_object(100, vec![(TABLE_STYLE_MESSAGE_TYPE, style_payload)]),
+            raw_object(200, vec![(TABLE_STYLE_PRESET_MESSAGE_TYPE, preset_payload)]),
+            raw_object(
+                300,
+                vec![
+                    (TABLE_STYLE_NETWORK_MESSAGE_TYPE, network_payload),
+                    (
+                        TABLE_STYLE_PRESET_MESSAGE_TYPE,
+                        appearance_preset_payload(300),
+                    ),
+                ],
+            ),
+        ]);
+        assert_catalog_appearance_rejected(&network_alias, 0, Some(200));
+    }
+
+    #[test]
+    fn catalog_appearance_validates_missing_and_cyclic_parents_after_full_child_overrides() {
+        let complete = [
+            Some(true),
+            Some(true),
+            Some(false),
+            Some(false),
+            Some(true),
+            Some(false),
+            Some(true),
+        ];
+        let missing_parent = appearance_package(vec![appearance_style_object(
+            100,
+            Some(101),
+            complete,
+            false,
+        )]);
+        assert_catalog_appearance_rejected(&missing_parent, 100, None);
+        let cyclic_parent = appearance_package(vec![
+            appearance_style_object(100, Some(101), complete, false),
+            appearance_style_object(101, Some(100), [None; 7], false),
+        ]);
+        assert_catalog_appearance_rejected(&cyclic_parent, 100, None);
+    }
+
+    #[test]
+    fn catalog_appearance_direct_style_precedes_malformed_or_missing_preset() {
+        let complete = [
+            Some(true),
+            Some(true),
+            Some(false),
+            Some(false),
+            Some(true),
+            Some(false),
+            Some(true),
+        ];
+        let missing_preset = appearance_package(vec![
+            appearance_model_object(42, 100, Some(200)),
+            appearance_style_object(100, None, complete, false),
+        ]);
+        assert_catalog_appearance_matches_legacy(&missing_preset, 42);
+        let malformed_preset = appearance_package(vec![
+            appearance_model_object(42, 100, Some(200)),
+            appearance_style_object(100, None, complete, false),
+            raw_object(200, vec![(TABLE_STYLE_PRESET_MESSAGE_TYPE, vec![0x1a])]),
+        ]);
+        assert_catalog_appearance_matches_legacy(&malformed_preset, 42);
+    }
+
+    #[test]
+    fn catalog_appearance_rejects_inheritance_overdepth_without_mutating_source() {
+        let mut objects = Vec::new();
+        for identifier in 100..=164 {
+            let parent = (identifier < 164).then_some(identifier + 1);
+            objects.push(appearance_style_object(
+                identifier, parent, [None; 7], false,
+            ));
+        }
+        let package = appearance_package(objects);
+        let before = package.to_bytes().expect("source bytes");
+        let mut catalog = KeynoteObjectCatalog::build(&package).expect("catalog");
+        assert!(catalog_table_appearance(&package, &mut catalog, 100, None).is_err());
+        assert_eq!(package.to_bytes().expect("source bytes"), before);
+        assert_eq!(catalog.stats().retained_payload_bytes, 0);
     }
 }
