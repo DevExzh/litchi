@@ -35,6 +35,7 @@ pub type ReadLimits = SourcePackageLimits;
 
 pub(super) const FAMILY_NAME: &str = "ODT";
 pub(super) const CONTENT_ROOT: &str = "<office:text";
+const MAX_CONTENT_BYTES: u64 = 256 * 1024 * 1024;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
 
@@ -209,6 +210,14 @@ impl SourceBackedDocument {
             let mimetype = package.mimetype()?;
             super::package::validate_mimetype(mimetype)?;
 
+            if package
+                .member_materialized_size(crate::constants::ODF_CONTENT)?
+                .is_some_and(|size| size > MAX_CONTENT_BYTES)
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "{FAMILY_NAME} content.xml exceeds the family limit"
+                )));
+            }
             let content_bytes = package.get_file(crate::constants::ODF_CONTENT)?;
             let content = Content::from_vec(content_bytes)?;
             // One fused tokenization validates the content structure and
@@ -407,10 +416,8 @@ impl SourceBackedDocument {
         &self,
         output: &mut W,
         options: litchi_core::TextOutputOptions<'_>,
-    ) -> std::result::Result<
-        litchi_core::TextOutputReport,
-        litchi_core::TextOutputError<Error>,
-    > {
+    ) -> std::result::Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<Error>>
+    {
         let mut writer = litchi_core::SequentialTextWriter::new(output, options);
         let parse_result = match self.check_source() {
             Ok(()) => {

@@ -5,8 +5,11 @@
 //! the facade separate lets future XML writers and snapshot edits share the
 //! semantic [`Block`] model without coupling to parser state or wire details.
 
-use super::model::Block;
-use super::{Heading, Paragraph, parse_paragraph_at, parse_text_block_texts, parse_text_blocks};
+use super::model::{Block, Kind};
+use super::{
+    Heading, Paragraph, parse_block_at, parse_paragraph_at, parse_text_block_texts,
+    parse_text_blocks,
+};
 use litchi_core::{
     Error, Result, SequentialTextWriter, TextOutputError, TextOutputOptions, TextOutputReport,
 };
@@ -24,6 +27,19 @@ impl Elements {
     /// Decode all block-level text elements in document order.
     pub fn parse_blocks(xml_content: &str) -> Result<Vec<Block>> {
         Self::parse(xml_content)
+    }
+
+    /// Decode one visible paragraph or heading without retaining the other
+    /// text blocks.
+    ///
+    /// The decoder still scans the complete input and applies the same XML,
+    /// text, and resource-limit validation as [`Self::parse`].
+    pub fn parse_block_at(xml_content: &str, index: usize) -> Result<Option<Block>> {
+        parse_block_at(xml_content, index)
+    }
+
+    pub(crate) fn scan_block_kinds(xml_content: &str) -> Result<Vec<Kind>> {
+        super::scan_text_block_kinds(xml_content)
     }
 
     /// Decode all paragraphs from an XML reader.
