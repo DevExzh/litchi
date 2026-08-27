@@ -2,6 +2,13 @@
 
 use super::*;
 
+fn legacy_table_appearance_compatibility_read(
+    editor: &PagesEditor,
+    model_id: u64,
+) -> Result<TableAppearance> {
+    crate::table_appearance::table_appearance(editor.package(), model_id)
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct PagesTableGraph {
     pub(super) info: PagesTableInfo,
@@ -131,7 +138,7 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
                 name: model.table_name.clone(),
                 rows: model.number_of_rows as usize,
                 columns: model.number_of_columns as usize,
-                appearance: crate::table_appearance::table_appearance(editor.package(), model_id)?,
+                appearance: legacy_table_appearance_compatibility_read(editor, model_id)?,
                 lock_state: table_lock_state_from_message(&message.data)?,
             },
         });

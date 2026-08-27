@@ -1840,6 +1840,35 @@ apply_body_table_title}` and `BodyTableSelector`; the former raw-object-ID
 `PagesEditor` title helpers were removed. Keynote's slide-table title methods
 remain migration-host helpers with their format-specific table CRUD.
 
+### Pages body-table appearance uses the focused package transaction
+
+Pages body-table appearance reads and supported exact-source edits use
+`litchi_pages::Package::{body_table_appearance,
+edit_body_table_appearance, apply_body_table_appearance}` with a typed
+`BodyTableSelector` and neutral `table::appearance::Appearance`. Native IDs,
+archives, ZIP/wire values, and generated models stay private. The Wave104
+owner covers canonical model/style admission, preset/network/default effective
+reads, locked exact no-ops, strict ArchiveInfo and opaque-metadata checks,
+global style-inbound authority, and source-bound candidate/inverse/locality
+verification; unsupported graphs fail closed.
+
+The focused `litchi_pages::Package` owner is strict for all of its reads and
+changed writes. Separately, `litchi-iwa` legacy table listing retains one
+private read-only appearance helper for compatibility; it does not attempt a
+focused Package read, perform mutation, or bypass a focused Package write
+failure. Raw `PagesEditor` mutation APIs remain retired, and the appearance
+example uses the focused Package owner.
+
+The focused Pages integration passed 21/21, the appearance codec 18/18, the
+boundary suite 614/614, and the eight-seed fuzz-target check; strict scoped
+Clippy, the `litchi-iwa` library/example checks, and `py_compile` also passed.
+The native Pages source was rejected by strict selector read before mutation,
+remained byte-exact, and produced no candidate/inverse or UI acceptance
+evidence. The operation ledger is logical rather than Package-cache,
+decompressed-Archive, allocator, or RSS telemetry. Legacy Pages physical
+table/content paths remain in `litchi-iwa`; this note does not imply a
+monolith-exit or a full-workspace-green claim.
+
 ### Numbers sheet and table names use the focused package transaction
 
 Sheet and table names are no longer `NumbersEditor` raw-ID operations. Use

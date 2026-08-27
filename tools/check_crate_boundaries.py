@@ -8284,6 +8284,331 @@ PAGES_SECTION_TEXT_RAW_ID_PARAMETER = re.compile(
     r"(?=$|[^A-Za-z0-9_])"
 )
 
+# Wave104 moves Pages body-table appearance configuration behind the focused
+# selector-first package facade.  This is deliberately separate from the
+# legacy table-appearance host: the package owns semantic appearance values,
+# while litchi-iwa retains no public/raw-ID appearance route once the owner is
+# complete.  The inventory remains dormant until the private owner is wired,
+# so the migration baseline is not reported as a violation mid-wave.
+RETIRED_IWA_PAGES_TABLE_APPEARANCE_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "appearance.rs"
+)
+RETIRED_IWA_PAGES_TABLE_APPEARANCE_METHODS = (
+    "body_table_appearance",
+    "set_body_table_appearance",
+)
+RETIRED_IWA_PAGES_TABLE_APPEARANCE_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_APPEARANCE_METHODS
+)
+IWA_PAGES_TABLE_APPEARANCE_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"(?:crate::table_appearance|litchi_numbers|numbers)[^;\n]*"
+        r"(?:table[ \t]*::[ \t]*appearance|TableAppearance|table_appearance|"
+        r"set_table_appearance|body_table_appearance)"
+    ),
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"(?:TableAppearance|Appearance)\b[^;\n]*"
+        r"(?:crate::table_appearance|litchi_numbers|numbers)"
+    ),
+)
+IWA_PAGES_TABLE_APPEARANCE_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*)?"
+    r"(?:r#)?(?P<method>body_table_appearance|"
+    r"set_body_table_appearance|table_appearance|set_table_appearance)\b"
+    r"[ \t\r\n]*\(",
+)
+IWA_PAGES_TABLE_APPEARANCE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_TABLE_APPEARANCE_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor|editor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>body_table_appearance|set_body_table_appearance|"
+        r"table_appearance|set_table_appearance)\b[ \t\r\n]*\(",
+    ),
+)
+PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "appearance.rs"
+PAGES_TABLE_APPEARANCE_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_appearance.rs"
+)
+PAGES_TABLE_APPEARANCE_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_appearance"
+)
+PAGES_TABLE_APPEARANCE_IMPLEMENTATION_SOURCES = (
+    PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE,
+    PAGES_TABLE_APPEARANCE_OWNER_SOURCE,
+)
+PAGES_TABLE_APPEARANCE_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_APPEARANCE_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES = (
+    "Appearance",
+    "Banding",
+    "GridlineVisibility",
+    "Gridlines",
+    "RowSizing",
+)
+PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+PAGES_TABLE_APPEARANCE_CANONICAL_TYPES = (
+    "BodyTableAppearanceEdit",
+    "BodyTableAppearancePatch",
+    "BodyTableAppearanceCommit",
+    "BodyTableAppearanceDiagnostics",
+    "BodyTableAppearanceError",
+    "BodyTableAppearanceLimitKind",
+    "BodyTableAppearancePath",
+)
+PAGES_TABLE_APPEARANCE_SHORT_NAMES = frozenset(
+    PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES
+    + PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES
+)
+PAGES_TABLE_APPEARANCE_PUBLIC_NAMES = frozenset(
+    PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES
+    + PAGES_TABLE_APPEARANCE_CANONICAL_TYPES
+    + ("BodyTableSelector",)
+)
+PAGES_TABLE_APPEARANCE_PACKAGE_METHODS = (
+    "body_table_appearance",
+    "edit_body_table_appearance",
+    "apply_body_table_appearance",
+)
+PAGES_TABLE_APPEARANCE_EDIT_METHODS = frozenset({"set", "commit"})
+PAGES_TABLE_APPEARANCE_FLAT_ALIASES = frozenset(
+    {
+        "TableAppearance",
+        "TableAppearanceCommit",
+        "TableAppearanceDiagnostics",
+        "TableAppearanceEdit",
+        "TableAppearanceError",
+        "TableAppearanceLimitKind",
+        "TableAppearancePatch",
+        "TableAppearancePath",
+        "AppearanceCommit",
+        "AppearanceDiagnostics",
+        "AppearanceEdit",
+        "AppearanceError",
+        "AppearanceLimitKind",
+        "AppearancePatch",
+        "AppearancePath",
+    }
+)
+PAGES_TABLE_APPEARANCE_ALIAS_TARGETS = frozenset(
+    PAGES_TABLE_APPEARANCE_CANONICAL_TYPES + PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES
+)
+PAGES_TABLE_APPEARANCE_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_appearance|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?appearance)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_PACKAGE_TABLE_APPEARANCE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body_table_appearance\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_TABLE_APPEARANCE_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_table_appearance\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_APPEARANCE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?appearance\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_APPEARANCE_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_TABLE_APPEARANCE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableAppearanceArchive",
+        "TableAppearanceSnapshot",
+        "TableModelArchive",
+        "TableStyleArchive",
+        "TableStylePresetArchive",
+        "TableStyleNetworkArchive",
+        "TableStylePropertiesArchive",
+        "StylesheetArchive",
+    }
+)
+PAGES_TABLE_APPEARANCE_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_TABLE_APPEARANCE_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tst", "tsp", "tswp", "litchi_iwa_protos"}
+)
+PAGES_TABLE_APPEARANCE_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/table_appearance_codec.rs"
+)
+PAGES_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE = Path("crates/litchi-iwa-protos/src/lib.rs")
+PAGES_TABLE_APPEARANCE_CODEC_MODULE = "table_appearance_codec"
+PAGES_TABLE_APPEARANCE_CODEC_REQUIRED_APIS = (
+    "DecodeOptions",
+    "DecodeError",
+    "AppearanceSnapshot",
+    "TableModelSnapshot",
+    "PreparedRewrite",
+    "PreparedTableModelStyleRewrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "decode_table_model_with_report",
+    "prepare_table_model_style_rewrite",
+    "canonical_table_style_variation",
+    "append_stylesheet_style",
+    "resolve_table_style_appearance",
+    "decode_table_style_preset_with_report",
+    "decode_table_style_network_with_report",
+)
+PAGES_TABLE_APPEARANCE_CODEC_REQUIRED_MARKER_GROUPS = {
+    "canonical unknown preservation": ("scan_group_fields", "find_group_end", "copy_from_slice"),
+    "prepared rewrite contract": ("prepare_table_model_style_rewrite", "execution_requirements", "execute"),
+    "bounded decode axes": ("max_input_bytes", "max_output_bytes", "max_fields", "max_work_bytes", "max_allocations"),
+}
+PAGES_TABLE_APPEARANCE_TEST_SOURCES = (
+    Path("crates/litchi-pages/tests/body_table_appearance.rs"),
+)
+PAGES_TABLE_APPEARANCE_FUZZ_SOURCES = (
+    Path("crates/litchi-iwa-protos/fuzz/fuzz_targets/table_appearance.rs"),
+    Path("crates/litchi/fuzz/fuzz_targets/pages_body_table_appearance.rs"),
+)
+PAGES_TABLE_APPEARANCE_FUZZ_CORPORA = (
+    Path("crates/litchi-iwa-protos/fuzz/corpus/table_appearance"),
+    Path("crates/litchi/fuzz/corpus/pages_body_table_appearance"),
+)
+PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS = {
+    "aggregate transaction budget": ("metadata_options", "WireLimits", "effective_archive_limits", "snappy_limits"),
+    "bounded resource axes": ("max_references", "max_iwa_stream_bytes", "effective_archive_limits", "snappy_limits", "try_reserve_exact"),
+    "strict prepared codec": ("appearance_codec", "prepare_table_model_style_rewrite", "execution_requirements", "exact_limits"),
+    "copy-on-write style graph": ("new_style", "replace_model_in_archive", "append_style_object", "replace_stylesheet_in_archive"),
+    "metadata ownership": ("MetadataFacts", "inspect_package_metadata_with_visitor", "uuid_additions", "SaveTokenBatch", "external_additions"),
+    "prepared execution accounting": ("model_requirements", "stylesheet_requirements", "execution_requirements", "execute"),
+    "package reassembly": ("prepare_reassembly_with_deletions", "EntryEdit", "execute"),
+    "exact artifacts and inverse": ("BodyTableAppearancePatch", "source_fingerprint", "inverse", "is_noop", "PatchConflict"),
+    "candidate reopen and locality": ("candidate", "Package::from_source_with_options", "verify_candidate_locality", "full_reparse_performed"),
+    "preview preservation": ("deleted_previews", "root_preview_deletions"),
+}
+# A Pages owner may use a more specific private spelling for the same seam
+# (for example ``MetadataSelectorSet`` instead of the generic ``MetadataFacts``
+# name, or ``from_source_catalog`` instead of the convenience constructor).
+# Keep the public ratchet strict while recognizing those equivalent private
+# implementations.  Test scaffolds generated from the canonical groups still
+# exercise the missing-marker branches directly.
+PAGES_TABLE_APPEARANCE_OWNER_MARKER_ALTERNATIVES = {
+    "strict prepared codec": (
+        "codec",
+        "prepare_table_model_style_rewrite",
+        "execution_requirements",
+        "exact_limits",
+    ),
+    "metadata ownership": (
+        "MetadataSelectorSet",
+        "inspect_package_metadata_with_visitor",
+        "uuid_additions",
+        "SaveTokenBatch",
+        "external_additions",
+    ),
+    "prepared execution accounting": (
+        "model_plan",
+        "stylesheet_plan",
+        "execution_requirements",
+        "execute",
+    ),
+    "candidate reopen and locality": (
+        "candidate",
+        "from_source_catalog",
+        "verify_candidate_locality",
+        "full_reparse_performed",
+    ),
+}
+PAGES_TABLE_APPEARANCE_FORBIDDEN_OWNER_PATTERNS = (
+    (
+        "row/cell movement",
+        re.compile(
+            r"\b(?:move|reorder|sort)_?(?:rows?|cells?)\b|"
+            r"\b(?:rows?|cells?)_(?:move|reorder|sort)\b",
+            re.I,
+        ),
+    ),
+    (
+        "formula/tile mutation",
+        re.compile(
+            r"\b(?:cell|cells?|formula|formulas?|tile|tiles?|data_store|data_stores?)_"
+            r"(?:rewrite|update|move|mutate|reorder|sort)\b|"
+            r"\b(?:rewrite|update|move|mutate|reorder|sort)_"
+            r"(?:cell|cells?|formula|formulas?|tile|tiles?|data_store|data_stores?)\b",
+            re.I,
+        ),
+    ),
+    (
+        "preview deletion",
+        re.compile(
+            r"\b(?:delete|remove|drop|rewrite)_?(?:root_)?previews?\b|"
+            r"\b(?:root_)?previews?_(?:delete|remove|drop|rewrite)\b",
+            re.I,
+        ),
+    ),
+    (
+        "one-shot style rewrite",
+        re.compile(r"\b(?:rewrite_table_model_style|append_stylesheet_style)\s*\("),
+    ),
+)
+PAGES_TABLE_APPEARANCE_PUBLIC_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+
+# Body-table spelling is also useful to callers which use the longer Wave104
+# name.  Keep these aliases as constants, not duplicate inventories.
+PAGES_BODY_TABLE_APPEARANCE_SEMANTIC_SOURCE = PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
+PAGES_BODY_TABLE_APPEARANCE_OWNER_SOURCE = PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+PAGES_BODY_TABLE_APPEARANCE_EXPORT_SOURCES = PAGES_TABLE_APPEARANCE_EXPORT_SOURCES
+PAGES_BODY_TABLE_APPEARANCE_PACKAGE_METHODS = PAGES_TABLE_APPEARANCE_PACKAGE_METHODS
+PAGES_BODY_TABLE_APPEARANCE_CANONICAL_TYPES = PAGES_TABLE_APPEARANCE_CANONICAL_TYPES
+
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
     "document_options",
     "set_document_options",
@@ -11290,6 +11615,75 @@ def _is_pages_table_sort_public_declaration(
     return bool(
         identifiers & (PAGES_TABLE_SORT_FLAT_ALIASES | PAGES_TABLE_SORT_PUBLIC_NAMES)
     ) or _pages_table_sort_owner_declaration(declaration)
+
+
+def _pages_table_appearance_public_leak(identifier: str) -> str | None:
+    """Classify physical/wire vocabulary forbidden in Pages appearance APIs."""
+
+    if identifier == "litchi_iwa_common":
+        return None
+    if identifier in PAGES_TABLE_APPEARANCE_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_TABLE_APPEARANCE_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_TABLE_APPEARANCE_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_table_appearance_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_TABLE_APPEARANCE_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_TABLE_APPEARANCE_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_table_appearance_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (
+            set(PAGES_TABLE_APPEARANCE_FLAT_ALIASES)
+            | set(PAGES_TABLE_APPEARANCE_PUBLIC_NAMES)
+        )
+    ) or _pages_table_appearance_owner_declaration(declaration)
+
+
+def _pages_table_appearance_owner_present(root: Path) -> bool:
+    """Activate Wave104 only after the private package owner is wired."""
+
+    owner_path = root / PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+    package_path = root / PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and (
+        PAGES_PACKAGE_TABLE_APPEARANCE_MODULE.search(package_source) is not None
+    )
 
 
 def _pages_footnote_lifecycle_public_leak(identifier: str) -> str | None:
@@ -19124,6 +19518,611 @@ def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str
 
 def _pages_header_footer_owner_present(root: Path) -> bool:
     return (root / PAGES_HEADER_FOOTER_OWNER_SOURCE).is_file()
+
+
+def audit_iwa_pages_table_appearance_source_topology(root: Path = ROOT) -> list[str]:
+    """Retire the raw Pages body-table appearance host once its owner lands.
+
+    Public appearance transactions use the focused package facade. One
+    private, read-only storage helper remains for legacy editor table listing;
+    it cannot publish a mutation or mask package-owner validation failures.
+    Test modules, comments, and string literals are masked; Numbers and
+    Keynote branches in shared examples are left alone, while a Pages branch
+    is required to use the focused route.
+    """
+
+    if not _pages_table_appearance_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name == "tests.rs" or "tests" in path.parts:
+                continue
+            source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            code = _mask_rust_non_code(source)
+            for name, line_number in _rust_function_declarations(source):
+                if name in RETIRED_IWA_PAGES_TABLE_APPEARANCE_METHOD_SET:
+                    violations.append(
+                        "retired litchi-iwa Pages table-appearance method "
+                        f"{name}: {path.relative_to(root)}:{line_number}"
+                    )
+            for pattern in IWA_PAGES_TABLE_APPEARANCE_IMPORTS:
+                for match in pattern.finditer(code):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-appearance import: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_TABLE_APPEARANCE_CALL.finditer(code):
+                if _pages_table_appearance_legacy_read_compatibility_call(
+                    root, path, code, match
+                ):
+                    continue
+                line_start = code.rfind("\n", 0, match.start()) + 1
+                line_end = code.find("\n", match.end())
+                if line_end < 0:
+                    line_end = len(code)
+                line = code[line_start:line_end]
+                if _pages_table_appearance_focused_package_call(code, match):
+                    continue
+                if re.search(
+                    rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-appearance call "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example_root = root / IWA_PAGES_TABLE_APPEARANCE_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            raw_source = example_path.read_text(encoding="utf-8")
+            source = _mask_rust_cfg_test_items(raw_source)
+            code = _mask_rust_non_code(source)
+            for pattern in IWA_PAGES_TABLE_APPEARANCE_IMPORTS:
+                for match in pattern.finditer(code):
+                    if not _pages_table_appearance_example_is_pages(
+                        example_path, code, match.start()
+                    ):
+                        continue
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Pages table-appearance example import: "
+                        f"{example_path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_TABLE_APPEARANCE_CALL.finditer(code):
+                if _pages_table_appearance_focused_package_call(code, match):
+                    continue
+                if not _pages_table_appearance_example_is_pages(
+                    example_path, code, match.start()
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-appearance example call "
+                    f"{match.group('method')}: {example_path.relative_to(root)}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = _mask_rust_non_code(readme_path.read_text(encoding="utf-8"))
+        for pattern in IWA_PAGES_README_TABLE_APPEARANCE_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-appearance README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+    return sorted(set(violations))
+
+
+def _pages_table_appearance_example_is_pages(
+    path: Path, source: str, match_start: int
+) -> bool:
+    """Identify Pages branches in the shared iWork examples."""
+
+    stem = path.stem.lower()
+    if "pages" in stem:
+        return True
+    line_start = source.rfind("\n", 0, match_start) + 1
+    line_end = source.find("\n", match_start)
+    if line_end < 0:
+        line_end = len(source)
+    line = source[line_start:line_end].lower()
+    if "pages" in line or "pageseditor" in line or "pages_editor" in line:
+        return True
+    function_matches = list(
+        re.finditer(r"\bfn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b", source[:match_start])
+    )
+    return bool(function_matches and "pages" in function_matches[-1].group(1).lower())
+
+
+def _pages_table_appearance_focused_package_call(
+    source: str, match: re.Match[str]
+) -> bool:
+    """Allow only calls proven to target the focused Pages package.
+
+    The package facade intentionally reuses the ``body_table_appearance``
+    spelling of the retired editor reader.  A method-name-only scan would
+    therefore flag valid calls such as ``pages_package.body_table_appearance``
+    as legacy host traffic.  Treat an explicitly qualified ``Package`` type
+    as proof, and require local type/binding evidence for variable receivers;
+    a receiver name alone is not an exemption for a raw editor/helper alias.
+    """
+
+    receiver = match.group("receiver")
+    if receiver is None:
+        return False
+    if receiver in {"Package", "PagesPackage"}:
+        return True
+
+    # Limit inference to the current function.  This prevents an unrelated
+    # `package` binding in an earlier function from blessing a raw call later
+    # in the file.
+    function_matches = list(
+        re.finditer(
+            r"\bfn\s+(?:r#)?[A-Za-z_][A-Za-z0-9_]*\b",
+            source[: match.start()],
+        )
+    )
+    function_start = function_matches[-1].start() if function_matches else 0
+    context = source[function_start : match.start()]
+    receiver_pattern = re.escape(receiver)
+    package_type = r"(?:litchi_pages::)?(?:Package|PagesPackage)"
+    return bool(
+        re.search(
+            rf"\b(?:let\s+(?:mut\s+)?{receiver_pattern}|{receiver_pattern})"
+            rf"\s*(?::\s*(?:&\s*(?:mut\s*)?)?{package_type}\b"
+            rf"|\s*=\s*{package_type}::[A-Za-z_][A-Za-z0-9_]*\s*\()",
+            context,
+        )
+    )
+
+
+def _pages_table_appearance_legacy_read_compatibility_call(
+    root: Path, path: Path, source: str, match: re.Match[str]
+) -> bool:
+    """Allow the sole read-only legacy fallback used by table listing.
+
+    The exact package owner intentionally rejects producer profiles it cannot
+    rewrite safely. Legacy ``PagesEditor`` physical table discovery must still
+    report their existing appearance, but this exception is confined to one
+    private helper and never permits a write or package-owner fallback.
+    """
+
+    expected = root / IWA_PAGES_SOURCE_ROOT / "editor/tables/storage.rs"
+    if path != expected or match.group("method") != "table_appearance":
+        return False
+    function_matches = list(
+        re.finditer(
+            r"\bfn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+            source[: match.start()],
+        )
+    )
+    return bool(
+        function_matches
+        and function_matches[-1].group(1)
+        == "legacy_table_appearance_compatibility_read"
+    )
+
+
+def audit_pages_table_appearance_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Pages appearance owner."""
+
+    if not _pages_table_appearance_owner_present(root):
+        return []
+
+    owner_path = root / PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+    semantic_path = root / PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
+    selector_path = root / PAGES_TABLE_APPEARANCE_SELECTOR_SOURCE
+    package_path = root / PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+    lib_path = root / PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[0]
+    table_path = root / PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[2]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path, table_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    package_code = code[package_path]
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+body_table_appearance\b",
+        package_code + code[lib_path],
+    ):
+        violations.append(
+            "focused litchi-pages body-table appearance owner module must remain private: "
+            f"{PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]}"
+        )
+    if PAGES_PACKAGE_TABLE_APPEARANCE_MODULE.search(package_code) is None:
+        violations.append(
+            "focused litchi-pages body-table appearance owner module is missing: "
+            f"{PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]}"
+        )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path], frozenset(PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES)
+    )
+    for name in PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-pages body-table appearance semantic API is missing "
+                f"{name}: {PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE}"
+            )
+    if PUBLIC_PAGES_TABLE_APPEARANCE_TRANSACTION_MODULE.search(
+        code[semantic_path]
+    ) is None:
+        violations.append(
+            "focused litchi-pages body-table appearance semantic API is missing "
+            f"table::appearance::transaction: {PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        sources[semantic_path], frozenset(PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES)
+    )
+    for name in PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES:
+        if name not in transaction_exports:
+            violations.append(
+                "focused litchi-pages body-table appearance transaction API is missing "
+                f"{name}: {PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE}"
+            )
+
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path], frozenset({"BodyTableSelector"})
+    )
+    if "BodyTableSelector" not in selector_exports:
+        violations.append(
+            "focused litchi-pages body-table appearance public API is missing canonical "
+            f"BodyTableSelector: {PAGES_TABLE_APPEARANCE_SELECTOR_SOURCE}"
+        )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        sources[lib_path], frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages body-table appearance public API is missing root "
+            f"BodyTableSelector re-export: {PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[0]}"
+        )
+
+    owner_exports = _rust_canonical_exports(
+        sources[owner_path], frozenset(PAGES_TABLE_APPEARANCE_CANONICAL_TYPES)
+    )
+    for name in PAGES_TABLE_APPEARANCE_CANONICAL_TYPES:
+        if name not in owner_exports:
+            violations.append(
+                "focused litchi-pages body-table appearance public API is missing canonical "
+                f"type {name}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+    for name in PAGES_TABLE_APPEARANCE_CANONICAL_TYPES:
+        for path in (package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], frozenset({name})
+            ):
+                violations.append(
+                    "focused litchi-pages body-table appearance public API is missing root "
+                    f"re-export {name}: {path.relative_to(root)}"
+                )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for method in PAGES_TABLE_APPEARANCE_PACKAGE_METHODS:
+        declaration = owner_methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-pages body-table appearance Package method is missing "
+                f"{method}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_body_table_appearance" and "BodyTableSelector" not in declaration:
+            violations.append(
+                "focused litchi-pages body-table appearance Package method "
+                f"{method} must accept selector-first BodyTableSelector: "
+                f"{PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+    apply_declaration = owner_methods.get("apply_body_table_appearance")
+    if apply_declaration is not None and "BodyTableAppearancePatch" not in apply_declaration:
+        violations.append(
+            "focused litchi-pages body-table appearance apply method must accept "
+            f"BodyTableAppearancePatch: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+        )
+    edit_methods = {
+        name
+        for edit_type in ("BodyTableAppearanceEdit", "Edit")
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], edit_type
+        )
+    }
+    for name in sorted(PAGES_TABLE_APPEARANCE_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-pages body-table appearance edit is missing "
+            f"{name}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+        )
+    for name in ("clear", "reset"):
+        if name in edit_methods:
+            violations.append(
+                "focused litchi-pages body-table appearance edit must not expose "
+                f"{name}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+    flat_methods = {"table_appearance", "edit_table_appearance", "apply_table_appearance"}
+    for method in sorted(flat_methods & owner_methods.keys()):
+        violations.append(
+            "focused litchi-pages body-table appearance public API retains flat Package method "
+            f"{method}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+        )
+
+    if PUBLIC_PAGES_TABLE_MODULE.search(code[lib_path]) is None:
+        violations.append(
+            "focused litchi-pages body-table appearance public API is missing canonical root "
+            f"table module: {PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[0]}"
+        )
+    if PUBLIC_PAGES_TABLE_APPEARANCE_MODULE.search(code[table_path]) is None:
+        violations.append(
+            "focused litchi-pages body-table appearance public API is missing canonical "
+            f"table::appearance module: {PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[2]}"
+        )
+
+    codec_path = root / PAGES_TABLE_APPEARANCE_CODEC_SOURCE
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-pages body-table appearance public API is missing strict hidden "
+            f"codec source: {PAGES_TABLE_APPEARANCE_CODEC_SOURCE}"
+        )
+    else:
+        codec_raw = codec_path.read_text(encoding="utf-8")
+        codec_source = _mask_rust_cfg_test_items(codec_raw)
+        codec_code = _mask_rust_non_code(codec_source)
+        for api in PAGES_TABLE_APPEARANCE_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(api)}\b",
+                codec_code,
+            ) is None:
+                violations.append(
+                    "focused litchi-pages body-table appearance hidden codec is missing "
+                    f"strict API {api}: {PAGES_TABLE_APPEARANCE_CODEC_SOURCE}"
+                )
+        for label, markers in PAGES_TABLE_APPEARANCE_CODEC_REQUIRED_MARKER_GROUPS.items():
+            if not all(marker in codec_code for marker in markers):
+                violations.append(
+                    "focused litchi-pages body-table appearance hidden codec is missing "
+                    f"{label} marker: {PAGES_TABLE_APPEARANCE_CODEC_SOURCE}"
+                )
+        codec_lib_path = root / PAGES_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE
+        codec_lib_source = (
+            _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+            if codec_lib_path.is_file()
+            else ""
+        )
+        if re.search(
+            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+            rf"pub\s+mod\s+{re.escape(PAGES_TABLE_APPEARANCE_CODEC_MODULE)}\b",
+            codec_lib_source,
+        ) is None:
+            violations.append(
+                "focused litchi-pages body-table appearance public API is missing hidden "
+                f"codec module {PAGES_TABLE_APPEARANCE_CODEC_MODULE}: {PAGES_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE}"
+            )
+        if re.search(r"(?m)#\s*\[\s*cfg\(\s*test\s*\)\s*\]", codec_raw) is None or re.search(
+            r"(?m)#\s*\[\s*test\s*\]", codec_raw
+        ) is None:
+            violations.append(
+                "focused litchi-pages body-table appearance hidden codec is missing cfg(test) #[test] coverage: "
+                f"{PAGES_TABLE_APPEARANCE_CODEC_SOURCE}"
+            )
+
+    for test_path in PAGES_TABLE_APPEARANCE_TEST_SOURCES:
+        absolute = root / test_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-pages body-table appearance boundary is missing integration test: "
+                f"{test_path}"
+            )
+        else:
+            test_code = _mask_rust_non_code(absolute.read_text(encoding="utf-8"))
+            if re.search(r"(?m)#\s*\[\s*test\s*\]", test_code) is None:
+                violations.append(
+                    "focused litchi-pages body-table appearance integration test is missing #[test] coverage: "
+                    f"{test_path}"
+                )
+            if not re.search(
+                r"\b(?:body_table_appearance|edit_body_table_appearance|apply_body_table_appearance)\b",
+                test_code,
+            ):
+                violations.append(
+                    "focused litchi-pages body-table appearance integration test does not exercise the owner: "
+                    f"{test_path}"
+                )
+    for fuzz_path in PAGES_TABLE_APPEARANCE_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-pages body-table appearance boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-pages body-table appearance fuzz target is missing fuzz_target! harness: "
+                f"{fuzz_path}"
+            )
+    for corpus in PAGES_TABLE_APPEARANCE_FUZZ_CORPORA:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-pages body-table appearance boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_TABLE_APPEARANCE_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_TABLE_APPEARANCE_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_TABLE_APPEARANCE_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    facade_names = (
+        set(PAGES_TABLE_APPEARANCE_CANONICAL_TYPES)
+        | set(PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES)
+        | {"BodyTableSelector"}
+        | set(PAGES_TABLE_APPEARANCE_PACKAGE_METHODS)
+        | set(PAGES_TABLE_APPEARANCE_FLAT_ALIASES)
+    )
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated = path in dedicated_sources
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        declarations = [
+            (declaration, line_number, True, dedicated)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, public_declaration, complete_scope in declarations:
+            if not _is_pages_table_appearance_public_declaration(
+                declaration, dedicated_source=complete_scope
+            ):
+                continue
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if public_declaration and "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-pages body-table appearance public API retains a glob re-export: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for identifier in sorted(identifiers):
+                reason = _pages_table_appearance_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages body-table appearance public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if public_declaration and identifier in PAGES_TABLE_APPEARANCE_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages body-table appearance public API retains flat alias "
+                        f"{identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in PAGES_TABLE_APPEARANCE_PUBLIC_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-pages body-table appearance public API exposes raw parameter "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-pages body-table appearance public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+
+    # Catch public aliases and duplicate module routes in sibling facade files.
+    for path in sorted((root / PAGES_SOURCE_ROOT).rglob("*.rs")):
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if identifiers[:3] == ["pub", "mod", "body_table_appearance"] and path != lib_path:
+                violations.append(
+                    "focused litchi-pages body-table appearance public API exposes duplicate "
+                    f"body_table_appearance module: {path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {"body_table_appearance", "appearance", "package"} & set(identifiers):
+                    violations.append(
+                        "focused litchi-pages body-table appearance public API retains root aliases via glob: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target = identifiers[alias_index - 1] if alias_index > 2 else ""
+                alias = identifiers[alias_index + 1] if alias_index + 1 < len(identifiers) else ""
+                if target in PAGES_TABLE_APPEARANCE_ALIAS_TARGETS and alias and alias != target:
+                    if path == semantic_path and alias in PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES:
+                        continue
+                    if alias in PAGES_TABLE_APPEARANCE_PUBLIC_NAMES:
+                        continue
+                    violations.append(
+                        "focused litchi-pages body-table appearance public API retains alternate alias "
+                        f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target = identifiers[-1]
+                if target in PAGES_TABLE_APPEARANCE_ALIAS_TARGETS and alias != target and alias not in PAGES_TABLE_APPEARANCE_PUBLIC_NAMES:
+                    violations.append(
+                        "focused litchi-pages body-table appearance public API retains alternate alias "
+                        f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+    return sorted(set(violations))
+
+
+def audit_pages_table_appearance_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one bounded, prepared Pages appearance transaction."""
+
+    if not _pages_table_appearance_owner_present(root):
+        return []
+    owner_path = root / PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner = _mask_rust_non_code(owner_source)
+    violations: list[str] = []
+    for label, markers in PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS.items():
+        alternatives = PAGES_TABLE_APPEARANCE_OWNER_MARKER_ALTERNATIVES.get(label)
+        has_markers = all(marker in owner for marker in markers)
+        if not has_markers and alternatives is not None:
+            has_markers = all(marker in owner for marker in alternatives)
+        if not has_markers:
+            violations.append(
+                "focused litchi-pages body-table appearance owner is missing "
+                f"{label} transaction marker: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+            )
+    if re.search(
+        r"deleted_previews\s*:\s*(?:usize\s*=\s*)?0|deleted_previews\s*=\s*0",
+        owner,
+    ) is None:
+        violations.append(
+            "focused litchi-pages body-table appearance owner must preserve previews "
+            f"with deleted_previews = 0: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+        )
+    for label, pattern in PAGES_TABLE_APPEARANCE_FORBIDDEN_OWNER_PATTERNS:
+        match = pattern.search(owner)
+        if match is not None:
+            line_number = owner.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages body-table appearance owner must not perform "
+                f"{label}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
+# Longer aliases keep the ratchet discoverable to callers that use the body
+# terminology from the public owner name.
+audit_iwa_pages_body_table_appearance_source_topology = (
+    audit_iwa_pages_table_appearance_source_topology
+)
+audit_pages_body_table_appearance_facade_source_topology = (
+    audit_pages_table_appearance_facade_source_topology
+)
+audit_pages_body_table_appearance_resource_source_topology = (
+    audit_pages_table_appearance_resource_source_topology
+)
 
 
 RETIRED_IWA_PAGES_HEADER_FOOTER_NUMBER_ATTACHMENT_METHODS = frozenset(
@@ -31387,6 +32386,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_dimension_facade_source_topology()
         + audit_iwa_pages_table_sort_source_topology()
         + audit_pages_table_sort_facade_source_topology()
+        + audit_iwa_pages_table_appearance_source_topology()
+        + audit_pages_table_appearance_facade_source_topology()
+        + audit_pages_table_appearance_resource_source_topology()
         + audit_iwa_pages_header_footer_source_topology()
         + audit_pages_header_footer_facade_source_topology()
         + audit_iwa_pages_section_text_source_topology()

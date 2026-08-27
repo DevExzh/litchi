@@ -19,6 +19,8 @@ target
 !/corpus/numbers_table_sort_order/*
 !/corpus/pages_body_table_sort_order/
 !/corpus/pages_body_table_sort_order/*
+!/corpus/pages_body_table_appearance/
+!/corpus/pages_body_table_appearance/*
 !/corpus/keynote_movie_playback/
 !/corpus/keynote_movie_playback/*
 !/corpus/keynote_slide_movie_geometry/

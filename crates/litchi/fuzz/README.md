@@ -298,6 +298,18 @@ not execute physical row sorting. The checked-in recipes under
 `corpus/pages_body_table_sort_order/` are command inputs, not native Pages
 package copies.
 
+`pages_body_table_appearance` is the focused selector-first body-table
+appearance lifecycle target. It offers arbitrary bytes to bounded Pages
+ingress and reuses a bounded command prefix against the repository's
+`basic.pages` seed. It covers typed appearance reads, no-op and complete set
+transactions, exact-source patch application and conflicts, inverse replay,
+candidate reopen/readback, selector failures, redacted errors, malformed
+ingress, and source-atomic physical limit failures. It changes only the
+persisted appearance value; rows, cells, formulas, comments, tiles, and view
+state remain outside this package configuration boundary. The checked-in
+recipes under `corpus/pages_body_table_appearance/` are command inputs, not
+native Pages package copies.
+
 `keynote_movie_playback` is the focused selector-first movie-playback target.
 It offers arbitrary bytes to bounded Keynote ingress and reuses the same
 input as bounded `SlideSelector`/`MovieSelector` commands. When the source
@@ -535,6 +547,14 @@ seeds:
 ```sh
 cargo +nightly fuzz run pages_section_pagination corpus/pages_section_pagination -- \
   -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Pages body-table appearance target with its command seeds:
+
+```sh
+cargo +nightly fuzz run pages_body_table_appearance \
+  corpus/pages_body_table_appearance -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
 The native packages currently store ZIP members with CRC protection. Most

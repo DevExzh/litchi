@@ -5,6 +5,7 @@
 //! semantic content is represented by the archive-free [`crate::Document`].
 
 mod body_footnote;
+pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_sort;
@@ -54,6 +55,11 @@ use crate::{
 pub use body_footnote::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
     BodyFootnoteLimitKind, BodyFootnotePatch,
+};
+pub use body_table_appearance::{
+    BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
+    BodyTableAppearanceError, BodyTableAppearanceLimitKind, BodyTableAppearancePatch,
+    BodyTableAppearancePath,
 };
 pub use body_table_dimension::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,

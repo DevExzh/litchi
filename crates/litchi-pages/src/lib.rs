@@ -81,6 +81,11 @@ pub use package::{
     BodyFootnoteLimitKind, BodyFootnotePatch,
 };
 pub use package::{
+    BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
+    BodyTableAppearanceError, BodyTableAppearanceLimitKind, BodyTableAppearancePatch,
+    BodyTableAppearancePath,
+};
+pub use package::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
     BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,
 };
