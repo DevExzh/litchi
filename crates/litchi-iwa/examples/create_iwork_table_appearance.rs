@@ -7,6 +7,9 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::headers::{
+    Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
+};
 use litchi_numbers::{
     Appearance, Banding, GridlineVisibility, Gridlines, Package, RowSizing, SheetSelector,
     TableSelector,
@@ -95,13 +98,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 600.0,
         },
     )?;
-    keynote.set_slide_table_header_settings(
-        0,
-        keynote_table.model_object_id,
-        HeaderSettings {
-            header_rows: Some(HeaderCount::ONE),
-            header_columns: Some(HeaderCount::ONE),
-            footer_rows: Some(HeaderCount::ONE),
+    keynote = set_focused_keynote_table_headers(
+        keynote,
+        KeynoteHeaderSettings {
+            header_rows: Some(KeynoteHeaderCount::ONE),
+            header_columns: Some(KeynoteHeaderCount::ONE),
+            footer_rows: Some(KeynoteHeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -156,4 +158,21 @@ fn set_focused_pages_table_headers(
     commit.package().write_to(&mut bytes)?;
     *editor = PagesEditor::from_bytes(&bytes)?;
     Ok(())
+}
+
+fn set_focused_keynote_table_headers(
+    editor: KeynoteEditor,
+    settings: KeynoteHeaderSettings,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_table_headers(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(KeynoteEditor::from_bytes(&bytes)?)
 }

@@ -2833,3 +2833,56 @@ The migration host, generated-schema owners, `litchi-iwa -> litchi-keynote`
 edge, debt 014, debt 016, every other current migration debt, and the IWA
 monolith remain unchanged. No crate, dependency edge, host adapter, debt item,
 or monolith is retired by Wave99.
+
+## 2026-08-27 amendment: Wave100 current-topology Keynote slide-table headers (conservative scalar owner)
+
+Wave100 adds a narrow selector-first `litchi-keynote` owner for the persisted
+header/footer/freeze/repeat settings of an existing, uniquely rooted canonical
+`TST.TableModelArchive` type-6001 slide table. `SlideSelector` selects the
+slide and the checked position-only `TableSelector` selects its table in
+z-order. The archive-free semantic surface is
+`slide::table::headers::{Count, Error, Settings}`; transaction types remain
+Keynote-prefixed and are re-exported through the nested transaction namespace.
+Native object identifiers, archives, ZIP entries, generated models, wire
+views, Prost, and Buffa values do not cross the public facade.
+
+The strict neutral `numbers_table_header_settings_codec` prepared codec
+admits exactly the following seven persisted header/footer/freeze/repeat
+settings: `header_rows`, `header_columns`,
+`footer_rows`, `header_rows_frozen`, `header_columns_frozen`,
+`repeating_header_rows_enabled`, and `repeating_header_columns_enabled`.
+Known-field duplicates, wrong wire types, noncanonical encodings, malformed
+framing, ambiguous ownership, locked tables, unsupported dependencies, and
+legacy type-6000 models fail closed. Unknown fields and their raw framing are
+preserved. Admission charges bounded input/output, field, work, nesting,
+reference, allocation, retained, scratch, and transaction resources before a
+candidate allocation; prepared requirements are checked again at exact
+execution. Publication is one canonical model rewrite followed by candidate
+reopen, semantic readback, exact inverse, and object/member-locality checks.
+
+This is a conservative persisted-scalar boundary only. It performs no row
+movement, cell or tile mutation, formula/storage rewrite, metadata/UUID/save
+token publication, preview deletion, dimension/topology/appearance change, or
+sort execution. The host retirement ratchet is correspondingly limited to
+production `litchi-iwa` Keynote branches and Keynote branches of shared
+examples; compatibility tests and unrelated Numbers/Pages branches remain
+outside this retirement.
+
+The native Keynote 14.4 acceptance record is deliberately narrower than the
+seven-field synthetic matrix. The real table carries `HauntedOwner` and a
+rooted `HeaderNameMgr`, so the owner correctly refuses count changes and the
+accepted edit preserves the 2/1/1 header-row/header-column/footer-row counts
+while toggling only the four freeze/repeat flags. The 500,128-byte source
+(`47cf0d…563b`) produced a 500,134-byte candidate (`687e6e…157`) and an inverse
+that is byte-identical to the source. Exactly one payload member changed,
+`Index/CalculationEngine.iwa` (3,480 to 3,486 bytes); no member was added or
+removed and every unrelated payload remained exact. Keynote opened the
+candidate without repair, displayed the 5-by-4 table with the preserved
+2/1/1 counts, and reopened a separately saved normalized copy without repair.
+The normalized copy is native evidence only, not a byte-parity oracle.
+
+Debt 014, debt 016, the `litchi-iwa -> litchi-keynote` edge, all other
+migration debts, the migration host, generated-schema and normal
+Prost/Buffa owners, and the IWA monolith deletion gate remain unchanged. No
+crate, dependency edge, manifest dependency, compatibility host, debt item,
+generated-schema owner, or monolith owner is retired by Wave100.

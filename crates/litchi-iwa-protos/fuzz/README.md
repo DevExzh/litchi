@@ -216,6 +216,53 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -timeout=10 -rss_limit_mb=2048
 ```
 
+## Numbers table-header settings codec
+
+`numbers_table_header_settings_codec` drives the strict generated-free
+projection for the required table dimensions and seven optional header,
+footer, freeze, and print-repetition fields. Successful payloads are decoded,
+prepared, executed under the exact `RewriteExecutionRequirements`, and read
+back through the strict decoder. The one-shot rewrite must match prepared
+execution byte-for-byte, and the caller-owned source must remain unchanged.
+
+Every prepared candidate is replayed with one less input-byte, output, field,
+work, nesting, allocation, retained-byte, and scratch ceiling; each
+max-minus-one operation must fail before publishing a candidate. Fixed `hex:`
+recipes under `corpus/numbers_table_header_settings_codec/` cover all optional
+fields, duplicate and missing required fields, wrong wire types, non-canonical known
+keys/values, truncation, unknown overlong scalars, balanced unknown groups,
+unterminated groups, and deep nesting. These are hand-authored protobuf
+payloads, not native Numbers package members.
+
+The target accepts raw inputs up to 64 KiB and uses finite ceilings of 128 KiB
+output, 8,192 fields, 512 KiB work, nesting depth 64, 16 allocations, 128 KiB
+retained bytes, and 512 KiB scratch. Type-check it with:
+
+```sh
+cargo +nightly fuzz check numbers_table_header_settings_codec
+```
+
+Run a bounded sanitizer smoke with mutable state outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-header-codec-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/numbers_table_header_settings_codec/*.hex "$fuzz_corpus/"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_header_settings_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Format-neutral table-dimension codec
 
 `table_dimension` drives the hidden `table_dimension_codec` facade over one

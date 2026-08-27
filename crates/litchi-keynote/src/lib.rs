@@ -346,12 +346,14 @@ pub use package::{
     SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
-    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
-    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath, SlideTableTitleCommit,
-    SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
-    SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit, SlideTextDiagnostics,
-    SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure,
-    WriteError,
+    SlideTableHeaderCommit, SlideTableHeaderDiagnostics, SlideTableHeaderEdit,
+    SlideTableHeaderError, SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind,
+    SlideTableHeaderPatch, SlideTableHeaderPath, SlideTableSortCommit, SlideTableSortDiagnostics,
+    SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch,
+    SlideTableSortPath, SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit,
+    SlideTableTitleError, SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit,
+    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats,
+    TextStorageFailure, WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};

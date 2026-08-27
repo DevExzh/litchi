@@ -3,10 +3,13 @@ use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSet
 
 use std::path::{Path, PathBuf};
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::headers::{
+    Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
+};
 use litchi_numbers::cell::{Update as TableCellUpdate, Value as CellValue};
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use litchi_numbers::{Package, SheetSelector, TableSelector};
@@ -121,13 +124,12 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
             height: 480.0,
         },
     )?;
-    editor.set_slide_table_header_settings(
-        0,
-        table.model_object_id,
-        HeaderSettings {
-            header_rows: Some(HeaderCount::ONE),
-            header_columns: Some(HeaderCount::ONE),
-            footer_rows: Some(HeaderCount::ONE),
+    editor = set_focused_keynote_table_headers(
+        editor,
+        KeynoteHeaderSettings {
+            header_rows: Some(KeynoteHeaderCount::ONE),
+            header_columns: Some(KeynoteHeaderCount::ONE),
+            footer_rows: Some(KeynoteHeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -156,6 +158,23 @@ fn set_pages_table_headers(
     commit.package().write_to(&mut bytes)?;
     *editor = litchi_iwa::pages::PagesEditor::from_bytes(&bytes)?;
     Ok(())
+}
+
+fn set_focused_keynote_table_headers(
+    editor: KeynoteEditor,
+    settings: KeynoteHeaderSettings,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_table_headers(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(KeynoteEditor::from_bytes(&bytes)?)
 }
 
 fn section_values() -> Vec<TableCellUpdate> {

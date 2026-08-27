@@ -7,10 +7,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage: list_keynote_tables <presentation.key>")?;
     let editor = KeynoteEditor::open(input)?;
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     for slide in editor.slides()? {
-        for info in editor.slide_tables(slide.index)? {
+        for (table_index, info) in editor.slide_tables(slide.index)?.into_iter().enumerate() {
             let table = editor.slide_table(slide.index, info.model_object_id)?;
-            let headers = editor.slide_table_header_settings(slide.index, info.model_object_id)?;
+            let headers = package.slide_table_header_settings(
+                litchi_keynote::SlideSelector::index(slide.index),
+                litchi_keynote::TableSelector::index(table_index),
+            )?;
             let title = editor.slide_table_title_settings(slide.index, info.model_object_id)?;
             let row_heights = (0..info.rows)
                 .map(|row| editor.slide_table_row_height(slide.index, info.model_object_id, row))

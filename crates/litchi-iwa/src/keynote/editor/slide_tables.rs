@@ -21,7 +21,6 @@ use litchi_numbers::cell::data_format::number::{
 use litchi_numbers::cell::data_format::numeral_system::NumeralSystem;
 use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text};
-use litchi_numbers::table::headers::Settings as HeaderSettings;
 
 mod appearance;
 mod comments;
@@ -173,6 +172,9 @@ pub struct RemovedKeynoteSlideTable {
     pub table: KeynoteSlideTableInfo,
 }
 
+/// Resolve the historical model identifier to the checked table position used
+/// by the focused Keynote package owner. A duplicate model identifier is
+/// malformed rather than an invitation to pick the first matching table.
 impl KeynoteEditor {
     /// List native tables owned directly by one slide in z-order.
     pub fn slide_tables(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTableInfo>> {
@@ -3915,40 +3917,6 @@ impl KeynoteEditor {
         if (resized.rows, resized.columns) != (rows, columns) {
             return Err(Error::InvalidFormat(
                 "Keynote table resize failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
-    /// Read a slide table's lossless header and footer configuration.
-    pub fn slide_table_header_settings(
-        &self,
-        slide_index: usize,
-        model_object_id: u64,
-    ) -> Result<HeaderSettings> {
-        require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::table_header_settings_in_package(self.package(), model_object_id)
-    }
-
-    /// Replace a slide table's header and footer configuration transactionally.
-    pub fn set_slide_table_header_settings(
-        &mut self,
-        slide_index: usize,
-        model_object_id: u64,
-        settings: HeaderSettings,
-    ) -> Result<()> {
-        require_table_model(self, slide_index, model_object_id)?;
-        let mut staged = self.package().clone();
-        crate::numbers::editor::set_table_header_settings_in_package(
-            &mut staged,
-            model_object_id,
-            settings,
-        )?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        if verified.slide_table_header_settings(slide_index, model_object_id)? != settings {
-            return Err(Error::InvalidFormat(
-                "Keynote table header settings failed validation".to_owned(),
             ));
         }
         *self = verified;

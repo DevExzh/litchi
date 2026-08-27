@@ -20,6 +20,9 @@ pub struct DecodeOptions {
     work: usize,
     recursion: u32,
     output_bytes: usize,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
 }
 impl DecodeOptions {
     #[must_use]
@@ -30,6 +33,9 @@ impl DecodeOptions {
             work,
             recursion,
             output_bytes: bytes,
+            allocations: usize::MAX,
+            retained_bytes: usize::MAX,
+            scratch_bytes: usize::MAX,
         }
     }
 
@@ -43,6 +49,13 @@ impl DecodeOptions {
             work: bytes.checked_mul(32).unwrap_or(usize::MAX).max(1),
             recursion: 8,
             output_bytes: bytes.checked_mul(2).unwrap_or(usize::MAX).max(1),
+            allocations: usize::MAX,
+            // The historical `for_source` constructor only bounded the
+            // source/output wire axes.  Keep retained capacity unbounded here
+            // for compatibility; callers that own an aggregate memory budget
+            // can opt into an explicit ceiling with `with_max_retained_bytes`.
+            retained_bytes: usize::MAX,
+            scratch_bytes: bytes.checked_mul(8).unwrap_or(usize::MAX).max(1),
         }
     }
 
@@ -57,6 +70,45 @@ impl DecodeOptions {
     #[must_use]
     pub const fn max_output_bytes(self) -> usize {
         self.output_bytes
+    }
+
+    /// Replace the logical allocation ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_allocations(mut self, maximum: usize) -> Self {
+        self.allocations = maximum;
+        self
+    }
+
+    /// Return the logical allocation ceiling used by rewrites.
+    #[must_use]
+    pub const fn max_allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Replace the retained-candidate ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.retained_bytes = maximum;
+        self
+    }
+
+    /// Return the retained-candidate ceiling used by rewrites.
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Replace the scratch-byte ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_scratch_bytes(mut self, maximum: usize) -> Self {
+        self.scratch_bytes = maximum;
+        self
+    }
+
+    /// Return the scratch-byte ceiling used by rewrites.
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.scratch_bytes
     }
     fn buffa(self) -> BuffaDecodeOptions {
         BuffaDecodeOptions::new()
@@ -204,6 +256,9 @@ enum Kind {
     Field { observed: usize, maximum: usize },
     Work { observed: usize, maximum: usize },
     Output { observed: usize, maximum: usize },
+    Allocations { observed: usize, maximum: usize },
+    Retained { observed: usize, maximum: usize },
+    Scratch { observed: usize, maximum: usize },
     Allocation { amount: usize },
     Projection,
 }
@@ -288,6 +343,36 @@ impl DecodeError {
             None
         }
     }
+
+    /// Return the logical allocation-limit observation, when applicable.
+    #[must_use]
+    pub const fn allocation_limit_values(&self) -> Option<(usize, usize)> {
+        if let Kind::Allocations { observed, maximum } = self.0 {
+            Some((observed, maximum))
+        } else {
+            None
+        }
+    }
+
+    /// Return the retained-byte-limit observation, when applicable.
+    #[must_use]
+    pub const fn retained_limit_values(&self) -> Option<(usize, usize)> {
+        if let Kind::Retained { observed, maximum } = self.0 {
+            Some((observed, maximum))
+        } else {
+            None
+        }
+    }
+
+    /// Return the scratch-byte-limit observation, when applicable.
+    #[must_use]
+    pub const fn scratch_limit_values(&self) -> Option<(usize, usize)> {
+        if let Kind::Scratch { observed, maximum } = self.0 {
+            Some((observed, maximum))
+        } else {
+            None
+        }
+    }
 }
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -305,6 +390,15 @@ impl fmt::Display for DecodeError {
             },
             Kind::Output { observed, maximum } => {
                 write!(f, "produced {observed} output bytes; maximum is {maximum}")
+            },
+            Kind::Allocations { observed, maximum } => {
+                write!(f, "requires {observed} allocations; maximum is {maximum}")
+            },
+            Kind::Retained { observed, maximum } => {
+                write!(f, "retains {observed} bytes; maximum is {maximum}")
+            },
+            Kind::Scratch { observed, maximum } => {
+                write!(f, "requires {observed} scratch bytes; maximum is {maximum}")
             },
             Kind::Allocation { amount } => {
                 write!(f, "cannot allocate table-header output for {amount} bytes")
@@ -324,6 +418,8 @@ pub struct RewriteReport {
     work_bytes: usize,
     max_depth: u32,
     allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
     changed: bool,
 }
 
@@ -362,6 +458,18 @@ impl RewriteReport {
     #[must_use]
     pub const fn allocations(self) -> usize {
         self.allocations
+    }
+
+    /// Candidate bytes retained by the rewrite output.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Scratch bytes reserved or logically traversed by the rewrite.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
     }
 
     /// Whether any selected optional field changed.
@@ -486,14 +594,335 @@ fn decode_snapshot_with_budget_mode(
     Ok(strict)
 }
 
-/// Rewrite the seven optional header/footer/freeze/repeat fields while
-/// retaining every required and unknown source span.
+/// Exact limits required by a prepared table-header rewrite.
+///
+/// Preparation performs all source validation and output sizing without
+/// reserving the candidate buffer.  The requirements include the strict
+/// source/rewrite/readback traversals and the single candidate allocation, so
+/// callers can charge the operation before allowing execution to allocate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewriteExecutionRequirements {
+    pub output_bytes: usize,
+    pub fields: usize,
+    pub work_bytes: usize,
+    pub max_depth: u32,
+    pub allocations: usize,
+    pub retained_bytes: usize,
+    pub scratch_bytes: usize,
+}
+
+impl RewriteExecutionRequirements {
+    /// Return exact limits for this prepared operation.
+    #[must_use]
+    pub const fn exact(self) -> RewriteExecutionLimits {
+        RewriteExecutionLimits {
+            output_bytes: self.output_bytes,
+            fields: self.fields,
+            work_bytes: self.work_bytes,
+            max_depth: self.max_depth,
+            allocations: self.allocations,
+            retained_bytes: self.retained_bytes,
+            scratch_bytes: self.scratch_bytes,
+        }
+    }
+
+    /// Compatibility spelling used by package transaction owners.
+    #[must_use]
+    pub const fn exact_limits(self) -> RewriteExecutionLimits {
+        self.exact()
+    }
+}
+
+/// Caller-supplied ceilings replayed before candidate allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewriteExecutionLimits {
+    pub output_bytes: usize,
+    pub fields: usize,
+    pub work_bytes: usize,
+    pub max_depth: u32,
+    pub allocations: usize,
+    pub retained_bytes: usize,
+    pub scratch_bytes: usize,
+}
+
+impl RewriteExecutionLimits {
+    /// Build exact limits from prepared requirements.
+    #[must_use]
+    pub const fn exact(requirements: RewriteExecutionRequirements) -> Self {
+        requirements.exact()
+    }
+
+    /// Build an unbounded limit set for trusted internal callers.
+    #[must_use]
+    pub const fn unrestricted() -> Self {
+        Self {
+            output_bytes: usize::MAX,
+            fields: usize::MAX,
+            work_bytes: usize::MAX,
+            max_depth: u32::MAX,
+            allocations: usize::MAX,
+            retained_bytes: usize::MAX,
+            scratch_bytes: usize::MAX,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_output_bytes(mut self, value: usize) -> Self {
+        self.output_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_fields(mut self, value: usize) -> Self {
+        self.fields = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_work_bytes(mut self, value: usize) -> Self {
+        self.work_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_max_depth(mut self, value: u32) -> Self {
+        self.max_depth = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_allocations(mut self, value: usize) -> Self {
+        self.allocations = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_retained_bytes(mut self, value: usize) -> Self {
+        self.retained_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_scratch_bytes(mut self, value: usize) -> Self {
+        self.scratch_bytes = value;
+        self
+    }
+}
+
+/// Candidate bytes and the exact accounting replayed by execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RewriteOutput {
+    bytes: Vec<u8>,
+    report: RewriteReport,
+}
+
+impl RewriteOutput {
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    #[must_use]
+    pub fn output(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    #[must_use]
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+
+    #[must_use]
+    pub fn into_output(self) -> Vec<u8> {
+        self.bytes
+    }
+
+    #[must_use]
+    pub const fn report(&self) -> RewriteReport {
+        self.report
+    }
+}
+
+/// Borrowed table-header rewrite prepared for exact execution-limit replay.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedTableHeaderSettingsRewrite<'source> {
+    source: &'source [u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+    report: RewriteReport,
+    requirements: RewriteExecutionRequirements,
+    current: TableHeaderSettingsSnapshot,
+}
+
+impl<'source> PreparedTableHeaderSettingsRewrite<'source> {
+    /// Return source/preparation accounting without allocating output.
+    #[must_use]
+    pub const fn prepare_report(&self) -> RewriteReport {
+        self.report
+    }
+
+    /// Return all ceilings that execution will consume.
+    #[must_use]
+    pub const fn execution_requirements(&self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Execute the already-validated rewrite after replaying all ceilings.
+    ///
+    /// No candidate allocation occurs before `limits` has accepted every
+    /// requirement.  The source slice is never modified.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_execution_limits(self.requirements, limits)?;
+        let mut output = reserve_output(self.requirements.output_bytes)?;
+        if self.report.changed {
+            let mut emit_budget = Budget::new(DecodeOptions {
+                bytes: self.source.len().max(1),
+                fields: usize::MAX,
+                work: usize::MAX,
+                recursion: self.options.recursion,
+                output_bytes: self.requirements.output_bytes,
+                allocations: usize::MAX,
+                retained_bytes: usize::MAX,
+                scratch_bytes: usize::MAX,
+            });
+            emit_rewrite_output(
+                self.source,
+                self.write,
+                self.options,
+                &mut emit_budget,
+                &mut output,
+            )?;
+        } else {
+            append_preserved_bytes(&mut output, self.source)?;
+        }
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError(Kind::Projection));
+        }
+
+        // A changed candidate is independently re-read through both the
+        // strict scanner and the borrowed Buffa view.  A no-op has already
+        // been fully validated during preparation and is copied byte-for-
+        // byte, so no second scan is needed.
+        if self.report.changed {
+            let readback_options = DecodeOptions {
+                bytes: self.options.bytes.max(output.len()),
+                fields: usize::MAX,
+                work: usize::MAX,
+                recursion: self.options.recursion,
+                output_bytes: self.options.output_bytes.max(output.len()),
+                allocations: usize::MAX,
+                retained_bytes: usize::MAX,
+                scratch_bytes: usize::MAX,
+            };
+            validate(&output, readback_options)?;
+            let mut readback_budget = Budget::new(readback_options);
+            let readback = decode_snapshot_with_budget_mode(
+                &output,
+                readback_options,
+                &mut readback_budget,
+                false,
+            )?;
+            if readback.optional_write() != self.write {
+                return Err(DecodeError(Kind::Projection));
+            }
+        } else if self.current.optional_write() != self.write {
+            return Err(DecodeError(Kind::Projection));
+        }
+        Ok(RewriteOutput {
+            bytes: output,
+            report: self.report,
+        })
+    }
+}
+
+/// Prepare a strict table-header rewrite without allocating candidate output.
+pub fn prepare_table_header_settings_rewrite<'source>(
+    source: &'source [u8],
+    write: TableHeaderSettingsWrite,
+    options: DecodeOptions,
+) -> Result<PreparedTableHeaderSettingsRewrite<'source>, DecodeError> {
+    validate(source, options)?;
+    let mut budget = Budget::new(options);
+    let current = decode_snapshot_with_budget_mode(source, options, &mut budget, false)?;
+    let changed = current.optional_write() != write;
+    let output_bytes = if changed {
+        let bytes = measure_rewrite_output(source, write, options, &mut budget)?;
+        if bytes > options.output_bytes {
+            return Err(DecodeError(Kind::Output {
+                observed: bytes,
+                maximum: options.output_bytes,
+            }));
+        }
+        precharge_candidate_readback(source, write, bytes, options, &mut budget)?;
+        bytes
+    } else {
+        if source.len() > options.output_bytes {
+            return Err(DecodeError(Kind::Output {
+                observed: source.len(),
+                maximum: options.output_bytes,
+            }));
+        }
+        source.len()
+    };
+    let scratch_bytes = if changed {
+        source
+            .len()
+            .checked_add(output_bytes)
+            .ok_or(DecodeError(Kind::Projection))?
+    } else {
+        // Even a byte-exact no-op performs a strict source traversal.  Count
+        // that borrowed scan as logical scratch so its ceiling remains
+        // independently enforceable before the copy allocation.
+        source.len()
+    };
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: budget.fields,
+        work_bytes: budget.work,
+        max_depth: budget.max_depth,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes,
+    };
+    check_prepare_limits(requirements, options)?;
+    let report = RewriteReport {
+        input_bytes: source.len(),
+        output_bytes,
+        fields: requirements.fields,
+        work_bytes: requirements.work_bytes,
+        max_depth: requirements.max_depth,
+        allocations: requirements.allocations,
+        retained_bytes: requirements.retained_bytes,
+        scratch_bytes: requirements.scratch_bytes,
+        changed,
+    };
+    Ok(PreparedTableHeaderSettingsRewrite {
+        source,
+        write,
+        options,
+        report,
+        requirements,
+        current,
+    })
+}
+
+/// Rewrite the seven optional fields while retaining all required and
+/// unknown source spans.  This compatibility API delegates through the
+/// prepared contract so one-shot and staged callers share identical checks.
 pub fn rewrite_table_header_settings(
     source: &[u8],
     write: TableHeaderSettingsWrite,
     options: DecodeOptions,
 ) -> Result<Vec<u8>, DecodeError> {
-    Ok(rewrite_table_header_settings_with_report(source, write, options)?.0)
+    let prepared = prepare_table_header_settings_rewrite(source, write, options)?;
+    Ok(prepared
+        .execute(prepared.execution_requirements().exact())?
+        .into_bytes())
 }
 
 /// Rewrite one table-header payload and return exact aggregate accounting.
@@ -502,81 +931,77 @@ pub fn rewrite_table_header_settings_with_report(
     write: TableHeaderSettingsWrite,
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, RewriteReport), DecodeError> {
-    validate(source, options)?;
-    let mut budget = Budget::new(options);
-    let current = decode_snapshot_with_budget_mode(source, options, &mut budget, false)?;
-    let changed = current.optional_write() != write;
-    if !changed {
-        if source.len() > options.output_bytes {
-            return Err(DecodeError(Kind::Output {
-                observed: source.len(),
-                maximum: options.output_bytes,
-            }));
-        }
-        let output = reserve_output(source.len())?;
-        let mut output = output;
-        append_bytes(&mut output, source)?;
-        return Ok((
-            output,
-            RewriteReport {
-                input_bytes: source.len(),
-                output_bytes: source.len(),
-                fields: budget.fields,
-                work_bytes: budget.work,
-                max_depth: budget.max_depth,
-                allocations: 1,
-                changed: false,
-            },
-        ));
-    }
+    let prepared = prepare_table_header_settings_rewrite(source, write, options)?;
+    let output = prepared.execute(prepared.execution_requirements().exact())?;
+    let report = output.report();
+    Ok((output.into_bytes(), report))
+}
 
-    let output_bytes = measure_rewrite_output(source, write, options, &mut budget)?;
-    if output_bytes > options.output_bytes {
+fn check_prepare_limits(
+    requirements: RewriteExecutionRequirements,
+    options: DecodeOptions,
+) -> Result<(), DecodeError> {
+    check_execution_limits(
+        requirements,
+        RewriteExecutionLimits {
+            output_bytes: options.output_bytes,
+            fields: options.fields,
+            work_bytes: options.work,
+            max_depth: options.recursion,
+            allocations: options.allocations,
+            retained_bytes: options.retained_bytes,
+            scratch_bytes: options.scratch_bytes,
+        },
+    )
+}
+
+fn check_execution_limits(
+    requirements: RewriteExecutionRequirements,
+    limits: RewriteExecutionLimits,
+) -> Result<(), DecodeError> {
+    if requirements.output_bytes > limits.output_bytes {
         return Err(DecodeError(Kind::Output {
-            observed: output_bytes,
-            maximum: options.output_bytes,
+            observed: requirements.output_bytes,
+            maximum: limits.output_bytes,
         }));
     }
-    precharge_candidate_readback(source, write, output_bytes, options, &mut budget)?;
-    let mut output = reserve_output(output_bytes)?;
-    let mut emit_budget = Budget::new(DecodeOptions {
-        fields: usize::MAX,
-        work: usize::MAX,
-        ..options
-    });
-    emit_rewrite_output(source, write, options, &mut emit_budget, &mut output)?;
-    if output.len() != output_bytes {
-        return Err(DecodeError(Kind::Projection));
+    if requirements.fields > limits.fields {
+        return Err(DecodeError(Kind::Field {
+            observed: requirements.fields,
+            maximum: limits.fields,
+        }));
     }
-
-    let readback_options = DecodeOptions {
-        bytes: options.bytes.max(output.len()),
-        output_bytes: options.output_bytes,
-        ..options
-    };
-    validate(&output, readback_options)?;
-    let mut readback_budget = Budget::new(DecodeOptions {
-        fields: usize::MAX,
-        work: usize::MAX,
-        ..readback_options
-    });
-    let readback =
-        decode_snapshot_with_budget_mode(&output, readback_options, &mut readback_budget, false)?;
-    if readback.optional_write() != write {
-        return Err(DecodeError(Kind::Projection));
+    if requirements.work_bytes > limits.work_bytes {
+        return Err(DecodeError(Kind::Work {
+            observed: requirements.work_bytes,
+            maximum: limits.work_bytes,
+        }));
     }
-    Ok((
-        output,
-        RewriteReport {
-            input_bytes: source.len(),
-            output_bytes,
-            fields: budget.fields,
-            work_bytes: budget.work,
-            max_depth: budget.max_depth,
-            allocations: 1,
-            changed: true,
-        },
-    ))
+    if requirements.max_depth > limits.max_depth {
+        return Err(DecodeError::resource(WireResourceLimit::Nesting {
+            observed: requirements.max_depth,
+            maximum: limits.max_depth,
+        }));
+    }
+    if requirements.allocations > limits.allocations {
+        return Err(DecodeError(Kind::Allocations {
+            observed: requirements.allocations,
+            maximum: limits.allocations,
+        }));
+    }
+    if requirements.retained_bytes > limits.retained_bytes {
+        return Err(DecodeError(Kind::Retained {
+            observed: requirements.retained_bytes,
+            maximum: limits.retained_bytes,
+        }));
+    }
+    if requirements.scratch_bytes > limits.scratch_bytes {
+        return Err(DecodeError(Kind::Scratch {
+            observed: requirements.scratch_bytes,
+            maximum: limits.scratch_bytes,
+        }));
+    }
+    Ok(())
 }
 
 /// Compatibility alias for callers that use the `rewrite_*_with_report`
@@ -780,7 +1205,7 @@ fn emit_rewrite_output(
                 append_varint_field(output, span.number, value)?;
             }
         } else {
-            append_bytes(output, &source[span.start..span.end])?;
+            append_preserved_bytes(output, &source[span.start..span.end])?;
         }
         Ok(())
     })?;
@@ -828,7 +1253,7 @@ fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
     Ok(output)
 }
 
-fn append_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), DecodeError> {
+fn append_preserved_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), DecodeError> {
     let remaining = output
         .capacity()
         .checked_sub(output.len())
@@ -1640,6 +2065,115 @@ mod tests {
         .with_max_output_bytes(report.output_bytes());
         assert!(rewrite_table_header_settings_with_report(&source, write, below_work).is_err());
         assert_eq!(output_allocations(), before);
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_rewrite_replays_exact_limits_and_unknown_framing() -> Result<(), DecodeError> {
+        let mut source = dimensions();
+        let unknown_varint = [0xa0, 0x06, 0x07];
+        let unknown_group = [0xa3, 0x06, 0x08, 1, 0xa4, 0x06];
+        source.extend(unknown_varint);
+        source.extend(unknown_group);
+        let write =
+            TableHeaderSettingsWrite::new(Some(3), None, None, Some(true), None, None, Some(false));
+        let options = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 32);
+        let prepared = prepare_table_header_settings_rewrite(&source, write, options)?;
+        let requirements = prepared.execution_requirements();
+        let preparation = prepared.prepare_report();
+        assert_eq!(preparation.output_bytes(), requirements.output_bytes);
+        assert_eq!(preparation.fields(), requirements.fields);
+        assert_eq!(preparation.work_bytes(), requirements.work_bytes);
+        assert_eq!(preparation.max_depth(), requirements.max_depth);
+        assert_eq!(preparation.allocations(), requirements.allocations);
+        assert_eq!(preparation.retained_bytes(), requirements.retained_bytes);
+        assert_eq!(preparation.scratch_bytes(), requirements.scratch_bytes);
+
+        let output = prepared.execute(requirements.exact())?;
+        assert_eq!(output.report(), preparation);
+        assert!(
+            output
+                .bytes()
+                .windows(unknown_varint.len())
+                .any(|window| { window == unknown_varint })
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(unknown_group.len())
+                .any(|window| { window == unknown_group })
+        );
+        let snapshot = decode_table_header_settings(
+            output.bytes(),
+            DecodeOptions::for_source(output.bytes()),
+        )?;
+        assert_eq!(snapshot.optional_write(), write);
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_noop_is_byte_exact_and_allocates_only_on_execute() -> Result<(), DecodeError> {
+        let mut source = dimensions();
+        source.extend(varint_field(HEADER_ROWS_FIELD, 2));
+        source.extend([0xa0, 0x06, 0x81, 0x00]);
+        let write = TableHeaderSettingsWrite::new(Some(2), None, None, None, None, None, None);
+        let prepared = prepare_table_header_settings_rewrite(
+            &source,
+            write,
+            DecodeOptions::for_source(&source),
+        )?;
+        let requirements = prepared.execution_requirements();
+        let preparation = prepared.prepare_report();
+        assert!(!preparation.changed());
+        assert_eq!(requirements.output_bytes, source.len());
+        assert_eq!(requirements.allocations, 1);
+        assert_eq!(requirements.scratch_bytes, source.len());
+        let before = output_allocations();
+        let output = prepared.execute(requirements.exact())?;
+        assert_eq!(output.bytes(), source.as_slice());
+        assert_eq!(output.report(), preparation);
+        assert_eq!(output_allocations(), before + 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_limits_reject_before_candidate_allocation() -> Result<(), DecodeError> {
+        let source = dimensions();
+        let write = TableHeaderSettingsWrite::new(
+            Some(3),
+            Some(2),
+            Some(1),
+            Some(true),
+            Some(false),
+            Some(true),
+            Some(false),
+        );
+        let options = DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 64);
+        let baseline = prepare_table_header_settings_rewrite(&source, write, options)?
+            .execution_requirements();
+
+        let cases = vec![
+            RewriteExecutionLimits::exact(baseline).with_fields(baseline.fields.saturating_sub(1)),
+            RewriteExecutionLimits::exact(baseline)
+                .with_work_bytes(baseline.work_bytes.saturating_sub(1)),
+            RewriteExecutionLimits::exact(baseline)
+                .with_max_depth(baseline.max_depth.saturating_sub(1)),
+            RewriteExecutionLimits::exact(baseline)
+                .with_output_bytes(baseline.output_bytes.saturating_sub(1)),
+            RewriteExecutionLimits::exact(baseline)
+                .with_allocations(baseline.allocations.saturating_sub(1)),
+            RewriteExecutionLimits::exact(baseline)
+                .with_retained_bytes(baseline.retained_bytes.saturating_sub(1)),
+            RewriteExecutionLimits::exact(baseline)
+                .with_scratch_bytes(baseline.scratch_bytes.saturating_sub(1)),
+        ];
+
+        for limits in cases {
+            let prepared = prepare_table_header_settings_rewrite(&source, write, options)?;
+            let before = output_allocations();
+            assert!(prepared.execute(limits).is_err());
+            assert_eq!(output_allocations(), before);
+        }
         Ok(())
     }
 }

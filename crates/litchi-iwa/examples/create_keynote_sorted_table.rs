@@ -1,10 +1,13 @@
 //! Create and physically sort a plain-text Keynote table without an input presentation.
-use litchi_numbers::table::headers::{Count as HeaderCount, Settings as HeaderSettings};
-
 use std::env;
 
-use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteTableCellUpdate, KeynoteTableCellValue};
+use litchi_iwa::keynote::{
+    KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue,
+};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::headers::{
+    Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
+};
 use litchi_numbers::table::sort::{ColumnIndex, Direction, Order, Rule};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,11 +29,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 470.0,
         },
     )?;
-    editor.set_slide_table_header_settings(
-        0,
-        table.model_object_id,
-        HeaderSettings {
-            header_rows: Some(HeaderCount::ONE),
+    editor = set_focused_keynote_table_headers(
+        editor,
+        KeynoteHeaderSettings {
+            header_rows: Some(KeynoteHeaderCount::ONE),
             ..Default::default()
         },
     )?;
@@ -95,4 +97,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.save(&output)?;
     println!("created {output}");
     Ok(())
+}
+
+fn set_focused_keynote_table_headers(
+    editor: KeynoteEditor,
+    settings: KeynoteHeaderSettings,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_table_headers(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        )?
+        .set(settings)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(KeynoteEditor::from_bytes(&bytes)?)
 }
