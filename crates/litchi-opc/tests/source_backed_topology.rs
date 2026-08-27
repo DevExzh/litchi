@@ -1004,11 +1004,15 @@ fn managed_cancellation_before_topology_publication_writes_nothing() {
 
 fn source_bytes_with_deleted_part_topology() -> Vec<u8> {
     let content_types = format!(
-        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/existing.xml" ContentType="application/vnd.example.deleted+xml"/></Types>"#
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/existing.xml" ContentType="application/vnd.example.deleted+xml"/><Override PartName="/custom/_rels/existing.xml.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/></Types>"#
     )
     .into_bytes();
     let root_relationships = format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/><Relationship Id="rIdDrop" Type="{CUSTOM_REL}" Target="custom/existing.xml"/></Relationships>"#
+    )
+    .into_bytes();
+    let owned_relationships = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rIdKeep" Type="{CUSTOM_REL}" Target="untouched.xml"/></Relationships>"#
     )
     .into_bytes();
     let entries = [
@@ -1039,6 +1043,13 @@ fn source_bytes_with_deleted_part_topology() -> Vec<u8> {
             local_extra: b"\x99\x99\x04\x00drop",
             central_extra: b"\x88\x88\x02\x00cd",
             comment: b"drop-comment",
+        },
+        Entry {
+            name: b"custom/_rels/existing.xml.rels",
+            data: &owned_relationships,
+            local_extra: b"\x99\x99\x04\x00owned",
+            central_extra: b"\x88\x88\x02\x00co",
+            comment: b"owned-comment",
         },
         Entry {
             name: b"custom/untouched.xml",
@@ -1246,5 +1257,54 @@ fn signed_part_deletion_is_refused_before_sink_write() {
         error,
         OpcError::SignedSourceRequiresExplicitPolicy
     ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn topology_remove_part_detaches_inbound_relationship_and_omits_owned_members() {
+    let source = source_bytes_with_deleted_part_topology();
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_remove_part(pack("/custom/existing.xml")).unwrap();
+    plan.try_remove_relationship(pack("/"), "rIdDrop").unwrap();
+
+    let output = publish(&source, plan).unwrap();
+    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    assert!(reopened.get_part(&pack("/custom/existing.xml")).is_err());
+
+    let content_types = String::from_utf8(zip_member(&output, "[Content_Types].xml")).unwrap();
+    assert!(!content_types.contains("PartName=\"/custom/existing.xml\""));
+    assert!(!content_types.contains("PartName=\"/custom/_rels/existing.xml.rels\""));
+    let root_relationships = String::from_utf8(zip_member(&output, "_rels/.rels")).unwrap();
+    assert!(!root_relationships.contains("rIdDrop"));
+
+    let before = raw_records(&source);
+    let after = raw_records(&output);
+    assert!(!after.contains_key("custom/existing.xml"));
+    assert!(!after.contains_key("custom/_rels/existing.xml.rels"));
+    assert_eq!(
+        after["custom/untouched.xml"].local,
+        before["custom/untouched.xml"].local
+    );
+    assert_eq!(
+        after["custom/untouched.xml"].central,
+        before["custom/untouched.xml"].central
+    );
+    assert_eq!(
+        zip_member(&output, "custom/untouched.xml"),
+        zip_member(&source, "custom/untouched.xml")
+    );
+}
+
+#[test]
+fn topology_remove_part_refuses_dangling_inbound_relationship_before_output() {
+    let source = source_bytes_with_deleted_part_topology();
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_remove_part(pack("/custom/existing.xml")).unwrap();
+
+    let mut output = Vec::new();
+    let error = open(&source)
+        .write_topology_to_stream(&mut output, plan)
+        .unwrap_err();
+    assert!(matches!(error, OpcError::InvalidRelationship(_)));
     assert!(output.is_empty());
 }

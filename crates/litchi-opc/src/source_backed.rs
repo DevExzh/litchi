@@ -23,6 +23,7 @@ use litchi_core::FileSource;
 use litchi_core::{
     ExecutionContext, ExecutionError, OwnedSource, ReadAt, Reservation, Resource, SourceVersion,
 };
+use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
@@ -130,6 +131,7 @@ struct PendingOverlay {
 pub struct SourceTopologyPlan {
     replacements: Vec<TopologyReplacement>,
     additions: Vec<TopologyPartAddition>,
+    removals: Vec<PackURI>,
     relationships: Vec<TopologyRelationshipChange>,
     relationship_bytes: usize,
 }
@@ -246,6 +248,7 @@ impl SourceTopologyPlan {
             .replacements
             .len()
             .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
             .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
         if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
             return Err(overlay_unavailable(format!(
@@ -263,6 +266,13 @@ impl SourceTopologyPlan {
             .additions
             .iter()
             .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+        {
+            return Err(OpcError::DuplicatePartName(partname.to_string()));
+        }
+        if self
+            .removals
+            .iter()
+            .any(|candidate| candidate.is_equivalent_to(&partname))
         {
             return Err(OpcError::DuplicatePartName(partname.to_string()));
         }
@@ -295,6 +305,7 @@ impl SourceTopologyPlan {
             .replacements
             .len()
             .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
             .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
         if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
             return Err(overlay_unavailable(format!(
@@ -309,6 +320,10 @@ impl SourceTopologyPlan {
                 .replacements
                 .iter()
                 .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+            || self
+                .removals
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(&partname))
         {
             return Err(OpcError::DuplicatePartName(partname.to_string()));
         }
@@ -324,6 +339,54 @@ impl SourceTopologyPlan {
             content_type,
             payload: Arc::new(payload),
         });
+        Ok(())
+    }
+
+    /// Remove one existing Part from the source-backed topology.
+    ///
+    /// Every inbound relationship owned by a retained Part or by the package
+    /// must also be removed or retargeted by this plan. The publisher removes
+    /// the Part's exact content-type Override when present and omits its owned
+    /// relationships member together with the physical Part member.
+    pub fn try_remove_part(&mut self, partname: PackURI) -> Result<()> {
+        if partname.as_str() == PACKAGE_URI {
+            return Err(OpcError::InvalidPackUri(
+                "the package root is not a Part URI".to_string(),
+            ));
+        }
+        let operation_count = self
+            .replacements
+            .len()
+            .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
+            .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
+        if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "topology Part operation set exceeds the {MAX_SOURCE_TOPOLOGY_PARTS}-Part bound"
+            )));
+        }
+        if self
+            .replacements
+            .iter()
+            .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+            || self
+                .additions
+                .iter()
+                .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+            || self
+                .removals
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(&partname))
+        {
+            return Err(OpcError::DuplicatePartName(partname.to_string()));
+        }
+        self.removals
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part removals",
+                source,
+            })?;
+        self.removals.push(partname);
         Ok(())
     }
 
@@ -557,7 +620,10 @@ impl SourceTopologyPlan {
     }
 
     fn is_empty(&self) -> bool {
-        self.replacements.is_empty() && self.additions.is_empty() && self.relationships.is_empty()
+        self.replacements.is_empty()
+            && self.additions.is_empty()
+            && self.removals.is_empty()
+            && self.relationships.is_empty()
     }
 }
 
@@ -3503,6 +3569,7 @@ impl SourceBackedPackage {
         let SourceTopologyPlan {
             mut replacements,
             mut additions,
+            mut removals,
             mut relationships,
             relationship_bytes: _,
         } = plan;
@@ -3511,6 +3578,7 @@ impl SourceBackedPackage {
             .sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
         additions
             .sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+        removals.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
         relationships.sort_unstable_by(|left, right| {
             left.owner
                 .as_str()
@@ -3518,7 +3586,7 @@ impl SourceBackedPackage {
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
         self.check_topology_progress()?;
-        if !additions.is_empty() && self.has_signature_infrastructure() {
+        if (!additions.is_empty() || !removals.is_empty()) && self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let (physical_members, _physical_member_memory) = self.build_physical_member_lookup()?;
@@ -3558,6 +3626,25 @@ impl SourceBackedPackage {
                 replacement: Arc::clone(&replacement.replacement),
             });
         }
+        let mut pending_removals = Vec::new();
+        pending_removals
+            .try_reserve_exact(removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology removal targets",
+                source,
+            })?;
+        for (index, removal) in removals.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let target = self
+                .part_index(removal)
+                .ok_or_else(|| OpcError::PartNotFound(removal.to_string()))?;
+            if pending_removals.contains(&target) {
+                return Err(OpcError::DuplicatePartName(removal.to_string()));
+            }
+            pending_removals.push(target);
+        }
         self.validate_overlay_limits(
             pending_replacements
                 .iter()
@@ -3586,6 +3673,8 @@ impl SourceBackedPackage {
         let namespace_capacity = self
             .parts
             .len()
+            .checked_sub(pending_removals.len())
+            .ok_or_else(|| overlay_unavailable("topology Part removal count underflows"))?
             .checked_add(additions.len())
             .ok_or_else(|| overlay_unavailable("topology Part count overflows usize"))?;
         self.limits.check(
@@ -3598,7 +3687,9 @@ impl SourceBackedPackage {
             if index & 0xff == 0 {
                 self.check_topology_progress()?;
             }
-            part_names.insert(&part.partname)?;
+            if !pending_removals.contains(&index) {
+                part_names.insert(&part.partname)?;
+            }
         }
         for (index, addition) in additions.iter().enumerate() {
             if index & 0x3f == 0 {
@@ -3634,6 +3725,9 @@ impl SourceBackedPackage {
                 source,
             })?;
         for (index, part) in self.parts.iter().enumerate() {
+            if pending_removals.contains(&index) {
+                continue;
+            }
             let key = folded_part_name(&part.partname)?;
             if canonical_part_names.insert(key, index).is_some() {
                 return Err(overlay_unavailable(
@@ -3710,6 +3804,61 @@ impl SourceBackedPackage {
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
         self.check_topology_progress()?;
+
+        // A retained owner may not keep an inbound edge to a removed Part.
+        // Require the same plan to remove or retarget every such relationship;
+        // relationship members owned by removed Parts are omitted wholesale.
+        let relationship_is_detached = |owner: &str, r_id: &str| {
+            relationships.iter().any(|change| {
+                change.owner.as_str() == owner
+                    && change.r_id == r_id
+                    && matches!(
+                        &change.operation,
+                        TopologyRelationshipOperation::Remove { .. }
+                            | TopologyRelationshipOperation::Replace { .. }
+                    )
+            })
+        };
+        for relationship in self.package_relationships.iter() {
+            if relationship.is_external() {
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            if self
+                .part_index(&target)
+                .is_some_and(|index| pending_removals.contains(&index))
+                && !relationship_is_detached(PACKAGE_URI, relationship.r_id())
+            {
+                return Err(OpcError::InvalidRelationship(format!(
+                    "relationship '{}' owned by the package still targets removed Part '{}'",
+                    relationship.r_id(),
+                    target
+                )));
+            }
+        }
+        for (owner_index, owner) in self.parts.iter().enumerate() {
+            if pending_removals.contains(&owner_index) {
+                continue;
+            }
+            for relationship in owner.relationships.iter() {
+                if relationship.is_external() {
+                    continue;
+                }
+                let target = relationship.target_partname()?;
+                if self
+                    .part_index(&target)
+                    .is_some_and(|index| pending_removals.contains(&index))
+                    && !relationship_is_detached(owner.partname.as_str(), relationship.r_id())
+                {
+                    return Err(OpcError::InvalidRelationship(format!(
+                        "relationship '{}' owned by '{}' still targets removed Part '{}'",
+                        relationship.r_id(),
+                        owner.partname,
+                        target
+                    )));
+                }
+            }
+        }
 
         // Group relationship changes by owner and produce canonical XML.
         // The member itself is appended only when the source has no such
@@ -3991,7 +4140,7 @@ impl SourceBackedPackage {
             _content_types_reservation,
             _source_content_types_memory,
             source_content_types,
-        ) = if additions.is_empty() {
+        ) = if additions.is_empty() && pending_removals.is_empty() {
             (None, None, None, None)
         } else {
             let (xml, reservation) = self.read_content_types_xml()?;
@@ -4035,16 +4184,49 @@ impl SourceBackedPackage {
         }
         required_content_type_overrides
             .sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+        let mut removed_content_type_overrides = Vec::new();
+        removed_content_type_overrides
+            .try_reserve_exact(pending_removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC removed content-type overrides",
+                source,
+            })?;
+        if let Some(source_content_types) = source_content_types.as_ref() {
+            for target in &pending_removals {
+                let partname = &self.parts[*target].partname;
+                if source_content_types.override_for(partname).is_some() {
+                    removed_content_type_overrides.push(partname.clone());
+                }
+                let relationships_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .source_entry_id_case_insensitive(
+                        relationships_uri.membername(),
+                        &physical_members,
+                    )?
+                    .is_some()
+                    && source_content_types
+                        .override_for(&relationships_uri)
+                        .is_some()
+                {
+                    removed_content_type_overrides.push(relationships_uri);
+                }
+            }
+        }
+        removed_content_type_overrides
+            .sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
         self.check_topology_progress()?;
         let (content_types_replacement, _generated_content_types_memory) =
-            if required_content_type_overrides.is_empty() {
-                (None, None)
+            if required_content_type_overrides.is_empty()
+                && removed_content_type_overrides.is_empty()
+            {
+                (None, Vec::new())
             } else {
-                let (xml, generated_memory_reservation) = content_types_with_overrides(
+                let (xml, generated_memory_reservation) = content_types_with_changes(
                     content_types_xml.as_deref().ok_or_else(|| {
                         overlay_unavailable("content-types source is unavailable for overrides")
                     })?,
                     &required_content_type_overrides,
+                    &removed_content_type_overrides,
                     self.limits,
                     self.cache.context(),
                     self.cache.reservation_failure_counter(),
@@ -4120,8 +4302,29 @@ impl SourceBackedPackage {
             });
         }
 
+        let mut omitted_members = Vec::new();
+        omitted_members
+            .try_reserve_exact(pending_removals.len().saturating_mul(2))
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology omitted members",
+                source,
+            })?;
+        for target in &pending_removals {
+            let part = &self.parts[*target];
+            omitted_members.push(part.partname.membername().to_string());
+            let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let relationship_member = relationships_uri.membername().to_string();
+            if self
+                .source_entry_id_case_insensitive(&relationship_member, &physical_members)?
+                .is_some()
+            {
+                omitted_members.push(relationship_member);
+            }
+        }
+
         if changed.is_empty()
             && additions.is_empty()
+            && pending_removals.is_empty()
             && relationship_publications.is_empty()
             && content_types_replacement.is_none()
         {
@@ -4184,7 +4387,12 @@ impl SourceBackedPackage {
                 );
             }
         }
-        self.write_changed_overlays_with_appended(writer, &changed, appended)
+        self.write_changed_overlays_with_omissions_and_appended(
+            writer,
+            &changed,
+            &omitted_members,
+            appended,
+        )
     }
 
     fn topology_relationship_target_ref(
@@ -5698,6 +5906,22 @@ impl SourceBackedPackage {
         )
     }
 
+    fn write_changed_overlays_with_omissions_and_appended<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        appended: Vec<soapberry_zip::RegeneratedEntry>,
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            appended,
+            None,
+        )
+    }
+
     fn write_changed_overlays_with_appended<W: Write>(
         self,
         writer: W,
@@ -6333,6 +6557,201 @@ fn folded_ascii_name(value: &str, resource: &'static str) -> Result<String> {
     folded.push_str(value);
     folded.make_ascii_lowercase();
     Ok(folded)
+}
+
+fn content_types_with_changes(
+    source: &[u8],
+    additions: &[(PackURI, String)],
+    removals: &[PackURI],
+    limits: ReadLimits,
+    context: Option<&ExecutionContext>,
+    reservation_failures: Option<&DiagnosticCounter>,
+) -> Result<(Vec<u8>, Vec<Arc<Reservation>>)> {
+    if removals.is_empty() {
+        let (output, reservation) =
+            content_types_with_overrides(source, additions, limits, context, reservation_failures)?;
+        let mut reservations = Vec::new();
+        reservations
+            .try_reserve_exact(usize::from(reservation.is_some()))
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC content-types change reservations",
+                source,
+            })?;
+        reservations.extend(reservation);
+        return Ok((output, reservations));
+    }
+    let (stripped, removal_reservation) =
+        content_types_without_overrides(source, removals, limits, context, reservation_failures)?;
+    if additions.is_empty() {
+        let mut reservations = Vec::new();
+        reservations
+            .try_reserve_exact(usize::from(removal_reservation.is_some()))
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC content-types change reservations",
+                source,
+            })?;
+        reservations.extend(removal_reservation);
+        return Ok((stripped, reservations));
+    }
+    let (output, addition_reservation) =
+        content_types_with_overrides(&stripped, additions, limits, context, reservation_failures)?;
+    let mut reservations = Vec::new();
+    reservations
+        .try_reserve_exact(2)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC content-types change reservations",
+            source,
+        })?;
+    reservations.extend(removal_reservation);
+    reservations.extend(addition_reservation);
+    Ok((output, reservations))
+}
+
+fn content_types_without_overrides(
+    source: &[u8],
+    removals: &[PackURI],
+    limits: ReadLimits,
+    context: Option<&ExecutionContext>,
+    reservation_failures: Option<&DiagnosticCounter>,
+) -> Result<(Vec<u8>, Option<Arc<Reservation>>)> {
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(removals.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC removed content-type spans",
+            source,
+        })?;
+    let mut matched = Vec::new();
+    matched
+        .try_reserve_exact(removals.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC removed content-type matches",
+            source,
+        })?;
+    matched.resize(removals.len(), false);
+    loop {
+        if let Some(context) = context {
+            context.check().map_err(map_execution_error)?;
+        }
+        let event_start = usize::try_from(reader.buffer_position())
+            .map_err(|_| overlay_unavailable("content-types XML position overflows usize"))?;
+        let (_, event) = reader.read_resolved_event()?;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| overlay_unavailable("content-types XML position overflows usize"))?;
+        if event_end < event_start || event_end > source.len() {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-types XML event range is invalid".to_string(),
+            ));
+        }
+        match event {
+            Event::Start(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"Override" {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "non-empty content-type Overrides are unsupported for topology removal"
+                            .to_string(),
+                    ));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("content-types XML depth overflows"))?;
+            },
+            Event::Empty(element) if depth == 1 && element.local_name().as_ref() == b"Override" => {
+                let mut part_name = None;
+                for attribute in element.attributes() {
+                    let attribute = attribute.map_err(|error| {
+                        OpcError::InvalidContentTypesManifest(error.to_string())
+                    })?;
+                    if attribute.key.as_ref() == b"PartName" {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|error| {
+                                OpcError::InvalidContentTypesManifest(error.to_string())
+                            })?;
+                        part_name = Some(value.into_owned());
+                    }
+                }
+                if let Some(part_name) = part_name {
+                    if let Some(index) = removals
+                        .iter()
+                        .position(|candidate| candidate.as_str() == part_name)
+                    {
+                        if matched[index] {
+                            return Err(OpcError::InvalidContentTypesManifest(format!(
+                                "duplicate content-type Override for '{}'",
+                                removals[index]
+                            )));
+                        }
+                        matched[index] = true;
+                        ranges.push((event_start, event_end));
+                    }
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OpcError::InvalidContentTypesManifest("unmatched closing element".to_string())
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if let Some(index) = matched.iter().position(|value| !*value) {
+        return Err(OpcError::InvalidContentTypesManifest(format!(
+            "content-type Override for '{}' was not found lexically",
+            removals[index]
+        )));
+    }
+    ranges.sort_unstable_by_key(|range| range.0);
+    let removed_bytes = ranges.iter().try_fold(0usize, |total, (start, end)| {
+        total.checked_add(end.checked_sub(*start)?)
+    });
+    let removed_bytes = removed_bytes
+        .ok_or_else(|| overlay_unavailable("removed content-types byte count overflows usize"))?;
+    let output_len = source
+        .len()
+        .checked_sub(removed_bytes)
+        .ok_or_else(|| overlay_unavailable("removed content-types byte count underflows"))?;
+    limits.check(
+        ReadResource::ContentTypesBytes,
+        output_len as u64,
+        limits.max_content_types_bytes() as u64,
+    )?;
+    let reservation = if let Some(context) = context {
+        let bytes = (source.len() as u64)
+            .checked_add(output_len as u64)
+            .ok_or_else(|| overlay_unavailable("content-types memory charge overflows u64"))?;
+        Some(Arc::new(context.reserve(Resource::Memory, bytes).map_err(
+            |error| {
+                if matches!(error, ExecutionError::ResourceLimit(_)) {
+                    if let Some(counter) = reservation_failures {
+                        counter.increment();
+                    }
+                }
+                map_execution_error(error)
+            },
+        )?))
+    } else {
+        None
+    };
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC content-types removal output",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for (start, end) in ranges {
+        output.extend_from_slice(&source[cursor..start]);
+        cursor = end;
+    }
+    output.extend_from_slice(&source[cursor..]);
+    ContentTypeMap::from_xml(&output, limits)?;
+    Ok((output, reservation))
 }
 
 fn content_types_with_overrides(
