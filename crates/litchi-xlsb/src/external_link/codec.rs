@@ -11,20 +11,19 @@
 
 use super::model::validate_defined_name;
 use super::*;
-use std::sync::Arc;
 
 /// A parsed source stream with the opaque records needed for lossless edits.
 #[derive(Debug, Clone)]
 pub(crate) struct Source {
     pub(crate) parsed: Parsed,
-    pub(crate) bytes: Arc<[u8]>,
+    pub(crate) bytes: Vec<u8>,
     pub(crate) unknown_records: Vec<UnknownRecord>,
 }
 
 /// Parse one stream and retain every record not modeled by this owner.
 pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
     let parsed = parse_external_link(data)?;
-    let bytes: Arc<[u8]> = Arc::from(data.to_vec());
+    let bytes = copy_bytes(data, "external-link source")?;
     let limits = crate::raw::Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
     let mut unknown_records = Vec::new();
     let mut unknown_bytes = 0usize;
@@ -51,16 +50,24 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
             .checked_add(header_len)
             .and_then(|end| end.checked_add(record.len()))
             .ok_or_else(|| invalid("opaque external-link record range overflow"))?;
-        let raw: Arc<[u8]> = Arc::from(data[offset..end].to_vec());
-        unknown_bytes = unknown_bytes
-            .checked_add(raw.len())
+        let raw_len = end - offset;
+        let next_unknown_bytes = unknown_bytes
+            .checked_add(raw_len)
             .ok_or_else(|| invalid("opaque external-link byte count overflow"))?;
-        if unknown_bytes > MAX_UNKNOWN_BYTES {
+        if next_unknown_bytes > MAX_UNKNOWN_BYTES {
             return Err(Error::InvalidLength {
                 expected: MAX_UNKNOWN_BYTES,
-                found: unknown_bytes,
+                found: next_unknown_bytes,
             });
         }
+        unknown_records
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "opaque external-link records",
+                source,
+            })?;
+        let raw = copy_bytes(&data[offset..end], "opaque external-link record")?;
+        unknown_bytes = next_unknown_bytes;
         unknown_records.push(UnknownRecord::new(
             u16::from(record.kind()),
             after_known,
@@ -201,6 +208,12 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                 }
                 let formula_len = usize::try_from(cursor.read_u32()?)
                     .map_err(|_| invalid("BrtSupNameFmla size overflow"))?;
+                if formula_len > 13 {
+                    return Err(Error::InvalidLength {
+                        expected: 13,
+                        found: formula_len,
+                    });
+                }
                 let formula = cursor.read_bytes(formula_len)?.to_vec();
                 cursor.finish()?;
                 current_formula = if formula.is_empty() {
@@ -312,6 +325,7 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                     .ok_or_else(|| invalid("external name block has no properties"))?;
                 match kind {
                     EXTERNAL_REFERENCE_WORKBOOK => {
+                        reserve_entry(&mut workbook_entries, "external workbook entries")?;
                         let scope = u32::from_le_bytes([bits[2], bits[3], bits[4], bits[5]]);
                         let mut entry = DefinedName::new(name)?
                             .with_built_in(bits[0] & EXTERNAL_NAME_BUILT_IN != 0);
@@ -324,14 +338,11 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                         if let Some(formula) = current_formula.take() {
                             entry = entry.with_formula(formula);
                         }
-                        if workbook_entries.len() >= MAX_COLLECTION_ITEMS {
-                            return Err(invalid(
-                                "external-link entry collection exceeds 65,535 items",
-                            ));
-                        }
+                        entry = entry.with_wire_bits(bits);
                         workbook_entries.push(entry);
                     },
                     EXTERNAL_REFERENCE_DDE => {
+                        reserve_entry(&mut dde_entries, "external DDE entries")?;
                         let mut item = DdeItem::new(name)?
                             .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
                             .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
@@ -339,14 +350,11 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                         if let Some(cache) = current_cache.take() {
                             item = item.with_cached_values(cache);
                         }
-                        if dde_entries.len() >= MAX_COLLECTION_ITEMS {
-                            return Err(invalid(
-                                "external-link entry collection exceeds 65,535 items",
-                            ));
-                        }
+                        item = item.with_wire_bits(bits);
                         dde_entries.push(item);
                     },
                     EXTERNAL_REFERENCE_OLE => {
+                        reserve_entry(&mut ole_entries, "external OLE entries")?;
                         let mut item = OleItem::new(name)?
                             .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
                             .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
@@ -354,11 +362,7 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                         if let Some(cache) = current_cache.take() {
                             item = item.with_cached_values(cache);
                         }
-                        if ole_entries.len() >= MAX_COLLECTION_ITEMS {
-                            return Err(invalid(
-                                "external-link entry collection exceeds 65,535 items",
-                            ));
-                        }
+                        item = item.with_wire_bits(bits);
                         ole_entries.push(item);
                     },
                     _ => unreachable!("external link kind was validated above"),
@@ -554,6 +558,27 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormula(message.into())
 }
 
+fn copy_bytes(data: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(data.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.extend_from_slice(data);
+    Ok(copied)
+}
+
+fn reserve_entry<T>(entries: &mut Vec<T>, resource: &'static str) -> Result<()> {
+    if entries.len() >= MAX_COLLECTION_ITEMS {
+        return Err(Error::InvalidLength {
+            expected: MAX_COLLECTION_ITEMS,
+            found: entries.len() + 1,
+        });
+    }
+    entries
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
 fn excel_name_eq(left: &str, right: &str) -> bool {
     left.chars()
         .flat_map(char::to_lowercase)
@@ -628,17 +653,21 @@ mod tests {
         assert_eq!(area.area().unwrap().first(), first);
         assert_eq!(area.sheets(), Some(sheets));
         assert_eq!(
-            NameFormula::cell_reference_error(SheetRange::Missing).kind(),
+            NameFormula::cell_reference_error(SheetRange::missing()).kind(),
             NameFormulaKind::CellReferenceError
         );
         assert_eq!(
-            NameFormula::area_reference_error(SheetRange::Missing).kind(),
+            NameFormula::area_reference_error(SheetRange::missing()).kind(),
             NameFormulaKind::AreaReferenceError
         );
         assert_eq!(
             NameFormula::reference_error().tokens(),
             [EXT_PTG_ERROR, REFERENCE_ERROR_CODE]
         );
+        assert!(matches!(
+            SheetRange::sheets(u16::MAX, u16::MAX),
+            Err(Error::InvalidFormula(_))
+        ));
     }
 
     #[test]
