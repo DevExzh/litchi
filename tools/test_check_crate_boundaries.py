@@ -66,6 +66,63 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     )
 
 
+def add_iwa_numbers_formula_renderer_scaffold(
+    root: Path,
+    *,
+    source: str | None = None,
+) -> None:
+    """Install the second production source required by the Wave106 ratchet."""
+
+    renderer = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE
+    renderer.parent.mkdir(parents=True, exist_ok=True)
+    renderer.write_text(
+        source if source is not None else (
+            "struct FormulaArchiveBytes;\n"
+            "fn preflight_formula_archive_envelope() {}\n"
+            "fn decode_formula_archive_with_visitor() {}\n"
+            "fn decode_formula_archive_for_render() {}\n"
+            "mod numbers_formula_codec {}\n"
+            "fn charge_formula_wire() {}\n"
+            "fn charge_formula_render_work() {}\n"
+        ),
+        encoding="utf-8",
+    )
+
+
+def add_iwa_numbers_formula_table_adapter_markers(root: Path) -> None:
+    """Mark the table extractor's import/use edge to the renderer adapter."""
+
+    table = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+    table.write_text(
+        table.read_text(encoding="utf-8")
+        + "\nuse super::formula_renderer::{FormulaArchiveBytes, render_formula_string};\n",
+        encoding="utf-8",
+    )
+
+
+def add_iwa_numbers_formula_table_scaffold(
+    root: Path,
+    *,
+    source: str | None = None,
+) -> None:
+    """Install a minimal table-extractor adapter/use fixture."""
+
+    table = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+    table.parent.mkdir(parents=True, exist_ok=True)
+    table.write_text(
+        source if source is not None else (
+            "use super::formula_renderer::{FormulaArchiveBytes, render_formula_string};\n"
+            "fn extract(bytes: &[u8]) {\n"
+            "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+            "    let _ = render_formula_string;\n"
+            "    charge_formula_wire(bytes.len());\n"
+            "    charge_formula_render_work(0);\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_transition_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -15919,6 +15976,647 @@ fn rewrite_movie_title_operation(
             self.assertEqual(len(violations), 4)
             for marker in boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_REQUIRED_MARKERS:
                 self.assertTrue(any(marker in violation for violation in violations))
+
+    def test_iwa_numbers_table_extractor_accepts_bounded_formula_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn extract_formula(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+                "    let _ = preflight_formula_archive_envelope(bytes);\n"
+                "    let _ = numbers_formula_codec::decode_formula_archive_with_visitor(bytes);\n"
+                "    let _ = numbers_formula_codec::decode_formula_archive_for_render(bytes);\n"
+                "    charge_formula_wire(bytes.len());\n"
+                "    charge_formula_render_work(0);\n"
+                "    let _ = tst::TableModelArchive::decode(bytes);\n"
+                "    let _ = tst::Tile::decode(bytes);\n"
+                "    let _ = tsce::FormulaOwnerDependenciesArchive::decode(bytes);\n"
+                "    let _ = prost::Message::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_allows_cfg_test_formula_oracles(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn extract_formula(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+                "    let _ = preflight_formula_archive_envelope(bytes);\n"
+                "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+                "    let _ = decode_formula_archive_for_render(bytes);\n"
+                "    charge_formula_wire(bytes.len());\n"
+                "    charge_formula_render_work(0);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tsce::FormulaArchive;\n"
+                "    use prost::Message;\n"
+                "    fn oracle(bytes: &[u8]) {\n"
+                "        let _: FormulaArchive = FormulaArchive::decode(bytes).unwrap();\n"
+                "        let _: tsce::AstNodeArchive = Default::default();\n"
+                "        let _: tsce::AstNodeArrayArchive = Default::default();\n"
+                "        let _: tsce::AstNodeType = Default::default();\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_rejects_direct_formula_decodes(
+        self,
+    ) -> None:
+        bounded_route = (
+            "fn bounded(bytes: &[u8]) {\n"
+            "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+            "    let _ = preflight_formula_archive_envelope(bytes);\n"
+            "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+            "    let _ = decode_formula_archive_for_render(bytes);\n"
+            "    charge_formula_wire(bytes.len());\n"
+            "    charge_formula_render_work(0);\n"
+            "}\n"
+        )
+        markers = {
+            "unqualified": "let _ = FormulaArchive::decode(bytes);\n",
+            "qualified": "let _ = tsce::FormulaArchive::decode(bytes);\n",
+            "fully qualified": (
+                "let _ = litchi_iwa_protos::tsce::FormulaArchive::decode(bytes);\n"
+            ),
+            "multiline": (
+                "let _ = litchi_iwa_protos::tsce::FormulaArchive\n"
+                "    ::decode(bytes);\n"
+            ),
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        bounded_route + "fn hostile(bytes: &[u8]) {\n" + marker + "}\n",
+                        encoding="utf-8",
+                    )
+                    add_iwa_numbers_formula_table_adapter_markers(root)
+                    add_iwa_numbers_formula_renderer_scaffold(root)
+                    violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "legacy iwa Numbers formula production source uses "
+                        "FormulaArchive::decode:",
+                        violations[0],
+                    )
+
+    def test_iwa_numbers_table_extractor_rejects_generated_formula_types_and_aliases(
+        self,
+    ) -> None:
+        bounded_route = (
+            "fn bounded(bytes: &[u8]) {\n"
+            "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+            "    let _ = preflight_formula_archive_envelope(bytes);\n"
+            "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+            "    let _ = decode_formula_archive_for_render(bytes);\n"
+            "    charge_formula_wire(bytes.len());\n"
+            "    charge_formula_render_work(0);\n"
+            "}\n"
+        )
+        markers = {
+            "parameter": "fn retain(value: tsce::FormulaArchive) { let _ = value; }\n",
+            "generic": "fn retain() { let _: Option<FormulaArchive> = None; }\n",
+            "constructor": (
+                "fn retain() {\n"
+                "    let _ = tsce::FormulaArchive { ..Default::default() };\n"
+                "}\n"
+            ),
+            "ufcs": (
+                "fn retain(bytes: &[u8]) {\n"
+                "    let _ = <tsce::FormulaArchive as Decoder>::decode(bytes);\n"
+                "}\n"
+            ),
+            "alias import": (
+                "use litchi_iwa_protos::tsce::FormulaArchive as NativeFormula;\n"
+                "fn retain(value: NativeFormula) { let _ = value; }\n"
+            ),
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(bounded_route + marker, encoding="utf-8")
+                    add_iwa_numbers_formula_table_adapter_markers(root)
+                    add_iwa_numbers_formula_renderer_scaffold(root)
+                    violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn("generated FormulaArchive type", violations[0])
+
+    def test_iwa_numbers_table_extractor_rejects_generated_formula_ast_types(
+        self,
+    ) -> None:
+        bounded_route = (
+            "fn bounded(bytes: &[u8]) {\n"
+            "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+            "    let _ = preflight_formula_archive_envelope(bytes);\n"
+            "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+            "    let _ = decode_formula_archive_for_render(bytes);\n"
+            "    charge_formula_wire(bytes.len());\n"
+            "    charge_formula_render_work(0);\n"
+            "}\n"
+        )
+        markers = {
+            "node": "fn retain(value: AstNodeArchive) { let _ = value; }\n",
+            "node array": (
+                "fn retain(value: AstNodeArrayArchive) { let _ = value; }\n"
+            ),
+            "node type": "fn retain(value: AstNodeType) { let _ = value; }\n",
+            "qualified node type": (
+                "fn retain() {\n"
+                "    let _: crate::protobuf::tsce::ast_node_array_archive::AstNodeType;\n"
+                "}\n"
+            ),
+        }
+        expected_labels = {
+            "node": "generated AstNodeArchive type",
+            "node array": "generated AstNodeArrayArchive type",
+            "node type": "generated AstNodeType enum",
+            "qualified node type": "generated AstNodeType enum",
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(bounded_route + marker, encoding="utf-8")
+                    add_iwa_numbers_formula_table_adapter_markers(root)
+                    add_iwa_numbers_formula_renderer_scaffold(root)
+                    violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(expected_labels[label], violations[0])
+
+    def test_iwa_numbers_table_extractor_rejects_formula_compatibility_fallback(
+        self,
+    ) -> None:
+        source_text = (
+            "fn bounded(bytes: &[u8]) {\n"
+            "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+            "    let _ = preflight_formula_archive_envelope(bytes);\n"
+            "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+            "    let _ = decode_formula_archive_for_render(bytes);\n"
+            "    charge_formula_wire(bytes.len());\n"
+            "    charge_formula_render_work(0);\n"
+            "}\n"
+            "struct FormulaArchiveBytesCompat { bytes: Box<[u8]> }\n"
+            "impl FormulaArchiveBytesCompat {\n"
+            "    fn decode(&self) -> Result<tsce::FormulaArchive> {\n"
+            "        tsce::FormulaArchive::decode(self.bytes.as_ref())\n"
+            "    }\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(source_text, encoding="utf-8")
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 2)
+            self.assertEqual(
+                sum("FormulaArchive::decode" in violation for violation in violations),
+                1,
+            )
+            self.assertEqual(
+                sum("generated FormulaArchive type" in violation for violation in violations),
+                1,
+            )
+
+    def test_iwa_numbers_table_extractor_ignores_formula_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn bounded(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+                "    let _ = preflight_formula_archive_envelope(bytes);\n"
+                "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+                "    let _ = decode_formula_archive_for_render(bytes);\n"
+                "    charge_formula_wire(bytes.len());\n"
+                "    charge_formula_render_work(0);\n"
+                "}\n"
+                "// FormulaArchive::decode and AstNodeArchive\n"
+                'const NOTE: &str = "FormulaArchive";\n'
+                'const RAW: &str = r###"tsce::FormulaArchive::decode"###;\n'
+                "/* AstNodeArrayArchive AstNodeType */\n",
+                encoding="utf-8",
+            )
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_cfg_test_import_does_not_hide_production_formula(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use litchi_iwa_protos::tsce::FormulaArchive;\n"
+                "fn bounded(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+                "    let _ = preflight_formula_archive_envelope(bytes);\n"
+                "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+                "    let _ = decode_formula_archive_for_render(bytes);\n"
+                "    charge_formula_wire(bytes.len());\n"
+                "    charge_formula_render_work(0);\n"
+                "}\n"
+                "fn production(bytes: &[u8]) {\n"
+                "    let _ = tsce::FormulaArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn oracle(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("FormulaArchive::decode", violations[0])
+
+    def test_iwa_numbers_table_extractor_does_not_activate_on_cfg_any_test_oracle(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn bounded(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+                "    let _ = preflight_formula_archive_envelope(bytes);\n"
+                "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+                "    let _ = decode_formula_archive_for_render(bytes);\n"
+                "    charge_formula_wire(bytes.len());\n"
+                "    charge_formula_render_work(0);\n"
+                "}\n"
+                "#[cfg(any(test, feature = \"oracle\"))]\n"
+                "fn oracle() {\n"
+                "    let _: tsce::FormulaArchive = Default::default();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("generated FormulaArchive type", violations[0])
+
+    def test_iwa_numbers_table_extractor_allows_unrelated_generated_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn bounded(bytes: &[u8]) {\n"
+                "    let _ = FormulaArchiveBytes::from_wire(bytes);\n"
+                "    let _ = preflight_formula_archive_envelope(bytes);\n"
+                "    let _ = decode_formula_archive_with_visitor(bytes);\n"
+                "    let _ = decode_formula_archive_for_render(bytes);\n"
+                "    charge_formula_wire(bytes.len());\n"
+                "    charge_formula_render_work(0);\n"
+                "    let _ = tst::TableModelArchive::decode(bytes);\n"
+                "    let _ = tst::Tile::decode(bytes);\n"
+                "    let _ = tsce::FormulaOwnerDependenciesArchive::decode(bytes);\n"
+                "    let _ = tst::group_by_archive::GroupNodeArchive::decode(bytes);\n"
+                "    let _ = prost::Message::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            add_iwa_numbers_formula_table_adapter_markers(root)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_formula_requires_every_bounded_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text("fn extract() {}\n", encoding="utf-8")
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            violations = boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                root
+            )
+            self.assertEqual(
+                len(violations),
+                len(boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_TABLE_REQUIRED_MARKERS)
+                + 1,
+            )
+            for marker in boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_TABLE_REQUIRED_MARKERS:
+                self.assertTrue(any(marker in violation for violation in violations))
+            self.assertTrue(any("adapter module use" in item for item in violations))
+
+    def test_iwa_numbers_table_extractor_formula_missing_source_is_dormant(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    Path(directory)
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_extractor_formula_renderer_is_mandatory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_formula_table_scaffold(root)
+            violations = (
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "missing generated-free formula renderer",
+                violations[0],
+            )
+
+    def test_iwa_numbers_formula_renderer_requires_every_neutral_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_formula_table_scaffold(root)
+            add_iwa_numbers_formula_renderer_scaffold(
+                root,
+                source="struct FormulaArchiveBytes;\n",
+            )
+            violations = (
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            missing = [
+                marker
+                for marker in boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_REQUIRED_MARKERS
+                if marker != "FormulaArchiveBytes"
+            ]
+            self.assertEqual(len(violations), len(missing))
+            for marker in missing:
+                self.assertTrue(any(marker in violation for violation in violations))
+
+    def test_iwa_numbers_formula_renderer_rejects_generated_production_routes(
+        self,
+    ) -> None:
+        renderer_base = (
+            "struct FormulaArchiveBytes;\n"
+            "fn preflight_formula_archive_envelope() {}\n"
+            "fn decode_formula_archive_with_visitor() {}\n"
+            "fn decode_formula_archive_for_render() {}\n"
+            "mod numbers_formula_codec {}\n"
+            "fn charge_formula_wire() {}\n"
+            "fn charge_formula_render_work() {}\n"
+        )
+        markers = {
+            "direct decode": (
+                "fn hostile(bytes: &[u8]) {\n"
+                "    let _ = tsce::FormulaArchive::decode(bytes);\n"
+                "}\n",
+                "FormulaArchive::decode",
+            ),
+            "root type": (
+                "fn hostile(value: tsce::FormulaArchive) { let _ = value; }\n",
+                "generated FormulaArchive type",
+            ),
+            "node": (
+                "fn hostile(value: AstNodeArchive) { let _ = value; }\n",
+                "generated AstNodeArchive type",
+            ),
+            "node array": (
+                "fn hostile(value: AstNodeArrayArchive) { let _ = value; }\n",
+                "generated AstNodeArrayArchive type",
+            ),
+            "node type": (
+                "fn hostile(value: AstNodeType) { let _ = value; }\n",
+                "generated AstNodeType enum",
+            ),
+            "colon tract": (
+                "fn hostile(value: AstColonTractArchive) { let _ = value; }\n",
+                "generated AstColonTractArchive type",
+            ),
+            "row coordinate": (
+                "fn hostile(value: AstRowCoordinateArchive) { let _ = value; }\n",
+                "generated AstRowCoordinateArchive type",
+            ),
+            "column coordinate": (
+                "fn hostile(value: AstColumnCoordinateArchive) { let _ = value; }\n",
+                "generated AstColumnCoordinateArchive type",
+            ),
+            "category reference": (
+                "fn hostile(value: AstCategoryReferenceArchive) { let _ = value; }\n",
+                "generated AstCategoryReferenceArchive type",
+            ),
+            "cross-table info": (
+                "fn hostile(value: AstCrossTableReferenceExtraInfoArchive) { let _ = value; }\n",
+                "generated AstCrossTableReferenceExtraInfoArchive type",
+            ),
+            "sticky bits": (
+                "fn hostile(value: AstStickyBits) { let _ = value; }\n",
+                "generated AstStickyBits type",
+            ),
+        }
+        for label, (marker, expected) in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_formula_table_scaffold(root)
+                    add_iwa_numbers_formula_renderer_scaffold(
+                        root,
+                        source=renderer_base + marker,
+                    )
+                    violations = (
+                        boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(expected, violations[0])
+                    self.assertIn(
+                        str(boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE),
+                        violations[0],
+                    )
+
+    def test_iwa_numbers_formula_renderer_masks_cfg_test_but_not_cfg_any(
+        self,
+    ) -> None:
+        renderer = (
+            "struct FormulaArchiveBytes;\n"
+            "fn preflight_formula_archive_envelope() {}\n"
+            "fn decode_formula_archive_with_visitor() {}\n"
+            "fn decode_formula_archive_for_render() {}\n"
+            "mod numbers_formula_codec {}\n"
+            "fn charge_formula_wire() {}\n"
+            "fn charge_formula_render_work() {}\n"
+            "#[cfg(test)]\n"
+            "fn oracle() { let _: tsce::FormulaArchive = Default::default(); }\n"
+            "#[cfg(test)]\n"
+            "fn ast_oracle(value: AstNodeArrayArchive) { let _ = value; }\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_formula_table_scaffold(root)
+            add_iwa_numbers_formula_renderer_scaffold(root, source=renderer)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            renderer_path = (
+                root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE
+            )
+            renderer_path.write_text(
+                renderer
+                + '#[cfg(any(test, feature = "oracle"))]\n'
+                + "fn unsupported_cfg(value: tsce::FormulaArchive) { let _ = value; }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("generated FormulaArchive type", violations[0])
+
+    def test_iwa_numbers_formula_renderer_allows_unrelated_tsce_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_formula_table_scaffold(root)
+            add_iwa_numbers_formula_renderer_scaffold(
+                root,
+                source=(
+                    "struct FormulaArchiveBytes;\n"
+                    "fn preflight_formula_archive_envelope() {}\n"
+                    "fn decode_formula_archive_with_visitor() {}\n"
+                    "fn decode_formula_archive_for_render() {}\n"
+                    "mod numbers_formula_codec {}\n"
+                    "fn charge_formula_wire() {}\n"
+                    "fn charge_formula_render_work() {}\n"
+                    "fn owners(\n"
+                    "    _: tsce::FormulaOwnerDependenciesArchive,\n"
+                    "    _: tsce::CategoryOwnerArchive,\n"
+                    "    _: tsce::GroupByArchive,\n"
+                    ") {}\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_formula_table_requires_real_adapter_use(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_formula_renderer_scaffold(root)
+            table = root / boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+            table.parent.mkdir(parents=True, exist_ok=True)
+            table.write_text(
+                "fn formula_renderer() {}\n"
+                "struct FormulaArchiveBytes;\n"
+                "fn render_formula_string() {}\n"
+                "fn charge_formula_wire() {}\n"
+                "fn charge_formula_render_work() {}\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("adapter module use", violations[0])
+
+            table.write_text(
+                "use unrelated::formula_renderer::{FormulaArchiveBytes, render_formula_string};\n"
+                "fn render_formula_string() {}\n"
+                "fn charge_formula_wire() {}\n"
+                "fn charge_formula_render_work() {}\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("adapter module use", violations[0])
 
     def test_iwa_keynote_slide_table_discovery_is_dormant_until_catalog_marker(
         self,

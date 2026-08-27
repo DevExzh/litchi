@@ -6028,6 +6028,122 @@ NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS = (
         ),
     ),
 )
+# Wave106 moves the legacy IWA host extractor's formula sidecar onto the same
+# bounded, generated-free path already owned by ``litchi-numbers``.  Keep this
+# as a separate ratchet from the Numbers package audit: the host extractor
+# still legitimately uses generated ``tsce`` owners for unrelated formula
+# metadata and generated TST readers for model/tile compatibility.  Only the
+# exact FormulaArchive root and its generated AST descendants are forbidden.
+IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/formula_renderer.rs"
+)
+IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_TABLE_REQUIRED_MARKERS = (
+    "FormulaArchiveBytes",
+    "charge_formula_wire",
+    "charge_formula_render_work",
+)
+IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_ADAPTER_USE = re.compile(
+    r"\buse[ \t\r\n]+(?:crate|self|super)"
+    r"(?:[ \t\r\n]*::[ \t\r\n]*(?:r#)?[A-Za-z_][A-Za-z0-9_]*)*"
+    r"[ \t\r\n]*::[ \t\r\n]*(?:r#)?formula_renderer\b"
+    r"|\b(?:crate|self|super)(?:[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*)*[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?formula_renderer\b"
+)
+IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_REQUIRED_MARKERS = (
+    "FormulaArchiveBytes",
+    "preflight_formula_archive_envelope",
+    "decode_formula_archive_with_visitor",
+    "decode_formula_archive_for_render",
+    "numbers_formula_codec",
+    "charge_formula_wire",
+    "charge_formula_render_work",
+)
+IWA_NUMBERS_TABLE_EXTRACTOR_NO_EAGER_FORMULA_PATTERNS = (
+    (
+        "FormulaArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?FormulaArchive[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated FormulaArchive type",
+        # Match the exact generated name, not the allowed bounded
+        # ``FormulaArchiveBytes`` preservation type.  Exclude the direct
+        # decode spelling so one occurrence reports one actionable reason.
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?FormulaArchive\b"
+            r"(?![ \t\r\n]*::[ \t\r\n]*decode\b)"
+        ),
+    ),
+    (
+        "generated AstNodeArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstNodeArchive\b"
+        ),
+    ),
+    (
+        "generated AstNodeArrayArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstNodeArrayArchive\b"
+        ),
+    ),
+    (
+        "generated AstNodeType enum",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstNodeType\b"
+        ),
+    ),
+    (
+        "generated AstColonTractArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstColonTractArchive\b"
+        ),
+    ),
+    (
+        "generated AstColonTractRelativeRangeArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstColonTractRelativeRangeArchive\b"
+        ),
+    ),
+    (
+        "generated AstColonTractAbsoluteRangeArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstColonTractAbsoluteRangeArchive\b"
+        ),
+    ),
+    (
+        "generated AstRowCoordinateArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstRowCoordinateArchive\b"
+        ),
+    ),
+    (
+        "generated AstColumnCoordinateArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstColumnCoordinateArchive\b"
+        ),
+    ),
+    (
+        "generated AstCategoryReferenceArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstCategoryReferenceArchive\b"
+        ),
+    ),
+    (
+        "generated AstCrossTableReferenceExtraInfoArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstCrossTableReferenceExtraInfoArchive\b"
+        ),
+    ),
+    (
+        "generated AstStickyBits type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?AstStickyBits\b"
+        ),
+    ),
+)
 NUMBERS_NAMES_GENERATED_PROTO_MODULES = ("tn", "tsce", "tst", "tswp")
 NUMBERS_NAMES_NO_EAGER_PROST_SOURCE_PATTERNS = (
     (
@@ -22749,6 +22865,90 @@ def audit_iwa_numbers_table_extractor_model_tile_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the legacy IWA formula sidecar on the bounded lazy route.
+
+    The adapter is intentionally split between ``table_extractor.rs`` and
+    ``formula_renderer.rs``.  The table extractor owns the import and budget
+    hand-off, while the renderer owns the bounded byte retention, preflight,
+    and neutral ``numbers_formula_codec`` visitors.  Inventory both files so
+    a migration cannot satisfy the ratchet with a marker-only import in the
+    wrong file.
+
+    ``litchi-iwa`` still owns unrelated generated TST/TSCE compatibility
+    readers, so the forbidden vocabulary is limited to the FormulaArchive
+    root and its generated AST descendants.  Each source is filtered
+    item-by-item with ``cfg(test)`` masking before comments and literals are
+    removed.  Generated Prost builders/decodes may therefore remain in
+    test-only differential oracles, while a production item or an unsupported
+    cfg shape cannot hide a regression.
+    """
+
+    violations: list[str] = []
+    table_path = root / IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE
+    if not table_path.is_file():
+        return violations
+
+    renderer_path = root / IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE
+    if not renderer_path.is_file():
+        violations.append(
+            "legacy iwa Numbers table extractor is missing generated-free "
+            "formula renderer: "
+            f"{IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE}"
+        )
+
+    source_code: dict[Path, str] = {}
+    table_raw = table_path.read_text(encoding="utf-8")
+    source_code[IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE] = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(table_raw)
+    )
+    if renderer_path.is_file():
+        renderer_raw = renderer_path.read_text(encoding="utf-8")
+        source_code[IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE] = (
+            _mask_rust_non_code(_mask_rust_cfg_test_items(renderer_raw))
+        )
+
+    table_code = source_code[IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE]
+    for marker in IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_TABLE_REQUIRED_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", table_code) is None:
+            violations.append(
+                "legacy iwa Numbers table extractor is missing bounded formula "
+                f"adapter {marker} route: {IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE}"
+            )
+
+    if IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_ADAPTER_USE.search(table_code) is None:
+        violations.append(
+            "legacy iwa Numbers table extractor is missing bounded formula "
+            "adapter module use: "
+            f"{IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE}"
+        )
+
+    if renderer_path.is_file():
+        renderer_code = source_code[
+            IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE
+        ]
+        for marker in IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_REQUIRED_MARKERS:
+            if re.search(rf"\b{re.escape(marker)}\b", renderer_code) is None:
+                violations.append(
+                    "legacy iwa Numbers formula renderer is missing bounded "
+                    f"{marker} route: "
+                    f"{IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE}"
+                )
+
+    for path, production_code in source_code.items():
+        for label, pattern in IWA_NUMBERS_TABLE_EXTRACTOR_NO_EAGER_FORMULA_PATTERNS:
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "legacy iwa Numbers formula production source uses "
+                    f"{label}: {path}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_slide_table_discovery_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -33062,6 +33262,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
+        + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
         + audit_iwa_keynote_slide_table_discovery_source_topology()
         + audit_iwa_keynote_slide_table_listing_appearance_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()

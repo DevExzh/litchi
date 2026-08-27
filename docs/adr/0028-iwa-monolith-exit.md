@@ -6357,3 +6357,54 @@ claim and closes no crate, manifest dependency, edge, or migration debt. The
 `litchi-iwa -> litchi-keynote` edge, all 13 ordered debts (including 014, 015,
 016, and 017), generated/Prost/Buffa owners, and the IWA monolith deletion
 gate remain unchanged.
+
+## 2026-08-28 amendment: Wave106 Numbers FormulaArchive extractor projection (not a monolith-exit gate)
+
+The preceding FormulaArchive and Wave52 records remain historical. Wave106
+changes only the remaining legacy Numbers `TableDataExtractor` sidecar route:
+it retains strict bounded owned wire bytes and renders through the neutral
+`numbers_formula_codec` scalar and compatibility visitors. Production
+generated `tsce::FormulaArchive` decoding and generated AST construction are
+gone from this extractor path, while the former generated renderer remains a
+`cfg(test)` differential oracle. The owned sidecar is a preservation form,
+not a zero-copy view.
+
+Canonical but incomplete postfix programs deliberately preserve legacy
+placeholder/last-expression behavior (`=FORMULA()` for operand-less negation,
+otherwise the final surplus expression). Malformed wire, duplicated known
+fields, and noncanonical known values remain fail-closed.
+
+`FormulaOwnerDependencies`, category maps, and name maps remain permissive
+generated best-effort compatibility debt. Formula authoring, formula-cache
+refresh, physical formula mutation, formula cloning, merge handling, and
+dependency shifting remain generated compatibility work. This is not a full
+Numbers formula-owner migration, a generated-free host, or a removal of the
+legacy physical formula graph.
+
+One `ProjectionBudget` spans reference-map census, sidecar admission,
+repeated formula renders, and table extraction, merging decode-report fields,
+work, and text usage. The ledger is conservative logical accounting rather
+than Package/cache, decompressed-Archive, process allocator, RSS, or
+codec-internal allocation telemetry. No zero-copy, allocator/RSS,
+latency/performance, or full-workspace claim follows.
+
+Wave106 verification records 38/38 focused extractor tests; green
+`litchi-iwa` library check, no-run, and strict Clippy gates; a passing formula
+fuzz binary check and strict Clippy gate with 14 seed cases smoked for 100
+runs; a dedicated FormulaArchive extractor boundary audit with no findings;
+and 643/643 full boundary unit tests with passing `py_compile`. These scoped
+results do not satisfy the monolith deletion gate.
+
+The only current native evidence is a read of the Numbers-created
+`/private/tmp/wave106-numbers-formula-source.numbers` (136,591 bytes,
+SHA-256
+`81fe99b6647e370d1b1663c703500f1fac239111ae7b4bea862f74803c94208c`, 43
+members). The source contains one 22-by-7 `Table 1`; the migrated extractor
+read six materialized cells and reported `=(B3+C3)` at zero-based `(1,3)` and
+`=SUM(B4:C4)` at `(2,3)`. No mutation, candidate, inverse, save/reopen, or UI
+acceptance claim is made.
+
+No crate, manifest dependency, dependency edge, or ordered debt is closed by
+Wave106. Debts 010, 015, and 016 remain open, as do all other current debts;
+the `litchi-iwa` edges, generated/Prost/Buffa owners, migration host, and IWA
+monolith deletion gate remain unchanged.

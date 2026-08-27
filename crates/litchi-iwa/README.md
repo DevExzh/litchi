@@ -2687,6 +2687,56 @@ crate, manifest dependency, dependency edge, or migration debt. The
 016, and 017), generated/Prost/Buffa owners, and the IWA monolith deletion gate
 remain unchanged.
 
+### Numbers FormulaArchive extraction uses a bounded neutral projection
+
+The legacy `litchi-iwa::numbers::table_extractor::TableDataExtractor` now
+retains strict bounded owned FormulaArchive wire bytes and renders through
+the neutral `numbers_formula_codec` scalar and compatibility visitors. The
+sidecar owns its preservation bytes; it is not a zero-copy view. Production
+generated `tsce::FormulaArchive` decoding and generated AST construction are
+removed from this extractor path, while the former generated renderer remains
+available only as a `cfg(test)` differential oracle.
+
+Canonical but incomplete postfix programs intentionally retain legacy output:
+operand-less negation renders `=FORMULA()` and surplus expressions select the
+final expression. Malformed wire, duplicated known fields, and noncanonical
+known values remain rejected.
+
+`FormulaOwnerDependencies`, category maps, and name maps remain permissive
+generated best-effort compatibility products. Formula authoring, formula-cache
+refresh, physical formula mutation, cloning, merge handling, and dependency
+shifting remain generated compatibility responsibilities. This section does
+not claim a full Numbers formula migration or generated-free physical table
+editing.
+
+One `ProjectionBudget` spans reference-map census, sidecar admission,
+repeated renders, and table extraction; formula decode-report fields, work,
+and text usage are merged into that budget. The ledger is conservative logical
+accounting, not Package/cache or decompressed-Archive, allocator, RSS, or
+codec-internal telemetry. No zero-copy, allocator/RSS, latency, or
+package-wide performance claim follows.
+
+Wave106 scoped gates are 38/38 focused extractor tests; green `litchi-iwa`
+library check, no-run, and strict Clippy; a passing formula fuzz binary check
+and strict Clippy with a 14-seed smoke run completed for 100 runs; a dedicated
+FormulaArchive extractor boundary audit with no findings; and 643/643 full
+boundary unit tests with passing `py_compile`.
+
+Read-only native evidence uses the Numbers-created
+`/private/tmp/wave106-numbers-formula-source.numbers` (136,591 bytes,
+SHA-256
+`81fe99b6647e370d1b1663c703500f1fac239111ae7b4bea862f74803c94208c`, 43
+members). It contains one 22-by-7 `Table 1`; the migrated extractor read six
+materialized cells and reported `=(B3+C3)` at zero-based `(1,3)` and
+`=SUM(B4:C4)` at `(2,3)`. No mutation, candidate, inverse, save/reopen, or UI
+acceptance claim follows.
+
+The legacy host still owns formula authoring/cache/mutation and related
+physical table, tile, dependency, clone, and merge paths. Wave106 closes no
+crate, manifest dependency, edge, or migration debt; all 13 ordered debts,
+the generated/Prost/Buffa owners, and the IWA monolith deletion gate remain
+unchanged.
+
 ## Embedded media
 
 Single-file packages and in-memory bytes expose their `Data/*` members. The
