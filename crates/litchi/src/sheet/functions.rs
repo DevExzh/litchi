@@ -3,6 +3,43 @@
 use super::traits::WorkbookTrait;
 use super::types::Result;
 
+#[cfg(feature = "xlsx")]
+fn checked_owned_xlsx_source_bytes(
+    bytes: &[u8],
+    limits: &crate::xlsx::ReadLimits,
+) -> Result<Vec<u8>> {
+    let input_bytes = u64::try_from(bytes.len()).map_err(|_| {
+        crate::map_ooxml_error(crate::xlsx::Error::Package(
+            crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                actual: u64::MAX,
+                maximum: limits.max_input_bytes(),
+            },
+        ))
+    })?;
+    if input_bytes > limits.max_input_bytes() {
+        return Err(Box::new(crate::map_ooxml_error(
+            crate::xlsx::Error::Package(crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                actual: input_bytes,
+                maximum: limits.max_input_bytes(),
+            }),
+        )));
+    }
+
+    let mut owned = Vec::new();
+    owned.try_reserve_exact(bytes.len()).map_err(|source| {
+        crate::map_ooxml_error(crate::xlsx::Error::Package(
+            crate::opc::OpcError::Allocation {
+                resource: "source-backed XLSX input bytes",
+                source,
+            },
+        ))
+    })?;
+    owned.extend_from_slice(bytes);
+    Ok(owned)
+}
+
 /// Open a workbook from a file path.
 ///
 /// On Unix and Windows, validates the XLSX OPC catalog and relationship graph
@@ -61,11 +98,14 @@ pub fn open_workbook_from_bytes_with_limits(
     bytes: &[u8],
     limits: crate::xlsx::ReadLimits,
 ) -> Result<Box<dyn WorkbookTrait>> {
-    let workbook = crate::xlsx::Package::from_slice_with_limits(bytes, limits)
-        .map_err(crate::map_ooxml_error)?
-        .into_workbook()
+    let bytes = checked_owned_xlsx_source_bytes(bytes, &limits)?;
+    let package = crate::opc::SourceBackedPackage::from_vec_with_limits(bytes, limits)
+        .map_err(|error| crate::map_ooxml_error(crate::xlsx::Error::Package(error)))?;
+    let workbook = crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)
         .map_err(crate::map_ooxml_error)?;
-    Ok(Box::new(super::adapters::Workbook::new(workbook)))
+    Ok(Box::new(super::adapters::Workbook::from_source_backed(
+        workbook,
+    )))
 }
 
 /// Open an XLS workbook from a file path.

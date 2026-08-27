@@ -75,7 +75,8 @@ fn coordinate(row: u32, column: u32) -> Address {
 ///
 /// Filesystem-backed opens retain the standalone source-backed owner so the
 /// workbook catalog can be listed without materializing worksheet payloads.
-/// Bytes-backed opens continue to use the historical owned snapshot.
+/// Dynamic path and bytes opens use source-backed ownership; explicit eager
+/// compatibility constructors may still provide an owned snapshot.
 pub(crate) struct Workbook {
     workbook: WorkbookModel,
     names: Box<[String]>,
@@ -784,10 +785,109 @@ mod tests {
         let bytes = fixture(false, false);
         let path = path_for(&bytes);
         let source = crate::sheet::open_workbook(path.path()).expect("source-backed open");
-        let eager = crate::sheet::open_workbook_from_bytes(&bytes).expect("eager open");
+        let source_bytes =
+            crate::sheet::open_workbook_from_bytes(&bytes).expect("source-backed bytes open");
 
         assert_workbook_trait_surface(source.as_ref());
-        assert_workbook_trait_surface(eager.as_ref());
+        assert_workbook_trait_surface(source_bytes.as_ref());
+    }
+
+    #[test]
+    fn source_bytes_catalog_and_selection_defer_corrupt_unselected_payload() {
+        let bytes = corrupt_central_crc(fixture(false, false), b"xl/worksheets/sheet2.xml");
+        let workbook = crate::sheet::open_workbook_from_bytes(&bytes)
+            .expect("catalog-only source-backed bytes open");
+
+        assert_eq!(workbook.worksheet_names(), ["First", "Second"]);
+        assert_eq!(workbook.worksheet_count(), 2);
+        let first = workbook
+            .worksheet_by_name("First")
+            .expect("select valid worksheet");
+        assert!(first.cell_value(0, 0).is_ok());
+
+        let second = workbook
+            .worksheet_by_name("Second")
+            .expect("select corrupt worksheet");
+        assert!(second.cell_value(0, 0).is_err());
+    }
+
+    #[test]
+    fn source_bytes_owns_input_after_backing_vec_drop() {
+        let workbook = {
+            let bytes = fixture(false, false);
+            crate::sheet::open_workbook_from_bytes(&bytes).expect("source-backed bytes open")
+        };
+
+        let first = workbook
+            .worksheet_by_name("First")
+            .expect("select worksheet after input drop");
+        assert!(first.cell_value(0, 0).is_ok());
+    }
+
+    #[test]
+    fn source_bytes_reject_non_xlsx_ooxml() {
+        let bytes = include_bytes!(
+            "../../../../../test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx"
+        );
+        assert!(crate::sheet::open_workbook_from_bytes(bytes).is_err());
+    }
+
+    #[cfg(feature = "xlsb")]
+    #[test]
+    fn source_bytes_reject_xlsb() {
+        let bytes = include_bytes!("../../../../../test-data/ooxml/xlsb/Simple.xlsb");
+        assert!(crate::sheet::open_workbook_from_bytes(bytes).is_err());
+    }
+
+    #[test]
+    fn source_bytes_enforce_input_and_part_limits() {
+        let bytes = fixture(false, false);
+        let input_limit = crate::xlsx::ReadLimits::builder()
+            .max_input_bytes((bytes.len() as u64).saturating_sub(1))
+            .unwrap()
+            .build()
+            .unwrap();
+        let input_error =
+            match crate::sheet::open_workbook_from_bytes_with_limits(&bytes, input_limit) {
+                Ok(_) => panic!("input limit must be checked before source ownership"),
+                Err(error) => error,
+            };
+        let input_message = match input_error.downcast_ref::<litchi_core::Error>() {
+            Some(litchi_core::Error::InvalidFormat(message)) => message,
+            Some(error) => panic!("unexpected input-limit facade error: {error}"),
+            None => panic!("input-limit error was not mapped to the facade error"),
+        };
+        let input_actual = bytes.len() as u64;
+        let input_maximum = input_actual - 1;
+        assert!(input_message.contains("input bytes"));
+        assert!(input_message.contains(&input_actual.to_string()));
+        assert!(input_message.contains(&input_maximum.to_string()));
+
+        let declared_part_bytes = crate::opc::SourceBackedPackage::from_vec(bytes.clone())
+            .expect("open source-backed package for declared part size")
+            .main_document_part()
+            .expect("find workbook part")
+            .declared_uncompressed_size()
+            .expect("read declared workbook part size");
+        let part_limit = crate::xlsx::ReadLimits::builder()
+            .max_part_bytes(declared_part_bytes - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let part_error =
+            match crate::sheet::open_workbook_from_bytes_with_limits(&bytes, part_limit) {
+                Ok(_) => panic!("workbook part limit must remain typed"),
+                Err(error) => error,
+            };
+        let part_message = match part_error.downcast_ref::<litchi_core::Error>() {
+            Some(litchi_core::Error::InvalidFormat(message)) => message,
+            Some(error) => panic!("unexpected part-limit facade error: {error}"),
+            None => panic!("part-limit error was not mapped to the facade error"),
+        };
+        let part_maximum = declared_part_bytes - 1;
+        assert!(part_message.contains("part bytes"));
+        assert!(part_message.contains(&declared_part_bytes.to_string()));
+        assert!(part_message.contains(&part_maximum.to_string()));
     }
 
     #[cfg(any(unix, windows))]
