@@ -42,12 +42,11 @@ pub enum FontEmbedding {
 pub(crate) struct PreservationProvenance {
     pub(crate) members: Vec<SourceMember>,
     pub(crate) parts: HashMap<PackURI, SourcePart>,
-    pub(crate) package_relationships_xml: String,
+    pub(crate) package_relationships_xml: CanonicalRelationshipsXml,
 }
 
 #[derive(Debug)]
 pub(crate) struct SourceMember {
-    pub(crate) name: Option<String>,
     pub(crate) kind: SourceMemberKind,
 }
 
@@ -64,9 +63,34 @@ pub(crate) enum SourceMemberKind {
 pub(crate) struct SourcePart {
     pub(crate) content_type: String,
     pub(crate) blob: Arc<Vec<u8>>,
-    pub(crate) relationships_xml: String,
+    pub(crate) relationships_xml: CanonicalRelationshipsXml,
     pub(crate) member_present: bool,
     pub(crate) relationships_member_present: bool,
+}
+
+const EMPTY_RELATIONSHIPS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+
+#[derive(Debug)]
+pub(crate) enum CanonicalRelationshipsXml {
+    Empty,
+    Owned(Box<[u8]>),
+}
+
+impl CanonicalRelationshipsXml {
+    pub(crate) fn from_relationships(relationships: &Relationships) -> Self {
+        if relationships.is_empty() {
+            Self::Empty
+        } else {
+            Self::Owned(relationships.to_xml().into_bytes().into_boxed_slice())
+        }
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Empty => EMPTY_RELATIONSHIPS_XML,
+            Self::Owned(bytes) => bytes,
+        }
+    }
 }
 
 /// Main API class for working with OPC packages.
@@ -196,6 +220,13 @@ impl OpcPackage {
     /// the classification; mutable package callers cannot manufacture it.
     pub(crate) fn set_non_part_members(&mut self, members: Vec<NonPartMember>) {
         self.non_part_members = members;
+    }
+
+    pub(crate) fn source_relationships_member_present(&self, partname: &PackURI) -> bool {
+        self.preservation
+            .as_deref()
+            .and_then(|provenance| provenance.parts.get(partname))
+            .is_some_and(|part| part.relationships_member_present)
     }
 
     /// Set save options for the package.
@@ -1175,7 +1206,7 @@ impl PreservationProvenance {
                 SourcePart {
                     content_type: try_owned_string(part.content_type())?,
                     blob: part.blob_arc(),
-                    relationships_xml: part.rels().to_xml(),
+                    relationships_xml: CanonicalRelationshipsXml::from_relationships(part.rels()),
                     member_present: false,
                     relationships_member_present: false,
                 },
@@ -1199,57 +1230,41 @@ impl PreservationProvenance {
             }
             let Ok(name) = std::str::from_utf8(raw_name) else {
                 members.push(SourceMember {
-                    name: None,
                     kind: SourceMemberKind::Unknown,
                 });
                 continue;
             };
 
-            let (stored_name, kind) = if name.eq_ignore_ascii_case("[Content_Types].xml") {
+            let kind = if name.eq_ignore_ascii_case("[Content_Types].xml") {
                 if content_types_present {
                     return None;
                 }
                 content_types_present = true;
-                (
-                    Some(try_owned_string(name)?),
-                    SourceMemberKind::ContentTypes,
-                )
+                SourceMemberKind::ContentTypes
             } else if name == package_relationships_name {
                 if package_relationships_present {
                     return None;
                 }
                 package_relationships_present = true;
-                (
-                    Some(try_owned_string(name)?),
-                    SourceMemberKind::PackageRelationships,
-                )
+                SourceMemberKind::PackageRelationships
             } else if let Some(partname) = part_members.get(name) {
                 let part = parts.get_mut(partname)?;
                 if part.member_present {
                     return None;
                 }
                 part.member_present = true;
-                (
-                    Some(try_owned_string(name)?),
-                    SourceMemberKind::Part(partname.clone()),
-                )
+                SourceMemberKind::Part(partname.clone())
             } else if let Some(partname) = relationship_members.get(name) {
                 let part = parts.get_mut(partname)?;
                 if part.relationships_member_present {
                     return None;
                 }
                 part.relationships_member_present = true;
-                (
-                    Some(try_owned_string(name)?),
-                    SourceMemberKind::PartRelationships(partname.clone()),
-                )
+                SourceMemberKind::PartRelationships(partname.clone())
             } else {
-                (None, SourceMemberKind::Unknown)
+                SourceMemberKind::Unknown
             };
-            members.push(SourceMember {
-                name: stored_name,
-                kind,
-            });
+            members.push(SourceMember { kind });
         }
 
         if members.len() != entry_count
@@ -1262,7 +1277,9 @@ impl PreservationProvenance {
         Some(Self {
             members,
             parts,
-            package_relationships_xml: package.rels().to_xml(),
+            package_relationships_xml: CanonicalRelationshipsXml::from_relationships(
+                package.rels(),
+            ),
         })
     }
 }
@@ -1445,6 +1462,28 @@ mod tests {
         assert_eq!(package.save_options().fonts, FontEmbedding::Subset);
         package.with_fonts(FontEmbedding::Full);
         assert_eq!(package.save_options().fonts, FontEmbedding::Full);
+    }
+
+    #[test]
+    fn relationship_provenance_uses_empty_sentinel_and_exact_owned_bytes() {
+        let empty_relationships = Relationships::new(PACKAGE_URI.to_owned());
+        let empty = CanonicalRelationshipsXml::from_relationships(&empty_relationships);
+        assert!(matches!(empty, CanonicalRelationshipsXml::Empty));
+        assert_eq!(empty.as_bytes(), EMPTY_RELATIONSHIPS_XML);
+
+        let mut relationships = Relationships::new(PACKAGE_URI.to_owned());
+        relationships
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "/custom/data.bin".to_owned(),
+                "rId1".to_owned(),
+                crate::TargetMode::Internal,
+            )
+            .unwrap();
+        let expected = relationships.to_xml();
+        let owned = CanonicalRelationshipsXml::from_relationships(&relationships);
+        assert!(matches!(&owned, CanonicalRelationshipsXml::Owned(_)));
+        assert_eq!(owned.as_bytes(), expected.as_bytes());
     }
 
     #[test]

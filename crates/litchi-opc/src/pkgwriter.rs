@@ -5,8 +5,7 @@
 use crate::constants::content_type as ct;
 use crate::content_type::ContentType;
 use crate::error::Result;
-use crate::package::OpcPackage;
-use crate::package::SourceMemberKind;
+use crate::package::{OpcPackage, SourceMember, SourceMemberKind};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgWriter;
 use crate::rel::Relationships;
@@ -68,6 +67,7 @@ struct PlannedPart<'package> {
     blob: &'package [u8],
     authored_xml: bool,
     rels: &'package Relationships,
+    relationships_member_present: bool,
     relationships: Option<PlannedRelationships>,
 }
 
@@ -125,6 +125,8 @@ impl<'package> PublicationPlan<'package> {
                     part.content_type(),
                 ) && !package.is_exact_source_xml(part),
                 rels: part.rels(),
+                relationships_member_present: package
+                    .source_relationships_member_present(part.partname()),
                 relationships: None,
             });
         }
@@ -146,7 +148,7 @@ impl<'package> PublicationPlan<'package> {
             if part.authored_xml {
                 PackageWriter::validate_authored_xml(part.partname.as_str(), part.blob)?;
             }
-            if !part.rels.is_empty() {
+            if !part.rels.is_empty() || part.relationships_member_present {
                 let uri = part
                     .partname
                     .rels_uri()
@@ -301,10 +303,26 @@ fn try_write_preserved<W: Write>(
             .cmp(right.owner_name())
             .then_with(|| left.kind_order().cmp(&right.kind_order()))
     });
-    if topology_add
-        && provenance.members.iter().any(|member| {
-            member.name.is_none() || matches!(&member.kind, SourceMemberKind::Unknown)
+    if provenance
+        .members
+        .iter()
+        .zip(index.entries())
+        .any(|(member, indexed_entry)| {
+            !matches!(&member.kind, SourceMemberKind::Unknown)
+                && preservation_member_name(member, indexed_entry).is_none()
         })
+    {
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    if topology_add
+        && provenance
+            .members
+            .iter()
+            .zip(index.entries())
+            .any(|(member, indexed_entry)| {
+                preservation_member_name(member, indexed_entry).is_none()
+                    || matches!(&member.kind, SourceMemberKind::Unknown)
+            })
     {
         // Appending generated entries after a source member whose identity is
         // not modeled would silently change an opaque archive topology. The
@@ -320,8 +338,8 @@ fn try_write_preserved<W: Write>(
                 resource: "OPC source preservation member names",
                 source,
             })?;
-        for member in &provenance.members {
-            let Some(name) = member.name.as_deref() else {
+        for (member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+            let Some(name) = preservation_member_name(member, indexed_entry) else {
                 return Ok(PreservationWrite::Fallback(writer));
             };
             member_names.insert(normalized_member_name(
@@ -329,6 +347,127 @@ fn try_write_preserved<W: Write>(
                 "OPC source preservation member name",
             )?);
         }
+
+        let mut planned_parts_by_name: HashMap<String, &PackURI> = HashMap::new();
+        planned_parts_by_name
+            .try_reserve(publication.parts.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC planned part member names",
+                source,
+            })?;
+        for part in &publication.parts {
+            let name =
+                normalized_member_name(part.partname.membername(), "OPC planned part member name")?;
+            if let Some(existing) = planned_parts_by_name.get(&name)
+                && (*existing).conflict_with(part.partname).is_some()
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            planned_parts_by_name.insert(name, part.partname);
+        }
+        for (name, current) in &planned_parts_by_name {
+            for (index, byte) in name.as_bytes().iter().enumerate().skip(1) {
+                if *byte != b'/' {
+                    continue;
+                }
+                let Some(existing) = planned_parts_by_name.get(&name[..index]) else {
+                    continue;
+                };
+                if (*existing).conflict_with(current).is_some() {
+                    return Ok(PreservationWrite::Fallback(writer));
+                }
+            }
+        }
+
+        let final_member_count = publication
+            .parts
+            .len()
+            .checked_mul(2)
+            .and_then(|count| count.checked_add(2))
+            .ok_or_else(|| crate::OpcError::ZipError("OPC final member count overflow".into()))?;
+        let mut final_member_names = HashSet::new();
+        final_member_names
+            .try_reserve(final_member_count)
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC final member names",
+                source,
+            })?;
+        if !insert_final_member_name(
+            &mut final_member_names,
+            &publication.content_types_uri,
+            "OPC final member name",
+        )? || !insert_final_member_name(
+            &mut final_member_names,
+            &publication.package_rels_uri,
+            "OPC final member name",
+        )? {
+            return Ok(PreservationWrite::Fallback(writer));
+        }
+        for part in &publication.parts {
+            if !insert_final_member_name(
+                &mut final_member_names,
+                part.partname,
+                "OPC final member name",
+            )? {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            if let Some(relationships) = part.relationships.as_ref()
+                && !insert_final_member_name(
+                    &mut final_member_names,
+                    &relationships.uri,
+                    "OPC final member name",
+                )?
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
+        if has_final_member_prefix_conflict(&final_member_names) {
+            return Ok(PreservationWrite::Fallback(writer));
+        }
+
+        let mut planned_relationship_names = HashSet::new();
+        planned_relationship_names
+            .try_reserve(publication.parts.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC planned relationship member names",
+                source,
+            })?;
+        for part in &publication.parts {
+            let relationships_uri = match part.partname.rels_uri() {
+                Ok(uri) => uri,
+                Err(_) => return Ok(PreservationWrite::Fallback(writer)),
+            };
+            let name = normalized_member_name(
+                relationships_uri.membername(),
+                "OPC planned relationship member name",
+            )?;
+            if !planned_relationship_names.insert(name) {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
+
+        for part in &additions {
+            let part_name =
+                normalized_member_name(part.partname.membername(), "OPC added part member name")?;
+            if member_names.contains(&part_name) || planned_relationship_names.contains(&part_name)
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            let relationships_uri = match part.partname.rels_uri() {
+                Ok(uri) => uri,
+                Err(_) => return Ok(PreservationWrite::Fallback(writer)),
+            };
+            let relationships_name = normalized_member_name(
+                relationships_uri.membername(),
+                "OPC added relationship member name",
+            )?;
+            if member_names.contains(&relationships_name)
+                || planned_parts_by_name.contains_key(&relationships_name)
+            {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
+
         let mut appended_names = HashSet::new();
         appended_names
             .try_reserve(appended.len())
@@ -388,7 +527,8 @@ fn try_write_preserved<W: Write>(
                 Some(publication.content_types_xml.len())
             },
             SourceMemberKind::PackageRelationships
-                if provenance.package_relationships_xml != publication.package_rels_xml =>
+                if provenance.package_relationships_xml.as_bytes()
+                    != publication.package_rels_xml.as_bytes() =>
             {
                 Some(publication.package_rels_xml.len())
             },
@@ -411,7 +551,7 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                (source_part.relationships_xml != relationships.xml)
+                (source_part.relationships_xml.as_bytes() != relationships.xml.as_bytes())
                     .then_some(relationships.xml.len())
             },
             SourceMemberKind::ContentTypes
@@ -419,7 +559,7 @@ fn try_write_preserved<W: Write>(
             | SourceMemberKind::Unknown => None,
         };
         if let Some(bytes) = bytes {
-            if member.name.is_none() {
+            if preservation_member_name(member, indexed_entry).is_none() {
                 return Ok(PreservationWrite::Fallback(writer));
             }
             regenerated_bytes = match regenerated_bytes.checked_add(bytes as u64) {
@@ -480,15 +620,16 @@ fn try_write_preserved<W: Write>(
             match &source_member.kind {
                 SourceMemberKind::ContentTypes if content_types_changed => regenerated_action(
                     indexed_entry.id(),
-                    source_member.name.as_deref(),
+                    preservation_member_name(source_member, indexed_entry),
                     publication.content_types_xml.as_bytes(),
                 )?,
                 SourceMemberKind::PackageRelationships
-                    if provenance.package_relationships_xml != publication.package_rels_xml =>
+                    if provenance.package_relationships_xml.as_bytes()
+                        != publication.package_rels_xml.as_bytes() =>
                 {
                     regenerated_action(
                         indexed_entry.id(),
-                        source_member.name.as_deref(),
+                        preservation_member_name(source_member, indexed_entry),
                         publication.package_rels_xml.as_bytes(),
                     )?
                 },
@@ -504,7 +645,7 @@ fn try_write_preserved<W: Write>(
                     } else {
                         regenerated_shared_action(
                             indexed_entry.id(),
-                            source_member.name.as_deref(),
+                            preservation_member_name(source_member, indexed_entry),
                             package.get_part(partname)?.blob_arc(),
                         )?
                     }
@@ -519,12 +660,12 @@ fn try_write_preserved<W: Write>(
                     let Some(source_part) = provenance.parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if source_part.relationships_xml == relationships.xml {
+                    if source_part.relationships_xml.as_bytes() == relationships.xml.as_bytes() {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
                         regenerated_action(
                             indexed_entry.id(),
-                            source_member.name.as_deref(),
+                            preservation_member_name(source_member, indexed_entry),
                             relationships.xml.as_bytes(),
                         )?
                     }
@@ -566,6 +707,54 @@ fn try_write_preserved<W: Write>(
         .write_to(&plan, Chunked { inner: writer })
         .map(|writer| PreservationWrite::Written(writer.inner))
         .map_err(|error| crate::OpcError::ZipError(error.to_string()))
+}
+
+fn insert_final_member_name(
+    names: &mut HashSet<String>,
+    uri: &PackURI,
+    resource: &'static str,
+) -> Result<bool> {
+    let name = normalized_member_name(uri.membername(), resource)?;
+    Ok(names.insert(name))
+}
+
+fn has_final_member_prefix_conflict(names: &HashSet<String>) -> bool {
+    for name in names {
+        for (index, byte) in name.as_bytes().iter().enumerate().skip(1) {
+            if *byte != b'/' {
+                continue;
+            }
+            if names.contains(&name[..index]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn preservation_member_name<'a>(
+    member: &SourceMember,
+    indexed_entry: &'a soapberry_zip::PreservedEntry,
+) -> Option<&'a str> {
+    let name = std::str::from_utf8(indexed_entry.raw_name_bytes()).ok()?;
+    match &member.kind {
+        SourceMemberKind::ContentTypes => name
+            .eq_ignore_ascii_case("[Content_Types].xml")
+            .then_some(name),
+        SourceMemberKind::PackageRelationships => {
+            let package_uri = PackURI::new(PACKAGE_URI).ok()?;
+            let relationships_uri = package_uri.rels_uri().ok()?;
+            let relationships_name = relationships_uri.membername();
+            (name == relationships_name).then_some(name)
+        },
+        SourceMemberKind::Part(partname) => (name == partname.membername()).then_some(name),
+        SourceMemberKind::PartRelationships(partname) => {
+            let relationships_uri = partname.rels_uri().ok()?;
+            let relationships_name = relationships_uri.membername();
+            (name == relationships_name).then_some(name)
+        },
+        SourceMemberKind::Unknown => Some(name),
+    }
 }
 
 fn regenerated_action(
@@ -1133,6 +1322,38 @@ mod tests {
         )
     }
 
+    fn source_with_explicit_empty_part_relationships() -> (Vec<u8>, PackURI) {
+        let partname = PackURI::new("/custom/empty.bin").expect("empty part URI");
+        let empty_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_deflated(
+                "[Content_Types].xml",
+                br#"<?xml version="1.0"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="bin" ContentType="application/octet-stream"/>
+</Types>"#,
+            )
+            .expect("write content types");
+        writer
+            .write_deflated("_rels/.rels", empty_relationships.as_bytes())
+            .expect("write package relationships");
+        writer
+            .write_deflated(partname.membername(), b"original")
+            .expect("write part");
+        writer
+            .write_deflated(
+                partname
+                    .rels_uri()
+                    .expect("part relationships URI")
+                    .membername(),
+                empty_relationships.as_bytes(),
+            )
+            .expect("write explicit empty part relationships");
+        (writer.finish_to_bytes().expect("finish source"), partname)
+    }
+
     fn signed_source() -> (Vec<u8>, PackURI) {
         let first = PackURI::new("/custom/first.bin").expect("first URI");
         let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
@@ -1588,6 +1809,58 @@ mod tests {
     }
 
     #[test]
+    fn package_relationship_edit_regenerates_using_raw_source_name() {
+        let (source, _first, second) = two_part_source(b"package relationship edit");
+        let mut package = OpcPackage::from_vec(source).expect("open package relationship source");
+        package.relate_to(second.membername(), "urn:package:test");
+
+        let output = PackageWriter::to_bytes(&package).expect("publish package relationship edit");
+        let raw = raw_archive(&output);
+        assert!(raw.central_order.iter().any(|name| name == "_rels/.rels"));
+
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen package relationship edit");
+        let relationship = reopened.rels().get("rId1").expect("package relationship");
+        assert_eq!(relationship.target_ref(), second.membername());
+    }
+
+    #[test]
+    fn revoked_part_mutation_preserves_explicit_empty_relationship_member() {
+        let (source, partname) = source_with_explicit_empty_part_relationships();
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source).expect("open explicit empty source");
+        package
+            .get_part_mut(&partname)
+            .expect("empty relationship part")
+            .set_blob(b"changed".to_vec());
+
+        let output = PackageWriter::to_bytes(&package).expect("publish changed part");
+        let raw = raw_archive(&output);
+        let relationships_name = partname
+            .rels_uri()
+            .expect("part relationships URI")
+            .membername()
+            .to_owned();
+        assert!(
+            raw.central_order
+                .iter()
+                .any(|name| name == &relationships_name)
+        );
+        assert_eq!(
+            raw.local_members[&relationships_name],
+            source_raw.local_members[&relationships_name]
+        );
+        assert_eq!(
+            central_without_local_offset(&raw.central_records[&relationships_name]),
+            central_without_local_offset(&source_raw.central_records[&relationships_name])
+        );
+
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen changed part");
+        let part = reopened.get_part(&partname).expect("changed part");
+        assert_eq!(part.blob(), b"changed");
+        assert!(part.rels().is_empty());
+    }
+
+    #[test]
     fn revoked_noop_uses_preservation_copy_all() {
         let (source, _first, _second) = two_part_source(b"copy-all comment");
         let mut package = OpcPackage::from_vec(source.clone()).expect("open owned source");
@@ -1790,6 +2063,115 @@ mod tests {
             reopened.get_part(&second_added).unwrap().content_type(),
             "application/octet-stream"
         );
+    }
+
+    #[test]
+    fn topology_add_rejects_packuri_derived_relationship_name_conflict() {
+        let existing_name = PackURI::new("/custom/new.bin").unwrap();
+        let candidate_name = PackURI::new("/custom/_rels/new.bin.rels").unwrap();
+        let mut existing = crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        );
+        crate::Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(existing));
+        let source = PackageWriter::to_bytes(&source_package).expect("serialize conflict source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open conflict source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            candidate_name,
+            "application/vnd.openxmlformats-package.relationships+xml".to_owned(),
+            Relationships::new(PACKAGE_URI.to_owned())
+                .to_xml()
+                .into_bytes(),
+        )));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn topology_add_rejects_relationship_member_prefix_conflict() {
+        let existing_name = PackURI::new("/custom/_rels").unwrap();
+        let candidate_name = PackURI::new("/custom/foo").unwrap();
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        )));
+        let source = PackageWriter::to_bytes(&source_package).expect("serialize prefix source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open prefix source");
+        let mut candidate = crate::BlobPart::new(
+            candidate_name,
+            "application/octet-stream".to_owned(),
+            b"candidate".to_vec(),
+        );
+        crate::Part::relate_to_ext(&mut candidate, "https://example.com", "urn:test");
+        package.add_part(Box::new(candidate));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn topology_add_rejects_part_descending_from_existing_relationship_member() {
+        let existing_name = PackURI::new("/custom/base.bin").unwrap();
+        let candidate_name = PackURI::new("/custom/_rels/base.bin.rels/child.bin").unwrap();
+        let mut source_package = OpcPackage::new();
+        let mut existing = crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        );
+        crate::Part::relate_to_ext(&mut existing, "https://example.com", "urn:test");
+        source_package.add_part(Box::new(existing));
+        let source =
+            PackageWriter::to_bytes(&source_package).expect("serialize relationship source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open relationship source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            candidate_name,
+            "application/octet-stream".to_owned(),
+            b"candidate".to_vec(),
+        )));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+    }
+
+    #[test]
+    fn topology_add_rejects_packuri_prefix_conflict() {
+        let existing_name = PackURI::new("/custom/foo").unwrap();
+        let candidate_name = PackURI::new("/custom/foo/bar.bin").unwrap();
+        let mut source_package = OpcPackage::new();
+        source_package.add_part(Box::new(crate::BlobPart::new(
+            existing_name,
+            "application/octet-stream".to_owned(),
+            b"existing".to_vec(),
+        )));
+        let source = PackageWriter::to_bytes(&source_package).expect("serialize prefix source");
+
+        let mut package = OpcPackage::from_vec(source).expect("open prefix source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            candidate_name,
+            "application/octet-stream".to_owned(),
+            b"candidate".to_vec(),
+        )));
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
     }
 
     #[test]
