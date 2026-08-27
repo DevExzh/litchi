@@ -1834,3 +1834,53 @@ fn tables_on_multiple_slides_remain_isolated() {
     assert_eq!(editor.slide_tables(0).unwrap()[0].name, "First");
     assert_eq!(editor.slide_tables(1).unwrap()[0].name, "Second");
 }
+
+#[test]
+fn source_built_tables_list_in_z_order_and_roundtrip_through_catalog() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let (position, size) = table_geometry();
+    editor
+        .add_slide_table(0, "First", 2, 2, position, size)
+        .unwrap();
+    editor
+        .add_slide_table(0, "Second", 3, 2, position, size)
+        .unwrap();
+    editor
+        .add_slide_table(0, "Third", 4, 3, position, size)
+        .unwrap();
+
+    let expected = [("First", 2, 2), ("Second", 3, 2), ("Third", 4, 3)];
+    let listed = editor.slide_tables(0).unwrap();
+    assert_eq!(listed.len(), expected.len());
+    for (table, (name, rows, columns)) in listed.iter().zip(expected) {
+        assert_eq!(table.name, name);
+        assert_eq!((table.rows, table.columns), (rows, columns));
+    }
+
+    // Listing is read-only and the compact catalog is rebuilt from the same
+    // immutable package snapshot on reopen; no table identity or z-order is
+    // inferred from the generated model's allocation order.
+    let source = editor.to_bytes().unwrap();
+    let reopened = KeynoteEditor::from_bytes(&source).unwrap();
+    let reread = reopened.slide_tables(0).unwrap();
+    assert_eq!(reread.len(), listed.len());
+    for (before, after) in listed.iter().zip(reread) {
+        assert_eq!(
+            (
+                before.name.as_str(),
+                before.rows,
+                before.columns,
+                before.drawable_object_id,
+                before.model_object_id,
+            ),
+            (
+                after.name.as_str(),
+                after.rows,
+                after.columns,
+                after.drawable_object_id,
+                after.model_object_id,
+            )
+        );
+    }
+    assert_eq!(reopened.to_bytes().unwrap(), source);
+}

@@ -1041,6 +1041,42 @@ yet moved to a concrete package owner. It does not demonstrate Keynote title,
 body, or speaker-notes editing: those semantic operations are owned by
 `litchi-keynote`.
 
+#### Keynote slide-table discovery boundary
+
+Legacy `KeynoteEditor::slide_tables` now uses a private bounded catalog for
+its package-wide discovery pass, and `add_slide_table` reuses the same bounded
+template-discovery route. The catalog keeps only compact object/member slots
+and message type/length facts; decompressed archives and payloads are borrowed
+for strict projections and are not retained. A borrowed model projection
+supplies only the table identity, name, and dimensions needed by discovery,
+with finite archive/object/message/reference/payload/retained/semantic and
+wire limits. Canonical model type 6001 is authoritative; strict legacy
+type-6000 is considered only when no type-6001 model exists, and simultaneous
+model candidates fail closed.
+
+This is a discovery optimization and admission boundary, not a new semantic
+Keynote package API. The legacy `KeynoteSlideTableInfo` result continues to
+expose its compatibility native identifiers. Complete TableInfo/model
+materialization, appearance and lock handling, storage/cells, formulas, tiles,
+comments, metadata, and native mutations remain on their existing generated
+or native compatibility paths. The private catalog does not claim a fully
+generated-free Keynote implementation, a zero-copy package, or retirement of
+the migration host, its dependency edges, or migration debts.
+
+An external public `KeynoteEditor` read-only driver checked the Wave99 source
+`/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
+`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`) and the
+Wave100 source (500,128 bytes, SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`). Each
+read one slide and one 5-by-4 `Table 1`; simultaneous 6000/6001 candidates
+reject; fresh reopen parity was true and
+post-read bytes and hashes were unchanged. Computer Use also opened the
+Wave100 source in Keynote 14.4 without repair, recovery, or conversion UI and
+observed `Table 1` with 5 rows and 4 columns; source bytes and hash remained
+exact. This is bounded read-only semantic and open/render evidence only: no
+Keynote save/normalization/mutation, performance/RSS, or public
+catalog-statistics claim follows.
+
 Numbers scalar cell writes are selector-first `litchi-numbers` package
 transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
 before publication, so any rejected coordinate, dependency, or cache update

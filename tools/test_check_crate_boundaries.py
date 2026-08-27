@@ -1442,6 +1442,60 @@ def add_keynote_slide_table_headers_canonical_scaffold(
             (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_iwa_keynote_slide_table_discovery_scaffold(root: Path) -> None:
+    """Create the smallest production listing route for the Wave101 ratchet."""
+
+    listing = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[0]
+    graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+    listing.parent.mkdir(parents=True, exist_ok=True)
+    graph.parent.mkdir(parents=True, exist_ok=True)
+    listing.write_text(
+        "struct KeynoteObjectCatalog;\n"
+        "struct CatalogLimits;\n"
+        "fn decode_table_projection(bytes: &[u8]) {\n"
+        "    let _ = numbers_names_codec::decode_table_names(bytes);\n"
+        "}\n"
+        "fn build_catalog(bytes: &[u8]) {\n"
+        "    let _catalog = KeynoteObjectCatalog;\n"
+        "    let _limits = CatalogLimits;\n"
+        "    let max_objects = 1;\n"
+        "    let _ = max_objects;\n"
+        "    try_reserve_exact();\n"
+        "    decode_table_projection(bytes);\n"
+        "}\n"
+        "fn slide_tables(bytes: &[u8]) {\n"
+        "    build_catalog(bytes);\n"
+        "    slide_table_graph_from_catalog_context(bytes);\n"
+        "}\n"
+        "fn retained_mutation_path(bytes: &[u8]) {\n"
+        "    let _ = ObjectGraph::read(bytes);\n"
+        "    let _ = TableModelArchive::decode(bytes);\n"
+        "    let _ = TableInfoArchive::decode(bytes);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    graph.write_text(
+        "fn slide_table_graph_from_catalog_context(bytes: &[u8]) {\n"
+        "    let _catalog = KeynoteObjectCatalog;\n"
+        "    decode_table_projection(bytes);\n"
+        "    decode_catalog_table_info(bytes);\n"
+        "}\n"
+        "fn decode_table_projection(bytes: &[u8]) {\n"
+        "    let _ = numbers_names_codec::decode_table_names(bytes);\n"
+        "}\n"
+        "fn decode_catalog_table_info(bytes: &[u8]) {\n"
+        "    let _ = table_info_codec::decode_table_info(bytes);\n"
+        "    let _ = TableInfoArchive::decode(bytes);\n"
+        "}\n"
+        "fn table_template(bytes: &[u8]) {\n"
+        "    let _ = ObjectGraph::read(bytes);\n"
+        "    let _ = TableModelArchive::decode(bytes);\n"
+        "    let _ = TableInfoArchive::decode(bytes);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -15009,6 +15063,248 @@ fn rewrite_movie_title_operation(
             self.assertEqual(len(violations), 4)
             for marker in boundaries.IWA_NUMBERS_TABLE_EXTRACTOR_REQUIRED_MARKERS:
                 self.assertTrue(any(marker in violation for violation in violations))
+
+    def test_iwa_keynote_slide_table_discovery_is_dormant_until_catalog_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[0]
+            listing.parent.mkdir(parents=True, exist_ok=True)
+            listing.write_text(
+                "fn slide_tables(bytes: &[u8]) {\n"
+                "    let _ = ObjectGraph::read(bytes);\n"
+                "    let _ = TableModelArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_discovery_requires_bounded_neutral_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[0]
+            listing.parent.mkdir(parents=True, exist_ok=True)
+            listing.write_text(
+                "struct KeynoteObjectCatalog;\n"
+                "fn slide_tables(bytes: &[u8]) {\n"
+                "    let _ = KeynoteObjectCatalog;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("catalog limits" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("neutral strict projection" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_rejects_graph_and_generated_reads(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8")
+            source = source.replace(
+                "    decode_table_projection(bytes);\n",
+                "    decode_table_projection(bytes);\n"
+                "    forbidden_discovery_reads(bytes);\n",
+            )
+            source += (
+                "fn forbidden_discovery_reads(bytes: &[u8]) {\n"
+                "    let _ = ObjectGraph::read(bytes);\n"
+                "    let _ = TableModelArchive::decode(bytes);\n"
+                "    let _ = TableInfoArchive::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("ObjectGraph::read" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("TableModelArchive::decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("TableInfoArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_rejects_generated_decode_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_table_projection(bytes);\n",
+                "    decode_table_projection(bytes);\n"
+                "    alias_discovery_read(bytes);\n",
+                1,
+            )
+            source += (
+                "use TableModelArchive as ModelAlias;\n"
+                "fn alias_discovery_read(bytes: &[u8]) {\n"
+                "    let _ = ModelAlias::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any(
+                    "TableModelArchive alias ModelAlias::decode" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_allows_only_selected_info_parse(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_catalog_table_info(bytes);\n",
+                "    decode_catalog_table_info(bytes);\n"
+                "    candidate_role_discovery(bytes);\n",
+                1,
+            )
+            source += (
+                "fn candidate_role_discovery(bytes: &[u8]) {\n"
+                "    let _ = table_info_codec::decode_table_info(bytes);\n"
+                "    let _ = TableInfoArchive::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any(
+                    "TableInfoArchive::decode via candidate_role_discovery" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_requires_projection_before_parse(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    let _ = table_info_codec::decode_table_info(bytes);\n"
+                "    let _ = TableInfoArchive::decode(bytes);\n",
+                "    let _ = TableInfoArchive::decode(bytes);\n"
+                "    let _ = table_info_codec::decode_table_info(bytes);\n",
+                1,
+            )
+            graph.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("TableInfoArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_masks_cfg_comments_and_strings(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            graph.write_text(
+                graph.read_text(encoding="utf-8")
+                + "// ObjectGraph::read TableModelArchive::decode TableInfoArchive::decode\n"
+                + 'const NOTE: &str = "ObjectGraph::read TableModelArchive::decode";\n'
+                + "#[cfg(test)]\n"
+                + "fn decoy(bytes: &[u8]) {\n"
+                + "    let _ = ObjectGraph::read(bytes);\n"
+                + "    let _ = TableModelArchive::decode(bytes);\n"
+                + "    let _ = TableInfoArchive::decode(bytes);\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_discovery_allows_retained_mutation_paths(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            graph.write_text(
+                graph.read_text(encoding="utf-8")
+                + "fn legacy_table_mutation(bytes: &[u8]) {\n"
+                + "    let _ = ObjectGraph::read(bytes);\n"
+                + "    let _ = TableModelArchive::decode(bytes);\n"
+                + "    let _ = TableInfoArchive::decode(bytes);\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_discovery_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_table_discovery_source_topology()",
+            main_source,
+        )
 
     def test_focused_numbers_extractor_no_eager_table_data_list_allows_test_only_usage(
         self,

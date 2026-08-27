@@ -14296,3 +14296,43 @@ the deprecated raw-ID root replacement/read compatibility methods remain, as
 do reply compatibility fallback, Pages/Keynote comments, debt 015, the
 `litchi-iwa -> litchi-numbers` edge, and the IWA monolith. No native,
 performance/RSS, manifest-edge, debt-exit, or monolith-exit claim is made.
+
+## 2026-08-27 amendment: Wave101 Keynote slide-table discovery verification record
+
+The Wave101 discovery slice was checked with the following focused evidence:
+
+- the strict borrowed table-model discovery codec passed 5/5;
+- the private bounded Keynote object catalog passed 9/9, including compact
+  slot/descriptor retention, duplicate and missing identity refusal, each
+  finite catalog axis, borrowed semantic-read charging, stale revision refusal,
+  deterministic indexed lookup, and source-byte atomicity;
+- the affected Keynote slide-table suite passed 30/30; and
+- the Python boundary suite passed 591/591, and the focused Wave101 live audit
+  returned no findings.
+
+The evidence covers one operation-scoped catalog scan, strict TableInfo/model
+discovery projections, authoritative canonical model type 6001 selection
+(strict type-6000 is considered only when no 6001 exists; simultaneous
+6000/6001 candidates reject), malformed and duplicate candidate refusal,
+unknown/group framing, and bounded archive,
+object, message, payload, reference, retained, semantic, field, work, text,
+and nesting axes. Existing generated/native complete-model, appearance, lock,
+storage, cell, formula, tile, metadata, and mutation paths remain compatibility
+paths. The catalog retains no parsed payloads, but this is not a package-wide
+zero-copy, allocation-free, performance/RSS, or full generated-free claim.
+
+An external public `KeynoteEditor` driver read the Wave99 source
+`/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
+`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`) and the
+Wave100 source (500,128 bytes, SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`). Each
+read one slide and one 5-by-4 table named `Table 1`; fresh reopen parity was
+true and post-read bytes and hashes were unchanged. Computer Use also opened
+the Wave100 source in Keynote 14.4 without repair, recovery, or conversion UI;
+the visible presentation contained `Table 1` with 5 rows and 4 columns. The
+source remained 500,128 bytes with the same SHA-256 after this read-only UI
+probe. This is bounded read-only semantic and open/render evidence only: no
+Keynote save/normalization/mutation, performance/RSS, or public
+catalog-statistics claim follows. The migration
+host, the `litchi-iwa -> litchi-keynote` edge, all 13 ordered migration debts,
+generated-schema/Prost/Buffa owners, and the IWA monolith remain unchanged.

@@ -39,6 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/hyperlink_codec.rs");
     println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
+    println!("cargo:rerun-if-changed=src/table_model_discovery_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_drawable_order_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_header_footer_codec.rs");
@@ -1282,6 +1283,16 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_numbers_names_generated {",
         ),
         (
+            "src/table_model_discovery_codec.rs",
+            "crate::buffa_numbers_names_generated::",
+            "mod buffa_numbers_names_generated {",
+        ),
+        (
+            "src/table_model_discovery_codec.rs",
+            "crate::buffa_numbers_table_header_settings_generated::",
+            "mod buffa_numbers_table_header_settings_generated {",
+        ),
+        (
             "src/numbers_sheet_order_codec.rs",
             "crate::buffa_numbers_sheet_order_generated::",
             "mod buffa_numbers_sheet_order_generated {",
@@ -1407,6 +1418,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         .map(str::to_owned)
         .collect::<Vec<_>>();
     expected_paths.sort_unstable();
+    expected_paths.dedup();
     let mut actual_paths = fs::read_dir("src")?
         .map(|entry| entry.map(|entry| entry.path()))
         .collect::<Result<Vec<_>, _>>()?

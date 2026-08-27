@@ -306,6 +306,56 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` if the temporary campaign should be retained.
 
+## Format-neutral table-model discovery codec
+
+`table_model_discovery_codec` fuzzes the borrowed, strict discovery projection
+used to admit a canonical `TST.TableModelArchive`. It returns only the
+caller-owned table identifier, display name, and dimensions; it does not
+construct a package, ZIP member, generated model, or rewrite candidate.
+Reported scalar and facts entry points are replayed against the same bytes and
+must agree exactly, including source borrowing and traversal accounting.
+
+Fixed protobuf recipes and generated cases cover all required fields,
+canonical unknown scalars/fixed values/length-delimited values, balanced and
+deep unknown groups, malformed and mismatched groups, truncated framing,
+duplicate and wrong-wire known fields, non-canonical keys/values, and invalid
+wire types. Successful inputs are retried with one less input-byte, field,
+work, and nesting ceiling; every refusal must be typed and leave the source
+unchanged. Its codec-owned report categories for allocations, retained bytes,
+and scratch bytes are zero because the snapshot retains only source borrows;
+these values are not allocator telemetry, and the projection exposes no
+mutable resource knobs for those axes.
+
+The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
+fields, 256 KiB of aggregate strict-plus-parity work, 64 KiB of borrowed text,
+and nesting depth 64.
+Recipes under `corpus/table_model_discovery_codec/` are hand-authored `hex:`
+protobuf payloads, not native Keynote packages.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check table_model_discovery_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-model-discovery-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/table_model_discovery_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  table_model_discovery_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root.
+
 ## Keynote movie-playback codec
 
 `movie_playback_codec` drives the hidden `movie_playback_codec` projection for

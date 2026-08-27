@@ -5360,6 +5360,7 @@ impl KeynoteEditor {
 mod builds;
 mod date_time_fields;
 mod drawable_order;
+mod keynote_object_catalog;
 mod named_paragraph_styles;
 mod placeholder_ownership;
 mod slide_audio;
