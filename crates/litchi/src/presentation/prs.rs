@@ -1146,10 +1146,8 @@ impl Presentation {
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(presentation) => {
                 let Some(slide) = presentation
-                    .slides()
+                    .slide_at(position)
                     .map_err(Error::from)?
-                    .into_iter()
-                    .nth(position)
                 else {
                     return Ok(None);
                 };

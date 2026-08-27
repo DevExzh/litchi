@@ -176,6 +176,25 @@ impl Presentation {
             .collect()
     }
 
+    /// Get one slide by its zero-based logical position.
+    ///
+    /// Unlike [`Self::slides`], this method parses only the requested slide
+    /// and does not retain the other slides in a temporary collection.
+    pub fn slide_at(&self, position: usize) -> Result<Option<Slide<'_>>> {
+        let Some(entry) = self.slide_directory.entries().get(position) else {
+            return Ok(None);
+        };
+
+        let factory = SlideFactory::new_with_limits(
+            &self.powerpoint_document,
+            &self.persist_mapping,
+            &self.slide_directory,
+            self.record_limits,
+        );
+        let slide_data = factory.parse_slide(entry.persist_id())?;
+        Ok(Some(Slide::from_slide_data(slide_data, position + 1)))
+    }
+
     /// Get the number of slides (actual Slide records only).
     #[inline]
     #[must_use]
@@ -1152,17 +1171,32 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
-        let slides = self.slides()?;
-        let text_parts: Vec<String> = slides
-            .iter()
-            .filter_map(|slide| slide.text().ok().map(ToString::to_string))
-            .filter(|text| !text.is_empty())
-            .collect();
+        let factory = SlideFactory::new_with_limits(
+            &self.powerpoint_document,
+            &self.persist_mapping,
+            &self.slide_directory,
+            self.record_limits,
+        );
+        let mut text = String::new();
 
-        Ok(if text_parts.is_empty() {
+        for (idx, entry) in self.slide_directory.entries().iter().enumerate() {
+            let slide = Slide::from_slide_data(factory.parse_slide(entry.persist_id())?, idx + 1);
+            let Ok(slide_text) = slide.text() else {
+                continue;
+            };
+            if slide_text.is_empty() {
+                continue;
+            }
+            if !text.is_empty() {
+                text.push_str("\n\n");
+            }
+            text.push_str(slide_text);
+        }
+
+        Ok(if text.is_empty() {
             String::from("No text content found in presentation")
         } else {
-            text_parts.join("\n\n")
+            text
         })
     }
 
