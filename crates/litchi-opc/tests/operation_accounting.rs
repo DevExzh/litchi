@@ -94,7 +94,10 @@ fn crc_failure_keeps_the_cold_read_counters_and_does_not_cache() {
     let part = package.part(&document_uri()).unwrap();
     let mut accounting = OpcOperationAccounting::default();
     let error = part.data_with_accounting(&mut accounting).unwrap_err();
-    assert!(matches!(error, OpcError::ZipError(_)));
+    assert!(
+        matches!(error, OpcError::ZipError(_)),
+        "unexpected CRC error: {error:?}"
+    );
     assert_eq!(accounting.stored_payload_bytes_read(), PART.len() as u64);
     assert_eq!(accounting.stored_payload_bytes_accepted(), 0);
 
@@ -365,4 +368,128 @@ fn singular_exact_noop_overlay_accounts_raw_publication_and_cache_selection() {
         assert_eq!(warm_accounting.compressed_deflate_payload_bytes_read(), 0);
         assert_eq!(warm_accounting.stored_payload_bytes_read(), 0);
     }
+}
+
+#[test]
+fn streamed_stored_and_deflated_parts_are_accounted_without_cache_materialization() {
+    for deflated in [false, true] {
+        let package = open(source_bytes(deflated));
+        let part = package
+            .part(&document_uri())
+            .expect("document part should be present");
+        let mut sink = Vec::new();
+        let mut accounting = OpcOperationAccounting::default();
+
+        let written = part
+            .stream_to_with_accounting(&mut sink, &mut accounting)
+            .expect("selected part should stream");
+
+        assert_eq!(written, PART.len() as u64);
+        assert_eq!(sink, PART);
+        assert_eq!(accounting.output_bytes_accepted(), PART.len() as u64);
+        if deflated {
+            assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
+            assert!(accounting.deflate_bytes_produced() > 0);
+            assert_eq!(accounting.deflate_bytes_accepted(), PART.len() as u64);
+            assert_eq!(accounting.stored_payload_bytes_read(), 0);
+        } else {
+            assert!(accounting.stored_payload_bytes_read() > 0);
+            assert_eq!(
+                accounting.stored_payload_bytes_accepted(),
+                PART.len() as u64
+            );
+            assert_eq!(accounting.compressed_deflate_payload_bytes_read(), 0);
+        }
+        assert_eq!(accounting.raw_unchanged_source_bytes_accepted(), 0);
+        assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+        assert_eq!(accounting.stored_payload_bytes_emitted(), 0);
+        assert_eq!(accounting.precompressed_payload_bytes_emitted(), 0);
+
+        let materialized = part
+            .data()
+            .expect("data read should remain available after streaming")
+            .into_arc()
+            .expect("unmanaged part data should expose its arc");
+        assert_eq!(materialized.as_slice(), PART);
+    }
+}
+
+#[test]
+fn streamed_partial_sink_preserves_physical_and_output_accounting() {
+    for deflated in [false, true] {
+        let package = open(source_bytes(deflated));
+        let part = package
+            .part(&document_uri())
+            .expect("document part should be present");
+        let mut sink = FailingSink {
+            bytes: Vec::new(),
+            remaining: 3,
+        };
+        let mut accounting = OpcOperationAccounting::default();
+
+        let error = part
+            .stream_to_with_accounting(&mut sink, &mut accounting)
+            .expect_err("the bounded sink should fail");
+
+        match error {
+            OpcError::IncompleteOutput { written, .. } => assert_eq!(written, 3),
+            other => panic!("unexpected stream error: {other:?}"),
+        }
+        assert_eq!(sink.bytes.len(), 3);
+        assert_eq!(accounting.output_bytes_accepted(), 3);
+        if deflated {
+            assert!(accounting.compressed_deflate_payload_bytes_read() >= 3);
+            assert!(accounting.deflate_bytes_produced() >= 3);
+        } else {
+            assert!(accounting.stored_payload_bytes_read() >= 3);
+        }
+        assert_eq!(accounting.raw_unchanged_source_bytes_accepted(), 0);
+        assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+    }
+}
+
+#[test]
+fn repeated_streaming_repeats_physical_work_without_cache_hits() {
+    let package = open(source_bytes(true));
+    let part = package
+        .part(&document_uri())
+        .expect("document part should be present");
+    let mut first_sink = Vec::new();
+    let mut first = OpcOperationAccounting::default();
+    part.stream_to_with_accounting(&mut first_sink, &mut first)
+        .expect("first selected stream should succeed");
+
+    let mut second_sink = Vec::new();
+    let mut second = OpcOperationAccounting::default();
+    part.stream_to_with_accounting(&mut second_sink, &mut second)
+        .expect("second selected stream should succeed");
+
+    assert_eq!(first_sink, PART);
+    assert_eq!(second_sink, PART);
+    assert!(second.compressed_deflate_payload_bytes_read() > 0);
+    assert!(second.deflate_bytes_produced() > 0);
+    assert_eq!(second.output_bytes_accepted(), PART.len() as u64);
+}
+
+#[test]
+fn streaming_bypasses_cache_and_data_remains_cold() {
+    let package = open(source_bytes(false));
+    let part = package
+        .part(&document_uri())
+        .expect("document part should be present");
+    let before = package.cache_diagnostics();
+    let mut sink = Vec::new();
+    part.stream_to(&mut sink)
+        .expect("selected part should stream");
+    let after_stream = package.cache_diagnostics();
+    assert_eq!(before, after_stream);
+
+    let data = part
+        .data()
+        .expect("data read should remain available after streaming")
+        .into_arc()
+        .expect("unmanaged part data should expose its arc");
+    assert_eq!(data.as_slice(), PART);
+    let after_data = package.cache_diagnostics();
+    assert_ne!(after_stream, after_data);
 }

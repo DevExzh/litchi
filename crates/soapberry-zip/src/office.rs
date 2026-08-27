@@ -1018,7 +1018,9 @@ impl<'data> ArchiveReader<'data> {
                 let accounting_result = accounting.add_stored_payload_bytes_read(source.count());
                 match result {
                     Err(error) => {
-                        drop(accounting_result);
+                        // Keep the observed source count even when the stream failed.  The
+                        // stream error remains primary if recording the count overflows.
+                        let _ = accounting_result;
                         Err(error)
                     },
                     Ok(bytes) => {
@@ -1042,7 +1044,9 @@ impl<'data> ArchiveReader<'data> {
                     accounting.add_compressed_deflate_payload_bytes_read(source.count());
                 match result {
                     Err(error) => {
-                        drop(accounting_result);
+                        // Keep the observed source count even when the stream failed.  The
+                        // stream error remains primary if recording the count overflows.
+                        let _ = accounting_result;
                         Err(error)
                     },
                     Ok(bytes) => {
@@ -4999,6 +5003,22 @@ mod tests {
             deflated_payload.len() as u64
         );
 
+        let mut indexed_deflated_failure = FailingWriter::new(3);
+        let mut indexed_deflated_failure_accounting = ZipOperationAccounting::default();
+        let error = indexed
+            .read_entry_to_with_accounting(
+                indexed_id,
+                &mut indexed_deflated_failure,
+                &mut indexed_deflated_failure_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(indexed_deflated_failure_accounting.compressed_deflate_payload_bytes_read() > 0);
+        assert_eq!(
+            indexed_deflated_failure_accounting.deflate_bytes_accepted(),
+            indexed_deflated_failure.bytes.len() as u64
+        );
+
         let indexed_stored_id = indexed.entry_id("stored.bin").unwrap();
         let mut indexed_stored_accounting = ZipOperationAccounting::default();
         assert_eq!(
@@ -5043,6 +5063,22 @@ mod tests {
         assert_eq!(
             indexed_stored_stream_accounting.compressed_deflate_payload_bytes_read(),
             0
+        );
+
+        let mut indexed_stored_failure = FailingWriter::new(2);
+        let mut indexed_stored_failure_accounting = ZipOperationAccounting::default();
+        let error = indexed
+            .read_entry_to_with_accounting(
+                indexed_stored_id,
+                &mut indexed_stored_failure,
+                &mut indexed_stored_failure_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(indexed_stored_failure_accounting.stored_payload_bytes_read() > 0);
+        assert_eq!(
+            indexed_stored_failure_accounting.stored_payload_bytes_accepted(),
+            indexed_stored_failure.bytes.len() as u64
         );
 
         let mut borrowed = ZipOperationAccounting::default();
@@ -5095,6 +5131,7 @@ mod tests {
             .read_to_with_accounting("payload.bin", &mut sink, &mut accounting)
             .unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
         assert_eq!(accounting.deflate_bytes_accepted(), sink.bytes.len() as u64);
         assert!(accounting.deflate_bytes_produced() >= accounting.deflate_bytes_accepted());
     }
