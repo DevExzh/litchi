@@ -5,6 +5,7 @@ use std::io::{Cursor, Write};
 use litchi::opc::{OpcPackage, PackURI};
 use litchi::sheet::{Workbook, WorkbookTrait};
 use litchi::xlsb;
+use litchi_core::sheet::{CellValue, Worksheet as WorksheetTrait};
 
 fn fixture_bytes() -> Vec<u8> {
     std::fs::read(concat!(
@@ -41,6 +42,48 @@ fn assert_source_changed<T>(result: litchi::sheet::Result<T>) {
         error.downcast_ref::<litchi_core::Error>(),
         Some(litchi_core::Error::SourceChanged { .. })
     ));
+}
+
+fn append_eager_cell_text(output: &mut String, value: &CellValue) {
+    match value {
+        CellValue::Empty => {},
+        CellValue::Bool(value) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
+        CellValue::Int(value) => output.push_str(&value.to_string()),
+        CellValue::Float(value) | CellValue::DateTime(value) => output.push_str(&value.to_string()),
+        CellValue::String(value) | CellValue::Error(value) => output.push_str(value),
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(value) if !matches!(value, CellValue::Empty) => {
+                append_eager_cell_text(output, value)
+            },
+            _ => {
+                output.push('=');
+                output.push_str(formula);
+            },
+        },
+    }
+}
+
+fn eager_text(workbook: &xlsb::Workbook) -> String {
+    let mut output = String::new();
+    for index in 0..WorkbookTrait::worksheet_count(workbook) {
+        let worksheet = WorkbookTrait::worksheet_by_index(workbook, index).unwrap();
+        let mut rows = WorksheetTrait::rows(worksheet.as_ref());
+        while let Some(row) = rows.next() {
+            let row = row.unwrap();
+            for (column, cell) in row.iter().enumerate() {
+                if column != 0 {
+                    output.push('\t');
+                }
+                append_eager_cell_text(&mut output, cell);
+            }
+            output.push('\n');
+        }
+    }
+    output
 }
 
 #[test]
@@ -117,6 +160,16 @@ fn lazy_facade_catalog_matches_eager_xlsb_tabs_and_date_system() {
     assert_eq!(lazy.worksheet_names().unwrap(), eager.worksheet_names());
     assert_eq!(lazy.worksheet_count().unwrap(), eager.worksheet_count());
     assert_eq!(eager_dyn.is_1904_date_system(), eager.is_1904_date_system());
+}
+
+#[test]
+fn source_backed_facade_text_matches_eager_workbook() {
+    let bytes = fixture_bytes();
+    let file = fixture_file(&bytes);
+    let source_backed = Workbook::open(file.path()).expect("lazy XLSB facade open");
+    let eager = xlsb::Workbook::new(Cursor::new(bytes)).expect("eager XLSB open");
+
+    assert_eq!(source_backed.text().unwrap(), eager_text(&eager));
 }
 
 #[test]

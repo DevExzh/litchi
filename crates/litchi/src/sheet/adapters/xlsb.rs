@@ -192,6 +192,37 @@ impl Workbook {
             .ok_or_else(|| boxed_error("XLSB eager compatibility workbook was not published"))
     }
 
+    fn eager_worksheet(
+        &self,
+        index: usize,
+        workbook: &xlsb::Workbook,
+    ) -> SheetResult<Arc<xlsb::Worksheet>> {
+        let source = self
+            .worksheets
+            .get(index)
+            .ok_or_else(|| boxed_error("XLSB eager worksheet cache position is out of bounds"))?;
+        let init = self
+            .worksheet_init
+            .get(index)
+            .ok_or_else(|| boxed_error("XLSB eager worksheet lock position is out of bounds"))?;
+        if let Some(worksheet) = source.get() {
+            return Ok(Arc::clone(worksheet));
+        }
+        let _guard = init
+            .lock()
+            .map_err(|_| boxed_error("XLSB worksheet initialization lock was poisoned"))?;
+        if let Some(worksheet) = source.get() {
+            return Ok(Arc::clone(worksheet));
+        }
+        let worksheet = Arc::new(workbook.worksheet(index).map_err(boxed_xlsb_error)?);
+        self.ensure_source_current()?;
+        source.set(Arc::clone(&worksheet)).map_err(|error| {
+            drop(error);
+            boxed_error("XLSB eager worksheet was already published")
+        })?;
+        Ok(worksheet)
+    }
+
     fn materialize<'a, T>(
         &'a self,
         handle: &SourceBackedWorksheet<'a>,
@@ -209,7 +240,7 @@ impl Workbook {
         let result = match source.get() {
             Some(worksheet) => operation(worksheet.as_ref()),
             None => {
-                let _guard = init
+                let guard = init
                     .lock()
                     .map_err(|_| boxed_error("XLSB worksheet initialization lock was poisoned"))?;
                 if let Some(worksheet) = source.get() {
@@ -231,8 +262,10 @@ impl Workbook {
                             )
                         },
                         Err(XlsbError::UnsupportedFeature(_)) => {
+                            drop(guard);
                             let workbook = self.eager_workbook()?;
-                            let worksheet = workbook.worksheet_by_index(handle.catalog_position)?;
+                            let worksheet =
+                                self.eager_worksheet(handle.catalog_position, workbook)?;
                             operation(worksheet.as_ref())
                         },
                         Err(error) => Err(boxed_xlsb_error(error)),
@@ -242,6 +275,36 @@ impl Workbook {
         };
         self.ensure_source_current()?;
         result
+    }
+
+    pub(crate) fn text(&self) -> SheetResult<String> {
+        match self.workbook.text() {
+            Ok(text) => Ok(text),
+            Err(XlsbError::UnsupportedFeature(_)) => self.eager_text(),
+            Err(error) => Err(boxed_xlsb_error(error)),
+        }
+    }
+
+    fn eager_text(&self) -> SheetResult<String> {
+        let workbook = self.eager_workbook()?;
+        let mut output = String::new();
+        for index in 0..workbook.worksheet_names().len() {
+            self.ensure_source_current()?;
+            let worksheet = self.eager_worksheet(index, workbook)?;
+            let mut rows = worksheet.rows();
+            while let Some(row) = rows.next() {
+                let row = row?;
+                for (column, cell) in row.iter().enumerate() {
+                    if column != 0 {
+                        output.push('\t');
+                    }
+                    append_eager_cell_text(&mut output, cell);
+                }
+                output.push('\n');
+            }
+        }
+        self.ensure_source_current()?;
+        Ok(output)
     }
 
     fn worksheet(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
@@ -261,6 +324,29 @@ impl Workbook {
             .ok_or_else(|| boxed_error(format!("XLSB worksheet '{name}' was not found")))?;
         let index = handle.workbook_position().map_err(boxed_xlsb_error)?;
         Ok(Box::new(SourceBackedWorksheet::new(self, index, handle)?))
+    }
+}
+
+fn append_eager_cell_text(output: &mut String, value: &CellValue) {
+    match value {
+        CellValue::Empty => {},
+        CellValue::Bool(value) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
+        CellValue::Int(value) => output.push_str(&value.to_string()),
+        CellValue::Float(value) | CellValue::DateTime(value) => output.push_str(&value.to_string()),
+        CellValue::String(value) | CellValue::Error(value) => output.push_str(value),
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(value) if !matches!(value, CellValue::Empty) => {
+                append_eager_cell_text(output, value)
+            },
+            _ => {
+                output.push('=');
+                output.push_str(formula);
+            },
+        },
     }
 }
 

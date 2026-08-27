@@ -7,9 +7,11 @@ use std::io::{self, Cursor};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{OwnedSource, ReadAt, SourceVersion};
+use litchi_core::{
+    OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
+};
 use litchi_opc::constants::relationship_type;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceCacheLimits};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, SourceCacheLimits};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, kind};
 use litchi_xlsb::{ReadLimits, SourceBackedWorkbook};
@@ -422,6 +424,96 @@ fn full_sheet_catalog_preserves_nonworksheet_tabs_and_worksheet_selectors() {
         assert!(workbook.sheet_by_name(&names[0]).unwrap().is_some());
         assert!(workbook.sheet_by_index(names.len()).unwrap().is_none());
     }
+}
+
+#[test]
+fn source_text_matches_legacy_terminal_newline_and_reports_progress() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    let expected = workbook.text().unwrap();
+    let mut output = Vec::new();
+    let report = workbook
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap();
+
+    let mut expected_without_terminal = expected.into_bytes();
+    expected_without_terminal.pop();
+    assert_eq!(output, expected_without_terminal);
+    assert!(report.objects_written() > 0);
+    assert_eq!(report.bytes_written(), output.len() as u64);
+}
+
+#[test]
+fn source_text_respects_output_limit() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    let mut output = Vec::new();
+    let error = workbook
+        .write_text_to(&mut output, TextOutputOptions::new("\n", "\n\n", 1, 1))
+        .unwrap_err();
+
+    assert!(matches!(
+        &error,
+        TextOutputError::Limit { limit, progress }
+            if limit.kind() == TextOutputLimitKind::OutputBytes
+                && limit.limit() == 1
+                && limit.observed() > 1
+                && progress.bytes_written() == 0
+                && progress.objects_written() == 0
+    ));
+    assert!(output.len() <= 1);
+}
+
+#[test]
+fn source_text_rejects_stale_source_before_output() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    source.change();
+
+    let text_error = workbook.text().unwrap_err();
+    assert!(matches!(
+        text_error,
+        PackageError::Opc(OpcError::SourceChanged { .. })
+    ));
+
+    let mut output = Vec::new();
+    let sink_error = workbook
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap_err();
+    assert!(matches!(
+        sink_error,
+        TextOutputError::Document {
+            source: PackageError::Opc(OpcError::SourceChanged { .. }),
+            progress,
+        } if progress.bytes_written() == 0 && progress.objects_written() == 0
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn source_text_rejects_nonworksheet_with_typed_error() {
+    let source = rewrite_sheet_relationship(
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+        "application/vnd.ms-excel.chartsheet",
+    );
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let mut output = Vec::new();
+    let error = workbook
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        TextOutputError::Document {
+            source: PackageError::UnsupportedFeature(_),
+            ..
+        }
+    ));
+    assert!(output.is_empty());
+    assert!(matches!(
+        workbook.text(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
 }
 
 #[test]
