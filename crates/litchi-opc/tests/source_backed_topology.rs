@@ -1001,3 +1001,250 @@ fn managed_cancellation_before_topology_publication_writes_nothing() {
     assert!(matches!(error, OpcError::Cancelled));
     assert!(output.is_empty());
 }
+
+fn source_bytes_with_deleted_part_topology() -> Vec<u8> {
+    let content_types = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/existing.xml" ContentType="application/vnd.example.deleted+xml"/></Types>"#
+    )
+    .into_bytes();
+    let root_relationships = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/><Relationship Id="rIdDrop" Type="{CUSTOM_REL}" Target="custom/existing.xml"/></Relationships>"#
+    )
+    .into_bytes();
+    let entries = [
+        Entry {
+            name: b"[Content_Types].xml",
+            data: &content_types,
+            local_extra: b"\x99\x99\x04\x00meta",
+            central_extra: b"\x88\x88\x02\x00ce",
+            comment: b"manifest-comment",
+        },
+        Entry {
+            name: b"_rels/.rels",
+            data: &root_relationships,
+            local_extra: b"\x99\x99\x04\x00root",
+            central_extra: b"\x88\x88\x02\x00cr",
+            comment: b"root-comment",
+        },
+        Entry {
+            name: b"word/document.xml",
+            data: b"<before/>",
+            local_extra: b"\x99\x99\x04\x00part",
+            central_extra: b"\x88\x88\x02\x00cp",
+            comment: b"part-comment",
+        },
+        Entry {
+            name: b"custom/existing.xml",
+            data: b"<deleted/>",
+            local_extra: b"\x99\x99\x04\x00drop",
+            central_extra: b"\x88\x88\x02\x00cd",
+            comment: b"drop-comment",
+        },
+        Entry {
+            name: b"custom/untouched.xml",
+            data: b"<untouched/>",
+            local_extra: b"\x99\x99\x04\x00keep",
+            central_extra: b"\x88\x88\x02\x00ck",
+            comment: b"keep-comment",
+        },
+    ];
+    stored_archive(&entries, b"archive-comment")
+}
+
+#[test]
+fn empty_overlay_and_deletion_batch_is_an_exact_source_copy() {
+    let source = source_bytes(false, false, false);
+    let package = open(&source);
+    let mut output = Vec::new();
+    package
+        .write_part_overlays_with_deletions_to_stream(&mut output, Vec::new(), Vec::new())
+        .unwrap();
+    assert_eq!(output, source);
+}
+
+#[test]
+fn one_existing_part_can_be_deleted_without_affecting_reopenable_package() {
+    let source = source_bytes(false, false, false);
+    let package = open(&source);
+    let mut output = Vec::new();
+    package
+        .write_part_overlays_with_deletions_to_stream(
+            &mut output,
+            Vec::new(),
+            vec![pack("/custom/existing.xml")],
+        )
+        .unwrap();
+
+    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    assert!(reopened.get_part(&pack("/custom/existing.xml")).is_err());
+    assert_eq!(
+        reopened
+            .get_part(&pack("/custom/untouched.xml"))
+            .unwrap()
+            .blob(),
+        b"<untouched/>"
+    );
+}
+
+#[test]
+fn replacement_and_deletion_are_published_in_one_sequential_output() {
+    let source = source_bytes(false, false, false);
+    let package = open(&source);
+    let mut output = Vec::new();
+    package
+        .write_part_overlays_with_deletions_to_stream(
+            &mut output,
+            vec![(pack("/word/document.xml"), b"<after/>".to_vec())],
+            vec![pack("/custom/existing.xml")],
+        )
+        .unwrap();
+
+    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        reopened
+            .get_part(&pack("/word/document.xml"))
+            .unwrap()
+            .blob(),
+        b"<after/>"
+    );
+    assert!(reopened.get_part(&pack("/custom/existing.xml")).is_err());
+}
+
+#[test]
+fn deletion_preserves_untouched_raw_records_and_compressed_payload_bytes() {
+    let source = source_bytes(false, false, false);
+    let package = open(&source);
+    let mut output = Vec::new();
+    package
+        .write_part_overlays_with_deletions_to_stream(
+            &mut output,
+            vec![(pack("/word/document.xml"), b"<after/>".to_vec())],
+            vec![pack("/custom/existing.xml")],
+        )
+        .unwrap();
+
+    let before = raw_records(&source);
+    let after = raw_records(&output);
+    for name in ["custom/untouched.xml", "[Content_Types].xml", "_rels/.rels"] {
+        assert_eq!(after[name].local, before[name].local, "local record {name}");
+        assert_eq!(
+            after[name].central, before[name].central,
+            "central record {name}"
+        );
+    }
+    assert_eq!(
+        zip_member(&output, "custom/untouched.xml"),
+        zip_member(&source, "custom/untouched.xml")
+    );
+    assert!(!after.contains_key("custom/existing.xml"));
+}
+
+#[test]
+fn deletion_does_not_rewrite_content_types_or_relationships() {
+    let source = source_bytes_with_deleted_part_topology();
+    let package = open(&source);
+    let mut output = Vec::new();
+    package
+        .write_part_overlays_with_deletions_to_stream(
+            &mut output,
+            vec![(pack("/word/document.xml"), b"<after/>".to_vec())],
+            vec![pack("/custom/existing.xml")],
+        )
+        .unwrap();
+
+    assert_eq!(
+        zip_member(&output, "[Content_Types].xml"),
+        zip_member(&source, "[Content_Types].xml")
+    );
+    assert_eq!(
+        zip_member(&output, "_rels/.rels"),
+        zip_member(&source, "_rels/.rels")
+    );
+    assert!(
+        String::from_utf8(zip_member(&output, "[Content_Types].xml"))
+            .unwrap()
+            .contains("PartName=\"/custom/existing.xml\"")
+    );
+    assert!(
+        String::from_utf8(zip_member(&output, "_rels/.rels"))
+            .unwrap()
+            .contains("Target=\"custom/existing.xml\"")
+    );
+    assert!(!raw_records(&output).contains_key("custom/existing.xml"));
+}
+
+struct WriteCountingSink {
+    writes: usize,
+}
+
+impl Write for WriteCountingSink {
+    fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+        self.writes += 1;
+        Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "unexpected output",
+        ))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn assert_deletion_rejected_before_sink(
+    source: &[u8],
+    replacements: Vec<(PackURI, Vec<u8>)>,
+    deletions: Vec<PackURI>,
+) {
+    let package = open(source);
+    let mut sink = WriteCountingSink { writes: 0 };
+    let error =
+        package.write_part_overlays_with_deletions_to_stream(&mut sink, replacements, deletions);
+    assert!(error.is_err());
+    assert_eq!(sink.writes, 0);
+}
+
+#[test]
+fn missing_duplicate_equivalent_and_overlapping_deletions_fail_before_sink_write() {
+    let source = source_bytes(false, false, false);
+    assert_deletion_rejected_before_sink(&source, Vec::new(), vec![pack("/custom/missing.xml")]);
+    assert_deletion_rejected_before_sink(
+        &source,
+        Vec::new(),
+        vec![pack("/custom/existing.xml"), pack("/custom/existing.xml")],
+    );
+    assert_deletion_rejected_before_sink(
+        &source,
+        Vec::new(),
+        vec![pack("/custom/existing.xml"), pack("/CUSTOM/EXISTING.XML")],
+    );
+    assert_deletion_rejected_before_sink(
+        &source,
+        vec![(pack("/custom/existing.xml"), b"<replacement/>".to_vec())],
+        vec![pack("/custom/existing.xml")],
+    );
+    assert_deletion_rejected_before_sink(
+        &source,
+        vec![(pack("/custom/existing.xml"), b"<replacement/>".to_vec())],
+        vec![pack("/CUSTOM/EXISTING.XML")],
+    );
+}
+
+#[test]
+fn signed_part_deletion_is_refused_before_sink_write() {
+    let source = signed_source_bytes();
+    let package = open(&source);
+    let mut output = Vec::new();
+    let error = package
+        .write_part_overlays_with_deletions_to_stream(
+            &mut output,
+            Vec::new(),
+            vec![pack("/word/document.xml")],
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::SignedSourceRequiresExplicitPolicy
+    ));
+    assert!(output.is_empty());
+}
