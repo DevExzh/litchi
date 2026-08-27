@@ -33,6 +33,7 @@ pub struct PreservedEntry {
     central_record: Range<u64>,
     central_bytes: Vec<u8>,
     compression_method: CompressionMethod,
+    local_central_name_mismatch: bool,
 }
 
 impl PreservedEntry {
@@ -413,6 +414,7 @@ where
                 central_record: central_offset..central_end,
                 central_bytes,
                 compression_method: central_fixed.compression_method.as_method(),
+                local_central_name_mismatch: false,
             });
         }
 
@@ -454,7 +456,9 @@ where
                 return Err(unsupported("overlapping or empty local-member spans"));
             }
 
-            validate_local_span(archive.get_ref(), &entries[index], local_end)?;
+            let local_central_name_mismatch =
+                validate_local_span(archive.get_ref(), &entries[index], local_end)?;
+            entries[index].local_central_name_mismatch = local_central_name_mismatch;
             entries[index].local_span.end = local_end;
         }
 
@@ -621,6 +625,33 @@ where
     fn prepare(&self, plan: &PreservationPlan) -> Result<Vec<PreparedEntry>, Error> {
         if plan.actions.len() != self.entries.len() {
             return Err(unsupported("plan does not cover every entry exactly once"));
+        }
+
+        let mut preserved_name_mismatch = false;
+        let mut generated_new_member = !plan.appended.is_empty();
+        for action in &plan.actions {
+            let (id, is_copy, generated) = match action {
+                PreservationAction::Copy(id) => (*id, true, None),
+                PreservationAction::Omit(id) => (*id, false, None),
+                PreservationAction::Regenerate { id, entry } => (*id, false, Some(entry)),
+            };
+            let index = usize::try_from(id.0).map_err(|_| unsupported("invalid entry ID"))?;
+            let Some(source_entry) = self.entries.get(index) else {
+                return Err(unsupported("invalid entry ID"));
+            };
+            if is_copy && source_entry.local_central_name_mismatch {
+                preserved_name_mismatch = true;
+            }
+            if let Some(entry) = generated {
+                if entry.name.as_bytes() != source_entry.raw_name_bytes() {
+                    generated_new_member = true;
+                }
+            }
+        }
+        if preserved_name_mismatch && generated_new_member {
+            return Err(unsupported(
+                "new members are unsupported with local and central filename mismatch",
+            ));
         }
 
         let mut prepared = Vec::new();
@@ -883,7 +914,7 @@ fn validate_local_span<R: ReaderAt>(
     source: &R,
     entry: &PreservedEntry,
     local_end: u64,
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     let mut local_bytes = [0u8; ZipLocalFileHeaderFixed::SIZE];
     source.read_exact_at(&mut local_bytes, entry.local_span.start)?;
     let local = ZipLocalFileHeaderFixed::parse(&local_bytes)?;
@@ -903,6 +934,24 @@ fn validate_local_span<R: ReaderAt>(
     if payload_end > local_end {
         return Err(unsupported("truncated or overlapping local member"));
     }
+    let central_name_start = ZipFileHeaderFixed::SIZE;
+    let central_name_end = central_name_start
+        .checked_add(usize::from(central.file_name_len))
+        .ok_or_else(|| unsupported("central filename range"))?;
+    if central_name_end > entry.central_bytes.len() {
+        return Err(unsupported("central filename range"));
+    }
+    let local_central_name_mismatch = if local.file_name_len != central.file_name_len {
+        true
+    } else {
+        let local_name_offset = entry
+            .local_span
+            .start
+            .checked_add(ZipLocalFileHeaderFixed::SIZE as u64)
+            .ok_or_else(|| unsupported("local filename range"))?;
+        let local_name = read_vec(source, local_name_offset, usize::from(local.file_name_len))?;
+        local_name.as_slice() != &entry.central_bytes[central_name_start..central_name_end]
+    };
     if local.flags & 0x08 == 0
         && (local.crc32 != central.crc32
             || local.compressed_size != central.compressed_size
@@ -910,7 +959,7 @@ fn validate_local_span<R: ReaderAt>(
     {
         return Err(unsupported("local and central sizes mismatch"));
     }
-    Ok(())
+    Ok(local_central_name_mismatch)
 }
 
 fn write_prepared_local<R, W>(
@@ -1509,6 +1558,19 @@ mod tests {
             .unwrap();
 
         assert_eq!(output, data);
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.try_append(RegeneratedEntry::new("appended.bin", b"payload".to_vec()))
+            .unwrap();
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to(&plan, &mut sink)
+            .expect_err("new members must reject mismatched source provenance");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(sink, b"untouched");
     }
 
     #[test]
