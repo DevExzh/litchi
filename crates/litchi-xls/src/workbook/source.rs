@@ -12,7 +12,10 @@ use crate::cell::Cell;
 use crate::error::Error;
 use crate::leniency::{Leniency, ToleranceLog};
 use crate::number_format::{DateSystem, Formatting};
-use crate::records::{BofRecord, BoundSheetRecord, CellRecord, Encoding, FormulaValue, SheetType};
+use crate::records::{
+    BofRecord, BoundSheetRecord, CellRecord, Encoding, FormulaValue, SharedStringScanError,
+    SharedStringSstScan, SheetType, decode_shared_string_entry, scan_shared_string_records,
+};
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
 use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor};
@@ -340,7 +343,7 @@ struct SourceInner {
     workbook_stream_len: u64,
     sheets: Box<[SheetEntry]>,
     worksheet_names: Box<[String]>,
-    strings: Arc<Vec<String>>,
+    sst: Arc<SharedStringSstScan>,
     formatting: Arc<Formatting>,
     encoding: Encoding,
     limits: SourceBackedLimits,
@@ -653,7 +656,7 @@ impl SourceBackedWorkbook {
             workbook_stream_len,
             sheets: parsed.sheets.into_boxed_slice(),
             worksheet_names: worksheet_names.into_boxed_slice(),
-            strings: Arc::new(parsed.strings),
+            sst: Arc::new(parsed.sst),
             formatting: Arc::new(parsed.formatting),
             encoding: parsed.encoding,
             limits,
@@ -1050,7 +1053,7 @@ impl SourceBackedWorksheet {
 struct ParsedGlobals {
     global_end: u64,
     sheets: Vec<SheetEntry>,
-    strings: Vec<String>,
+    sst: SharedStringSstScan,
     formatting: Formatting,
     encoding: Encoding,
 }
@@ -1299,12 +1302,24 @@ fn parse_globals(
                     ));
                 }
                 sst_seen = true;
+                sst_refs
+                    .try_reserve(1)
+                    .map_err(|_error| SourceBackedError::Allocation {
+                        resource: "SST record references",
+                        requested: 1,
+                    })?;
                 sst_refs.push(record);
                 while records
                     .get(i + 1)
                     .is_some_and(|next| next.kind().get() == CONTINUE)
                 {
                     i += 1;
+                    sst_refs
+                        .try_reserve(1)
+                        .map_err(|_error| SourceBackedError::Allocation {
+                            resource: "SST record references",
+                            requested: 1,
+                        })?;
                     sst_refs.push(records[i]);
                 }
                 if record.payload().len() < 8 {
@@ -1374,13 +1389,7 @@ fn parse_globals(
     let mut tolerance = ToleranceLog::new(Leniency::Strict);
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
-    let strings = if sst_refs.is_empty() {
-        Vec::new()
-    } else {
-        crate::records::SharedStringTable::parse_from_records(&sst_refs, &encoding)
-            .map_err(SourceBackedError::Parse)?
-            .strings
-    };
+    let sst = scan_shared_string_records(&sst_refs).map_err(map_shared_string_error)?;
 
     let mut sheets = Vec::new();
     sheets
@@ -1422,7 +1431,7 @@ fn parse_globals(
     Ok(ParsedGlobals {
         global_end: offset,
         sheets,
-        strings,
+        sst,
         formatting,
         encoding,
     })
@@ -1724,6 +1733,7 @@ fn query_cell(
                     sheet_format,
                     target_row,
                     target_column,
+                    execution,
                     &mut found,
                 )?;
                 continue;
@@ -1757,6 +1767,7 @@ fn query_cell(
                             sheet_format,
                             target_row,
                             target_column,
+                            execution,
                             &mut found,
                         )?;
                     }
@@ -1767,6 +1778,7 @@ fn query_cell(
                         sheet_format,
                         target_row,
                         target_column,
+                        execution,
                         &mut found,
                     )?;
                 }
@@ -1781,6 +1793,7 @@ fn query_cell(
                     sheet_format,
                     target_row,
                     target_column,
+                    execution,
                     &mut found,
                 )?;
             },
@@ -1793,6 +1806,7 @@ fn query_cell(
                         sheet_format,
                         target_row,
                         target_column,
+                        execution,
                         &mut found,
                     )?;
                 }
@@ -1808,6 +1822,7 @@ fn query_cell(
                         sheet_format,
                         target_row,
                         target_column,
+                        execution,
                         &mut found,
                     )?;
                 }
@@ -1829,12 +1844,147 @@ fn finish_query(
     Ok(found)
 }
 
+fn resolve_shared_string(
+    owner: &SourceInner,
+    string_index: u32,
+    execution: Option<&ExecutionContext>,
+) -> Result<litchi_core::sheet::CellValue> {
+    if owner.sst.segments.is_empty() {
+        return Ok(litchi_core::sheet::CellValue::Error(
+            "SST not available".to_owned(),
+        ));
+    }
+    let Some(index) = usize::try_from(string_index).ok() else {
+        return Ok(litchi_core::sheet::CellValue::Error(format!(
+            "Invalid SST index: {string_index} (max: {})",
+            owner.sst.entries.len()
+        )));
+    };
+    let Some(location) = owner.sst.entries.get(index).copied() else {
+        return Ok(litchi_core::sheet::CellValue::Error(format!(
+            "Invalid SST index: {string_index} (max: {})",
+            owner.sst.entries.len()
+        )));
+    };
+    if location.start >= location.end {
+        return Err(SourceBackedError::InvalidData(
+            "SST entry locator has an empty span".to_owned(),
+        ));
+    }
+
+    if let Some(context) = execution {
+        context.check().map_err(SourceBackedError::from)?;
+    }
+    owner.ensure_current()?;
+
+    let mut first_segment = None;
+    for (segment_index, segment) in owner.sst.segments.iter().enumerate() {
+        let segment_end = segment
+            .logical_offset
+            .checked_add(segment.len)
+            .ok_or_else(|| SourceBackedError::InvalidData("SST segment span overflow".into()))?;
+        if location.start >= segment.logical_offset && location.start < segment_end {
+            first_segment = Some(segment_index);
+            break;
+        }
+    }
+    let Some(first_segment) = first_segment else {
+        return Err(SourceBackedError::InvalidData(
+            "SST entry locator is outside its segments".to_owned(),
+        ));
+    };
+
+    let first = &owner.sst.segments[first_segment];
+    let first_offset = first
+        .source_offset
+        .checked_add((location.start - first.logical_offset) as u64)
+        .ok_or_else(|| SourceBackedError::InvalidData("SST source offset overflow".into()))?;
+    let refs = owner
+        .workbook_path
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let mut cursor = owner
+        .cfb
+        .stream_cursor_at(&refs, first_offset)
+        .map_err(SourceBackedError::from)?;
+    let mut chunks = Vec::<Vec<u8>>::new();
+    chunks
+        .try_reserve_exact(owner.sst.segments.len().saturating_sub(first_segment))
+        .map_err(|_| SourceBackedError::Allocation {
+            resource: "selected SST chunks",
+            requested: owner.sst.segments.len().saturating_sub(first_segment) as u64,
+        })?;
+
+    for segment in owner.sst.segments.iter().skip(first_segment) {
+        let segment_end = segment
+            .logical_offset
+            .checked_add(segment.len)
+            .ok_or_else(|| SourceBackedError::InvalidData("SST segment span overflow".into()))?;
+        let start = location.start.max(segment.logical_offset);
+        let end = location.end.min(segment_end);
+        if start >= end {
+            if segment.logical_offset >= location.end {
+                break;
+            }
+            continue;
+        }
+        if let Some(context) = execution {
+            context.check().map_err(SourceBackedError::from)?;
+        }
+        owner.ensure_current()?;
+        let source_offset = segment
+            .source_offset
+            .checked_add((start - segment.logical_offset) as u64)
+            .ok_or_else(|| SourceBackedError::InvalidData("SST source offset overflow".into()))?;
+        cursor
+            .skip_to(source_offset)
+            .map_err(SourceBackedError::from)?;
+        let length = end - start;
+        let mut chunk = Vec::new();
+        chunk
+            .try_reserve_exact(length)
+            .map_err(|_| SourceBackedError::Allocation {
+                resource: "selected SST entry",
+                requested: length as u64,
+            })?;
+        chunk.resize(length, 0);
+        cursor
+            .read_exact(&mut chunk)
+            .map_err(SourceBackedError::from)?;
+        chunks.push(chunk);
+    }
+
+    let mut slices = Vec::new();
+    slices
+        .try_reserve_exact(chunks.len())
+        .map_err(|_| SourceBackedError::Allocation {
+            resource: "selected SST parser segments",
+            requested: chunks.len() as u64,
+        })?;
+    for chunk in &chunks {
+        slices.push(chunk.as_slice());
+    }
+    let decoded = decode_shared_string_entry(&slices);
+    match decoded {
+        Ok(value) => {
+            owner.ensure_current()?;
+            Ok(litchi_core::sheet::CellValue::String(value))
+        },
+        Err(error) => {
+            owner.ensure_current()?;
+            Err(map_shared_string_error(error))
+        },
+    }
+}
+
 fn process_cell(
     record: &CellRecord,
     owner: &SourceInner,
     formatting: &Formatting,
     target_row: u16,
     target_column: u16,
+    execution: Option<&ExecutionContext>,
     found: &mut Option<SourceBackedCell>,
 ) -> Result<()> {
     formatting
@@ -1843,18 +1993,19 @@ fn process_cell(
     if record.row() != target_row || record.col() != target_column {
         return Ok(());
     }
-    let Some(cell) = Cell::from_record_with_formula_context(
-        record,
-        Some(owner.strings.as_slice()),
-        None,
-        Some(formatting),
-    ) else {
+    let Some(cell) = Cell::from_record_with_formula_context(record, None, None, Some(formatting))
+    else {
         return Ok(());
+    };
+    let value = if let Some(string_index) = cell.shared_string_index() {
+        resolve_shared_string(owner, string_index, execution)?
+    } else {
+        cell.value().clone()
     };
     *found = Some(SourceBackedCell {
         row: u32::from(target_row),
         column: u32::from(target_column),
-        value: cell.value().clone(),
+        value,
     });
     Ok(())
 }
@@ -1868,6 +2019,22 @@ fn cell_xf_index(record: &CellRecord) -> u16 {
         | CellRecord::Rk { xf_index, .. }
         | CellRecord::LabelSst { xf_index, .. }
         | CellRecord::Formula { xf_index, .. } => *xf_index,
+    }
+}
+
+fn map_shared_string_error(error: SharedStringScanError) -> SourceBackedError {
+    match error {
+        SharedStringScanError::Biff(error) => SourceBackedError::Parse(error),
+        SharedStringScanError::Invalid(message) => {
+            SourceBackedError::Parse(Error::InvalidData(message))
+        },
+        SharedStringScanError::Allocation {
+            resource,
+            requested,
+        } => SourceBackedError::Allocation {
+            resource,
+            requested: requested as u64,
+        },
     }
 }
 
