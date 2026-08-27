@@ -3275,3 +3275,48 @@ RSS, or codec-internal allocation behavior. No zero-copy or package-wide
 performance claim follows. The `litchi-iwa -> litchi-pages` edge, debt 017
 and all 13 ordered debts, generated/Prost/Buffa ownership, and the IWA
 monolith deletion gate remain unchanged.
+
+## 2026-08-28 amendment: Wave109 Keynote slide-table name owner (topology remains unchanged)
+
+Wave109 records selector-first litchi_keynote::Package ownership of the
+archive-free slide::table::name::Name value and exact name transactions
+through Package::{slide_table_name, edit_slide_table_name,
+apply_slide_table_name}. The strict table_model_discovery_codec field-8
+prepared rewrite preserves unknown canonical fields/groups and rejects
+malformed, duplicate-known, noncanonical, or wrong-wire input before
+publication. Native identifiers, Archive/ZIP/member data, wire views, and
+generated/Prost/Buffa values remain private.
+
+The admitted route is rooted and unique: slide -> table-info -> model ->
+storage/name. Strict storage-route, role, ArchiveInfo, metadata/current-
+component, UUID, and global-inbound authority checks run before staging;
+unsupported, ambiguous, aliased, locked, malformed, or otherwise unproven
+routes fail closed. Focused transaction tests verify source and unrelated-byte
+preservation, candidate semantic readback/locality, and exact inverse
+restoration including canonical preview state. The raw Keynote rename mutation
+path is retired with no fallback. Physical rows/cells, storage, formulas,
+tiles, and broader table compatibility remain in litchi-iwa.
+
+The scoped gates are 18/18 focused slide-table-name tests; strict
+litchi-keynote library and test Clippy PASS; 30/30 IWA host slide-table tests
+and litchi-iwa library check PASS; slide-table-name fuzz-target check and
+strict target Clippy PASS with 10 command-only hex seeds; 662/662 boundary
+unit tests; py_compile PASS; full checker PASS; and live
+FACADE=[]; RESOURCE=[]; HOST=[] audits.
+
+No positive native Keynote name/rename acceptance is claimed. The strict read
+of /private/tmp/wave100-native-table-headers-source.key (500,128 bytes,
+SHA-256 47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b,
+86 members) returned InvalidSource. The source remained exact; no candidate
+or inverse was produced and no UI run occurred, so native mutation, save,
+reopen, and UI acceptance evidence is withheld.
+
+One conservative logical operation ledger is recorded. Package cache,
+decompressed-Archive, OS/process allocator, and RSS telemetry are
+unobservable; no zero-copy, allocator/RSS, or package-wide performance claim
+is made. This amendment closes no crate, manifest, dependency edge, debt,
+host owner, generated owner, or monolith gate. The authoritative topology
+remains 64 packages, 239 internal dependency declarations, one migration host,
+and 13 ordered debts; litchi-iwa -> litchi-keynote/debt 014, all other
+edges/debts, generated/Prost/Buffa ownership, and the IWA monolith deletion
+gate remain unchanged.

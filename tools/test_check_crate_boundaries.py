@@ -1478,6 +1478,149 @@ def add_keynote_slide_table_dimension_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_name_canonical_scaffold(root: Path) -> None:
+    """Install the smallest complete Wave109 Keynote name-owner fixture."""
+
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub enum Error { Empty, ContainsNul }\n"
+        "pub struct Name;\n"
+        "pub mod transaction {\n"
+        "    pub use crate::package::slide_table_name::{\n"
+        "        SlideTableNameCommit as Commit,\n"
+        "        SlideTableNameDiagnostics as Diagnostics,\n"
+        "        SlideTableNameEdit as Edit,\n"
+        "        SlideTableNameError as Error,\n"
+        "        SlideTableNameLimitKind as LimitKind,\n"
+        "        SlideTableNamePatch as Patch,\n"
+        "        SlideTableNamePath as Path,\n"
+        "    };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector {\n"
+        "    pub const fn index(index: usize) -> Self { let _ = index; Self }\n"
+        "    pub const fn position(position: Position) -> Self { let _ = position; Self }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES
+        )
+        + "struct NameBudget;\n"
+        + "fn budget() { residual; budget; }\n"
+        + "fn codec() { table_model_discovery_codec; prepare_table_model_name_rewrite; execution_requirements; execute; TABLE_MODEL_MESSAGE_TYPE; table_name; codec_report; requirements; exact_limits; }\n"
+        + "fn authority() { validate_package_metadata; validate_slide_metadata; validate_table_info_metadata; validate_global_inbound_references; authority; }\n"
+        + "fn publish() { ExactArtifacts; source_fingerprint; inverse; is_noop; PatchConflict; prepare_reassembly; EntryEdit; candidate; reopen; validate; verify_locality; same_content_ignoring_offsets; let deleted_previews = root_preview_deletions(); let diagnostics = Diagnostics { deleted_previews }; }\n"
+        + "fn no_op() { if patch.is_noop() { let diagnostics = Diagnostics { deleted_previews: 0 }; } }\n"
+        + "impl Package {\n"
+        + "pub fn slide_table_name<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Name, SlideTableNameError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_name<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableNameEdit, SlideTableNameError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_name(&self, patch: &SlideTableNamePatch) -> Result<SlideTableNameCommit, SlideTableNameError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableNameEdit {\n"
+        + "pub fn path(&self) -> SlideTableNamePath { todo!() }\n"
+        + "pub fn before(&self) -> &Name { todo!() }\n"
+        + "pub fn name(&self) -> &Name { todo!() }\n"
+        + "pub fn set(self, name: Name) -> Self { let _ = name; self }\n"
+        + "pub fn set_name(self, name: &str) -> Result<Self, SlideTableNameError> { let _ = name; todo!() }\n"
+        + "pub fn commit(self) -> Result<SlideTableNameCommit, SlideTableNameError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_name;\n"
+        "pub use slide_table_name::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n"
+        "pub use slide::table::name::{Error, Name};\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "const TABLE_NAME_FIELD: u32 = 8;\n"
+        + "pub struct DecodeError;\n"
+        + "pub struct DecodeOptions;\n"
+        + "pub struct TableModelSnapshot;\n"
+        + "pub struct TableModelNameWrite;\n"
+        + "pub struct TableModelNameRewriteReport;\n"
+        + "pub struct TableModelNameRewriteRequirements;\n"
+        + "pub struct TableModelNameRewriteLimits;\n"
+        + "pub struct TableModelNameRewriteOutput;\n"
+        + "pub struct PreparedTableModelNameRewrite;\n"
+        + "pub fn decode_table_model_with_report() {}\n"
+        + "pub fn prepare_table_model_name_rewrite() {}\n"
+        + "pub fn table_model_source_fingerprint() {}\n"
+        + "fn known_field() {} fn duplicate() {} fn noncanonical() {}\n"
+        + "fn skip_unknown() {} fn nested_wire() {} fn extend_from_slice() {} fn require_wire() {} fn wrong_wire_type() {}\n"
+        + "fn readback() {} fn source_fingerprint() {} fn table_name() {}\n"
+        + "fn execution_requirements() {} fn execute() {}\n"
+        + "#[cfg(test)] mod tests { #[test] fn canonical() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    for test_path in boundaries.KEYNOTE_SLIDE_TABLE_NAME_TEST_SOURCES:
+        test = root / test_path
+        test.parent.mkdir(parents=True, exist_ok=True)
+        test.write_text(
+            "#[test]\n"
+            "fn owner_name_lifecycle() { package.slide_table_name(slide, table); }\n"
+            "#[test]\n"
+            "fn exact_noop_reports_zero_previews() {\n"
+            "    let noop = package.edit_slide_table_name(slide, table).commit();\n"
+            "    assert!(noop.patch().is_noop());\n"
+            "    assert_eq!(noop.diagnostics().deleted_previews(), 0);\n"
+            "}\n"
+            "#[test]\n"
+            "fn changed_rename_reports_root_preview_deletions() {\n"
+            "    let changed = package.edit_slide_table_name(slide, table).set_name(name).commit();\n"
+            "    assert!(changed.diagnostics().changed());\n"
+            "    assert_eq!(changed.diagnostics().deleted_previews(), PREVIEWS.len());\n"
+            "}\n",
+            encoding="utf-8",
+        )
+    for fuzz_path in boundaries.KEYNOTE_SLIDE_TABLE_NAME_FUZZ_SOURCES:
+        fuzz = root / fuzz_path
+        fuzz.parent.mkdir(parents=True, exist_ok=True)
+        fuzz.write_text(
+            "#![no_main]\n"
+            "use libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in boundaries.KEYNOTE_SLIDE_TABLE_NAME_FUZZ_CORPORA:
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
 def add_keynote_slide_table_headers_canonical_scaffold(
     root: Path,
     *,
@@ -14087,6 +14230,362 @@ fn rewrite_movie_title_operation(
         for expression in (
             "+ audit_keynote_slide_table_dimension_facade_source_topology()",
             "+ audit_iwa_keynote_slide_table_dimension_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_name_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE,
+            Path("crates/litchi-keynote/src/slide/table/name.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE,
+            Path("crates/litchi-keynote/src/slide/table.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE,
+            Path("crates/litchi-keynote/src/package/slide_table_name.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-keynote/src/package.rs"),
+                Path("crates/litchi-keynote/src/lib.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES,
+            frozenset(
+                {
+                    "SlideTableNameCommit",
+                    "SlideTableNameDiagnostics",
+                    "SlideTableNameEdit",
+                    "SlideTableNameError",
+                    "SlideTableNameLimitKind",
+                    "SlideTableNamePatch",
+                    "SlideTableNamePath",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_TYPES,
+            frozenset({"Error", "Name"}),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_METHODS,
+            frozenset(
+                {
+                    "slide_table_name",
+                    "edit_slide_table_name",
+                    "apply_slide_table_name",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_TABLE_NAME_EDIT_METHODS,
+            frozenset({"path", "before", "name", "set", "set_name", "commit"}),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TABLE_NAME_METHODS,
+            frozenset({"rename_slide_table"}),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_NUMBERS_HELPER.pattern,
+            r"(?<![A-Za-z0-9_#])(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+            r"[ \t\r\n]*::[ \t\r\n]*)*(?:r#)?"
+            r"(?P<helper>rename_table_in_package)\b[ \t\r\n]*\(",
+        )
+
+    def test_keynote_slide_table_name_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_resource_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_name_source_topology(root),
+                [],
+            )
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_name_facade_rejects_public_physical_raw_and_flat(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_name(model_id: u64, source_bytes: &[u8], wire: WireView, generated: GeneratedProjection, prost: prost_types::MessageInfo) -> ArchiveObject { todo!() }\n"
+                + "pub use self::SlideTableNameEdit as NameEdit;\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_name_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "raw byte slice",
+                "raw parameter",
+                "archive/IWA type ArchiveObject",
+                "wire type WireView",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+                "flat alias NameEdit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_name_facade_requires_semantics_selectors_and_methods(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE
+            semantic.write_text("pub struct Name;\n", encoding="utf-8")
+            selector = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE
+            selector.write_text("pub struct TableSelector;\n", encoding="utf-8")
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_name_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "semantic API is missing",
+                "transaction API is missing",
+                "selector must expose",
+                "Package method is missing",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing contract violation {fragment!r}: {violations!r}",
+                )
+
+    def test_keynote_slide_table_name_requires_private_owner_and_codec_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_table_name;", "pub mod slide_table_name;"
+                ),
+                encoding="utf-8",
+            )
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "pub fn prepare_table_model_name_rewrite", "pub fn missing_prepare"
+                ),
+                encoding="utf-8",
+            )
+            codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text("pub mod table_model_discovery_codec;\n", encoding="utf-8")
+            integration = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_TEST_SOURCES[0]
+            integration.write_text(
+                integration.read_text(encoding="utf-8").replace(
+                    "deleted_previews(), 0", "deleted_previews(), 1"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_name_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "owner module must remain private",
+                "prepare_table_model_name_rewrite",
+                "missing hidden codec module table_model_discovery_codec",
+                "exact no-op deleted_previews == 0",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing owner/codec violation {fragment!r}: {violations!r}",
+                )
+
+    def test_keynote_slide_table_name_resource_markers_and_one_shot_are_required(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_resource_source_topology(root),
+                [],
+            )
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+            baseline = owner.read_text(encoding="utf-8")
+            source = baseline.replace(
+                "root_preview_deletions", "missing_preview_deletions"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_name_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+
+            # A changed rename may remove any number of existing root previews;
+            # only the exact no-op path is required to report zero.
+            owner.write_text(
+                baseline + "fn changed_nonzero() { let deleted_previews = 3; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_resource_source_topology(root),
+                [],
+            )
+
+            source = baseline
+            source = source.replace(
+                boundaries.KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_MARKER_GROUPS[
+                    "candidate reopen and authority"
+                ][0],
+                "missing_validation",
+            )
+            source += "fn bad() { rewrite_table_model_name(source, name); rename_table_in_package(package, id, name); }\n"
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_name_resource_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("candidate reopen and authority" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("one-shot table-model name rewrite" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("legacy Numbers name helper" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_name_retires_raw_route_and_allows_focused_package(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use crate::numbers::editor::rename_table_in_package;\n"
+                "pub fn rename_slide_table(&mut self, slide_index: usize, model_object_id: u64, name: &str) {}\n"
+                "fn raw() { editor.rename_slide_table(0, 7, name); KeynoteEditor::rename_slide_table(0, 7, name); crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n"
+                "fn focused() { package.slide_table_name(slide, table); package.edit_slide_table_name(slide, table); package.apply_slide_table_name(&patch); }\n"
+                "// editor.rename_slide_table(0, 7, name);\n"
+                'const DOC: &str = "crate::numbers::editor::rename_table_in_package(x, id, name)";\n'
+                "#[cfg(test)]\nfn test_only() { editor.rename_slide_table(0, 7, name); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_name_source_topology(
+                root
+            )
+            self.assertTrue(any("method rename_slide_table:" in item for item in violations), violations)
+            self.assertTrue(any("call rename_slide_table:" in item for item in violations), violations)
+            self.assertTrue(any("helper import:" in item for item in violations), violations)
+            self.assertTrue(any("helper rename_table_in_package:" in item for item in violations), violations)
+            self.assertFalse(any("DOC" in item or "test_only" in item for item in violations))
+
+            numbers_example = (
+                root
+                / boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_EXAMPLE_ROOT
+                / "edit_numbers_table.rs"
+            )
+            numbers_example.parent.mkdir(parents=True, exist_ok=True)
+            numbers_example.write_text(
+                "fn numbers_only() { crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n",
+                encoding="utf-8",
+            )
+            keynote_example = (
+                root
+                / boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_EXAMPLE_ROOT
+                / "edit_keynote_table.rs"
+            )
+            keynote_example.write_text(
+                "fn create() { editor.rename_slide_table(0, 7, name); crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n",
+                encoding="utf-8",
+            )
+            mixed_example = (
+                root
+                / boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_EXAMPLE_ROOT
+                / "mixed_iwork.rs"
+            )
+            mixed_example.write_text(
+                "fn numbers_branch() { crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n"
+                "fn keynote_branch() { editor.rename_slide_table(0, 7, name); }\n",
+                encoding="utf-8",
+            )
+            example_violations = boundaries.audit_iwa_keynote_slide_table_name_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("edit_keynote_table.rs" in item for item in example_violations),
+                example_violations,
+            )
+            self.assertTrue(
+                any("mixed_iwork.rs" in item and "rename_slide_table" in item for item in example_violations),
+                example_violations,
+            )
+            self.assertFalse(any("edit_numbers_table.rs" in item for item in example_violations))
+
+            host.write_text(
+                "fn focused() { package.slide_table_name(slide, table); package.edit_slide_table_name(slide, table); package.apply_slide_table_name(&patch); }\n",
+                encoding="utf-8",
+            )
+            keynote_example.write_text(
+                "fn create() { package.edit_slide_table_name(slide, table); }\n",
+                encoding="utf-8",
+            )
+            mixed_example.write_text(
+                "fn numbers_branch() { crate::numbers::editor::rename_table_in_package(&mut staged, 7, name); }\n"
+                "fn keynote_branch() { package.edit_slide_table_name(slide, table); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_name_source_topology(root), []
+            )
+
+    def test_iwa_keynote_slide_table_name_allows_complete_host_retirement(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_NAME_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text("fn physical_only() {}\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_name_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_name_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_name_facade_source_topology()",
+            "+ audit_keynote_slide_table_name_resource_source_topology()",
+            "+ audit_iwa_keynote_slide_table_name_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

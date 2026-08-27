@@ -1420,14 +1420,6 @@ pub(crate) fn set_table_formula_in_package(
     )
 }
 
-pub(crate) fn rename_table_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    name: &str,
-) -> Result<()> {
-    model::rename_attached_table_in_package(package, table_id, name)
-}
-
 pub(crate) fn resize_table_in_package(
     package: &mut IWorkPackage,
     table_id: u64,

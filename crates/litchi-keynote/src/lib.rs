@@ -355,17 +355,20 @@ pub use package::{
     SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind, SlideTableHeaderPatch,
     SlideTableHeaderPath, SlideTableLockStateCommit, SlideTableLockStateDiagnostics,
     SlideTableLockStateEdit, SlideTableLockStateError, SlideTableLockStateLimitKind,
-    SlideTableLockStatePatch, SlideTableLockStatePath, SlideTableSortCommit,
-    SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind,
-    SlideTableSortPatch, SlideTableSortPath, SlideTableTitleCommit, SlideTableTitleDiagnostics,
-    SlideTableTitleEdit, SlideTableTitleError, SlideTableTitleLimitKind, SlideTableTitlePatch,
-    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch, Stats, TextStorageFailure, WriteError,
+    SlideTableLockStatePatch, SlideTableLockStatePath, SlideTableNameCommit,
+    SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
+    SlideTableNamePatch, SlideTableNamePath, SlideTableSortCommit, SlideTableSortDiagnostics,
+    SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch,
+    SlideTableSortPath, SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit,
+    SlideTableTitleError, SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit,
+    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats,
+    TextStorageFailure, WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;
+pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
 pub(crate) use transition::Effect;

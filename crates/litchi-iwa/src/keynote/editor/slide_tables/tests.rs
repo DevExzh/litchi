@@ -88,6 +88,63 @@ fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Packa
     })
 }
 
+fn set_focused_table_name(
+    editor: &mut KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+    before_name: &str,
+    name: &str,
+) -> Result<bool> {
+    let before = editor.to_bytes()?;
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    let package = focused_table_package(editor)?;
+    let semantic_name = litchi_keynote::slide::table::name::Name::new(name).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote name value failed: {error}"))
+    })?;
+    let result = package
+        .edit_slide_table_name(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .and_then(|edit| edit.set(semantic_name).commit());
+    let commit = match result {
+        Ok(commit) => commit,
+        Err(
+            litchi_keynote::SlideTableNameError::InvalidSource { .. }
+            | litchi_keynote::SlideTableNameError::UnsupportedDependency
+            | litchi_keynote::SlideTableNameError::UnsupportedSource,
+        ) => {
+            assert_eq!(editor.to_bytes()?, before);
+            assert_eq!(
+                editor.slide_table(slide_index, model_object_id)?.info.name,
+                before_name
+            );
+            return Ok(false);
+        },
+        Err(error) => {
+            return Err(Error::InvalidFormat(format!(
+                "focused Keynote name edit failed: {error}"
+            )));
+        },
+    };
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote name write failed: {error}"))
+    })?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    let package = focused_table_package(editor)?;
+    let focused_name = package
+        .slide_table_name(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("focused Keynote name read failed: {error}"))
+        })?;
+    assert_eq!(focused_name.as_str(), name);
+    Ok(true)
+}
+
 fn focused_table_title_settings(
     editor: &KeynoteEditor,
     slide_index: usize,
@@ -1130,9 +1187,9 @@ fn source_built_table_roundtrips_full_crud() {
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_invalid_batch);
-    editor
-        .rename_slide_table(0, table.model_object_id, "Outlook")
-        .unwrap();
+    let focused_name_changed =
+        set_focused_table_name(&mut editor, 0, table.model_object_id, "Forecast", "Outlook")
+            .unwrap();
     editor
         .resize_slide_table(0, table.model_object_id, 4, 4)
         .unwrap();
@@ -1178,7 +1235,14 @@ fn source_built_table_roundtrips_full_crud() {
     let bytes = editor.to_bytes().unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&bytes).unwrap();
     let materialized = reopened.slide_table(0, table.model_object_id).unwrap();
-    assert_eq!(materialized.info.name, "Outlook");
+    assert_eq!(
+        materialized.info.name,
+        if focused_name_changed {
+            "Outlook"
+        } else {
+            "Forecast"
+        }
+    );
     assert_eq!((materialized.info.rows, materialized.info.columns), (4, 4));
     assert_eq!(materialized.info.geometry, laid_out_geometry);
     assert_eq!(

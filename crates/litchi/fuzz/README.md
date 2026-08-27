@@ -72,6 +72,18 @@ apply/conflict/inverse replay, redacted selectors, source-byte atomicity, and
 bounded package/semantic limits. The command recipes under
 `corpus/keynote_slide_table_dimension/` contain no native package bytes.
 
+`keynote_slide_table_name` is the focused selector-first slide-table name
+target. It offers arbitrary bytes to bounded Keynote ingress and replays a
+finite command stream against the source-built and locked table packages
+shared by the neighboring table targets. It covers positional slide/table
+selection, no-op, ASCII/Unicode/bounded names, empty/NUL validation, exact
+candidate reopen/readback, apply/conflict/inverse replay, locked-edit
+refusal, redacted errors, source-byte atomicity, and bounded package/semantic
+limits. Table names are values rather than selectors, so duplicate table
+names remain valid. The command recipes under
+`corpus/keynote_slide_table_name/` are not native package fixtures, and the
+target does not duplicate the low-level table-model codec fuzz target.
+
 `keynote_chart_title` is the focused selector-first chart-title target. It
 drives tiny source-built packages through positional and exact-name chart
 selectors, visible-empty and hidden-stale title states, set/clear/no-op
@@ -269,6 +281,12 @@ source-built package receive every command stream.
 semantic profile. Dimension commands consume at most 1 KiB after optional
 `hex:` decoding; keep `-max_len` at 4 KiB so malformed ingress and both
 source-built package variants receive every command stream.
+
+`keynote_slide_table_name` uses the same finite Keynote physical and semantic
+profile. Name commands consume at most 1 KiB after optional `hex:` decoding;
+bounded name values consume at most 1 KiB; keep `-max_len` at 4 KiB so
+malformed ingress and both source-built package variants receive every command
+stream.
 
 `keynote_chart_title` uses the same finite Keynote physical and semantic
 profile. Chart-title command bytes consume at most 1 KiB; keep `-max_len` at
@@ -489,6 +507,14 @@ Run the focused Keynote slide-table-dimension target with its command seeds:
 ```sh
 cargo +nightly fuzz run keynote_slide_table_dimension \
   corpus/keynote_slide_table_dimension -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote slide-table-name target with its command seeds:
+
+```sh
+cargo +nightly fuzz run keynote_slide_table_name \
+  corpus/keynote_slide_table_name -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 

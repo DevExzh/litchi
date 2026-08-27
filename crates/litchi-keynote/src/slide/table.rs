@@ -2,7 +2,7 @@
 //!
 //! The native IWA adapter owns object discovery, protobuf decoding, and
 //! package mutation. These focused modules expose only the values callers use
-//! to describe table formulas, sorting, and title settings.
+//! to describe table formulas, sorting, names, and title settings.
 
 use litchi_core::Position;
 
@@ -16,6 +16,8 @@ pub mod formula;
 pub mod headers;
 /// Interactive lock state for a table.
 pub mod lock;
+/// Validated display names for a table.
+pub mod name;
 /// Sort values shared through the neutral iWork semantic model.
 pub mod sort;
 /// Lossless visibility and outline settings for a table title.

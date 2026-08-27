@@ -19,9 +19,11 @@ mod slide_movie_title;
 mod slide_notes;
 mod slide_order;
 pub(crate) mod slide_table_appearance;
+pub(crate) mod slide_table_core;
 pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_lock_state;
+pub(crate) mod slide_table_name;
 pub(crate) mod slide_table_sort_order;
 mod slide_table_title;
 
@@ -132,6 +134,10 @@ pub use slide_table_lock_state::{
     SlideTableLockStateCommit, SlideTableLockStateDiagnostics, SlideTableLockStateEdit,
     SlideTableLockStateError, SlideTableLockStateLimitKind, SlideTableLockStatePatch,
     SlideTableLockStatePath,
+};
+pub use slide_table_name::{
+    SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,
+    SlideTableNameLimitKind, SlideTableNamePatch, SlideTableNamePath,
 };
 pub use slide_table_sort_order::{
     SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
