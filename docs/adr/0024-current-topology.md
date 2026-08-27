@@ -2782,3 +2782,54 @@ host, debt 014, debt 016, the `litchi-iwa -> litchi-keynote` edge, other
 migration hosts, generated-schema/normal Prost/Buffa owners, and the IWA
 monolith remain. No crate, edge, debt, manifest dependency, compatibility
 adapter, or monolith owner is retired by Wave98.
+
+## 2026-08-27 amendment: Wave99 current-topology Keynote slide-table persisted sort configuration (not a monolith-exit gate)
+
+Wave99 defines a narrow `litchi-keynote` package boundary for persisted sort
+configuration on an existing canonical `TST.TableModelArchive` (field 44).
+The public operation is selector-first: `SlideSelector` identifies the slide
+and the checked position-only `TableSelector` counts only table drawables in
+that slide's z-order. The public semantic value is the archive-free common
+`table::sort` model (`ColumnIndex`, `Direction`, `Order`, `Rule`, `Scope`, and
+`RowRange`); `Scope::SelectedRows` is persisted configuration, while
+`RowRange` is not accepted by the package configuration edit. Transaction
+types remain Keynote-prefixed, and patch application is distinct from the
+legacy physical `Sort Now` executor.
+
+The focused owner is limited to a uniquely rooted canonical type-6001 table
+and a source-preserving field-44 rewrite. Field 45 and every other model
+field, object, member, metadata record, and preview remain byte-authoritative
+unless the narrow transaction explicitly changes field 44. Legacy type-6000,
+malformed, duplicate, aliased, locked, unsupported multi-owner, and ambiguous
+graph routes fail closed. No native identifier, archive, ZIP, wire, generated,
+Prost, or Buffa type is part of the public facade.
+
+Admission requires the strict neutral `numbers_table_sort_order_codec` route,
+its prepared report/requirements/execute contract, bounded operation-local
+resource preflight, prepared reassembly, candidate reopen and semantic
+verification, exact patch/inverse behavior, and object/member locality. The
+sort slice preserves previews exactly (`deleted_previews == 0`); it does not
+claim row movement, selected-row execution, table storage or cell mutation.
+Those physical responsibilities remain in the legacy Keynote host.
+
+The Wave99 boundary gate passes all 573 Python policy tests; both checker
+modules compile with `py_compile`, and the scoped diff-check is clean. These
+are source-topology and documentation gates only and do not constitute a
+Cargo, native-application, or native byte-parity result.
+
+A bounded Keynote 14.4 evidence record used a fresh table-only source at
+`/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
+`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`).
+The package owner published one entire-table ascending rule on column zero,
+reopened the 499,861-byte candidate with exact semantic readback, and produced
+a byte-identical inverse. The 86-member ZIP set was preserved and only
+`Index/CalculationEngine.iwa` changed (3,183 to 3,190 member bytes). Keynote
+reopened the exact candidate without repair and rendered the five-by-four
+table. Its formatter exposed no persisted-sort control, so this proves native
+no-repair readability, not native semantic UI acceptance, normalization,
+physical row sorting, or native post-save byte parity.
+
+The migration host, generated-schema owners, `litchi-iwa -> litchi-keynote`
+edge, debt 014, debt 016, every other current migration debt, and the IWA
+monolith remain unchanged. No crate, dependency edge, host adapter, debt item,
+or monolith is retired by Wave99.

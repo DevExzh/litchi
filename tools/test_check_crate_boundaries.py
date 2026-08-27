@@ -1172,6 +1172,96 @@ def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "pub struct Edit; pub struct Patch; pub struct Commit; pub struct Diagnostics;\n"
+        "pub struct Error; pub struct LimitKind; pub struct Path;\n"
+        "}\n"
+        "pub use litchi_iwa_common::table::sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope};\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector { pub fn index(index: usize) -> Self { let _ = index; Self } }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES
+        )
+        + "struct SortBudget;\n"
+        + "fn strict_codec() { numbers_table_sort_order_codec; decode_table_model_sort_order_with_report; prepare_table_model_sort_order_rewrite; }\n"
+        + "fn prepared() { PreparedTableSortOrderRewrite; execution_requirements; report(); execute; }\n"
+        + "fn fields() { TABLE_MODEL_MESSAGE_TYPE; sort_order; }\n"
+        + "fn rewrite() { replace_message_preserving_header_with_limits; }\n"
+        + "fn transaction() { residual; budget; ExactArtifacts; inverse; is_noop; prepare_reassembly; candidate; reopen; validate; verify_locality; same_content; let deleted_previews: usize = 0; }\n"
+        + "impl Package {\n"
+        + "pub fn slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Option<Order>, SlideTableSortError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableSortEdit, SlideTableSortError> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_sort_order(&self, patch: &SlideTableSortPatch) -> Result<SlideTableSortCommit, SlideTableSortError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableSortEdit { pub fn order(&self) -> Option<&Order> { todo!() } pub fn set(self, order: Order) -> Self { let _ = order; self } pub fn clear(self) -> Self { self } pub fn reset(self) -> Self { self } pub fn commit(self) -> Result<SlideTableSortCommit, SlideTableSortError> { todo!() } }\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_sort_order;\n"
+        "pub use slide_table_sort_order::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n"
+        "pub use slide::table::sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope};\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in (
+                "SortOrderSnapshot",
+                "PreparedTableSortOrderRewrite",
+                "RewriteExecutionRequirements",
+                "RewriteExecutionLimits",
+            )
+        )
+        + "pub type PreparedTableModelSortOrderRewrite<'a> = PreparedTableSortOrderRewrite;\n"
+        + "pub fn decode_table_model_sort_order_with_report() {}\n"
+        + "pub fn prepare_table_model_sort_order_rewrite() {}\n"
+        + "pub fn canonical_table_sort_order() {}\n"
+        + "pub fn rewrite_table_model_sort_order() {}\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod numbers_table_sort_order_codec;\n"
+        "#[doc(hidden)]\n"
+        "pub mod table_sort_order_codec;\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -12718,6 +12808,103 @@ fn rewrite_movie_title_operation(
         for expression in (
             "+ audit_keynote_slide_table_title_facade_source_topology()",
             "+ audit_keynote_slide_table_title_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_sort_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_facade_source_topology(root),
+                [],
+            )
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_facade_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_sort_rejects_public_physical_and_row_range_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_sort(bytes: &[u8], model_id: u64, rows: RowRange) -> ArchiveObject { todo!() }\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::SlideTableSortEdit as SortEdit;\n",
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl Package { pub fn edit_slide_table_sort_order_with_rows(&self, rows: RowRange) {} }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_sort_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("legacy RowRange" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_requires_exact_codec_and_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_CODEC_SOURCE
+            source = codec.read_text(encoding="utf-8").replace(
+                "pub fn prepare_table_model_sort_order_rewrite", "pub fn missing_prepare"
+            )
+            codec.write_text(source, encoding="utf-8")
+            lib = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_CODEC_PUBLIC_SOURCE
+            lib.write_text("pub mod numbers_table_sort_order_codec;\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_sort_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("prepare_table_model_sort_order_rewrite" in item for item in violations), violations)
+            self.assertTrue(any("hidden codec module table_sort_order_codec" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_resource_markers_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_resource_source_topology(root),
+                [],
+            )
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS[
+                "prepared codec requirements"
+            ]:
+                source = source.replace(marker, "")
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("prepared codec requirements" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "let deleted_previews: usize = 0", "let deleted_previews: usize = 1"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_sort_facade_source_topology()",
+            "+ audit_keynote_slide_table_sort_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 
