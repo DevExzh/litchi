@@ -8,16 +8,19 @@ use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
-use litchi_core::sheet::{Cell, CellValue};
+use litchi_core::sheet::{Cell, CellValue, Worksheet as _};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
     OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
 };
 use litchi_opc::constants::relationship_type;
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, Part, SourceBackedPackage, SourceCacheLimits,
+};
+use litchi_xlsb::external_link::ExternalLinkLimits;
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, Writer, kind};
-use litchi_xlsb::{ReadLimits, SourceBackedWorkbook};
+use litchi_xlsb::{ReadLimits, SourceBackedWorkbook, Workbook};
 
 fn fixture() -> Vec<u8> {
     std::fs::read(concat!(
@@ -25,6 +28,105 @@ fn fixture() -> Vec<u8> {
         "/../../test-data/ooxml/xlsb/Simple.xlsb"
     ))
     .unwrap()
+}
+
+fn external_link_fixture() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/bug66682.xlsb"
+    ))
+    .unwrap()
+}
+
+fn external_wide_string(value: &str) -> Vec<u8> {
+    let units: Vec<u16> = value.encode_utf16().collect();
+    let mut output = Vec::with_capacity(4 + units.len() * 2);
+    output.extend_from_slice(&u32::try_from(units.len()).unwrap().to_le_bytes());
+    for unit in units {
+        output.extend_from_slice(&unit.to_le_bytes());
+    }
+    output
+}
+
+fn two_external_link_fixture() -> (Vec<u8>, usize) {
+    let mut package = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
+    let copied_external_uri = PackURI::new("/xl/externalLinks/externalLink2.bin").unwrap();
+    let (external_part_bytes, external_content_type, external_blob, external_relationships) = {
+        let external = package.get_part(&external_uri).unwrap();
+        (
+            external.blob().len(),
+            external.content_type().to_owned(),
+            external.blob().to_vec(),
+            external
+                .rels()
+                .iter()
+                .map(|relationship| {
+                    (
+                        relationship.reltype().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.r_id().to_owned(),
+                        relationship.is_external(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )
+    };
+    let workbook_relationship_type = package
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| {
+            relationship
+                .target_partname()
+                .is_ok_and(|target| target == external_uri)
+        })
+        .unwrap()
+        .reltype()
+        .to_owned();
+    let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let end = Records::new(&workbook_blob)
+        .find_map(|record| {
+            let record = record.unwrap();
+            (record.kind() == kind::SUP_BOOK_SRC).then(|| {
+                let (_, header_len) =
+                    Header::parse(&workbook_blob[record.offset()..], RawLimits::DEFAULT).unwrap();
+                record.offset() + header_len + record.len()
+            })
+        })
+        .unwrap();
+    let mut second_reference = Vec::new();
+    Writer::new(&mut second_reference)
+        .write_record(kind::SUP_BOOK_SRC, &external_wide_string("rIdExternalCopy"))
+        .unwrap();
+    workbook_blob.splice(end..end, second_reference);
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(workbook_blob);
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            workbook_relationship_type,
+            "externalLinks/externalLink2.bin".to_owned(),
+            "rIdExternalCopy".to_owned(),
+            false,
+        );
+    let mut copied_external =
+        BlobPart::new(copied_external_uri, external_content_type, external_blob);
+    for (reltype, target, relationship_id, external) in external_relationships {
+        copied_external
+            .rels_mut()
+            .add_relationship(reltype, target, relationship_id, external);
+    }
+    package.add_part(Box::new(copied_external));
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    (output, external_part_bytes)
 }
 
 fn rewrite_part(partname: &str, blob: Vec<u8>) -> Vec<u8> {
@@ -1463,4 +1565,305 @@ fn source_external_and_pivot_table_dependencies_remain_typed_refusals() {
             .materialize(),
         Err(PackageError::UnsupportedFeature(_))
     ));
+}
+
+#[test]
+fn source_external_link_catalog_is_payload_lazy_and_target_inert() {
+    let bytes = external_link_fixture();
+    let eager = Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+
+    assert_eq!(workbook.external_link_count().unwrap(), 1);
+    let links = workbook.external_links().unwrap();
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].metadata(), eager.external_link(0).unwrap());
+    let worksheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let source_worksheet = worksheet.materialize().unwrap();
+    let eager_worksheet = eager.worksheet(0).unwrap();
+    let (min_row, min_column, max_row, max_column) = source_worksheet.dimensions().unwrap();
+    let mut formula_count = 0usize;
+    for row in min_row..=max_row {
+        for column in min_column..=max_column {
+            let Some(source_cell) = source_worksheet.get_cell(row, column) else {
+                continue;
+            };
+            if source_cell.is_formula() {
+                formula_count += 1;
+                let eager_cell = eager_worksheet.get_cell(row, column).unwrap();
+                assert_eq!(source_cell.value(), eager_cell.value());
+            }
+        }
+    }
+    assert!(formula_count > 0);
+}
+
+#[test]
+fn source_external_link_declared_size_is_lazily_bounded() {
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(0)
+        .max_total_part_bytes(0)
+        .build()
+        .unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_external_link_limits(
+        Arc::new(OwnedSource::new(external_link_fixture())),
+        limits,
+    )
+    .unwrap();
+
+    assert_eq!(workbook.external_link_count().unwrap(), 1);
+    let worksheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+    assert!(matches!(
+        worksheet.materialize(),
+        Err(PackageError::ExternalLinkLimitExceeded { .. })
+    ));
+}
+
+#[test]
+fn source_external_link_parts_share_one_aggregate_budget() {
+    let (bytes, part_bytes) = two_external_link_fixture();
+    let rejecting_limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes)
+        .build()
+        .unwrap();
+    let rejecting = SourceBackedWorkbook::from_read_at_with_external_link_limits(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        rejecting_limits,
+    )
+    .unwrap();
+    assert_eq!(rejecting.external_link_count().unwrap(), 2);
+    assert!(matches!(
+        rejecting.external_links(),
+        Err(PackageError::ExternalLinkLimitExceeded { .. })
+    ));
+
+    let exact_limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes.checked_mul(2).unwrap())
+        .build()
+        .unwrap();
+    let exact = SourceBackedWorkbook::from_read_at_with_external_link_limits(
+        Arc::new(OwnedSource::new(bytes)),
+        exact_limits,
+    )
+    .unwrap();
+    let links = exact.external_links().unwrap();
+    assert_eq!(links.len(), 2);
+    assert_eq!(links[0].metadata(), links[1].metadata());
+}
+
+#[test]
+fn source_external_link_mutation_does_not_publish_partial_cache_and_retries() {
+    let (bytes, _) = two_external_link_fixture();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        None,
+    ));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    source.arm_mutation_on_table(1);
+    assert!(matches!(
+        workbook.external_links(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(source.table_payload_reads_for(0) > 0);
+    assert!(source.table_payload_reads_for(1) > 0);
+    let failed_first_reads = source.table_payload_reads_for(0);
+    let failed_second_reads = source.table_payload_reads_for(1);
+
+    source.reset_revision();
+    let links = workbook.external_links().unwrap();
+    assert_eq!(links.len(), 2);
+    assert_eq!(source.table_payload_reads_for(0), failed_first_reads);
+    assert!(source.table_payload_reads_for(1) > failed_second_reads);
+}
+
+#[test]
+fn source_external_link_second_part_cancellation_is_typed() {
+    let (bytes, _) = two_external_link_fixture();
+    let (cancellation_source, context) = managed_context();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        Some(cancellation_source),
+    ));
+    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    source.arm_cancel_on_table(1);
+    assert_cancelled(workbook.external_links());
+    assert!(source.table_payload_reads_for(0) > 0);
+    assert!(source.table_payload_reads_for(1) > 0);
+}
+
+#[test]
+fn source_external_link_semantic_cache_survives_physical_eviction() {
+    let (bytes, _) = two_external_link_fixture();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        None,
+    ));
+    let package = SourceBackedPackage::from_read_at_with_cache_limits(
+        source.clone(),
+        SourceCacheLimits::new(1, 1).unwrap(),
+    )
+    .unwrap();
+    let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+    assert_eq!(workbook.external_links().unwrap().len(), 2);
+    let first_reads = source.table_payload_reads_for(0);
+    let second_reads = source.table_payload_reads_for(1);
+    assert!(first_reads > 0);
+    assert!(second_reads > 0);
+
+    assert_eq!(workbook.external_links().unwrap().len(), 2);
+    assert_eq!(source.table_payload_reads_for(0), first_reads);
+    assert_eq!(source.table_payload_reads_for(1), second_reads);
+}
+
+#[test]
+fn source_external_link_owner_graph_is_validated_at_catalog_open() {
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
+
+    let mut wrong_relationship =
+        OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let (relationship_id, target, external) = wrong_relationship
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            relationship
+                .target_partname()
+                .is_ok_and(|partname| partname == external_uri)
+                .then(|| {
+                    (
+                        relationship.r_id().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.is_external(),
+                    )
+                })
+        })
+        .unwrap();
+    wrong_relationship
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .remove(&relationship_id)
+        .unwrap();
+    wrong_relationship
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            relationship_type::STYLES.to_owned(),
+            target,
+            relationship_id,
+            external,
+        );
+    let mut bytes = Vec::new();
+    wrong_relationship.to_stream(&mut bytes).unwrap();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+
+    let mut wrong_content = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    wrong_content
+        .get_part_mut(&external_uri)
+        .unwrap()
+        .set_content_type("application/octet-stream".to_owned())
+        .unwrap();
+    let mut bytes = Vec::new();
+    wrong_content.to_stream(&mut bytes).unwrap();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))),
+        Err(PackageError::InvalidContentType { .. })
+    ));
+}
+
+#[test]
+fn source_external_link_payload_failures_remain_deferred_and_typed() {
+    let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
+
+    let mut malformed = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    malformed
+        .get_part_mut(&external_uri)
+        .unwrap()
+        .set_blob(vec![0]);
+    let mut bytes = Vec::new();
+    malformed.to_stream(&mut bytes).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    assert!(matches!(
+        workbook.external_links(),
+        Err(PackageError::Wire(_))
+    ));
+
+    let mut missing_inner = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let relationship_id = missing_inner
+        .get_part(&external_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .next()
+        .unwrap()
+        .r_id()
+        .to_owned();
+    missing_inner
+        .get_part_mut(&external_uri)
+        .unwrap()
+        .rels_mut()
+        .remove(&relationship_id)
+        .unwrap();
+    let mut bytes = Vec::new();
+    missing_inner.to_stream(&mut bytes).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    assert!(matches!(
+        workbook.external_links(),
+        Err(PackageError::InvalidFormula(_))
+    ));
+}
+
+#[test]
+fn source_external_link_successful_initialization_is_single_flight() {
+    let (bytes, _) = two_external_link_fixture();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        None,
+    ));
+    let package = SourceBackedPackage::from_read_at_with_cache_limits(
+        source.clone(),
+        SourceCacheLimits::new(1, 1).unwrap(),
+    )
+    .unwrap();
+    let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+    let first = workbook.clone();
+    let second = workbook.clone();
+    let first = std::thread::spawn(move || first.external_links().unwrap().len());
+    let second = std::thread::spawn(move || second.external_links().unwrap().len());
+    assert_eq!(first.join().unwrap(), 2);
+    assert_eq!(second.join().unwrap(), 2);
+    assert_eq!(source.table_payload_reads_for(0), 1);
+    assert_eq!(source.table_payload_reads_for(1), 1);
+
+    assert_eq!(workbook.external_links().unwrap().len(), 2);
+    assert_eq!(source.table_payload_reads_for(0), 1);
+    assert_eq!(source.table_payload_reads_for(1), 1);
 }

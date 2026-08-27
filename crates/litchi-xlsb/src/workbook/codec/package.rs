@@ -629,18 +629,17 @@ impl Workbook {
         }
 
         let parsed = crate::external_link::parse_external_link_with_budget(part.blob(), budget)?;
-        self.resolve_external_book(part, parsed, budget)
+        Self::resolve_external_book(part.rels(), parsed, budget)
     }
 
-    fn resolve_external_book(
-        &self,
-        part: &dyn litchi_opc::Part,
+    pub(in crate::workbook) fn resolve_external_book(
+        relationships: &litchi_opc::Relationships,
         parsed: crate::external_link::Parsed,
         budget: &mut crate::external_link::Budget,
     ) -> Result<ExternalBook> {
         match parsed.link().kind() {
             Kind::Dde => {
-                if !part.rels().is_empty() {
+                if !relationships.is_empty() {
                     return Err(crate::package::error::Error::InvalidFormula(
                         "DDE external link must not contain relationships".to_string(),
                     ));
@@ -650,7 +649,7 @@ impl Workbook {
                 })
             },
             Kind::Workbook | Kind::Ole => {
-                if part.rels().len() != 1 {
+                if relationships.len() != 1 {
                     return Err(crate::package::error::Error::InvalidFormula(
                         "external workbook/OLE link must have exactly one data-source relationship"
                             .to_string(),
@@ -662,7 +661,7 @@ impl Workbook {
                         "external workbook/OLE link has no data-source relationship ID".to_string(),
                     )
                 })?;
-                let relationship = part.rels().get(relationship_id).ok_or_else(|| {
+                let relationship = relationships.get(relationship_id).ok_or_else(|| {
                     crate::package::error::Error::InvalidFormula(format!(
                         "external data relationship {relationship_id:?} is missing"
                     ))

@@ -12,4 +12,4 @@ mod source;
 mod tests;
 
 pub use model::{Workbook, WorksheetIterator};
-pub use source::{SourceBackedWorkbook, SourceBackedWorksheet};
+pub use source::{SourceBackedExternalLink, SourceBackedWorkbook, SourceBackedWorksheet};
