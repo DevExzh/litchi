@@ -290,6 +290,107 @@ fn owned_bytes_facade_defers_malformed_unselected_worksheet() {
 }
 
 #[test]
+fn dynamic_owned_bytes_facade_defers_malformed_unselected_worksheet() {
+    let malformed = malformed_second_sheet();
+    let workbook = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&malformed)
+        .expect("dynamic XLSB bytes facade should open the catalog");
+    let names = WorkbookTrait::worksheet_names(workbook.as_ref());
+    assert_eq!(
+        WorkbookTrait::worksheet_count(workbook.as_ref()),
+        names.len()
+    );
+    assert!(names.len() >= 2);
+
+    let first = WorkbookTrait::worksheet_by_index(workbook.as_ref(), 0)
+        .expect("the valid first worksheet should remain selectable");
+    assert!(first.cell_by_coordinate("A1").is_ok());
+
+    let second = WorkbookTrait::worksheet_by_index(workbook.as_ref(), 1)
+        .expect("the malformed worksheet catalog entry should remain selectable");
+    assert!(second.cell_by_coordinate("A1").is_err());
+}
+
+#[test]
+fn dynamic_owned_bytes_facade_retains_input_after_caller_mutation() {
+    let mut bytes = mixed_chart_tabs_bytes();
+    let workbook = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes)
+        .expect("dynamic XLSB bytes facade open");
+    bytes.fill(0);
+
+    let data = WorkbookTrait::worksheet_by_name(workbook.as_ref(), "Data")
+        .expect("owned source should outlive the caller's input slice");
+    assert_eq!(
+        data.cell_by_coordinate("A1").unwrap().value(),
+        &CellValue::String("DATA".to_string())
+    );
+}
+
+#[test]
+fn dynamic_owned_bytes_facade_enforces_exact_input_limit() {
+    let bytes = all_worksheet_bytes();
+    let input_bytes = u64::try_from(bytes.len()).unwrap();
+    let exact_limits = xlsb::ReadLimits::builder()
+        .max_input_bytes(input_bytes)
+        .unwrap()
+        .build()
+        .unwrap();
+    let workbook =
+        litchi::sheet::open_xlsb_workbook_from_bytes_dyn_with_limits(&bytes, exact_limits)
+            .expect("an input exactly at the configured limit should be accepted");
+    assert_eq!(WorkbookTrait::worksheet_count(workbook.as_ref()), 2);
+
+    let below_limit = xlsb::ReadLimits::builder()
+        .max_input_bytes(input_bytes - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = litchi::sheet::open_xlsb_workbook_from_bytes_dyn_with_limits(&bytes, below_limit)
+        .expect_err("an input over the configured limit must be rejected before copying");
+    assert!(error.downcast_ref::<litchi_core::Error>().is_some());
+}
+
+#[test]
+fn dynamic_owned_bytes_facade_enforces_exact_part_limit() {
+    let bytes = all_worksheet_bytes();
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let largest_part_bytes = package
+        .iter_parts()
+        .map(|part| part.blob().len())
+        .max()
+        .expect("generated package must contain ordinary parts");
+    let exact_limits = xlsb::ReadLimits::builder()
+        .max_part_bytes(u64::try_from(largest_part_bytes).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+    litchi::sheet::open_xlsb_workbook_from_bytes_dyn_with_limits(&bytes, exact_limits)
+        .expect("parts exactly at the configured limit should be accepted");
+
+    let below_limit = xlsb::ReadLimits::builder()
+        .max_part_bytes(u64::try_from(largest_part_bytes - 1).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = litchi::sheet::open_xlsb_workbook_from_bytes_dyn_with_limits(&bytes, below_limit)
+        .expect_err("a part over the configured limit must be rejected");
+    assert!(error.downcast_ref::<litchi_core::Error>().is_some());
+}
+
+#[test]
+fn dynamic_xlsb_byte_entrypoint_rejects_xlsx() {
+    let bytes = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsx/SimpleNormal.xlsx"
+    ));
+    assert!(litchi::sheet::open_xlsb_workbook_from_bytes_dyn(bytes).is_err());
+}
+
+#[test]
+fn dynamic_xlsb_byte_entrypoint_rejects_arbitrary_bytes() {
+    assert!(litchi::sheet::open_xlsb_workbook_from_bytes_dyn(b"not an XLSB package").is_err());
+}
+
+#[test]
 fn path_facade_reports_typed_source_change_for_catalog_and_reads() {
     let file = fixture_file(&fixture_bytes());
     let workbook = Workbook::open(file.path()).expect("lazy XLSB facade open");
@@ -511,8 +612,7 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
     assert!(
         matches!(
             dynamic_error
-                .downcast_ref::<Box<xlsb::package::error::Error>>()
-                .map(Box::as_ref),
+                .downcast_ref::<xlsb::package::error::Error>(),
             Some(xlsb::package::error::Error::UnsupportedFeature(message))
                 if message == "XLSB active sheet is not a worksheet"
         ),
