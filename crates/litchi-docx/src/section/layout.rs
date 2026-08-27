@@ -8,6 +8,7 @@
 //! the publication splice retains opaque attributes on edited known nodes and
 //! all unrelated section markup.
 
+use super::codec::section_child_rank;
 use super::inventory::{Inventory, RelationshipBinding, SourceSpan};
 use super::{Columns, Limits, Margins, PageSize, Section, Selector, Start};
 use crate::error::{Error, Result};
@@ -16,7 +17,7 @@ use litchi_core::{Position, SourceVersion};
 use litchi_opc::{SourceArtifact, SourceArtifactFingerprint, SourceLineage};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::sync::Arc;
 
@@ -351,7 +352,7 @@ impl Edit {
             let replacement = replacement.as_deref().ok_or_else(|| {
                 Error::InvalidFormat("changed section layout has no replacement bytes".into())
             })?;
-            let next_xml = replace_range(self.base.xml.as_slice(), start, end, &replacement)?;
+            let next_xml = replace_range(self.base.xml.as_slice(), start, end, replacement)?;
             let target = Snapshot::from_shared_xml(
                 Arc::new(next_xml),
                 self.base.source_version,
@@ -620,14 +621,12 @@ impl ChildSpan {
 
 #[derive(Clone)]
 struct FragmentContext {
-    root_bindings: Vec<RelationshipBinding>,
     analysis: FragmentAnalysis,
 }
 
 #[derive(Clone)]
 struct FragmentAnalysis {
     elements: Vec<ElementInfo>,
-    word_namespace: Vec<u8>,
 }
 
 #[derive(Clone)]
@@ -637,6 +636,8 @@ struct ElementInfo {
     local_start: usize,
     local_end: usize,
     word: bool,
+    word_namespace: Option<Vec<u8>>,
+    namespace_bindings: Vec<RelationshipBinding>,
     attributes: WordAttributeInfo,
     parent: Option<usize>,
 }
@@ -713,14 +714,7 @@ impl FragmentContext {
         xml.extend_from_slice(section);
         xml.extend_from_slice(&suffix_bytes);
         let analysis = FragmentAnalysis::parse(&xml, section_start, section.len(), limits)?;
-        Ok(Self {
-            root_bindings: span.namespace_bindings().to_vec(),
-            analysis,
-        })
-    }
-
-    fn word_namespace(&self) -> &[u8] {
-        &self.analysis.word_namespace
+        Ok(Self { analysis })
     }
 
     fn element(&self, start: usize) -> Result<&ElementInfo> {
@@ -775,21 +769,50 @@ impl FragmentContext {
 
     fn in_scope_word_attribute_prefix(
         &self,
+        target_start: usize,
         preferred: Option<&[u8]>,
-    ) -> Option<(Vec<u8>, Vec<u8>)> {
-        for binding in self.root_bindings.iter().rev() {
-            let prefix = &binding.prefix;
-            if prefix.is_empty() {
-                continue;
+    ) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
+        let element = self.element(target_start)?;
+        let Some(owner) = element.word_namespace.as_deref() else {
+            return Ok(None);
+        };
+        Ok(element
+            .namespace_bindings
+            .iter()
+            .rev()
+            .find(|binding| {
+                !binding.prefix.is_empty()
+                    && binding.namespace.as_slice() == owner
+                    && preferred.is_none_or(|wanted| wanted == binding.prefix.as_slice())
+            })
+            .map(|binding| (binding.prefix.clone(), binding.namespace.clone())))
+    }
+
+    fn fresh_word_attribute_prefix(&self, target_start: usize) -> Result<(Vec<u8>, Vec<u8>)> {
+        let element = self.element(target_start)?;
+        let namespace = element.word_namespace.clone().ok_or(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "edit_section_layout",
+            reason: "the target section element has no resolved owning Word namespace",
+        })?;
+        let mut suffix = 0usize;
+        loop {
+            let prefix = if suffix == 0 {
+                b"w".to_vec()
+            } else {
+                format!("w{suffix}").into_bytes()
+            };
+            if !element
+                .namespace_bindings
+                .iter()
+                .any(|binding| binding.prefix == prefix)
+            {
+                return Ok((prefix, namespace));
             }
-            if preferred.is_some_and(|wanted| wanted != prefix.as_slice()) {
-                continue;
-            }
-            if is_word_namespace_bytes(&binding.namespace) {
-                return Some((prefix.clone(), binding.namespace.clone()));
-            }
+            suffix = suffix.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("section layout namespace prefix counter overflow".into())
+            })?;
         }
-        None
     }
 }
 
@@ -817,7 +840,6 @@ impl FragmentAnalysis {
         let mut elements = Vec::<ElementInfo>::new();
         let mut section_root = None::<usize>;
         let mut section_closed = false;
-        let mut word_namespace = None::<Vec<u8>>;
 
         loop {
             let start = reader_offset(&reader)?;
@@ -848,10 +870,6 @@ impl FragmentAnalysis {
                                 "section fragment root is not WordprocessingML sectPr".into(),
                             ));
                         }
-                        word_namespace = match &namespace {
-                            ResolveResult::Bound(Namespace(uri)) => Some(uri.to_vec()),
-                            _ => None,
-                        };
                     }
                     let in_section = section_root.is_some() || is_section_root;
                     if in_section {
@@ -887,10 +905,6 @@ impl FragmentAnalysis {
                                 "section fragment root is not WordprocessingML sectPr".into(),
                             ));
                         }
-                        word_namespace = match &namespace {
-                            ResolveResult::Bound(Namespace(uri)) => Some(uri.to_vec()),
-                            _ => None,
-                        };
                     }
                     if section_root.is_some() || is_section_root {
                         let index = push_fragment_element(
@@ -940,13 +954,7 @@ impl FragmentAnalysis {
                 "section fragment root range does not match its source span".into(),
             ));
         }
-        let word_namespace = word_namespace.ok_or_else(|| {
-            Error::InvalidFormat("section fragment Word namespace was not resolved".into())
-        })?;
-        Ok(Self {
-            elements,
-            word_namespace,
-        })
+        Ok(Self { elements })
     }
 }
 
@@ -991,10 +999,30 @@ fn push_fragment_element(
         local_start,
         local_end,
         word: is_wordprocessing_namespace(namespace),
+        word_namespace: match namespace {
+            ResolveResult::Bound(Namespace(namespace)) if is_word_namespace_bytes(namespace) => {
+                Some(namespace.to_vec())
+            },
+            _ => None,
+        },
+        namespace_bindings: effective_namespace_bindings(resolver),
         attributes: word_attribute_info_from_element(element, namespace, resolver)?,
         parent,
     });
     Ok(index)
+}
+
+fn effective_namespace_bindings(resolver: &NamespaceResolver) -> Vec<RelationshipBinding> {
+    resolver
+        .bindings()
+        .map(|(prefix, Namespace(namespace))| RelationshipBinding {
+            prefix: match prefix {
+                PrefixDeclaration::Default => Vec::new(),
+                PrefixDeclaration::Named(prefix) => prefix.as_ref().to_vec(),
+            },
+            namespace: namespace.to_vec(),
+        })
+        .collect()
 }
 
 fn word_attribute_info_from_element(
@@ -1007,6 +1035,12 @@ fn word_attribute_info_from_element(
     }
     let mut info = WordAttributeInfo::default();
     let element_is_unprefixed = element.name().prefix().is_none();
+    let element_namespace = match namespace {
+        ResolveResult::Bound(Namespace(namespace)) if is_word_namespace_bytes(namespace) => {
+            Some(*namespace)
+        },
+        _ => None,
+    };
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         let local = attribute.key.local_name();
@@ -1018,10 +1052,15 @@ fn word_attribute_info_from_element(
             continue;
         }
         let (attribute_namespace, _) = resolver.resolve_attribute(attribute.key);
-        let word = is_wordprocessing_namespace(&attribute_namespace)
-            || (element_is_unprefixed
-                && prefix.is_empty()
-                && matches!(attribute_namespace, ResolveResult::Unbound));
+        let word = matches!(
+            (&element_namespace, &attribute_namespace),
+            (
+                Some(element),
+                ResolveResult::Bound(Namespace(attribute)),
+            ) if element == attribute
+        ) || (element_is_unprefixed
+            && prefix.is_empty()
+            && matches!(attribute_namespace, ResolveResult::Unbound));
         if word {
             if info.any_prefix.is_none() {
                 info.any_prefix = Some(prefix.clone());
@@ -1170,10 +1209,7 @@ fn ensure_clear_is_lossless(
     if attributes.iter().any(|attribute| {
         attribute.prefix == b"xmlns"
             || (attribute.prefix.is_empty() && attribute.local.as_slice() == b"xmlns")
-            || !field
-                .attributes()
-                .iter()
-                .any(|local| *local == attribute.local.as_slice())
+            || !field.attributes().contains(&attribute.local.as_slice())
             || !info.prefixes.iter().any(|(local, prefix)| {
                 local.as_slice() == attribute.local.as_slice() && prefix == &attribute.prefix
             })
@@ -1213,12 +1249,7 @@ impl KnownChild {
     }
 
     const fn rank(self) -> usize {
-        match self {
-            Self::Type => 0,
-            Self::PageSize => 1,
-            Self::Margins => 2,
-            Self::Columns => 3,
-        }
+        section_child_rank(self.local()).expect("modeled section child has a rank") as usize
     }
 
     const fn attributes(self) -> &'static [&'static [u8]] {
@@ -1273,28 +1304,28 @@ fn unique_child<'a>(
 }
 
 fn insertion_offset(original: &[u8], children: &[ChildSpan], field: KnownChild) -> Result<usize> {
+    if children
+        .iter()
+        .any(|child| child.word && section_child_rank(child.local(original)).is_none())
+    {
+        return Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "edit_section_layout",
+            reason: "an unknown direct Word section child blocks safe modeled insertion",
+        });
+    }
     for child in children {
         if !child.word {
             continue;
         }
-        let Some(other) = known_child(child.local(original)) else {
+        let Some(other_rank) = section_child_rank(child.local(original)) else {
             continue;
         };
-        if other.rank() > field.rank() {
+        if usize::from(other_rank) > field.rank() {
             return Ok(child.start);
         }
     }
     root_close_start(original)
-}
-
-fn known_child(local: &[u8]) -> Option<KnownChild> {
-    match local {
-        b"type" => Some(KnownChild::Type),
-        b"pgSz" => Some(KnownChild::PageSize),
-        b"pgMar" => Some(KnownChild::Margins),
-        b"cols" => Some(KnownChild::Columns),
-        _ => None,
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -1360,6 +1391,7 @@ fn patch_columns(
     let root_info = word_attribute_info(fragment, target_start)?;
     patch_known_attributes_with_info(
         fragment,
+        target_start,
         &output,
         candidate,
         KnownChild::Columns.attributes(),
@@ -1375,11 +1407,12 @@ fn patch_known_attributes_at(
     known: &[&[u8]],
 ) -> Result<Vec<u8>> {
     let info = word_attribute_info(fragment, target_start)?;
-    patch_known_attributes_with_info(fragment, original, candidate, known, &info)
+    patch_known_attributes_with_info(fragment, target_start, original, candidate, known, &info)
 }
 
 fn patch_known_attributes_with_info(
     fragment: &FragmentContext,
+    target_start: usize,
     original: &[u8],
     candidate: &[u8],
     known: &[&[u8]],
@@ -1428,6 +1461,9 @@ fn patch_known_attributes_with_info(
                 edits.push((start, source.end, Vec::new()));
             },
             (None, Some(target)) => {
+                let in_scope_prefix = fragment
+                    .in_scope_word_attribute_prefix(target_start, None)?
+                    .map(|(prefix, _)| prefix);
                 let prefix = info
                     .prefixes
                     .iter()
@@ -1445,15 +1481,16 @@ fn patch_known_attributes_with_info(
                         let element_prefix = element_prefix(&original[..original_end]);
                         (!element_prefix.is_empty()).then(|| element_prefix.to_vec())
                     })
-                    .or_else(|| {
-                        fragment
-                            .in_scope_word_attribute_prefix(None)
-                            .map(|(prefix, _)| prefix)
-                    })
-                    .unwrap_or_else(|| {
-                        bind_attribute_namespace = Some(fragment.word_namespace().to_vec());
-                        b"w".to_vec()
-                    });
+                    .or_else(|| in_scope_prefix.clone());
+                let prefix = match prefix {
+                    Some(prefix) => prefix,
+                    None => {
+                        let (prefix, namespace) =
+                            fragment.fresh_word_attribute_prefix(target_start)?;
+                        bind_attribute_namespace = Some((prefix.clone(), namespace));
+                        prefix
+                    },
+                };
                 let mut attribute = Vec::new();
                 attribute.push(b' ');
                 if !prefix.is_empty() {
@@ -1490,15 +1527,8 @@ fn patch_known_attributes_with_info(
     for (start, end, replacement) in edits.into_iter().rev() {
         output = replace_range(&output, start, end, &replacement)?;
     }
-    if let Some(namespace) = bind_attribute_namespace {
-        let prefix = lexical_attributes(&output[..opening_tag_end(&output)?])?
-            .iter()
-            .find_map(|attribute| {
-                (attribute.local.as_slice() == b"w" && attribute.prefix == b"xmlns")
-                    .then(|| b"w".as_slice())
-            })
-            .unwrap_or(b"w");
-        output = bind_candidate_attribute_namespace(&output, prefix, &namespace)?;
+    if let Some((prefix, namespace)) = bind_attribute_namespace {
+        output = bind_candidate_attribute_namespace(&output, &prefix, &namespace)?;
     }
     Ok(output)
 }
@@ -1816,18 +1846,17 @@ fn rebind_candidate_child(
             target_attribute_prefix.extend_from_slice(target_prefix);
         } else if !candidate_attribute_prefix.is_empty()
             && let Some((prefix, _namespace)) =
-                fragment.in_scope_word_attribute_prefix(Some(candidate_attribute_prefix))
+                fragment.in_scope_word_attribute_prefix(0, Some(candidate_attribute_prefix))?
         {
             target_attribute_prefix = prefix;
-        } else if let Some((prefix, _namespace)) = fragment.in_scope_word_attribute_prefix(None) {
+        } else if let Some((prefix, _namespace)) =
+            fragment.in_scope_word_attribute_prefix(0, None)?
+        {
             target_attribute_prefix = prefix;
         } else {
-            target_attribute_prefix = if candidate_attribute_prefix.is_empty() {
-                b"w".to_vec()
-            } else {
-                candidate_attribute_prefix.to_vec()
-            };
-            bind_attribute_namespace = Some(fragment.word_namespace().to_vec());
+            let (prefix, namespace) = fragment.fresh_word_attribute_prefix(0)?;
+            target_attribute_prefix = prefix;
+            bind_attribute_namespace = Some((target_attribute_prefix.clone(), namespace));
         }
     }
     let mut output = rewrite_candidate_qnames(
@@ -1837,8 +1866,8 @@ fn rebind_candidate_child(
         candidate_attribute_prefix,
         &target_attribute_prefix,
     )?;
-    if let Some(namespace) = bind_attribute_namespace {
-        output = bind_candidate_attribute_namespace(&output, &target_attribute_prefix, &namespace)?;
+    if let Some((prefix, namespace)) = bind_attribute_namespace {
+        output = bind_candidate_attribute_namespace(&output, &prefix, &namespace)?;
     }
     Ok(output)
 }
@@ -2164,13 +2193,11 @@ fn ensure_semantic_readback(
     selector: Selector,
     expected: &LocalState,
 ) -> Result<()> {
-    let section = inventory
-        .section(selector)
-        .ok_or_else(|| Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "section layout edit lost its selected main-story section",
-        })?;
+    let section = inventory.section(selector).ok_or(Error::UnsafeEdit {
+        format: "DOCX",
+        operation: "edit_section_layout",
+        reason: "section layout edit lost its selected main-story section",
+    })?;
     if section.page_size() != expected.page_size
         || section.margins() != expected.margins
         || section.start() != expected.start

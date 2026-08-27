@@ -86,6 +86,8 @@ pub(crate) struct Raw {
     root_name: Vec<u8>,
     root_prefix: Option<Vec<u8>>,
     attribute_prefix: Option<Vec<u8>>,
+    generated_attribute_prefix: Option<Vec<u8>>,
+    word_namespace: Option<Vec<u8>>,
     namespace_bindings: Vec<NamespaceBinding>,
     suffix: Vec<u8>,
     children: Vec<Node>,
@@ -192,6 +194,7 @@ pub(crate) fn encode(snapshot: &Snapshot) -> Result<Vec<u8>> {
     if snapshot.dirty.is_empty() {
         return Ok(snapshot.raw.original_bytes());
     }
+    ensure_no_unknown_word_insertion_barrier(&snapshot.raw, &snapshot.state, snapshot.dirty)?;
 
     let mut output = Vec::new();
     output.extend_from_slice(&snapshot.raw.prefix);
@@ -321,6 +324,26 @@ impl Raw {
         }
     }
 
+    fn write_generated_attribute_namespace(&self, xml: &mut String) -> Result<()> {
+        let Some(prefix) = &self.generated_attribute_prefix else {
+            return Ok(());
+        };
+        let Some(namespace) = &self.word_namespace else {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "edit_section_layout",
+                reason: "the generated section property has no resolved owning Word namespace",
+            });
+        };
+        write!(
+            xml,
+            " xmlns:{}=\"{}\"",
+            String::from_utf8_lossy(prefix),
+            escape_namespace_uri(&String::from_utf8_lossy(namespace)),
+        )?;
+        Ok(())
+    }
+
     fn has_namespace_binding(&self, prefix: &[u8]) -> bool {
         self.namespace_bindings
             .iter()
@@ -391,25 +414,25 @@ fn insert_missing_before(
     let fields = [
         (
             0,
-            section_child_rank("type").expect("section type rank"),
+            section_child_rank(b"type").expect("section type rank"),
             dirty.start,
             start,
         ),
         (
             1,
-            section_child_rank("pgSz").expect("section page size rank"),
+            section_child_rank(b"pgSz").expect("section page size rank"),
             dirty.page_size,
             page_size,
         ),
         (
             2,
-            section_child_rank("pgMar").expect("section margin rank"),
+            section_child_rank(b"pgMar").expect("section margin rank"),
             dirty.margins,
             margins,
         ),
         (
             3,
-            section_child_rank("cols").expect("section columns rank"),
+            section_child_rank(b"cols").expect("section columns rank"),
             dirty.columns,
             columns,
         ),
@@ -425,13 +448,61 @@ fn insert_missing_before(
     Ok(())
 }
 
+fn ensure_no_unknown_word_insertion_barrier(raw: &Raw, state: &State, dirty: Dirty) -> Result<()> {
+    let has_unknown_word_child = raw.children.iter().any(|node| {
+        matches!(
+            node,
+            Node::Element {
+                local_name,
+                word: true,
+                ..
+            } if section_child_rank(local_name.as_bytes()).is_none()
+        )
+    });
+    if !has_unknown_word_child {
+        return Ok(());
+    }
+    let insertions = [
+        (b"type".as_slice(), dirty.start, state.start.is_some()),
+        (
+            b"pgSz".as_slice(),
+            dirty.page_size,
+            state.page_size.is_some(),
+        ),
+        (b"pgMar".as_slice(), dirty.margins, state.margins.is_some()),
+        (b"cols".as_slice(), dirty.columns, state.columns.is_some()),
+    ];
+    let needs_insertion = insertions.iter().any(|(local_name, dirty, present)| {
+        *dirty
+            && *present
+            && !raw.children.iter().any(|node| {
+                matches!(
+                    node,
+                    Node::Element {
+                        local_name: child_name,
+                        word: true,
+                        ..
+                    } if child_name.as_bytes() == *local_name
+                )
+            })
+    });
+    if needs_insertion {
+        return Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "edit_section_layout",
+            reason: "an unknown direct Word section child blocks safe modeled insertion",
+        });
+    }
+    Ok(())
+}
+
 fn node_rank(node: &Node) -> Option<u8> {
     match node {
         Node::Element {
             local_name,
             word: true,
             ..
-        } => section_child_rank(local_name),
+        } => section_child_rank(local_name.as_bytes()),
         Node::Element { .. } | Node::Raw(_) => None,
     }
 }
@@ -440,11 +511,13 @@ fn write_start(raw: &Raw, start: Start) -> Result<Vec<u8>> {
     let mut xml = String::new();
     write!(
         xml,
-        "<{} {}=\"{}\"/>",
+        "<{} {}=\"{}\"",
         raw.element_name("type"),
         raw.attribute_name("val")?,
         start.to_xml()
     )?;
+    raw.write_generated_attribute_namespace(&mut xml)?;
+    xml.push_str("/>");
     Ok(xml.into_bytes())
 }
 
@@ -452,6 +525,7 @@ fn write_page_size(raw: &Raw, page_size: &PageSize) -> Result<Vec<u8>> {
     validate_page_size(page_size)?;
     let mut xml = String::new();
     write!(xml, "<{}", raw.element_name("pgSz"))?;
+    raw.write_generated_attribute_namespace(&mut xml)?;
     if let Some(width) = page_size.width {
         write!(
             xml,
@@ -481,6 +555,7 @@ fn write_margins(raw: &Raw, margins: &Margins) -> Result<Vec<u8>> {
     validate_margins(margins)?;
     let mut xml = String::new();
     write!(xml, "<{}", raw.element_name("pgMar"))?;
+    raw.write_generated_attribute_namespace(&mut xml)?;
     write_measurement(raw, &mut xml, "top", margins.top)?;
     write_measurement(raw, &mut xml, "right", margins.right)?;
     write_measurement(raw, &mut xml, "bottom", margins.bottom)?;
@@ -516,6 +591,7 @@ fn write_columns(raw: &Raw, columns: &Columns) -> Result<Vec<u8>> {
         raw.attribute_name("num")?,
         columns.count
     )?;
+    raw.write_generated_attribute_namespace(&mut xml)?;
     if let Some(space) = columns.space {
         write!(
             xml,
@@ -660,6 +736,8 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
     let mut root_name = Vec::new();
     let mut root_prefix = None;
     let mut attribute_prefix: Option<Vec<u8>> = None;
+    let mut generated_attribute_prefix: Option<Vec<u8>> = None;
+    let mut word_namespace: Option<Vec<u8>> = None;
     let mut namespace_bindings = Vec::new();
     let mut root_start = 0usize;
     let mut root_end = 0usize;
@@ -694,6 +772,7 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
             validate_root_namespace(&namespace)?;
         }
         let word_element = is_word_element(&namespace, &fragment_prefix);
+        let event_word_namespace = resolved_word_namespace(&namespace);
         let event_end = offset(&reader)?;
         if matches!(event, Event::Start(_) | Event::Empty(_)) {
             nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -723,8 +802,17 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
                         .prefix()
                         .map(|prefix| prefix.into_inner().to_vec());
                     namespace_bindings = root_namespace_bindings(&element, decoder)?;
-                    attribute_prefix =
-                        root_attribute_prefix(root_prefix.as_deref(), &namespace_bindings);
+                    word_namespace = event_word_namespace.clone();
+                    attribute_prefix = root_attribute_prefix(
+                        root_prefix.as_deref(),
+                        &namespace_bindings,
+                        word_namespace.as_deref(),
+                    );
+                    if attribute_prefix.is_none() && word_namespace.is_some() {
+                        let prefix = fresh_namespace_prefix(&namespace_bindings);
+                        attribute_prefix = Some(prefix.clone());
+                        generated_attribute_prefix = Some(prefix);
+                    }
                     root_open = Some(xml[event_start..event_end].to_vec());
                 } else if stack.len() == 1 {
                     direct_child_start = Some((
@@ -758,8 +846,17 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
                         .map(|prefix| prefix.into_inner().to_vec());
                     root_open = Some(xml[event_start..event_end].to_vec());
                     namespace_bindings = root_namespace_bindings(&element, decoder)?;
-                    attribute_prefix =
-                        root_attribute_prefix(root_prefix.as_deref(), &namespace_bindings);
+                    word_namespace = event_word_namespace.clone();
+                    attribute_prefix = root_attribute_prefix(
+                        root_prefix.as_deref(),
+                        &namespace_bindings,
+                        word_namespace.as_deref(),
+                    );
+                    if attribute_prefix.is_none() && word_namespace.is_some() {
+                        let prefix = fresh_namespace_prefix(&namespace_bindings);
+                        attribute_prefix = Some(prefix.clone());
+                        generated_attribute_prefix = Some(prefix);
+                    }
                 } else if stack.len() == 1 {
                     children.push(Node::Element {
                         local_name: String::from_utf8_lossy(element.local_name().as_ref())
@@ -848,6 +945,8 @@ fn parse_raw(xml: &[u8]) -> Result<Raw> {
         root_name,
         root_prefix,
         attribute_prefix,
+        generated_attribute_prefix,
+        word_namespace,
         namespace_bindings,
         suffix: xml[root_end..].to_vec(),
         children,
@@ -867,7 +966,7 @@ fn decode_state(raw: &Raw) -> Result<State> {
         else {
             continue;
         };
-        if let Some(rank) = section_child_rank(local_name) {
+        if let Some(rank) = section_child_rank(local_name.as_bytes()) {
             if last_rank.is_some_and(|last_rank| rank < last_rank) {
                 return Err(Error::InvalidFormat(format!(
                     "section property '{local_name}' is out of schema order"
@@ -927,29 +1026,29 @@ fn decode_state(raw: &Raw) -> Result<State> {
     Ok(state)
 }
 
-fn section_child_rank(name: &str) -> Option<u8> {
+pub(crate) const fn section_child_rank(name: &[u8]) -> Option<u8> {
     match name {
-        "headerReference" | "footerReference" => Some(0),
-        "footnotePr" => Some(1),
-        "endnotePr" => Some(2),
-        "type" => Some(3),
-        "pgSz" => Some(4),
-        "pgMar" => Some(5),
-        "paperSrc" => Some(6),
-        "pgBorders" => Some(7),
-        "lnNumType" => Some(8),
-        "pgNumType" => Some(9),
-        "cols" => Some(10),
-        "formProt" => Some(11),
-        "vAlign" => Some(12),
-        "noEndnote" => Some(13),
-        "titlePg" => Some(14),
-        "textDirection" => Some(15),
-        "bidi" => Some(16),
-        "rtlGutter" => Some(17),
-        "docGrid" => Some(18),
-        "printerSettings" => Some(19),
-        "sectPrChange" => Some(20),
+        b"headerReference" | b"footerReference" => Some(0),
+        b"footnotePr" => Some(1),
+        b"endnotePr" => Some(2),
+        b"type" => Some(3),
+        b"pgSz" => Some(4),
+        b"pgMar" => Some(5),
+        b"paperSrc" => Some(6),
+        b"pgBorders" => Some(7),
+        b"lnNumType" => Some(8),
+        b"pgNumType" => Some(9),
+        b"cols" => Some(10),
+        b"formProt" => Some(11),
+        b"vAlign" => Some(12),
+        b"noEndnote" => Some(13),
+        b"titlePg" => Some(14),
+        b"textDirection" => Some(15),
+        b"bidi" => Some(16),
+        b"rtlGutter" => Some(17),
+        b"docGrid" => Some(18),
+        b"printerSettings" => Some(19),
+        b"sectPrChange" => Some(20),
         _ => None,
     }
 }
@@ -1244,6 +1343,7 @@ fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(Str
         .name()
         .prefix()
         .map(|prefix| prefix.into_inner().to_vec());
+    let element_namespace = resolver.resolve_element(element.name()).0;
     let decoder = reader.decoder();
     validate_element_qname(element.name().as_ref(), "section")?;
     validate_attribute_qnames(&element, decoder, "section")?;
@@ -1260,7 +1360,7 @@ fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(Str
         );
         let relevant = match family {
             AttributeFamily::Word => {
-                is_wordprocessing_namespace(&namespace)
+                same_word_namespace(&element_namespace, &namespace)
                     || matches!(namespace, ResolveResult::Unbound)
                     || same_fragment_prefix
             },
@@ -1269,7 +1369,7 @@ fn attributes(raw: &Raw, xml: &[u8], family: AttributeFamily) -> Result<Vec<(Str
                     || matches!(&namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r" && !raw.has_namespace_binding(prefix.as_slice()))
             },
             AttributeFamily::Reference => {
-                is_wordprocessing_namespace(&namespace)
+                same_word_namespace(&element_namespace, &namespace)
                     || matches!(namespace, ResolveResult::Unbound)
                     || same_fragment_prefix
             },
@@ -1296,6 +1396,19 @@ fn is_relationship_namespace(namespace: &ResolveResult<'_>) -> bool {
         b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
     matches!(namespace, ResolveResult::Bound(quick_xml::name::Namespace(value)) if *value == TRANSITIONAL || *value == STRICT)
+}
+
+fn same_word_namespace(
+    element_namespace: &ResolveResult<'_>,
+    attribute_namespace: &ResolveResult<'_>,
+) -> bool {
+    matches!(
+        (element_namespace, attribute_namespace),
+        (
+            ResolveResult::Bound(quick_xml::name::Namespace(element)),
+            ResolveResult::Bound(quick_xml::name::Namespace(attribute)),
+        ) if is_word_namespace_bytes(element) && element == attribute
+    )
 }
 
 fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
@@ -1346,6 +1459,7 @@ fn required_attribute(raw: &Raw, xml: &[u8], name: &[u8]) -> Result<String> {
         .name()
         .prefix()
         .map(|prefix| prefix.into_inner().to_vec());
+    let element_namespace = resolver.resolve_element(element.name()).0;
     let mut value = None;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -1359,7 +1473,7 @@ fn required_attribute(raw: &Raw, xml: &[u8], name: &[u8]) -> Result<String> {
                 if element_prefix.as_deref() == Some(prefix.as_slice())
                     && !raw.has_namespace_binding(prefix.as_slice())
         );
-        if !is_wordprocessing_namespace(&namespace)
+        if !same_word_namespace(&element_namespace, &namespace)
             && !matches!(namespace, ResolveResult::Unbound)
             && !same_fragment_prefix
         {
@@ -1427,21 +1541,55 @@ fn root_namespace_bindings(
 fn root_attribute_prefix(
     root_prefix: Option<&[u8]>,
     bindings: &[NamespaceBinding],
+    word_namespace: Option<&[u8]>,
 ) -> Option<Vec<u8>> {
     if let Some(prefix) = root_prefix.filter(|prefix| !prefix.is_empty()) {
         return Some(prefix.to_vec());
     }
-    bindings.iter().find_map(|binding| {
+    let word_namespace = word_namespace?;
+    if let Some(prefix) = bindings.iter().find_map(|binding| {
         let prefix = binding.prefix.as_deref()?;
-        is_wordprocessing_namespace_uri(&binding.uri).then(|| prefix.to_vec())
-    })
+        (binding.uri.as_bytes() == word_namespace).then(|| prefix.to_vec())
+    }) {
+        return Some(prefix);
+    }
+    None
 }
 
-fn is_wordprocessing_namespace_uri(value: &str) -> bool {
+fn fresh_namespace_prefix(bindings: &[NamespaceBinding]) -> Vec<u8> {
+    let mut index = 0usize;
+    loop {
+        let prefix = if index == 0 {
+            b"w".to_vec()
+        } else {
+            format!("w{index}").into_bytes()
+        };
+        if !bindings
+            .iter()
+            .any(|binding| binding.prefix.as_deref() == Some(prefix.as_slice()))
+        {
+            return prefix;
+        }
+        index = index.saturating_add(1);
+    }
+}
+
+fn resolved_word_namespace(namespace: &ResolveResult<'_>) -> Option<Vec<u8>> {
+    match namespace {
+        ResolveResult::Bound(quick_xml::name::Namespace(namespace))
+            if is_word_namespace_bytes(namespace) =>
+        {
+            Some(namespace.to_vec())
+        },
+        _ => None,
+    }
+}
+
+fn is_word_namespace_bytes(value: &[u8]) -> bool {
     matches!(
         value,
-        "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-            | "http://purl.oclc.org/ooxml/wordprocessingml/main"
+        b"http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            | b"http://purl.oclc.org/ooxml/wordprocessingml/main"
     )
 }
 
@@ -1649,21 +1797,6 @@ mod tests {
         assert!(output.contains("alias:w=\""));
         assert!(!output.contains("r:w=\""));
         assert!(!output.contains("x:w=\""));
-    }
-
-    #[test]
-    fn default_only_or_unbound_word_namespace_rejects_generated_attributes() {
-        for xml in [
-            r#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><pgSz w="12240" h="15840"/></sectPr>"#,
-            r#"<sectPr><pgSz w="12240" h="15840"/></sectPr>"#,
-            r#"<sectPr xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:foreign"><pgSz w="12240" h="15840"/></sectPr>"#,
-        ] {
-            assert!(matches!(
-                dirty_page_size(xml),
-                Err(Error::InvalidFormat(message))
-                    if message.contains("without a named WordprocessingML prefix")
-            ));
-        }
     }
 
     #[test]

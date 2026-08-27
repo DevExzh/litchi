@@ -8,8 +8,8 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::section::{
-    Columns, Emu, Limits, Margins, Orientation, Ownership, PageSize, Property, PropertyValue,
-    Selector, Start,
+    Column, Columns, Emu, Limits, Margins, Orientation, Ownership, PageSize, Property,
+    PropertyValue, Selector, Start,
 };
 use litchi_docx::{Error, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -531,6 +531,15 @@ fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
     panic!("missing ZIP member")
 }
 
+fn main_xml(zip: &[u8]) -> String {
+    let package = OpcPackage::from_reader(io::Cursor::new(zip.to_vec())).unwrap();
+    let main = package
+        .get_part(&PackURI::new(format!("/{MAIN}")).unwrap())
+        .unwrap()
+        .blob();
+    String::from_utf8(main.to_vec()).unwrap()
+}
+
 #[test]
 fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     let document = format!(
@@ -950,6 +959,277 @@ fn section_layout_default_word_namespace_rebinds_inserted_qnames() {
             Some(Emu::from_twips(16838))
         );
     }
+}
+
+#[test]
+fn section_layout_missing_children_precede_standard_barriers_losslessly() {
+    let cases = [
+        (
+            "pgSz",
+            format!(
+                r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign"><w:body><w:p><w:pPr><w:sectPr><f:foreign f:keep="yes"/><!-- keep this comment --><w:pgBorders/><w:docGrid/><w:sectPrChange/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+            ),
+            "pgBorders",
+        ),
+        (
+            "pgMar",
+            format!(
+                r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><f:foreign f:keep="yes"/><!-- keep this comment --><w:docGrid/><w:sectPrChange/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+            ),
+            "docGrid",
+        ),
+        (
+            "cols",
+            format!(
+                r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:left="720"/><f:foreign f:keep="yes"/><!-- keep this comment --><w:sectPrChange/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+            ),
+            "sectPrChange",
+        ),
+    ];
+
+    for (field, document, barrier) in cases {
+        let source_bytes = fixture(document.as_bytes());
+        let package =
+            source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+                .unwrap();
+        let source = package.section_layout_snapshot().unwrap();
+        let mut edit = source.edit(0).unwrap();
+        match field {
+            "pgSz" => {
+                edit.set_page_size(Some(PageSize {
+                    width: Some(Emu::from_twips(11906)),
+                    height: Some(Emu::from_twips(16838)),
+                    orientation: Orientation::Landscape,
+                }))
+                .unwrap();
+            },
+            "pgMar" => {
+                edit.set_margins(Some(Margins {
+                    top: Some(Emu::from_twips(720)),
+                    right: Some(Emu::from_twips(720)),
+                    bottom: Some(Emu::from_twips(720)),
+                    left: Some(Emu::from_twips(1080)),
+                    header: None,
+                    footer: None,
+                    gutter: None,
+                }))
+                .unwrap();
+            },
+            "cols" => {
+                edit.set_columns(Some(Columns {
+                    equal_width: true,
+                    count: 2,
+                    space: Some(Emu::from_twips(240)),
+                    separator: true,
+                    columns: Vec::new(),
+                }))
+                .unwrap();
+            },
+            _ => unreachable!("unknown section-layout field"),
+        }
+        let commit = edit.commit().unwrap();
+        let mut output = Vec::new();
+        package
+            .publish_section_layout_commit_to_stream(&mut output, &commit)
+            .unwrap();
+
+        let main = main_xml(&output);
+        let inserted = format!("<w:{field}");
+        assert!(
+            main.find(&inserted).unwrap() < main.find(&format!("<w:{barrier}")).unwrap(),
+            "{field} was not inserted before {barrier}: {main}"
+        );
+        assert!(main.contains(r#"<f:foreign f:keep="yes"/>"#));
+        assert!(main.contains("<!-- keep this comment -->"));
+        assert_eq!(
+            &output[payload_range(&output, HEADER)],
+            &source_bytes[payload_range(&source_bytes, HEADER)]
+        );
+        assert_eq!(
+            &output[payload_range(&output, UNUSED)],
+            &source_bytes[payload_range(&source_bytes, UNUSED)]
+        );
+
+        let reopened =
+            source_backed::Package::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();
+        let reopened_snapshot = reopened.section_layout_snapshot().unwrap();
+        let section = &reopened_snapshot.inventory().sections()[0];
+        match field {
+            "pgSz" => assert_eq!(
+                section.page_size().unwrap().orientation,
+                Orientation::Landscape
+            ),
+            "pgMar" => assert_eq!(section.margins().unwrap().left, Some(Emu::from_twips(1080))),
+            "cols" => assert_eq!(section.columns().unwrap().count, 2),
+            _ => unreachable!("unknown section-layout field"),
+        }
+    }
+}
+
+#[test]
+fn section_layout_local_prefix_shadowing_preserves_foreign_markup_and_reopens() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:x="{W}" xmlns:f="urn:foreign"><w:body><w:p><w:pPr><w:sectPr><x:pgSz xmlns:w="urn:page-shadow" f:marker="page" x:w="12240"/><x:pgMar xmlns:w="urn:margins-shadow" f:marker="margins" x:left="720"/><x:cols xmlns:w="urn:columns-shadow" f:marker="columns" x:num="1"><x:col xmlns:w="urn:column-shadow" f:marker="column" x:w="600"/></x:cols></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+    );
+    let source_bytes = fixture(document.as_bytes());
+    let package =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    let source = package.section_layout_snapshot().unwrap();
+    let mut edit = source.edit(0).unwrap();
+    edit.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Landscape,
+    }))
+    .unwrap()
+    .set_margins(Some(Margins {
+        top: Some(Emu::from_twips(720)),
+        right: Some(Emu::from_twips(1080)),
+        bottom: Some(Emu::from_twips(720)),
+        left: Some(Emu::from_twips(1080)),
+        header: Some(Emu::from_twips(360)),
+        footer: Some(Emu::from_twips(360)),
+        gutter: Some(Emu::from_twips(120)),
+    }))
+    .unwrap()
+    .set_columns(Some(Columns {
+        equal_width: false,
+        count: 1,
+        space: Some(Emu::from_twips(240)),
+        separator: true,
+        columns: vec![Column {
+            width: Emu::from_twips(900),
+            space: Some(Emu::from_twips(120)),
+        }],
+    }))
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    package
+        .publish_section_layout_commit_to_stream(&mut output, &commit)
+        .unwrap();
+
+    let main = main_xml(&output);
+    for shadow in [
+        r#"xmlns:w="urn:page-shadow""#,
+        r#"xmlns:w="urn:margins-shadow""#,
+        r#"xmlns:w="urn:columns-shadow""#,
+        r#"xmlns:w="urn:column-shadow""#,
+    ] {
+        assert!(
+            main.contains(shadow),
+            "missing preserved declaration {shadow}"
+        );
+    }
+    for marker in [
+        r#"f:marker="page""#,
+        r#"f:marker="margins""#,
+        r#"f:marker="columns""#,
+        r#"f:marker="column""#,
+    ] {
+        assert!(
+            main.contains(marker),
+            "missing preserved foreign attribute {marker}"
+        );
+    }
+    for modeled in [
+        r#"x:h="16838""#,
+        r#"x:orient="landscape""#,
+        r#"x:top="720""#,
+        r#"x:right="1080""#,
+        r#"x:bottom="720""#,
+        r#"x:left="1080""#,
+        r#"x:header="360""#,
+        r#"x:footer="360""#,
+        r#"x:gutter="120""#,
+        r#"x:equalWidth="0""#,
+        r#"x:space="240""#,
+        r#"x:sep="1""#,
+        r#"x:w="900""#,
+        r#"x:space="120""#,
+    ] {
+        assert!(
+            main.contains(modeled),
+            "missing modeled attribute in section Word namespace: {modeled}"
+        );
+    }
+    assert!(!main.contains(r#"w:h="16838""#));
+    assert!(!main.contains(r#"w:top="720""#));
+
+    let reopened =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();
+    let reopened_snapshot = reopened.section_layout_snapshot().unwrap();
+    let section = &reopened_snapshot.inventory().sections()[0];
+    assert_eq!(
+        section.page_size().unwrap().height,
+        Some(Emu::from_twips(16838))
+    );
+    assert_eq!(section.margins().unwrap().left, Some(Emu::from_twips(1080)));
+    assert_eq!(
+        section.columns().unwrap(),
+        Columns {
+            equal_width: false,
+            count: 1,
+            space: Some(Emu::from_twips(240)),
+            separator: true,
+            columns: vec![Column {
+                width: Emu::from_twips(900),
+                space: Some(Emu::from_twips(120)),
+            }],
+        }
+    );
+}
+
+#[test]
+fn section_layout_missing_field_with_unknown_word_child_is_typed_unsafe_edit() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:unknown w:opaque="keep"/><w:docGrid/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+    );
+    let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(
+        document.as_bytes(),
+    ))))
+    .unwrap();
+    let source = package.section_layout_snapshot().unwrap();
+    let mut edit = source.edit(0).unwrap();
+    edit.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Portrait,
+    }))
+    .unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "edit_section_layout",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn section_layout_complex_noop_remains_byte_exact() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:f="urn:foreign"><w:body><w:p><w:pPr><w:sectPr><f:foreign f:keep="yes"/><!-- keep this comment --><w:pgBorders/><w:docGrid/><w:sectPrChange/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
+    );
+    let source_bytes = fixture(document.as_bytes());
+    let package =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    let noop = package
+        .section_layout_snapshot()
+        .unwrap()
+        .edit(0)
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(noop.patch().is_noop());
+    let mut output = Vec::new();
+    package
+        .publish_section_layout_commit_to_stream(&mut output, &noop)
+        .unwrap();
+    assert_eq!(output, source_bytes);
 }
 
 #[test]
