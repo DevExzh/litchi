@@ -13,8 +13,9 @@ use crate::error::Error;
 use crate::leniency::{Leniency, ToleranceLog};
 use crate::number_format::{DateSystem, Formatting};
 use crate::records::{
-    BofRecord, BoundSheetRecord, CellRecord, Encoding, FormulaValue, SharedStringScanError,
-    SharedStringSstScan, SheetType, decode_shared_string_entry, scan_shared_string_records,
+    BofRecord, BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue,
+    SharedStringScanError, SharedStringSstScan, SheetType, decode_shared_string_entry,
+    scan_shared_string_records,
 };
 use crate::{SheetKind, SheetVisibility, Workbook};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
@@ -22,12 +23,15 @@ use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCu
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::sheet::Cell as CellTrait;
-use litchi_core::{ExecutionContext, ExecutionError, ReadAt, SourceVersion};
-use std::collections::HashSet;
+use litchi_core::{
+    ExecutionContext, ExecutionError, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind,
+    TextOutputError, TextOutputOptions, TextOutputReport,
+};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::io::Cursor;
+use std::io::{self, Cursor, Write};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
@@ -46,6 +50,8 @@ const DEFAULT_GLOBAL_RECORDS: usize = 1_000_000;
 const DEFAULT_SST_ENTRIES: usize = 1_000_000;
 const DEFAULT_WORKSHEET_BYTES: u64 = 128 * 1024 * 1024;
 const DEFAULT_WORKSHEET_RECORDS: usize = 1_000_000;
+const DEFAULT_TEXT_CELLS: usize = 1_000_000;
+const DEFAULT_TEXT_BYTES: u64 = 128 * 1024 * 1024;
 const DEFAULT_SHEET_COUNT: usize = 4_096;
 const DEFAULT_MATERIALIZE_BYTES: u64 = 128 * 1024 * 1024;
 const MATERIALIZE_CHUNK_BYTES: usize = 64 * 1024;
@@ -67,6 +73,10 @@ pub struct SourceBackedLimits {
     pub max_worksheet_scan_bytes: u64,
     /// Maximum BIFF records parsed for one worksheet query.
     pub max_worksheet_scan_records: usize,
+    /// Maximum unique cells retained while projecting one worksheet to text.
+    pub max_text_cells: usize,
+    /// Maximum owned string/error bytes retained while projecting one worksheet.
+    pub max_text_bytes: u64,
     /// Maximum number of `BoundSheet8` entries.
     pub max_sheet_count: usize,
 }
@@ -81,6 +91,8 @@ impl Default for SourceBackedLimits {
             max_sst_entries: DEFAULT_SST_ENTRIES,
             max_worksheet_scan_bytes: DEFAULT_WORKSHEET_BYTES,
             max_worksheet_scan_records: DEFAULT_WORKSHEET_RECORDS,
+            max_text_cells: DEFAULT_TEXT_CELLS,
+            max_text_bytes: DEFAULT_TEXT_BYTES,
             max_sheet_count: DEFAULT_SHEET_COUNT,
         }
     }
@@ -146,6 +158,20 @@ impl SourceBackedLimits {
         self
     }
 
+    /// Sets the maximum unique cells retained for one source-backed text projection.
+    #[must_use]
+    pub const fn with_max_text_cells(mut self, value: usize) -> Self {
+        self.max_text_cells = value;
+        self
+    }
+
+    /// Sets the maximum owned string/error bytes retained for one source-backed text projection.
+    #[must_use]
+    pub const fn with_max_text_bytes(mut self, value: u64) -> Self {
+        self.max_text_bytes = value;
+        self
+    }
+
     /// Sets the `BoundSheet8` count ceiling.
     #[must_use]
     pub const fn with_max_sheet_count(mut self, value: usize) -> Self {
@@ -160,6 +186,8 @@ impl SourceBackedLimits {
             || self.max_sst_entries == 0
             || self.max_worksheet_scan_bytes == 0
             || self.max_worksheet_scan_records == 0
+            || self.max_text_cells == 0
+            || self.max_text_bytes == 0
             || self.max_sheet_count == 0
         {
             return Err(SourceBackedError::ResourceLimit {
@@ -177,7 +205,7 @@ impl SourceBackedLimits {
 #[derive(Debug)]
 pub enum SourceBackedError {
     /// An underlying positional-source error.
-    Io(std::io::Error),
+    Io(io::Error),
     /// A CFB validation or range-read error.
     Cfb(OleError),
     /// An existing XLS semantic codec rejected the source.
@@ -284,8 +312,8 @@ impl std::error::Error for SourceBackedError {
     }
 }
 
-impl From<std::io::Error> for SourceBackedError {
-    fn from(error: std::io::Error) -> Self {
+impl From<io::Error> for SourceBackedError {
+    fn from(error: io::Error) -> Self {
         Self::Io(error)
     }
 }
@@ -470,6 +498,231 @@ impl SourceBackedCell {
     }
 }
 
+struct SourceCheckedTextSink<'owner, 'output, W: ?Sized> {
+    output: &'output mut W,
+    owner: &'owner SourceInner,
+    execution: Option<&'owner ExecutionContext>,
+    failure: Arc<Mutex<Option<SourceBackedError>>>,
+}
+
+impl<'owner, 'output, W: ?Sized> SourceCheckedTextSink<'owner, 'output, W> {
+    fn record_failure(&self, error: SourceBackedError) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check(&self) -> io::Result<()> {
+        let result = self
+            .execution
+            .map_or(Ok(()), |context| {
+                context.check().map_err(SourceBackedError::from)
+            })
+            .and_then(|()| self.owner.ensure_current());
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let message = error.to_string();
+                self.record_failure(error);
+                Err(io::Error::other(message))
+            },
+        }
+    }
+}
+
+impl<'owner, 'output, W: Write + ?Sized> Write for SourceCheckedTextSink<'owner, 'output, W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.check()?;
+        let result = self.output.write(bytes);
+        let _ = self.check();
+        result
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.check()?;
+        let result = self.output.flush();
+        let _ = self.check();
+        result
+    }
+}
+
+fn take_source_text_failure(
+    failure: &Arc<Mutex<Option<SourceBackedError>>>,
+) -> Option<SourceBackedError> {
+    failure
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
+}
+
+#[derive(Default)]
+struct FallibleTextCollector {
+    bytes: Vec<u8>,
+    allocation: Option<SourceBackedError>,
+}
+
+impl FallibleTextCollector {
+    fn push_terminal_newline(&mut self, current_bytes: u64, max_output_bytes: u64) -> Result<()> {
+        let required = current_bytes
+            .checked_add(1)
+            .ok_or(SourceBackedError::ResourceLimit {
+                resource: "text output",
+                observed: u64::MAX,
+                maximum: max_output_bytes,
+            })?;
+        if required > max_output_bytes {
+            return Err(SourceBackedError::ResourceLimit {
+                resource: "text output",
+                observed: required,
+                maximum: max_output_bytes,
+            });
+        }
+        self.bytes
+            .try_reserve(1)
+            .map_err(|_error| SourceBackedError::Allocation {
+                resource: "source-backed text output",
+                requested: 1,
+            })?;
+        self.bytes.push(b'\n');
+        Ok(())
+    }
+
+    fn take_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for FallibleTextCollector {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if let Err(_error) = self.bytes.try_reserve(bytes.len()) {
+            let typed = SourceBackedError::Allocation {
+                resource: "source-backed text output",
+                requested: bytes.len() as u64,
+            };
+            let message = typed.to_string();
+            self.allocation = Some(typed);
+            return Err(io::Error::other(message));
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct SourceTextSheet {
+    cells: HashMap<(u16, u16), litchi_core::sheet::CellValue>,
+    max_row: u16,
+    max_col: u16,
+    retained_text_bytes: u64,
+}
+
+impl SourceTextSheet {
+    fn new() -> Self {
+        Self {
+            cells: HashMap::new(),
+            max_row: 0,
+            max_col: 0,
+            retained_text_bytes: 0,
+        }
+    }
+
+    fn insert(
+        &mut self,
+        row: u16,
+        column: u16,
+        value: litchi_core::sheet::CellValue,
+        limits: SourceBackedLimits,
+    ) -> Result<()> {
+        let old_bytes = self
+            .cells
+            .get(&(row, column))
+            .map(retained_text_bytes)
+            .unwrap_or(0);
+        let new_bytes = retained_text_bytes(&value);
+        let retained = self
+            .retained_text_bytes
+            .checked_sub(old_bytes)
+            .and_then(|bytes| bytes.checked_add(new_bytes))
+            .ok_or(SourceBackedError::ResourceLimit {
+                resource: "text bytes",
+                observed: u64::MAX,
+                maximum: limits.max_text_bytes,
+            })?;
+        if retained > limits.max_text_bytes {
+            return Err(SourceBackedError::ResourceLimit {
+                resource: "text bytes",
+                observed: retained,
+                maximum: limits.max_text_bytes,
+            });
+        }
+
+        let is_new = !self.cells.contains_key(&(row, column));
+        if is_new {
+            let observed =
+                self.cells
+                    .len()
+                    .checked_add(1)
+                    .ok_or(SourceBackedError::ResourceLimit {
+                        resource: "text cells",
+                        observed: u64::MAX,
+                        maximum: limits.max_text_cells as u64,
+                    })?;
+            if observed > limits.max_text_cells {
+                return Err(SourceBackedError::ResourceLimit {
+                    resource: "text cells",
+                    observed: observed as u64,
+                    maximum: limits.max_text_cells as u64,
+                });
+            }
+            self.cells
+                .try_reserve(1)
+                .map_err(|_error| SourceBackedError::Allocation {
+                    resource: "source-backed text cells",
+                    requested: 1,
+                })?;
+        }
+
+        let _ = self.cells.insert((row, column), value);
+        self.retained_text_bytes = retained;
+        self.max_row = self.max_row.max(row);
+        self.max_col = self.max_col.max(column);
+        Ok(())
+    }
+}
+
+fn retained_text_bytes(value: &litchi_core::sheet::CellValue) -> u64 {
+    match value {
+        litchi_core::sheet::CellValue::String(value)
+        | litchi_core::sheet::CellValue::Error(value) => {
+            u64::try_from(value.len()).unwrap_or(u64::MAX)
+        },
+        litchi_core::sheet::CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => u64::try_from(formula.len())
+            .unwrap_or(u64::MAX)
+            .saturating_add(
+                cached_value
+                    .as_deref()
+                    .map(retained_text_bytes)
+                    .unwrap_or(0),
+            ),
+        litchi_core::sheet::CellValue::Empty
+        | litchi_core::sheet::CellValue::Bool(_)
+        | litchi_core::sheet::CellValue::Int(_)
+        | litchi_core::sheet::CellValue::Float(_)
+        | litchi_core::sheet::CellValue::DateTime(_) => 0,
+    }
+}
+
 impl SourceBackedWorkbook {
     /// Opens a positional source with default finite limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
@@ -504,6 +757,117 @@ impl SourceBackedWorkbook {
     ) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at_with_limits(source, limits)
+    }
+
+    /// Extracts all ordinary worksheet text through the bounded source-backed
+    /// projection. The returned string retains the legacy trailing newline.
+    pub fn text(&self) -> Result<String> {
+        self.text_impl(None)
+    }
+
+    /// Extracts all ordinary worksheet text with cooperative cancellation.
+    pub fn text_with_execution(&self, execution: &ExecutionContext) -> Result<String> {
+        self.text_impl(Some(execution))
+    }
+
+    /// Streams ordinary worksheet rows to a caller-owned sink.
+    ///
+    /// Each logical row is one paragraph-like object. Cells are emitted in a
+    /// dense rectangular range with tab separators. The standard text-output
+    /// policy controls object separators, empty rows, and output limits; this
+    /// method does not append a terminal separator.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<SourceBackedError>> {
+        self.write_text_to_impl(output, options, None)
+    }
+
+    /// Streams ordinary worksheet rows with cooperative cancellation.
+    pub fn write_text_to_with_execution<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+        execution: &ExecutionContext,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<SourceBackedError>> {
+        self.write_text_to_impl(output, options, Some(execution))
+    }
+
+    fn text_impl(&self, execution: Option<&ExecutionContext>) -> Result<String> {
+        let mut collector = FallibleTextCollector::default();
+        let report = match self.write_text_to_impl(
+            &mut collector,
+            TextOutputOptions::default(),
+            execution,
+        ) {
+            Ok(report) => report,
+            Err(error) => {
+                let allocation = collector.allocation.take();
+                return Err(map_text_output_error(error, allocation));
+            },
+        };
+        if report.objects_written() != 0 {
+            check_text_state(&self.inner, execution)?;
+            collector.push_terminal_newline(
+                report.bytes_written(),
+                TextOutputOptions::default().max_output_bytes(),
+            )?;
+            check_text_state(&self.inner, execution)?;
+        }
+        self.inner.ensure_current()?;
+        String::from_utf8(collector.take_bytes())
+            .map_err(|_error| SourceBackedError::InvalidData("text output was not UTF-8".into()))
+    }
+
+    fn write_text_to_impl<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+        execution: Option<&ExecutionContext>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<SourceBackedError>> {
+        let failure = Arc::new(Mutex::new(None));
+        let mut checked_output = SourceCheckedTextSink {
+            output,
+            owner: &self.inner,
+            execution,
+            failure: Arc::clone(&failure),
+        };
+        let mut writer = SequentialTextWriter::new(&mut checked_output, options);
+        let conversion = (|| {
+            check_text_state(&self.inner, execution)
+                .map_err(|source| writer.document_error(source))?;
+            let refs = self
+                .inner
+                .workbook_path
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            for sheet in self
+                .inner
+                .sheets
+                .iter()
+                .filter(|sheet| sheet.worksheet_index.is_some())
+            {
+                check_text_state(&self.inner, execution)
+                    .map_err(|source| writer.document_error(source))?;
+                let collected = scan_text_sheet(&self.inner, sheet, &refs, execution)
+                    .map_err(|source| writer.document_error(source))?;
+                check_text_state(&self.inner, execution)
+                    .map_err(|source| writer.document_error(source))?;
+                write_text_sheet(&self.inner, &collected, &mut writer, execution)?;
+            }
+            Ok::<(), TextOutputError<SourceBackedError>>(())
+        })();
+
+        let progress = writer.progress();
+        let source = take_source_text_failure(&failure)
+            .or_else(|| execution.and_then(|context| context.check().err().map(Into::into)))
+            .or_else(|| self.inner.ensure_current().err());
+        if let Some(source) = source {
+            return Err(TextOutputError::Document { source, progress });
+        }
+        conversion.map(|()| writer.finish())
     }
 
     /// Advanced compatibility adapter to the existing eager semantic owner.
@@ -1631,6 +1995,308 @@ impl<'a> WorksheetScan<'a> {
     }
 }
 
+fn check_text_state(owner: &SourceInner, execution: Option<&ExecutionContext>) -> Result<()> {
+    if let Some(context) = execution {
+        context.check().map_err(SourceBackedError::from)?;
+    }
+    owner.ensure_current()
+}
+
+fn map_text_output_error(
+    error: TextOutputError<SourceBackedError>,
+    collector_failure: Option<SourceBackedError>,
+) -> SourceBackedError {
+    match error {
+        TextOutputError::Document { source, .. } => source,
+        TextOutputError::Limit { limit, .. } => SourceBackedError::ResourceLimit {
+            resource: "text output",
+            observed: limit.observed(),
+            maximum: limit.limit(),
+        },
+        TextOutputError::Sink { source, .. } => {
+            collector_failure.unwrap_or(SourceBackedError::Io(source))
+        },
+        TextOutputError::NonDeterministicFragments { .. } => SourceBackedError::InvalidData(
+            "source-backed XLS text fragments were not deterministic".into(),
+        ),
+        _ => SourceBackedError::InvalidData("unsupported text output error".into()),
+    }
+}
+
+fn scan_text_sheet(
+    owner: &SourceInner,
+    sheet: &SheetEntry,
+    refs: &[&str],
+    execution: Option<&ExecutionContext>,
+) -> Result<SourceTextSheet> {
+    let mut collected = SourceTextSheet::new();
+    let mut scan = WorksheetScan::new(
+        &owner.cfb,
+        refs,
+        sheet.start,
+        sheet.end,
+        owner.limits,
+        execution,
+    )?;
+    let mut pending_formula = None;
+    let mut first = true;
+
+    loop {
+        let frame = scan.next_frame()?;
+        if first {
+            first = false;
+            if frame.kind != BOF {
+                return Err(SourceBackedError::InvalidData(
+                    "BoundSheet8 position does not point to a BIFF worksheet BOF".into(),
+                ));
+            }
+            let payload = scan.read_payload(&frame)?;
+            validate_worksheet_bof(payload)?;
+            continue;
+        }
+        if frame.kind == EOF {
+            if frame.payload_len != 0 {
+                return Err(SourceBackedError::InvalidData(
+                    "BIFF worksheet EOF has a non-empty payload".into(),
+                ));
+            }
+            if pending_formula.is_some() {
+                return Err(SourceBackedError::InvalidData(
+                    "string-valued FORMULA lacks STRING result".into(),
+                ));
+            }
+            return Ok(collected);
+        }
+
+        if let Some(mut formula) = pending_formula.take() {
+            if frame.kind == STRING {
+                let payload = scan.take_payload(&frame)?;
+                let mut continues = Vec::new();
+                let text = loop {
+                    match crate::utils::decode_string_record(&payload, &continues)
+                        .map_err(SourceBackedError::Parse)?
+                    {
+                        crate::utils::StringRecordDecode::Complete(text) => break text,
+                        crate::utils::StringRecordDecode::NeedContinue => {
+                            let next = scan.next_frame()?;
+                            if next.kind != CONTINUE {
+                                return Err(SourceBackedError::InvalidData(
+                                    "FORMULA string result continuation is not CONTINUE".into(),
+                                ));
+                            }
+                            continues.try_reserve(1).map_err(|_error| {
+                                SourceBackedError::Allocation {
+                                    resource: "formula STRING continuations",
+                                    requested: 1,
+                                }
+                            })?;
+                            continues.push(scan.take_payload(&next)?);
+                        },
+                    }
+                };
+                scan.recycle_payload(payload);
+                if let CellRecord::Formula { value, .. } = &mut formula {
+                    *value = FormulaValue::String(text);
+                }
+                collect_source_cell(&formula, owner, &mut collected, execution)?;
+                continue;
+            }
+            if !matches!(frame.kind, 0x0221 | 0x0236 | 0x04BC | 0x0091) {
+                return Err(SourceBackedError::InvalidData(
+                    "string-valued FORMULA is not followed by STRING".into(),
+                ));
+            }
+            pending_formula = Some(formula);
+        }
+
+        if frame.kind == STRING {
+            return Err(SourceBackedError::InvalidData(
+                "STRING record has no pending FORMULA result".into(),
+            ));
+        }
+
+        match frame.kind {
+            0x0200 => {
+                let payload = scan.read_payload(&frame)?;
+                if let Ok(dimensions) = DimensionsRecord::parse(payload) {
+                    let max_row = dimensions.last_row.saturating_sub(1);
+                    let max_column = dimensions.last_col.saturating_sub(1);
+                    collected.max_row = collected
+                        .max_row
+                        .max(u16::try_from(max_row).unwrap_or(u16::MAX));
+                    collected.max_col = collected
+                        .max_col
+                        .max(u16::try_from(max_column).unwrap_or(u16::MAX));
+                }
+            },
+            0x0006 => {
+                let payload = scan.read_payload(&frame)?;
+                let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
+                    .map_err(SourceBackedError::Parse)?;
+                if matches!(
+                    cell,
+                    CellRecord::Formula {
+                        value: FormulaValue::StringPending,
+                        ..
+                    }
+                ) {
+                    pending_formula = Some(cell);
+                } else {
+                    collect_source_cell(&cell, owner, &mut collected, execution)?;
+                }
+            },
+            0x0201 | 0x0203 | 0x0204 | 0x0205 | 0x027E | 0x00FD => {
+                let payload = scan.read_payload(&frame)?;
+                let cell = CellRecord::parse(frame.kind, payload, &owner.encoding)
+                    .map_err(SourceBackedError::Parse)?;
+                collect_source_cell(&cell, owner, &mut collected, execution)?;
+            },
+            0x00BD => {
+                let payload = scan.read_payload(&frame)?;
+                let mut processing = Ok(());
+                CellRecord::visit_mul_rk(payload, |cell| {
+                    if processing.is_ok() {
+                        processing = collect_source_cell(&cell, owner, &mut collected, execution);
+                    }
+                })
+                .map_err(SourceBackedError::Parse)?;
+                processing?;
+            },
+            0x00BE => {
+                let payload = scan.read_payload(&frame)?;
+                let mut processing = Ok(());
+                CellRecord::visit_mul_blank(payload, |cell| {
+                    if processing.is_ok() {
+                        processing = collect_source_cell(&cell, owner, &mut collected, execution);
+                    }
+                })
+                .map_err(SourceBackedError::Parse)?;
+                processing?;
+            },
+            _ => scan.skip_payload(&frame)?,
+        }
+    }
+}
+
+fn write_text_sheet<'options, 'output, W: Write + ?Sized>(
+    owner: &SourceInner,
+    sheet: &SourceTextSheet,
+    writer: &mut SequentialTextWriter<'options, 'output, W>,
+    execution: Option<&ExecutionContext>,
+) -> std::result::Result<(), TextOutputError<SourceBackedError>> {
+    let mut row = 0_u16;
+    loop {
+        check_text_state(owner, execution).map_err(|source| writer.document_error(source))?;
+        let mut value = String::new();
+        let mut column = 0_u16;
+        loop {
+            if column != 0 {
+                value.try_reserve(1).map_err(|_error| {
+                    writer.document_error(SourceBackedError::Allocation {
+                        resource: "source-backed text row",
+                        requested: 1,
+                    })
+                })?;
+                value.push('\t');
+            }
+            if let Some(cell) = sheet.cells.get(&(row, column)) {
+                append_source_cell_text(&mut value, cell)
+                    .map_err(|source| writer.document_error(source))?;
+            }
+            if column == sheet.max_col {
+                break;
+            }
+            column = column.checked_add(1).ok_or_else(|| {
+                writer.document_error(SourceBackedError::InvalidData(
+                    "source-backed XLS text column overflow".into(),
+                ))
+            })?;
+        }
+        writer.write_object(TextObjectKind::Paragraph, &value)?;
+        if row == sheet.max_row {
+            break;
+        }
+        row = row.checked_add(1).ok_or_else(|| {
+            writer.document_error(SourceBackedError::InvalidData(
+                "source-backed XLS text row overflow".into(),
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+struct TextByteCounter {
+    bytes: usize,
+}
+
+impl fmt::Write for TextByteCounter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        self.bytes = self.bytes.checked_add(value.len()).ok_or(fmt::Error)?;
+        Ok(())
+    }
+}
+
+fn append_counted_text<F>(output: &mut String, render: F) -> Result<()>
+where
+    F: Fn(&mut dyn fmt::Write) -> fmt::Result,
+{
+    let mut counter = TextByteCounter { bytes: 0 };
+    render(&mut counter).map_err(|_error| {
+        SourceBackedError::InvalidData("text formatting length overflow".into())
+    })?;
+    let additional = u64::try_from(counter.bytes).unwrap_or(u64::MAX);
+    let current = u64::try_from(output.len()).unwrap_or(u64::MAX);
+    current
+        .checked_add(additional)
+        .ok_or(SourceBackedError::Allocation {
+            resource: "source-backed text row",
+            requested: u64::MAX,
+        })?;
+    output
+        .try_reserve(counter.bytes)
+        .map_err(|_error| SourceBackedError::Allocation {
+            resource: "source-backed text row",
+            requested: counter.bytes as u64,
+        })?;
+    render(output).map_err(|_error| SourceBackedError::InvalidData("text formatting failed".into()))
+}
+
+fn append_source_cell_text(
+    output: &mut String,
+    value: &litchi_core::sheet::CellValue,
+) -> Result<()> {
+    match value {
+        litchi_core::sheet::CellValue::Empty => Ok(()),
+        litchi_core::sheet::CellValue::Bool(value) => append_counted_text(output, |writer| {
+            fmt::Write::write_str(writer, if *value { "TRUE" } else { "FALSE" })
+        }),
+        litchi_core::sheet::CellValue::Int(value) => {
+            append_counted_text(output, |writer| fmt::write(writer, format_args!("{value}")))
+        },
+        litchi_core::sheet::CellValue::Float(value)
+        | litchi_core::sheet::CellValue::DateTime(value) => {
+            append_counted_text(output, |writer| fmt::write(writer, format_args!("{value}")))
+        },
+        litchi_core::sheet::CellValue::String(value)
+        | litchi_core::sheet::CellValue::Error(value) => {
+            append_counted_text(output, |writer| fmt::Write::write_str(writer, value))
+        },
+        litchi_core::sheet::CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(litchi_core::sheet::CellValue::Empty) | None => {
+                append_counted_text(output, |writer| {
+                    fmt::Write::write_char(writer, '=')?;
+                    fmt::Write::write_str(writer, formula)
+                })
+            },
+            Some(value) => append_source_cell_text(output, value),
+        },
+    }
+}
+
 fn validate_worksheet_bof(payload: &[u8]) -> Result<()> {
     let bof = BofRecord::parse(payload).map_err(SourceBackedError::Parse)?;
     if bof.version as u16 != BIFF8 {
@@ -1998,6 +2664,47 @@ fn resolve_shared_string(
             Err(map_shared_string_error(error))
         },
     }
+}
+
+fn decode_source_cell(
+    record: &CellRecord,
+    owner: &SourceInner,
+    formatting: &Formatting,
+    execution: Option<&ExecutionContext>,
+) -> Result<Option<(u16, u16, litchi_core::sheet::CellValue)>> {
+    formatting
+        .validate_cell_xf(cell_xf_index(record))
+        .map_err(SourceBackedError::Parse)?;
+    let Some(cell) = Cell::from_record_with_formula_context(record, None, None, Some(formatting))
+    else {
+        return Ok(None);
+    };
+    let value = if let Some(string_index) = cell.shared_string_index() {
+        if owner.sst.segments.is_empty() {
+            litchi_core::sheet::CellValue::Error(format!(
+                "Invalid SST index: {string_index} (max: 0)"
+            ))
+        } else {
+            resolve_shared_string(owner, string_index, execution)?
+        }
+    } else {
+        cell.value().clone()
+    };
+    Ok(Some((record.row(), record.col(), value)))
+}
+
+fn collect_source_cell(
+    record: &CellRecord,
+    owner: &SourceInner,
+    collected: &mut SourceTextSheet,
+    execution: Option<&ExecutionContext>,
+) -> Result<()> {
+    if let Some((row, column, value)) =
+        decode_source_cell(record, owner, &owner.formatting, execution)?
+    {
+        collected.insert(row, column, value, owner.limits)?;
+    }
+    Ok(())
 }
 
 fn process_cell(
