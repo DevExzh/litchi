@@ -7,6 +7,7 @@ use litchi_iwa_common::table::cell::conditional_highlight::{
     Condition, Rule, Style as ConditionalHighlightStyle, Text as ConditionalText,
 };
 use litchi_keynote::slide::table::{
+    dimension::{Dimension, Size},
     formula::{FormulaCachedValue, FormulaCellReference, FormulaExpression},
     sort::{ColumnIndex, Direction, Order, RowRange, Rule as SortRule},
 };
@@ -206,6 +207,33 @@ fn clear_focused_table_sort_order(
         Error::InvalidFormat(format!("focused Keynote sort write failed: {error}"))
     })?;
     *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn assert_focused_table_dimension_rejected(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+    dimension: Dimension,
+    size: Size,
+) -> Result<()> {
+    let before = editor.to_bytes()?;
+    let table_index = focused_table_index(editor, slide_index, model_object_id)?;
+    let result = focused_table_package(editor)?
+        .edit_slide_table_dimension_size(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_index),
+            dimension,
+        )
+        .and_then(|edit| edit.set(size).commit());
+    assert!(
+        matches!(
+            result,
+            Err(litchi_keynote::SlideTableDimensionError::UnsupportedDependency)
+        ),
+        "focused Keynote dimension edit unexpectedly admitted builder snapshot: {result:?}"
+    );
+    assert_eq!(editor.to_bytes()?, before);
     Ok(())
 }
 
@@ -1129,29 +1157,23 @@ fn source_built_table_roundtrips_full_crud() {
     editor
         .set_slide_table_header_settings(0, table.model_object_id, headers)
         .unwrap();
-    editor
-        .set_slide_table_column_width(
-            0,
-            table.model_object_id,
-            0,
-            KeynoteTableDimensionSize::points(300.0).unwrap(),
-        )
-        .unwrap();
-    editor
-        .set_slide_table_row_height(
-            0,
-            table.model_object_id,
-            0,
-            KeynoteTableDimensionSize::points(140.0).unwrap(),
-        )
-        .unwrap();
-    let laid_out_geometry = DrawableGeometry {
-        size: Some(DrawableSize {
-            width: 975.0,
-            height: 455.0,
-        }),
-        ..replacement
-    };
+    assert_focused_table_dimension_rejected(
+        &editor,
+        0,
+        table.model_object_id,
+        Dimension::Column(0),
+        Size::points(300.0).unwrap(),
+    )
+    .unwrap();
+    assert_focused_table_dimension_rejected(
+        &editor,
+        0,
+        table.model_object_id,
+        Dimension::Row(0),
+        Size::points(140.0).unwrap(),
+    )
+    .unwrap();
+    let laid_out_geometry = replacement;
 
     let bytes = editor.to_bytes().unwrap();
     let mut reopened = KeynoteEditor::from_bytes(&bytes).unwrap();
@@ -1164,18 +1186,6 @@ fn source_built_table_roundtrips_full_crud() {
             .slide_table_header_settings(0, table.model_object_id)
             .unwrap(),
         headers
-    );
-    assert_eq!(
-        reopened
-            .slide_table_column_width(0, table.model_object_id, 0)
-            .unwrap(),
-        KeynoteTableDimensionSize::points(300.0).unwrap()
-    );
-    assert_eq!(
-        reopened
-            .slide_table_row_height(0, table.model_object_id, 0)
-            .unwrap(),
-        KeynoteTableDimensionSize::points(140.0).unwrap()
     );
     assert_eq!(
         materialized.get_cell(0, 0),
@@ -1653,8 +1663,8 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
         .add_slide_table(0, "Topology", 4, 4, position, size)
         .unwrap();
     let model_id = table.model_object_id;
-    let row_size = KeynoteTableDimensionSize::points(88.0).unwrap();
-    let column_size = KeynoteTableDimensionSize::points(144.0).unwrap();
+    let row_size = Size::points(88.0).unwrap();
+    let column_size = Size::points(144.0).unwrap();
     editor
         .set_slide_table_cell(
             0,
@@ -1674,12 +1684,16 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
             FormulaCachedValue::number(7.0).expect("finite cached number"),
         )
         .unwrap();
-    editor
-        .set_slide_table_row_height(0, model_id, 1, row_size)
+    assert_focused_table_dimension_rejected(&editor, 0, model_id, Dimension::Row(1), row_size)
         .unwrap();
-    editor
-        .set_slide_table_column_width(0, model_id, 1, column_size)
-        .unwrap();
+    assert_focused_table_dimension_rejected(
+        &editor,
+        0,
+        model_id,
+        Dimension::Column(1),
+        column_size,
+    )
+    .unwrap();
     let baseline_geometry = editor.slide_tables(0).unwrap()[0].geometry;
     let baseline = editor.to_bytes().unwrap();
 
@@ -1701,15 +1715,6 @@ fn source_built_table_roundtrips_section_relative_axis_crud_transactionally() {
         shifted.get_cell(3, 3),
         Some(&KeynoteTableCellValue::Formula("=B2".to_owned()))
     );
-    assert_eq!(
-        reopened.slide_table_row_height(0, model_id, 1).unwrap(),
-        row_size
-    );
-    assert_eq!(
-        reopened.slide_table_column_width(0, model_id, 1).unwrap(),
-        column_size
-    );
-
     editor
         .remove_slide_table_column(0, model_id, ColumnDeletion::body(1))
         .unwrap();

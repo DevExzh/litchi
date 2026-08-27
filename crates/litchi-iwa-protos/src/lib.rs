@@ -1480,9 +1480,10 @@ pub mod table_dimension_codec {
         decode_data_store_with_visitor, decode_header, decode_header_storage,
         decode_header_storage_bucket, decode_header_storage_bucket_with_report,
         decode_header_storage_bucket_with_visitor, decode_header_storage_with_report,
-        decode_header_with_report, decode_table_model, decode_table_model_with_report,
-        decode_table_model_with_visitor, execute_header_storage_bucket_size_plan,
-        plan_header_storage_bucket_sizes, rewrite_header_storage_bucket_sizes,
+        decode_header_storage_with_visitor, decode_header_with_report, decode_table_model,
+        decode_table_model_with_report, decode_table_model_with_visitor,
+        execute_header_storage_bucket_size_plan, plan_header_storage_bucket_sizes,
+        rewrite_header_storage_bucket_sizes,
     };
 }
 

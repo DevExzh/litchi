@@ -1397,6 +1397,87 @@ def add_keynote_slide_table_lock_state_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_dimension_canonical_scaffold(root: Path) -> None:
+    """Install the smallest complete Wave108 Keynote dimension facade."""
+
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use litchi_iwa_common::table::dimension::{Dimension, Error, Points, Size};\n"
+        "pub mod transaction {\n"
+        "    pub use crate::package::slide_table_dimension::{\n"
+        "        SlideTableDimensionCommit as Commit,\n"
+        "        SlideTableDimensionDiagnostics as Diagnostics,\n"
+        "        SlideTableDimensionEdit as Edit,\n"
+        "        SlideTableDimensionError as Error,\n"
+        "        SlideTableDimensionLimitKind as LimitKind,\n"
+        "        SlideTableDimensionPatch as Patch,\n"
+        "        SlideTableDimensionPath as Path,\n"
+        "    };\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector {\n"
+        "    pub const fn index(index: usize) -> Self { let _ = index; Self }\n"
+        "    pub const fn position(position: Position) -> Self { let _ = position; Self }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES
+        )
+        + "struct DimensionBudget;\n"
+        + "fn strict() { table_dimension_codec; ExactArtifacts; }\n"
+        + "fn transaction() { budget; residual; prepare; execute; candidate; reopen; verify_locality; inverse; let deleted_previews: usize = 0; }\n"
+        + "impl Package {\n"
+        + "pub fn slide_table_dimension_size<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, dimension: Dimension) -> Result<Size, SlideTableDimensionError> { let _ = (slide, table, dimension); todo!() }\n"
+        + "pub fn edit_slide_table_dimension_size<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, dimension: Dimension) -> Result<SlideTableDimensionEdit, SlideTableDimensionError> { let _ = (slide, table, dimension); todo!() }\n"
+        + "pub fn apply_slide_table_dimension_size(&self, patch: &SlideTableDimensionPatch) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTableDimensionEdit {\n"
+        + "pub fn size(&self) -> Size { todo!() }\n"
+        + "pub fn set(self, size: Size) -> Self { let _ = size; self }\n"
+        + "pub fn set_points(self, points: Points) -> Self { let _ = points; self }\n"
+        + "pub fn reset(self) -> Self { self }\n"
+        + "pub fn commit(self) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_dimension;\n"
+        "pub use slide_table_dimension::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES)
+        )
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[1]
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES)
+        )
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n"
+        "pub use slide::table::dimension::{Dimension, Error, Points, Size};\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_table_headers_canonical_scaffold(
     root: Path,
     *,
@@ -13867,6 +13948,145 @@ fn rewrite_movie_title_operation(
         for expression in (
             "+ audit_keynote_slide_table_lock_state_facade_source_topology()",
             "+ audit_iwa_keynote_slide_table_lock_state_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_dimension_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_table_dimension_rejects_public_physical_raw_and_flat(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_dimension(bytes: &[u8], model_id: u64, wire: WireView, generated: GeneratedProjection, prost: prost_types::MessageInfo) -> ArchiveObject { todo!() }\n"
+                + "pub use self::SlideTableDimensionEdit as DimensionEdit;\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "raw byte slice",
+                "raw parameter",
+                "archive/IWA type ArchiveObject",
+                "wire type WireView",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+                "flat alias DimensionEdit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_dimension_requires_semantic_and_selector_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text("pub struct Dimension;\n", encoding="utf-8")
+            selector = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_SOURCE
+            selector.write_text("pub struct TableSelector;\n", encoding="utf-8")
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "semantic API is missing",
+                "transaction API is missing",
+                "selector must expose",
+                "Package method is missing",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing contract violation {fragment!r}: {violations!r}",
+                )
+
+    def test_iwa_keynote_slide_table_dimension_retire_and_preserve_physical_geometry(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub use litchi_numbers::table::dimension::{Dimension, Points, Size};\n"
+                "pub fn slide_table_dimension_size(&self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn set_slide_table_dimension_size(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn slide_table_row_height(&self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn set_slide_table_row_height(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn slide_table_column_width(&self, slide_index: usize, model_id: u64) {}\n"
+                "pub fn set_slide_table_column_width(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "fn raw() { editor.slide_table_dimension_size(0, 7); editor.set_slide_table_row_height(0, 7); }\n"
+                "fn physical() { editor.set_slide_table_geometry(0, 7, geometry); set_uniform_table_dimensions(geometry); }\n"
+                "fn focused() { package.slide_table_dimension_size(slide, table, Dimension::Row(0)); package.edit_slide_table_dimension_size(slide, table, Dimension::Column(0)); package.apply_slide_table_dimension_size(&patch); }\n",
+                encoding="utf-8",
+            )
+            example = (
+                root
+                / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_EXAMPLE_ROOT
+                / "create_keynote_table.rs"
+            )
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn create() { editor.set_slide_table_dimension_size(0, 7, size); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_dimension_source_topology(
+                root
+            )
+            self.assertTrue(any("slide-table-dimension method" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-dimension call" in item for item in violations), violations)
+            self.assertTrue(any("slide-table-dimension import" in item for item in violations), violations)
+            self.assertTrue(any("example call" in item for item in violations), violations)
+            self.assertFalse(any("set_slide_table_geometry" in item for item in violations), violations)
+            self.assertFalse(any("set_uniform_table_dimensions" in item for item in violations), violations)
+
+            host.write_text(
+                "fn physical() { editor.set_slide_table_geometry(0, 7, geometry); set_uniform_table_dimensions(geometry); }\n"
+                "fn focused() { package.slide_table_dimension_size(slide, table, Dimension::Row(0)); package.edit_slide_table_dimension_size(slide, table, Dimension::Column(0)); package.apply_slide_table_dimension_size(&patch); }\n",
+                encoding="utf-8",
+            )
+            example.write_text(
+                "fn create() { package.edit_slide_table_dimension_size(slide, table, Dimension::Row(0)); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_dimension_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_dimension_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_dimension_facade_source_topology()",
+            "+ audit_iwa_keynote_slide_table_dimension_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

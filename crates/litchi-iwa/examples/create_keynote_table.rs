@@ -2,9 +2,10 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableDimensionSize, KeynoteTableTitleSettings,
+    KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::slide::table::dimension::{Dimension, Size};
 use litchi_keynote::slide::table::formula::{
     FormulaCachedValue, FormulaCellReference, FormulaExpression,
 };
@@ -66,19 +67,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         KeynoteTableTitleSettings::new(Some(true), Some(true)),
     )?;
     for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {
-        editor.set_slide_table_column_width(
-            0,
-            table.model_object_id,
-            column,
-            KeynoteTableDimensionSize::points(width)?,
+        editor = set_focused_keynote_table_dimension(
+            editor,
+            Dimension::Column(column),
+            Size::points(width)?,
         )?;
     }
     for (row, height) in [90.0, 100.0, 110.0, 130.0].into_iter().enumerate() {
-        editor.set_slide_table_row_height(
-            0,
-            table.model_object_id,
-            row,
-            KeynoteTableDimensionSize::points(height)?,
+        editor = set_focused_keynote_table_dimension(
+            editor,
+            Dimension::Row(row),
+            Size::points(height)?,
         )?;
     }
     editor.set_slide_table_formula(
@@ -128,6 +127,50 @@ fn set_focused_keynote_table_headers(
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
     Ok(KeynoteEditor::from_bytes(&bytes)?)
+}
+
+fn set_focused_keynote_table_dimension(
+    editor: KeynoteEditor,
+    dimension: Dimension,
+    size: Size,
+) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
+    let source = editor.to_bytes()?;
+    let package = litchi_keynote::Package::from_bytes(&source)?;
+    let result = package
+        .edit_slide_table_dimension_size(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            dimension,
+        )?
+        .set(size)
+        .commit();
+    let commit = match result {
+        Ok(commit) => commit,
+        Err(litchi_keynote::SlideTableDimensionError::UnsupportedDependency) => {
+            // KeynoteDocumentBuilder snapshots intentionally do not satisfy
+            // the focused owner's exact-source authority proof. Keep the
+            // builder's private physical sizing and do not fall back to the
+            // retired raw-ID writer.
+            if editor.to_bytes()? != source {
+                return Err("focused Keynote dimension rejection mutated the builder".into());
+            }
+            return Ok(editor);
+        },
+        Err(error) => return Err(error.into()),
+    };
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    let reopened = KeynoteEditor::from_bytes(&bytes)?;
+    let package = litchi_keynote::Package::from_bytes(&bytes)?;
+    if package.slide_table_dimension_size(
+        litchi_keynote::SlideSelector::index(0),
+        litchi_keynote::TableSelector::index(0),
+        dimension,
+    )? != size
+    {
+        return Err("focused Keynote dimension failed round-trip validation".into());
+    }
+    Ok(reopened)
 }
 
 fn set_focused_keynote_table_title(

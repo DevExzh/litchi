@@ -1824,6 +1824,137 @@ KEYNOTE_SLIDE_TABLE_LOCK_STATE_PUBLIC_RAW_ID_PARAMETER = re.compile(
     r"(?=$|[^A-Za-z0-9_])"
 )
 
+# Wave108 moves persisted Keynote slide-table row/column dimensions behind a
+# selector-first package owner. Keep this ratchet separate from the physical
+# geometry executor: the latter may still resize native table/cell geometry in
+# litchi-iwa, while persisted dimension settings must not retain raw native
+# identifiers, generated archives, or a public IWA editor surface.
+KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "table" / "dimension.rs"
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table.rs"
+KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_dimension.rs"
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES = frozenset(
+    {
+        "SlideTableDimensionCommit",
+        "SlideTableDimensionDiagnostics",
+        "SlideTableDimensionEdit",
+        "SlideTableDimensionError",
+        "SlideTableDimensionLimitKind",
+        "SlideTableDimensionPatch",
+        "SlideTableDimensionPath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_TYPES = frozenset(
+    {"Dimension", "Error", "Points", "Size"}
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_TRANSACTION_TYPES = frozenset(
+    {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"}
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "TableSelector"}
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_PACKAGE_METHODS = frozenset(
+    {
+        "slide_table_dimension_size",
+        "edit_slide_table_dimension_size",
+        "apply_slide_table_dimension_size",
+    }
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_EDIT_METHODS = frozenset(
+    {"size", "set", "set_points", "reset", "commit"}
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_FLAT_ALIASES = frozenset(
+    {
+        "DimensionCommit",
+        "DimensionDiagnostics",
+        "DimensionEdit",
+        "DimensionError",
+        "DimensionLimitKind",
+        "DimensionPatch",
+        "DimensionPath",
+        "DimensionSizeCommit",
+        "DimensionSizeDiagnostics",
+        "DimensionSizeEdit",
+        "DimensionSizeError",
+        "DimensionSizeLimitKind",
+        "DimensionSizePatch",
+        "DimensionSizePath",
+        "TableDimensionCommit",
+        "TableDimensionDiagnostics",
+        "TableDimensionEdit",
+        "TableDimensionError",
+        "TableDimensionLimitKind",
+        "TableDimensionPatch",
+        "TableDimensionPath",
+        "TableDimensionSizeCommit",
+        "TableDimensionSizeDiagnostics",
+        "TableDimensionSizeEdit",
+        "TableDimensionSizeError",
+        "TableDimensionSizeLimitKind",
+        "TableDimensionSizePatch",
+        "TableDimensionSizePath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ArchiveReferenceKind",
+        "ArchiveReferenceOccurrence",
+        "ArchiveReferencePolicy",
+        "ArchiveReferenceScope",
+        "ArchiveReferenceVisitor",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "FieldType",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableDimensionArchive",
+        "TableDimensionSnapshot",
+        "TableInfoArchive",
+        "TableModelArchive",
+        "TableModelSnapshot",
+    }
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tst", "tsp", "tsd", "tswp"}
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_PUBLIC_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:slide_table_dimension|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?dimension)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+
 RETIRED_IWA_KEYNOTE_SLIDE_TABLE_LOCK_STATE_METHODS = frozenset(
     {"slide_table_lock_state", "set_slide_table_lock_state"}
 )
@@ -2463,6 +2594,44 @@ IWA_KEYNOTE_SLIDE_TABLE_SORT_NUMBERS_HELPER = re.compile(
     r"(?<![A-Za-z0-9_])(?:table_sort_order_in_package|"
     r"set_table_sort_order_in_package|clear_table_sort_order_in_package)\b"
 )
+
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_METHODS = frozenset(
+    {
+        "slide_table_dimension_size",
+        "set_slide_table_dimension_size",
+        "slide_table_row_height",
+        "set_slide_table_row_height",
+        "slide_table_column_width",
+        "set_slide_table_column_width",
+    }
+)
+IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_table_dimension_size|"
+    r"set_slide_table_dimension_size|slide_table_row_height|"
+    r"set_slide_table_row_height|slide_table_column_width|"
+    r"set_slide_table_column_width|edit_slide_table_dimension_size|"
+    r"apply_slide_table_dimension_size)\b[ \t\r\n]*\(",
+)
+IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*pub[ \t]+use[^;\n]*"
+        r"(?:litchi_numbers|numbers)[^;\n]*"
+        r"(?:table[ \t]*::[ \t]*dimension|Dimension|Points|Size)"
+    ),
+)
+IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_NUMBERS_HELPER = re.compile(r"(?!)")
+IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_PHYSICAL_METHODS = frozenset(
+    {
+        "set_slide_table_geometry",
+        "set_uniform_table_dimensions",
+        "set_table_geometry_in_package",
+    }
+)
+IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs"
+)
+IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+
 IWA_KEYNOTE_SLIDE_TABLE_CONFIG_PACKAGE_RECEIVERS = frozenset(
     {
         "package",
@@ -29831,6 +30000,238 @@ def audit_keynote_slide_table_lock_state_facade_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_table_dimension_owner_present(root: Path) -> bool:
+    """Return whether the Wave108 persisted-dimension owner is active."""
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_dimension\s*;",
+        package_source,
+    ) is not None
+
+
+def audit_keynote_slide_table_dimension_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Keynote dimension facade."""
+
+    if not _keynote_slide_table_dimension_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[1]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+slide_table_dimension\b",
+        code[package_path] + code[lib_path],
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table dimension owner module must remain private: "
+            f"{KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[0]}"
+        )
+    if re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_table_dimension\s*;",
+        code[package_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table dimension owner module is missing: "
+            f"{KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table dimension public API is missing "
+                    f"canonical type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_TYPES,
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_TYPES - semantic_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table dimension semantic API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE}"
+        )
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+transaction\b",
+        code[semantic_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table dimension semantic API is missing "
+            f"slide::table::dimension::transaction: {KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        sources[semantic_path], KEYNOTE_SLIDE_TABLE_DIMENSION_TRANSACTION_TYPES
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_DIMENSION_TRANSACTION_TYPES - transaction_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table dimension transaction API is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE}"
+        )
+
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path] + sources[lib_path],
+        KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_TYPES,
+    )
+    for name in sorted(
+        KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_TYPES - selector_exports
+    ):
+        violations.append(
+            "focused litchi-keynote slide-table dimension public API is missing selector "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES[1]}"
+        )
+    if re.search(
+        r"impl[ \t\r\n]+(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*)?"
+        r"TableSelector\b[\s\S]*?\bpub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+        r"(?:index|position)\b",
+        code[selector_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote slide-table dimension selector must expose checked "
+            f"TableSelector::index/position: {KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_SOURCE}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_DIMENSION_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote slide-table dimension Package method is missing "
+                f"{name}: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_table_dimension_size":
+            for selector in ("SlideSelector", "TableSelector"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote slide-table dimension Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
+                    )
+            if not re.search(r"\bDimension\b", declaration):
+                violations.append(
+                    "focused litchi-keynote slide-table dimension Package method "
+                    f"{name} must accept Dimension: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
+                )
+        elif "SlideTableDimensionPatch" not in declaration:
+            violations.append(
+                "focused litchi-keynote slide-table dimension apply method must accept "
+                f"SlideTableDimensionPatch: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "SlideTableDimensionEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_DIMENSION_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-keynote slide-table dimension edit is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_TYPES
+        | KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_TABLE_DIMENSION_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_TABLE_DIMENSION_FLAT_ALIASES
+    )
+    dedicated_sources = {owner_path, semantic_path}
+    for path in paths:
+        dedicated = path in dedicated_sources
+        # ``Error`` is also a ubiquitous nested identifier in unrelated
+        # package errors (for example ``ReadError::Archive``). It remains a
+        # required semantic export, but alone must not select every public
+        # package error declaration for the facade leak scan.
+        selection_names = facade_names if dedicated else facade_names - {"Error"}
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not identifiers.intersection(selection_names):
+                continue
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote slide-table dimension public API retains a glob "
+                    f"re-export: {path.relative_to(root)}:{line_number}"
+                )
+            for identifier in sorted(identifiers):
+                if identifier == "litchi_iwa_common":
+                    reason = None
+                elif identifier in KEYNOTE_SLIDE_TABLE_DIMENSION_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_SLIDE_TABLE_DIMENSION_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif (
+                    identifier == "wire"
+                    or identifier in KEYNOTE_SLIDE_TABLE_DIMENSION_WIRE_TYPES
+                ):
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote slide-table dimension public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_SLIDE_TABLE_DIMENSION_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote slide-table dimension public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote slide-table dimension public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_TABLE_DIMENSION_PUBLIC_RAW_ID_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote slide-table dimension public API exposes raw "
+                    f"parameter {match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def _keynote_slide_table_headers_owner_present(root: Path) -> bool:
     """Return whether the Wave100 slide-table-header owner is active.
 
@@ -30428,7 +30829,7 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
     *,
     feature: str,
 ) -> list[str]:
-    """Audit the retired IWA title/sort config routes for one feature."""
+    """Audit one retired IWA Keynote slide-table config route."""
 
     if feature == "title":
         owner_present = _keynote_slide_table_title_owner_present(root)
@@ -30446,6 +30847,16 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
         physical_methods = frozenset(
             {"apply_slide_table_sort_order", "apply_slide_table_sort_order_to_rows"}
         )
+    elif feature == "dimension":
+        owner_present = _keynote_slide_table_dimension_owner_present(root)
+        retired_methods = RETIRED_IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_METHODS
+        call_pattern = IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_CALL
+        numbers_helper = IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_NUMBERS_HELPER
+        label = "dimension"
+        # Geometry/resize helpers remain physical compatibility machinery. They
+        # have distinct names and are intentionally not part of call_pattern;
+        # keep the explicit allowlist here so this policy is obvious and testable.
+        physical_methods = IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_PHYSICAL_METHODS
     else:  # pragma: no cover - private helper is called with fixed features.
         raise ValueError(f"unknown Keynote table-config feature: {feature}")
 
@@ -30490,6 +30901,15 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
                 f"retired litchi-iwa Numbers persisted table-{label} {scope}helper "
                 f"{match.group(0)}: {relative}:{line_number}"
             )
+
+        if not example:
+            for pattern in IWA_KEYNOTE_SLIDE_TABLE_DIMENSION_IMPORTS:
+                for match in pattern.finditer(code):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Keynote slide-table-dimension import: "
+                        f"{relative}:{line_number}"
+                    )
 
         for match in call_pattern.finditer(code):
             if example and not _iwa_keynote_config_example_is_keynote(
@@ -30568,6 +30988,16 @@ def audit_iwa_keynote_slide_table_sort_source_topology(
     """Retire persisted raw sort routes while preserving physical Sort Now."""
 
     return _audit_iwa_keynote_slide_table_config_source_topology(root, feature="sort")
+
+
+def audit_iwa_keynote_slide_table_dimension_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw persisted dimensions while preserving physical geometry."""
+
+    return _audit_iwa_keynote_slide_table_config_source_topology(
+        root, feature="dimension"
+    )
 
 
 def audit_iwa_keynote_slide_table_lock_state_source_topology(
@@ -33527,6 +33957,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_slide_table_sort_facade_source_topology()
         + audit_keynote_slide_table_sort_resource_source_topology()
         + audit_iwa_keynote_slide_table_sort_source_topology()
+        + audit_keynote_slide_table_dimension_facade_source_topology()
+        + audit_iwa_keynote_slide_table_dimension_source_topology()
         + audit_keynote_slide_table_lock_state_facade_source_topology()
         + audit_iwa_keynote_slide_table_lock_state_source_topology()
         + audit_iwa_keynote_slide_table_headers_source_topology()

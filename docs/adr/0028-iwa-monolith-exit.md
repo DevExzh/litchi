@@ -6409,6 +6409,59 @@ Wave106. Debts 010, 015, and 016 remain open, as do all other current debts;
 the `litchi-iwa` edges, generated/Prost/Buffa owners, migration host, and IWA
 monolith deletion gate remain unchanged.
 
+## 2026-08-28 amendment: Wave108 Keynote slide-table dimension owner (not a monolith-exit gate)
+
+Selector-first Keynote slide-table dimension reads and edits are now owned by
+`litchi_keynote::Package` through
+`slide_table_dimension_size`, `edit_slide_table_dimension_size`, and
+`apply_slide_table_dimension_size`. The public values are archive-free
+`slide::table::dimension::{Dimension, Points, Size}`; native object IDs,
+Archive/ZIP/member data, raw wire views, and generated/Prost/Buffa values are
+not exposed.
+
+The focused owner performs an atomic `HeaderStorageBucket` size plus
+`TableInfo` drawable-geometry rewrite. Strict role, ArchiveInfo/FieldInfo,
+metadata, global-inbound, and lock authority checks run before publication.
+One conservative logical budget covers source admission, candidate reopen,
+semantic reread, locality, exact inverse, and stale/conflict rejection.
+The raw persisted-dimension host methods and wrappers are retired, as is the
+obsolete Keynote appearance bridge. Two remaining legacy geometry/remove and
+archive-name lookups use `KeynoteObjectCatalog`; `litchi-iwa` still owns
+physical resize/geometry, row/cell, storage, formula, tile, and other legacy
+compatibility work.
+
+The global physical census enforces UUID-pair uniqueness and rejects all-zero
+identifiers before publication. This authority check is scoped to the
+dimension route; unrelated metadata assignments are not claimed migrated.
+
+Wave108 gates are a passing Keynote owner library check and strict library
+Clippy; 12/12 focused dimension tests with strict test Clippy; 30/30 IWA
+slide-table host tests; passing `create_keynote_table` and
+`list_keynote_tables` example checks; a passing lifecycle fuzz-target check
+and strict target Clippy with 10 command-only seeds; focused dimension
+boundary checks 5/5; and 653/653 full boundary unit tests with passing
+`py_compile` and empty live facade/host audits. The top-level checker still
+has only three unrelated pre-existing untracked Pages table-lock findings.
+These scoped gates do not satisfy the IWA monolith deletion gate.
+
+Native positive dimension acceptance is not claimed. The one authorized read
+used `/private/tmp/wave100-native-table-headers-source.key` (500,128 bytes,
+SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`, 86
+members); strict Row read returned `UnsupportedDependency`. The source
+remained exact, no candidate or inverse was emitted, no UI run occurred, and
+no repository files changed. Native dimension mutation, save, reopen, and UI
+acceptance evidence is withheld.
+
+The operation budget remains a conservative logical envelope, not telemetry
+for Package/SourceCatalog caches, decompressed Archives, the process
+allocator, RSS, or codec-internal allocation behavior. No zero-copy,
+allocator/RSS, or package-wide performance claim follows. The
+`litchi-iwa -> litchi-keynote` edge, all 13 ordered debts (including 017),
+generated/Prost/Buffa ownership, migration-host role, and the IWA monolith
+deletion gate remain unchanged. Wave108 closes no crate, manifest dependency,
+edge, debt, host owner, generated owner, or monolith gate.
+
 ## 2026-08-28 amendment: Wave107 Pages body-table name owner (not a monolith-exit gate)
 
 Wave107 places selector-first Pages body-table name discovery and rename
