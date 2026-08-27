@@ -26,6 +26,8 @@ pub struct Workbook {
     pub(super) worksheet_positions: Vec<usize>,
     /// Relationship identifiers in full workbook sheet-catalog order.
     pub(super) worksheet_rel_ids: Vec<Option<String>>,
+    /// Primary `BrtBookView.itabCur` position in full workbook sheet order.
+    pub(super) active_catalog_position: Option<usize>,
     pub(crate) formula_context: Context,
     pub(super) shared_strings: Vec<SharedString>,
     pub(super) styles: StylesTable,
@@ -222,15 +224,37 @@ impl Workbook {
     pub fn calc(&self) -> &Props {
         &self.calc
     }
+
+    /// Return the primary workbook view's physical sheet-catalog position.
+    #[must_use]
+    pub fn active_catalog_position(&self) -> Option<usize> {
+        self.active_catalog_position
+    }
+
+    /// Return the primary workbook view's public worksheet ordinal, when it
+    /// names a worksheet rather than a chart, dialog, or macro sheet.
+    #[must_use]
+    pub fn active_worksheet_index(&self) -> Option<usize> {
+        self.active_catalog_position.and_then(|catalog_position| {
+            self.worksheet_positions
+                .iter()
+                .position(|&position| position == catalog_position)
+        })
+    }
 }
 
 impl litchi_core::sheet::WorkbookTrait for Workbook {
     fn active_sheet_index(&self) -> usize {
-        0
+        self.active_worksheet_index().unwrap_or(0)
     }
 
     fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
-        self.worksheet_by_index(0)
+        let index = self.active_worksheet_index().ok_or_else(|| {
+            Box::new(crate::package::error::Error::UnsupportedFeature(
+                "XLSB active sheet is not a worksheet".to_string(),
+            ))
+        })?;
+        self.worksheet_by_index(index)
     }
 
     fn worksheet_count(&self) -> usize {

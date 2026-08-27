@@ -22,6 +22,7 @@ pub(in crate::workbook) struct ParsedWorkbookInfo {
     pub(in crate::workbook) worksheet_names: Vec<String>,
     pub(in crate::workbook) worksheet_rel_ids: Vec<Option<String>>,
     pub(in crate::workbook) worksheet_states: Vec<u32>,
+    pub(in crate::workbook) active_catalog_position: Option<usize>,
     pub(in crate::workbook) supporting_links: Vec<SupportingLink>,
     pub(in crate::workbook) external_sheets: Vec<ExternalSheet>,
     pub(in crate::workbook) external_link_rel_ids: Vec<String>,
@@ -41,9 +42,79 @@ impl Workbook {
         let external_link_rel_ids = &mut info.external_link_rel_ids;
         let defined_names = &mut info.defined_names;
         let is_1904 = &mut info.is_1904;
+        let mut book_views_open = false;
+        let mut book_views_seen = false;
+        let mut max_book_view_catalog_position: Option<usize> = None;
         for record in iter.by_ref() {
             let record = record?;
             match record.kind() {
+                kind::BEGIN_BOOK_VIEWS => {
+                    if !record.payload().is_empty() {
+                        return Err(crate::package::error::Error::InvalidLength {
+                            expected: 0,
+                            found: record.payload().len(),
+                        });
+                    }
+                    if book_views_seen || book_views_open {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtBeginBookViews".to_string(),
+                            val: "duplicate or nested book-view block".to_string(),
+                        });
+                    }
+                    book_views_seen = true;
+                    book_views_open = true;
+                },
+                kind::END_BOOK_VIEWS => {
+                    if !record.payload().is_empty() {
+                        return Err(crate::package::error::Error::InvalidLength {
+                            expected: 0,
+                            found: record.payload().len(),
+                        });
+                    }
+                    if !book_views_open {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtEndBookViews".to_string(),
+                            val: "book-view block has no matching begin record".to_string(),
+                        });
+                    }
+                    book_views_open = false;
+                },
+                kind::BOOK_VIEW => {
+                    if !book_views_open {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtBookView".to_string(),
+                            val: "record is outside the book-view block".to_string(),
+                        });
+                    }
+                    const BOOK_VIEW_PAYLOAD_LEN: usize = 29;
+                    let data = record.payload();
+                    if data.len() != BOOK_VIEW_PAYLOAD_LEN {
+                        return Err(crate::package::error::Error::InvalidLength {
+                            expected: BOOK_VIEW_PAYLOAD_LEN,
+                            found: data.len(),
+                        });
+                    }
+                    let first =
+                        usize::try_from(binary::read_u32_le_at(data, 20)?).map_err(|_| {
+                            crate::package::error::Error::InvalidFormula(
+                                "BrtBookView itabFirst does not fit usize".to_string(),
+                            )
+                        })?;
+                    let active =
+                        usize::try_from(binary::read_u32_le_at(data, 24)?).map_err(|_| {
+                            crate::package::error::Error::InvalidFormula(
+                                "BrtBookView itabCur does not fit usize".to_string(),
+                            )
+                        })?;
+                    let maximum = first.max(active);
+                    max_book_view_catalog_position = Some(
+                        max_book_view_catalog_position
+                            .map_or(maximum, |current| current.max(maximum)),
+                    );
+                    if info.active_catalog_position.is_none() {
+                        info.active_catalog_position = Some(active);
+                    }
+                },
                 kind::WORKBOOK_PROP => {
                     if let Ok(prop) =
                         crate::package::records::WorkbookPropRecord::parse(record.payload())
@@ -121,6 +192,20 @@ impl Workbook {
                     // Skip other records
                 },
             }
+        }
+        if book_views_open {
+            return Err(crate::package::error::Error::Unrecognized {
+                typ: "BrtBeginBookViews".to_string(),
+                val: "missing BrtEndBookViews record".to_string(),
+            });
+        }
+        if let Some(maximum) = max_book_view_catalog_position
+            && maximum >= worksheet_names.len()
+        {
+            return Err(crate::package::error::Error::InvalidFormula(format!(
+                "BrtBookView sheet position {maximum} exceeds the {} available sheets",
+                worksheet_names.len()
+            )));
         }
         Ok(info)
     }

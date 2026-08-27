@@ -736,6 +736,7 @@ impl Workbook {
             worksheet_names: Vec::new(),
             worksheet_positions: Vec::new(),
             worksheet_rel_ids: Vec::new(),
+            active_catalog_position: None,
             formula_context: Context::default(),
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -761,6 +762,8 @@ impl Workbook {
         let blob = workbook_part.blob();
         let mut iter = Records::new(blob);
         let info = Self::read_workbook(&mut iter)?;
+        let active_catalog_position =
+            (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         let external_link_uris = info
             .external_link_rel_ids
             .iter()
@@ -1093,6 +1096,7 @@ impl Workbook {
         self.worksheet_names = worksheet_names;
         self.worksheet_positions = worksheet_positions;
         self.worksheet_rel_ids = info.worksheet_rel_ids;
+        self.active_catalog_position = active_catalog_position;
         self.is_1904 = info.is_1904;
         self.calc = info.calc.unwrap_or_default();
         self.pivot_cache_definitions = pivot_cache_definitions;

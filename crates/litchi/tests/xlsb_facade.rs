@@ -72,6 +72,116 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
     output.into_inner()
 }
 
+fn all_worksheet_bytes() -> Vec<u8> {
+    use xlsb::writer::{MutableWorksheet, WorkbookWriter};
+
+    let mut first = MutableWorksheet::new("First");
+    first.set_cell(0, 0, "FIRST");
+    let mut tail = MutableWorksheet::new("Tail");
+    tail.set_cell(0, 0, "TAIL");
+
+    let mut writer = WorkbookWriter::new();
+    writer.add_worksheet(first);
+    writer.add_worksheet(tail);
+
+    let mut output = Cursor::new(Vec::new());
+    writer.save(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn chart_first_tabs_bytes() -> Vec<u8> {
+    use xlsb::chart::{Anchor, Chart};
+    use xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+
+    let chart = Chart::bar_chart_with_cache(
+        "Sales",
+        "Data!$A$1:$A$2",
+        &["North", "South"],
+        "Data!$B$1:$B$2",
+        &[42.0, 55.0],
+        Anchor::new(0, 0, 10, 20),
+    )
+    .unwrap();
+    let mut data = MutableWorksheet::new("Data");
+    data.set_cell(0, 0, "DATA");
+
+    let mut writer = WorkbookWriter::new();
+    writer
+        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .unwrap();
+    writer.add_worksheet(data);
+
+    let mut output = Cursor::new(Vec::new());
+    writer.save(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut book_view_count = 0;
+    {
+        let mut writer = xlsb::raw::Writer::new(&mut rewritten);
+        for record in xlsb::raw::Records::new(&original) {
+            let record = record.unwrap();
+            let mut payload = record.payload().to_vec();
+            if record.kind() == xlsb::raw::kind::BOOK_VIEW {
+                assert_eq!(payload.len(), 29, "unexpected BrtBookView payload length");
+                payload[24..28].copy_from_slice(&active_catalog_position.to_le_bytes());
+                book_view_count += 1;
+            }
+            writer.write_record(record.kind(), &payload).unwrap();
+        }
+    }
+    assert_eq!(
+        book_view_count, 1,
+        "generated workbook must have one BrtBookView"
+    );
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(rewritten);
+
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
+fn active_book_view_catalog_position(bytes: &[u8]) -> u32 {
+    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let workbook = package.get_part(&workbook_uri).unwrap();
+    let mut active_catalog_position = None;
+    for record in xlsb::raw::Records::new(workbook.blob()) {
+        let record = record.unwrap();
+        if record.kind() != xlsb::raw::kind::BOOK_VIEW {
+            continue;
+        }
+        assert_eq!(
+            record.payload().len(),
+            29,
+            "unexpected BrtBookView payload length"
+        );
+        assert!(
+            active_catalog_position
+                .replace(u32::from_le_bytes(
+                    record.payload()[24..28].try_into().unwrap()
+                ))
+                .is_none(),
+            "generated workbook must have one BrtBookView"
+        );
+    }
+    active_catalog_position.expect("generated workbook must have one BrtBookView")
+}
+
+fn save_eager_workbook(workbook: &xlsb::Workbook) -> Vec<u8> {
+    let mut output = Cursor::new(Vec::new());
+    workbook.save(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn malformed_second_sheet() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(fixture_bytes())).unwrap();
     let sheet = PackURI::new("/xl/worksheets/sheet2.bin").unwrap();
@@ -322,4 +432,215 @@ fn eager_xlsb_byte_entrypoint_rejects_malformed_sheet_while_lazy_facade_opens() 
 
     assert!(xlsb::Workbook::new(Cursor::new(malformed.clone())).is_err());
     assert!(litchi::sheet::open_xlsb_workbook_from_bytes(&malformed).is_err());
+}
+
+#[test]
+fn eager_and_dynamic_facade_select_active_tail_in_all_worksheet_catalog() {
+    let bytes = rewrite_active_book_view(&all_worksheet_bytes(), 1);
+
+    let eager = xlsb::Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&eager), 1);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&eager).unwrap().name(),
+        "Tail"
+    );
+
+    let dynamic = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(dynamic.as_ref()), 1);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(dynamic.as_ref())
+            .unwrap()
+            .name(),
+        "Tail"
+    );
+}
+
+#[test]
+fn eager_and_dynamic_facade_map_active_tail_catalog_position_to_worksheet_ordinal() {
+    let bytes = rewrite_active_book_view(&mixed_chart_tabs_bytes(), 2);
+
+    let eager = xlsb::Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&eager), 1);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&eager).unwrap().name(),
+        "Tail"
+    );
+
+    let dynamic = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(dynamic.as_ref()), 1);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(dynamic.as_ref())
+            .unwrap()
+            .name(),
+        "Tail"
+    );
+
+    let reopened = xlsb::Workbook::new(Cursor::new(save_eager_workbook(&eager))).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&reopened), 1);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&reopened).unwrap().name(),
+        "Tail"
+    );
+}
+
+#[test]
+fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
+    let bytes = rewrite_active_book_view(&mixed_chart_tabs_bytes(), 1);
+
+    let eager = xlsb::Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&eager), 0);
+    let eager_error = WorkbookTrait::active_worksheet(&eager)
+        .err()
+        .expect("a chart tab cannot be returned as an active worksheet");
+    assert!(
+        matches!(
+            eager_error
+                .downcast_ref::<Box<xlsb::package::error::Error>>()
+                .map(Box::as_ref),
+            Some(xlsb::package::error::Error::UnsupportedFeature(message))
+                if message == "XLSB active sheet is not a worksheet"
+        ),
+        "active chart failure must retain the typed XLSB package error"
+    );
+
+    let dynamic = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(dynamic.as_ref()), 0);
+    let dynamic_error = WorkbookTrait::active_worksheet(dynamic.as_ref())
+        .err()
+        .expect("a chart tab cannot be returned as an active worksheet");
+    assert!(
+        matches!(
+            dynamic_error
+                .downcast_ref::<Box<xlsb::package::error::Error>>()
+                .map(Box::as_ref),
+            Some(xlsb::package::error::Error::UnsupportedFeature(message))
+                if message == "XLSB active sheet is not a worksheet"
+        ),
+        "active chart failure must retain the typed XLSB package error"
+    );
+}
+
+#[test]
+fn eager_xlsb_rejects_out_of_range_active_catalog_position() {
+    for active_catalog_position in [3, u32::MAX] {
+        let bytes = rewrite_active_book_view(&mixed_chart_tabs_bytes(), active_catalog_position);
+        let eager_error = xlsb::Workbook::new(Cursor::new(bytes.clone()))
+            .expect_err("out-of-range active catalog position must be rejected");
+        assert!(
+            matches!(eager_error, xlsb::package::error::Error::InvalidFormula(message) if message.contains("BrtBookView sheet position")),
+            "out-of-range active catalog position must retain a typed XLSB error"
+        );
+
+        let dynamic_error = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes)
+            .expect_err("dynamic facade must reject out-of-range active catalog position");
+        assert!(
+            dynamic_error.downcast_ref::<litchi_core::Error>().is_some(),
+            "dynamic facade must retain a typed core error"
+        );
+
+        let file = fixture_file(&bytes);
+        let path_error = litchi::sheet::open_xlsb_workbook_dyn(file.path())
+            .expect_err("path facade must reject out-of-range active catalog position");
+        assert!(
+            matches!(
+                path_error.downcast_ref::<xlsb::package::error::Error>(),
+                Some(xlsb::package::error::Error::InvalidFormula(message))
+                    if message.contains("BrtBookView sheet position")
+            ),
+            "path facade must retain the typed XLSB error"
+        );
+    }
+}
+
+#[test]
+fn xlsb_writer_default_active_tab_is_deterministic() {
+    let bytes = mixed_chart_tabs_bytes();
+    let eager = xlsb::Workbook::new(Cursor::new(bytes)).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&eager), 0);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&eager).unwrap().name(),
+        "Data"
+    );
+
+    let reopened = xlsb::Workbook::new(Cursor::new(save_eager_workbook(&eager))).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&reopened), 0);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&reopened).unwrap().name(),
+        "Data"
+    );
+}
+
+#[test]
+fn path_facade_selects_active_tail_after_chart_tab_and_observes_source_changes() {
+    let bytes = rewrite_active_book_view(&mixed_chart_tabs_bytes(), 2);
+    let file = fixture_file(&bytes);
+    let workbook = litchi::sheet::open_xlsb_workbook_dyn(file.path()).unwrap();
+
+    assert_eq!(WorkbookTrait::active_sheet_index(workbook.as_ref()), 1);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(workbook.as_ref())
+            .unwrap()
+            .name(),
+        "Tail"
+    );
+
+    let mut changed = std::fs::OpenOptions::new()
+        .append(true)
+        .open(file.path())
+        .unwrap();
+    changed.write_all(b"source mutation").unwrap();
+    changed.flush().unwrap();
+
+    assert_source_changed(WorkbookTrait::active_worksheet(workbook.as_ref()));
+}
+
+#[test]
+fn path_facade_reports_typed_error_for_active_chart_and_source_change_takes_precedence() {
+    let bytes = rewrite_active_book_view(&mixed_chart_tabs_bytes(), 1);
+    let file = fixture_file(&bytes);
+    let workbook = litchi::sheet::open_xlsb_workbook_dyn(file.path()).unwrap();
+
+    assert_eq!(WorkbookTrait::active_sheet_index(workbook.as_ref()), 0);
+    let error = WorkbookTrait::active_worksheet(workbook.as_ref())
+        .err()
+        .expect("a chart tab cannot be returned as an active worksheet");
+    assert!(
+        matches!(
+            error.downcast_ref::<xlsb::package::error::Error>(),
+            Some(xlsb::package::error::Error::UnsupportedFeature(message))
+                if message == "XLSB active sheet is not a worksheet"
+        ),
+        "path facade active-chart failure must retain the typed XLSB error"
+    );
+
+    let mut changed = std::fs::OpenOptions::new()
+        .append(true)
+        .open(file.path())
+        .unwrap();
+    changed.write_all(b"source mutation").unwrap();
+    changed.flush().unwrap();
+
+    assert_source_changed(WorkbookTrait::active_worksheet(workbook.as_ref()));
+}
+
+#[test]
+fn chart_first_writer_defaults_active_catalog_to_first_worksheet() {
+    let bytes = chart_first_tabs_bytes();
+    assert_eq!(active_book_view_catalog_position(&bytes), 1);
+
+    let eager = xlsb::Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(&eager), 0);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(&eager).unwrap().name(),
+        "Data"
+    );
+
+    let dynamic = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes).unwrap();
+    assert_eq!(WorkbookTrait::active_sheet_index(dynamic.as_ref()), 0);
+    assert_eq!(
+        WorkbookTrait::active_worksheet(dynamic.as_ref())
+            .unwrap()
+            .name(),
+        "Data"
+    );
 }
