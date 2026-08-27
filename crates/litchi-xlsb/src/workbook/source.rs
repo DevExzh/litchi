@@ -521,7 +521,7 @@ impl SourceBackedWorkbook {
         let mut writer = SequentialTextWriter::new(&mut checked_output, options);
         let conversion = (|| {
             check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
-            for catalog_position in 0..self.inner.sheets.len() {
+            for &catalog_position in &self.inner.worksheet_positions {
                 check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
                 let sheet = SourceBackedWorksheet {
                     inner: Arc::clone(&self.inner),

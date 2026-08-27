@@ -175,6 +175,26 @@ pub fn open_xlsb_workbook_dyn_with_limits<P: AsRef<std::path::Path>>(
     path: P,
     limits: crate::xlsb::ReadLimits,
 ) -> Result<Box<dyn WorkbookTrait>> {
+    #[cfg(all(
+        any(feature = "xlsx", feature = "ods", feature = "xls", feature = "xlsb"),
+        any(unix, windows)
+    ))]
+    {
+        if let crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
+            workbook,
+            source,
+            limits,
+            ..
+        } = crate::detection_smart::detected::detect_workbook_source_path_with_limits(
+            path.as_ref(),
+            limits,
+        )? {
+            let workbook =
+                super::adapters::XlsbWorkbook::from_source_backed(workbook, source, limits)?;
+            return Ok(Box::new(workbook));
+        }
+    }
+
     let workbook = open_xlsb_workbook_with_limits(path, limits)?;
     Ok(Box::new(workbook))
 }

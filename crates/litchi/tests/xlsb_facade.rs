@@ -21,6 +21,36 @@ fn fixture_file(bytes: &[u8]) -> tempfile::NamedTempFile {
     file
 }
 
+fn mixed_chart_tabs_bytes() -> Vec<u8> {
+    use xlsb::chart::{Anchor, Chart};
+    use xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+
+    let chart = Chart::bar_chart_with_cache(
+        "Sales",
+        "Data!$A$1:$A$2",
+        &["North", "South"],
+        "Data!$B$1:$B$2",
+        &[42.0, 55.0],
+        Anchor::new(0, 0, 10, 20),
+    )
+    .unwrap();
+    let mut data = MutableWorksheet::new("Data");
+    data.set_cell(0, 0, "DATA");
+    let mut tail = MutableWorksheet::new("Tail");
+    tail.set_cell(0, 0, "TAIL");
+
+    let mut writer = WorkbookWriter::new();
+    writer.add_worksheet(data);
+    writer
+        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .unwrap();
+    writer.add_worksheet(tail);
+
+    let mut output = Cursor::new(Vec::new());
+    writer.save(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn malformed_second_sheet() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(fixture_bytes())).unwrap();
     let sheet = PackURI::new("/xl/worksheets/sheet2.bin").unwrap();
@@ -170,6 +200,61 @@ fn source_backed_facade_text_matches_eager_workbook() {
     let eager = xlsb::Workbook::new(Cursor::new(bytes)).expect("eager XLSB open");
 
     assert_eq!(source_backed.text().unwrap(), eager_text(&eager));
+}
+
+#[test]
+fn source_backed_facade_skips_chart_tabs_when_selecting_worksheets() {
+    let bytes = mixed_chart_tabs_bytes();
+    let file = fixture_file(&bytes);
+    let workbook =
+        litchi::sheet::open_xlsb_workbook_dyn(file.path()).expect("lazy XLSB facade open");
+
+    assert_eq!(WorkbookTrait::worksheet_count(workbook.as_ref()), 2);
+    assert_eq!(
+        WorkbookTrait::worksheet_names(workbook.as_ref()),
+        &["Data".to_string(), "Tail".to_string()]
+    );
+
+    let first = WorkbookTrait::worksheet_by_index(workbook.as_ref(), 0).expect("first worksheet");
+    assert_eq!(first.name(), "Data");
+    assert_eq!(
+        first
+            .cell_by_coordinate("A1")
+            .expect("first worksheet cell")
+            .value(),
+        &CellValue::String("DATA".to_string())
+    );
+
+    let tail = WorkbookTrait::worksheet_by_index(workbook.as_ref(), 1).expect("tail worksheet");
+    assert_eq!(tail.name(), "Tail");
+    assert_eq!(
+        tail.cell_by_coordinate("A1")
+            .expect("tail worksheet cell")
+            .value(),
+        &CellValue::String("TAIL".to_string())
+    );
+    assert!(WorkbookTrait::worksheet_by_index(workbook.as_ref(), 2).is_err());
+
+    let named_tail =
+        WorkbookTrait::worksheet_by_name(workbook.as_ref(), "Tail").expect("named tail worksheet");
+    assert_eq!(named_tail.name(), "Tail");
+    assert!(WorkbookTrait::worksheet_by_name(workbook.as_ref(), "Sales Chart").is_err());
+
+    let mut worksheets = WorkbookTrait::worksheets(workbook.as_ref());
+    assert_eq!(worksheets.next().unwrap().unwrap().name(), "Data");
+    assert_eq!(worksheets.next().unwrap().unwrap().name(), "Tail");
+    assert!(worksheets.next().is_none());
+}
+
+#[test]
+fn source_backed_facade_text_skips_chart_tabs() {
+    let file = fixture_file(&mixed_chart_tabs_bytes());
+    let workbook = Workbook::open(file.path()).expect("lazy XLSB facade open");
+
+    assert_eq!(
+        workbook.text().expect("source-backed XLSB text"),
+        "DATA\nTAIL\n"
+    );
 }
 
 #[test]
