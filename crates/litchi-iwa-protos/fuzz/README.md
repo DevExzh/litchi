@@ -378,14 +378,18 @@ cargo +nightly fuzz check movie_playback_codec
 ## Format-neutral table-appearance codec
 
 `table_appearance` drives the generated-free `table_appearance_codec` facade
-over bounded TableModel, TableStyle, and Stylesheet payloads. Successful model
-and stylesheet rewrites execute with exact prepared requirements and decode
-again, exercising source preservation, candidate verification, unknown-field
-retention, and typed output/field/work/allocation ceilings. Malformed,
-duplicate, wrong-wire, non-canonical, truncated, and unbalanced-group inputs
-are observed without mutating their caller-owned source. The recipes under
-`corpus/table_appearance/` include canonical known properties, unknown
-overlong scalars/groups, style-edge rewrites, and strict failure shapes.
+over bounded TableModel, TableStyle, TableStylePreset, TableStyleNetwork, and
+Stylesheet payloads. Successful model and stylesheet rewrites execute with
+exact prepared requirements and decode again, exercising source preservation,
+candidate verification, unknown-field retention, and typed
+output/field/work/allocation ceilings. The preset and network discovery
+projections are replayed through both plain and reported decoders and probe
+their input/field/work/nesting ceilings one below the reported requirement.
+Malformed, duplicate, wrong-wire, non-canonical, truncated, and unbalanced-
+group inputs are observed without mutating their caller-owned source. The
+recipes under `corpus/table_appearance/` include canonical known properties,
+unknown overlong scalars/groups, preset/network reference failures,
+style-edge rewrites, and strict failure shapes.
 
 List and type-check the target from this directory:
 

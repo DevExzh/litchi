@@ -1496,6 +1496,47 @@ def add_iwa_keynote_slide_table_discovery_scaffold(root: Path) -> None:
     )
 
 
+def add_iwa_keynote_slide_table_listing_appearance_scaffold(root: Path) -> None:
+    """Create an owner-gated listing appearance route for Wave102 tests."""
+
+    listing = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[0]
+    graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[1]
+    listing.parent.mkdir(parents=True, exist_ok=True)
+    graph.parent.mkdir(parents=True, exist_ok=True)
+    listing.write_text(
+        "struct KeynoteObjectCatalog;\n"
+        "struct CatalogLimits;\n"
+        "struct KeynoteSlideTableAppearanceListing;\n"
+        "fn build_catalog(bytes: &[u8]) {\n"
+        "    let _catalog = KeynoteObjectCatalog;\n"
+        "    let _limits = CatalogLimits;\n"
+        "    let _ = bytes;\n"
+        "    try_reserve_exact();\n"
+        "}\n"
+        "fn slide_tables(bytes: &[u8]) {\n"
+        "    build_catalog(bytes);\n"
+        "    slide_table_graph_from_catalog_context(bytes);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    graph.write_text(
+        "fn slide_table_graph_from_catalog_context(bytes: &[u8]) {\n"
+        "    let _catalog = KeynoteObjectCatalog;\n"
+        "    let _listing = KeynoteSlideTableAppearanceListing;\n"
+        "    decode_appearance_values(bytes);\n"
+        "}\n"
+        "fn decode_appearance_values(bytes: &[u8]) {\n"
+        "    let _ = table_appearance_codec::decode_table_appearance(bytes);\n"
+        "}\n"
+        "fn retained_mutation_path(bytes: &[u8]) {\n"
+        "    let _ = package.archive(bytes);\n"
+        "    let _ = TableModelArchive::decode(bytes);\n"
+        "    let _ = TableStyleArchive::decode(bytes);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -15303,6 +15344,179 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_keynote_slide_table_discovery_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_keynote_slide_table_listing_appearance_is_dormant_until_owner_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[0]
+            listing.parent.mkdir(parents=True, exist_ok=True)
+            listing.write_text(
+                "fn slide_tables(bytes: &[u8]) {\n"
+                "    let _ = crate::table_appearance::table_appearance(bytes);\n"
+                "    let _ = package.archive(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_listing_appearance_requires_catalog_and_codec(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_listing_appearance_scaffold(root)
+            listing = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[0]
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[1]
+            listing.write_text(
+                listing.read_text(encoding="utf-8").replace(
+                    "let _catalog = KeynoteObjectCatalog;", "let _catalog = ();"
+                ),
+                encoding="utf-8",
+            )
+            graph.write_text(
+                graph.read_text(encoding="utf-8").replace(
+                    "let _catalog = KeynoteObjectCatalog;", "let _catalog = ();"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                root
+            )
+            self.assertTrue(any("bounded catalog" in item for item in violations), violations)
+
+            graph.write_text(
+                graph.read_text(encoding="utf-8").replace(
+                    "table_appearance_codec::decode_table_appearance(bytes)",
+                    "legacy_appearance(bytes)",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                root
+            )
+            self.assertTrue(any("strict appearance codec" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_listing_appearance_rejects_reachable_legacy_reads(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_listing_appearance_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_appearance_values(bytes);\n",
+                "    decode_appearance_values(bytes);\n"
+                "    forbidden_listing_appearance(bytes);\n",
+                1,
+            )
+            source += (
+                "fn forbidden_listing_appearance(bytes: &[u8]) {\n"
+                "    let _ = crate::table_appearance::table_appearance(bytes);\n"
+                "    let _ = package.archive(bytes);\n"
+                "    let _ = TableModelArchive::decode(bytes);\n"
+                "    let _ = TableStyleArchive::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                root
+            )
+            self.assertTrue(any("legacy table_appearance reader" in item for item in violations), violations)
+            self.assertTrue(any("package.archive" in item for item in violations), violations)
+            self.assertTrue(any("generated table appearance/model/style decode" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_listing_appearance_rejects_alias_reads(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_listing_appearance_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_appearance_values(bytes);\n",
+                "    decode_appearance_values(bytes);\n"
+                "    forbidden_alias_reads(bytes);\n",
+                1,
+            )
+            source += (
+                "use crate::table_appearance::table_appearance as read_legacy;\n"
+                "use crate::protobuf::tst::TableStyleArchive as LegacyStyle;\n"
+                "fn forbidden_alias_reads(bytes: &[u8]) {\n"
+                "    let _ = read_legacy(bytes);\n"
+                "    let _ = LegacyStyle::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                root
+            )
+            self.assertTrue(any("legacy table appearance alias read_legacy" in item for item in violations), violations)
+            self.assertTrue(any("generated TableStyleArchive alias LegacyStyle decode" in item for item in violations), violations)
+
+    def test_iwa_keynote_slide_table_listing_appearance_masks_cfg_non_code_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_listing_appearance_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[1]
+            graph.write_text(
+                graph.read_text(encoding="utf-8")
+                + "// table_appearance package.archive TableModelArchive::decode\n"
+                + 'const NOTE: &str = "table_appearance package.archive TableStyleArchive::decode";\n'
+                + "#[cfg(test)]\n"
+                + "fn decoy(bytes: &[u8]) {\n"
+                + "    let _ = crate::table_appearance::table_appearance(bytes);\n"
+                + "    let _ = package.archive(bytes);\n"
+                + "    let _ = TableModelArchive::decode(bytes);\n"
+                + "    let _ = TableStyleArchive::decode(bytes);\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_listing_appearance_allows_unreachable_mutation_paths(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_listing_appearance_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_LISTING_APPEARANCE_SOURCES[1]
+            graph.write_text(
+                graph.read_text(encoding="utf-8")
+                + "fn legacy_table_appearance_mutation(bytes: &[u8]) {\n"
+                + "    let _ = crate::table_appearance::table_appearance(bytes);\n"
+                + "    let _ = package.archive(bytes);\n"
+                + "    let _ = TableModelArchive::decode(bytes);\n"
+                + "    let _ = TableStyleArchive::decode(bytes);\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_listing_appearance_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_keynote_slide_table_listing_appearance_audit_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_table_listing_appearance_source_topology()",
             main_source,
         )
 

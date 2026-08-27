@@ -32,6 +32,34 @@ const STYLE_STYLESHEET_FIELD: u32 = 5;
 const STYLE_OVERRIDE_COUNT_FIELD: u32 = 10;
 const STYLE_PROPERTIES_FIELD: u32 = 11;
 
+const STYLE_PRESET_INDEX_FIELD: u32 = 1;
+const STYLE_PRESET_IMAGE_FIELD: u32 = 2;
+const STYLE_PRESET_NETWORK_FIELD: u32 = 3;
+
+const STYLE_NETWORK_BODY_TEXT_FIELD: u32 = 1;
+const STYLE_NETWORK_HEADER_ROW_TEXT_FIELD: u32 = 2;
+const STYLE_NETWORK_HEADER_COLUMN_TEXT_FIELD: u32 = 3;
+const STYLE_NETWORK_FOOTER_ROW_TEXT_FIELD: u32 = 4;
+const STYLE_NETWORK_BODY_CELL_FIELD: u32 = 5;
+const STYLE_NETWORK_HEADER_ROW_FIELD: u32 = 6;
+const STYLE_NETWORK_HEADER_COLUMN_FIELD: u32 = 7;
+const STYLE_NETWORK_FOOTER_ROW_FIELD: u32 = 8;
+const STYLE_NETWORK_TABLE_STYLE_FIELD: u32 = 9;
+const STYLE_NETWORK_TABLE_NAME_FIELD: u32 = 10;
+const STYLE_NETWORK_TABLE_NAME_SHAPE_FIELD: u32 = 11;
+const STYLE_NETWORK_PRESET_ID_FIELD: u32 = 12;
+const STYLE_NETWORK_CATEGORY_LEVEL_1_TEXT_FIELD: u32 = 13;
+const STYLE_NETWORK_CATEGORY_LEVEL_5_TEXT_FIELD: u32 = 17;
+const STYLE_NETWORK_CATEGORY_LEVEL_1_STYLE_FIELD: u32 = 18;
+const STYLE_NETWORK_CATEGORY_LEVEL_5_STYLE_FIELD: u32 = 22;
+const STYLE_NETWORK_LABEL_LEVEL_1_TEXT_FIELD: u32 = 23;
+const STYLE_NETWORK_LABEL_LEVEL_5_TEXT_FIELD: u32 = 27;
+const STYLE_NETWORK_LABEL_LEVEL_1_STYLE_FIELD: u32 = 28;
+const STYLE_NETWORK_LABEL_LEVEL_5_STYLE_FIELD: u32 = 32;
+const STYLE_NETWORK_PIVOT_BODY_SUMMARY_ROW_FIELD: u32 = 33;
+const STYLE_NETWORK_PIVOT_BODY_SUMMARY_COLUMN_FIELD: u32 = 34;
+const STYLE_NETWORK_PIVOT_HEADER_COLUMN_SUMMARY_FIELD: u32 = 35;
+
 const PROPERTIES_BANDED_ROWS_FIELD: u32 = 1;
 const PROPERTIES_AUTO_RESIZE_FIELD: u32 = 22;
 const PROPERTIES_BODY_HORIZONTAL_FIELD: u32 = 33;
@@ -517,6 +545,51 @@ impl<'source> TableModelSnapshot<'source> {
     }
 }
 
+/// Borrowed `TST.TableStylePresetArchive` projection.
+///
+/// The preset index and image edge are validated as part of the strict wire
+/// pass, but only the optional style-network edge is needed by package
+/// appearance discovery. The source remains byte-authoritative.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableStylePresetSnapshot<'source> {
+    source: &'source [u8],
+    style_network_identifier: Option<u64>,
+}
+
+impl<'source> TableStylePresetSnapshot<'source> {
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn style_network_identifier(self) -> Option<u64> {
+        self.style_network_identifier
+    }
+}
+
+/// Borrowed `TST.TableStyleNetworkArchive` projection.
+///
+/// All required and optional style edges are validated, while the required
+/// table-style edge is the only fact consumed by the appearance owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableStyleNetworkSnapshot<'source> {
+    source: &'source [u8],
+    table_style_identifier: u64,
+}
+
+impl<'source> TableStyleNetworkSnapshot<'source> {
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    #[must_use]
+    pub const fn table_style_identifier(self) -> u64 {
+        self.table_style_identifier
+    }
+}
+
 /// Borrowed TableStyle parent/stylesheet and direct-override projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableStyleSnapshot<'source> {
@@ -896,6 +969,58 @@ pub fn decode_table_style_with_report(
             stylesheet_identifier: snapshot.stylesheet_identifier,
             is_variation: snapshot.is_variation,
             overrides: snapshot.overrides,
+        },
+        budget.report(source.len(), 0),
+    ))
+}
+
+/// Decode one `TST.TableStylePresetArchive` into a borrowed discovery
+/// projection.
+pub fn decode_table_style_preset(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<TableStylePresetSnapshot<'_>, DecodeError> {
+    Ok(decode_table_style_preset_with_report(source, options)?.0)
+}
+
+/// Decode one `TST.TableStylePresetArchive` and return strict consumption.
+pub fn decode_table_style_preset_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableStylePresetSnapshot<'_>, DecodeReport), DecodeError> {
+    ensure_input(source, options)?;
+    let mut budget = Budget::new(options);
+    let style_network_identifier = parse_table_style_preset(source, 1, &mut budget)?;
+    Ok((
+        TableStylePresetSnapshot {
+            source,
+            style_network_identifier,
+        },
+        budget.report(source.len(), 0),
+    ))
+}
+
+/// Decode one `TST.TableStyleNetworkArchive` into a borrowed discovery
+/// projection.
+pub fn decode_table_style_network(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<TableStyleNetworkSnapshot<'_>, DecodeError> {
+    Ok(decode_table_style_network_with_report(source, options)?.0)
+}
+
+/// Decode one `TST.TableStyleNetworkArchive` and return strict consumption.
+pub fn decode_table_style_network_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableStyleNetworkSnapshot<'_>, DecodeReport), DecodeError> {
+    ensure_input(source, options)?;
+    let mut budget = Budget::new(options);
+    let table_style_identifier = parse_table_style_network(source, 1, &mut budget)?;
+    Ok((
+        TableStyleNetworkSnapshot {
+            source,
+            table_style_identifier,
         },
         budget.report(source.len(), 0),
     ))
@@ -1342,7 +1467,11 @@ fn scan_model(
                     return Err(DecodeError::invalid("duplicate TableModel table_style"));
                 }
                 let payload = field.length()?;
-                let reference = parse_reference(payload, 2, budget)?;
+                // Native producers may use a present zero style edge when
+                // the style preset supplies the effective appearance. Keep
+                // this compatibility exception local to the model field;
+                // independent style-registry edges remain nonzero.
+                let reference = parse_model_style_reference(payload, 2, budget)?;
                 style_ref_bytes = payload.len();
                 style = Some(reference);
             },
@@ -1369,6 +1498,126 @@ fn scan_model(
         max_depth: budget.max_depth,
         nested_ref_bytes: style_ref_bytes,
     })
+}
+
+fn parse_table_style_preset(
+    source: &[u8],
+    depth: u32,
+    budget: &mut Budget,
+) -> Result<Option<u64>, DecodeError> {
+    let mut seen = [false; 4];
+    let mut style_network_identifier = None;
+    scan_fields(source, depth, budget, |field, budget| {
+        let slot = match field.number {
+            STYLE_PRESET_INDEX_FIELD => Some(STYLE_PRESET_INDEX_FIELD as usize),
+            STYLE_PRESET_IMAGE_FIELD => Some(STYLE_PRESET_IMAGE_FIELD as usize),
+            STYLE_PRESET_NETWORK_FIELD => Some(STYLE_PRESET_NETWORK_FIELD as usize),
+            _ => None,
+        };
+        let Some(slot) = slot else {
+            return Ok(());
+        };
+        if seen[slot] {
+            return Err(DecodeError::invalid(
+                "duplicate TableStylePreset known field",
+            ));
+        }
+        seen[slot] = true;
+        match field.number {
+            STYLE_PRESET_INDEX_FIELD => {
+                let value = canonical_value(field)?;
+                if value > i32::MAX as u64 && value < 0xffff_ffff_8000_0000 {
+                    return Err(DecodeError::invalid(
+                        "TableStylePreset index is out of int32 range",
+                    ));
+                }
+            },
+            STYLE_PRESET_IMAGE_FIELD => {
+                let _ = parse_reference(field.length()?, depth.saturating_add(1), budget)?;
+            },
+            STYLE_PRESET_NETWORK_FIELD => {
+                style_network_identifier = Some(parse_reference(
+                    field.length()?,
+                    depth.saturating_add(1),
+                    budget,
+                )?);
+            },
+            _ => unreachable!("TableStylePreset known field was not classified"),
+        }
+        Ok(())
+    })?;
+    Ok(style_network_identifier)
+}
+
+fn parse_table_style_network(
+    source: &[u8],
+    depth: u32,
+    budget: &mut Budget,
+) -> Result<u64, DecodeError> {
+    let mut seen = [false; 36];
+    let mut table_style_identifier = None;
+    scan_fields(source, depth, budget, |field, budget| {
+        let is_reference = matches!(
+            field.number,
+            STYLE_NETWORK_BODY_TEXT_FIELD
+                | STYLE_NETWORK_HEADER_ROW_TEXT_FIELD
+                | STYLE_NETWORK_HEADER_COLUMN_TEXT_FIELD
+                | STYLE_NETWORK_FOOTER_ROW_TEXT_FIELD
+                | STYLE_NETWORK_BODY_CELL_FIELD
+                | STYLE_NETWORK_HEADER_ROW_FIELD
+                | STYLE_NETWORK_HEADER_COLUMN_FIELD
+                | STYLE_NETWORK_FOOTER_ROW_FIELD
+                | STYLE_NETWORK_TABLE_STYLE_FIELD
+                | STYLE_NETWORK_TABLE_NAME_FIELD
+                | STYLE_NETWORK_TABLE_NAME_SHAPE_FIELD
+                | STYLE_NETWORK_CATEGORY_LEVEL_1_TEXT_FIELD..=STYLE_NETWORK_CATEGORY_LEVEL_5_TEXT_FIELD
+                | STYLE_NETWORK_CATEGORY_LEVEL_1_STYLE_FIELD..=STYLE_NETWORK_CATEGORY_LEVEL_5_STYLE_FIELD
+                | STYLE_NETWORK_LABEL_LEVEL_1_TEXT_FIELD..=STYLE_NETWORK_LABEL_LEVEL_5_TEXT_FIELD
+                | STYLE_NETWORK_LABEL_LEVEL_1_STYLE_FIELD..=STYLE_NETWORK_LABEL_LEVEL_5_STYLE_FIELD
+                | STYLE_NETWORK_PIVOT_BODY_SUMMARY_ROW_FIELD
+                | STYLE_NETWORK_PIVOT_BODY_SUMMARY_COLUMN_FIELD
+                | STYLE_NETWORK_PIVOT_HEADER_COLUMN_SUMMARY_FIELD
+        );
+        if is_reference {
+            let slot = field.number as usize;
+            if seen[slot] {
+                return Err(DecodeError::invalid(
+                    "duplicate TableStyleNetwork reference field",
+                ));
+            }
+            seen[slot] = true;
+            let identifier = parse_reference(field.length()?, depth.saturating_add(1), budget)?;
+            if field.number == STYLE_NETWORK_TABLE_STYLE_FIELD {
+                table_style_identifier = Some(identifier);
+            }
+            return Ok(());
+        }
+        if field.number == STYLE_NETWORK_PRESET_ID_FIELD {
+            let slot = STYLE_NETWORK_PRESET_ID_FIELD as usize;
+            if seen[slot] {
+                return Err(DecodeError::invalid(
+                    "duplicate TableStyleNetwork preset_id",
+                ));
+            }
+            seen[slot] = true;
+            let _ = u32::try_from(canonical_value(field)?)
+                .map_err(|_| DecodeError::invalid("TableStyleNetwork preset_id is out of range"))?;
+        }
+        Ok(())
+    })?;
+    for present in seen
+        .iter()
+        .skip(STYLE_NETWORK_BODY_TEXT_FIELD as usize)
+        .take(STYLE_NETWORK_TABLE_STYLE_FIELD as usize)
+    {
+        if !*present {
+            return Err(DecodeError::invalid(
+                "TableStyleNetwork required reference is missing",
+            ));
+        }
+    }
+    table_style_identifier
+        .ok_or_else(|| DecodeError::invalid("TableStyleNetwork table_style reference is missing"))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1995,6 +2244,23 @@ fn parse_children_entry(
 }
 
 fn parse_reference(source: &[u8], depth: u32, budget: &mut Budget) -> Result<u64, DecodeError> {
+    parse_reference_with_zero_policy(source, depth, budget, false)
+}
+
+fn parse_model_style_reference(
+    source: &[u8],
+    depth: u32,
+    budget: &mut Budget,
+) -> Result<u64, DecodeError> {
+    parse_reference_with_zero_policy(source, depth, budget, true)
+}
+
+fn parse_reference_with_zero_policy(
+    source: &[u8],
+    depth: u32,
+    budget: &mut Budget,
+    allow_zero: bool,
+) -> Result<u64, DecodeError> {
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut deprecated_is_external = None;
@@ -2033,7 +2299,7 @@ fn parse_reference(source: &[u8], depth: u32, budget: &mut Budget) -> Result<u64
         Ok(())
     })?;
     identifier
-        .filter(|value| *value != 0)
+        .filter(|value| allow_zero || *value != 0)
         .ok_or_else(|| DecodeError::invalid("reference identifier is missing or zero"))
 }
 
@@ -2757,6 +3023,42 @@ mod tests {
     fn unknown_group() -> Vec<u8> {
         vec![0x13, 0x08, 0x00, 0x14]
     }
+    fn style_registry_unknown_group() -> Vec<u8> {
+        // Field 77 is outside both style-registry schemas. Keep a nested
+        // canonical scalar in the group so the strict framing pass exercises
+        // the complete unknown-group path without colliding with a known
+        // reference field.
+        vec![0xeb, 0x04, 0xf0, 0x04, 0x01, 0xec, 0x04]
+    }
+    fn style_preset(network: Option<u64>) -> Vec<u8> {
+        let mut source = varint_field(STYLE_PRESET_INDEX_FIELD, 3);
+        source.extend_from_slice(&length_field(
+            STYLE_PRESET_IMAGE_FIELD,
+            &reference_payload(4),
+        ));
+        if let Some(network) = network {
+            source.extend_from_slice(&length_field(
+                STYLE_PRESET_NETWORK_FIELD,
+                &reference_payload(network),
+            ));
+        }
+        source
+    }
+    fn style_network_references() -> Vec<u8> {
+        let mut source = Vec::new();
+        for field in STYLE_NETWORK_BODY_TEXT_FIELD..=STYLE_NETWORK_TABLE_STYLE_FIELD {
+            source.extend_from_slice(&length_field(
+                field,
+                &reference_payload(u64::from(field) + 10),
+            ));
+        }
+        source
+    }
+    fn style_network() -> Vec<u8> {
+        let mut source = style_network_references();
+        source.extend_from_slice(&varint_field(STYLE_NETWORK_PRESET_ID_FIELD, 7));
+        source
+    }
     fn identified(name: &[u8], style_identifier: u64) -> Vec<u8> {
         let mut entry = length_field(IDENTIFIED_IDENTIFIER_FIELD, name);
         entry.extend_from_slice(&length_field(
@@ -2779,6 +3081,100 @@ mod tests {
         let properties = canonical_properties(props);
         root.extend_from_slice(&length_field(STYLE_PROPERTIES_FIELD, &properties));
         root
+    }
+
+    #[test]
+    fn table_style_preset_projection_is_borrowed_and_strict() {
+        let mut source = style_registry_unknown_group();
+        source.extend_from_slice(&style_preset(Some(17)));
+        source.extend_from_slice(&style_registry_unknown_group());
+        let (snapshot, report) =
+            decode_table_style_preset_with_report(&source, options(&source)).unwrap();
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(snapshot.style_network_identifier(), Some(17));
+        assert_eq!(report.input_bytes(), source.len());
+        assert!(report.fields() >= 7);
+
+        let mut duplicate = source.clone();
+        duplicate.extend_from_slice(&length_field(
+            STYLE_PRESET_NETWORK_FIELD,
+            &reference_payload(18),
+        ));
+        assert!(decode_table_style_preset(&duplicate, options(&duplicate)).is_err());
+
+        let mut wrong_wire = style_preset(None);
+        wrong_wire.extend_from_slice(&varint_field(STYLE_PRESET_NETWORK_FIELD, 17));
+        assert!(decode_table_style_preset(&wrong_wire, options(&wrong_wire)).is_err());
+
+        let noncanonical_index = vec![0x08, 0x80, 0x00];
+        assert!(
+            decode_table_style_preset(&noncanonical_index, options(&noncanonical_index)).is_err()
+        );
+        let out_of_range_index = varint_field(STYLE_PRESET_INDEX_FIELD, 0x8000_0000);
+        assert!(
+            decode_table_style_preset(&out_of_range_index, options(&out_of_range_index)).is_err()
+        );
+
+        let limited = options(&source).with_max_fields(report.fields().saturating_sub(1));
+        let error = decode_table_style_preset(&source, limited).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+    }
+
+    #[test]
+    fn table_style_network_projection_requires_known_edges_and_limits() {
+        let mut source = style_registry_unknown_group();
+        source.extend_from_slice(&style_network());
+        source.extend_from_slice(&style_registry_unknown_group());
+        let (snapshot, report) =
+            decode_table_style_network_with_report(&source, options(&source)).unwrap();
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(snapshot.table_style_identifier(), 19);
+        assert_eq!(report.input_bytes(), source.len());
+        assert!(report.fields() >= 23);
+
+        let mut duplicate = source.clone();
+        duplicate.extend_from_slice(&length_field(
+            STYLE_NETWORK_TABLE_STYLE_FIELD,
+            &reference_payload(20),
+        ));
+        assert!(decode_table_style_network(&duplicate, options(&duplicate)).is_err());
+
+        let mut wrong_wire = style_network();
+        wrong_wire.extend_from_slice(&varint_field(STYLE_NETWORK_TABLE_STYLE_FIELD, 19));
+        assert!(decode_table_style_network(&wrong_wire, options(&wrong_wire)).is_err());
+
+        let mut missing = length_field(STYLE_NETWORK_TABLE_STYLE_FIELD, &reference_payload(19));
+        missing.extend_from_slice(&varint_field(STYLE_NETWORK_PRESET_ID_FIELD, 7));
+        assert!(decode_table_style_network(&missing, options(&missing)).is_err());
+
+        let mut noncanonical = style_network();
+        noncanonical.extend_from_slice(&[0x60, 0x80, 0x00]);
+        assert!(decode_table_style_network(&noncanonical, options(&noncanonical)).is_err());
+
+        let limited = options(&source).with_max_fields(report.fields().saturating_sub(1));
+        let error = decode_table_style_network(&source, limited).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+    }
+
+    #[test]
+    fn model_zero_style_edge_uses_present_preset_compatibility() {
+        let mut source = length_field(MODEL_STYLE_FIELD, &reference_payload(0));
+        source.extend_from_slice(&length_field(
+            MODEL_STYLE_PRESET_FIELD,
+            &reference_payload(17),
+        ));
+        let snapshot = decode_table_model(&source, options(&source)).unwrap();
+        assert_eq!(snapshot.style_identifier(), 0);
+        assert_eq!(snapshot.style_preset_identifier(), Some(17));
+
+        let missing = length_field(MODEL_STYLE_PRESET_FIELD, &reference_payload(17));
+        assert!(decode_table_model(&missing, options(&missing)).is_err());
     }
 
     #[test]

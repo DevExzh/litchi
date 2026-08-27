@@ -6146,3 +6146,66 @@ migration debts (including debts 014, 016, and 017), generated-schema and
 normal Prost/Buffa owners, and the IWA monolith deletion gate remain
 unchanged. Wave101 retires no crate, dependency edge, manifest dependency,
 host adapter, debt item, generated owner, or monolith owner.
+
+## 2026-08-27 amendment: Wave102 Keynote slide-table bounded appearance listing (not a monolith-exit gate)
+
+Wave102 extends the existing Keynote slide-table discovery boundary with
+strict appearance facts. The active `KeynoteEditor::slide_tables` listing
+continues to use one bounded `KeynoteObjectCatalog` and one decoded slide
+context; it now resolves the table's appearance through borrowed
+`table_appearance_codec` projections for
+the model style/preset, preset-to-network, network-to-style, and bounded full
+parent-inheritance routes. A direct nonzero style retains the legacy
+precedence rule. No parsed appearance payload is retained by the catalog.
+
+Missing, malformed, duplicate, role-aliased, cyclic, and over-depth facts on
+the projected model/style/preset/network and traversed parent routes fail
+closed. Stylesheet-registry ownership and unprojected style-property fields
+remain at the compatibility owner. The appearance projection is read-only
+listing support: existing public APIs and writers, legacy Keynote mutation
+paths, and the deliberate generated TableInfo geometry read remain at their
+current owners. No metadata, UUID, save-token, global ownership, or
+full-package transaction is introduced, and no public native identifier,
+archive, ZIP, wire, generated, Prost, or Buffa value is exposed.
+
+This is not a package-wide budget, zero-copy, allocation-free, RSS, or
+wall-clock performance claim. The bounded catalog and strict projection
+limits constrain this listing operation only; full appearance/style writers,
+storage, cells, formulas, tiles, comments, metadata, and native mutation
+remain outside this slice.
+
+The focused evidence is 14/14 for the appearance codec, 50/50 for the
+affected Keynote slide-table suite, 598/598 for the Python boundary suite,
+and an empty focused live audit. Protos and IWA library checks passed, strict
+scoped Clippy passed (with the repository's existing Pages warnings allowed
+for the IWA target), the isolated appearance fuzz target check passed, and
+Rust 2024 formatting plus diff checks were clean.
+
+An external public `KeynoteEditor` read-only driver replayed the Wave99 source
+`/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
+`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`) and
+the Wave100 source (500,128 bytes, SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`). Each
+contained one slide and one 5-by-4 `Table 1`; both reported row banding
+`Disabled`, row sizing `Fixed`, and all five gridline classes `Visible`.
+Fresh replay was exact: all 86/86 ZIP members were byte-identical, with zero
+changed, added, or removed members. This is read-only semantic evidence, not
+native mutation or save acceptance.
+
+Computer Use opened and rendered an immutable disposable copy of the Wave100
+source in Keynote 14.4 without repair, recovery, or conversion UI. With the
+table selected, the formatter showed alternating row color off, resize rows
+to fit off, all five gridline toggles on, one header column, two header rows,
+one footer row, and a 5-by-4 table. The immutable copy remained exactly
+500,128 bytes with SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b` after
+close. A separate writable disposable copy auto-persisted view state on
+close, so the byte-identity statement applies only to the immutable copy.
+No native appearance mutation, save, normalization, or post-save acceptance
+claim follows.
+
+The migration host, `litchi-iwa -> litchi-keynote` edge, all 13 ordered
+migration debts (including debts 014, 016, and 017), generated-schema and
+normal Prost/Buffa owners, and the IWA monolith deletion gate remain
+unchanged. Wave102 retires no crate, edge, debt, manifest dependency, host
+adapter, generated owner, or monolith owner.
