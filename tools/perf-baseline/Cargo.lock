@@ -1377,6 +1377,7 @@ dependencies = [
  "litchi-opc",
  "litchi-sheet",
  "litchi-spreadsheet-drawing",
+ "once_cell",
  "quick-xml",
  "thiserror",
 ]
