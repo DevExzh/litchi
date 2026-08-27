@@ -3927,6 +3927,10 @@ impl SourceBackedPackage {
             None => self.read_part(target)?,
         };
         if original.as_bytes() == replacement.as_slice() {
+            // The exact source path does not need the decoded comparison
+            // payload. Drop it before the first publication write so a
+            // managed oversized-cache bypass releases its reservation.
+            drop(original);
             return match accounting {
                 Some(accounting) => self.write_exact_source_with_accounting(writer, accounting),
                 None => self.write_exact_source(writer),
@@ -3944,6 +3948,9 @@ impl SourceBackedPackage {
             validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
             validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
         }
+        // Changed publication re-reads unchanged source records and only
+        // owns the replacement payload.
+        drop(original);
 
         let changed = [ChangedOverlay {
             target: ChangedOverlayTarget::Part(target),
@@ -4055,6 +4062,7 @@ impl SourceBackedPackage {
         }
         validate_overlay_xml(relationship_uri.as_str(), &original_relationships)?;
         validate_overlay_xml(relationship_uri.as_str(), &relationship_xml)?;
+        drop(original_part);
 
         let changed = [
             ChangedOverlay {
@@ -4276,6 +4284,9 @@ impl SourceBackedPackage {
                     replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
                 });
             }
+            // The original is needed only for comparison and XML auditing;
+            // never carry its handle into changed-member publication.
+            drop(original);
         }
 
         if changed.is_empty() {
@@ -4419,6 +4430,7 @@ impl SourceBackedPackage {
                 validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
                 validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
             }
+            drop(original);
             replacements.push(ChangedOverlay {
                 target: ChangedOverlayTarget::Part(overlay.target),
                 replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
@@ -11235,6 +11247,53 @@ mod tests {
         assert_eq!(sink.calls, 1);
         assert_eq!(sink.accepted, 0);
         assert_eq!(budget.used(Resource::OutputBytes), 0);
+    }
+
+    #[test]
+    fn managed_oversized_bypass_releases_comparison_memory_before_exact_publication() {
+        struct MemoryObservingSink<'budget> {
+            budget: &'budget Budget,
+            bytes: Vec<u8>,
+            first_memory: Option<u64>,
+        }
+
+        impl Write for MemoryObservingSink<'_> {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.first_memory
+                    .get_or_insert(self.budget.used(Resource::Memory));
+                self.bytes.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                Arc::new(CountingSource::new(source_bytes.clone())),
+                ReadLimits::default(),
+                SourceCacheLimits::new(1, 1).unwrap(),
+                context,
+            )
+            .unwrap();
+        let mut sink = MemoryObservingSink {
+            budget: &budget,
+            bytes: Vec::new(),
+            first_memory: None,
+        };
+
+        package
+            .write_part_overlay_to_stream(&mut sink, &target, b"<before/>".to_vec())
+            .unwrap();
+
+        assert_eq!(sink.bytes, source_bytes);
+        assert_eq!(sink.first_memory, Some(0));
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 }
 
