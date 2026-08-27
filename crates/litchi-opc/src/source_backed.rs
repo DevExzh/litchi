@@ -45,6 +45,76 @@ const MAX_SOURCE_TOPOLOGY_RELATIONSHIPS: usize = 4096;
 const MAX_SOURCE_RELATIONSHIP_FIELD_BYTES: usize = 64 * 1024;
 const MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES: usize = 8 * 1024 * 1024;
 
+#[cfg(test)]
+#[derive(Debug)]
+struct TestPublicationHook {
+    entered: Arc<std::sync::Barrier>,
+    release: Arc<std::sync::Barrier>,
+    waiter_joined: Arc<std::sync::Barrier>,
+}
+
+#[cfg(test)]
+impl TestPublicationHook {
+    fn new() -> Self {
+        Self {
+            entered: Arc::new(std::sync::Barrier::new(2)),
+            release: Arc::new(std::sync::Barrier::new(2)),
+            waiter_joined: Arc::new(std::sync::Barrier::new(2)),
+        }
+    }
+
+    fn pause(&self) {
+        self.entered.wait();
+        self.release.wait();
+    }
+
+    fn wait_until_entered(&self) {
+        self.entered.wait();
+    }
+
+    fn release(&self) {
+        self.release.wait();
+    }
+
+    fn signal_waiter_joined(&self) {
+        self.waiter_joined.wait();
+    }
+
+    fn wait_until_waiter_joined(&self) {
+        self.waiter_joined.wait();
+    }
+}
+
+#[cfg(test)]
+struct TestPublicationHookGuard<'cache> {
+    cache: &'cache PartCache,
+}
+
+#[cfg(test)]
+impl Drop for TestPublicationHookGuard<'_> {
+    fn drop(&mut self) {
+        *self
+            .cache
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+}
+
+#[cfg(test)]
+struct TestCacheAdmissionBypassGuard<'cache> {
+    cache: &'cache PartCache,
+}
+
+#[cfg(test)]
+impl Drop for TestCacheAdmissionBypassGuard<'_> {
+    fn drop(&mut self) {
+        self.cache
+            .force_allocation_bypass
+            .store(false, Ordering::Release);
+    }
+}
+
 struct PendingOverlay {
     target: usize,
     replacement: Arc<Vec<u8>>,
@@ -1662,7 +1732,13 @@ impl PartData {
     ///
     /// Managed payloads retain a hierarchical memory reservation for the
     /// lifetime of this handle and cannot be detached as a bare `Arc`. Use
-    /// [`Self::as_bytes`] or clone the [`PartData`] handle instead.
+    /// [`Self::as_bytes`] or clone the [`PartData`] handle instead. The
+    /// compatibility [`Self::into_arc`] helper is available for unmanaged
+    /// payloads.
+    #[allow(
+        clippy::wrong_self_convention,
+        reason = "this compatibility API borrows PartData while sharing its immutable allocation"
+    )]
     pub fn into_arc(&self) -> Result<Arc<Vec<u8>>> {
         if self.payload.reservation.is_some() {
             return Err(OpcError::ManagedPartDataArcEscape);
@@ -1709,9 +1785,16 @@ struct CacheEntry {
     last_used: u64,
 }
 
+#[derive(Debug)]
+struct PendingPublication {
+    flight: Arc<LoadFlight>,
+    payload: Arc<Vec<u8>>,
+}
+
 #[derive(Debug, Default)]
 struct CacheState {
     entries: HashMap<EntryId, CacheEntry>,
+    pending: HashMap<EntryId, PendingPublication>,
     flights: HashMap<EntryId, Arc<LoadFlight>>,
     total_bytes: usize,
     clock: u64,
@@ -1721,15 +1804,15 @@ struct CacheState {
 struct FlightState {
     complete: bool,
     payload: Option<CachedPayload>,
+    reservation: Option<Arc<Reservation>>,
+    flight_object_reservation: Option<Arc<Reservation>>,
+    payload_object_reservation: Option<Arc<Reservation>>,
 }
 
 #[derive(Debug)]
 struct LoadFlight {
     state: Mutex<FlightState>,
     completed: Condvar,
-    reservation: Option<Arc<Reservation>>,
-    flight_object_reservation: Option<Arc<Reservation>>,
-    payload_object_reservation: Option<Arc<Reservation>>,
 }
 
 impl LoadFlight {
@@ -1739,20 +1822,50 @@ impl LoadFlight {
         payload_object_reservation: Option<Arc<Reservation>>,
     ) -> Self {
         Self {
-            state: Mutex::new(FlightState::default()),
+            state: Mutex::new(FlightState {
+                reservation,
+                flight_object_reservation,
+                payload_object_reservation,
+                ..FlightState::default()
+            }),
             completed: Condvar::new(),
-            reservation,
-            flight_object_reservation,
-            payload_object_reservation,
         }
     }
 
     fn reservation(&self) -> Option<Arc<Reservation>> {
-        self.reservation.as_ref().map(Arc::clone)
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .reservation
+            .as_ref()
+            .map(Arc::clone)
     }
 
     fn payload_object_reservation(&self) -> Option<Arc<Reservation>> {
-        self.payload_object_reservation.as_ref().map(Arc::clone)
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .payload_object_reservation
+            .as_ref()
+            .map(Arc::clone)
+    }
+
+    fn diagnostic_reservations(
+        &self,
+    ) -> (
+        Option<Arc<Reservation>>,
+        Option<Arc<Reservation>>,
+        Option<Arc<Reservation>>,
+    ) {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        (
+            state.reservation.as_ref().map(Arc::clone),
+            state.payload_object_reservation.as_ref().map(Arc::clone),
+            state.flight_object_reservation.as_ref().map(Arc::clone),
+        )
     }
 
     fn wait(
@@ -1781,23 +1894,46 @@ impl LoadFlight {
         Ok(state.payload.clone())
     }
 
-    fn finish_success(&self, payload: CachedPayload) {
+    fn finish_success(&self, payload: CachedPayload) -> bool {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.complete {
+            drop(payload);
+            return false;
+        }
+        // The published payload carries the memory and payload-object
+        // reservations. Drop the flight's ownership before waking waiters;
+        // the Arc clones retained by the payload prevent double release.
+        state.reservation = None;
+        state.payload_object_reservation = None;
+        // This reservation represents only the coordination object, not the
+        // delivered payload, so it is released at terminal success.
+        state.flight_object_reservation = None;
         state.payload = Some(payload);
         state.complete = true;
         self.completed.notify_all();
+        true
     }
 
-    fn finish_failure(&self) {
+    fn finish_failure(&self) -> bool {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.complete {
+            return false;
+        }
+        // A failed loader must release every flight-owned reservation before
+        // notifying waiters. Otherwise a tight-budget waiter can retry while
+        // the failed loader still holds the memory/object quota.
+        state.reservation = None;
+        state.payload_object_reservation = None;
+        state.flight_object_reservation = None;
         state.complete = true;
         self.completed.notify_all();
+        true
     }
 }
 
@@ -1806,6 +1942,13 @@ enum CacheAccess {
     Loader(Arc<LoadFlight>),
     Waiter(Arc<LoadFlight>),
     Bypass(LoadResources),
+}
+
+#[derive(Clone, Copy)]
+enum CachePublication {
+    Pending,
+    Uncached(CacheRetention),
+    NotCurrent,
 }
 
 struct LoadResources {
@@ -1822,12 +1965,78 @@ struct PartCache {
     budget: Option<ExecutionContext>,
     input_reservation_failures: Option<Arc<DiagnosticCounter>>,
     output_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    #[cfg(test)]
+    publication_hook: Mutex<Option<Arc<TestPublicationHook>>>,
+    #[cfg(test)]
+    force_allocation_bypass: AtomicBool,
 }
 
 impl PartCache {
     #[cfg(test)]
     fn new(limits: SourceCacheLimits) -> Self {
         Self::new_with_diagnostics(limits, Arc::new(DiagnosticState::default()))
+    }
+
+    #[cfg(test)]
+    fn insert_for_test(&self, entry_id: EntryId, payload: CachedPayload) -> CacheRetention {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.insert_locked(&mut state, entry_id, payload)
+    }
+
+    #[cfg(test)]
+    fn install_test_publication_hook(
+        &self,
+        hook: Arc<TestPublicationHook>,
+    ) -> TestPublicationHookGuard<'_> {
+        let mut slot = self
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert!(
+            slot.replace(hook).is_none(),
+            "publication hook already installed"
+        );
+        drop(slot);
+        TestPublicationHookGuard { cache: self }
+    }
+
+    #[cfg(test)]
+    fn pause_test_publication(&self) {
+        let hook = self
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_ref()
+            .map(Arc::clone);
+        if let Some(hook) = hook {
+            hook.pause();
+        }
+    }
+
+    #[cfg(test)]
+    fn signal_test_waiter_joined(&self) {
+        let hook = self
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_ref()
+            .map(Arc::clone);
+        if let Some(hook) = hook {
+            hook.signal_waiter_joined();
+        }
+    }
+
+    #[cfg(test)]
+    fn force_test_cache_admission_bypass(&self) -> TestCacheAdmissionBypassGuard<'_> {
+        assert!(
+            self.force_allocation_bypass
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+        );
+        TestCacheAdmissionBypassGuard { cache: self }
     }
 
     fn new_with_diagnostics(limits: SourceCacheLimits, diagnostics: Arc<DiagnosticState>) -> Self {
@@ -1839,6 +2048,10 @@ impl PartCache {
             budget: None,
             input_reservation_failures: None,
             output_reservation_failures: None,
+            #[cfg(test)]
+            publication_hook: Mutex::new(None),
+            #[cfg(test)]
+            force_allocation_bypass: AtomicBool::new(false),
         }
     }
 
@@ -1857,6 +2070,10 @@ impl PartCache {
             budget: Some(context),
             input_reservation_failures: Some(input_reservation_failures),
             output_reservation_failures: Some(output_reservation_failures),
+            #[cfg(test)]
+            publication_hook: Mutex::new(None),
+            #[cfg(test)]
+            force_allocation_bypass: AtomicBool::new(false),
         }
     }
 
@@ -1897,19 +2114,28 @@ impl PartCache {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.clock = state.clock.wrapping_add(1);
         let clock = state.clock;
+        if let Some(flight) = state.flights.get(&entry_id) {
+            self.counters.waiter_joins.increment();
+            #[cfg(test)]
+            self.signal_test_waiter_joined();
+            return Ok(CacheAccess::Waiter(Arc::clone(flight)));
+        }
         if let Some(entry) = state.entries.get_mut(&entry_id) {
             entry.last_used = clock;
             self.counters.hits.increment();
             return Ok(CacheAccess::Hit(entry.payload.clone()));
         }
-        if let Some(flight) = state.flights.get(&entry_id) {
-            self.counters.waiter_joins.increment();
-            return Ok(CacheAccess::Waiter(Arc::clone(flight)));
-        }
 
         let reservation = self.reserve_for_load(&mut state, declared_bytes)?;
         let payload_object_reservation = self.reserve_object_for_load()?;
-        if state.flights.try_reserve(1).is_err() {
+        #[cfg(test)]
+        let force_allocation_bypass = self.force_allocation_bypass.load(Ordering::Acquire);
+        #[cfg(not(test))]
+        let force_allocation_bypass = false;
+        if force_allocation_bypass
+            || state.flights.try_reserve(1).is_err()
+            || state.pending.try_reserve(1).is_err()
+        {
             self.charge_cold_work(declared_bytes)?;
             self.counters.cold_loads.increment();
             self.counters.allocation_bypasses.increment();
@@ -2031,65 +2257,224 @@ impl PartCache {
         }
     }
 
-    fn complete_success(
+    fn publish_pending(
         &self,
         entry_id: EntryId,
         flight: &Arc<LoadFlight>,
         payload: CachedPayload,
-    ) -> std::result::Result<(), ExecutionError> {
+    ) -> std::result::Result<CachePublication, ExecutionError> {
         self.check_context()?;
-        let delivered = payload.clone();
-        {
-            let mut state = self
-                .state
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            // This is the final cooperative cancellation point immediately
-            // before publishing a clean value into the shared cache.
-            self.check_context()?;
-            self.counters.successful_loads.increment();
-            self.record_retention(self.insert_locked(&mut state, entry_id, payload));
-        }
-        // Complete before removing the flight so an oversized, deliberately
-        // uncached value still has no gap in which a late peer can start a
-        // duplicate load instead of joining this successful delivery.
-        flight.finish_success(delivered);
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        remove_flight(&mut state, entry_id, flight);
-        Ok(())
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            return Ok(CachePublication::NotCurrent);
+        }
+
+        // `enter` reserves this bookkeeping slot before the archive read. A
+        // second admission check keeps direct/internal callers fail-closed if
+        // the reservation was not made by that path.
+        if state.pending.try_reserve(1).is_err() {
+            return Ok(CachePublication::Uncached(
+                CacheRetention::AllocationFailure,
+            ));
+        }
+        let retention = self.insert_locked(&mut state, entry_id, payload.clone());
+        if !matches!(retention, CacheRetention::Retained) {
+            return Ok(CachePublication::Uncached(retention));
+        }
+        state.pending.insert(
+            entry_id,
+            PendingPublication {
+                flight: Arc::clone(flight),
+                payload: Arc::clone(&payload.bytes),
+            },
+        );
+        Ok(CachePublication::Pending)
     }
 
     fn complete_failure(&self, entry_id: EntryId, flight: &Arc<LoadFlight>) {
-        self.counters.failed_loads.increment();
-        // Publish failure to current waiters before allowing a new retrying
-        // loader to install a replacement flight.
-        flight.finish_failure();
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            remove_pending_locked(&mut state, entry_id, flight, None);
+            let transitioned = flight.finish_failure();
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return;
+        }
+        remove_pending_locked(&mut state, entry_id, flight, None);
+        // Publish failure to current waiters before allowing a new retrying
+        // loader to install a replacement flight. The conditional transition
+        // prevents a late completion from resurrecting an already failed load.
+        let transitioned = flight.finish_failure();
         remove_flight(&mut state, entry_id, flight);
+        if transitioned {
+            self.counters.failed_loads.increment();
+        }
     }
 
     fn complete_bypass_success(
         &self,
-        entry_id: EntryId,
-        payload: CachedPayload,
+        _entry_id: EntryId,
+        _payload: CachedPayload,
     ) -> std::result::Result<(), ExecutionError> {
+        // Allocation-admission fallback is deliberately uncached. The
+        // returned PartData still owns the reservations carried by its
+        // payload; no cache bookkeeping allocation is attempted here.
         self.check_context()?;
+        self.counters.successful_loads.increment();
+        self.counters.bypasses.increment();
+        Ok(())
+    }
+
+    fn complete_uncached_success(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        retention: CacheRetention,
+    ) -> Option<CachedPayload> {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        // Keep the no-flight allocation-fallback path under the same
-        // pre-publication cancellation contract as the normal flight path.
-        self.check_context()?;
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            drop(payload);
+            let transitioned = flight.finish_failure();
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return None;
+        }
+        let delivered = payload.clone();
+        let transitioned = flight.finish_success(delivered);
+        remove_flight(&mut state, entry_id, flight);
+        if transitioned {
+            self.counters.successful_loads.increment();
+            self.record_retention(retention);
+            Some(payload)
+        } else {
+            drop(payload);
+            None
+        }
+    }
+
+    fn commit_pending(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+    ) -> Option<CachedPayload> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        let pending_matches = state.pending.get(&entry_id).is_some_and(|pending| {
+            Arc::ptr_eq(&pending.flight, flight) && Arc::ptr_eq(&pending.payload, &payload.bytes)
+        });
+        let entry_matches = state
+            .entries
+            .get(&entry_id)
+            .is_some_and(|entry| Arc::ptr_eq(&entry.payload.bytes, &payload.bytes));
+        if !is_current || !pending_matches || !entry_matches {
+            remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
+            drop(payload);
+            let transitioned = flight.finish_failure();
+            if is_current {
+                remove_flight(&mut state, entry_id, flight);
+            }
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return None;
+        }
+
+        // The cache state lock is intentionally acquired before the flight
+        // lock. This makes the provisional entry and terminal transition one
+        // ordered publication, while all source freshness checks stay outside
+        // both locks.
+        let delivered = payload.clone();
+        let transitioned = flight.finish_success(delivered);
+        if !transitioned {
+            remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
+            remove_flight(&mut state, entry_id, flight);
+            drop(payload);
+            return None;
+        }
+        state.pending.remove(&entry_id);
+        remove_flight(&mut state, entry_id, flight);
         self.counters.successful_loads.increment();
-        self.record_retention(self.insert_locked(&mut state, entry_id, payload));
-        Ok(())
+        Some(payload)
+    }
+
+    fn rollback_publication(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        publication: CachePublication,
+    ) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if matches!(publication, CachePublication::Pending) {
+            remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
+        }
+        drop(payload);
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            let transitioned = flight.finish_failure();
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return;
+        }
+        let transitioned = flight.finish_failure();
+        remove_flight(&mut state, entry_id, flight);
+        if transitioned {
+            self.counters.failed_loads.increment();
+        }
+    }
+
+    fn invalidate_if_matches(&self, entry_id: EntryId, payload: &CachedPayload) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let matches = state
+            .entries
+            .get(&entry_id)
+            .is_some_and(|entry| Arc::ptr_eq(&entry.payload.bytes, &payload.bytes));
+        if let Some(removed) = matches.then(|| state.entries.remove(&entry_id)).flatten() {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(removed.payload.bytes.len());
+        }
     }
 
     fn complete_bypass_failure(&self) {
@@ -2193,7 +2578,9 @@ impl PartCache {
             );
         }
         for flight in state.flights.values() {
-            if let Some(reservation) = flight.reservation.as_ref() {
+            let (reservation, payload_object_reservation, flight_object_reservation) =
+                flight.diagnostic_reservations();
+            if let Some(reservation) = reservation.as_ref() {
                 let already_counted = state.entries.values().any(|entry| {
                     entry
                         .payload
@@ -2208,7 +2595,7 @@ impl PartCache {
                     );
                 }
             }
-            if let Some(object_reservation) = flight.payload_object_reservation.as_ref() {
+            if let Some(object_reservation) = payload_object_reservation.as_ref() {
                 let already_counted = state.entries.values().any(|entry| {
                     entry
                         .payload
@@ -2223,7 +2610,7 @@ impl PartCache {
                     );
                 }
             }
-            if let Some(object_reservation) = flight.flight_object_reservation.as_ref() {
+            if let Some(object_reservation) = flight_object_reservation.as_ref() {
                 self.add_diagnostic_gauge(
                     &mut budget_cache_reserved_objects,
                     object_reservation.amount(),
@@ -2341,6 +2728,40 @@ fn remove_flight(state: &mut CacheState, entry_id: EntryId, flight: &Arc<LoadFli
     {
         state.flights.remove(&entry_id);
     }
+}
+
+fn remove_pending_locked(
+    state: &mut CacheState,
+    entry_id: EntryId,
+    flight: &Arc<LoadFlight>,
+    expected_payload: Option<&Arc<Vec<u8>>>,
+) -> bool {
+    let Some((pending_flight, pending_payload)) = state
+        .pending
+        .get(&entry_id)
+        .map(|pending| (Arc::clone(&pending.flight), Arc::clone(&pending.payload)))
+    else {
+        return false;
+    };
+    if !Arc::ptr_eq(&pending_flight, flight)
+        || expected_payload.is_some_and(|expected| !Arc::ptr_eq(expected, &pending_payload))
+    {
+        return false;
+    }
+
+    state.pending.remove(&entry_id);
+    let entry_matches = state
+        .entries
+        .get(&entry_id)
+        .is_some_and(|entry| Arc::ptr_eq(&entry.payload.bytes, &pending_payload));
+    if entry_matches {
+        if let Some(removed) = state.entries.remove(&entry_id) {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(removed.payload.bytes.len());
+        }
+    }
+    true
 }
 
 fn payload_is_externally_pinned(payload: &CachedPayload) -> bool {
@@ -5508,7 +5929,10 @@ impl SourceBackedPackage {
                 .map_err(map_execution_error)?
             {
                 CacheAccess::Hit(bytes) => {
-                    self.source.ensure_current()?;
+                    if let Err(error) = self.source.ensure_current() {
+                        self.cache.invalidate_if_matches(entry_id, &bytes);
+                        return Err(error);
+                    }
                     self.cache.check_context().map_err(map_execution_error)?;
                     return Ok(PartData { payload: bytes });
                 },
@@ -5517,7 +5941,10 @@ impl SourceBackedPackage {
                         .wait(self.cache.context())
                         .map_err(map_execution_error)?
                     {
-                        self.source.ensure_current()?;
+                        if let Err(error) = self.source.ensure_current() {
+                            self.cache.invalidate_if_matches(entry_id, &payload);
+                            return Err(error);
+                        }
                         self.cache.check_context().map_err(map_execution_error)?;
                         return Ok(PartData { payload });
                     }
@@ -5582,7 +6009,9 @@ impl SourceBackedPackage {
                 },
             };
             // The decompressor has finished and no payload has been
-            // published yet. Cancellation here discards the cold result.
+            // published yet. Source freshness has precedence over
+            // cancellation and payload-shape errors for this completed read.
+            self.source.ensure_current()?;
             self.cache.check_context().map_err(map_execution_error)?;
             if let Some(declared) = declared_bytes {
                 if bytes.len() as u64 != declared {
@@ -5592,7 +6021,6 @@ impl SourceBackedPackage {
                     )));
                 }
             }
-            self.source.ensure_current()?;
             self.limits.check(
                 ReadResource::PartBytes,
                 bytes.len() as u64,
@@ -5631,26 +6059,61 @@ impl SourceBackedPackage {
                     reservation,
                     object_reservation,
                 };
+                let publication =
+                    match self
+                        .cache
+                        .publish_pending(entry_id, &flight, payload.clone())
+                    {
+                        Ok(publication) => publication,
+                        Err(error) => {
+                            drop(payload);
+                            self.cache.complete_failure(entry_id, &flight);
+                            return Err(map_execution_error(error));
+                        },
+                    };
+                #[cfg(test)]
+                self.cache.pause_test_publication();
                 // The low-level report has been merged above. Make source
-                // freshness the last decision before a cold value becomes
-                // visible through the cache or its same-Part flight.
+                // freshness and execution state the final decisions before a
+                // cold value becomes visible through the cache or its
+                // same-Part flight. These checks deliberately run outside all
+                // cache and flight locks.
                 if let Err(error) = self.source.ensure_current() {
-                    self.cache.complete_failure(entry_id, &flight);
+                    self.cache
+                        .rollback_publication(entry_id, &flight, payload, publication);
                     return Err(error);
                 }
-                if let Err(error) = self
-                    .cache
-                    .complete_success(entry_id, &flight, payload.clone())
-                {
-                    self.cache.complete_failure(entry_id, &flight);
+                if let Err(error) = self.cache.check_context() {
+                    self.cache
+                        .rollback_publication(entry_id, &flight, payload, publication);
                     return Err(map_execution_error(error));
                 }
+                let payload = match publication {
+                    CachePublication::Pending => {
+                        self.cache.commit_pending(entry_id, &flight, payload)
+                    },
+                    CachePublication::Uncached(retention) => self
+                        .cache
+                        .complete_uncached_success(entry_id, &flight, payload, retention),
+                    CachePublication::NotCurrent => {
+                        self.cache
+                            .rollback_publication(entry_id, &flight, payload, publication);
+                        None
+                    },
+                };
+                let Some(payload) = payload else {
+                    return Err(overlay_unavailable(
+                        "source-backed OPC cache publication lost its exact loader flight",
+                    ));
+                };
                 if let Err(error) = merge_result {
                     return Err(error);
                 }
                 Ok(PartData { payload })
             },
             (Some(flight), Err(error)) => {
+                drop(reservation);
+                drop(object_reservation);
                 self.cache.complete_failure(entry_id, &flight);
                 Err(error)
             },
@@ -6803,6 +7266,65 @@ mod tests {
 
         fn version(&self) -> std::io::Result<SourceVersion> {
             Ok(SourceVersion::new(77, 0))
+        }
+    }
+
+    struct GatedCorruptSource {
+        bytes: Vec<u8>,
+        payload_offset: usize,
+        payload_gate_entered: Arc<Barrier>,
+        payload_gate_release: Arc<Barrier>,
+        payload_gate_armed: AtomicBool,
+        payload_reads: AtomicUsize,
+    }
+
+    impl GatedCorruptSource {
+        fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
+            Self {
+                bytes,
+                payload_offset,
+                payload_gate_entered: Arc::new(Barrier::new(2)),
+                payload_gate_release: Arc::new(Barrier::new(2)),
+                payload_gate_armed: AtomicBool::new(true),
+                payload_reads: AtomicUsize::new(0),
+            }
+        }
+
+        fn wait_until_payload_read(&self) {
+            self.payload_gate_entered.wait();
+        }
+
+        fn release_payload_read(&self) {
+            self.payload_gate_release.wait();
+        }
+    }
+
+    impl ReadAt for GatedCorruptSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset == self.payload_offset {
+                self.payload_reads.fetch_add(1, Ordering::SeqCst);
+                if self.payload_gate_armed.swap(false, Ordering::SeqCst) {
+                    self.payload_gate_entered.wait();
+                    self.payload_gate_release.wait();
+                }
+            }
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(101, 0))
         }
     }
 
@@ -9282,6 +9804,350 @@ mod tests {
     }
 
     #[test]
+    fn provisional_publication_source_change_rolls_back_everything() {
+        const DOCUMENT: &[u8] = b"source changed after provisional publication";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let (budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let hook = Arc::new(TestPublicationHook::new());
+        let _hook_guard = package
+            .cache
+            .install_test_publication_hook(Arc::clone(&hook));
+
+        let result = std::thread::scope(|scope| {
+            let package = &package;
+            let task = scope.spawn(move || package.main_document_part().unwrap().data());
+            hook.wait_until_entered();
+            {
+                let state = package.cache.state.lock().unwrap();
+                assert_eq!(state.entries.len(), 1);
+                assert_eq!(state.pending.len(), 1);
+                assert_eq!(state.flights.len(), 1);
+            }
+            source.changed();
+            hook.release();
+            task.join().unwrap()
+        });
+
+        assert!(matches!(result, Err(OpcError::SourceChanged { .. })));
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.retained_bytes, 0);
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let state = package.cache.state.lock().unwrap();
+        assert!(state.entries.is_empty());
+        assert!(state.pending.is_empty());
+        assert!(state.flights.is_empty());
+    }
+
+    #[test]
+    fn provisional_publication_waiter_joins_and_stable_hit_reuses_allocation() {
+        const DOCUMENT: &[u8] = b"waiter joins provisional publication";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let hook = Arc::new(TestPublicationHook::new());
+        let _hook_guard = package
+            .cache
+            .install_test_publication_hook(Arc::clone(&hook));
+
+        let (first, second) = std::thread::scope(|scope| {
+            let package = &package;
+            let first_task = scope.spawn(move || package.main_document_part().unwrap().data());
+            hook.wait_until_entered();
+            let second_task = scope.spawn(move || package.main_document_part().unwrap().data());
+            hook.wait_until_waiter_joined();
+            let diagnostics = package.cache_diagnostics();
+            assert_eq!(diagnostics.cold_loads, 1);
+            assert_eq!(diagnostics.waiter_joins, 1);
+            assert_eq!(diagnostics.hits, 0);
+            assert_eq!(diagnostics.in_flight_loads, 1);
+            hook.release();
+            (
+                first_task.join().unwrap().unwrap(),
+                second_task.join().unwrap().unwrap(),
+            )
+        });
+
+        assert_eq!(first.as_bytes(), DOCUMENT);
+        assert_eq!(second.as_bytes(), DOCUMENT);
+        assert!(first.shares_allocation_with(&second));
+        let hit = package.main_document_part().unwrap().data().unwrap();
+        assert!(first.shares_allocation_with(&hit));
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.cold_loads, 1);
+        assert_eq!(diagnostics.waiter_joins, 1);
+        assert_eq!(diagnostics.hits, 1);
+        assert_eq!(diagnostics.successful_loads, 1);
+        assert_eq!(diagnostics.retained_entries, 1);
+        assert_eq!(diagnostics.in_flight_loads, 0);
+    }
+
+    #[test]
+    fn provisional_publication_cancellation_rolls_back_everything() {
+        const DOCUMENT: &[u8] = b"cancelled after provisional publication";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let hook = Arc::new(TestPublicationHook::new());
+        let _hook_guard = package
+            .cache
+            .install_test_publication_hook(Arc::clone(&hook));
+
+        let result = std::thread::scope(|scope| {
+            let package = &package;
+            let task = scope.spawn(move || package.main_document_part().unwrap().data());
+            hook.wait_until_entered();
+            let diagnostics = package.cache_diagnostics();
+            assert_eq!(diagnostics.retained_entries, 1);
+            assert_eq!(diagnostics.in_flight_loads, 1);
+            assert_eq!(
+                diagnostics.budget_cache_reserved_bytes,
+                DOCUMENT.len() as u64
+            );
+            assert_eq!(diagnostics.budget_cache_reserved_objects, 2);
+            assert_eq!(budget.used(Resource::Memory), DOCUMENT.len() as u64);
+            {
+                let state = package.cache.state.lock().unwrap();
+                assert_eq!(state.entries.len(), 1);
+                assert_eq!(state.pending.len(), 1);
+                assert_eq!(state.flights.len(), 1);
+            }
+            cancellation_source.cancel();
+            hook.release();
+            task.join().unwrap()
+        });
+
+        assert!(matches!(result, Err(OpcError::Cancelled)));
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.retained_bytes, 0);
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let state = package.cache.state.lock().unwrap();
+        assert!(state.entries.is_empty());
+        assert!(state.pending.is_empty());
+        assert!(state.flights.is_empty());
+    }
+
+    #[test]
+    fn managed_failed_loader_releases_reservations_before_waiter_retry() {
+        const DOCUMENT: &[u8] = b"stable corrupt payload for a managed retry";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[payload_offset] ^= 0xff;
+        let source = Arc::new(GatedCorruptSource::new(bytes, payload_offset));
+        let (budget, context) = managed_context(DOCUMENT.len() as u64);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let hook = Arc::new(TestPublicationHook::new());
+        let _hook_guard = package
+            .cache
+            .install_test_publication_hook(Arc::clone(&hook));
+
+        let (loader_result, waiter_result) = std::thread::scope(|scope| {
+            let package = &package;
+            let loader = scope.spawn(move || package.main_document_part().unwrap().data());
+            source.wait_until_payload_read();
+            let waiter = scope.spawn(move || package.main_document_part().unwrap().data());
+            hook.wait_until_waiter_joined();
+            let diagnostics = package.cache_diagnostics();
+            assert_eq!(diagnostics.in_flight_loads, 1);
+            assert_eq!(diagnostics.waiter_joins, 1);
+            assert_eq!(
+                diagnostics.budget_cache_reserved_bytes,
+                DOCUMENT.len() as u64
+            );
+            assert_eq!(diagnostics.budget_cache_reserved_objects, 2);
+            source.release_payload_read();
+            (loader.join().unwrap(), waiter.join().unwrap())
+        });
+
+        assert!(matches!(loader_result, Err(OpcError::ZipError(_))));
+        assert!(matches!(waiter_result, Err(OpcError::ZipError(_))));
+        assert!(source.payload_reads.load(Ordering::SeqCst) >= 2);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.failed_loads, 2);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.retained_bytes, 0);
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let state = package.cache.state.lock().unwrap();
+        assert!(state.entries.is_empty());
+        assert!(state.pending.is_empty());
+        assert!(state.flights.is_empty());
+    }
+
+    #[test]
+    fn managed_allocation_admission_bypass_returns_correct_bytes_without_retention() {
+        const DOCUMENT: &[u8] = b"forced allocation-admission bypass";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            false,
+        )));
+        let (budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let _bypass_guard = package.cache.force_test_cache_admission_bypass();
+        let data = package.main_document_part().unwrap().data().unwrap();
+        assert_eq!(data.as_bytes(), DOCUMENT);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.cold_loads, 1);
+        assert_eq!(diagnostics.successful_loads, 1);
+        assert_eq!(diagnostics.bypasses, 1);
+        assert_eq!(diagnostics.allocation_bypasses, 1);
+        assert_eq!(diagnostics.oversized_bypasses, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.retained_bytes, 0);
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_bytes, 0);
+        assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
+        assert_eq!(diagnostics.budget_reservation_failures, 0);
+        assert_eq!(budget.used(Resource::Memory), DOCUMENT.len() as u64);
+        drop(data);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn cache_cleanup_is_exact_identity_scoped_and_late_success_cannot_resurrect() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"document", false),
+        )))
+        .unwrap();
+        let first_id = package.parts[0].entry_id;
+        let second_id = package.parts[1].entry_id;
+        let cache = PartCache::new(SourceCacheLimits::new(32, 3).unwrap());
+        let old_flight = Arc::new(LoadFlight::new(None, None, None));
+        let new_flight = Arc::new(LoadFlight::new(None, None, None));
+        let old_payload = CachedPayload {
+            bytes: Arc::new(vec![1, 2]),
+            reservation: None,
+            object_reservation: None,
+        };
+        let new_payload = CachedPayload {
+            bytes: Arc::new(vec![3, 4]),
+            reservation: None,
+            object_reservation: None,
+        };
+        assert!(matches!(
+            cache.insert_for_test(first_id, new_payload.clone()),
+            CacheRetention::Retained
+        ));
+        {
+            let mut state = cache.state.lock().unwrap();
+            state.flights.insert(first_id, Arc::clone(&new_flight));
+            state.pending.insert(
+                first_id,
+                PendingPublication {
+                    flight: Arc::clone(&new_flight),
+                    payload: Arc::clone(&new_payload.bytes),
+                },
+            );
+        }
+
+        cache.rollback_publication(
+            first_id,
+            &old_flight,
+            old_payload.clone(),
+            CachePublication::Pending,
+        );
+        {
+            let state = cache.state.lock().unwrap();
+            assert!(
+                state
+                    .flights
+                    .get(&first_id)
+                    .is_some_and(|flight| Arc::ptr_eq(flight, &new_flight))
+            );
+            assert!(state.pending.contains_key(&first_id));
+            assert!(state.entries.contains_key(&first_id));
+        }
+        assert!(
+            cache
+                .complete_uncached_success(
+                    first_id,
+                    &old_flight,
+                    old_payload,
+                    CacheRetention::Retained,
+                )
+                .is_none()
+        );
+        assert!(
+            cache
+                .commit_pending(first_id, &new_flight, new_payload.clone())
+                .is_some()
+        );
+        assert_eq!(cache.state.lock().unwrap().entries.len(), 1);
+
+        let failed_flight = match cache.enter(second_id, 1).unwrap() {
+            CacheAccess::Loader(flight) => flight,
+            _ => panic!("expected a fresh loader flight"),
+        };
+        cache.complete_failure(second_id, &failed_flight);
+        assert!(failed_flight.wait(None).unwrap().is_none());
+        assert!(
+            cache
+                .complete_uncached_success(
+                    second_id,
+                    &failed_flight,
+                    CachedPayload {
+                        bytes: Arc::new(vec![5]),
+                        reservation: None,
+                        object_reservation: None,
+                    },
+                    CacheRetention::Retained,
+                )
+                .is_none()
+        );
+        let state = cache.state.lock().unwrap();
+        assert!(!state.entries.contains_key(&second_id));
+        assert!(!state.pending.contains_key(&second_id));
+        assert!(!state.flights.contains_key(&second_id));
+    }
+
+    #[test]
     fn cache_evicts_by_byte_weight_and_entry_count_and_rejects_oversized_values() {
         let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
             archive_bytes(root_relationships(), b"document", false),
@@ -9291,55 +10157,59 @@ mod tests {
         let second_id = package.parts[1].entry_id;
         let cache = PartCache::new(SourceCacheLimits::new(3, 3).unwrap());
         let first = Arc::new(vec![1, 2]);
-        cache
-            .complete_bypass_success(
+        assert!(matches!(
+            cache.insert_for_test(
                 first_id,
                 CachedPayload {
                     bytes: Arc::clone(&first),
                     reservation: None,
                     object_reservation: None,
                 },
-            )
-            .unwrap();
+            ),
+            CacheRetention::Retained
+        ));
         assert!(Arc::ptr_eq(
             &cache.state.lock().unwrap().entries[&first_id].payload.bytes,
             &first
         ));
         drop(first);
-        cache
-            .complete_bypass_success(
+        assert!(matches!(
+            cache.insert_for_test(
                 second_id,
                 CachedPayload {
                     bytes: Arc::new(vec![3, 4]),
                     reservation: None,
                     object_reservation: None,
                 },
-            )
-            .unwrap();
+            ),
+            CacheRetention::Retained
+        ));
         assert!(!cache.state.lock().unwrap().entries.contains_key(&first_id));
         assert!(cache.state.lock().unwrap().entries.contains_key(&second_id));
 
         let entry_limited = PartCache::new(SourceCacheLimits::new(10, 1).unwrap());
-        entry_limited
-            .complete_bypass_success(
+        assert!(matches!(
+            entry_limited.insert_for_test(
                 first_id,
                 CachedPayload {
                     bytes: Arc::new(vec![1, 2]),
                     reservation: None,
                     object_reservation: None,
                 },
-            )
-            .unwrap();
-        entry_limited
-            .complete_bypass_success(
+            ),
+            CacheRetention::Retained
+        ));
+        assert!(matches!(
+            entry_limited.insert_for_test(
                 second_id,
                 CachedPayload {
                     bytes: Arc::new(vec![3, 4]),
                     reservation: None,
                     object_reservation: None,
                 },
-            )
-            .unwrap();
+            ),
+            CacheRetention::Retained
+        ));
         assert!(
             !entry_limited
                 .state
@@ -9357,19 +10227,20 @@ mod tests {
                 .contains_key(&second_id)
         );
 
-        cache
-            .complete_bypass_success(
+        assert!(matches!(
+            cache.insert_for_test(
                 first_id,
                 CachedPayload {
                     bytes: Arc::new(vec![0, 0, 0, 0]),
                     reservation: None,
                     object_reservation: None,
                 },
-            )
-            .unwrap();
+            ),
+            CacheRetention::Oversized
+        ));
         assert!(!cache.state.lock().unwrap().entries.contains_key(&first_id));
         assert_eq!(cache.diagnostics().evictions, 1);
-        assert_eq!(cache.diagnostics().oversized_bypasses, 1);
+        assert_eq!(cache.diagnostics().oversized_bypasses, 0);
     }
 
     #[test]
