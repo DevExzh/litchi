@@ -13,6 +13,7 @@ use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{
     PackURI, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
 };
+use once_cell::sync::OnceCell;
 
 use super::model::Workbook;
 use crate::package::error::{Error, Result};
@@ -71,8 +72,8 @@ struct SourceInner {
     styles_part: Option<PackURI>,
     incomplete_formula_context: bool,
     is_1904_date_system: bool,
-    shared_strings: Mutex<Option<Arc<Vec<SharedString>>>>,
-    styles: Mutex<Option<Arc<StylesTable>>>,
+    shared_strings: SemanticCache<Vec<SharedString>>,
+    styles: SemanticCache<StylesTable>,
 }
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
@@ -338,8 +339,8 @@ impl SourceBackedWorkbook {
                 styles_part,
                 incomplete_formula_context,
                 is_1904_date_system,
-                shared_strings: Mutex::new(None),
-                styles: Mutex::new(None),
+                shared_strings: SemanticCache::new(),
+                styles: SemanticCache::new(),
             }),
         })
     }
@@ -673,63 +674,77 @@ impl SourceBackedWorksheet {
     }
 }
 
+struct SemanticCache<T> {
+    value: OnceCell<Arc<T>>,
+}
+
+impl<T> SemanticCache<T> {
+    const fn new() -> Self {
+        Self {
+            value: OnceCell::new(),
+        }
+    }
+
+    fn get_or_try_init<E, F>(&self, init: F) -> std::result::Result<Arc<T>, E>
+    where
+        F: FnOnce() -> std::result::Result<Arc<T>, E>,
+    {
+        self.value.get_or_try_init(init).map(Arc::clone)
+    }
+}
+
 impl SourceInner {
     fn shared_strings(&self) -> Result<Arc<Vec<SharedString>>> {
         self.package.check_execution()?;
         self.package.source_version()?;
-        {
-            let retained = self.shared_strings.lock().map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "source-backed XLSB shared-string cache is poisoned: {error}"
-                ))
-            })?;
-            if let Some(strings) = retained.as_ref() {
-                return Ok(Arc::clone(strings));
+        let strings = self.shared_strings.get_or_try_init(|| {
+            self.package.check_execution()?;
+            self.package.source_version()?;
+            let mut strings = Vec::new();
+            if let Some(partname) = self.shared_strings_part.as_ref() {
+                let data = self.package.part(partname)?.data()?;
+                self.package.check_execution()?;
+                self.package.source_version()?;
+                let mut records = Records::new(data.as_bytes());
+                Workbook::read_shared_strings(&mut records, &mut strings)?;
+                self.package.check_execution()?;
+                self.package.source_version()?;
             }
-        }
-        let mut strings = Vec::new();
-        if let Some(partname) = self.shared_strings_part.as_ref() {
-            let data = self.package.part(partname)?.data()?;
-            let mut records = Records::new(data.as_bytes());
-            Workbook::read_shared_strings(&mut records, &mut strings)?;
-        }
-        self.package.source_version()?;
-        let strings = Arc::new(strings);
-        let mut retained = self.shared_strings.lock().map_err(|error| {
-            Error::InvalidFormat(format!(
-                "source-backed XLSB shared-string cache is poisoned: {error}"
-            ))
+            let strings = Arc::new(strings);
+            self.package.check_execution()?;
+            self.package.source_version()?;
+            Ok::<_, Error>(strings)
         })?;
-        Ok(Arc::clone(retained.get_or_insert(strings)))
+        self.package.check_execution()?;
+        self.package.source_version()?;
+        Ok(strings)
     }
 
     fn styles(&self) -> Result<Arc<StylesTable>> {
         self.package.check_execution()?;
         self.package.source_version()?;
-        {
-            let retained = self.styles.lock().map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "source-backed XLSB style cache is poisoned: {error}"
-                ))
-            })?;
-            if let Some(styles) = retained.as_ref() {
-                return Ok(Arc::clone(styles));
-            }
-        }
-        let styles = if let Some(partname) = self.styles_part.as_ref() {
-            let data = self.package.part(partname)?.data()?;
-            StylesTable::from_bytes(data.as_bytes())?
-        } else {
-            StylesTable::default()
-        };
-        self.package.source_version()?;
-        let styles = Arc::new(styles);
-        let mut retained = self.styles.lock().map_err(|error| {
-            Error::InvalidFormat(format!(
-                "source-backed XLSB style cache is poisoned: {error}"
-            ))
+        let styles = self.styles.get_or_try_init(|| {
+            self.package.check_execution()?;
+            self.package.source_version()?;
+            let styles = if let Some(partname) = self.styles_part.as_ref() {
+                let data = self.package.part(partname)?.data()?;
+                self.package.check_execution()?;
+                self.package.source_version()?;
+                let styles = StylesTable::from_bytes(data.as_bytes())?;
+                self.package.check_execution()?;
+                self.package.source_version()?;
+                styles
+            } else {
+                StylesTable::default()
+            };
+            let styles = Arc::new(styles);
+            self.package.check_execution()?;
+            self.package.source_version()?;
+            Ok::<_, Error>(styles)
         })?;
-        Ok(Arc::clone(retained.get_or_insert(styles)))
+        self.package.check_execution()?;
+        self.package.source_version()?;
+        Ok(styles)
     }
 }
 
@@ -1150,4 +1165,118 @@ fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "single-flight tests use panic-on-failure thread extraction"
+    )]
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    use super::SemanticCache;
+
+    #[test]
+    fn concurrent_callers_share_one_successful_initialization() {
+        const CALLERS: usize = 8;
+        let cache = Arc::new(SemanticCache::new());
+        let ready = Arc::new(Barrier::new(CALLERS));
+        let loader_started = Arc::new(Barrier::new(2));
+        let load_count = Arc::new(AtomicUsize::new(0));
+        let handles = (0..CALLERS)
+            .map(|_| {
+                let cache = Arc::clone(&cache);
+                let ready = Arc::clone(&ready);
+                let loader_started = Arc::clone(&loader_started);
+                let load_count = Arc::clone(&load_count);
+                thread::spawn(move || {
+                    ready.wait();
+                    cache.get_or_try_init(|| {
+                        if load_count.fetch_add(1, Ordering::SeqCst) == 0 {
+                            loader_started.wait();
+                        }
+                        Ok::<Arc<usize>, &'static str>(Arc::new(42))
+                    })
+                })
+            })
+            .collect::<Vec<_>>();
+        loader_started.wait();
+
+        let values = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap().unwrap())
+            .collect::<Vec<_>>();
+        let first = values.first().expect("callers should return values");
+        assert!(values.iter().all(|value| Arc::ptr_eq(first, value)));
+        assert!(values.iter().all(|value| **value == 42));
+        assert_eq!(load_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn failed_initialization_is_not_retained_and_can_retry() {
+        let cache = SemanticCache::new();
+        let load_count = AtomicUsize::new(0);
+        let first = cache.get_or_try_init(|| {
+            load_count.fetch_add(1, Ordering::SeqCst);
+            Err::<Arc<usize>, _>("synthetic parse failure")
+        });
+        assert!(matches!(first, Err("synthetic parse failure")));
+
+        let retry = cache
+            .get_or_try_init(|| {
+                load_count.fetch_add(1, Ordering::SeqCst);
+                Ok::<Arc<usize>, &'static str>(Arc::new(9))
+            })
+            .unwrap();
+        assert_eq!(*retry, 9);
+        assert_eq!(load_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn separate_cache_instances_initialize_independently() {
+        let first = SemanticCache::new();
+        let second = SemanticCache::new();
+        let first_value = first
+            .get_or_try_init(|| Ok::<Arc<usize>, &'static str>(Arc::new(1)))
+            .unwrap();
+        let second_value = second
+            .get_or_try_init(|| Ok::<Arc<usize>, &'static str>(Arc::new(2)))
+            .unwrap();
+
+        assert_eq!(*first_value, 1);
+        assert_eq!(*second_value, 2);
+        assert!(!Arc::ptr_eq(&first_value, &second_value));
+    }
+
+    #[test]
+    fn source_backed_semantic_caches_reuse_production_arcs() {
+        let bytes = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/ooxml/xlsb/Simple.xlsb"
+        ))
+        .unwrap();
+        let workbook = super::SourceBackedWorkbook::from_read_at(Arc::new(
+            litchi_core::OwnedSource::new(bytes),
+        ))
+        .unwrap();
+        let expected_strings = workbook.inner.shared_strings().unwrap();
+        let expected_styles = workbook.inner.styles().unwrap();
+        let handles = (0..8)
+            .map(|_| {
+                let inner = Arc::clone(&workbook.inner);
+                thread::spawn(move || (inner.shared_strings().unwrap(), inner.styles().unwrap()))
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            let (strings, styles) = handle.join().unwrap();
+            assert!(Arc::ptr_eq(&expected_strings, &strings));
+            assert!(Arc::ptr_eq(&expected_styles, &styles));
+        }
+    }
 }
