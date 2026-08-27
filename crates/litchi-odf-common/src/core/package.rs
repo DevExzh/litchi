@@ -737,6 +737,66 @@ impl SourceBackedPackage {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Return the ZIP central-directory declared uncompressed size of one
+    /// archive member without reading or decompressing its payload.
+    ///
+    /// This is metadata for the ZIP container member. For an ODF-encrypted
+    /// entry it describes the stored ciphertext bytes, not the plaintext
+    /// returned by [`Self::get_file`], and it is not independently verified
+    /// until the payload is read.
+    pub fn member_uncompressed_size(&self, path: &str) -> Result<Option<u64>> {
+        let result = (|| {
+            self.ensure_current()?;
+            let path = normalize_member_path(path)?;
+            if !self.archive.contains(path) {
+                return Ok(None);
+            }
+            self.archive
+                .metadata(path)
+                .map(|metadata| Some(metadata.uncompressed_size()))
+                .map_err(map_zip_error)
+        })();
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Return the declared size of one member after ODF materialization
+    /// without reading or decompressing its payload.
+    ///
+    /// For an encrypted entry this returns the manifest's declared plaintext
+    /// size, which is the size checked by the decryption path. For an
+    /// unencrypted entry it returns the ZIP central-directory declaration.
+    /// Both values are attacker-controlled metadata and are not proof of the
+    /// decoded length. A missing member returns `Ok(None)`; an encrypted
+    /// member without a manifest plaintext size returns an invalid-format
+    /// error, matching [`Self::get_file`].
+    pub fn member_materialized_size(&self, path: &str) -> Result<Option<u64>> {
+        let result = (|| {
+            self.ensure_current()?;
+            let path = normalize_member_path(path)?;
+            if !self.archive.contains(path) {
+                return Ok(None);
+            }
+            let zip_size = self
+                .archive
+                .metadata(path)
+                .map(|metadata| metadata.uncompressed_size())
+                .map_err(map_zip_error)?;
+            let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
+                return Ok(Some(zip_size));
+            };
+            if entry.encryption.is_some() {
+                let size = entry.size.ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Encrypted ODF entry '{path}' has no plaintext size"
+                    ))
+                })?;
+                return Ok(Some(size));
+            }
+            Ok(Some(zip_size))
+        })();
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
     /// Check whether an archive member uses ZIP Store compression.
     pub fn is_stored(&self, path: &str) -> Result<bool> {
         let result = (|| {
@@ -2048,6 +2108,53 @@ mod tests {
     }
 
     #[test]
+    fn source_backed_materialized_member_size_is_metadata_only_and_safe() {
+        let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
+        let source = CountingSource::new(data);
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let after_open = source.read_count();
+
+        let zip_size = package.member_uncompressed_size("content.xml").unwrap();
+        assert!(zip_size.is_some());
+        assert_eq!(
+            package.member_materialized_size("content.xml").unwrap(),
+            zip_size
+        );
+        assert_eq!(
+            package.member_materialized_size("missing.bin").unwrap(),
+            None
+        );
+        assert!(matches!(
+            package.member_materialized_size("../content.xml"),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert_eq!(source.read_count(), after_open);
+    }
+
+    #[test]
+    fn source_backed_materialized_member_size_uses_encrypted_plaintext_metadata() {
+        let plaintext = b"<office:document-content/>";
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .set_encryption("source-password", Profile::compatible())
+            .unwrap();
+        writer.add_file("content.xml", plaintext).unwrap();
+        let data = writer.finish_to_bytes().unwrap();
+
+        let source = CountingSource::new(data);
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let after_open = source.read_count();
+        assert_eq!(
+            package.member_materialized_size("content.xml").unwrap(),
+            Some(u64::try_from(plaintext.len()).unwrap())
+        );
+        assert_eq!(source.read_count(), after_open);
+    }
+
+    #[test]
     fn source_backed_selected_read_defers_crc_validation() {
         let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
         let marker = b"PNG\x89\x50\x4e\x47\x0d\x0a\x1a\x0a";
@@ -2098,6 +2205,12 @@ mod tests {
             package.has_file("../content.xml"),
             package.is_stored("../content.xml"),
             package.get_file("../content.xml").map(|_| true),
+            package
+                .member_uncompressed_size("../content.xml")
+                .map(|_| true),
+            package
+                .member_materialized_size("../content.xml")
+                .map(|_| true),
         ] {
             assert!(matches!(operation, Err(Error::InvalidFormat(_))));
         }
@@ -2113,6 +2226,14 @@ mod tests {
         ));
         assert!(matches!(
             package.get_file("../content.xml"),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            package.member_uncompressed_size("../content.xml"),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            package.member_materialized_size("../content.xml"),
             Err(Error::SourceChanged { .. })
         ));
 

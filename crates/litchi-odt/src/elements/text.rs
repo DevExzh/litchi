@@ -1033,6 +1033,62 @@ impl ParagraphOutput {
     }
 }
 
+struct BlockOutput {
+    target: usize,
+    next_block: usize,
+    block: Option<TextBlock>,
+}
+
+impl BlockOutput {
+    fn begin(&mut self, source: &BytesStart<'_>) -> bool {
+        if !is_text_block_name(source.local_name().as_ref()) {
+            return false;
+        }
+        let retain = self.next_block == self.target;
+        self.next_block += 1;
+        retain
+    }
+
+    fn store(&mut self, mut element: Element, text: String) -> Result<()> {
+        element.set_text_owned(text);
+        self.block = Some(match element.tag_name() {
+            "text:p" => TextBlock::Paragraph(Paragraph::from_element(element)?),
+            "text:h" => TextBlock::Heading(Heading::from_element(element)?),
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "element is not an ODF paragraph or heading".to_string(),
+                ));
+            },
+        });
+        Ok(())
+    }
+}
+
+trait SelectedTextBlockOutput {
+    fn begin(&mut self, source: &BytesStart<'_>) -> bool;
+    fn store(&mut self, element: Element, text: String) -> Result<()>;
+}
+
+impl SelectedTextBlockOutput for ParagraphOutput {
+    fn begin(&mut self, source: &BytesStart<'_>) -> bool {
+        ParagraphOutput::begin(self, source)
+    }
+
+    fn store(&mut self, element: Element, text: String) -> Result<()> {
+        ParagraphOutput::store(self, element, text)
+    }
+}
+
+impl SelectedTextBlockOutput for BlockOutput {
+    fn begin(&mut self, source: &BytesStart<'_>) -> bool {
+        BlockOutput::begin(self, source)
+    }
+
+    fn store(&mut self, element: Element, text: String) -> Result<()> {
+        BlockOutput::store(self, element, text)
+    }
+}
+
 /// Parse every `text:p` and `text:h` in `xml_content` into flat text blocks.
 ///
 /// ODF allows a paragraph to contain further paragraphs through frames
@@ -1063,6 +1119,146 @@ pub(crate) fn parse_paragraph_at(xml_content: &str, index: usize) -> Result<Opti
     };
     parse_selected_paragraph(xml_content, &mut output)?;
     Ok(output.paragraph)
+}
+
+pub(crate) fn parse_block_at(xml_content: &str, index: usize) -> Result<Option<TextBlock>> {
+    let mut output = BlockOutput {
+        target: index,
+        next_block: 0,
+        block: None,
+    };
+    parse_selected_paragraph(xml_content, &mut output)?;
+    Ok(output.block)
+}
+
+/// Scan visible paragraph and heading starts without retaining XML elements
+/// or text. The caller is responsible for ODT package-root validation; this
+/// routine mirrors the text parser's namespace and suppression rules.
+pub(crate) fn scan_text_block_kinds(xml_content: &str) -> Result<Vec<Kind>> {
+    let mut reader = NsReader::from_str(xml_content);
+    let mut buffer = Vec::new();
+    let mut kinds = Vec::new();
+    let mut active_depths: Vec<usize> = Vec::new();
+    let mut document_depth = 0usize;
+    let mut tracked_changes_depth = 0usize;
+    let mut skipped_depth = 0usize;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
+        let text_namespace =
+            matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = document_depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text nesting depth overflow".to_string())
+                })?;
+                if document_depth > MAX_TEXT_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODF text nesting exceeds {MAX_TEXT_DEPTH} levels"
+                    )));
+                }
+
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth =
+                        tracked_changes_depth.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODF tracked-change nesting depth overflow".to_string(),
+                            )
+                        })?;
+                } else if is_text_element(text_namespace, element, b"tracked-changes") {
+                    tracked_changes_depth = 1;
+                } else {
+                    let block_kind = (skipped_depth == 0)
+                        .then(|| text_block_kind(text_namespace, element))
+                        .flatten();
+                    if block_kind.is_none()
+                        && let Some(current) = active_depths.last_mut()
+                    {
+                        *current = current.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODF text block nesting depth overflow".to_string(),
+                            )
+                        })?;
+                    }
+
+                    if let Some(kind) = block_kind {
+                        push_text_block_kind(&mut kinds, kind)?;
+                        active_depths
+                            .try_reserve(1)
+                            .map_err(|source| Error::Allocation {
+                                resource: "ODT source text-block scan stack",
+                                source,
+                            })?;
+                        active_depths.push(1);
+                    } else if skipped_depth > 0 {
+                        skipped_depth = skipped_depth.checked_add(1).ok_or_else(|| {
+                            Error::InvalidFormat("ODF suppressed text depth overflow".to_string())
+                        })?;
+                    } else if active_depths.last().is_some()
+                        && (is_text_element(text_namespace, element, b"note-body")
+                            || is_text_element(text_namespace, element, b"ruby-text"))
+                    {
+                        skipped_depth = 1;
+                    }
+                }
+            },
+            Event::Empty(ref element) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(kind) = text_block_kind(text_namespace, element) {
+                    push_text_block_kind(&mut kinds, kind)?;
+                }
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text element stack underflow".to_string())
+                })?;
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth -= 1;
+                } else {
+                    skipped_depth = skipped_depth.saturating_sub(1);
+                    if let Some(current) = active_depths.last_mut() {
+                        *current = current.checked_sub(1).ok_or_else(|| {
+                            Error::InvalidFormat("ODT text block stack underflow".to_string())
+                        })?;
+                        if *current == 0 {
+                            active_depths.pop().ok_or_else(|| {
+                                Error::InvalidFormat(BLOCK_STACK_ERROR.to_string())
+                            })?;
+                        }
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    if !active_depths.is_empty()
+        || document_depth != 0
+        || tracked_changes_depth != 0
+        || skipped_depth != 0
+    {
+        return Err(Error::InvalidFormat(
+            "incomplete ODF text XML structure".to_string(),
+        ));
+    }
+    Ok(kinds)
+}
+
+fn push_text_block_kind(kinds: &mut Vec<Kind>, kind: Kind) -> Result<()> {
+    if kinds.len() >= MAX_TEXT_BLOCKS {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BLOCKS} paragraphs and headings"
+        )));
+    }
+    kinds.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT source text-block catalog",
+        source,
+    })?;
+    kinds.push(kind);
+    Ok(())
 }
 
 fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result<Vec<TextBlock>> {
@@ -2149,7 +2345,10 @@ pub(crate) fn write_text_blocks_to_writer<'options, 'output, W: Write + ?Sized>(
     Ok(())
 }
 
-fn parse_selected_paragraph(xml_content: &str, output: &mut ParagraphOutput) -> Result<()> {
+fn parse_selected_paragraph<O: SelectedTextBlockOutput + ?Sized>(
+    xml_content: &str,
+    output: &mut O,
+) -> Result<()> {
     let mut reader = NsReader::from_str(xml_content);
     let mut buffer = Vec::new();
     let mut active: Vec<ActiveSelectedTextBlock> = Vec::new();
@@ -2319,7 +2518,22 @@ fn is_text_element(text_namespace: bool, element: &BytesStart<'_>, local_name: &
 }
 
 fn is_text_block(text_namespace: bool, element: &BytesStart<'_>) -> bool {
-    matches!(element.local_name().as_ref(), b"p" | b"h") && text_namespace
+    text_block_kind(text_namespace, element).is_some()
+}
+
+fn is_text_block_name(local_name: &[u8]) -> bool {
+    matches!(local_name, b"p" | b"h")
+}
+
+fn text_block_kind(text_namespace: bool, element: &BytesStart<'_>) -> Option<Kind> {
+    if !text_namespace {
+        return None;
+    }
+    match element.local_name().as_ref() {
+        b"p" => Some(Kind::Paragraph),
+        b"h" => Some(Kind::Heading),
+        _ => None,
+    }
 }
 
 fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<Element> {
@@ -2749,10 +2963,10 @@ fn count_text_block(block_count: &mut usize) -> Result<()> {
     Ok(())
 }
 
-fn finish_selected_text_block(
+fn finish_selected_text_block<O: SelectedTextBlockOutput + ?Sized>(
     element: Option<Element>,
     text: RetainedText,
-    output: &mut ParagraphOutput,
+    output: &mut O,
     total_text_bytes: &mut usize,
 ) -> Result<()> {
     *total_text_bytes = total_text_bytes

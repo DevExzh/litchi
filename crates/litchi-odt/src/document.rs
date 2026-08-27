@@ -4,6 +4,7 @@
 //! typed state, XML codecs, package lifecycle, semantic queries, and safety
 //! limits live in focused sibling modules.
 
+mod catalog;
 mod codec;
 mod model;
 mod open_parse;
@@ -15,5 +16,6 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use catalog::{SourceBackedDocumentCatalog, TextBlockCatalogEntry};
 pub use model::Document;
 pub use source::{ReadLimits, SourceBackedDocument};
