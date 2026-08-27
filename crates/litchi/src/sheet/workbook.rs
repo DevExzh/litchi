@@ -11,7 +11,7 @@ use litchi_ole_common::property_set::PropertySetReader;
 use litchi_ole_common::property_set::SharedPropertySetReader;
 use std::path::Path;
 #[cfg(all(feature = "xls", any(unix, windows)))]
-use std::{io::Cursor, sync::Arc, sync::OnceLock};
+use std::{sync::Arc, sync::OnceLock};
 
 const MAX_WORKBOOK_PATH_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
@@ -116,7 +116,6 @@ fn append_cell_text(out: &mut String, cell: &litchi_core::sheet::CellValue) {
 pub(super) struct XlsSource {
     workbook: crate::xls::SourceBackedWorkbook,
     cfb: Arc<litchi_cfb::SharedOleFile>,
-    eager: OnceLock<crate::xls::Workbook<Cursor<Vec<u8>>>>,
     metadata: OnceLock<Metadata>,
 }
 
@@ -129,7 +128,6 @@ impl XlsSource {
         Self {
             workbook,
             cfb,
-            eager: OnceLock::new(),
             metadata: OnceLock::new(),
         }
     }
@@ -141,26 +139,9 @@ impl XlsSource {
             .map_err(map_xls_source_error)
     }
 
-    fn with_eager<T>(
-        &self,
-        operation: impl FnOnce(&crate::xls::Workbook<Cursor<Vec<u8>>>) -> Result<T>,
-    ) -> Result<T> {
+    fn text(&self) -> Result<String> {
         self.ensure_current()?;
-        if self.eager.get().is_none() {
-            let eager = self
-                .workbook
-                .materialize_eager()
-                .map_err(map_xls_source_error)?;
-            self.ensure_current()?;
-            let _ = self.eager.set(eager);
-        }
-
-        let eager = self.eager.get().ok_or_else(|| {
-            Box::new(Error::ParseError(
-                "XLS eager compatibility materialization was not published".to_owned(),
-            )) as Box<dyn std::error::Error + Send + Sync>
-        })?;
-        let result = operation(eager);
+        let result = self.workbook.text().map_err(map_xls_source_error);
         self.ensure_current()?;
         result
     }
@@ -221,7 +202,7 @@ fn xls_metadata_error_is_soft(error: &litchi_cfb::OleError) -> bool {
 ///
 /// The selected format is detected from the file signature. Filesystem XLS
 /// opens retain a checked positional source for lazy worksheet names/counts;
-/// text extraction uses bounded on-demand compatibility materialization.
+/// text extraction uses the source owner's bounded worksheet-local projection.
 ///
 /// # Supported Formats
 ///
@@ -774,24 +755,7 @@ impl Workbook {
             },
 
             #[cfg(all(feature = "xls", any(unix, windows)))]
-            WorkbookImpl::XlsSource(source) => source.with_eager(|xls| {
-                let mut out = String::new();
-                for i in 0..xls.worksheet_count() {
-                    let ws = xls.worksheet_by_index(i)?;
-                    let mut rows = ws.rows();
-                    while let Some(row) = rows.next() {
-                        let row = row?;
-                        for (idx, cell) in row.iter().enumerate() {
-                            if idx > 0 {
-                                out.push('\t');
-                            }
-                            append_cell_text(&mut out, cell);
-                        }
-                        out.push('\n');
-                    }
-                }
-                Ok(out)
-            }),
+            WorkbookImpl::XlsSource(source) => source.text(),
 
             #[cfg(feature = "ods")]
             WorkbookImpl::Ods(spreadsheet) => Ok(spreadsheet.borrow().text()?),
@@ -1853,17 +1817,14 @@ mod source_xls_path_tests {
     fn filesystem_open_retains_xls_source_until_text() {
         let path = fixture_path();
         let workbook = Workbook::open(&path).expect("failed to open XLS source");
-        let WorkbookImpl::XlsSource(source) = &workbook.inner else {
+        let WorkbookImpl::XlsSource(_source) = &workbook.inner else {
             panic!("filesystem XLS did not select the source-backed facade variant");
         };
-        assert!(source.eager.get().is_none());
-
         let names = workbook
             .worksheet_names()
             .expect("failed to enumerate source-backed XLS sheets");
         assert!(!names.is_empty());
         assert_eq!(workbook.worksheet_count().unwrap(), names.len());
-        assert!(source.eager.get().is_none());
     }
 
     #[test]
@@ -1917,13 +1878,11 @@ mod source_xls_path_tests {
     fn source_xls_matches_eager_names_text_and_metadata() {
         let path = fixture_path();
         let source = Workbook::open(&path).expect("failed to open source-backed XLS");
-        let WorkbookImpl::XlsSource(source_adapter) = &source.inner else {
+        let WorkbookImpl::XlsSource(_source_adapter) = &source.inner else {
             panic!("filesystem XLS did not select the source-backed facade variant");
         };
-        assert!(source_adapter.eager.get().is_none());
         let source_metadata = source.metadata().unwrap();
         assert!(source_metadata.application.is_some());
-        assert!(source_adapter.eager.get().is_none());
 
         let eager =
             Workbook::from_bytes(std::fs::read(&path).unwrap()).expect("failed to open eager XLS");
@@ -1940,7 +1899,6 @@ mod source_xls_path_tests {
         assert_eq!(source_metadata.application, eager_metadata.application);
         assert_eq!(source_metadata.author, eager_metadata.author);
         assert_eq!(source.text().unwrap(), eager.text().unwrap());
-        assert!(source_adapter.eager.get().is_some());
     }
 
     #[test]
@@ -2214,12 +2172,7 @@ mod source_xls_path_tests {
             SourceBackedLimits::default().with_max_materialize_bytes(1),
         )
         .unwrap();
-        let cfb = Arc::new(litchi_cfb::SharedOleFile::open(Arc::clone(&source)).unwrap());
-        let adapter = XlsSource::new(owner, cfb);
-        let error = adapter.with_eager(|_| Ok(())).unwrap_err();
-        assert!(matches!(
-            error.downcast_ref::<SourceBackedError>(),
-            Some(SourceBackedError::ResourceLimit { .. })
-        ));
+        let error = owner.materialize_eager().unwrap_err();
+        assert!(matches!(error, SourceBackedError::ResourceLimit { .. }));
     }
 }

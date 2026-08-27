@@ -1,8 +1,8 @@
 use litchi_cfb::{OleWriter, SharedOleFile};
-use litchi_core::sheet::{Cell as CellTrait, CellValue};
+use litchi_core::sheet::{Cell as CellTrait, CellValue, WorkbookTrait};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
-    OwnedSource, ReadAt, SourceVersion,
+    OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_xls::{SourceBackedError, SourceBackedLimits, SourceBackedWorkbook, Workbook};
 use std::io::{self, Cursor};
@@ -1472,6 +1472,183 @@ fn raw_handoff_enforces_input_limit_against_existing_cfb_size() {
         })
     ));
     assert!(source.ranges().is_empty());
+}
+
+fn append_eager_text_cell(output: &mut String, value: &CellValue) {
+    match value {
+        CellValue::Empty => {},
+        CellValue::Bool(value) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
+        CellValue::Int(value) => output.push_str(&value.to_string()),
+        CellValue::Float(value) | CellValue::DateTime(value) => {
+            output.push_str(&value.to_string());
+        },
+        CellValue::String(value) | CellValue::Error(value) => output.push_str(value),
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(value) => append_eager_text_cell(output, value),
+            None => {
+                output.push('=');
+                output.push_str(formula);
+            },
+        },
+    }
+}
+
+fn eager_text(workbook: &Workbook<Cursor<Vec<u8>>>) -> String {
+    let mut output = String::new();
+    for worksheet_index in 0..workbook.worksheet_count() {
+        let worksheet = workbook.worksheet_by_index(worksheet_index).unwrap();
+        let mut rows = worksheet.rows();
+        while let Some(row) = rows.next() {
+            let row = row.unwrap();
+            for (column, cell) in row.iter().enumerate() {
+                if column != 0 {
+                    output.push('\t');
+                }
+                append_eager_text_cell(&mut output, cell);
+            }
+            output.push('\n');
+        }
+    }
+    output
+}
+
+fn assert_source_text_matches_eager(bytes: Vec<u8>) {
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
+    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    assert_eq!(owner.text().unwrap(), eager_text(&eager));
+}
+
+#[test]
+fn source_text_sink_matches_legacy_text_and_reports_output_limits() {
+    let owner =
+        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture("Simple.xls"))))
+            .unwrap();
+    let legacy = owner.text().unwrap();
+    assert!(legacy.ends_with("\n"));
+
+    let mut output = Vec::new();
+    let report = owner
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap();
+    assert_eq!(output, legacy.strip_suffix("\n").unwrap().as_bytes());
+    assert_eq!(report.bytes_written(), output.len() as u64);
+    assert!(report.objects_written() > 0);
+
+    let mut limited = Vec::new();
+    let error = owner
+        .write_text_to(
+            &mut limited,
+            TextOutputOptions::new("\n", "\n\n", 1, u64::MAX),
+        )
+        .unwrap_err();
+    assert!(matches!(error, TextOutputError::Limit { .. }));
+    assert_eq!(error.progress().bytes_written(), limited.len() as u64);
+}
+
+#[test]
+fn source_text_matches_eager_formula_and_out_of_order_packed_duplicate() {
+    assert_source_text_matches_eager(ole_fixture("FormulaSheetRange.xls"));
+
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut inserted = number_frame(0, 0, 0, 7.0);
+    inserted.extend_from_slice(&number_frame(1, 0, 0, 8.0));
+    inserted.extend_from_slice(&mul_rk_frame(0, 0, &[99, 101]));
+    let modified = insert_before_worksheet_eof(&original, &inserted);
+    assert_source_text_matches_eager(cfb_with_streams(&[("Workbook", &modified)]));
+}
+
+#[test]
+fn source_text_honors_valid_dimensions_and_retained_text_limits() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let mut dimensions = Vec::new();
+    dimensions.extend_from_slice(&0_u32.to_le_bytes());
+    dimensions.extend_from_slice(&13_u32.to_le_bytes());
+    dimensions.extend_from_slice(&0_u16.to_le_bytes());
+    dimensions.extend_from_slice(&2_u16.to_le_bytes());
+    dimensions.extend_from_slice(&0_u16.to_le_bytes());
+    let mut extra = frame_bytes(0x0200, &dimensions);
+    extra.extend_from_slice(&number_frame(10, 0, 0, 101.0));
+    extra.extend_from_slice(&number_frame(11, 0, 0, 102.0));
+    let modified = insert_before_worksheet_eof(&original, &extra);
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    assert_source_text_matches_eager(bytes.clone());
+
+    let mut legacy_dimensions = Vec::new();
+    legacy_dimensions.extend_from_slice(&0_u16.to_le_bytes());
+    legacy_dimensions.extend_from_slice(&13_u16.to_le_bytes());
+    legacy_dimensions.extend_from_slice(&0_u16.to_le_bytes());
+    legacy_dimensions.extend_from_slice(&2_u16.to_le_bytes());
+    legacy_dimensions.extend_from_slice(&0_u16.to_le_bytes());
+    let modified = insert_before_worksheet_eof(&original, &frame_bytes(0x0200, &legacy_dimensions));
+    assert_source_text_matches_eager(cfb_with_streams(&[("Workbook", &modified)]));
+
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(
+        Arc::new(CountingSource::new(bytes.clone())),
+        SourceBackedLimits::default().with_max_text_cells(1),
+    )
+    .unwrap();
+    assert!(matches!(
+        owner.text(),
+        Err(SourceBackedError::ResourceLimit {
+            resource: "text cells",
+            ..
+        })
+    ));
+
+    let owner = SourceBackedWorkbook::from_read_at_with_limits(
+        Arc::new(CountingSource::new(bytes)),
+        SourceBackedLimits::default().with_max_text_bytes(1),
+    )
+    .unwrap();
+    assert!(matches!(
+        owner.text(),
+        Err(SourceBackedError::ResourceLimit {
+            resource: "text bytes",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn source_text_rejects_malformed_recognized_tail_and_bare_string_without_rows() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let malformed =
+        insert_before_worksheet_eof(&original, &frame_bytes(0x0204, &[0, 0, 0, 0, 1, 0]));
+    let mut output = Vec::new();
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(
+        cfb_with_streams(&[("Workbook", &malformed)]),
+    )))
+    .unwrap();
+    let error = owner
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap_err();
+    assert!(matches!(error, TextOutputError::Document { .. }));
+    assert!(output.is_empty());
+    assert_eq!(error.progress().objects_written(), 0);
+
+    let bare_string = insert_before_worksheet_eof(&original, &frame_bytes(0x0207, &[]));
+    let owner = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(
+        cfb_with_streams(&[("Workbook", &bare_string)]),
+    )))
+    .unwrap();
+    let mut output = Vec::new();
+    let error = owner
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        TextOutputError::Document {
+            source: SourceBackedError::InvalidData(_),
+            ..
+        }
+    ));
+    assert!(output.is_empty());
+    assert_eq!(error.progress().objects_written(), 0);
 }
 
 fn frame_bytes(kind: u16, payload: &[u8]) -> Vec<u8> {
