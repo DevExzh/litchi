@@ -13,7 +13,6 @@ use super::{
     MAX_XLSB_EXTERNAL_CACHE_ROWS, MAX_XLSB_EXTERNAL_CACHED_VALUES, Result,
 };
 use std::collections::HashSet;
-use std::sync::Arc;
 
 pub(crate) const EXT_PTG_ERROR: u8 = 0x1C;
 pub(crate) const EXT_PTG_REFERENCE: u8 = 0x3A;
@@ -138,14 +137,20 @@ pub enum NameFormulaKind {
 
 /// Sheet range used by an external defined-name reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SheetRange {
-    /// The referenced external sheet cannot be found.
-    Missing,
-    /// Inclusive zero-based external sheet indices.
-    Sheets { first: u16, last: u16 },
+pub struct SheetRange {
+    first: i16,
+    last: i16,
 }
 
 impl SheetRange {
+    /// Create a range whose referenced external sheet cannot be found.
+    pub const fn missing() -> Self {
+        Self {
+            first: -1,
+            last: -1,
+        }
+    }
+
     /// Create a validated inclusive range of external sheets.
     pub fn sheets(first: u16, last: u16) -> Result<Self> {
         if last < first || last > i16::MAX as u16 {
@@ -153,21 +158,26 @@ impl SheetRange {
                 "invalid external sheet range {first}..={last}"
             )));
         }
-        Ok(Self::Sheets { first, last })
+        Ok(Self {
+            first: first.cast_signed(),
+            last: last.cast_signed(),
+        })
+    }
+
+    /// Return the inclusive zero-based sheet bounds, or `None` for a missing sheet.
+    pub const fn bounds(self) -> Option<(u16, u16)> {
+        if self.first < 0 {
+            None
+        } else {
+            Some((self.first.cast_unsigned(), self.last.cast_unsigned()))
+        }
     }
 
     fn encode(self) -> [u8; 4] {
-        match self {
-            Self::Missing => [0xFF; 4],
-            Self::Sheets { first, last } => {
-                let first = i16::try_from(first).expect("sheet range was validated");
-                let last = i16::try_from(last).expect("sheet range was validated");
-                let mut encoded = [0; 4];
-                encoded[..2].copy_from_slice(&first.to_le_bytes());
-                encoded[2..].copy_from_slice(&last.to_le_bytes());
-                encoded
-            },
-        }
+        let mut encoded = [0; 4];
+        encoded[..2].copy_from_slice(&self.first.to_le_bytes());
+        encoded[2..].copy_from_slice(&self.last.to_le_bytes());
+        encoded
     }
 }
 
@@ -537,12 +547,13 @@ impl ValueMatrix {
 }
 
 /// One defined name stored by an external-workbook link.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct DefinedName {
     name: String,
     formula: Option<NameFormula>,
     built_in: bool,
     scope_sheet_index: Option<u16>,
+    wire_bits: Option<[u8; 7]>,
 }
 
 impl DefinedName {
@@ -552,6 +563,7 @@ impl DefinedName {
             formula: None,
             built_in: false,
             scope_sheet_index: None,
+            wire_bits: None,
         };
         entry.validate(0, false)?;
         Ok(entry)
@@ -578,6 +590,15 @@ impl DefinedName {
 
     pub fn formula(&self) -> Option<&NameFormula> {
         self.formula.as_ref()
+    }
+
+    pub(crate) fn with_wire_bits(mut self, wire_bits: [u8; 7]) -> Self {
+        self.wire_bits = Some(wire_bits);
+        self
+    }
+
+    pub(crate) const fn wire_bits(&self) -> Option<[u8; 7]> {
+        self.wire_bits
     }
 
     pub const fn is_built_in(&self) -> bool {
@@ -607,14 +628,26 @@ impl DefinedName {
     }
 }
 
+impl PartialEq for DefinedName {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.formula == other.formula
+            && self.built_in == other.built_in
+            && self.scope_sheet_index == other.scope_sheet_index
+    }
+}
+
+impl Eq for DefinedName {}
+
 /// One DDE data item and its optional inert cache.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DdeItem {
     name: String,
     want_advise: bool,
     want_picture: bool,
     supports_ole: bool,
     cached_values: Option<ValueMatrix>,
+    wire_bits: Option<[u8; 7]>,
 }
 
 impl DdeItem {
@@ -625,6 +658,7 @@ impl DdeItem {
             want_picture: false,
             supports_ole: false,
             cached_values: None,
+            wire_bits: None,
         };
         item.validate()?;
         Ok(item)
@@ -676,6 +710,15 @@ impl DdeItem {
         self.cached_values.as_ref()
     }
 
+    pub(crate) fn with_wire_bits(mut self, wire_bits: [u8; 7]) -> Self {
+        self.wire_bits = Some(wire_bits);
+        self
+    }
+
+    pub(crate) const fn wire_bits(&self) -> Option<[u8; 7]> {
+        self.wire_bits
+    }
+
     fn validate(&self) -> Result<()> {
         validate_defined_name(&self.name)?;
         if self.supports_ole && self.name != "StdDocumentName" {
@@ -690,14 +733,25 @@ impl DdeItem {
     }
 }
 
+impl PartialEq for DdeItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.want_advise == other.want_advise
+            && self.want_picture == other.want_picture
+            && self.supports_ole == other.supports_ole
+            && self.cached_values == other.cached_values
+    }
+}
+
 /// One OLE data item and its optional inert cache.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct OleItem {
     name: String,
     want_advise: bool,
     want_picture: bool,
     display_as_icon: bool,
     cached_values: Option<ValueMatrix>,
+    wire_bits: Option<[u8; 7]>,
 }
 
 impl OleItem {
@@ -708,6 +762,7 @@ impl OleItem {
             want_picture: false,
             display_as_icon: false,
             cached_values: None,
+            wire_bits: None,
         };
         item.validate()?;
         Ok(item)
@@ -759,12 +814,31 @@ impl OleItem {
         self.cached_values.as_ref()
     }
 
+    pub(crate) fn with_wire_bits(mut self, wire_bits: [u8; 7]) -> Self {
+        self.wire_bits = Some(wire_bits);
+        self
+    }
+
+    pub(crate) const fn wire_bits(&self) -> Option<[u8; 7]> {
+        self.wire_bits
+    }
+
     fn validate(&self) -> Result<()> {
         validate_defined_name(&self.name)?;
         if let Some(values) = &self.cached_values {
             values.validate()?;
         }
         Ok(())
+    }
+}
+
+impl PartialEq for OleItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.want_advise == other.want_advise
+            && self.want_picture == other.want_picture
+            && self.display_as_icon == other.display_as_icon
+            && self.cached_values == other.cached_values
     }
 }
 
@@ -784,17 +858,12 @@ pub enum Entries {
 pub struct UnknownRecord {
     kind: u16,
     after_known: usize,
-    bytes: Arc<[u8]>,
+    bytes: Vec<u8>,
     payload_start: usize,
 }
 
 impl UnknownRecord {
-    pub(crate) fn new(
-        kind: u16,
-        after_known: usize,
-        bytes: Arc<[u8]>,
-        payload_start: usize,
-    ) -> Self {
+    pub(crate) fn new(kind: u16, after_known: usize, bytes: Vec<u8>, payload_start: usize) -> Self {
         Self {
             kind,
             after_known,
@@ -1070,6 +1139,10 @@ impl Parsed {
         self.link
     }
 
+    pub(crate) fn into_parts(self) -> (Link, Option<String>) {
+        (self.link, self.relationship_id)
+    }
+
     /// Return the relationship identifier, if this link has one.
     pub fn relationship_id(&self) -> Option<&str> {
         self.relationship_id.as_deref()
@@ -1197,12 +1270,9 @@ fn decode_sheet_range(data: &[u8]) -> SheetRange {
     let first = i16::from_le_bytes([data[0], data[1]]);
     let last = i16::from_le_bytes([data[2], data[3]]);
     if first == -1 {
-        SheetRange::Missing
+        SheetRange::missing()
     } else {
-        SheetRange::Sheets {
-            first: u16::try_from(first).expect("validated external sheet index"),
-            last: u16::try_from(last).expect("validated external sheet index"),
-        }
+        SheetRange { first, last }
     }
 }
 

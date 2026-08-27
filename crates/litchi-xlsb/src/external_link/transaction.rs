@@ -24,13 +24,18 @@ impl Snapshot {
     }
 
     fn from_source(source: codec::Source) -> Self {
-        let link = source.parsed.clone().into_link();
+        let codec::Source {
+            parsed,
+            bytes,
+            unknown_records,
+        } = source;
+        let (link, relationship_id) = parsed.into_parts();
         Self {
             link,
             source: Arc::new(SourceState {
-                bytes: source.bytes,
-                relationship_id: source.parsed.relationship_id().map(str::to_owned),
-                unknown_records: source.unknown_records,
+                bytes,
+                relationship_id,
+                unknown_records,
             }),
         }
     }
@@ -128,6 +133,11 @@ impl Transaction {
 
     /// Alias for editing the unresolved workbook/OLE relationship identifier.
     pub fn set_relationship_id(&mut self, relationship_id: impl Into<String>) -> Result<()> {
+        if self.link.kind() == Kind::Dde {
+            return Err(invalid(
+                "DDE external links do not have a relationship identifier",
+            ));
+        }
         self.set_source(relationship_id)
     }
 
@@ -367,11 +377,11 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         validation::validate_link(&self.link)?;
         if self.link == self.base.link {
-            let source = Arc::clone(&self.base.source.bytes);
+            let source = self.base.source.bytes.clone();
             return Ok(Commit {
                 snapshot: self.base.clone(),
                 patch: Patch {
-                    before: Arc::clone(&source),
+                    before: source.clone(),
                     after: source,
                 },
             });
@@ -386,12 +396,12 @@ impl Transaction {
             relationship_id,
             self.base.unknown_records(),
         )?;
-        let after = Arc::<[u8]>::from(bytes);
-        if after.as_ref() == self.base.source_bytes() {
+        let after = bytes;
+        if after.as_slice() == self.base.source_bytes() {
             return Ok(Commit {
                 snapshot: self.base.clone(),
                 patch: Patch {
-                    before: Arc::clone(&self.base.source.bytes),
+                    before: self.base.source.bytes.clone(),
                     after,
                 },
             });
@@ -400,7 +410,7 @@ impl Transaction {
         Ok(Commit {
             snapshot,
             patch: Patch {
-                before: Arc::clone(&self.base.source.bytes),
+                before: self.base.source.bytes.clone(),
                 after,
             },
         })
@@ -443,15 +453,15 @@ impl Commit {
 /// A reversible patch guarded by the exact source stream bytes.
 #[derive(Debug, Clone)]
 pub struct Patch {
-    before: Arc<[u8]>,
-    after: Arc<[u8]>,
+    before: Vec<u8>,
+    after: Vec<u8>,
 }
 
 impl Patch {
     /// Whether this patch leaves the stream byte-identical.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.before.as_ref() == self.after.as_ref()
+        self.before == self.after
     }
 
     /// Borrow the exact before-image.
@@ -468,7 +478,7 @@ impl Patch {
 
     /// Apply only to the exact source stream used to create this patch.
     pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>> {
-        if source != self.before.as_ref() {
+        if source != self.before.as_slice() {
             return Err(invalid(
                 "external-link patch source snapshot does not match",
             ));
@@ -485,8 +495,8 @@ impl Patch {
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
-            before: Arc::clone(&self.after),
-            after: Arc::clone(&self.before),
+            before: self.after.clone(),
+            after: self.before.clone(),
         }
     }
 }
@@ -503,7 +513,7 @@ pub fn apply(data: &[u8], patch: &Patch) -> Result<Vec<u8>> {
 
 #[derive(Debug, Clone)]
 struct SourceState {
-    bytes: Arc<[u8]>,
+    bytes: Vec<u8>,
     relationship_id: Option<String>,
     unknown_records: Vec<UnknownRecord>,
 }
