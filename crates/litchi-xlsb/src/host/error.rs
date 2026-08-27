@@ -97,6 +97,15 @@ pub enum Error {
         /// Resource whose aggregate capacity could not be represented.
         resource: &'static str,
     },
+    /// A governed external-link resource limit was exceeded.
+    ExternalLinkLimitExceeded {
+        /// External-link resource whose configured ceiling was crossed.
+        resource: crate::external_link::ExternalLinkResource,
+        /// Observed or requested amount.
+        actual: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
     /// Shared DrawingML parsing error.
     Drawing(litchi_drawingml::Error),
     /// Shared host-neutral OOXML package-service error.
@@ -181,6 +190,14 @@ impl fmt::Display for Error {
             Error::CapacityOverflow { resource } => {
                 write!(f, "capacity overflow while planning {resource}")
             },
+            Error::ExternalLinkLimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => write!(
+                f,
+                "external-link {resource} limit exceeded: actual {actual}, maximum {maximum}"
+            ),
             Error::Drawing(error) => write!(f, "DrawingML error: {error}"),
             Error::Common(error) => write!(f, "shared OOXML error: {error}"),
             Error::Opc(error) => write!(f, "OPC source error: {error}"),
@@ -235,6 +252,7 @@ impl std::error::Error for Error {
             | Error::InvalidRelationship(_)
             | Error::InvalidContentType { .. }
             | Error::CapacityOverflow { .. }
+            | Error::ExternalLinkLimitExceeded { .. }
             | Error::WideStringLength { .. }
             | Error::Unrecognized { .. }
             | Error::PasswordProtected => None,
@@ -322,6 +340,15 @@ impl From<crate::external_link::Error> for Error {
             },
             crate::external_link::Error::Allocation { resource, source } => {
                 Self::Allocation { resource, source }
+            },
+            crate::external_link::Error::LimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => Self::ExternalLinkLimitExceeded {
+                resource,
+                actual,
+                maximum,
             },
         }
     }

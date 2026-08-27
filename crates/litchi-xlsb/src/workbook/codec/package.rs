@@ -615,9 +615,10 @@ impl Workbook {
         Ok(output)
     }
 
-    pub(in crate::workbook) fn load_external_book(
+    pub(in crate::workbook) fn load_external_book_with_budget(
         &self,
         uri: &litchi_opc::PackURI,
+        budget: &mut crate::external_link::Budget,
     ) -> Result<ExternalBook> {
         let part = self.package.get_part(uri)?;
         if part.content_type() != "application/vnd.ms-excel.externalLink" {
@@ -627,7 +628,16 @@ impl Workbook {
             )));
         }
 
-        let parsed = crate::external_link::parse_external_link(part.blob())?;
+        let parsed = crate::external_link::parse_external_link_with_budget(part.blob(), budget)?;
+        self.resolve_external_book(part, parsed, budget)
+    }
+
+    fn resolve_external_book(
+        &self,
+        part: &dyn litchi_opc::Part,
+        parsed: crate::external_link::Parsed,
+        budget: &mut crate::external_link::Budget,
+    ) -> Result<ExternalBook> {
         match parsed.link().kind() {
             Kind::Dde => {
                 if !part.rels().is_empty() {
@@ -679,10 +689,25 @@ impl Workbook {
                     )));
                 }
 
+                let target_ref = relationship.target_ref();
+                let target = copy_target_ref(target_ref, budget)?;
                 Ok(ExternalBook {
-                    metadata: parsed.resolve_source(relationship.target_ref().to_string())?,
+                    metadata: parsed.resolve_source(target)?,
                 })
             },
         }
     }
+}
+
+fn copy_target_ref(target_ref: &str, budget: &mut crate::external_link::Budget) -> Result<String> {
+    budget.string(target_ref.encode_utf16().count(), target_ref.len())?;
+    let mut copied = String::new();
+    copied
+        .try_reserve_exact(target_ref.len())
+        .map_err(|source| crate::external_link::Error::Allocation {
+            resource: "external-link relationship target",
+            source,
+        })?;
+    copied.push_str(target_ref);
+    Ok(copied)
 }

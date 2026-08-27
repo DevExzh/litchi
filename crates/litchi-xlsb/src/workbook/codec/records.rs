@@ -161,6 +161,18 @@ impl Workbook {
                             "BrtSupBookSrc has an invalid relationship ID".to_string(),
                         ));
                     }
+                    external_link_rel_ids.try_reserve(1).map_err(|source| {
+                        crate::package::error::Error::Allocation {
+                            resource: "eager XLSB external-link relationship IDs",
+                            source,
+                        }
+                    })?;
+                    supporting_links.try_reserve(1).map_err(|source| {
+                        crate::package::error::Error::Allocation {
+                            resource: "eager XLSB supporting-link results",
+                            source,
+                        }
+                    })?;
                     let book_index = u32::try_from(external_link_rel_ids.len()).map_err(|_| {
                         crate::package::error::Error::InvalidFormula(
                             "external-link count overflow".to_string(),

@@ -195,7 +195,8 @@ fn assert_external_formula_length_error(source: &[u8], found: usize) {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::InvalidLength { .. }
-        | Error::Allocation { .. }) => {
+        | Error::Allocation { .. }
+        | Error::LimitExceeded { .. }) => {
             panic!("unexpected external formula error: {other:?}")
         },
     }
@@ -525,7 +526,10 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
             assert_eq!(expected, MAX_UNKNOWN_RECORDS);
             assert_eq!(found, MAX_UNKNOWN_RECORDS + 1);
         },
-        other @ (Error::Wire(_) | Error::InvalidFormula(_) | Error::Allocation { .. }) => {
+        other @ (Error::Wire(_)
+        | Error::InvalidFormula(_)
+        | Error::Allocation { .. }
+        | Error::LimitExceeded { .. }) => {
             panic!("unexpected unknown-record count error: {other:?}")
         },
     }
@@ -542,8 +546,714 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
             assert_eq!(expected, MAX_UNKNOWN_BYTES);
             assert_eq!(found, count * one_record.len());
         },
-        other @ (Error::Wire(_) | Error::InvalidFormula(_) | Error::Allocation { .. }) => {
+        other @ (Error::Wire(_)
+        | Error::InvalidFormula(_)
+        | Error::Allocation { .. }
+        | Error::LimitExceeded { .. }) => {
             panic!("unexpected unknown-record byte error: {other:?}")
         },
     }
+}
+
+fn assert_limit_exceeded<T>(
+    result: Result<T>,
+    resource: ExternalLinkResource,
+    actual: usize,
+    maximum: usize,
+) {
+    let Err(error) = result else {
+        panic!("expected {resource} limit failure")
+    };
+    let Error::LimitExceeded {
+        resource: found_resource,
+        actual: found_actual,
+        maximum: found_maximum,
+    } = error
+    else {
+        panic!("expected {resource} limit failure, found {error:?}")
+    };
+    assert_eq!(found_resource, resource);
+    assert_eq!(found_actual, actual);
+    assert_eq!(found_maximum, maximum);
+}
+
+#[test]
+fn external_link_limits_builder_and_default_are_publicly_parity_checked() {
+    let default_from_builder = ExternalLinkLimits::builder().build().unwrap();
+    assert_eq!(default_from_builder, ExternalLinkLimits::DEFAULT);
+    assert_eq!(ExternalLinkLimits::default(), default_from_builder);
+
+    let primary = ExternalLinkLimits::builder()
+        .max_part_bytes(64)
+        .max_total_part_bytes(128)
+        .max_opaque_bytes(8)
+        .max_total_opaque_bytes(16)
+        .max_utf16_units(2)
+        .max_total_utf16_units(4)
+        .max_records(3)
+        .max_cache_records(4)
+        .max_opaque_records(5)
+        .max_links(6)
+        .max_items(7)
+        .max_matrices(8)
+        .max_cells(9)
+        .max_decoded_semantic_bytes(10)
+        .max_retained_objects(11)
+        .build()
+        .unwrap();
+    let aliases = ExternalLinkLimits::builder()
+        .max_part_bytes(64)
+        .max_total_part_bytes(128)
+        .max_opaque_bytes(8)
+        .max_total_opaque_bytes(16)
+        .max_utf16_units(2)
+        .max_total_utf16_units(4)
+        .max_total_records(3)
+        .max_total_cache_records(4)
+        .max_total_opaque_records(5)
+        .max_total_links(6)
+        .max_total_items(7)
+        .max_total_matrices(8)
+        .max_total_cells(9)
+        .max_total_decoded_semantic_bytes(10)
+        .max_total_retained_objects(11)
+        .build()
+        .unwrap();
+    assert_eq!(primary, aliases);
+    assert_eq!(primary.max_total_records(), primary.max_records());
+    assert_eq!(
+        primary.max_total_cache_records(),
+        primary.max_cache_records()
+    );
+    assert_eq!(
+        primary.max_total_opaque_records(),
+        primary.max_opaque_records()
+    );
+    assert_eq!(primary.max_total_links(), primary.max_links());
+    assert_eq!(primary.max_total_items(), primary.max_items());
+    assert_eq!(primary.max_total_matrices(), primary.max_matrices());
+    assert_eq!(primary.max_total_cells(), primary.max_cells());
+    assert_eq!(
+        primary.max_total_decoded_semantic_bytes(),
+        primary.max_decoded_semantic_bytes()
+    );
+    assert_eq!(
+        primary.max_total_retained_objects(),
+        primary.max_retained_objects()
+    );
+}
+
+#[test]
+fn external_link_part_limit_accepts_exact_bytes_and_reports_one_below() {
+    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let exact = ExternalLinkLimits::builder()
+        .max_part_bytes(source.len())
+        .max_total_part_bytes(source.len())
+        .build()
+        .unwrap();
+    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+
+    let below = ExternalLinkLimits::builder()
+        .max_part_bytes(source.len() - 1)
+        .max_total_part_bytes(source.len() - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, below),
+        ExternalLinkResource::PartBytes,
+        source.len(),
+        source.len() - 1,
+    );
+}
+
+#[test]
+fn external_link_record_limit_accepts_exact_records_and_reports_one_below() {
+    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let record_count = record_kinds(&source).len();
+    let exact = ExternalLinkLimits::builder()
+        .max_records(record_count)
+        .build()
+        .unwrap();
+    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+
+    let below = ExternalLinkLimits::builder()
+        .max_records(record_count - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, below),
+        ExternalLinkResource::Records,
+        record_count,
+        record_count - 1,
+    );
+}
+
+#[test]
+fn external_link_utf16_limits_count_non_bmp_units_per_string_and_in_total() {
+    let link = Link::dde("X", "😀", vec!["A".to_string()]).unwrap();
+    let source = write_external_link_stream(&link, None).unwrap();
+    let non_bmp_units = "😀".encode_utf16().count();
+    let total_units =
+        "X".encode_utf16().count() + "😀".encode_utf16().count() + "A".encode_utf16().count();
+    assert_eq!(non_bmp_units, 2);
+
+    let exact = ExternalLinkLimits::builder()
+        .max_utf16_units(non_bmp_units)
+        .max_total_utf16_units(total_units)
+        .build()
+        .unwrap();
+    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+
+    let one_below = ExternalLinkLimits::builder()
+        .max_utf16_units(non_bmp_units - 1)
+        .max_total_utf16_units(total_units)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, one_below),
+        ExternalLinkResource::Utf16Units,
+        non_bmp_units,
+        non_bmp_units - 1,
+    );
+
+    let total_below = ExternalLinkLimits::builder()
+        .max_utf16_units(non_bmp_units)
+        .max_total_utf16_units(total_units - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, total_below),
+        ExternalLinkResource::TotalUtf16Units,
+        total_units,
+        total_units - 1,
+    );
+}
+
+#[test]
+fn external_link_decoded_semantic_bytes_accept_exact_and_report_one_below() {
+    let link = Link::dde("X", "Y", vec!["A".to_string()]).unwrap();
+    let source = write_external_link_stream(&link, None).unwrap();
+    let semantic_bytes = "X".len() + "Y".len() + "A".len();
+    let exact = ExternalLinkLimits::builder()
+        .max_decoded_semantic_bytes(semantic_bytes)
+        .build()
+        .unwrap();
+    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+
+    let one_below = ExternalLinkLimits::builder()
+        .max_decoded_semantic_bytes(semantic_bytes - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, one_below),
+        ExternalLinkResource::DecodedSemanticBytes,
+        semantic_bytes,
+        semantic_bytes - 1,
+    );
+}
+
+#[test]
+fn external_link_item_limits_aggregate_workbook_names_and_dde_ole_items() {
+    let workbook = Link::workbook_with_defined_names(
+        "unused-host-source",
+        vec!["Data".to_string()],
+        vec![
+            DefinedName::new("A").unwrap(),
+            DefinedName::new("B").unwrap(),
+        ],
+    )
+    .unwrap();
+    let dde = Link::dde_with_items(
+        "X",
+        "Y",
+        vec![DdeItem::new("A").unwrap(), DdeItem::new("B").unwrap()],
+    )
+    .unwrap();
+    let ole = Link::ole_with_items(
+        "rIdOle",
+        "Acme.Server",
+        vec![OleItem::new("A").unwrap(), OleItem::new("B").unwrap()],
+    )
+    .unwrap();
+
+    for (link, relationship_id) in [
+        (&workbook, Some("rIdPath")),
+        (&dde, None),
+        (&ole, Some("rIdOle")),
+    ] {
+        let source = write_external_link_stream(link, relationship_id).unwrap();
+        let exact = ExternalLinkLimits::builder().max_items(2).build().unwrap();
+        assert!(parse_external_link_with_limits(&source, exact).is_ok());
+
+        let one_below = ExternalLinkLimits::builder().max_items(1).build().unwrap();
+        assert_limit_exceeded(
+            parse_external_link_with_limits(&source, one_below),
+            ExternalLinkResource::Items,
+            2,
+            1,
+        );
+    }
+}
+
+#[test]
+fn external_link_cache_limits_aggregate_matrices_and_cells_across_items() {
+    let matrix = ValueMatrix::new(1, 1, vec![CachedValue::Empty]).unwrap();
+    let link = Link::dde_with_items(
+        "X",
+        "Y",
+        vec![
+            DdeItem::new("A")
+                .unwrap()
+                .with_cached_values(matrix.clone()),
+            DdeItem::new("B").unwrap().with_cached_values(matrix),
+        ],
+    )
+    .unwrap();
+    let source = write_external_link_stream(&link, None).unwrap();
+
+    let exact = ExternalLinkLimits::builder()
+        .max_matrices(2)
+        .max_cells(2)
+        .build()
+        .unwrap();
+    assert!(parse_external_link_with_limits(&source, exact).is_ok());
+
+    let matrix_below = ExternalLinkLimits::builder()
+        .max_matrices(1)
+        .max_cells(2)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, matrix_below),
+        ExternalLinkResource::Matrices,
+        2,
+        1,
+    );
+
+    let cells_below = ExternalLinkLimits::builder()
+        .max_matrices(2)
+        .max_cells(1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        parse_external_link_with_limits(&source, cells_below),
+        ExternalLinkResource::Cells,
+        2,
+        1,
+    );
+}
+
+#[test]
+fn external_link_snapshot_limits_bound_opaque_records_and_bytes() {
+    let source = insert_unknown_after_first_record(
+        &write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap(),
+    );
+    let default_snapshot = Snapshot::read(&source).unwrap();
+    let opaque_bytes = default_snapshot.unknown_records()[0].bytes().len();
+
+    let exact = ExternalLinkLimits::builder()
+        .max_opaque_bytes(opaque_bytes)
+        .max_total_opaque_bytes(opaque_bytes)
+        .max_opaque_records(1)
+        .build()
+        .unwrap();
+    let snapshot = Snapshot::read_with_limits(&source, exact).unwrap();
+    assert_eq!(snapshot.limits(), exact);
+    assert_eq!(snapshot.unknown_records().len(), 1);
+
+    let record_below = ExternalLinkLimits::builder()
+        .max_opaque_records(0)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        Snapshot::read_with_limits(&source, record_below),
+        ExternalLinkResource::OpaqueRecords,
+        1,
+        0,
+    );
+
+    let bytes_below = ExternalLinkLimits::builder()
+        .max_opaque_bytes(opaque_bytes - 1)
+        .max_total_opaque_bytes(opaque_bytes - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        Snapshot::read_with_limits(&source, bytes_below),
+        ExternalLinkResource::OpaqueBytes,
+        opaque_bytes,
+        opaque_bytes - 1,
+    );
+}
+
+#[test]
+fn external_link_snapshot_limits_are_reused_and_enforced_by_changed_commit() {
+    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let maximum = source.len();
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(maximum)
+        .max_total_part_bytes(maximum)
+        .build()
+        .unwrap();
+    let snapshot = Snapshot::read_with_limits(&source, limits).unwrap();
+    assert_eq!(snapshot.limits(), limits);
+
+    let mut edit = snapshot.edit();
+    let long_source = format!("rId{}", "x".repeat(256));
+    edit.set_source(long_source).unwrap();
+    let staged = edit.link();
+    let expected_after = write_external_link_stream(staged, Some(staged.source())).unwrap();
+    assert!(expected_after.len() > maximum);
+    assert_limit_exceeded(
+        edit.commit(),
+        ExternalLinkResource::PartBytes,
+        expected_after.len(),
+        maximum,
+    );
+}
+
+#[test]
+fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
+    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let mut edit = Snapshot::read(&source).unwrap().edit();
+    edit.set_source("rIdChangedToLonger").unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch();
+    let maximum = patch.after().len();
+    let exact = ExternalLinkLimits::builder()
+        .max_part_bytes(maximum)
+        .max_total_part_bytes(maximum)
+        .build()
+        .unwrap();
+    assert_eq!(
+        apply_with_limits(patch.before(), patch, exact).unwrap(),
+        patch.after()
+    );
+    assert!(apply_with_limits(b"stale", patch, exact).is_err());
+
+    let one_below = ExternalLinkLimits::builder()
+        .max_part_bytes(maximum - 1)
+        .max_total_part_bytes(maximum - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        apply_with_limits(patch.before(), patch, one_below),
+        ExternalLinkResource::PartBytes,
+        maximum,
+        maximum - 1,
+    );
+}
+
+#[test]
+fn external_link_malformed_wire_keeps_wire_and_structural_errors_typed() {
+    let source = write_external_link_stream(&workbook_link(), Some("rIdPath")).unwrap();
+    let truncated = replace_record_payload(
+        &source,
+        crate::raw::kind::SUP_NAME_START,
+        0,
+        &[2, 0, 0, 0, b'A', 0],
+    );
+    let wire_error =
+        parse_external_link_with_limits(&truncated, ExternalLinkLimits::DEFAULT).unwrap_err();
+    assert!(matches!(wire_error, Error::Wire(_)));
+
+    let mut structurally_invalid = source;
+    Writer::new(&mut structurally_invalid)
+        .write_record(crate::raw::kind::SUP_NAME_END, &[])
+        .unwrap();
+    let structural_error =
+        parse_external_link_with_limits(&structurally_invalid, ExternalLinkLimits::DEFAULT)
+            .unwrap_err();
+    assert!(matches!(structural_error, Error::InvalidFormula(_)));
+}
+
+#[test]
+fn external_link_writer_part_limits_accept_exact_output_and_reject_one_below() {
+    let link = workbook_link();
+    let canonical = write_external_link_stream(&link, Some("rIdPath")).unwrap();
+    let exact = ExternalLinkLimits::builder()
+        .max_part_bytes(canonical.len())
+        .max_total_part_bytes(canonical.len())
+        .build()
+        .unwrap();
+    let bounded = write_external_link_stream_with_limits(&link, Some("rIdPath"), exact).unwrap();
+    assert_eq!(bounded, canonical);
+
+    let one_below = ExternalLinkLimits::builder()
+        .max_part_bytes(canonical.len() - 1)
+        .max_total_part_bytes(canonical.len() - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&link, Some("rIdPath"), one_below),
+        ExternalLinkResource::PartBytes,
+        canonical.len(),
+        canonical.len() - 1,
+    );
+}
+
+#[test]
+fn external_link_writer_rejects_authored_semantic_limits_with_typed_resources() {
+    let workbook = workbook_link();
+    let items = ExternalLinkLimits::builder().max_items(0).build().unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&workbook, Some("rIdPath"), items),
+        ExternalLinkResource::Items,
+        1,
+        0,
+    );
+
+    let matrix = ValueMatrix::new(1, 1, vec![CachedValue::Empty]).unwrap();
+    let cached = Link::dde_with_items(
+        "X",
+        "Y",
+        vec![DdeItem::new("A").unwrap().with_cached_values(matrix)],
+    )
+    .unwrap();
+    let cells = ExternalLinkLimits::builder().max_cells(0).build().unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&cached, None, cells),
+        ExternalLinkResource::Cells,
+        1,
+        0,
+    );
+
+    let short = Link::dde("X", "Y", vec!["A".to_string()]).unwrap();
+    let utf16 = ExternalLinkLimits::builder()
+        .max_utf16_units(0)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&short, None, utf16),
+        ExternalLinkResource::Utf16Units,
+        1,
+        0,
+    );
+
+    let semantic_bytes = ExternalLinkLimits::builder()
+        .max_decoded_semantic_bytes(0)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&short, None, semantic_bytes),
+        ExternalLinkResource::DecodedSemanticBytes,
+        1,
+        0,
+    );
+}
+
+#[test]
+fn external_link_strict_snapshot_commit_rejects_larger_model_and_remains_retryable() {
+    let link = Link::dde_with_items("X", "Y", vec![DdeItem::new("A").unwrap()]).unwrap();
+    let source = write_external_link_stream(&link, None).unwrap();
+    let limits = ExternalLinkLimits::builder().max_items(1).build().unwrap();
+    let snapshot = Snapshot::read_with_limits(&source, limits).unwrap();
+
+    let mut rejected = snapshot.edit();
+    rejected
+        .upsert_dde_item(DdeItem::new("B").unwrap())
+        .unwrap();
+    assert_limit_exceeded(rejected.commit(), ExternalLinkResource::Items, 2, 1);
+    assert_eq!(snapshot.source_bytes(), source.as_slice());
+    assert_eq!(snapshot.link(), &link);
+    assert_eq!(snapshot.limits(), limits);
+
+    let mut retry = snapshot.edit();
+    retry.set_dde_topic("Z").unwrap();
+    let committed = retry.commit().unwrap();
+    assert_eq!(committed.snapshot().limits(), limits);
+    assert_eq!(committed.snapshot().link().dde_topic(), Some("Z"));
+}
+
+#[test]
+fn external_link_patch_apply_with_limits_rejects_semantic_after_image() {
+    let link = Link::dde_with_items("X", "Y", vec![DdeItem::new("A").unwrap()]).unwrap();
+    let source = write_external_link_stream(&link, None).unwrap();
+    let mut edit = Snapshot::read(&source).unwrap().edit();
+    edit.upsert_dde_item(DdeItem::new("B").unwrap()).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch();
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(patch.after().len())
+        .max_total_part_bytes(patch.after().len())
+        .max_items(1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        apply_with_limits(patch.before(), patch, limits),
+        ExternalLinkResource::Items,
+        2,
+        1,
+    );
+}
+
+#[test]
+fn dde_relationship_id_refusal_is_atomic_and_valid_edits_remain_retryable() {
+    let link = Link::dde_with_items("X", "Y", vec![DdeItem::new("A").unwrap()]).unwrap();
+    let source = write_external_link_stream(&link, None).unwrap();
+    let snapshot = Snapshot::read(&source).unwrap();
+    let mut edit = snapshot.edit();
+    let before = edit.link().clone();
+
+    assert!(matches!(
+        edit.set_relationship_id("rIdDde"),
+        Err(Error::InvalidFormula(_))
+    ));
+    assert_eq!(edit.link(), &before);
+    assert_eq!(snapshot.source_bytes(), source.as_slice());
+
+    edit.set_source("Changed").unwrap();
+    let committed = edit.commit().unwrap();
+    assert_eq!(committed.snapshot().link().source(), "Changed");
+    assert_eq!(committed.snapshot().link().dde_topic(), Some("Y"));
+}
+
+#[test]
+fn external_link_writer_cache_matrix_record_and_object_limits_have_exact_edges() {
+    let matrix = ValueMatrix::new(1, 1, vec![CachedValue::Empty]).unwrap();
+    let link = Link::dde_with_items(
+        "X",
+        "Y",
+        vec![DdeItem::new("A").unwrap().with_cached_values(matrix)],
+    )
+    .unwrap();
+    let canonical = write_external_link_stream(&link, None).unwrap();
+    let kinds = record_kinds(&canonical);
+    let record_count = kinds.len();
+
+    let exact = ExternalLinkLimits::builder()
+        .max_matrices(1)
+        .max_cells(1)
+        .max_records(record_count)
+        .build()
+        .unwrap();
+    assert_eq!(
+        write_external_link_stream_with_limits(&link, None, exact).unwrap(),
+        canonical
+    );
+
+    let matrix_below = ExternalLinkLimits::builder()
+        .max_matrices(0)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&link, None, matrix_below),
+        ExternalLinkResource::Matrices,
+        1,
+        0,
+    );
+
+    let cells_below = ExternalLinkLimits::builder().max_cells(0).build().unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&link, None, cells_below),
+        ExternalLinkResource::Cells,
+        1,
+        0,
+    );
+
+    let records_below = ExternalLinkLimits::builder()
+        .max_records(record_count - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&link, None, records_below),
+        ExternalLinkResource::Records,
+        record_count,
+        record_count - 1,
+    );
+}
+
+#[test]
+fn external_link_writer_extern_cache_record_limit_uses_opaque_table_records() {
+    let link = workbook_link();
+    let base = write_external_link_stream(&link, Some("rIdPath")).unwrap();
+    let opaque_specs = [
+        (crate::raw::kind::EXTERN_TABLE_START, &[0x00; 5][..]),
+        (crate::raw::kind::EXTERN_ROW_HDR, &[0x00; 4][..]),
+        (crate::raw::kind::EXTERN_CELL_BLANK, &[0x00; 4][..]),
+        (
+            crate::raw::kind::EXTERN_CELL_REAL,
+            &[
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ][..],
+        ),
+        (
+            crate::raw::kind::EXTERN_CELL_BOOL,
+            &[0x02, 0x00, 0x00, 0x00, 0x01][..],
+        ),
+        (
+            crate::raw::kind::EXTERN_CELL_ERROR,
+            &[0x03, 0x00, 0x00, 0x00, 0x07][..],
+        ),
+        (
+            crate::raw::kind::EXTERN_CELL_STRING,
+            &[0x04, 0x00, 0x00, 0x00, 1, 0, 0, 0, b'x', 0][..],
+        ),
+        (crate::raw::kind::EXTERN_TABLE_END, &[][..]),
+        (RecordKind::new(0x3FFD).unwrap(), &[0xD0, 0xD1][..]),
+    ];
+    let source = insert_unknown_records_after_known_record(&base, 2, &opaque_specs);
+    let snapshot = Snapshot::read(&source).unwrap();
+    assert_eq!(snapshot.unknown_records().len(), opaque_specs.len());
+    let cache_records = snapshot
+        .unknown_records()
+        .iter()
+        .take_while(|record| record.kind() != 0x3FFD)
+        .count();
+    assert_eq!(cache_records, 8);
+
+    let exact = ExternalLinkLimits::builder()
+        .max_cache_records(cache_records)
+        .build()
+        .unwrap();
+    assert!(
+        package::write_external_link_stream_with_unknown_and_limits(
+            &link,
+            Some("rIdPath"),
+            snapshot.unknown_records(),
+            exact,
+        )
+        .is_ok()
+    );
+
+    let one_below = ExternalLinkLimits::builder()
+        .max_cache_records(cache_records - 1)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        package::write_external_link_stream_with_unknown_and_limits(
+            &link,
+            Some("rIdPath"),
+            snapshot.unknown_records(),
+            one_below,
+        ),
+        ExternalLinkResource::CacheRecords,
+        cache_records,
+        cache_records - 1,
+    );
+}
+
+#[test]
+fn external_link_writer_retained_object_limit_has_exact_edge() {
+    let link = Link::workbook_with_defined_names(
+        "unused-host-source",
+        vec!["Data".to_string()],
+        Vec::new(),
+    )
+    .unwrap();
+    let exact = ExternalLinkLimits::builder()
+        .max_retained_objects(1)
+        .build()
+        .unwrap();
+    assert!(write_external_link_stream_with_limits(&link, Some("rIdPath"), exact).is_ok());
+
+    let one_below = ExternalLinkLimits::builder()
+        .max_retained_objects(0)
+        .build()
+        .unwrap();
+    assert_limit_exceeded(
+        write_external_link_stream_with_limits(&link, Some("rIdPath"), one_below),
+        ExternalLinkResource::RetainedObjects,
+        1,
+        0,
+    );
 }

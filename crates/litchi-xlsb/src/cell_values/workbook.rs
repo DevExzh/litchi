@@ -7,6 +7,7 @@
 //! Workbook-level publication for lossless cell-value edits.
 
 use super::{Commit, Limits, Snapshot, Value};
+use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI, Part};
@@ -51,6 +52,17 @@ pub fn read_with_limits(
 /// Returns an error for a stale patch, a non-worksheet target, or a candidate
 /// that fails complete XLSB workbook validation.
 pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> Result<Snapshot> {
+    apply_with_external_link_limits(package, worksheet, commit, ExternalLinkLimits::default())
+}
+
+/// Apply one source-checked cell-value commit while validating candidate
+/// workbook reparses with an explicit external-link policy.
+pub fn apply_with_external_link_limits(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
@@ -61,7 +73,10 @@ pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> 
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
     candidate.unsign();
-    let parsed = crate::Workbook::from_opc_package(candidate.clone())?;
+    let parsed = crate::Workbook::from_opc_package_with_external_link_limits(
+        candidate.clone(),
+        external_link_limits,
+    )?;
     let worksheet_index = (0..parsed.worksheet_count())
         .find_map(|index| {
             parsed

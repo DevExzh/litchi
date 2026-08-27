@@ -1,6 +1,7 @@
 //! Workbook/package traversal for worksheet cell-watch snapshots.
 
 use super::worksheet::{self, Commit, Snapshot};
+use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use litchi_opc::{OpcPackage, PackURI, Part};
 
@@ -48,6 +49,17 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Sheet>> {
 /// owner before publication. A failed parse or source guard leaves the input
 /// package unchanged.
 pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> Result<Snapshot> {
+    apply_with_external_link_limits(package, worksheet, commit, ExternalLinkLimits::default())
+}
+
+/// Apply a cell-watch commit while validating candidate workbook reparses
+/// with an explicit external-link policy.
+pub fn apply_with_external_link_limits(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
@@ -58,7 +70,10 @@ pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> 
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
     candidate.unsign();
-    crate::Workbook::from_opc_package(candidate.clone())?;
+    crate::Workbook::from_opc_package_with_external_link_limits(
+        candidate.clone(),
+        external_link_limits,
+    )?;
     *package = candidate;
     worksheet::read(&updated)
 }

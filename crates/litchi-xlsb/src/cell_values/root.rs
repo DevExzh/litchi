@@ -18,6 +18,7 @@
 
 use super::{CellFormula, Reference, TransferLimits, Value};
 use crate::Workbook;
+use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
 use litchi_core::sheet::traits::WorkbookTrait;
@@ -160,6 +161,7 @@ pub struct WorkbookEdit {
     before: Arc<[u8]>,
     operations: Vec<Operation>,
     limits: TransferLimits,
+    external_link_limits: ExternalLinkLimits,
 }
 
 impl WorkbookEdit {
@@ -169,6 +171,7 @@ impl WorkbookEdit {
             before: Arc::from(workbook_bytes(workbook)?),
             operations: Vec::new(),
             limits,
+            external_link_limits: workbook.external_link_limits(),
         })
     }
 
@@ -179,7 +182,7 @@ impl WorkbookEdit {
     /// Returns an error for an invalid selector, invalid/duplicate name, or a
     /// transaction that exceeds its finite change policy.
     pub fn rename_sheet(&mut self, sheet: usize, name: String) -> Result<()> {
-        let workbook = workbook_from_bytes(&self.before)?;
+        let workbook = workbook_from_bytes(&self.before, self.external_link_limits)?;
         validate_sheet_name(&workbook, sheet, &name)?;
         self.stage(Operation::RenameSheet { sheet, name })
     }
@@ -213,7 +216,7 @@ impl WorkbookEdit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay(&self.before, &candidate)?;
+        let _validated_candidate = replay(&self.before, &candidate, self.external_link_limits)?;
         self.stage(operation)
     }
 
@@ -281,7 +284,7 @@ impl WorkbookEdit {
                 "formula authoring requires a Formula*Cache value".to_string(),
             ));
         }
-        let mut donor = workbook_from_bytes(&self.before)?;
+        let mut donor = workbook_from_bytes(&self.before, self.external_link_limits)?;
         let style_index = author_style(&mut donor, style)?;
         insert_candidate_cell(
             &mut donor,
@@ -307,7 +310,7 @@ impl WorkbookEdit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay(&self.before, &candidate)?;
+        let _validated_candidate = replay(&self.before, &candidate, self.external_link_limits)?;
         self.stage(operation)
     }
 
@@ -376,7 +379,7 @@ impl WorkbookEdit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay(&self.before, &candidate)?;
+        let _validated_candidate = replay(&self.before, &candidate, self.external_link_limits)?;
         self.stage(operation)
     }
 
@@ -388,7 +391,7 @@ impl WorkbookEdit {
         style: &AuthoredStyle,
         shared: bool,
     ) -> Result<()> {
-        let mut donor = workbook_from_bytes(&self.before)?;
+        let mut donor = workbook_from_bytes(&self.before, self.external_link_limits)?;
         let style_index = author_style(&mut donor, style)?;
         let font_id = donor
             .styles()
@@ -409,7 +412,10 @@ impl WorkbookEdit {
         let value = if shared {
             let mut package = donor.package.clone();
             let index = super::resources::intern_shared_string_for_new_cell(&mut package, &string)?;
-            donor = Workbook::from_opc_package(package)?;
+            donor = Workbook::from_opc_package_with_external_link_limits(
+                package,
+                donor.external_link_limits(),
+            )?;
             Value::SharedStringIndex(index)
         } else {
             Value::RichString(string)
@@ -424,11 +430,16 @@ impl WorkbookEdit {
     ///
     /// Returns an error when replay, complete workbook readback, or bounds fail.
     pub fn commit(self) -> Result<WorkbookCommit> {
-        let after = Arc::from(replay(&self.before, &self.operations)?);
+        let after = Arc::from(replay(
+            &self.before,
+            &self.operations,
+            self.external_link_limits,
+        )?);
         let patch = WorkbookPatch {
             before: self.before,
             after,
             operations: self.operations,
+            external_link_limits: self.external_link_limits,
         };
         let _bounded_encoding = patch.to_bytes(self.limits)?;
         Ok(WorkbookCommit { patch })
@@ -476,6 +487,7 @@ pub struct WorkbookPatch {
     before: Arc<[u8]>,
     after: Arc<[u8]>,
     operations: Vec<Operation>,
+    external_link_limits: ExternalLinkLimits,
 }
 
 impl WorkbookPatch {
@@ -508,7 +520,10 @@ impl WorkbookPatch {
                 "workbook patch source is stale".to_string(),
             ));
         }
-        let candidate = validated_workbook(&self.after)?;
+        let candidate = validated_workbook_with_external_link_limits(
+            &self.after,
+            workbook.external_link_limits(),
+        )?;
         *workbook = candidate;
         Ok(())
     }
@@ -520,6 +535,7 @@ impl WorkbookPatch {
             before: Arc::clone(&self.after),
             after: Arc::clone(&self.before),
             operations: Vec::new(),
+            external_link_limits: self.external_link_limits,
         }
     }
 
@@ -570,12 +586,13 @@ impl WorkbookPatch {
                 conflicts,
             });
         }
-        let after = Arc::from(replay(&self.before, &merged)?);
+        let after = Arc::from(replay(&self.before, &merged, self.external_link_limits)?);
         Ok(WorkbookMergeOutcome {
             patch: Some(Self {
                 before: Arc::clone(&self.before),
                 after,
                 operations: merged,
+                external_link_limits: self.external_link_limits,
             }),
             conflicts,
         })
@@ -639,6 +656,18 @@ impl WorkbookPatch {
     /// result. Exact-image inverse patches intentionally carry no forward
     /// operations and validate both package endpoints instead.
     pub fn from_bytes(data: &[u8], limits: TransferLimits) -> Result<Self> {
+        Self::from_bytes_with_external_link_limits(data, limits, ExternalLinkLimits::default())
+    }
+
+    /// Decode a durable workbook patch with an explicit external-link policy.
+    ///
+    /// The caller profile governs validation of both package images and
+    /// semantic replay; no default-policy parse is performed first.
+    pub fn from_bytes_with_external_link_limits(
+        data: &[u8],
+        limits: TransferLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
         validate_limits(limits)?;
         if data.len() > limits.bytes() {
             return Err(Error::InvalidLength {
@@ -689,11 +718,15 @@ impl WorkbookPatch {
                 found: data.len(),
             });
         }
-        let before = Arc::from(data[32..before_end].to_vec());
-        let after = Arc::from(data[before_end..after_end].to_vec());
-        let _validated_before = validated_workbook(&before)?;
-        let _validated_after = validated_workbook(&after)?;
-        if !operations.is_empty() && replay(&before, &operations)?.as_slice() != after.as_ref() {
+        let before = copy_arc(&data[32..before_end], "workbook patch before image")?;
+        let after = copy_arc(&data[before_end..after_end], "workbook patch after image")?;
+        let _validated_before =
+            validated_workbook_with_external_link_limits(&before, external_link_limits)?;
+        let _validated_after =
+            validated_workbook_with_external_link_limits(&after, external_link_limits)?;
+        if !operations.is_empty()
+            && replay(&before, &operations, external_link_limits)?.as_slice() != after.as_ref()
+        {
             return Err(Error::InvalidFormat(
                 "durable workbook patch operations do not reconstruct its after image".to_string(),
             ));
@@ -702,6 +735,7 @@ impl WorkbookPatch {
             before,
             after,
             operations,
+            external_link_limits,
         })
     }
 
@@ -887,8 +921,12 @@ impl WorkbookHistory {
     }
 }
 
-fn replay(before: &[u8], operations: &[Operation]) -> Result<Vec<u8>> {
-    let mut workbook = validated_workbook(before)?;
+fn replay(
+    before: &[u8],
+    operations: &[Operation],
+    external_link_limits: ExternalLinkLimits,
+) -> Result<Vec<u8>> {
+    let mut workbook = validated_workbook_with_external_link_limits(before, external_link_limits)?;
     for operation in operations {
         match operation {
             Operation::RenameSheet { sheet, name } => rename_sheet(&mut workbook, *sheet, name)?,
@@ -930,7 +968,10 @@ fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super:
     let mut package = workbook.package.clone();
     let index = super::resources::intern_style_plan(&mut package, &plan)?;
     package.unsign();
-    *workbook = Workbook::from_opc_package(package)?;
+    *workbook = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        workbook.external_link_limits(),
+    )?;
     Ok(index)
 }
 
@@ -951,8 +992,16 @@ fn insert_candidate_cell(
         edit.insert(reference, style, value)?;
     }
     let commit = edit.commit()?;
-    let _snapshot = super::workbook::apply(&mut package, &uri, &commit)?;
-    *workbook = Workbook::from_opc_package(package)?;
+    let _snapshot = super::workbook::apply_with_external_link_limits(
+        &mut package,
+        &uri,
+        &commit,
+        workbook.external_link_limits(),
+    )?;
+    *workbook = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        workbook.external_link_limits(),
+    )?;
     Ok(())
 }
 
@@ -1080,7 +1129,10 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         .get_part_mut(&worksheet_uri)?
         .set_blob(worksheet_output);
     package.unsign();
-    *workbook = Workbook::from_opc_package(package)?;
+    *workbook = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        workbook.external_link_limits(),
+    )?;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     if workbook.sheet_drawing(catalog_position).is_none() {
         return Err(Error::InvalidFormat(
@@ -1153,7 +1205,10 @@ fn append_image(
     )?;
     drawing_part.set_blob(drawing_xml);
     package.unsign();
-    *workbook = Workbook::from_opc_package(package)?;
+    *workbook = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        workbook.external_link_limits(),
+    )?;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     let drawing = workbook.sheet_drawing(catalog_position).ok_or_else(|| {
         Error::InvalidFormat("appended worksheet drawing failed semantic readback".to_string())
@@ -1203,7 +1258,8 @@ fn transfer_cell(
     target_sheet: usize,
     target_reference: Reference,
 ) -> Result<()> {
-    let source = validated_workbook(source_bytes)?;
+    let source =
+        validated_workbook_with_external_link_limits(source_bytes, target.external_link_limits())?;
     let source_snapshot = source.cell_values(source_sheet)?;
     let source_cell = source_snapshot
         .cell(source_reference)?
@@ -1273,8 +1329,16 @@ fn transfer_cell(
     }
     edit.set_show_phonetic(target_reference, source_cell.show_phonetic())?;
     let commit = edit.commit()?;
-    let _published_snapshot = super::workbook::apply(&mut package, &uri, &commit)?;
-    *target = Workbook::from_opc_package(package)?;
+    let _published_snapshot = super::workbook::apply_with_external_link_limits(
+        &mut package,
+        &uri,
+        &commit,
+        target.external_link_limits(),
+    )?;
+    *target = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        target.external_link_limits(),
+    )?;
     Ok(())
 }
 
@@ -1305,7 +1369,10 @@ fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<()>
     let mut package = workbook.package.clone();
     package.get_part_mut(&uri)?.set_blob(output);
     package.unsign();
-    *workbook = Workbook::from_opc_package(package)?;
+    *workbook = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        workbook.external_link_limits(),
+    )?;
     Ok(())
 }
 
@@ -1379,18 +1446,31 @@ fn validate_all_worksheets(workbook: &Workbook) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn validated_workbook(bytes: &[u8]) -> Result<Workbook> {
-    let workbook = workbook_from_bytes(bytes)?;
+pub(super) fn validated_workbook_with_external_link_limits(
+    bytes: &[u8],
+    external_link_limits: ExternalLinkLimits,
+) -> Result<Workbook> {
+    let workbook = workbook_from_bytes(bytes, external_link_limits)?;
     validate_all_worksheets(&workbook)?;
     Ok(workbook)
 }
 
-fn workbook_from_bytes(bytes: &[u8]) -> Result<Workbook> {
-    crate::Package::from_slice(bytes)?.into_workbook()
+fn workbook_from_bytes(bytes: &[u8], external_link_limits: ExternalLinkLimits) -> Result<Workbook> {
+    crate::Package::from_slice_with_external_link_limits(bytes, external_link_limits)?
+        .into_workbook()
 }
 
 fn workbook_bytes(workbook: &Workbook) -> Result<Vec<u8>> {
     crate::Package::from(workbook.package.clone()).to_bytes()
+}
+
+fn copy_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<[u8]>> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.extend_from_slice(bytes);
+    Ok(Arc::from(copied))
 }
 
 fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
@@ -1476,7 +1556,10 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let target_sheet = read_next_usize(data, offset)?;
             let target_row = read_next_u32(data, offset)?;
             let target_column = read_next_u32(data, offset)?;
-            let source = Arc::from(read_slice(data, offset, source_len)?.to_vec());
+            let source = copy_arc(
+                read_slice(data, offset, source_len)?,
+                "workbook patch transfer-cell source",
+            )?;
             Ok(Operation::TransferCell {
                 source,
                 source_sheet,
@@ -1534,7 +1617,10 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let source_sheet = read_next_usize(data, offset)?;
             let source_anchor = read_next_usize(data, offset)?;
             let target_sheet = read_next_usize(data, offset)?;
-            let source = Arc::from(read_slice(data, offset, source_len)?.to_vec());
+            let source = copy_arc(
+                read_slice(data, offset, source_len)?,
+                "workbook patch transfer-drawing source",
+            )?;
             Ok(Operation::TransferDrawing {
                 source,
                 source_sheet,

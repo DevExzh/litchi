@@ -4,6 +4,7 @@ use super::model::Workbook;
 use crate::calc::Props;
 use crate::cell_values;
 use crate::cell_watches;
+use crate::external_link::{Budget, ExternalLinkLimits};
 use crate::package::error::Result;
 use crate::package::formula::{Context, View, excel_name_eq, table::Definition as TableDefinition};
 use crate::package::styles_table::StylesTable;
@@ -140,8 +141,14 @@ impl Workbook {
     ) -> Result<cell_values::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let mut candidate = self.package.clone();
-        let snapshot = cell_values::workbook::apply(&mut candidate, &uri, commit)?;
-        *self = Self::from_opc_package(candidate)?;
+        let snapshot = cell_values::workbook::apply_with_external_link_limits(
+            &mut candidate,
+            &uri,
+            commit,
+            self.external_link_limits,
+        )?;
+        *self =
+            Self::from_opc_package_with_external_link_limits(candidate, self.external_link_limits)?;
         Ok(snapshot)
     }
 
@@ -237,7 +244,12 @@ impl Workbook {
     ) -> Result<sparkline::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
         sparkline::workbook::validate_commit_context(&commit, &self.formula_context)?;
-        sparkline::workbook::apply(&mut self.package, &uri, commit)
+        sparkline::workbook::apply_with_external_link_limits(
+            &mut self.package,
+            &uri,
+            commit,
+            self.external_link_limits,
+        )
     }
 
     /// Read optional sparkline groups selected by worksheet name.
@@ -265,7 +277,12 @@ impl Workbook {
         commit: &cell_watches::Commit,
     ) -> Result<cell_watches::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_watches::workbook::apply(&mut self.package, &uri, commit)
+        cell_watches::workbook::apply_with_external_link_limits(
+            &mut self.package,
+            &uri,
+            commit,
+            self.external_link_limits,
+        )
     }
 
     /// Read the typed cell-watch and phonetic snapshot selected by worksheet
@@ -374,7 +391,8 @@ impl Workbook {
         let value = edit(&mut candidate)?;
 
         Self::validate_edit_candidate(&candidate)?;
-        let validated = Self::from_opc_package(candidate)?;
+        let validated =
+            Self::from_opc_package_with_external_link_limits(candidate, self.external_link_limits)?;
         *self = validated;
         Ok(value)
     }
@@ -709,7 +727,11 @@ impl Workbook {
 
     /// Read and validate an XLSB workbook with the default bounded OPC limits.
     pub fn new<R: Read + Seek>(reader: R) -> Result<Self> {
-        Self::new_with_limits(reader, litchi_opc::ReadLimits::default())
+        Self::new_with_limits_and_external_link_limits(
+            reader,
+            litchi_opc::ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
     }
 
     /// Read and validate an XLSB workbook with explicit OPC resource limits.
@@ -717,8 +739,35 @@ impl Workbook {
         reader: R,
         limits: litchi_opc::ReadLimits,
     ) -> Result<Self> {
+        Self::new_with_limits_and_external_link_limits(
+            reader,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read and validate an XLSB workbook with explicit external-link
+    /// resource limits and default OPC limits.
+    pub fn new_with_external_link_limits<R: Read + Seek>(
+        reader: R,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::new_with_limits_and_external_link_limits(
+            reader,
+            litchi_opc::ReadLimits::default(),
+            external_link_limits,
+        )
+    }
+
+    /// Read and validate an XLSB workbook with independent OPC and
+    /// external-link resource limits.
+    pub fn new_with_limits_and_external_link_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
         let package = OpcPackage::from_reader_with_limits(reader, limits)?;
-        Self::from_opc_package(package)
+        Self::from_opc_package_with_external_link_limits(package, external_link_limits)
     }
 
     /// Create an XLSB workbook from an already-parsed OPC package.
@@ -730,6 +779,16 @@ impl Workbook {
     ///
     /// * `package` - An already-parsed OPC package
     pub fn from_opc_package(package: OpcPackage) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits(package, ExternalLinkLimits::default())
+    }
+
+    /// Create an XLSB workbook from an already-parsed OPC package using
+    /// explicit external-link resource limits.
+    pub fn from_opc_package_with_external_link_limits(
+        package: OpcPackage,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        let mut external_link_budget = external_link_limits.budget();
         let mut workbook = Workbook {
             package,
             worksheets: Vec::new(),
@@ -738,6 +797,7 @@ impl Workbook {
             worksheet_rel_ids: Vec::new(),
             active_catalog_position: None,
             formula_context: Context::default(),
+            external_link_limits,
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
             calc: Props::default(),
@@ -749,14 +809,14 @@ impl Workbook {
             connections: None,
         };
 
-        workbook.load_workbook_info()?;
+        workbook.load_workbook_info(&mut external_link_budget)?;
         workbook.load_styles()?;
         workbook.load_shared_strings()?;
 
         Ok(workbook)
     }
 
-    fn load_workbook_info(&mut self) -> Result<()> {
+    fn load_workbook_info(&mut self, external_link_budget: &mut Budget) -> Result<()> {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
@@ -764,36 +824,48 @@ impl Workbook {
         let info = Self::read_workbook(&mut iter)?;
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
-        let external_link_uris = info
-            .external_link_rel_ids
-            .iter()
-            .map(|rel_id| {
-                let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                    crate::package::error::Error::InvalidFormula(format!(
-                        "BrtSupBookSrc relationship {rel_id:?} is missing"
-                    ))
-                })?;
-                if relationship.is_external() {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "BrtSupBookSrc relationship {rel_id:?} is external"
-                    )));
-                }
-                if !matches!(
-                    relationship.reltype(),
-                    relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
-                ) {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "BrtSupBookSrc relationship {rel_id:?} has invalid type {:?}",
-                        relationship.reltype()
-                    )));
-                }
-                relationship.target_partname().map_err(Into::into)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let external_books = external_link_uris
-            .iter()
-            .map(|uri| self.load_external_book(uri))
-            .collect::<Result<Vec<_>>>()?;
+        // BrtSupBookSrc identifiers are workbook-stream metadata. The
+        // external-link budget starts when each referenced part is parsed.
+        external_link_budget.preflight_links(info.external_link_rel_ids.len())?;
+        let mut external_link_uris = Vec::new();
+        external_link_uris
+            .try_reserve_exact(info.external_link_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB external-link URI map",
+                source,
+            })?;
+        for rel_id in &info.external_link_rel_ids {
+            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+                crate::package::error::Error::InvalidFormula(format!(
+                    "BrtSupBookSrc relationship {rel_id:?} is missing"
+                ))
+            })?;
+            if relationship.is_external() {
+                return Err(crate::package::error::Error::InvalidFormula(format!(
+                    "BrtSupBookSrc relationship {rel_id:?} is external"
+                )));
+            }
+            if !matches!(
+                relationship.reltype(),
+                relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
+            ) {
+                return Err(crate::package::error::Error::InvalidFormula(format!(
+                    "BrtSupBookSrc relationship {rel_id:?} has invalid type {:?}",
+                    relationship.reltype()
+                )));
+            }
+            external_link_uris.push(relationship.target_partname()?);
+        }
+        let mut external_books = Vec::new();
+        external_books
+            .try_reserve_exact(external_link_uris.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB external-link result map",
+                source,
+            })?;
+        for uri in &external_link_uris {
+            external_books.push(self.load_external_book_with_budget(uri, external_link_budget)?);
+        }
         let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
         let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {

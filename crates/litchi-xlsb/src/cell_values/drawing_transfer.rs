@@ -228,7 +228,10 @@ pub(super) fn transfer(
     source_anchor: usize,
     target_sheet: usize,
 ) -> Result<()> {
-    let source = super::root::validated_workbook(source_bytes)?;
+    let source = super::root::validated_workbook_with_external_link_limits(
+        source_bytes,
+        target.external_link_limits(),
+    )?;
     let source_plan = plan_source(&source, source_sheet, source_anchor)?;
     let target_plan = plan_target(target, target_sheet)?;
     if source_plan.layout.strict != target_plan.layout.strict {
@@ -272,7 +275,10 @@ pub(super) fn transfer(
         target_relationships,
     )?;
     package.unsign();
-    *target = Workbook::from_opc_package(package)?;
+    *target = Workbook::from_opc_package_with_external_link_limits(
+        package,
+        target.external_link_limits(),
+    )?;
     validate_readback(
         target,
         target_sheet,

@@ -20,9 +20,9 @@ pub(crate) struct Source {
     pub(crate) unknown_records: Vec<UnknownRecord>,
 }
 
-/// Parse one stream and retain every record not modeled by this owner.
-pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
-    let parsed = parse_external_link(data)?;
+/// Parse one stream while consuming the caller's operation-scoped budget.
+pub(crate) fn parse_source_with_budget(data: &[u8], budget: &mut Budget) -> Result<Source> {
+    let parsed = parse_external_link_with_budget(data, budget)?;
     let bytes = copy_bytes(data, "external-link source")?;
     let limits = crate::raw::Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
     let mut unknown_records = Vec::new();
@@ -60,6 +60,8 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
                 found: next_unknown_bytes,
             });
         }
+        budget.opaque(1, raw_len)?;
+        budget.retained_objects(1)?;
         unknown_records
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
@@ -105,12 +107,28 @@ pub(crate) fn is_modeled_record(kind: crate::raw::Kind) -> bool {
 
 /// Parse one complete XLSB External Link part stream.
 pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
+    parse_external_link_with_limits(data, ExternalLinkLimits::DEFAULT)
+}
+
+/// Parse one complete stream under an explicit finite resource policy.
+pub fn parse_external_link_with_limits(data: &[u8], limits: ExternalLinkLimits) -> Result<Parsed> {
+    let mut budget = limits.budget();
+    parse_external_link_with_budget(data, &mut budget)
+}
+
+/// Parse one complete stream while consuming the caller's operation budget.
+pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) -> Result<Parsed> {
     if data.len() > MAX_LINK_PART_BYTES {
         return Err(Error::InvalidLength {
             expected: MAX_LINK_PART_BYTES,
             found: data.len(),
         });
     }
+    budget.begin_link_part(data.len())?;
+    // Stable retained-object accounting: one Link, one semantic item, one
+    // cache matrix, one dense cache cell, or one opaque record per object.
+    // Strings and formula tokens are charged by their semantic-byte limits.
+    budget.retained_objects(1)?;
     let limits = crate::raw::Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
     let mut link_type = None;
     let mut target_key = String::new();
@@ -130,9 +148,29 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
     let mut cache_dimensions = None;
     let mut cache_values = Vec::new();
     let mut saw_end = false;
+    let mut extern_table_open = false;
 
     for record in crate::raw::Records::with_limits(data, limits) {
         let record = record?;
+        let cache_region = extern_table_open
+            || record.kind() == crate::raw::kind::EXTERN_TABLE_START
+            || record.kind() == crate::raw::kind::EXTERN_TABLE_END;
+        budget.record(cache_region)?;
+        match record.kind() {
+            crate::raw::kind::EXTERN_TABLE_START => {
+                if extern_table_open {
+                    return Err(invalid("nested external table cache region"));
+                }
+                extern_table_open = true;
+            },
+            crate::raw::kind::EXTERN_TABLE_END => {
+                if !extern_table_open {
+                    return Err(invalid("external table cache region has no start"));
+                }
+                extern_table_open = false;
+            },
+            _ => {},
+        }
         if saw_end {
             return Err(invalid("external link has records after BrtEndSupBook"));
         }
@@ -147,11 +185,20 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                 let mut cursor =
                     crate::raw::Cursor::with_limits(record.payload(), "BrtBeginSupBook", limits);
                 let kind = cursor.read_u16()?;
-                let first = cursor.read_wide_string()?;
+                let first =
+                    read_external_wide_string(&mut cursor, budget, "BrtBeginSupBook string1")?;
                 let second = if kind == EXTERNAL_REFERENCE_WORKBOOK {
-                    cursor.read_nullable_wide_string()?
+                    read_external_nullable_wide_string(
+                        &mut cursor,
+                        budget,
+                        "BrtBeginSupBook string2",
+                    )?
                 } else {
-                    Some(cursor.read_wide_string()?)
+                    Some(read_external_wide_string(
+                        &mut cursor,
+                        budget,
+                        "BrtBeginSupBook string2",
+                    )?)
                 };
                 cursor.finish()?;
                 if kind > EXTERNAL_REFERENCE_OLE || first.is_empty() {
@@ -173,7 +220,7 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                 {
                     return Err(invalid("unexpected BrtSupTabs"));
                 }
-                sheet_names = parse_external_sheet_names(record.payload(), limits)?;
+                sheet_names = parse_external_sheet_names(record.payload(), limits, budget)?;
                 saw_sup_tabs = true;
             },
             crate::raw::kind::SUP_NAME_START => {
@@ -184,7 +231,7 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                 }
                 let mut cursor =
                     crate::raw::Cursor::with_limits(record.payload(), "BrtSupNameStart", limits);
-                let name = cursor.read_wide_string()?;
+                let name = read_external_wide_string(&mut cursor, budget, "BrtSupNameStart")?;
                 cursor.finish()?;
                 validate_defined_name(&name)?;
                 current_name = Some(name);
@@ -214,7 +261,9 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                         found: formula_len,
                     });
                 }
-                let formula = cursor.read_bytes(formula_len)?.to_vec();
+                let formula_bytes = cursor.read_bytes(formula_len)?;
+                budget.token_bytes(formula_len)?;
+                let formula = copy_bytes(formula_bytes, "external name formula")?;
                 cursor.finish()?;
                 current_formula = if formula.is_empty() {
                     None
@@ -268,6 +317,10 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                         found: count,
                     });
                 }
+                budget.matrix(1)?;
+                budget.cells(count)?;
+                budget.retained_objects(1)?;
+                budget.retained_objects(count)?;
                 cache_values.clear();
                 cache_values
                     .try_reserve(count)
@@ -293,6 +346,7 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                     record.kind(),
                     record.payload(),
                     limits,
+                    budget,
                 )?);
             },
             crate::raw::kind::SUP_NAME_VALUE_END => {
@@ -323,6 +377,8 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
                 let bits = current_bits
                     .take()
                     .ok_or_else(|| invalid("external name block has no properties"))?;
+                budget.items(1)?;
+                budget.retained_objects(1)?;
                 match kind {
                     EXTERNAL_REFERENCE_WORKBOOK => {
                         reserve_entry(&mut workbook_entries, "external workbook entries")?;
@@ -399,6 +455,9 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
     if kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs {
         return Err(invalid("external workbook link has no BrtSupTabs"));
     }
+    if extern_table_open {
+        return Err(invalid("external table cache region has no end"));
+    }
     let link_kind = match kind {
         EXTERNAL_REFERENCE_WORKBOOK => Kind::Workbook,
         EXTERNAL_REFERENCE_DDE => Kind::Dde,
@@ -407,7 +466,11 @@ pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
     };
     let relationship_id = match link_kind {
         Kind::Dde => None,
-        Kind::Workbook | Kind::Ole => Some(target_key.clone()),
+        Kind::Workbook | Kind::Ole => Some(copy_string(
+            &target_key,
+            "external relationship identifier",
+            budget,
+        )?),
     };
     let entries = match kind {
         EXTERNAL_REFERENCE_WORKBOOK => Entries::Workbook(workbook_entries),
@@ -438,15 +501,32 @@ pub fn parse_external_link_with_relationship(data: &[u8]) -> Result<Parsed> {
     parse_external_link(data)
 }
 
+/// Explicitly named relationship-aware parser under an explicit policy.
+pub fn parse_external_link_with_relationship_with_limits(
+    data: &[u8],
+    limits: ExternalLinkLimits,
+) -> Result<Parsed> {
+    parse_external_link_with_limits(data, limits)
+}
+
 /// Parse a stream when the caller only needs its inert semantic model.
 pub fn parse_external_link_model(data: &[u8]) -> Result<Link> {
     parse_external_link(data).map(Parsed::into_link)
+}
+
+/// Parse only the inert semantic model under an explicit policy.
+pub fn parse_external_link_model_with_limits(
+    data: &[u8],
+    limits: ExternalLinkLimits,
+) -> Result<Link> {
+    parse_external_link_with_limits(data, limits).map(Parsed::into_link)
 }
 
 fn parse_external_cached_value(
     record_type: crate::raw::Kind,
     data: &[u8],
     limits: crate::raw::Limits,
+    budget: &mut Budget,
 ) -> Result<CachedValue> {
     match record_type {
         crate::raw::kind::SUP_NAME_NIL if data.is_empty() => Ok(CachedValue::Empty),
@@ -469,7 +549,7 @@ fn parse_external_cached_value(
                 });
             }
             let mut cursor = crate::raw::Cursor::with_limits(data, "BrtSupNameSt", limits);
-            let value = cursor.read_wide_string()?;
+            let value = read_external_wide_string(&mut cursor, budget, "BrtSupNameSt")?;
             cursor.finish()?;
             Ok(CachedValue::String(value))
         },
@@ -479,7 +559,11 @@ fn parse_external_cached_value(
     }
 }
 
-fn parse_external_sheet_names(data: &[u8], limits: crate::raw::Limits) -> Result<Vec<String>> {
+fn parse_external_sheet_names(
+    data: &[u8],
+    limits: crate::raw::Limits,
+    budget: &mut Budget,
+) -> Result<Vec<String>> {
     if data.len() < 4 {
         return Err(Error::InvalidLength {
             expected: 4,
@@ -495,6 +579,8 @@ fn parse_external_sheet_names(data: &[u8], limits: crate::raw::Limits) -> Result
         )));
     }
     let mut names = Vec::new();
+    budget.retained_objects(1)?;
+    budget.retained_objects(count)?;
     names
         .try_reserve(count)
         .map_err(|source| Error::Allocation {
@@ -502,7 +588,7 @@ fn parse_external_sheet_names(data: &[u8], limits: crate::raw::Limits) -> Result
             source,
         })?;
     for _ in 0..count {
-        let name = cursor.read_wide_string()?;
+        let name = read_external_wide_string(&mut cursor, budget, "BrtSupTabs")?;
         let name_len = name.encode_utf16().count();
         if name_len == 0
             || name_len > 31
@@ -565,6 +651,108 @@ fn copy_bytes(data: &[u8], resource: &'static str) -> Result<Vec<u8>> {
         .map_err(|source| Error::Allocation { resource, source })?;
     copied.extend_from_slice(data);
     Ok(copied)
+}
+
+fn copy_string(value: &str, resource: &'static str, budget: &mut Budget) -> Result<String> {
+    budget.string(value.encode_utf16().count(), value.len())?;
+    let mut copied = String::new();
+    copied
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.push_str(value);
+    Ok(copied)
+}
+
+fn read_external_nullable_wide_string(
+    cursor: &mut crate::raw::Cursor<'_>,
+    budget: &mut Budget,
+    context: &'static str,
+) -> Result<Option<String>> {
+    let length_offset = cursor.position();
+    let units = cursor.read_u32()?;
+    if units == u32::MAX {
+        return Ok(None);
+    }
+    read_external_wide_string_after_units(cursor, units, length_offset, budget, context).map(Some)
+}
+
+fn read_external_wide_string(
+    cursor: &mut crate::raw::Cursor<'_>,
+    budget: &mut Budget,
+    context: &'static str,
+) -> Result<String> {
+    let length_offset = cursor.position();
+    let units = cursor.read_u32()?;
+    read_external_wide_string_after_units(cursor, units, length_offset, budget, context)
+}
+
+fn read_external_wide_string_after_units(
+    cursor: &mut crate::raw::Cursor<'_>,
+    units: u32,
+    length_offset: usize,
+    budget: &mut Budget,
+    context: &'static str,
+) -> Result<String> {
+    let units = usize::try_from(units).map_err(|_| {
+        Error::Wire(crate::raw::Error::LengthOverflow {
+            what: "UTF-16 string",
+            length: usize::MAX,
+        })
+    })?;
+    if units > MAX_WIDE_STRING_UNITS {
+        return Err(Error::Wire(crate::raw::Error::StringLimit {
+            units,
+            limit: MAX_WIDE_STRING_UNITS,
+            offset: length_offset,
+        }));
+    }
+    let byte_len = units
+        .checked_mul(2)
+        .ok_or(Error::Wire(crate::raw::Error::LengthOverflow {
+            what: "UTF-16 string",
+            length: units,
+        }))?;
+    let string_offset = cursor.position();
+    let bytes = cursor.read_bytes(byte_len)?;
+    let exact_utf8_bytes = validate_external_utf16(bytes, string_offset)?;
+    budget.string(units, exact_utf8_bytes)?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(exact_utf8_bytes)
+        .map_err(|source| Error::Allocation {
+            resource: context,
+            source,
+        })?;
+    append_external_utf16(bytes, string_offset, &mut output)?;
+    Ok(output)
+}
+
+fn validate_external_utf16(bytes: &[u8], offset: usize) -> Result<usize> {
+    let mut exact_utf8_bytes = 0usize;
+    for decoded in std::char::decode_utf16(external_utf16_units(bytes)) {
+        let value = decoded.map_err(|_| Error::Wire(crate::raw::Error::InvalidUtf16 { offset }))?;
+        exact_utf8_bytes = exact_utf8_bytes
+            .checked_add(value.len_utf8())
+            .ok_or(Error::Wire(crate::raw::Error::LengthOverflow {
+                what: "UTF-8 string",
+                length: usize::MAX,
+            }))?;
+    }
+    Ok(exact_utf8_bytes)
+}
+
+fn append_external_utf16(bytes: &[u8], offset: usize, output: &mut String) -> Result<()> {
+    for decoded in std::char::decode_utf16(external_utf16_units(bytes)) {
+        let value = decoded.map_err(|_| Error::Wire(crate::raw::Error::InvalidUtf16 { offset }))?;
+        output.push(value);
+    }
+    Ok(())
+}
+
+fn external_utf16_units(bytes: &[u8]) -> impl Iterator<Item = u16> + '_ {
+    bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
 }
 
 fn reserve_entry<T>(entries: &mut Vec<T>, resource: &'static str) -> Result<()> {
