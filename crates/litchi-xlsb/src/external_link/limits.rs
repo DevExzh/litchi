@@ -649,6 +649,30 @@ impl Budget {
         Ok(())
     }
 
+    /// Validate one deferred part against the current operation without
+    /// consuming it. The parser still charges the actual decoded length.
+    pub(crate) fn preflight_link_part(&self, data_len: usize) -> Result<()> {
+        let _ = checked_add(
+            0,
+            data_len,
+            ExternalLinkResource::PartBytes,
+            self.limits.max_part_bytes,
+        )?;
+        let _ = checked_add(
+            self.usage.total_part_bytes,
+            data_len,
+            ExternalLinkResource::TotalPartBytes,
+            self.limits.max_total_part_bytes,
+        )?;
+        let _ = checked_add(
+            self.usage.links,
+            1,
+            ExternalLinkResource::Links,
+            self.limits.max_links,
+        )?;
+        Ok(())
+    }
+
     /// Charge one link part before retaining its bytes.
     pub(crate) fn begin_link_part(&mut self, data_len: usize) -> Result<()> {
         let local_part_bytes = checked_add(

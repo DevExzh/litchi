@@ -141,7 +141,9 @@ pub use raw::Error;
 pub use package::scenarios;
 pub use package::{Cell, FormulaOpacityReason, FormulaResolutionStatus, Package};
 pub use sheet::Worksheet;
-pub use workbook::{SourceBackedWorkbook, SourceBackedWorksheet, Workbook};
+pub use workbook::{
+    SourceBackedExternalLink, SourceBackedWorkbook, SourceBackedWorksheet, Workbook,
+};
 
 pub use pivot_view::Part;
 

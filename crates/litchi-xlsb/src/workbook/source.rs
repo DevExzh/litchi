@@ -16,8 +16,9 @@ use litchi_opc::{
 use once_cell::sync::OnceCell;
 
 use super::model::Workbook;
+use crate::external_link::{ExternalLinkLimits, Link};
 use crate::package::error::{Error, Result};
-use crate::package::formula::{Context, Definition};
+use crate::package::formula::{Context, Definition, ExternalBook};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::StylesTable;
 use crate::raw::{Records, kind};
@@ -33,6 +34,7 @@ const XLSB_MAX_COLUMN_INDEX: u32 = 16_383;
 const XLSB_SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 const XLSB_STYLES_CONTENT_TYPE: &str = "application/vnd.ms-excel.styles";
 const XLSB_TABLE_CONTENT_TYPE: &str = "application/vnd.ms-excel.table";
+const XLSB_EXTERNAL_LINK_CONTENT_TYPE: &str = "application/vnd.ms-excel.externalLink";
 const XLSB_COMMENTS_CONTENT_TYPE: &str = "application/vnd.ms-excel.comments";
 const XLSB_CHARTSHEET_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -66,7 +68,12 @@ struct SheetMetadata {
 
 #[derive(Debug)]
 struct TablePartMetadata {
-    catalog_position: usize,
+    worksheet_position: usize,
+    partname: PackURI,
+}
+
+#[derive(Debug)]
+struct ExternalLinkPartMetadata {
     partname: PackURI,
 }
 
@@ -75,8 +82,10 @@ struct SourceInner {
     sheets: Vec<SheetMetadata>,
     worksheet_positions: Vec<usize>,
     table_parts: Vec<TablePartMetadata>,
+    external_link_parts: Vec<ExternalLinkPartMetadata>,
     active_catalog_position: Option<usize>,
     formula_context: Context,
+    external_link_limits: ExternalLinkLimits,
     shared_strings_part: Option<PackURI>,
     styles_part: Option<PackURI>,
     incomplete_formula_context: bool,
@@ -84,6 +93,7 @@ struct SourceInner {
     shared_strings: SemanticCache<Vec<SharedString>>,
     styles: SemanticCache<StylesTable>,
     tables: SemanticCache<TableDefinitions>,
+    external_books: SemanticCache<ExternalBooks>,
 }
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
@@ -93,7 +103,8 @@ struct SourceInner {
 /// and source-bound.
 /// `SourceCacheLimits` bounds retained OPC payload bytes, and configured
 /// per-Part read limits apply to each source payload. Successfully parsed
-/// shared-string, style, and table-definition values are retained separately.
+/// shared-string, style, table-definition, and bounded inert external-link
+/// values are retained separately.
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
@@ -111,6 +122,25 @@ pub struct SourceBackedWorksheet {
     catalog_position: usize,
 }
 
+/// A source-checked, immutable view of one bounded inert external-link model.
+///
+/// The handle shares the already parsed semantic catalog without cloning DDE
+/// or OLE cached matrices. It never follows, opens, refreshes, evaluates, or
+/// executes the external target.
+#[derive(Clone)]
+pub struct SourceBackedExternalLink {
+    books: Arc<[ExternalBook]>,
+    index: usize,
+}
+
+impl SourceBackedExternalLink {
+    /// Borrow the complete inert link metadata retained by this snapshot.
+    #[must_use]
+    pub fn metadata(&self) -> &Link {
+        self.books[self.index].metadata_ref()
+    }
+}
+
 impl SourceBackedWorkbook {
     /// Open with the default bounded OPC read and cache policies.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
@@ -122,6 +152,30 @@ impl SourceBackedWorkbook {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
             source, limits,
         )?)
+    }
+
+    /// Open with the default bounded OPC policy and explicit external-link
+    /// semantic resource limits.
+    pub fn from_read_at_with_external_link_limits(
+        source: Arc<dyn ReadAt>,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package_with_external_link_limits(
+            SourceBackedPackage::from_read_at(source)?,
+            external_link_limits,
+        )
+    }
+
+    /// Open with explicit bounded OPC and external-link semantic policies.
+    pub fn from_read_at_with_limits_and_external_link_limits(
+        source: Arc<dyn ReadAt>,
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package_with_external_link_limits(
+            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
+            external_link_limits,
+        )
     }
 
     /// Open with an explicit finite deferred-payload cache policy.
@@ -180,6 +234,17 @@ impl SourceBackedWorkbook {
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        Self::from_source_backed_package_with_external_link_limits(
+            package,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Build a lazy XLSB catalog with explicit external-link semantic limits.
+    pub fn from_source_backed_package_with_external_link_limits(
+        package: SourceBackedPackage,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
         let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
         if workbook_part.content_type() != content_type::XLSB_BIN {
@@ -214,6 +279,43 @@ impl SourceBackedWorkbook {
             "styles",
         )?;
 
+        let external_link_budget = external_link_limits.budget();
+        external_link_budget.preflight_links(info.external_link_rel_ids.len())?;
+        let mut external_link_parts = Vec::new();
+        external_link_parts
+            .try_reserve_exact(info.external_link_rel_ids.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB external-link catalog",
+                source,
+            })?;
+        for relationship_id in &info.external_link_rel_ids {
+            let _ = preflight_package(&package)?;
+            let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
+                Error::InvalidRelationship(format!(
+                    "BrtSupBookSrc relationship {relationship_id:?} is missing"
+                ))
+            })?;
+            if relationship.is_external() {
+                return Err(Error::InvalidRelationship(format!(
+                    "BrtSupBookSrc relationship {relationship_id:?} is external"
+                )));
+            }
+            if !matches!(
+                relationship.reltype(),
+                relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
+            ) {
+                return Err(Error::InvalidRelationship(format!(
+                    "BrtSupBookSrc relationship {relationship_id:?} has invalid type {:?}",
+                    relationship.reltype()
+                )));
+            }
+            let partname = relationship.target_partname()?;
+            let part = package.part(&partname)?;
+            require_content_type(&part, XLSB_EXTERNAL_LINK_CONTENT_TYPE)?;
+            external_link_parts.push(ExternalLinkPartMetadata { partname });
+            postflight_package(&package)?;
+        }
+
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(info.worksheet_names.len())
@@ -242,7 +344,7 @@ impl SourceBackedWorkbook {
                 resource: "source-backed XLSB worksheet target validation",
                 source,
             })?;
-        let mut incomplete_formula_context = !info.external_link_rel_ids.is_empty();
+        let mut incomplete_formula_context = false;
 
         for (workbook_position, (name, relationship_id)) in info
             .worksheet_names
@@ -281,6 +383,7 @@ impl SourceBackedWorkbook {
                 relationship.reltype(),
                 relationship_type::WORKSHEET | relationship_type::STRICT_WORKSHEET
             ) {
+                let worksheet_position = worksheet_positions.len();
                 require_content_type(&sheet_part, XLSB_WORKSHEET_CONTENT_TYPE)?;
                 for relationship in sheet_part.rels().iter() {
                     if matches!(
@@ -302,7 +405,7 @@ impl SourceBackedWorkbook {
                                 source,
                             })?;
                         table_parts.push(TablePartMetadata {
-                            catalog_position: workbook_position,
+                            worksheet_position,
                             partname: table_partname,
                         });
                     }
@@ -382,8 +485,10 @@ impl SourceBackedWorkbook {
                 sheets,
                 worksheet_positions,
                 table_parts,
+                external_link_parts,
                 active_catalog_position,
                 formula_context,
+                external_link_limits,
                 shared_strings_part,
                 styles_part,
                 incomplete_formula_context,
@@ -391,8 +496,55 @@ impl SourceBackedWorkbook {
                 shared_strings: SemanticCache::new(),
                 styles: SemanticCache::new(),
                 tables: SemanticCache::new(),
+                external_books: SemanticCache::new(),
             }),
         })
+    }
+
+    /// Return the number of external-link owners without reading their payloads.
+    pub fn external_link_count(&self) -> Result<usize> {
+        let _ = preflight_package(&self.inner.package)?;
+        let count = self.inner.external_link_parts.len();
+        postflight_package(&self.inner.package)?;
+        Ok(count)
+    }
+
+    /// Return one bounded inert external-link snapshot in `BrtSupBookSrc` order.
+    pub fn external_link(&self, index: usize) -> Result<Option<SourceBackedExternalLink>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let books = self.inner.external_books()?;
+        let link = if index < books.len() {
+            Some(SourceBackedExternalLink { books, index })
+        } else {
+            None
+        };
+        postflight_package(&self.inner.package)?;
+        Ok(link)
+    }
+
+    /// Snapshot all bounded inert external links in `BrtSupBookSrc` order.
+    pub fn external_links(&self) -> Result<Vec<SourceBackedExternalLink>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let books = self.inner.external_books()?;
+        let mut links = Vec::new();
+        links
+            .try_reserve_exact(books.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB external-link handles",
+                source,
+            })?;
+        links.extend((0..books.len()).map(|index| SourceBackedExternalLink {
+            books: Arc::clone(&books),
+            index,
+        }));
+        postflight_package(&self.inner.package)?;
+        Ok(links)
+    }
+
+    /// Return the external-link semantic policy configured for this source-backed workbook.
+    #[must_use]
+    pub fn external_link_limits(&self) -> ExternalLinkLimits {
+        self.inner.external_link_limits
     }
 
     /// Return the number of workbook tabs after checking source freshness.
@@ -704,8 +856,8 @@ impl SourceBackedWorksheet {
     /// Parse the selected worksheet BIFF12 stream without reading unselected sheets.
     ///
     /// This source-backed layer materializes stream-owned worksheet data and
-    /// all table definitions needed for cross-sheet structured references.
-    /// Other workbook adjunct owners such as drawings, external books,
+    /// all table definitions and bounded inert external-link metadata needed
+    /// for formula resolution. Other workbook adjunct owners such as drawings,
     /// PivotTables, slicers, and timelines remain separately deferred rather
     /// than forcing eager loading.
     pub fn materialize(&self) -> Result<Worksheet> {
@@ -719,10 +871,11 @@ impl SourceBackedWorksheet {
         }
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB worksheet materialization requires deferred external or PivotTable formula owners"
+                "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners"
                     .to_string(),
             ));
         }
+        let external_books = self.inner.external_books()?;
         let tables = self.inner.tables()?;
         let worksheet_part = self.inner.package.part(&metadata.partname)?;
         if worksheet_part.rels().iter().any(|relationship| {
@@ -754,6 +907,7 @@ impl SourceBackedWorksheet {
         let shared_strings = self.inner.shared_strings()?;
         let styles = self.inner.styles()?;
         let mut formula_context = self.inner.formula_context.clone();
+        formula_context.external_books = external_books;
         formula_context.tables = Arc::clone(&tables);
         let mut worksheet = Workbook::read_worksheet(
             Cursor::new(worksheet_data.as_bytes()),
@@ -792,6 +946,10 @@ struct TableDefinitions {
     definitions: Arc<[Definition]>,
 }
 
+struct ExternalBooks {
+    books: Arc<[ExternalBook]>,
+}
+
 struct SemanticCache<T> {
     value: OnceCell<Arc<T>>,
 }
@@ -812,6 +970,53 @@ impl<T> SemanticCache<T> {
 }
 
 impl SourceInner {
+    fn external_books(&self) -> Result<Arc<[ExternalBook]>> {
+        let _ = preflight_package(&self.package)?;
+        let external_books =
+            self.external_books.get_or_try_init(|| {
+                let _ = preflight_package(&self.package)?;
+                let mut budget = self.external_link_limits.budget();
+                budget.preflight_links(self.external_link_parts.len())?;
+                let mut books = Vec::new();
+                books
+                    .try_reserve_exact(self.external_link_parts.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "source-backed XLSB external books",
+                        source,
+                    })?;
+                for metadata in &self.external_link_parts {
+                    let _ = preflight_package(&self.package)?;
+                    let part = self.package.part(&metadata.partname)?;
+                    require_content_type(&part, XLSB_EXTERNAL_LINK_CONTENT_TYPE)?;
+                    let declared_size = usize::try_from(part.declared_uncompressed_size()?)
+                        .map_err(|_source| Error::CapacityOverflow {
+                            resource: "source-backed XLSB external-link declared size",
+                        })?;
+                    budget.preflight_link_part(declared_size)?;
+                    postflight_package(&self.package)?;
+                    let _ = preflight_package(&self.package)?;
+                    let data = part.data()?;
+                    postflight_package(&self.package)?;
+                    let _ = preflight_package(&self.package)?;
+                    let parsed = crate::external_link::parse_external_link_with_budget(
+                        data.as_bytes(),
+                        &mut budget,
+                    )?;
+                    postflight_package(&self.package)?;
+                    let book = Workbook::resolve_external_book(part.rels(), parsed, &mut budget)?;
+                    postflight_package(&self.package)?;
+                    books.push(book);
+                }
+                let books = Arc::new(ExternalBooks {
+                    books: books.into(),
+                });
+                postflight_package(&self.package)?;
+                Ok::<_, Error>(books)
+            })?;
+        postflight_package(&self.package)?;
+        Ok(Arc::clone(&external_books.books))
+    }
+
     fn shared_strings(&self) -> Result<Arc<Vec<SharedString>>> {
         self.package.check_execution()?;
         self.package.source_version()?;
@@ -884,8 +1089,10 @@ impl SourceInner {
                 let data = part.data()?;
                 postflight_package(&self.package)?;
                 let _ = preflight_package(&self.package)?;
-                let table =
-                    Workbook::parse_table_definition(data.as_bytes(), table_part.catalog_position);
+                let table = Workbook::parse_table_definition(
+                    data.as_bytes(),
+                    table_part.worksheet_position,
+                );
                 postflight_package(&self.package)?;
                 let table = table?;
                 let duplicate_error = if tables
