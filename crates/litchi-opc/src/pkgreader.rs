@@ -1498,6 +1498,9 @@ fn inspect_relationship_element(
             "relationship Id '{id}' is not an XML ID"
         )));
     }
+    if ids.contains(&id) {
+        return Err(OpcError::DuplicateRelationshipId(id));
+    }
     ids.try_reserve(1)
         .map_err(|source| allocation("OPC relationship IDs", source))?;
     if !ids.insert(id.clone()) {
