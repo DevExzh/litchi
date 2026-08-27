@@ -52,6 +52,7 @@ const CALCULATION_ENGINE: u64 = 903;
 const HEADER_NAME_MANAGER: u64 = 904;
 const PIVOT_OWNER: u64 = 905;
 const TABLE_INFO_CACHE: u64 = 906;
+const CATEGORY_OWNER: u64 = 907;
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHOW_MESSAGE_TYPE: u32 = 2;
@@ -677,6 +678,36 @@ fn with_invalid_group_owner_index(package: &[u8], duplicate: bool) -> TestResult
     append_model_message_field(package, 81, &owner)
 }
 
+fn with_invalid_group_coordinate(package: &[u8]) -> TestResult<Vec<u8>> {
+    let mut coordinate = Vec::new();
+    append_varint_field(&mut coordinate, 2, 99)?;
+    append_varint_field(&mut coordinate, 3, 0)?;
+    let mut group = Vec::new();
+    append_length_delimited_field(
+        &mut group,
+        1,
+        &tsp::Uuid {
+            lower: 71,
+            upper: 72,
+        }
+        .encode_to_vec(),
+    )?;
+    append_varint_field(&mut group, 6, 0)?;
+    append_length_delimited_field(&mut group, 7, &coordinate)?;
+    let mut owner = Vec::new();
+    append_length_delimited_field(
+        &mut owner,
+        1,
+        &tsp::Uuid {
+            lower: 73,
+            upper: 74,
+        }
+        .encode_to_vec(),
+    )?;
+    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_model_message_field(package, 81, &owner)
+}
+
 fn with_pivot_owner(package: &[u8]) -> TestResult<Vec<u8>> {
     replace_member_archive(package, MODEL_MEMBER, |archive| {
         let model = archive
@@ -714,6 +745,35 @@ fn with_pivot_owner(package: &[u8]) -> TestResult<Vec<u8>> {
             .encode_to_vec(),
             &[],
         )?);
+        Ok(())
+    })
+}
+
+fn with_opaque_category_reference(package: &[u8]) -> TestResult<Vec<u8>> {
+    replace_member_archive(package, MODEL_MEMBER, |archive| {
+        let model = archive
+            .object_mut(MODELS[0])
+            .ok_or_else(|| io::Error::other("missing table model object"))?;
+        let message_index = model
+            .messages
+            .iter()
+            .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+            .ok_or_else(|| io::Error::other("missing table-model message"))?;
+        let mut reference_payload = reference(CATEGORY_OWNER).encode_to_vec();
+        append_varint_field(&mut reference_payload, 4, 1)?;
+        let mut payload = model.messages[message_index].data.clone();
+        append_length_delimited_field(&mut payload, 86, &reference_payload)?;
+        model.replace_message_preserving_header(
+            message_index,
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: payload,
+            },
+        )?;
+        let info = &mut model.archive_info.message_infos[message_index];
+        info.object_references.push(CATEGORY_OWNER);
+        info.field_infos
+            .push(field_reference(vec![86], &[CATEGORY_OWNER]));
         Ok(())
     })
 }
@@ -871,6 +931,61 @@ fn archive_info_missing_model(package: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+fn slide_archive_info_missing_routes(package: &[u8]) -> TestResult<Vec<u8>> {
+    replace_member_archive(package, DOCUMENT_MEMBER, |archive| {
+        let object = archive
+            .object_mut(SLIDE)
+            .ok_or_else(|| io::Error::other("missing slide object"))?;
+        let info = &mut object.archive_info.message_infos[0];
+        info.object_references.clear();
+        info.field_infos.clear();
+        Ok(())
+    })
+}
+
+fn duplicate_slide_field_info(package: &[u8]) -> TestResult<Vec<u8>> {
+    replace_member_archive(package, DOCUMENT_MEMBER, |archive| {
+        let object = archive
+            .object_mut(SLIDE)
+            .ok_or_else(|| io::Error::other("missing slide object"))?;
+        let duplicate = object.archive_info.message_infos[0].field_infos[0].clone();
+        object.archive_info.message_infos[0]
+            .field_infos
+            .push(duplicate);
+        Ok(())
+    })
+}
+
+fn slide_aggregate_only(package: &[u8]) -> TestResult<Vec<u8>> {
+    replace_member_archive(package, DOCUMENT_MEMBER, |archive| {
+        let object = archive
+            .object_mut(SLIDE)
+            .ok_or_else(|| io::Error::other("missing slide object"))?;
+        object.archive_info.message_infos[0]
+            .field_infos
+            .retain(|field| field.path.as_slice() != [7] && field.path.as_slice() != [42]);
+        Ok(())
+    })
+}
+
+fn table_info_with_canonical_model_alias(package: &[u8]) -> TestResult<Vec<u8>> {
+    let model = model_payload(package, MODELS[0])?;
+    replace_member_archive(package, DOCUMENT_MEMBER, |archive| {
+        let object = archive
+            .object_mut(TABLE_INFOS[0])
+            .ok_or_else(|| io::Error::other("missing table-info object"))?;
+        let mut info = object.archive_info.message_infos[0].clone();
+        info.type_ = TABLE_MODEL_MESSAGE_TYPE;
+        info.length = u32::try_from(model.len())?;
+        object.messages.push(RawMessage {
+            type_: TABLE_MODEL_MESSAGE_TYPE,
+            data: model,
+        });
+        object.archive_info.message_infos.push(info);
+        Ok(())
+    })
+}
+
 fn field_info_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
     replace_member_archive(package, DOCUMENT_MEMBER, |archive| {
         let object = archive
@@ -977,6 +1092,16 @@ fn selectors_read_all_seven_fields_and_positions_count_only_tables() -> TestResu
             slide: litchi_core::Position::new(0),
             table: litchi_core::Position::new(0),
         }
+    );
+
+    // Native Keynote commonly emits aggregate-only slide reference
+    // authority. The complete aggregate remains mandatory, while the paired
+    // owned/z-order FieldInfo projection is optional as a producer shape.
+    let aggregate_only = slide_aggregate_only(&source)?;
+    let aggregate_only = Package::from_bytes(&aggregate_only)?;
+    assert_eq!(
+        aggregate_only.slide_table_header_settings("Tables", 0usize)?,
+        fixture_settings(0)
     );
     Ok(())
 }
@@ -1271,6 +1396,8 @@ fn malformed_inactive_category_routes_fail_closed() -> TestResult {
         with_malformed_category_owner(&source, true)?,
         with_invalid_group_owner_index(&source, true)?,
         with_invalid_group_owner_index(&source, false)?,
+        with_invalid_group_coordinate(&source)?,
+        with_opaque_category_reference(&source)?,
     ] {
         let package = Package::from_bytes(&source)?;
         let before = exact_bytes(&package)?;
@@ -1343,6 +1470,9 @@ fn duplicate_missing_and_noncanonical_graph_routes_fail_closed() -> TestResult {
     assert_rejected_atomically(&duplicate_model_identity(&source)?)?;
     assert_rejected_atomically(&archive_info_missing_model(&source)?)?;
     assert_rejected_atomically(&field_info_wrong_path(&source)?)?;
+    assert_rejected_atomically(&slide_archive_info_missing_routes(&source)?)?;
+    assert_rejected_atomically(&duplicate_slide_field_info(&source)?)?;
+    assert_rejected_atomically(&table_info_with_canonical_model_alias(&source)?)?;
     assert_rejected_atomically(&add_foreign_inbound(&source)?)?;
     Ok(())
 }

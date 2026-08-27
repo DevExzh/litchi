@@ -14,7 +14,9 @@
     reason = "the focused package boundary redacts lower-layer failure details"
 )]
 
+use std::collections::HashSet;
 use std::fmt;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
@@ -50,6 +52,7 @@ const PIVOT_FIELD: u32 = 85;
 const CATEGORY_OWNER_FIELD: u32 = 86;
 const CATEGORY_OWNER_REFERENCE_MESSAGE_TYPE: u32 = 6_372;
 const GROUP_BY_MESSAGE_TYPE: u32 = 6_373;
+const GROUP_NODE_MESSAGE_TYPE: u32 = 6_383;
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const HEADER_NAME_MANAGER_MESSAGE_TYPE: u32 = 6_366;
 
@@ -261,6 +264,7 @@ struct HeaderBudget {
     max_allocations: usize,
     max_retained: usize,
     max_scratch: usize,
+    max_transaction_work: usize,
     input: usize,
     output: usize,
     fields: usize,
@@ -270,6 +274,7 @@ struct HeaderBudget {
     allocations: usize,
     retained: usize,
     scratch: usize,
+    transaction_work: usize,
 }
 
 impl HeaderBudget {
@@ -290,6 +295,7 @@ impl HeaderBudget {
             max_allocations: aggregate,
             max_retained: aggregate,
             max_scratch: aggregate,
+            max_transaction_work: aggregate,
             input: 0,
             output: 0,
             fields: 0,
@@ -299,6 +305,7 @@ impl HeaderBudget {
             allocations: 0,
             retained: 0,
             scratch: 0,
+            transaction_work: 0,
         })
     }
 
@@ -391,6 +398,15 @@ impl HeaderBudget {
             amount,
             self.max_scratch,
             SlideTableHeaderLimitKind::Scratch,
+        )
+    }
+
+    fn transaction_work(&mut self, amount: usize) -> Result<(), SlideTableHeaderError> {
+        Self::add(
+            &mut self.transaction_work,
+            amount,
+            self.max_transaction_work,
+            SlideTableHeaderLimitKind::TransactionWork,
         )
     }
 
@@ -905,9 +921,9 @@ fn select_table(
     )?;
     let z_order =
         repeated_references(slide_payload, SLIDE_Z_ORDER_FIELD, wire_limits, &mut budget)?;
-    reject_duplicates(&owned)?;
-    reject_duplicates(&z_order)?;
-    validate_slide_metadata(slide, slide_message_index, &owned, &z_order)?;
+    let owned_set = checked_reference_set(&owned, &mut budget)?;
+    let _z_order_set = checked_reference_set(&z_order, &mut budget)?;
+    validate_slide_metadata(slide, slide_message_index, &owned, &z_order, &mut budget)?;
 
     let mut tables = Vec::new();
     budget.allocations(z_order.len())?;
@@ -929,12 +945,16 @@ fn select_table(
         {
             continue;
         }
-        if owned
+        // A TableInfo object that also carries a canonical model payload is
+        // role-ambiguous even when its field-2 route points elsewhere.
+        if info_object
+            .messages
             .iter()
-            .filter(|candidate| **candidate == table_info_identifier)
-            .count()
-            != 1
+            .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
         {
+            return Err(SlideTableHeaderError::UnsupportedTopology);
+        }
+        if !owned_set.contains(&table_info_identifier) {
             return Err(SlideTableHeaderError::InvalidSource);
         }
         let (table_info_message_index, info_payload) =
@@ -945,7 +965,12 @@ fn select_table(
             return Err(SlideTableHeaderError::InvalidSource);
         }
         let model_identifier = info.table_model().identifier().get();
-        validate_table_info_metadata(info_object, table_info_message_index, model_identifier)?;
+        validate_table_info_metadata(
+            info_object,
+            table_info_message_index,
+            model_identifier,
+            &mut budget,
+        )?;
         let (model_component, model) = package
             .object_with_component(model_identifier)
             .ok_or(SlideTableHeaderError::InvalidSource)?;
@@ -1494,21 +1519,34 @@ fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTabl
                 identifier = Some(value);
             },
             2 | 3 => return Err(SlideTableHeaderError::UnsupportedTopology),
-            _ => {},
+            _ => return Err(SlideTableHeaderError::InvalidSource),
         }
     }
     identifier.ok_or(SlideTableHeaderError::InvalidSource)
 }
 
-fn reject_duplicates(values: &[u64]) -> Result<(), SlideTableHeaderError> {
-    if values
-        .iter()
-        .enumerate()
-        .any(|(index, value)| values[..index].contains(value))
-    {
-        return Err(SlideTableHeaderError::InvalidSource);
+fn checked_reference_set(
+    values: &[u64],
+    budget: &mut HeaderBudget,
+) -> Result<HashSet<u64>, SlideTableHeaderError> {
+    budget.transaction_work(values.len())?;
+    budget.allocations(values.len())?;
+    let scratch = values
+        .len()
+        .checked_mul(size_of::<u64>().saturating_mul(4))
+        .ok_or(SlideTableHeaderError::InvalidSource)?;
+    budget.scratch(scratch)?;
+    let mut seen = HashSet::new();
+    seen.try_reserve(values.len())
+        .map_err(|_| SlideTableHeaderError::Allocation {
+            amount: values.len(),
+        })?;
+    for &value in values {
+        if value == 0 || !seen.insert(value) {
+            return Err(SlideTableHeaderError::InvalidSource);
+        }
     }
-    Ok(())
+    Ok(seen)
 }
 
 fn validate_slide_metadata(
@@ -1516,6 +1554,7 @@ fn validate_slide_metadata(
     message_index: usize,
     owned: &[u64],
     z_order: &[u64],
+    budget: &mut HeaderBudget,
 ) -> Result<(), SlideTableHeaderError> {
     validate_message_header(object, message_index)?;
     let info = object
@@ -1523,48 +1562,71 @@ fn validate_slide_metadata(
         .message_infos
         .get(message_index)
         .ok_or(SlideTableHeaderError::InvalidSource)?;
-    reject_duplicates(&info.object_references)?;
-    for identifier in owned.iter().chain(z_order) {
-        if !info.object_references.is_empty()
-            && info
-                .object_references
-                .iter()
-                .filter(|candidate| **candidate == *identifier)
-                .count()
-                != 1
-        {
-            return Err(SlideTableHeaderError::InvalidSource);
-        }
+    let declared = checked_reference_set(&info.object_references, budget)?;
+    budget.transaction_work(owned.len().saturating_add(z_order.len()))?;
+    budget.allocations(owned.len().saturating_add(z_order.len()))?;
+    let mut expected = HashSet::new();
+    expected
+        .try_reserve(owned.len().saturating_add(z_order.len()))
+        .map_err(|_| SlideTableHeaderError::Allocation {
+            amount: owned.len().saturating_add(z_order.len()),
+        })?;
+    expected.extend(owned.iter().chain(z_order).copied());
+    // The aggregate is a message-wide reference census, so native slides may
+    // also declare masters, styles, transitions, or notes.  The two selected
+    // drawable routes must nevertheless be present exactly once; an empty or
+    // partial aggregate cannot authorize them.
+    if !expected.is_subset(&declared) {
+        return Err(SlideTableHeaderError::InvalidSource);
     }
+    let mut owned_field = false;
+    let mut z_order_field = false;
     for field in &info.field_infos {
         if field.path.as_slice() == [SLIDE_OWNED_DRAWABLES_FIELD] {
-            if field
-                .r#type
-                .is_some_and(|kind| kind != FieldType::ObjectReference)
+            if owned_field
+                || field
+                    .r#type
+                    .is_some_and(|kind| kind != FieldType::ObjectReference)
                 || !field.data_references.is_empty()
                 || field.object_references.as_slice() != owned
             {
                 return Err(SlideTableHeaderError::InvalidSource);
             }
+            owned_field = true;
+            continue;
         }
         if field.path.as_slice() == [SLIDE_Z_ORDER_FIELD] {
-            if field
-                .r#type
-                .is_some_and(|kind| kind != FieldType::ObjectReference)
+            if z_order_field
+                || field
+                    .r#type
+                    .is_some_and(|kind| kind != FieldType::ObjectReference)
                 || !field.data_references.is_empty()
                 || field.object_references.as_slice() != z_order
             {
                 return Err(SlideTableHeaderError::InvalidSource);
             }
+            z_order_field = true;
+            continue;
+        }
+        if !field.object_references.is_empty() || !field.data_references.is_empty() {
+            return Err(SlideTableHeaderError::UnsupportedTopology);
         }
     }
-    Ok(())
+    // Native Keynote commonly emits aggregate-only slide authority.  When it
+    // emits per-field authority, both repeated routes must be present exactly
+    // once; a partial producer shape is ambiguous and fails closed.
+    if owned_field == z_order_field {
+        Ok(())
+    } else {
+        Err(SlideTableHeaderError::InvalidSource)
+    }
 }
 
 fn validate_table_info_metadata(
     object: &ArchiveObject,
     message_index: usize,
     model: u64,
+    budget: &mut HeaderBudget,
 ) -> Result<(), SlideTableHeaderError> {
     validate_message_header(object, message_index)?;
     let info = object
@@ -1572,26 +1634,11 @@ fn validate_table_info_metadata(
         .message_infos
         .get(message_index)
         .ok_or(SlideTableHeaderError::InvalidSource)?;
-    if info.object_references.contains(&0)
-        || info
-            .object_references
-            .iter()
-            .enumerate()
-            .any(|(index, identifier)| info.object_references[..index].contains(identifier))
-    {
-        return Err(SlideTableHeaderError::InvalidSource);
-    }
+    let declared = checked_reference_set(&info.object_references, budget)?;
     // The drawable parent is the rooted payload route above and is not a
     // strong ArchiveInfo edge in native Keynote.  The model edge, when an
     // aggregate is present, remains source-authoritative and unique.
-    if !info.object_references.is_empty()
-        && info
-            .object_references
-            .iter()
-            .filter(|identifier| **identifier == model)
-            .count()
-            != 1
-    {
+    if !declared.contains(&model) {
         return Err(SlideTableHeaderError::InvalidSource);
     }
     if !info.data_references.is_empty() {
@@ -1885,6 +1932,11 @@ fn validate_global_inbound_references(
                 .ok_or(SlideTableHeaderError::InvalidSource)?;
             budget.fields(metadata_fields)?;
             budget.work(
+                message_bytes
+                    .checked_add(metadata_fields)
+                    .ok_or(SlideTableHeaderError::InvalidSource)?,
+            )?;
+            budget.transaction_work(
                 message_bytes
                     .checked_add(metadata_fields)
                     .ok_or(SlideTableHeaderError::InvalidSource)?,
@@ -2617,8 +2669,12 @@ fn deprecated_category_grouping_active(
                 validate_uuid_payload(field.payload(), limits, budget)?;
             },
             2 if field.wire_type() == 2 => {
-                active |= group_by_enabled(field.payload(), limits, budget)?
+                let (enabled, root_reference) = group_by_enabled(field.payload(), limits, budget)?
                     .ok_or(SlideTableHeaderError::InvalidSource)?;
+                if root_reference.is_some() {
+                    return Err(SlideTableHeaderError::UnsupportedDependency);
+                }
+                active |= enabled;
             },
             _ => return Err(SlideTableHeaderError::InvalidSource),
         }
@@ -2634,12 +2690,13 @@ fn group_by_enabled(
     payload: &[u8],
     limits: WireLimits,
     budget: &mut HeaderBudget,
-) -> Result<Option<bool>, SlideTableHeaderError> {
+) -> Result<Option<(bool, Option<u64>)>, SlideTableHeaderError> {
     let fields = parse_all_fields(payload, limits)?;
     charge_wire_view(payload, &fields, budget)?;
     let mut enabled = None;
     let mut group_uid_seen = false;
     let mut owner_index_seen = false;
+    let mut root_reference = None;
     for field in fields.fields() {
         match field.number() {
             1 if !group_uid_seen && field.wire_type() == 2 => {
@@ -2652,6 +2709,29 @@ fn group_by_enabled(
                     return Err(SlideTableHeaderError::InvalidSource);
                 }
                 enabled = Some(value == 1);
+            },
+            // Native Keynote emits one exact dormant root sentinel even when
+            // grouping is disabled.  Admit only that closed, coordinate-free
+            // shape; any populated or malformed group tree remains unsafe.
+            3 if field.wire_type() == 2 => {
+                validate_inert_group_node(field.payload(), limits, budget)?;
+            },
+            7..=13 | 16 if field.wire_type() == 2 => {
+                let expected_column = match field.number() {
+                    7 => 0,
+                    8 => 1,
+                    9 => 3,
+                    10 => 2,
+                    11 => 4,
+                    12 => 5,
+                    13 => 6,
+                    16 => 7,
+                    _ => unreachable!(),
+                };
+                validate_inert_coordinate(field.payload(), expected_column, limits, budget)?;
+            },
+            18 if root_reference.is_none() && field.wire_type() == 2 => {
+                root_reference = Some(strict_reference(field.payload(), limits)?);
             },
             // The default owner index is emitted by native Keynote even for
             // an otherwise dormant group.  It is scalar metadata, not an
@@ -2667,16 +2747,80 @@ fn group_by_enabled(
             // Every other known GroupBy payload carries coordinate, formula,
             // aggregate, row-UID, or child-reference state that this scalar
             // header transaction cannot regenerate safely.
-            2..=5 | 7..=13 | 15..=18 if field.wire_type() == 2 => {
+            2 | 4 | 5 | 15 | 17 if field.wire_type() == 2 => {
                 return Err(SlideTableHeaderError::UnsupportedDependency);
             },
             _ => return Err(SlideTableHeaderError::InvalidSource),
         }
     }
     if group_uid_seen {
-        Ok(enabled)
+        Ok(enabled.map(|value| (value, root_reference)))
     } else {
         Err(SlideTableHeaderError::InvalidSource)
+    }
+}
+
+fn validate_inert_group_node(
+    payload: &[u8],
+    limits: WireLimits,
+    budget: &mut HeaderBudget,
+) -> Result<(), SlideTableHeaderError> {
+    let fields = parse_all_fields(payload, limits)?;
+    charge_wire_view(payload, &fields, budget)?;
+    let mut uid_seen = false;
+    let mut format_manager_seen = false;
+    for field in fields.fields() {
+        match field.number() {
+            1 if !uid_seen && field.wire_type() == 2 => {
+                uid_seen = true;
+                if validate_uuid_payload(field.payload(), limits, budget)? != (1, 0) {
+                    return Err(SlideTableHeaderError::UnsupportedDependency);
+                }
+            },
+            6 if !format_manager_seen && field.wire_type() == 2 => {
+                format_manager_seen = true;
+                if !field.payload().is_empty() {
+                    return Err(SlideTableHeaderError::UnsupportedDependency);
+                }
+            },
+            3..=5 | 7..=10 if field.wire_type() == 2 => {
+                return Err(SlideTableHeaderError::UnsupportedDependency);
+            },
+            _ => return Err(SlideTableHeaderError::InvalidSource),
+        }
+    }
+    if uid_seen {
+        Ok(())
+    } else {
+        Err(SlideTableHeaderError::InvalidSource)
+    }
+}
+
+fn validate_inert_coordinate(
+    payload: &[u8],
+    expected_column: u64,
+    limits: WireLimits,
+    budget: &mut HeaderBudget,
+) -> Result<(), SlideTableHeaderError> {
+    let fields = parse_all_fields(payload, limits)?;
+    charge_wire_view(payload, &fields, budget)?;
+    let mut column = None;
+    let mut row = None;
+    for field in fields.fields() {
+        match field.number() {
+            2 if column.is_none() && field.wire_type() == 0 => {
+                column = Some(canonical_varint(field.payload())?);
+            },
+            3 if row.is_none() && field.wire_type() == 0 => {
+                row = Some(canonical_varint(field.payload())?);
+            },
+            _ => return Err(SlideTableHeaderError::InvalidSource),
+        }
+    }
+    if column == Some(expected_column) && row == Some(0) {
+        Ok(())
+    } else {
+        Err(SlideTableHeaderError::UnsupportedDependency)
     }
 }
 
@@ -2728,9 +2872,21 @@ fn category_owner_reference_active(
     }
     budget.allocations(references.len())?;
     budget.references(references.len())?;
+    budget.transaction_work(references.len())?;
+    budget.scratch(
+        references
+            .len()
+            .checked_mul(size_of::<u64>().saturating_mul(4))
+            .ok_or(SlideTableHeaderError::InvalidSource)?,
+    )?;
     let mut identifiers = Vec::new();
+    let mut seen = HashSet::new();
     identifiers
         .try_reserve_exact(references.len())
+        .map_err(|_| SlideTableHeaderError::Allocation {
+            amount: references.len(),
+        })?;
+    seen.try_reserve(references.len())
         .map_err(|_| SlideTableHeaderError::Allocation {
             amount: references.len(),
         })?;
@@ -2741,13 +2897,13 @@ fn category_owner_reference_active(
             || identifier == selection.table_info_identifier
             || identifier == selection.model_identifier
             || identifier == owner_identifier
-            || identifiers.contains(&identifier)
+            || !seen.insert(identifier)
         {
             return Err(SlideTableHeaderError::InvalidSource);
         }
         identifiers.push(identifier);
     }
-    require_declared_group_references(owner_object, owner_message_index, &identifiers)?;
+    require_declared_group_references(owner_object, owner_message_index, &identifiers, budget)?;
     let mut active = false;
     for identifier in identifiers {
         let group_object = source
@@ -2758,8 +2914,30 @@ fn category_owner_reference_active(
             unique_message_index(&group_object.messages, GROUP_BY_MESSAGE_TYPE)?
                 .ok_or(SlideTableHeaderError::InvalidSource)?;
         validate_message_header(group_object, message_index)?;
-        active |= group_by_enabled(&message.data, limits, budget)?
+        let (enabled, root_reference) = group_by_enabled(&message.data, limits, budget)?
             .ok_or(SlideTableHeaderError::InvalidSource)?;
+        if let Some(root_identifier) = root_reference {
+            if root_identifier == 1
+                || root_identifier == selection.slide_identifier
+                || root_identifier == selection.table_info_identifier
+                || root_identifier == selection.model_identifier
+                || root_identifier == owner_identifier
+                || root_identifier == identifier
+            {
+                return Err(SlideTableHeaderError::InvalidSource);
+            }
+            require_declared_reference(group_object, message_index, root_identifier, &[18])?;
+            let root_object = source
+                .object_with_component(root_identifier)
+                .map(|(_, object)| object)
+                .ok_or(SlideTableHeaderError::InvalidSource)?;
+            let (root_message_index, root_message) =
+                unique_message_index(&root_object.messages, GROUP_NODE_MESSAGE_TYPE)?
+                    .ok_or(SlideTableHeaderError::InvalidSource)?;
+            validate_message_header(root_object, root_message_index)?;
+            validate_inert_group_node(&root_message.data, limits, budget)?;
+        }
+        active |= enabled;
     }
     Ok(active)
 }
@@ -2768,39 +2946,43 @@ fn require_declared_group_references(
     object: &ArchiveObject,
     message_index: usize,
     identifiers: &[u64],
+    budget: &mut HeaderBudget,
 ) -> Result<(), SlideTableHeaderError> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
         .ok_or(SlideTableHeaderError::InvalidSource)?;
-    for identifier in identifiers {
-        if info
-            .object_references
-            .iter()
-            .filter(|candidate| **candidate == *identifier)
-            .count()
-            != 1
-        {
-            return Err(SlideTableHeaderError::InvalidSource);
-        }
+    let expected = checked_reference_set(identifiers, budget)?;
+    let declared = checked_reference_set(&info.object_references, budget)?;
+    if declared != expected {
+        return Err(SlideTableHeaderError::InvalidSource);
     }
+    budget.transaction_work(info.field_infos.len())?;
+    budget.allocations(identifiers.len())?;
+    let mut field_declared = HashSet::new();
+    field_declared.try_reserve(identifiers.len()).map_err(|_| {
+        SlideTableHeaderError::Allocation {
+            amount: identifiers.len(),
+        }
+    })?;
     for field in &info.field_infos {
         for identifier in &field.object_references {
-            if identifiers.contains(identifier)
-                && (field.path.as_slice() != [1]
-                    || info
-                        .field_infos
-                        .iter()
-                        .filter(|candidate| {
-                            candidate.path.as_slice() == [1]
-                                && candidate.object_references.contains(identifier)
-                        })
-                        .count()
-                        != 1)
+            budget.transaction_work(1)?;
+            if !expected.contains(identifier)
+                || field.path.as_slice() != [1]
+                || !field_declared.insert(*identifier)
             {
                 return Err(SlideTableHeaderError::InvalidSource);
             }
+        }
+        if !field.data_references.is_empty()
+            || (!field.object_references.is_empty()
+                && field
+                    .r#type
+                    .is_some_and(|kind| kind != FieldType::ObjectReference))
+        {
+            return Err(SlideTableHeaderError::InvalidSource);
         }
     }
     Ok(())
