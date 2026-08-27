@@ -138,16 +138,17 @@ impl Workbook {
         limits: ReadLimits,
     ) -> SheetResult<Self> {
         let names = workbook
-            .sheet_names()
+            .worksheet_names()
             .map_err(boxed_xlsb_error)?
             .into_boxed_slice();
+        let catalog_count = workbook.sheet_count().map_err(boxed_xlsb_error)?;
         let date1904 = workbook.is_1904_date_system().map_err(boxed_xlsb_error)?;
         let worksheets = std::iter::repeat_with(OnceLock::new)
-            .take(names.len())
+            .take(catalog_count)
             .collect::<Vec<_>>()
             .into_boxed_slice();
         let worksheet_init = std::iter::repeat_with(|| Mutex::new(()))
-            .take(names.len())
+            .take(catalog_count)
             .collect::<Vec<_>>()
             .into_boxed_slice();
         Ok(Self {
@@ -287,10 +288,14 @@ impl Workbook {
 
     fn eager_text(&self) -> SheetResult<String> {
         let workbook = self.eager_workbook()?;
+        let source_worksheets = self.workbook.worksheets().map_err(boxed_xlsb_error)?;
         let mut output = String::new();
-        for index in 0..workbook.worksheet_names().len() {
+        for source_worksheet in source_worksheets {
             self.ensure_source_current()?;
-            let worksheet = self.eager_worksheet(index, workbook)?;
+            let catalog_position = source_worksheet
+                .workbook_position()
+                .map_err(boxed_xlsb_error)?;
+            let worksheet = self.eager_worksheet(catalog_position, workbook)?;
             let mut rows = worksheet.rows();
             while let Some(row) = rows.next() {
                 let row = row?;
@@ -310,20 +315,29 @@ impl Workbook {
     fn worksheet(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
         let handle = self
             .workbook
-            .sheet_by_index(index)
+            .worksheet_by_index(index)
             .map_err(boxed_xlsb_error)?
             .ok_or_else(|| boxed_error(format!("XLSB worksheet index {index} is out of bounds")))?;
-        Ok(Box::new(SourceBackedWorksheet::new(self, index, handle)?))
+        let catalog_position = handle.workbook_position().map_err(boxed_xlsb_error)?;
+        Ok(Box::new(SourceBackedWorksheet::new(
+            self,
+            catalog_position,
+            handle,
+        )?))
     }
 
     fn worksheet_named(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
         let handle = self
             .workbook
-            .sheet_by_name(name)
+            .worksheet_by_name(name)
             .map_err(boxed_xlsb_error)?
             .ok_or_else(|| boxed_error(format!("XLSB worksheet '{name}' was not found")))?;
-        let index = handle.workbook_position().map_err(boxed_xlsb_error)?;
-        Ok(Box::new(SourceBackedWorksheet::new(self, index, handle)?))
+        let catalog_position = handle.workbook_position().map_err(boxed_xlsb_error)?;
+        Ok(Box::new(SourceBackedWorksheet::new(
+            self,
+            catalog_position,
+            handle,
+        )?))
     }
 }
 
