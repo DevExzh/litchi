@@ -13,6 +13,9 @@ impl From<crate::formula::Error> for Error {
                 Self::InvalidLength { expected, found }
             },
             crate::formula::Error::UnsupportedFeature(feature) => Self::UnsupportedFeature(feature),
+            crate::formula::Error::UnresolvedDependency(dependency) => {
+                Self::UnresolvedDependency(dependency)
+            },
             crate::formula::Error::Encoding(message) => Self::Encoding(message),
         }
     }

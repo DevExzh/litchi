@@ -13,7 +13,7 @@ use super::Context;
 impl Context {
     pub(super) fn validate_active_pivot_scope(&self) -> Result<&Scope> {
         let scope_key = self.active_pivot_scope.as_ref().ok_or_else(|| {
-            Error::InvalidFormula(
+            Error::UnresolvedDependency(
                 "PtgSxName requires an explicit pivot cache, sheet, and view scope".to_string(),
             )
         })?;
@@ -21,7 +21,7 @@ impl Context {
         let sheet_index = scope_key.sheet_index();
         let view_name = scope_key.view_name();
         if sheet_index >= self.worksheet_names.len() {
-            return Err(Error::InvalidFormula(format!(
+            return Err(Error::UnresolvedDependency(format!(
                 "pivot sheet index {sheet_index} is outside the workbook sheet range"
             )));
         }
@@ -38,12 +38,12 @@ impl Context {
                 && view.name.eq_ignore_ascii_case(view_name)
         });
         let _view = views.next().ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "PivotTable view {view_name:?} on sheet {sheet_index} does not use cache {cache_id}"
             ))
         })?;
         if views.next().is_some() {
-            return Err(Error::InvalidFormula(format!(
+            return Err(Error::UnresolvedDependency(format!(
                 "PivotTable view {view_name:?} on sheet {sheet_index} and cache {cache_id} is ambiguous"
             )));
         }
@@ -54,12 +54,12 @@ impl Context {
                 && scope.view_name.eq_ignore_ascii_case(view_name)
         });
         let scope = scopes.next().ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "calculated-name metadata is missing for PivotTable view {view_name:?}"
             ))
         })?;
         if scopes.next().is_some() {
-            return Err(Error::InvalidFormula(format!(
+            return Err(Error::UnresolvedDependency(format!(
                 "calculated-name metadata for PivotTable view {view_name:?} is ambiguous"
             )));
         }
@@ -72,7 +72,7 @@ impl Context {
             Error::InvalidFormula("pivot calculated-name index overflow".to_string())
         })?;
         let reference = scope.references.get(index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "pivot calculated-name index {index} is outside 0..{}",
                 scope.references.len()
             ))

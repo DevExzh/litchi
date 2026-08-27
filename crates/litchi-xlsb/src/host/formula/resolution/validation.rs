@@ -19,6 +19,9 @@ pub(super) fn owner_formula_resolution<T>(result: Result<T>) -> crate::formula::
             crate::formula::Error::InvalidLength { expected, found }
         },
         Error::UnsupportedFeature(feature) => crate::formula::Error::UnsupportedFeature(feature),
+        Error::UnresolvedDependency(dependency) => {
+            crate::formula::Error::UnresolvedDependency(dependency)
+        },
         Error::Encoding(message) => crate::formula::Error::Encoding(message),
         error => crate::formula::Error::InvalidFormula(error.to_string()),
     })

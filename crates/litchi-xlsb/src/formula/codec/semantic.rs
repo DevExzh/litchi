@@ -124,14 +124,16 @@ impl Compiler {
                     row_relative,
                     col_relative,
                 } => {
-                    let col_str = column_index_to_name(*col + 1);
-                    let row_str = row + 1;
+                    let col = (*col).checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("cell column index overflow".to_string())
+                    })?;
+                    let row = (*row).checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormula("cell row index overflow".to_string())
+                    })?;
+                    let col_str = column_index_to_name(col);
                     let col_prefix = if *col_relative { "" } else { "$" };
                     let row_prefix = if *row_relative { "" } else { "$" };
-                    stack.push(format!(
-                        "{}{}{}{}",
-                        col_prefix, col_str, row_prefix, row_str
-                    ));
+                    stack.push(format!("{}{}{}{}", col_prefix, col_str, row_prefix, row));
                 },
                 Token::AreaRef {
                     row_first,
@@ -148,13 +150,13 @@ impl Compiler {
                         *col_first,
                         *row_first_relative,
                         *col_first_relative,
-                    );
+                    )?;
                     let last = Self::format_reference(
                         *row_last,
                         *col_last,
                         *row_last_relative,
                         *col_last_relative,
-                    );
+                    )?;
                     stack.push(format!("{}:{}", first, last));
                 },
                 Token::CellRef3d {
@@ -165,13 +167,13 @@ impl Compiler {
                     col_relative,
                 } => {
                     let context = context.ok_or_else(|| {
-                        Error::UnsupportedFeature(
+                        Error::UnresolvedDependency(
                             "PtgRef3d requires workbook extern-sheet resolution".to_string(),
                         )
                     })?;
                     let prefix = context.sheet_prefix(*sheet_index)?;
                     let reference =
-                        Self::format_reference(*row, *col, *row_relative, *col_relative);
+                        Self::format_reference(*row, *col, *row_relative, *col_relative)?;
                     stack.push(format!("{prefix}!{reference}"));
                 },
                 Token::AreaRef3d {
@@ -186,7 +188,7 @@ impl Compiler {
                     col_last_relative,
                 } => {
                     let context = context.ok_or_else(|| {
-                        Error::UnsupportedFeature(
+                        Error::UnresolvedDependency(
                             "PtgArea3d requires workbook extern-sheet resolution".to_string(),
                         )
                     })?;
@@ -196,13 +198,13 @@ impl Compiler {
                         *col_first,
                         *row_first_relative,
                         *col_first_relative,
-                    );
+                    )?;
                     let last = Self::format_reference(
                         *row_last,
                         *col_last,
                         *row_last_relative,
                         *col_last_relative,
-                    );
+                    )?;
                     stack.push(format!("{prefix}!{first}:{last}"));
                 },
                 Token::ReferenceError { .. } => stack.push("#REF!".to_string()),
@@ -260,7 +262,7 @@ impl Compiler {
                 },
                 Token::Name(idx) => {
                     let context = context.ok_or_else(|| {
-                        Error::UnsupportedFeature(format!(
+                        Error::UnresolvedDependency(format!(
                             "XLSB defined name index {idx} requires workbook name resolution"
                         ))
                     })?;
@@ -271,7 +273,7 @@ impl Compiler {
                     name_index,
                 } => {
                     let context = context.ok_or_else(|| {
-                        Error::UnsupportedFeature(
+                        Error::UnresolvedDependency(
                             "PtgNameX requires workbook external-link resolution".to_string(),
                         )
                     })?;
@@ -282,7 +284,7 @@ impl Compiler {
                 },
                 Token::TableReference(reference) => {
                     let context = context.ok_or_else(|| {
-                        Error::UnsupportedFeature(format!(
+                        Error::UnresolvedDependency(format!(
                             "structured table reference on Xti {} requires table-definition resolution",
                             reference.sheet_index
                         ))
@@ -291,7 +293,7 @@ impl Compiler {
                 },
                 Token::PivotName(index) => {
                     let context = context.ok_or_else(|| {
-                        Error::InvalidFormula(
+                        Error::UnresolvedDependency(
                             "PtgSxName requires pivot-cache calculated-name metadata".to_string(),
                         )
                     })?;
@@ -314,15 +316,26 @@ impl Compiler {
         Ok(stack.pop().expect("length checked"))
     }
 
-    fn format_reference(row: u32, col: u32, row_relative: bool, col_relative: bool) -> String {
-        let col_str = column_index_to_name(col + 1);
-        format!(
+    fn format_reference(
+        row: u32,
+        col: u32,
+        row_relative: bool,
+        col_relative: bool,
+    ) -> Result<String> {
+        let col = col
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormula("cell column index overflow".to_string()))?;
+        let row = row
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormula("cell row index overflow".to_string()))?;
+        let col_str = column_index_to_name(col);
+        Ok(format!(
             "{}{}{}{}",
             if col_relative { "" } else { "$" },
             col_str,
             if row_relative { "" } else { "$" },
-            row + 1
-        )
+            row
+        ))
     }
 
     /// Convert binary operator to string

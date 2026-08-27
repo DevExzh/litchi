@@ -66,6 +66,8 @@ pub enum Error {
     FileNotFound(String),
     /// Unsupported feature
     UnsupportedFeature(String),
+    /// Formula text requires workbook metadata that is missing or ambiguous.
+    UnresolvedDependency(String),
     /// A drawing transfer was refused before any package mutation.
     DrawingTransfer(crate::cell_values::DrawingTransferRefusal),
     /// Encoding error
@@ -160,6 +162,9 @@ impl fmt::Display for Error {
             Error::UnsupportedFeature(feature) => {
                 write!(f, "Unsupported feature: {}", feature)
             },
+            Error::UnresolvedDependency(dependency) => {
+                write!(f, "Unresolved formula dependency: {}", dependency)
+            },
             Error::DrawingTransfer(refusal) => write!(f, "Drawing transfer refused: {refusal}"),
             Error::Encoding(msg) => {
                 write!(f, "Encoding error: {}", msg)
@@ -223,6 +228,7 @@ impl std::error::Error for Error {
             | Error::WorksheetNotFound(_)
             | Error::FileNotFound(_)
             | Error::UnsupportedFeature(_)
+            | Error::UnresolvedDependency(_)
             | Error::Encoding(_)
             | Error::InvalidFormat(_)
             | Error::InvalidUri(_)

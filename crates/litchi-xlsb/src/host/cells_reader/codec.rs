@@ -455,7 +455,7 @@ where
                 parsed.flags,
                 group,
                 self.formula_context,
-            ))
+            )?)
         } else if exp_cell.is_some() {
             Err(Error::InvalidFormula(format!(
                 "PtgExp cell {} has no array/shared formula definition",
@@ -469,7 +469,7 @@ where
                 parsed.formula,
                 parsed.flags,
                 self.formula_context,
-            ))
+            )?)
         }
     }
 

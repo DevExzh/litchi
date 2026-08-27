@@ -19,7 +19,7 @@ impl Context {
                 Error::InvalidFormula("PtgName index is one-based and cannot be zero".to_string())
             })?;
         self.defined_names.get(index).cloned().ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "PtgName index {} exceeds {} workbook names",
                 index + 1,
                 self.defined_names.len()
@@ -37,31 +37,40 @@ impl Context {
             .external_sheets
             .get(usize::from(xti_index))
             .ok_or_else(|| {
-                Error::InvalidFormula(format!(
+                Error::UnresolvedDependency(format!(
                     "PtgNameX Xti index {xti_index} exceeds {} entries",
                     self.external_sheets.len()
                 ))
             })?;
         let link_index = usize::try_from(xti.external_link)
             .map_err(|_| Error::InvalidFormula("external-link index overflow".to_string()))?;
-        let SupportingLink::ExternalWorkbook(book_index) =
-            self.supporting_links.get(link_index).ok_or_else(|| {
-                Error::InvalidFormula(format!(
-                    "PtgNameX refers to missing supporting link {}",
-                    xti.external_link
-                ))
-            })?
-        else {
-            return Err(Error::InvalidFormula(
-                "PtgNameX does not refer to an external workbook".to_string(),
-            ));
+        let link = self.supporting_links.get(link_index).ok_or_else(|| {
+            Error::UnresolvedDependency(format!(
+                "PtgNameX refers to missing supporting link {}",
+                xti.external_link
+            ))
+        })?;
+        let book_index = match link {
+            SupportingLink::ExternalWorkbook(book_index) => book_index,
+            SupportingLink::AddIn => {
+                return Err(Error::UnsupportedFeature(
+                    "PtgNameX refers to an add-in".to_string(),
+                ));
+            },
+            SupportingLink::SelfWorkbook | SupportingLink::SameSheet => {
+                return Err(Error::InvalidFormula(
+                    "PtgNameX does not refer to an external workbook".to_string(),
+                ));
+            },
         };
         let external_book_index = usize::try_from(*book_index)
             .map_err(|_| Error::InvalidFormula("external book index overflow".to_string()))?;
         let book = self
             .external_books
             .get(external_book_index)
-            .ok_or_else(|| Error::InvalidFormula(format!("missing external book {book_index}")))?;
+            .ok_or_else(|| {
+                Error::UnresolvedDependency(format!("missing external book {book_index}"))
+            })?;
         if !book.metadata.is_workbook() {
             return Err(Error::UnsupportedFeature(
                 "PtgNameX refers to a DDE or OLE data source".to_string(),
@@ -71,7 +80,7 @@ impl Context {
             .map_err(|_| Error::InvalidFormula("external name index overflow".to_string()))?;
         let names = book.metadata.defined_names();
         let name = names.get(index).ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "external name index {name_index} exceeds {} names",
                 names.len()
             ))

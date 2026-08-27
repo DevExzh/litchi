@@ -49,12 +49,12 @@ impl Context {
             .iter()
             .filter(|table| table.table_id == table_id);
         let table = matches.next().ok_or_else(|| {
-            Error::InvalidFormula(format!(
+            Error::UnresolvedDependency(format!(
                 "structured reference names missing table ID {table_id}"
             ))
         })?;
         if matches.next().is_some() {
-            return Err(Error::InvalidFormula(format!(
+            return Err(Error::UnresolvedDependency(format!(
                 "structured reference table ID {table_id} is ambiguous"
             )));
         }
@@ -68,7 +68,7 @@ impl Context {
             TableColumns::All => TableNamedColumns::All,
             TableColumns::One(index) => {
                 let name = table.columns.get(usize::from(index)).ok_or_else(|| {
-                    Error::InvalidFormula(format!(
+                    Error::UnresolvedDependency(format!(
                         "structured-reference column {index} exceeds {} columns in table {:?}",
                         table.columns.len(),
                         table.display_name
@@ -78,13 +78,13 @@ impl Context {
             },
             TableColumns::Range { first, last } => {
                 let first_name = table.columns.get(usize::from(first)).ok_or_else(|| {
-                    Error::InvalidFormula(format!(
+                    Error::UnresolvedDependency(format!(
                         "structured-reference first column {first} exceeds {} columns",
                         table.columns.len()
                     ))
                 })?;
                 let last_name = table.columns.get(usize::from(last)).ok_or_else(|| {
-                    Error::InvalidFormula(format!(
+                    Error::UnresolvedDependency(format!(
                         "structured-reference last column {last} exceeds {} columns",
                         table.columns.len()
                     ))
