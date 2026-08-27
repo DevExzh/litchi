@@ -44,6 +44,15 @@ const FOOTER_ROW_TEXT_STYLE_FIELD: u32 = 27;
 const MAX_RECURSION: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 const BUFFA_PARITY_PASSES: usize = 2;
+
+const fn doubled_at_least_one(value: usize) -> usize {
+    match value.checked_mul(2) {
+        Some(0) => 1,
+        Some(value) => value,
+        None => usize::MAX,
+    }
+}
+
 const REQUIRED_FIELDS_MASK: u32 = (1 << TABLE_ID_FIELD)
     | (1 << TABLE_STYLE_FIELD)
     | (1 << BASE_DATA_STORE_FIELD)
@@ -564,6 +573,10 @@ pub struct DecodeOptions {
     max_work_bytes: usize,
     max_text_bytes: usize,
     recursion_limit: u32,
+    max_output_bytes: usize,
+    max_allocations: usize,
+    max_retained_bytes: usize,
+    max_scratch_bytes: usize,
 }
 
 impl DecodeOptions {
@@ -581,6 +594,10 @@ impl DecodeOptions {
             max_work_bytes,
             max_text_bytes: max_input_bytes,
             recursion_limit,
+            max_output_bytes: doubled_at_least_one(max_input_bytes),
+            max_allocations: 1,
+            max_retained_bytes: doubled_at_least_one(max_input_bytes),
+            max_scratch_bytes: doubled_at_least_one(max_input_bytes),
         }
     }
 
@@ -638,6 +655,34 @@ impl DecodeOptions {
         self
     }
 
+    /// Replace the candidate-output byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn with_max_output_bytes(mut self, maximum: usize) -> Self {
+        self.max_output_bytes = maximum;
+        self
+    }
+
+    /// Replace the logical output-allocation ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn with_max_allocations(mut self, maximum: usize) -> Self {
+        self.max_allocations = maximum;
+        self
+    }
+
+    /// Replace the retained-candidate byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn with_max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_bytes = maximum;
+        self
+    }
+
+    /// Replace the logical scratch-byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn with_max_scratch_bytes(mut self, maximum: usize) -> Self {
+        self.max_scratch_bytes = maximum;
+        self
+    }
+
     /// Return the input-byte ceiling.
     #[must_use]
     pub const fn max_input_bytes(self) -> usize {
@@ -666,6 +711,30 @@ impl DecodeOptions {
     #[must_use]
     pub const fn recursion_limit(self) -> u32 {
         self.recursion_limit
+    }
+
+    /// Return the candidate-output byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    /// Return the logical output-allocation ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_allocations(self) -> usize {
+        self.max_allocations
+    }
+
+    /// Return the retained-candidate byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.max_retained_bytes
+    }
+
+    /// Return the logical scratch-byte ceiling used by prepared rewrites.
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.max_scratch_bytes
     }
 
     fn buffa(self) -> BuffaDecodeOptions {
@@ -807,6 +876,14 @@ pub enum DecodeLimit {
     Work { observed: usize, maximum: usize },
     /// Borrowed UTF-8 text exceeded the text-byte ceiling.
     Text { observed: usize, maximum: usize },
+    /// The prepared rewrite exceeded its candidate-output byte ceiling.
+    Output { observed: usize, maximum: usize },
+    /// The prepared rewrite exceeded its logical allocation ceiling.
+    Allocations { observed: usize, maximum: usize },
+    /// The prepared rewrite exceeded its retained-byte ceiling.
+    Retained { observed: usize, maximum: usize },
+    /// The prepared rewrite exceeded its scratch-byte ceiling.
+    Scratch { observed: usize, maximum: usize },
     /// An unknown group exceeded the configured nesting ceiling.
     Nesting { observed: u32, maximum: u32 },
 }
@@ -824,6 +901,7 @@ enum DecodeErrorKind {
     Missing(&'static str),
     Duplicate(&'static str),
     NonCanonical(&'static str),
+    FingerprintMismatch,
     Projection,
 }
 
@@ -855,6 +933,12 @@ impl DecodeError {
     const fn noncanonical(reason: &'static str) -> Self {
         Self {
             kind: DecodeErrorKind::NonCanonical(reason),
+        }
+    }
+
+    const fn fingerprint_mismatch() -> Self {
+        Self {
+            kind: DecodeErrorKind::FingerprintMismatch,
         }
     }
 
@@ -925,6 +1009,22 @@ impl fmt::Display for DecodeError {
                 formatter,
                 "table-model discovery borrows {observed} text bytes; maximum is {maximum}"
             ),
+            DecodeErrorKind::Limit(DecodeLimit::Output { observed, maximum }) => write!(
+                formatter,
+                "table-model name rewrite emits {observed} bytes; maximum is {maximum}"
+            ),
+            DecodeErrorKind::Limit(DecodeLimit::Allocations { observed, maximum }) => write!(
+                formatter,
+                "table-model name rewrite requires {observed} allocations; maximum is {maximum}"
+            ),
+            DecodeErrorKind::Limit(DecodeLimit::Retained { observed, maximum }) => write!(
+                formatter,
+                "table-model name rewrite retains {observed} bytes; maximum is {maximum}"
+            ),
+            DecodeErrorKind::Limit(DecodeLimit::Scratch { observed, maximum }) => write!(
+                formatter,
+                "table-model name rewrite requires {observed} scratch bytes; maximum is {maximum}"
+            ),
             DecodeErrorKind::Limit(DecodeLimit::Nesting { observed, maximum }) => write!(
                 formatter,
                 "table-model discovery reached nesting {observed}; maximum is {maximum}"
@@ -936,6 +1036,9 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::NonCanonical(reason) => {
                 write!(formatter, "non-canonical protobuf representation: {reason}")
             },
+            DecodeErrorKind::FingerprintMismatch => {
+                formatter.write_str("table-model rewrite source fingerprint changed")
+            },
             DecodeErrorKind::Projection => {
                 formatter.write_str("table-model discovery projection disagrees with Buffa")
             },
@@ -944,6 +1047,552 @@ impl fmt::Display for DecodeError {
 }
 
 impl std::error::Error for DecodeError {}
+
+/// Borrowed table-name rewrite request.  The requested name remains owned by
+/// the caller until the prepared operation is executed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableModelNameWrite<'name> {
+    name: &'name str,
+    expected_fingerprint: Option<u64>,
+}
+
+impl<'name> TableModelNameWrite<'name> {
+    /// Build a name rewrite request without changing the source fingerprint
+    /// policy.
+    #[must_use]
+    pub const fn new(name: &'name str) -> Self {
+        Self {
+            name,
+            expected_fingerprint: None,
+        }
+    }
+
+    /// Require the complete source payload to have this fingerprint before a
+    /// rewrite is prepared.
+    #[must_use]
+    pub const fn with_fingerprint(mut self, expected_fingerprint: u64) -> Self {
+        self.expected_fingerprint = Some(expected_fingerprint);
+        self
+    }
+
+    /// Return the requested table name.
+    #[must_use]
+    pub const fn name(self) -> &'name str {
+        self.name
+    }
+
+    /// Return the optional source-fingerprint guard.
+    #[must_use]
+    pub const fn expected_fingerprint(self) -> Option<u64> {
+        self.expected_fingerprint
+    }
+}
+
+impl<'name> From<&'name str> for TableModelNameWrite<'name> {
+    fn from(name: &'name str) -> Self {
+        Self::new(name)
+    }
+}
+
+/// Aggregate accounting for one prepared table-name rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableModelNameRewriteReport {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    text_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+    changed: bool,
+    source_fingerprint: u64,
+}
+
+impl TableModelNameRewriteReport {
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn text_bytes(self) -> usize {
+        self.text_bytes
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
+    #[must_use]
+    pub const fn source_fingerprint(self) -> u64 {
+        self.source_fingerprint
+    }
+}
+
+/// Exact ceilings required by one prepared table-name rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableModelNameRewriteRequirements {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    text_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+impl TableModelNameRewriteRequirements {
+    /// Build execution limits that accept exactly these requirements.
+    #[must_use]
+    pub const fn exact(self) -> TableModelNameRewriteLimits {
+        TableModelNameRewriteLimits {
+            input_bytes: self.input_bytes,
+            output_bytes: self.output_bytes,
+            fields: self.fields,
+            work_bytes: self.work_bytes,
+            text_bytes: self.text_bytes,
+            max_depth: self.max_depth,
+            allocations: self.allocations,
+            retained_bytes: self.retained_bytes,
+            scratch_bytes: self.scratch_bytes,
+        }
+    }
+
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn text_bytes(self) -> usize {
+        self.text_bytes
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> u32 {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+}
+
+/// Caller-provided ceilings replayed before the rewrite output is allocated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableModelNameRewriteLimits {
+    input_bytes: usize,
+    output_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    text_bytes: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+impl TableModelNameRewriteLimits {
+    /// Start with no additional execution restriction.
+    #[must_use]
+    pub const fn unrestricted() -> Self {
+        Self {
+            input_bytes: usize::MAX,
+            output_bytes: usize::MAX,
+            fields: usize::MAX,
+            work_bytes: usize::MAX,
+            text_bytes: usize::MAX,
+            max_depth: u32::MAX,
+            allocations: usize::MAX,
+            retained_bytes: usize::MAX,
+            scratch_bytes: usize::MAX,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_input_bytes(mut self, maximum: usize) -> Self {
+        self.input_bytes = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_output_bytes(mut self, maximum: usize) -> Self {
+        self.output_bytes = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_fields(mut self, maximum: usize) -> Self {
+        self.fields = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_work_bytes(mut self, maximum: usize) -> Self {
+        self.work_bytes = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_text_bytes(mut self, maximum: usize) -> Self {
+        self.text_bytes = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_max_depth(mut self, maximum: u32) -> Self {
+        self.max_depth = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_allocations(mut self, maximum: usize) -> Self {
+        self.allocations = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_retained_bytes(mut self, maximum: usize) -> Self {
+        self.retained_bytes = maximum;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_scratch_bytes(mut self, maximum: usize) -> Self {
+        self.scratch_bytes = maximum;
+        self
+    }
+}
+
+/// Output bytes and accounting produced by one prepared execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableModelNameRewriteOutput {
+    bytes: Vec<u8>,
+    report: TableModelNameRewriteReport,
+}
+
+impl TableModelNameRewriteOutput {
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    #[must_use]
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+
+    #[must_use]
+    pub const fn report(&self) -> TableModelNameRewriteReport {
+        self.report
+    }
+}
+
+/// Strictly prepared raw-preserving table-name rewrite.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedTableModelNameRewrite<'source, 'name> {
+    source: &'source [u8],
+    name: TableModelNameWrite<'name>,
+    name_field_start: usize,
+    name_field_end: usize,
+    options: DecodeOptions,
+    report: TableModelNameRewriteReport,
+    requirements: TableModelNameRewriteRequirements,
+    current: TableModelDiscoverySnapshot<'source>,
+}
+
+impl<'source, 'name> PreparedTableModelNameRewrite<'source, 'name> {
+    /// Return preparation and execution accounting.
+    #[must_use]
+    pub const fn prepare_report(&self) -> TableModelNameRewriteReport {
+        self.report
+    }
+
+    /// Return exact ceilings consumed by execution.
+    #[must_use]
+    pub const fn execution_requirements(&self) -> TableModelNameRewriteRequirements {
+        self.requirements
+    }
+
+    /// Return the source fingerprint captured during preparation.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.report.source_fingerprint
+    }
+
+    /// Execute the prepared rewrite after checking every advertised ceiling.
+    pub fn execute(
+        self,
+        limits: TableModelNameRewriteLimits,
+    ) -> Result<TableModelNameRewriteOutput, DecodeError> {
+        check_name_rewrite_limits(self.requirements, limits)?;
+        if table_model_source_fingerprint(self.source) != self.report.source_fingerprint {
+            return Err(DecodeError::fingerprint_mismatch());
+        }
+
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_error| DecodeError::wire("table-model name rewrite allocation failed"))?;
+        if self.report.changed {
+            output.extend_from_slice(&self.source[..self.name_field_start]);
+            push_varint((u64::from(TABLE_NAME_FIELD) << 3) | 2, &mut output);
+            push_varint(
+                u64::try_from(self.name.name.len()).map_err(|_error| DecodeError::projection())?,
+                &mut output,
+            );
+            output.extend_from_slice(self.name.name.as_bytes());
+            output.extend_from_slice(&self.source[self.name_field_end..]);
+        } else {
+            output.extend_from_slice(self.source);
+        }
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError::projection());
+        }
+
+        let readback_options = self
+            .options
+            .with_max_input_bytes(output.len())
+            .with_max_fields(self.requirements.fields)
+            .with_max_work_bytes(self.requirements.work_bytes)
+            .with_max_text_bytes(self.requirements.text_bytes)
+            .with_max_output_bytes(output.len())
+            .with_max_allocations(self.requirements.allocations)
+            .with_max_retained_bytes(self.requirements.retained_bytes)
+            .with_max_scratch_bytes(self.requirements.scratch_bytes);
+        let (readback, _report) = decode_table_model_with_report(&output, readback_options)?;
+        if readback.table_id() != self.current.table_id()
+            || readback.rows() != self.current.rows()
+            || readback.columns() != self.current.columns()
+            || readback.table_name() != self.name.name
+        {
+            return Err(DecodeError::projection());
+        }
+
+        Ok(TableModelNameRewriteOutput {
+            bytes: output,
+            report: self.report,
+        })
+    }
+}
+
+/// Prepare a strict raw-preserving rewrite of required field 8
+/// (`TST.TableModelArchive.table_name`).
+pub fn prepare_table_model_name_rewrite<'source, 'name>(
+    source: &'source [u8],
+    write: impl Into<TableModelNameWrite<'name>>,
+    options: DecodeOptions,
+) -> Result<PreparedTableModelNameRewrite<'source, 'name>, DecodeError> {
+    let write = write.into();
+    let (parsed, source_report) = decode_parsed_model_with_report(source, options)?;
+    if write
+        .expected_fingerprint()
+        .is_some_and(|expected| expected != table_model_source_fingerprint(source))
+    {
+        return Err(DecodeError::fingerprint_mismatch());
+    }
+
+    let changed = parsed.table_name != write.name();
+    let old_field_len = parsed
+        .name_field_end
+        .checked_sub(parsed.name_field_start)
+        .ok_or_else(DecodeError::projection)?;
+    let new_field_len = encoded_length_delimited_field_len(TABLE_NAME_FIELD, write.name().len())?;
+    let output_bytes = source
+        .len()
+        .checked_sub(old_field_len)
+        .and_then(|length| length.checked_add(new_field_len))
+        .ok_or_else(DecodeError::projection)?;
+    let candidate_text_bytes = source_report
+        .text_bytes
+        .checked_sub(parsed.table_name.len())
+        .and_then(|text| text.checked_add(write.name().len()))
+        .ok_or_else(DecodeError::projection)?;
+    if candidate_text_bytes > options.max_text_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Text {
+            observed: candidate_text_bytes,
+            maximum: options.max_text_bytes,
+        }));
+    }
+
+    let candidate_work = output_bytes
+        .checked_mul(BUFFA_PARITY_PASSES + 1)
+        .ok_or_else(DecodeError::projection)?;
+    let rewrite_work = output_bytes;
+    let fields = source_report
+        .fields
+        .checked_mul(2)
+        .ok_or_else(DecodeError::projection)?;
+    let work_bytes = source_report
+        .work_bytes
+        .checked_add(candidate_work)
+        .and_then(|work| work.checked_add(rewrite_work))
+        .ok_or_else(DecodeError::projection)?;
+    let text_bytes = source_report
+        .text_bytes
+        .checked_add(candidate_text_bytes)
+        .ok_or_else(DecodeError::projection)?;
+    let scratch_bytes = source
+        .len()
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::projection)?;
+    let requirements = TableModelNameRewriteRequirements {
+        input_bytes: source.len(),
+        output_bytes,
+        fields,
+        work_bytes,
+        text_bytes,
+        max_depth: source_report.max_depth,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes,
+    };
+    check_name_rewrite_limits(
+        requirements,
+        TableModelNameRewriteLimits {
+            input_bytes: options.max_input_bytes,
+            output_bytes: options.max_output_bytes,
+            fields: options.max_fields,
+            work_bytes: options.max_work_bytes,
+            text_bytes: options.max_text_bytes,
+            max_depth: options.recursion_limit,
+            allocations: options.max_allocations,
+            retained_bytes: options.max_retained_bytes,
+            scratch_bytes: options.max_scratch_bytes,
+        },
+    )?;
+    let report = TableModelNameRewriteReport {
+        input_bytes: source.len(),
+        output_bytes,
+        fields,
+        work_bytes,
+        text_bytes,
+        max_depth: source_report.max_depth,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes,
+        changed,
+        source_fingerprint: table_model_source_fingerprint(source),
+    };
+    Ok(PreparedTableModelNameRewrite {
+        source,
+        name: write,
+        name_field_start: parsed.name_field_start,
+        name_field_end: parsed.name_field_end,
+        options,
+        report,
+        requirements,
+        current: TableModelDiscoverySnapshot {
+            table_id: parsed.table_id,
+            table_name: parsed.table_name,
+            rows: parsed.rows,
+            columns: parsed.columns,
+        },
+    })
+}
+
+/// Prepare and execute a strict table-name rewrite in one call.
+pub fn rewrite_table_model_name(
+    source: &[u8],
+    name: &str,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    let prepared =
+        prepare_table_model_name_rewrite(source, TableModelNameWrite::new(name), options)?;
+    Ok(prepared
+        .execute(prepared.execution_requirements().exact())?
+        .into_bytes())
+}
+
+/// Prepare and execute a strict table-name rewrite with accounting.
+pub fn rewrite_table_model_name_with_report(
+    source: &[u8],
+    name: &str,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, TableModelNameRewriteReport), DecodeError> {
+    let prepared =
+        prepare_table_model_name_rewrite(source, TableModelNameWrite::new(name), options)?;
+    let output = prepared.execute(prepared.execution_requirements().exact())?;
+    let report = output.report();
+    Ok((output.into_bytes(), report))
+}
+
+/// Stable allocation-free fingerprint for a complete table-model payload.
+#[must_use]
+pub fn table_model_source_fingerprint(source: &[u8]) -> u64 {
+    let mut fingerprint = 14_695_981_039_346_656_037u64;
+    for byte in source {
+        fingerprint ^= u64::from(*byte);
+        fingerprint = fingerprint.wrapping_mul(1_099_511_628_211u64);
+    }
+    fingerprint
+}
 
 /// Decode the strict borrowed table-model discovery facts.
 pub fn decode_table_model(
@@ -958,6 +1607,22 @@ pub fn decode_table_model_with_report(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(TableModelSnapshot<'_>, DecodeReport), DecodeError> {
+    let (parsed, report) = decode_parsed_model_with_report(source, options)?;
+    Ok((
+        TableModelDiscoverySnapshot {
+            table_id: parsed.table_id,
+            table_name: parsed.table_name,
+            rows: parsed.rows,
+            columns: parsed.columns,
+        },
+        report,
+    ))
+}
+
+fn decode_parsed_model_with_report<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<(ParsedModel<'source>, DecodeReport), DecodeError> {
     validate_input(source, options)?;
     let mut budget = Budget::new(options, source.len());
     let parsed = parse_model(source, &mut budget, 0)?;
@@ -987,12 +1652,7 @@ pub fn decode_table_model_with_report(
     }
 
     Ok((
-        TableModelDiscoverySnapshot {
-            table_id: parsed.table_id,
-            table_name: parsed.table_name,
-            rows: parsed.rows,
-            columns: parsed.columns,
-        },
+        parsed,
         DecodeReport {
             input_bytes: source.len(),
             fields: budget.fields,
@@ -1184,6 +1844,8 @@ struct ParsedModel<'source> {
     table_name: &'source str,
     rows: u32,
     columns: u32,
+    name_field_start: usize,
+    name_field_end: usize,
 }
 
 fn parse_model<'source>(
@@ -1197,9 +1859,15 @@ fn parse_model<'source>(
     let mut table_name = None;
     let mut rows = None;
     let mut columns = None;
+    let mut name_field_start = None;
+    let mut name_field_end = None;
     let mut required_fields = 0u32;
     let mut seen_known_fields = 0u128;
     while !remaining.is_empty() {
+        let field_start = source
+            .len()
+            .checked_sub(remaining.len())
+            .ok_or_else(|| DecodeError::wire("source cursor underflow"))?;
         let (tag, key_canonical) = read_varint(&mut remaining)?;
         if !key_canonical {
             return Err(DecodeError::noncanonical("protobuf field key"));
@@ -1225,7 +1893,16 @@ fn parse_model<'source>(
                     let value = read_string(&mut remaining, budget)?;
                     match number {
                         TABLE_ID_FIELD => table_id = Some(value),
-                        TABLE_NAME_FIELD => table_name = Some(value),
+                        TABLE_NAME_FIELD => {
+                            table_name = Some(value);
+                            name_field_start = Some(field_start);
+                            name_field_end = Some(
+                                source
+                                    .len()
+                                    .checked_sub(remaining.len())
+                                    .ok_or_else(|| DecodeError::wire("source cursor underflow"))?,
+                            );
+                        },
                         _ => {},
                     }
                 },
@@ -1288,6 +1965,10 @@ fn parse_model<'source>(
         rows: rows.ok_or_else(|| DecodeError::missing("TST.TableModelArchive.number_of_rows"))?,
         columns: columns
             .ok_or_else(|| DecodeError::missing("TST.TableModelArchive.number_of_columns"))?,
+        name_field_start: name_field_start
+            .ok_or_else(|| DecodeError::missing("TST.TableModelArchive.table_name"))?,
+        name_field_end: name_field_end
+            .ok_or_else(|| DecodeError::missing("TST.TableModelArchive.table_name"))?,
     })
 }
 
@@ -1483,6 +2164,97 @@ fn read_varint(source: &mut &[u8]) -> Result<(u64, bool), DecodeError> {
         }
     }
     Err(DecodeError::wire("varint is too long"))
+}
+
+fn encoded_length_delimited_field_len(
+    field_number: u32,
+    payload_len: usize,
+) -> Result<usize, DecodeError> {
+    let key = (u64::from(field_number) << 3) | 2;
+    varint_len(key)
+        .checked_add(varint_len(
+            u64::try_from(payload_len).map_err(|_error| DecodeError::projection())?,
+        ))
+        .and_then(|length| length.checked_add(payload_len))
+        .ok_or_else(DecodeError::projection)
+}
+
+fn varint_len(mut value: u64) -> usize {
+    let mut length = 1usize;
+    while value >= 128 {
+        value >>= 7;
+        length += 1;
+    }
+    length
+}
+
+fn push_varint(mut value: u64, output: &mut Vec<u8>) {
+    while value >= 128 {
+        output.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+fn check_name_rewrite_limits(
+    requirements: TableModelNameRewriteRequirements,
+    limits: TableModelNameRewriteLimits,
+) -> Result<(), DecodeError> {
+    if requirements.input_bytes > limits.input_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Bytes {
+            observed: requirements.input_bytes,
+            maximum: limits.input_bytes,
+        }));
+    }
+    if requirements.output_bytes > limits.output_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Output {
+            observed: requirements.output_bytes,
+            maximum: limits.output_bytes,
+        }));
+    }
+    if requirements.fields > limits.fields {
+        return Err(DecodeError::limit(DecodeLimit::Fields {
+            observed: requirements.fields,
+            maximum: limits.fields,
+        }));
+    }
+    if requirements.work_bytes > limits.work_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Work {
+            observed: requirements.work_bytes,
+            maximum: limits.work_bytes,
+        }));
+    }
+    if requirements.text_bytes > limits.text_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Text {
+            observed: requirements.text_bytes,
+            maximum: limits.text_bytes,
+        }));
+    }
+    if requirements.max_depth > limits.max_depth {
+        return Err(DecodeError::limit(DecodeLimit::Nesting {
+            observed: requirements.max_depth,
+            maximum: limits.max_depth,
+        }));
+    }
+    if requirements.allocations > limits.allocations {
+        return Err(DecodeError::limit(DecodeLimit::Allocations {
+            observed: requirements.allocations,
+            maximum: limits.allocations,
+        }));
+    }
+    if requirements.retained_bytes > limits.retained_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Retained {
+            observed: requirements.retained_bytes,
+            maximum: limits.retained_bytes,
+        }));
+    }
+    if requirements.scratch_bytes > limits.scratch_bytes {
+        return Err(DecodeError::limit(DecodeLimit::Scratch {
+            observed: requirements.scratch_bytes,
+            maximum: limits.scratch_bytes,
+        }));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1779,5 +2551,220 @@ mod tests {
         ] {
             assert!(decode_table_model(&malformed, options(&malformed)).is_err());
         }
+    }
+
+    fn rewrite_options(source: &[u8]) -> DecodeOptions {
+        let bytes = source.len().max(1);
+        DecodeOptions::for_source(source)
+            .with_max_input_bytes(bytes)
+            .with_max_output_bytes(bytes.saturating_mul(2))
+            .with_max_fields(bytes.saturating_mul(2))
+            .with_max_work_bytes(bytes.saturating_mul(8))
+            .with_max_text_bytes(bytes)
+            .with_max_allocations(1)
+            .with_max_retained_bytes(bytes.saturating_mul(2))
+            .with_max_scratch_bytes(bytes.saturating_mul(3))
+    }
+
+    #[test]
+    fn prepared_name_rewrite_preserves_unknowns_and_inverse_is_exact() {
+        let mut source = model();
+        varint_field(100, 7, &mut source);
+        source.extend_from_slice(&[0xab, 0x06, 0xab, 0x06, 0xac, 0x06, 0xac, 0x06]);
+        let options = rewrite_options(&source);
+        let prepared = prepare_table_model_name_rewrite(&source, "Renamed", options)
+            .expect("prepare table name rewrite");
+        let requirements = prepared.execution_requirements();
+        assert!(prepared.prepare_report().changed());
+        assert!(requirements.output_bytes() > source.len());
+        assert!(requirements.allocations() > 0);
+        assert!(requirements.retained_bytes() > 0);
+        assert!(requirements.scratch_bytes() > 0);
+        let output = prepared
+            .execute(requirements.exact())
+            .expect("execute table name rewrite");
+        assert_eq!(output.report(), prepared.prepare_report());
+        assert!(
+            output
+                .bytes()
+                .windows(2)
+                .any(|window| window == [0xa0, 0x06])
+        );
+        assert!(
+            output
+                .bytes()
+                .windows(8)
+                .any(|window| window == [0xab, 0x06, 0xab, 0x06, 0xac, 0x06, 0xac, 0x06])
+        );
+        let rewritten = decode_table_model(
+            output.bytes(),
+            options.with_max_input_bytes(output.bytes().len()),
+        )
+        .expect("read rewritten table model");
+        assert_eq!(rewritten.table_name(), "Renamed");
+        assert_eq!((rewritten.rows(), rewritten.columns()), (3, 4));
+
+        let inverse_options = rewrite_options(output.bytes());
+        let inverse = rewrite_table_model_name(output.bytes(), "Table", inverse_options)
+            .expect("inverse table name rewrite");
+        assert_eq!(inverse, source);
+    }
+
+    #[test]
+    fn unchanged_name_rewrite_is_an_exact_noop() {
+        let source = model();
+        let options = rewrite_options(&source);
+        let prepared = prepare_table_model_name_rewrite(&source, "Table", options)
+            .expect("prepare no-op table name rewrite");
+        assert!(!prepared.prepare_report().changed());
+        let output = prepared
+            .execute(prepared.execution_requirements().exact())
+            .expect("execute no-op table name rewrite");
+        assert_eq!(output.bytes(), source.as_slice());
+    }
+
+    #[test]
+    fn name_rewrite_rejects_duplicate_wrong_wire_invalid_utf8_and_stale_fingerprint() {
+        let source = model();
+        let options = rewrite_options(&source);
+
+        let mut duplicate = source.clone();
+        bytes_field(TABLE_NAME_FIELD, b"Other", &mut duplicate);
+        let duplicate_error =
+            prepare_table_model_name_rewrite(&duplicate, "Renamed", rewrite_options(&duplicate))
+                .expect_err("duplicate table name");
+        assert_eq!(
+            duplicate_error.duplicate_singular_field(),
+            Some("TST.TableModelArchive.table_name")
+        );
+
+        let mut wrong_wire = source.clone();
+        varint_field(TABLE_NAME_FIELD, 1, &mut wrong_wire);
+        assert!(
+            prepare_table_model_name_rewrite(&wrong_wire, "Renamed", rewrite_options(&wrong_wire))
+                .is_err()
+        );
+
+        let mut invalid_utf8 = source.clone();
+        let name = invalid_utf8
+            .windows(5)
+            .position(|window| window == b"Table")
+            .expect("table name payload");
+        invalid_utf8[name] = 0xff;
+        let utf8_error = decode_table_model(&invalid_utf8, rewrite_options(&invalid_utf8))
+            .expect_err("invalid table name UTF-8");
+        assert_eq!(
+            utf8_error.noncanonical_reason(),
+            Some("string is not valid UTF-8")
+        );
+
+        let stale = TableModelNameWrite::new("Renamed").with_fingerprint(0);
+        assert!(
+            prepare_table_model_name_rewrite(&source, stale, options)
+                .expect_err("stale table-model fingerprint")
+                .to_string()
+                .contains("fingerprint")
+        );
+    }
+
+    #[test]
+    fn name_rewrite_execution_rejects_each_maximum_at_minus_one() {
+        let mut source = model();
+        source.extend_from_slice(&[0xab, 0x06, 0xab, 0x06, 0xac, 0x06, 0xac, 0x06]);
+        let options = rewrite_options(&source);
+        let prepared = prepare_table_model_name_rewrite(&source, "Renamed", options)
+            .expect("prepare bounded table name rewrite");
+        let requirements = prepared.execution_requirements();
+
+        let assert_limit = |limits: TableModelNameRewriteLimits, expected: DecodeLimit| {
+            assert_eq!(
+                prepared
+                    .execute(limits)
+                    .expect_err("minus-one rewrite limit")
+                    .resource_limit(),
+                Some(expected)
+            );
+        };
+
+        let maximum = requirements.input_bytes().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_input_bytes(maximum),
+            DecodeLimit::Bytes {
+                observed: requirements.input_bytes(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.output_bytes().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_output_bytes(maximum),
+            DecodeLimit::Output {
+                observed: requirements.output_bytes(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.fields().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_fields(maximum),
+            DecodeLimit::Fields {
+                observed: requirements.fields(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.work_bytes().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_work_bytes(maximum),
+            DecodeLimit::Work {
+                observed: requirements.work_bytes(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.text_bytes().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_text_bytes(maximum),
+            DecodeLimit::Text {
+                observed: requirements.text_bytes(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.max_depth().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_max_depth(maximum),
+            DecodeLimit::Nesting {
+                observed: requirements.max_depth(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.allocations().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_allocations(maximum),
+            DecodeLimit::Allocations {
+                observed: requirements.allocations(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.retained_bytes().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_retained_bytes(maximum),
+            DecodeLimit::Retained {
+                observed: requirements.retained_bytes(),
+                maximum,
+            },
+        );
+
+        let maximum = requirements.scratch_bytes().saturating_sub(1);
+        assert_limit(
+            requirements.exact().with_scratch_bytes(maximum),
+            DecodeLimit::Scratch {
+                observed: requirements.scratch_bytes(),
+                maximum,
+            },
+        );
     }
 }

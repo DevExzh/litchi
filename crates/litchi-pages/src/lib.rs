@@ -99,6 +99,10 @@ pub use package::{
     BodyTableLockLimitKind, BodyTableLockPatch,
 };
 pub use package::{
+    BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
+    BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,
+};
+pub use package::{
     BodyTableSortCommit, BodyTableSortDiagnostics, BodyTableSortEdit, BodyTableSortError,
     BodyTableSortLimitKind, BodyTableSortPatch, BodyTableSortPath,
 };
@@ -136,3 +140,4 @@ pub use selector::BodyTableSelector;
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::headers::Settings as BodyTableHeaderSettings;
 pub use table::lock::BodyTableLockState;
+pub use table::name::{Error as BodyTableNameValueError, Name as BodyTableName};

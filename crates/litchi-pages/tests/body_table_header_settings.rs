@@ -309,11 +309,7 @@ fn append_dependency_field(package: &[u8]) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or("missing model message")?;
         let mut data = model.messages[message_index].data.clone();
-        litchi_iwa_common::wire::append_length_delimited_field(
-            &mut data,
-            83,
-            &reference(999).encode_to_vec(),
-        )?;
+        litchi_iwa_common::wire::append_length_delimited_field(&mut data, 83, b"dependency")?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
@@ -321,9 +317,6 @@ fn append_dependency_field(package: &[u8]) -> TestResult<Vec<u8>> {
                 data,
             },
         )?;
-        model.archive_info.message_infos[0]
-            .object_references
-            .push(999);
         Ok(())
     })
 }

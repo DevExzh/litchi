@@ -6408,3 +6408,55 @@ No crate, manifest dependency, dependency edge, or ordered debt is closed by
 Wave106. Debts 010, 015, and 016 remain open, as do all other current debts;
 the `litchi-iwa` edges, generated/Prost/Buffa owners, migration host, and IWA
 monolith deletion gate remain unchanged.
+
+## 2026-08-28 amendment: Wave107 Pages body-table name owner (not a monolith-exit gate)
+
+Wave107 places selector-first Pages body-table name discovery and rename
+transactions in `litchi_pages::Package` through
+`Package::{body_table_name, edit_body_table_name, apply_body_table_name}`.
+The public `table::name::Name` and transaction values are archive-free;
+native identifiers, Archive/ZIP/member values, wire views, and
+generated/Prost/Buffa values remain private. The strict
+`table_model_discovery_codec` field-8 borrowed projection and prepared raw
+rewrite preserve unknown canonical fields/groups while rejecting malformed,
+duplicate-known, noncanonical, and wrong-wire inputs before publication.
+
+The raw `PagesEditor` rename mutation path is retired and the example is
+migrated to the focused package owner. `PagesEditor::tables()` retains only
+legacy generated read-only name-listing compatibility outside focused owner
+admission; no mutation fallback exists. Physical Pages table/content,
+storage, formula, and other compatibility responsibilities remain in
+`litchi-iwa`.
+
+The scoped gates are 22/22 for focused Pages body-table-name integration,
+38/38 for host Pages table tests, 9/9 for the focused codec, and 565/565 for
+the full `litchi-iwa-protos` library suite. Strict Pages owner/test Clippy
+passed; the `edit_pages_table` example check passed; lifecycle fuzz check and
+strict target Clippy passed with 10 command seeds. Boundary unit tests passed
+648/648 and live name HOST/FACADE audits were empty. The full checker remains
+blocked only by an unrelated pre-existing untracked Pages table-lock file;
+these are scoped verification results and do not satisfy the monolith
+deletion gate.
+
+Name-owner metadata admission proves the selected model's unique current
+component and locator and rejects unknown, external, data, ambiguous, and
+root-map routes. Unrelated UUID bits and component assignments are
+opaque-preserved, not independently verifiable by this slice.
+
+No positive native Pages name or rename acceptance is claimed. The only
+available body-table source,
+`/private/tmp/wave104-pages-native-source.pages` (108,776 bytes, SHA-256
+`997509fda639f5dcdabd4546c392b9ebdc3d8c7e9c1d967f35b9f2a0aca38359`, 43
+members), was rejected by strict selector read with
+`InvalidSource { path: Table { table: 0 } }`; its bytes remained exact, no
+candidate or inverse was produced, and no UI run occurred. Native Pages name
+mutation, save, reopen, and UI acceptance evidence is withheld.
+
+The operation ledger is conservative logical accounting, not telemetry for
+Package/SourceCatalog caches, decompressed-Archive memory, the process
+allocator, RSS, or codec-internal allocator behavior. No zero-copy,
+allocator/RSS, latency, or package-wide performance claim follows. Wave107
+closes no crate, manifest dependency, edge, or ordered debt: the
+`litchi-iwa -> litchi-pages` edge, debt 017 and all 13 debts,
+generated/Prost/Buffa owners, migration host, and IWA monolith deletion gate
+remain unchanged.

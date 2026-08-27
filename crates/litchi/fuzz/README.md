@@ -320,6 +320,19 @@ state remain outside this package configuration boundary. The checked-in
 recipes under `corpus/pages_body_table_appearance/` are command inputs, not
 native Pages package copies.
 
+`pages_body_table_name` is the focused selector-first body-table name
+transaction target. It offers arbitrary bytes to bounded Pages ingress and
+reuses a bounded command prefix against the repository's `basic.pages` seed.
+It covers selector boundaries, archive-free name validation, empty/NUL and
+UTF-8 values, no-op/set transactions, exact-source patch application and
+conflicts, inverse replay, candidate reopen/readback, malformed and redacted
+errors, source atomicity, and the accessible physical input/archive limits.
+The name owner carries its wire, text, reference, output, and transaction
+ceilings internally; this harness observes typed failures and does not invent
+caller knobs that the public API does not expose. Recipes under
+`corpus/pages_body_table_name/` are command inputs, not native Pages package
+copies.
+
 `keynote_movie_playback` is the focused selector-first movie-playback target.
 It offers arbitrary bytes to bounded Keynote ingress and reuses the same
 input as bounded `SlideSelector`/`MovieSelector` commands. When the source
@@ -572,6 +585,14 @@ Run the focused Pages body-table appearance target with its command seeds:
 ```sh
 cargo +nightly fuzz run pages_body_table_appearance \
   corpus/pages_body_table_appearance -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Pages body-table name target with its command seeds:
+
+```sh
+cargo +nightly fuzz run pages_body_table_name \
+  corpus/pages_body_table_name -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
