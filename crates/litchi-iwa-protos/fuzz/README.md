@@ -4,19 +4,28 @@
 
 `numbers_formula_archive` sends one bounded, caller-owned
 `TSCE.FormulaArchive` source through strict inspection and the visitor
-decoder. Successful inputs must agree on report bounds, node and precedent
-counts, semantic node values, and source-order callbacks. Failed inputs must
-not publish partial visitor facts. The target also constructs independent
-duplicate, missing-required, wrong-wire, non-canonical, invalid-UTF-8,
-aggregate-budget, and deep-recursion cases so those contracts do not depend on
-libFuzzer discovering a valid formula first.
+decoder, and through the legacy-compatible render-event adapter with a
+bounded, source-borrowing event sink. Successful inputs must agree on report
+bounds, node and precedent counts, semantic node values, source-order
+callbacks, and generated-Prost structural counts. Render strings are checked
+to point into the caller's unchanged source bytes; malformed and
+max-minus-one render probes must not publish partial events. The target also
+constructs independent duplicate, missing-required, wrong-wire, non-canonical,
+invalid-UTF-8, aggregate-budget, and deep-recursion cases so those contracts
+do not depend on libFuzzer discovering a valid formula first.
 
 The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
-fields, 256 KiB of work, 2,048 nodes, 64 KiB of text, and recursion depth 32.
-The checked-in `corpus/numbers_formula_archive/empty_ast_array.hex` is a
-minimal empty AST envelope; generated cases cover the malformed and resource
-boundaries above. Corpus recipes use the `hex:` form and are hand-authored,
-not copied from a native Numbers package.
+fields, 256 KiB of work, 2,048 nodes, 64 KiB of text, wire recursion depth 32,
+and independent render recursion depth 64. Render options explicitly permit
+canonical opaque unknown fields and unknown function identifiers. The
+checked-in `corpus/numbers_formula_archive/empty_ast_array.hex` is a minimal
+empty AST envelope; additional hand-authored recipes cover scalar, string/date/
+duration, array/list, unknown-function, local/cross-table/coordinate,
+category/range, thunk, opaque unknown scalar, unknown-group handling, and
+malformed-nested render paths.
+Generated cases cover the malformed and resource boundaries above. Corpus
+recipes use the `hex:` form and are hand-authored, not copied from a native
+Numbers package.
 
 List and type-check the target from this directory:
 

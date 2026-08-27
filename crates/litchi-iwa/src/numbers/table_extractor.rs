@@ -34,6 +34,7 @@ use super::bnc::{BncCellView, CachedScalar, StoredValue};
 use super::bnc::{decimal128_le, read_decimal128_le};
 use super::cell::CellValue;
 use super::editor::table_model_projection::{ProbeBudget, map_resource_error, select_candidate};
+use super::formula_renderer::{FormulaArchiveBytes, render_formula_string};
 use super::table::NumbersTable;
 use crate::bundle::Bundle;
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
@@ -43,6 +44,7 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
 use litchi_iwa_protos::comment_storage_codec;
+use litchi_iwa_protos::numbers_formula_codec;
 use litchi_iwa_protos::numbers_names_codec;
 use litchi_iwa_protos::numbers_table_cell_storage_codec;
 use litchi_numbers::cell::FiniteF64;
@@ -52,7 +54,7 @@ use std::collections::{HashMap, HashSet};
 
 type CompactTable<T> = Box<[(u32, T)]>;
 type StringTable = CompactTable<String>;
-type FormulaTable = CompactTable<tsce::FormulaArchive>;
+type FormulaTable = CompactTable<FormulaArchiveBytes>;
 type FormulaErrorTable = CompactTable<String>;
 type CommentTable = CompactTable<Comment>;
 type FormulaOwnerKey = [u32; 4];
@@ -78,6 +80,9 @@ const MAX_TABLE_LIST_PAYLOAD_FIELDS: usize = WireLimits::MAX_FIELDS;
 const MAX_TABLE_LIST_PAYLOAD_WORK: usize = WireLimits::MAX_REWRITE_WORK;
 const MAX_TABLE_LIST_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
 const MAX_TABLE_LIST_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
+const MAX_FORMULA_WIRE_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
+const MAX_FORMULA_RENDER_WORK: usize = litchi_numbers::MAX_REFERENCES;
+const MAX_FORMULA_RENDER_DEPTH: usize = WireLimits::MAX_NESTING;
 
 /// Aggregate admission state for one host table-data-list projection.
 ///
@@ -90,12 +95,17 @@ const MAX_TABLE_LIST_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
 /// compatibility, but their selected references/text are not published by
 /// the legacy best-effort route.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct ProjectionBudget {
-    references: usize,
-    payload_fields: usize,
-    payload_work: usize,
+pub(super) struct ProjectionBudget {
+    pub(super) references: usize,
+    pub(super) payload_fields: usize,
+    pub(super) payload_work: usize,
     staging_text_bytes: usize,
     entries: usize,
+    pub(super) formula_wire_bytes: usize,
+    pub(super) output_text_bytes: usize,
+    pub(super) formula_render_work: usize,
+    pub(super) max_output_text_bytes: usize,
+    pub(super) max_formula_render_depth: usize,
 }
 
 impl ProjectionBudget {
@@ -106,6 +116,11 @@ impl ProjectionBudget {
             payload_work: 0,
             staging_text_bytes: 0,
             entries: 0,
+            formula_wire_bytes: 0,
+            output_text_bytes: 0,
+            formula_render_work: 0,
+            max_output_text_bytes: MAX_TABLE_LIST_TEXT_BYTES,
+            max_formula_render_depth: MAX_FORMULA_RENDER_DEPTH,
         }
     }
 
@@ -113,15 +128,15 @@ impl ProjectionBudget {
         MAX_TABLE_LIST_REFERENCES.saturating_sub(self.references)
     }
 
-    const fn remaining_payload_fields(self) -> usize {
+    pub(super) const fn remaining_payload_fields(self) -> usize {
         MAX_TABLE_LIST_PAYLOAD_FIELDS.saturating_sub(self.payload_fields)
     }
 
-    const fn remaining_payload_work(self) -> usize {
+    pub(super) const fn remaining_payload_work(self) -> usize {
         MAX_TABLE_LIST_PAYLOAD_WORK.saturating_sub(self.payload_work)
     }
 
-    const fn remaining_staging_text_bytes(self) -> usize {
+    pub(super) const fn remaining_staging_text_bytes(self) -> usize {
         MAX_TABLE_LIST_TEXT_BYTES.saturating_sub(self.staging_text_bytes)
     }
 
@@ -194,6 +209,113 @@ impl ProjectionBudget {
             MAX_TABLE_LIST_ENTRIES,
             litchi_iwa_common::LimitKind::Fields,
         )
+    }
+
+    pub(super) fn charge_formula_wire(&mut self, amount: usize) -> Result<()> {
+        Self::charge(
+            &mut self.formula_wire_bytes,
+            amount,
+            MAX_FORMULA_WIRE_BYTES,
+            litchi_iwa_common::LimitKind::InputBytes,
+        )
+    }
+
+    pub(super) fn charge_wire_preflight(
+        &mut self,
+        report: litchi_iwa_common::wire::WirePreflight,
+    ) -> Result<()> {
+        let mut next = *self;
+        Self::charge(
+            &mut next.payload_fields,
+            report.fields(),
+            MAX_TABLE_LIST_PAYLOAD_FIELDS,
+            litchi_iwa_common::LimitKind::Fields,
+        )?;
+        Self::charge(
+            &mut next.payload_work,
+            report.scanned_bytes(),
+            MAX_TABLE_LIST_PAYLOAD_WORK,
+            litchi_iwa_common::LimitKind::RewriteWork,
+        )?;
+        *self = next;
+        Ok(())
+    }
+
+    pub(super) fn retain_formula_preflight_cost(&mut self, fields: usize, work: usize) {
+        self.payload_fields = self
+            .payload_fields
+            .saturating_add(fields)
+            .min(MAX_TABLE_LIST_PAYLOAD_FIELDS);
+        self.payload_work = self
+            .payload_work
+            .saturating_add(work)
+            .min(MAX_TABLE_LIST_PAYLOAD_WORK);
+    }
+
+    pub(super) fn charge_formula_lazy_work(&mut self, amount: usize) -> Result<()> {
+        Self::charge(
+            &mut self.payload_work,
+            amount,
+            MAX_TABLE_LIST_PAYLOAD_WORK,
+            litchi_iwa_common::LimitKind::RewriteWork,
+        )
+    }
+
+    pub(super) fn check_output_text(&self, amount: usize) -> Result<()> {
+        let observed = self.output_text_bytes.saturating_add(amount);
+        if observed > MAX_TABLE_LIST_TEXT_BYTES {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::OutputBytes,
+                observed,
+                limit: MAX_TABLE_LIST_TEXT_BYTES,
+            }));
+        }
+        Ok(())
+    }
+
+    pub(super) fn charge_output_text(&mut self, amount: usize) -> Result<()> {
+        Self::charge(
+            &mut self.output_text_bytes,
+            amount,
+            MAX_TABLE_LIST_TEXT_BYTES,
+            litchi_iwa_common::LimitKind::OutputBytes,
+        )
+    }
+
+    pub(super) fn charge_formula_render_work(&mut self, amount: usize) -> Result<()> {
+        Self::charge(
+            &mut self.formula_render_work,
+            amount,
+            MAX_FORMULA_RENDER_WORK,
+            litchi_iwa_common::LimitKind::RewriteWork,
+        )
+    }
+
+    pub(super) fn charge_formula_decode_report(
+        &mut self,
+        report: numbers_formula_codec::DecodeReport,
+    ) -> Result<()> {
+        // Formula decoding performs a strict preflight pass followed by the
+        // caller callback pass. Merge the complete successful report into a
+        // copy so a later aggregate-axis refusal cannot publish a partially
+        // charged traversal.
+        let mut next = *self;
+        next.charge_payload_fields(report.fields())?;
+        next.charge_payload_work(report.work())?;
+        next.charge_staging_text(report.text_bytes())?;
+        *self = next;
+        Ok(())
+    }
+
+    pub(super) fn check_formula_render_depth(&self, depth: usize) -> Result<()> {
+        if depth > self.max_formula_render_depth {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                observed: depth,
+                limit: self.max_formula_render_depth,
+            }));
+        }
+        Ok(())
     }
 
     fn charge_decode_work(
@@ -420,6 +542,7 @@ struct TileRowStage<'context, 'tables> {
     tile_size: usize,
     dimensions: Dimensions,
     budget: &'context mut CellBudget,
+    formula_budget: &'context mut ProjectionBudget,
     cell_tables: &'context CellTables<'tables>,
     rows: HashSet<u32>,
     cells: Vec<StagedTableCell>,
@@ -432,6 +555,7 @@ impl<'context, 'tables> TileRowStage<'context, 'tables> {
         tile_size: usize,
         dimensions: Dimensions,
         budget: &'context mut CellBudget,
+        formula_budget: &'context mut ProjectionBudget,
         cell_tables: &'context CellTables<'tables>,
     ) -> Self {
         Self {
@@ -439,6 +563,7 @@ impl<'context, 'tables> TileRowStage<'context, 'tables> {
             tile_size,
             dimensions,
             budget,
+            formula_budget,
             cell_tables,
             rows: HashSet::new(),
             cells: Vec::new(),
@@ -482,6 +607,7 @@ impl numbers_table_cell_storage_codec::StorageVisitor for TileRowStage<'_, '_> {
             self.tile_size,
             self.dimensions,
             self.budget,
+            self.formula_budget,
             self.cell_tables,
             &mut self.cells,
         ) {
@@ -529,6 +655,7 @@ fn stage_tile_row(
     tile_size: usize,
     dimensions: Dimensions,
     budget: &mut CellBudget,
+    formula_budget: &mut ProjectionBudget,
     cell_tables: &CellTables<'_>,
     staged: &mut Vec<StagedTableCell>,
 ) -> Result<()> {
@@ -583,11 +710,14 @@ fn stage_tile_row(
                 dimensions.columns()
             ))
         })?;
-        let parsed = TableDataExtractor::parse_cell_storage(
+        let parsed = TableDataExtractor::parse_cell_storage_with_budget(
             &cell_storage[range],
             cell_tables,
             row_index,
             column_index,
+            dimensions.rows() as usize,
+            dimensions.columns() as usize,
+            formula_budget,
         )?;
         staged.push(StagedTableCell {
             row: row_index,
@@ -798,20 +928,23 @@ trait ListValueConverter<T> {
     fn convert(
         &mut self,
         entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+        budget: &mut ProjectionBudget,
     ) -> Result<Option<T>>;
 }
 
 impl<T, F> ListValueConverter<T> for F
 where
-    F: for<'source> FnMut(
+    F: for<'source, 'budget> FnMut(
         numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'source>,
+        &'budget mut ProjectionBudget,
     ) -> Result<Option<T>>,
 {
     fn convert(
         &mut self,
         entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+        budget: &mut ProjectionBudget,
     ) -> Result<Option<T>> {
-        self(entry)
+        self(entry, budget)
     }
 }
 
@@ -819,8 +952,9 @@ where
 /// source.  Visitor callbacks can run before a later wire error, so semantic
 /// conversion/allocation failures are retained until the enclosing decode has
 /// finished.  Only a successful, admitted candidate is published.
-struct TypedListVisitor<'converter, T, C> {
+struct TypedListVisitor<'converter, 'budget, T, C> {
     converter: &'converter mut C,
+    budget: &'budget mut ProjectionBudget,
     stage_semantics: bool,
     // Retained for the constructor's call-site/error context. The legacy
     // extractor selects the requested union member in each converter rather
@@ -839,9 +973,10 @@ struct TypedListVisitor<'converter, T, C> {
     semantic_error: Option<Error>,
 }
 
-impl<'converter, T, C> TypedListVisitor<'converter, T, C> {
+impl<'converter, 'budget, T, C> TypedListVisitor<'converter, 'budget, T, C> {
     fn new(
         converter: &'converter mut C,
+        budget: &'budget mut ProjectionBudget,
         expected_list_type: i32,
         segment: bool,
         stage_semantics: bool,
@@ -850,6 +985,7 @@ impl<'converter, T, C> TypedListVisitor<'converter, T, C> {
     ) -> Self {
         Self {
             converter,
+            budget,
             stage_semantics,
             _expected_list_type: expected_list_type,
             max_entries,
@@ -901,7 +1037,7 @@ impl<'converter, T, C> TypedListVisitor<'converter, T, C> {
     }
 }
 
-impl<T, C> numbers_table_cell_storage_codec::StorageVisitor for TypedListVisitor<'_, T, C>
+impl<T, C> numbers_table_cell_storage_codec::StorageVisitor for TypedListVisitor<'_, '_, T, C>
 where
     C: ListValueConverter<T>,
 {
@@ -945,7 +1081,7 @@ where
         if self.semantic_error.is_some() || !self.stage_semantics {
             return Ok(());
         }
-        match self.converter.convert(entry) {
+        match self.converter.convert(entry, self.budget) {
             Ok(Some(value)) => {
                 if self.values.try_reserve(1).is_err() {
                     self.record_semantic_error(allocation_error(
@@ -1003,22 +1139,21 @@ where
 }
 
 #[derive(Debug, Clone)]
-struct FormulaReferenceName {
-    sheet: String,
-    table: String,
+pub(super) struct FormulaReferenceName {
+    pub(super) sheet: String,
+    pub(super) table: String,
 }
 
 #[derive(Debug, Clone, Default)]
-struct FormulaReferenceMaps {
-    owners: HashMap<FormulaOwnerKey, FormulaReferenceName>,
-    categories: HashMap<FormulaCategoryKey, String>,
+pub(super) struct FormulaReferenceMaps {
+    pub(super) owners: HashMap<FormulaOwnerKey, FormulaReferenceName>,
+    pub(super) categories: HashMap<FormulaCategoryKey, String>,
 }
 
 /// Extractor for Numbers table data
 pub struct TableDataExtractor<'a> {
     bundle: &'a Bundle,
     object_index: &'a ObjectIndex,
-    formula_references: FormulaReferenceMaps,
 }
 
 impl<'a> TableDataExtractor<'a> {
@@ -1027,14 +1162,15 @@ impl<'a> TableDataExtractor<'a> {
         Self {
             bundle,
             object_index,
-            formula_references: build_formula_reference_maps(bundle),
         }
     }
 
     /// Extract all tables from the document
     pub fn extract_all_tables(&self) -> Result<Vec<NumbersTable>> {
         let mut tables = Vec::new();
-        self.for_each_table(|table| {
+        let mut formula_budget = ProjectionBudget::new();
+        let formula_references = build_formula_reference_maps(self.bundle, &mut formula_budget)?;
+        self.for_each_table(&mut formula_budget, &formula_references, |table| {
             tables.try_reserve(1).map_err(|_| {
                 allocation_error("Numbers extracted table results", tables.len() + 1)
             })?;
@@ -1044,8 +1180,29 @@ impl<'a> TableDataExtractor<'a> {
         Ok(tables)
     }
 
-    fn for_each_table(&self, mut visit: impl FnMut(NumbersTable) -> Result<()>) -> Result<()> {
+    fn for_each_table(
+        &self,
+        formula_budget: &mut ProjectionBudget,
+        formula_references: &FormulaReferenceMaps,
+        mut visit: impl FnMut(NumbersTable) -> Result<()>,
+    ) -> Result<()> {
         let mut seen_objects = HashSet::new();
+        let candidate_count = [TABLE_MODEL_MESSAGE_TYPE, 6_000].into_iter().try_fold(
+            0usize,
+            |count, message_type| {
+                count
+                    .checked_add(self.object_index.iter_entries_by_type(message_type).count())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Numbers table-model candidate count overflows usize".to_owned(),
+                        )
+                    })
+            },
+        )?;
+        formula_budget.charge_entries(candidate_count)?;
+        seen_objects.try_reserve(candidate_count).map_err(|_| {
+            allocation_error("Numbers table-model candidate identities", candidate_count)
+        })?;
 
         // Real packages index TableModelArchive as 6001. Older generated
         // fixtures may store the same payload under 6000, so the object
@@ -1057,7 +1214,11 @@ impl<'a> TableDataExtractor<'a> {
                     continue;
                 }
                 if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
-                    && let Some(table) = self.extract_table_from_object(&resolved)?
+                    && let Some(table) = self.extract_table_from_object_with_formula_budget(
+                        &resolved,
+                        formula_budget,
+                        formula_references,
+                    )?
                 {
                     visit(table)?;
                 }
@@ -1070,6 +1231,21 @@ impl<'a> TableDataExtractor<'a> {
     pub fn extract_table_from_object(
         &self,
         object: &ResolvedObjectRef<'_>,
+    ) -> Result<Option<NumbersTable>> {
+        let mut formula_budget = ProjectionBudget::new();
+        let formula_references = build_formula_reference_maps(self.bundle, &mut formula_budget)?;
+        self.extract_table_from_object_with_formula_budget(
+            object,
+            &mut formula_budget,
+            &formula_references,
+        )
+    }
+
+    fn extract_table_from_object_with_formula_budget(
+        &self,
+        object: &ResolvedObjectRef<'_>,
+        formula_budget: &mut ProjectionBudget,
+        formula_references: &FormulaReferenceMaps,
     ) -> Result<Option<NumbersTable>> {
         let mut projection_budget = ProbeBudget::new();
         let selected = select_candidate(object.messages, &mut projection_budget, |message| {
@@ -1101,6 +1277,8 @@ impl<'a> TableDataExtractor<'a> {
             projection.model(),
             projection.data_store(),
             &mut projection_budget,
+            formula_budget,
+            formula_references,
         )
         .map(Some)
     }
@@ -1111,6 +1289,8 @@ impl<'a> TableDataExtractor<'a> {
         table_model: numbers_table_cell_storage_codec::TableModelSnapshot<'_>,
         data_store: numbers_table_cell_storage_codec::DataStoreSnapshot<'_>,
         projection_budget: &mut ProbeBudget,
+        formula_budget: &mut ProjectionBudget,
+        formula_references: &FormulaReferenceMaps,
     ) -> Result<NumbersTable> {
         let (row_count, column_count) = checked_table_dimensions(
             table_model.number_of_rows(),
@@ -1123,7 +1303,8 @@ impl<'a> TableDataExtractor<'a> {
         let string_table = self.load_string_table(data_store.string_table().identifier())?;
 
         // Extract formula table for formula cells
-        let formula_table = self.load_formula_table(data_store.formula_table().identifier())?;
+        let formula_table =
+            self.load_formula_table(data_store.formula_table().identifier(), formula_budget)?;
         let formula_error_table = match data_store.formula_error_table() {
             Some(reference) => self.load_formula_error_table(reference.identifier())?,
             None => Box::default(),
@@ -1145,11 +1326,12 @@ impl<'a> TableDataExtractor<'a> {
             formula_errors: &formula_error_table,
             rich_text: &rich_text_table,
             comments: &comment_table,
-            formula_references: &self.formula_references,
+            formula_references,
         };
         self.parse_tiles(
             data_store.tiles(),
             projection_budget,
+            formula_budget,
             &cell_tables,
             &mut table,
         )?;
@@ -1160,7 +1342,8 @@ impl<'a> TableDataExtractor<'a> {
     /// Load a TableDataList from an object reference
     fn load_string_table(&self, object_id: u64) -> Result<StringTable> {
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 let Some(value) = entry.string_value() else {
                     // Preserve the legacy filter_map behavior: a string-list
                     // entry carrying another union member is wire-valid but
@@ -1181,33 +1364,33 @@ impl<'a> TableDataExtractor<'a> {
         )
     }
 
-    fn load_formula_table(&self, object_id: u64) -> Result<FormulaTable> {
+    fn load_formula_table(
+        &self,
+        object_id: u64,
+        formula_budget: &mut ProjectionBudget,
+    ) -> Result<FormulaTable> {
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             budget: &mut ProjectionBudget| {
                 let Some(value) = entry.formula() else {
                     // The compatibility route historically ignored entries
                     // without the requested formula union member.
                     return Ok(None);
                 };
-                tsce::FormulaArchive::decode(value)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!(
-                            "Numbers formula entry {} is malformed: {error}",
-                            entry.key()
-                        ))
-                    })
-                    .map(Some)
+                FormulaArchiveBytes::from_wire(value, budget).map(Some)
             };
-        self.load_table_data_list_entries(
+        self.load_table_data_list_entries_with_budget(
             object_id,
             tst::table_data_list::ListType::Formula,
+            formula_budget,
             &mut converter,
         )
     }
 
     fn load_formula_error_table(&self, object_id: u64) -> Result<FormulaErrorTable> {
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 let Some(value) = entry.string_value() else {
                     // Keep the old filter_map semantics for a sparse or
                     // mixed-union formula-error sidecar.
@@ -1229,7 +1412,8 @@ impl<'a> TableDataExtractor<'a> {
 
     fn load_rich_text_table(&self, object_id: u64) -> Result<StringTable> {
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 let Some(payload_reference) = entry.rich_text_payload() else {
                     // Rich-text sidecars historically ignored entries whose
                     // union did not carry a payload reference. The strict
@@ -1260,7 +1444,8 @@ impl<'a> TableDataExtractor<'a> {
 
     fn load_comment_table(&self, object_id: u64) -> Result<CommentTable> {
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 if entry.ref_count() == 0 {
                     return Err(Error::InvalidFormat(format!(
                         "Numbers comment entry {} has a zero reference count",
@@ -1403,6 +1588,20 @@ impl<'a> TableDataExtractor<'a> {
     where
         C: ListValueConverter<T>,
     {
+        let mut budget = ProjectionBudget::new();
+        self.load_table_data_list_entries_with_budget(object_id, list_type, &mut budget, converter)
+    }
+
+    fn load_table_data_list_entries_with_budget<T, C>(
+        &self,
+        object_id: u64,
+        list_type: tst::table_data_list::ListType,
+        budget: &mut ProjectionBudget,
+        converter: &mut C,
+    ) -> Result<CompactTable<T>>
+    where
+        C: ListValueConverter<T>,
+    {
         let resolved = self
             .object_index
             .resolve_ref_id(self.bundle, object_id)?
@@ -1417,8 +1616,6 @@ impl<'a> TableDataExtractor<'a> {
         let mut segment_ids = None;
         let mut structural_error = None;
         let mut semantic_error = None;
-        let mut budget = ProjectionBudget::new();
-
         for message in resolved
             .messages
             .iter()
@@ -1432,7 +1629,7 @@ impl<'a> TableDataExtractor<'a> {
             let (probe, probe_report) =
                 numbers_table_cell_storage_codec::decode_table_data_list_type_with_report(
                     &message.data,
-                    table_data_list_decode_options_with_budget(&message.data, budget, false),
+                    table_data_list_decode_options_with_budget(&message.data, *budget, false),
                 )
                 .map_err(|error| {
                     table_data_list_decode_error_with_offsets(
@@ -1455,12 +1652,51 @@ impl<'a> TableDataExtractor<'a> {
             } else {
                 local_max_entries
             };
+            let mut staged_budget = *budget;
+            let mut reserved_report = None;
+            let decode_options = if admitting_candidate {
+                // The storage codec invokes converters while it scans list
+                // entries. Obtain and charge an exact no-callback report,
+                // then reserve the identical callback-pass report before any
+                // formula wire preflight or owned copy can run.
+                let (_, report) =
+                    numbers_table_cell_storage_codec::decode_table_data_list_with_report(
+                        &message.data,
+                        table_data_list_decode_options_with_budget(&message.data, *budget, true),
+                    )
+                    .map_err(|error| {
+                        table_data_list_decode_error_with_offsets(
+                            object_id,
+                            list_type,
+                            error,
+                            budget.references,
+                            budget.payload_fields,
+                            budget.payload_work,
+                            budget.staging_text_bytes,
+                        )
+                    })?;
+                budget.charge_decode_report(report)?;
+                let options =
+                    table_data_list_decode_options_with_budget(&message.data, *budget, true);
+                staged_budget = *budget;
+                staged_budget.charge_decode_report(report)?;
+                reserved_report = Some(report);
+                options
+            } else {
+                table_data_list_decode_options_with_budget(&message.data, *budget, false)
+            };
             let field_offset = budget.payload_fields;
             let work_offset = budget.payload_work;
             let reference_offset = budget.references;
             let text_offset = budget.staging_text_bytes;
+            let visitor_budget = if admitting_candidate {
+                &mut staged_budget
+            } else {
+                &mut *budget
+            };
             let mut visitor = TypedListVisitor::new(
                 converter,
+                visitor_budget,
                 expected,
                 false,
                 admitting_candidate,
@@ -1470,11 +1706,7 @@ impl<'a> TableDataExtractor<'a> {
             let (snapshot, report) =
                 numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
                     &message.data,
-                    table_data_list_decode_options_with_budget(
-                        &message.data,
-                        budget,
-                        admitting_candidate,
-                    ),
+                    decode_options,
                     &mut visitor,
                 )
                 .map_err(|error| {
@@ -1504,8 +1736,18 @@ impl<'a> TableDataExtractor<'a> {
                 );
                 continue;
             }
-            budget.charge_decode_report(report)?;
-            budget.charge_entries(keys.len())?;
+            if let Some(reserved) = reserved_report {
+                if report != reserved {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers {list_type:?} TableDataList report changed between preflight and callback"
+                    )));
+                }
+                staged_budget.charge_entries(keys.len())?;
+                *budget = staged_budget;
+            } else {
+                budget.charge_decode_report(report)?;
+                budget.charge_entries(keys.len())?;
+            }
             if let Some(error) = callback_structural {
                 record_first_list_error(&mut structural_error, error);
             }
@@ -1555,7 +1797,7 @@ impl<'a> TableDataExtractor<'a> {
                     &segment_message.data,
                     table_data_list_decode_options_with_budget(
                         &segment_message.data,
-                        budget,
+                        *budget,
                         false,
                     ),
                 )
@@ -1579,12 +1821,57 @@ impl<'a> TableDataExtractor<'a> {
                 } else {
                     local_max_entries
                 };
+                let mut staged_budget = *budget;
+                let mut reserved_report = None;
+                let decode_options = if admitting_segment {
+                    let (_, report) = numbers_table_cell_storage_codec::decode_table_data_list_segment_with_report(
+                        &segment_message.data,
+                        table_data_list_decode_options_with_budget(
+                            &segment_message.data,
+                            *budget,
+                            true,
+                        ),
+                    )
+                    .map_err(|error| {
+                        table_data_list_decode_error_with_offsets(
+                            segment_id,
+                            list_type,
+                            error,
+                            budget.references,
+                            budget.payload_fields,
+                            budget.payload_work,
+                            budget.staging_text_bytes,
+                        )
+                    })?;
+                    budget.charge_decode_report(report)?;
+                    let options = table_data_list_decode_options_with_budget(
+                        &segment_message.data,
+                        *budget,
+                        true,
+                    );
+                    staged_budget = *budget;
+                    staged_budget.charge_decode_report(report)?;
+                    reserved_report = Some(report);
+                    options
+                } else {
+                    table_data_list_decode_options_with_budget(
+                        &segment_message.data,
+                        *budget,
+                        false,
+                    )
+                };
                 let field_offset = budget.payload_fields;
                 let work_offset = budget.payload_work;
                 let reference_offset = budget.references;
                 let text_offset = budget.staging_text_bytes;
+                let visitor_budget = if admitting_segment {
+                    &mut staged_budget
+                } else {
+                    &mut *budget
+                };
                 let mut visitor = TypedListVisitor::new(
                     converter,
+                    visitor_budget,
                     expected,
                     true,
                     admitting_segment,
@@ -1594,11 +1881,7 @@ impl<'a> TableDataExtractor<'a> {
                 let (snapshot, report) =
                     numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
                         &segment_message.data,
-                        table_data_list_decode_options_with_budget(
-                            &segment_message.data,
-                            budget,
-                            admitting_segment,
-                        ),
+                        decode_options,
                         &mut visitor,
                     )
                     .map_err(|error| {
@@ -1641,8 +1924,18 @@ impl<'a> TableDataExtractor<'a> {
                     );
                     continue;
                 }
-                budget.charge_decode_report(report)?;
-                budget.charge_entries(segment_keys.len())?;
+                if let Some(reserved) = reserved_report {
+                    if report != reserved {
+                        return Err(Error::InvalidFormat(format!(
+                            "Numbers {list_type:?} TableDataListSegment report changed between preflight and callback"
+                        )));
+                    }
+                    staged_budget.charge_entries(segment_keys.len())?;
+                    *budget = staged_budget;
+                } else {
+                    budget.charge_decode_report(report)?;
+                    budget.charge_entries(segment_keys.len())?;
+                }
                 if let Some(error) = callback_structural {
                     record_first_list_error(&mut structural_error, error);
                 }
@@ -1732,6 +2025,7 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         tile_storage_source: &[u8],
         projection_budget: &mut ProbeBudget,
+        formula_budget: &mut ProjectionBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
@@ -1793,6 +2087,7 @@ impl<'a> TableDataExtractor<'a> {
                 dimensions,
                 &mut budget,
                 projection_budget,
+                formula_budget,
                 cell_tables,
                 table,
             )?;
@@ -1810,6 +2105,7 @@ impl<'a> TableDataExtractor<'a> {
         dimensions: Dimensions,
         budget: &mut CellBudget,
         projection_budget: &mut ProbeBudget,
+        formula_budget: &mut ProjectionBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
     ) -> Result<()> {
@@ -1838,7 +2134,14 @@ impl<'a> TableDataExtractor<'a> {
             })?
             .data
             .as_slice();
-        let mut stage = TileRowStage::new(row_origin, tile_size, dimensions, budget, cell_tables);
+        let mut stage = TileRowStage::new(
+            row_origin,
+            tile_size,
+            dimensions,
+            budget,
+            formula_budget,
+            cell_tables,
+        );
         let decoded = numbers_table_cell_storage_codec::decode_tile_with_visitor(
             source,
             projection_budget.options(source),
@@ -1950,18 +2253,56 @@ impl<'a> TableDataExtractor<'a> {
         Ok(cells)
     }
 
+    #[cfg(test)]
     fn parse_cell_storage(
         data: &[u8],
         cell_tables: &CellTables<'_>,
         row: usize,
         column: usize,
     ) -> Result<ParsedCell> {
+        let mut formula_budget = ProjectionBudget::new();
+        Self::parse_cell_storage_with_budget(
+            data,
+            cell_tables,
+            row,
+            column,
+            row.saturating_add(1),
+            column.saturating_add(1),
+            &mut formula_budget,
+        )
+    }
+
+    fn parse_cell_storage_with_budget(
+        data: &[u8],
+        cell_tables: &CellTables<'_>,
+        row: usize,
+        column: usize,
+        row_count: usize,
+        column_count: usize,
+        formula_budget: &mut ProjectionBudget,
+    ) -> Result<ParsedCell> {
         let version = *data
             .first()
             .ok_or_else(|| Error::ParseError("Empty Numbers cell storage".to_string()))?;
         match version {
-            0..=4 => Self::parse_pre_bnc_cell(data, cell_tables, row, column),
-            5 => Self::parse_bnc_cell(data, cell_tables, row, column),
+            0..=4 => Self::parse_pre_bnc_cell(
+                data,
+                cell_tables,
+                row,
+                column,
+                row_count,
+                column_count,
+                formula_budget,
+            ),
+            5 => Self::parse_bnc_cell(
+                data,
+                cell_tables,
+                row,
+                column,
+                row_count,
+                column_count,
+                formula_budget,
+            ),
             other => Err(Error::ParseError(format!(
                 "Unsupported Numbers cell storage version {other}"
             ))),
@@ -1973,6 +2314,9 @@ impl<'a> TableDataExtractor<'a> {
         cell_tables: &CellTables<'_>,
         row: usize,
         column: usize,
+        row_count: usize,
+        column_count: usize,
+        formula_budget: &mut ProjectionBudget,
     ) -> Result<ParsedCell> {
         let cell = BncCellView::parse(data).map_err(|error| {
             Error::ParseError(format!(
@@ -1987,11 +2331,14 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
                 ))
             })?;
-            let rendered = Self::extract_formula_string(
+            let rendered = render_formula_string(
                 formula,
                 row,
                 column,
+                row_count,
+                column_count,
                 cell_tables.formula_references,
+                formula_budget,
             )
             .map_err(|error| {
                 Error::ParseError(format!(
@@ -2066,6 +2413,9 @@ impl<'a> TableDataExtractor<'a> {
         cell_tables: &CellTables<'_>,
         row: usize,
         column: usize,
+        row_count: usize,
+        column_count: usize,
+        formula_budget: &mut ProjectionBudget,
     ) -> Result<ParsedCell> {
         let version = data[0];
         let header_length = if version <= 1 { 8 } else { 12 };
@@ -2134,11 +2484,14 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers formula table has no entry {identifier} referenced by cell ({row}, {column})"
                 ))
             })?;
-            let rendered = Self::extract_formula_string(
+            let rendered = render_formula_string(
                 formula,
                 row,
                 column,
+                row_count,
+                column_count,
                 cell_tables.formula_references,
+                formula_budget,
             )
             .map_err(|error| {
                 Error::ParseError(format!(
@@ -2196,6 +2549,7 @@ impl<'a> TableDataExtractor<'a> {
     ///
     /// O(n) where n is the number of AST nodes. Uses a stack-based algorithm
     /// for efficient conversion.
+    #[cfg(test)]
     fn extract_formula_string(
         formula: &tsce::FormulaArchive,
         host_row: usize,
@@ -2509,6 +2863,7 @@ impl<'a> TableDataExtractor<'a> {
     }
 
     /// Convert column index to Excel-style letter (0 -> A, 1 -> B, ..., 25 -> Z, 26 -> AA)
+    #[cfg(test)]
     fn column_index_to_letter(index: u32) -> String {
         let mut result = String::new();
         let mut idx = index;
@@ -2527,6 +2882,7 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Get function name from function index
     /// Based on Numbers built-in function list
+    #[cfg(test)]
     fn get_function_name(index: u32) -> String {
         super::function_map::function_name(index)
             .map(str::to_owned)
@@ -2665,58 +3021,132 @@ fn first_rich_text_payload_text(
     Ok(None)
 }
 
-fn build_formula_reference_maps(bundle: &Bundle) -> FormulaReferenceMaps {
+fn build_formula_reference_maps(
+    bundle: &Bundle,
+    budget: &mut ProjectionBudget,
+) -> Result<FormulaReferenceMaps> {
+    // Build one operation-local identifier index instead of rescanning every
+    // archive for each sheet, drawable, and model edge. Charge and reserve the
+    // complete object inventory before retaining any borrowed entries.
+    let object_count = bundle
+        .iter_archives()
+        .try_fold(0usize, |count, (_, archive)| {
+            count.checked_add(archive.objects.len()).ok_or_else(|| {
+                Error::InvalidFormat("Numbers formula object inventory overflows usize".to_owned())
+            })
+        })?;
+    budget.charge_entries(object_count)?;
+    budget.charge_payload_work(object_count)?;
+    let mut objects = HashMap::<u64, &crate::archive::ArchiveObject>::new();
+    objects
+        .try_reserve(object_count)
+        .map_err(|_| allocation_error("Numbers formula object inventory", object_count))?;
+    for (_, archive) in bundle.iter_archives() {
+        for object in &archive.objects {
+            if let Some(identifier) = object.archive_info.identifier {
+                objects.entry(identifier).or_insert(object);
+            }
+        }
+    }
+
     let mut result = FormulaReferenceMaps::default();
+    budget.charge_entries(1)?;
+    budget.charge_staging_text("Grand Total".len())?;
+    result
+        .categories
+        .try_reserve(1)
+        .map_err(|_| allocation_error("Numbers formula category names", 1))?;
     result.categories.insert([1, 0], "Grand Total".to_owned());
     let mut table_info_names = HashMap::<u64, FormulaReferenceName>::new();
-    let root = bundle
+    let mut root = None;
+    if let Some(object) = bundle
         .get_archive("Index/Document.iwa")
         .and_then(|archive| archive.object(1))
-        .and_then(|object| {
-            object
-                .messages
-                .iter()
-                .find_map(|message| tn::DocumentArchive::decode(message.data.as_slice()).ok())
-        });
+    {
+        for message in &object.messages {
+            budget.charge_payload_fields(message.data.len())?;
+            budget.charge_payload_work(message.data.len())?;
+            if let Ok(document) = tn::DocumentArchive::decode(message.data.as_slice()) {
+                root = Some(document);
+                break;
+            }
+        }
+    }
 
     if let Some(root) = root {
         for sheet_reference in root.sheets {
-            let Some(sheet_object) = find_bundle_object(bundle, sheet_reference.identifier) else {
+            let Some(sheet_object) = objects.get(&sheet_reference.identifier).copied() else {
                 continue;
             };
-            let Some(sheet) = sheet_object.messages.iter().find_map(|message| {
-                tn::SheetArchive::decode(message.data.as_slice())
-                    .ok()
-                    .or_else(|| {
-                        tn::FormBasedSheetArchive::decode(message.data.as_slice())
-                            .ok()
-                            .map(|form| form.super_)
-                    })
-            }) else {
+            let mut sheet = None;
+            for message in &sheet_object.messages {
+                budget.charge_payload_fields(message.data.len())?;
+                budget.charge_payload_work(message.data.len())?;
+                if let Ok(decoded) = tn::SheetArchive::decode(message.data.as_slice()) {
+                    sheet = Some(decoded);
+                    break;
+                }
+                if let Ok(form) = tn::FormBasedSheetArchive::decode(message.data.as_slice()) {
+                    sheet = Some(form.super_);
+                    break;
+                }
+            }
+            let Some(sheet) = sheet else {
                 continue;
             };
             for drawable in sheet.drawable_infos {
-                let Some(drawable_object) = find_bundle_object(bundle, drawable.identifier) else {
+                let Some(drawable_object) = objects.get(&drawable.identifier).copied() else {
                     continue;
                 };
-                let table_name = drawable_object.messages.iter().find_map(|message| {
-                    let table_info = tst::TableInfoArchive::decode(message.data.as_slice()).ok()?;
-                    let model_object =
-                        find_bundle_object(bundle, table_info.table_model.identifier)?;
-                    model_object.messages.iter().find_map(|message| {
-                        (message.type_ == 6000 || message.type_ == 6001)
-                            .then(|| {
-                                numbers_names_codec::decode_table_names(
-                                    message.data.as_slice(),
-                                    table_name_decode_options(message.data.as_slice()),
-                                )
-                                .ok()
-                            })
-                            .flatten()
-                            .map(|model| model.table_name().to_owned())
-                    })
-                });
+                let mut table_name = None;
+                for message in &drawable_object.messages {
+                    budget.charge_payload_fields(message.data.len())?;
+                    budget.charge_payload_work(message.data.len())?;
+                    let Ok(table_info) = tst::TableInfoArchive::decode(message.data.as_slice())
+                    else {
+                        continue;
+                    };
+                    let Some(model_object) =
+                        objects.get(&table_info.table_model.identifier).copied()
+                    else {
+                        continue;
+                    };
+                    for model_message in &model_object.messages {
+                        budget.charge_payload_work(model_message.data.len())?;
+                        if model_message.type_ != 6000 && model_message.type_ != 6001 {
+                            continue;
+                        }
+                        budget.charge_payload_fields(model_message.data.len())?;
+                        budget.charge_payload_work(model_message.data.len().saturating_mul(3))?;
+                        let Ok(model) = numbers_names_codec::decode_table_names(
+                            model_message.data.as_slice(),
+                            table_name_decode_options(model_message.data.as_slice()),
+                        ) else {
+                            continue;
+                        };
+                        let name = model.table_name();
+                        budget.charge_staging_text(name.len())?;
+                        let mut owned = String::new();
+                        owned.try_reserve_exact(name.len()).map_err(|_| {
+                            allocation_error("Numbers formula table name", name.len())
+                        })?;
+                        owned.push_str(name);
+                        table_name = Some(owned);
+                        break;
+                    }
+                    if table_name.is_some() {
+                        break;
+                    }
+                }
                 if let Some(table) = table_name {
+                    budget.charge_entries(1)?;
+                    budget.charge_staging_text(sheet.name.len())?;
+                    table_info_names.try_reserve(1).map_err(|_| {
+                        allocation_error(
+                            "Numbers formula table reference names",
+                            table_info_names.len().saturating_add(1),
+                        )
+                    })?;
                     table_info_names.insert(
                         drawable.identifier,
                         FormulaReferenceName {
@@ -2732,16 +3162,27 @@ fn build_formula_reference_maps(bundle: &Bundle) -> FormulaReferenceMaps {
     for (_, archive) in bundle.iter_archives() {
         for object in &archive.objects {
             for message in &object.messages {
-                if message.type_ == 6383
-                    && let Ok(group_node) =
+                budget.charge_payload_work(1)?;
+                if message.type_ == 6383 {
+                    budget.charge_payload_fields(message.data.len())?;
+                    budget.charge_payload_work(message.data.len())?;
+                    if let Ok(group_node) =
                         tst::group_by_archive::GroupNodeArchive::decode(message.data.as_slice())
-                {
-                    collect_formula_category_names(&group_node, &mut result.categories);
+                    {
+                        collect_formula_category_names(
+                            &group_node,
+                            &mut result.categories,
+                            budget,
+                            1,
+                        )?;
+                    }
                     continue;
                 }
                 if message.type_ != 4008 {
                     continue;
                 }
+                budget.charge_payload_fields(message.data.len())?;
+                budget.charge_payload_work(message.data.len())?;
                 let Ok(owner) =
                     tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
                 else {
@@ -2753,29 +3194,54 @@ fn build_formula_reference_maps(bundle: &Bundle) -> FormulaReferenceMaps {
                 let Some(name) = table_info_names.get(&table_info.identifier) else {
                     continue;
                 };
+                budget.charge_entries(1)?;
+                budget.charge_staging_text(name.sheet.len())?;
+                budget.charge_staging_text(name.table.len())?;
+                result.owners.try_reserve(1).map_err(|_| {
+                    allocation_error(
+                        "Numbers formula owner names",
+                        result.owners.len().saturating_add(1),
+                    )
+                })?;
                 result
                     .owners
                     .insert(formula_owner_key(&owner.formula_owner_uid), name.clone());
             }
         }
     }
-    result
+    Ok(result)
 }
 
 fn collect_formula_category_names(
     node: &tst::group_by_archive::GroupNodeArchive,
     names: &mut HashMap<FormulaCategoryKey, String>,
-) {
+    budget: &mut ProjectionBudget,
+    depth: usize,
+) -> Result<()> {
+    budget.check_formula_render_depth(depth)?;
+    budget.charge_payload_work(1)?;
     if let Some(value) = node
         .group_cell_value
         .as_ref()
         .and_then(group_cell_value_label)
     {
+        budget.charge_entries(1)?;
+        budget.charge_staging_text(value.len())?;
+        names.try_reserve(1).map_err(|_| {
+            allocation_error(
+                "Numbers formula category names",
+                names.len().saturating_add(1),
+            )
+        })?;
         names.insert(formula_category_key(&node.group_uid), value);
     }
     for child in &node.child {
-        collect_formula_category_names(child, names);
+        let child_depth = depth.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("Numbers formula category depth overflows usize".to_owned())
+        })?;
+        collect_formula_category_names(child, names, budget, child_depth)?;
     }
+    Ok(())
 }
 
 fn group_cell_value_label(value: &tsce::CellValueArchive) -> Option<String> {
@@ -2793,6 +3259,7 @@ fn group_cell_value_label(value: &tsce::CellValueArchive) -> Option<String> {
     value.date_value.as_ref().map(|date| date.value.to_string())
 }
 
+#[cfg(test)]
 fn render_category_reference(
     node: &tsce::ast_node_array_archive::AstNodeArchive,
     references: &FormulaReferenceMaps,
@@ -2817,13 +3284,6 @@ fn render_category_reference(
         .unwrap_or_else(|| "#CATEGORY!".to_owned())
 }
 
-fn find_bundle_object(bundle: &Bundle, identifier: u64) -> Option<&crate::archive::ArchiveObject> {
-    bundle
-        .iter_archives()
-        .map(|(_, archive)| archive)
-        .find_map(|archive| archive.object(identifier))
-}
-
 fn formula_owner_key(owner: &crate::protobuf::tsp::Uuid) -> FormulaOwnerKey {
     [
         owner.lower as u32,
@@ -2837,6 +3297,7 @@ fn formula_category_key(category: &crate::protobuf::tsp::Uuid) -> FormulaCategor
     [category.lower, category.upper]
 }
 
+#[cfg(test)]
 fn cfuuid_key(owner: &crate::protobuf::tsp::CfuuidArchive) -> Option<FormulaOwnerKey> {
     Some([
         owner.uuid_w0?,
@@ -2846,6 +3307,7 @@ fn cfuuid_key(owner: &crate::protobuf::tsp::CfuuidArchive) -> Option<FormulaOwne
     ])
 }
 
+#[cfg(test)]
 fn formula_reference_prefix(
     owner: &crate::protobuf::tsp::CfuuidArchive,
     references: &FormulaReferenceMaps,
@@ -2856,6 +3318,7 @@ fn formula_reference_prefix(
         .unwrap_or_else(|| "Table::".to_owned())
 }
 
+#[cfg(test)]
 fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &str) -> Result<u32> {
     let coordinate = if absolute {
         i64::from(stored)
@@ -2872,6 +3335,7 @@ fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &s
     })
 }
 
+#[cfg(test)]
 fn render_colon_tract(
     node: &tsce::ast_node_array_archive::AstNodeArchive,
     host_row: usize,
@@ -2997,6 +3461,7 @@ fn render_colon_tract(
     }
 }
 
+#[cfg(test)]
 fn resolve_colon_axis(
     relative: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractRelativeRangeArchive],
     absolute: &[tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive],
@@ -3037,6 +3502,7 @@ fn resolve_colon_axis(
     ))
 }
 
+#[cfg(test)]
 fn pop_binary_operands(stack: &mut Vec<String>, operation: &str) -> Result<(String, String)> {
     let right = stack.pop().ok_or_else(|| {
         Error::ParseError(format!(
@@ -3051,6 +3517,7 @@ fn pop_binary_operands(stack: &mut Vec<String>, operation: &str) -> Result<(Stri
     Ok((left, right))
 }
 
+#[cfg(test)]
 fn pop_formula_arguments(
     stack: &mut Vec<String>,
     count: u32,
@@ -3375,6 +3842,305 @@ mod tests {
     }
 
     #[test]
+    fn standalone_local_reference_uses_compatibility_sticky_semantics() {
+        use tsce::ast_node_array_archive::{
+            AstLocalCellReferenceNodeArchive, AstNodeArchive, AstNodeType,
+        };
+
+        let formula = tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: vec![AstNodeArchive {
+                    ast_node_type: AstNodeType::LocalCellReferenceNode as i32,
+                    ast_local_cell_reference_node_reference: Some(
+                        AstLocalCellReferenceNodeArchive {
+                            row_handle: 2,
+                            column_handle: 3,
+                            row_is_sticky: 1,
+                            column_is_sticky: 1,
+                        },
+                    ),
+                    ..Default::default()
+                }],
+            },
+            ..Default::default()
+        };
+        let source = formula.encode_to_vec();
+        let mut admission_budget = ProjectionBudget::new();
+        let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget).unwrap();
+
+        // The scalar codec renders this node with sticky flags, whereas the
+        // historical generated renderer intentionally drops them. The
+        // generated-free compatibility visitor must therefore handle it.
+        let mut render_budget = ProjectionBudget::new();
+        let actual = render_formula_string(
+            &retained,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut render_budget,
+        )
+        .unwrap();
+        let expected = TableDataExtractor::extract_formula_string(
+            &formula,
+            0,
+            0,
+            &FormulaReferenceMaps::default(),
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(actual, "=D3");
+    }
+
+    #[test]
+    fn empty_formula_wire_preserves_legacy_default_render() {
+        let mut admission_budget = ProjectionBudget::new();
+        let retained = FormulaArchiveBytes::from_wire(&[], &mut admission_budget).unwrap();
+        let mut render_budget = ProjectionBudget::new();
+        let rendered = render_formula_string(
+            &retained,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut render_budget,
+        )
+        .unwrap();
+        assert_eq!(rendered, "=");
+
+        // Prost omits an empty nested message, so the generated default
+        // archive serializes to the same zero-byte compatibility form.  Keep
+        // a separate wire case with the required root field present but an
+        // empty AST array to ensure the strict generated-free path does not
+        // confuse "present and empty" with "missing".
+        let encoded_empty = [0x0a, 0x00];
+        let mut encoded_budget = ProjectionBudget::new();
+        let retained = FormulaArchiveBytes::from_wire(&encoded_empty, &mut encoded_budget).unwrap();
+        let mut encoded_render_budget = ProjectionBudget::new();
+        let rendered = render_formula_string(
+            &retained,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut encoded_render_budget,
+        )
+        .unwrap();
+        assert_eq!(rendered, "=");
+    }
+
+    #[test]
+    fn incomplete_postfix_preserves_explicit_legacy_placeholder_semantics() {
+        use tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
+
+        let cases = [
+            (
+                vec![AstNodeArchive {
+                    ast_node_type: AstNodeType::NegationNode as i32,
+                    ..Default::default()
+                }],
+                "=FORMULA()",
+            ),
+            (
+                vec![
+                    AstNodeArchive {
+                        ast_node_type: AstNodeType::NumberNode as i32,
+                        ast_number_node_number: Some(1.0),
+                        ..Default::default()
+                    },
+                    AstNodeArchive {
+                        ast_node_type: AstNodeType::NumberNode as i32,
+                        ast_number_node_number: Some(2.0),
+                        ..Default::default()
+                    },
+                ],
+                "=2",
+            ),
+        ];
+
+        for (nodes, expected) in cases {
+            let formula = tsce::FormulaArchive {
+                ast_node_array: tsce::AstNodeArrayArchive { ast_node: nodes },
+                ..Default::default()
+            };
+            let source = formula.encode_to_vec();
+            let source_before = source.clone();
+            let mut admission_budget = ProjectionBudget::new();
+            let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget).unwrap();
+            let mut render_budget = ProjectionBudget::new();
+            let actual = render_formula_string(
+                &retained,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                &mut render_budget,
+            )
+            .unwrap();
+            let legacy = TableDataExtractor::extract_formula_string(
+                &formula,
+                0,
+                0,
+                &FormulaReferenceMaps::default(),
+            )
+            .unwrap();
+            assert_eq!(source, source_before);
+            assert_eq!(actual, legacy);
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn scalar_formula_decode_report_is_merged_across_repeated_renders() -> Result<()> {
+        use tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
+
+        let formula = tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: vec![AstNodeArchive {
+                    ast_node_type: AstNodeType::NumberNode as i32,
+                    ast_number_node_number: Some(7.5),
+                    ..Default::default()
+                }],
+            },
+            ..Default::default()
+        };
+        let source = formula.encode_to_vec();
+        let source_before = source.clone();
+        let mut admission_budget = ProjectionBudget::new();
+        let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget)?;
+        assert_eq!(source, source_before);
+
+        let render = |budget: &mut ProjectionBudget| {
+            render_formula_string(
+                &retained,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                budget,
+            )
+        };
+
+        let mut probe = ProjectionBudget::new();
+        let expected = render(&mut probe)?;
+        let fields = probe.payload_fields;
+        let work = probe.payload_work;
+        assert!(fields > 0, "successful scalar decode must report fields");
+        assert!(work > 0, "successful scalar decode must report work");
+        assert!(probe.formula_render_work > 0);
+
+        let mut fields_budget = ProjectionBudget::new();
+        fields_budget.payload_fields = MAX_TABLE_LIST_PAYLOAD_FIELDS - fields;
+        assert_eq!(render(&mut fields_budget)?, expected);
+        assert_eq!(fields_budget.payload_fields, MAX_TABLE_LIST_PAYLOAD_FIELDS);
+        let fields_before_refusal = fields_budget;
+        let fields_error = render(&mut fields_budget).unwrap_err();
+        assert!(matches!(
+            fields_error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                ..
+            })
+        ));
+        assert_eq!(
+            fields_budget.payload_fields,
+            fields_before_refusal.payload_fields
+        );
+
+        let mut work_budget = ProjectionBudget::new();
+        work_budget.payload_work = MAX_TABLE_LIST_PAYLOAD_WORK - work;
+        assert_eq!(render(&mut work_budget)?, expected);
+        assert_eq!(work_budget.payload_work, MAX_TABLE_LIST_PAYLOAD_WORK);
+        let work_before_refusal = work_budget;
+        let work_error = render(&mut work_budget).unwrap_err();
+        assert!(matches!(
+            work_error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                ..
+            })
+        ));
+        assert_eq!(work_budget.payload_work, work_before_refusal.payload_work);
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_formula_decode_report_text_is_merged_across_repeated_renders() -> Result<()> {
+        use tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
+
+        let formula = tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: vec![AstNodeArchive {
+                    ast_node_type: AstNodeType::StringNode as i32,
+                    ast_string_node_string: Some("aggregate".to_owned()),
+                    ..Default::default()
+                }],
+            },
+            ..Default::default()
+        };
+        let source = formula.encode_to_vec();
+        let source_before = source.clone();
+        let mut admission_budget = ProjectionBudget::new();
+        let retained = FormulaArchiveBytes::from_wire(&source, &mut admission_budget)?;
+        assert_eq!(source, source_before);
+
+        let render = |budget: &mut ProjectionBudget| {
+            render_formula_string(
+                &retained,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                budget,
+            )
+        };
+
+        let mut probe = ProjectionBudget::new();
+        let expected = render(&mut probe)?;
+        let fields = probe.payload_fields;
+        let work = probe.payload_work;
+        let text = probe.staging_text_bytes;
+        assert!(
+            fields > 0,
+            "successful compatibility decode must report fields"
+        );
+        assert!(work > 0, "successful compatibility decode must report work");
+        assert!(text > 0, "successful compatibility decode must report text");
+        assert!(!expected.is_empty());
+
+        let mut text_budget = ProjectionBudget::new();
+        text_budget.staging_text_bytes = MAX_TABLE_LIST_TEXT_BYTES - text;
+        assert_eq!(render(&mut text_budget)?, expected);
+        assert_eq!(text_budget.staging_text_bytes, MAX_TABLE_LIST_TEXT_BYTES);
+        let text_before_refusal = text_budget;
+        let text_error = render(&mut text_budget).unwrap_err();
+        assert!(
+            matches!(
+                &text_error,
+                Error::InvalidFormat(message) if message.contains("text exceeded")
+            ) || matches!(
+                text_error,
+                Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::OutputBytes,
+                    ..
+                })
+            ),
+            "unexpected second-render error: {text_error:?}"
+        );
+        assert_eq!(
+            text_budget.staging_text_bytes,
+            text_before_refusal.staging_text_bytes
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_fixed_width_cell_offsets() {
         let offsets = [
             0xff, 0xff, // column 0 missing
@@ -3644,15 +4410,18 @@ mod tests {
         }
         .encode_to_vec();
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 Ok::<Option<u64>, Error>(
                     entry
                         .rich_text_payload()
                         .map(|reference| reference.identifier()),
                 )
             };
+        let mut list_budget = ProjectionBudget::new();
         let mut visitor = TypedListVisitor::new(
             &mut converter,
+            &mut list_budget,
             tst::table_data_list::ListType::RichTextPayload as i32,
             false,
             true,
@@ -3712,11 +4481,14 @@ mod tests {
         }
         .encode_to_vec();
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 Ok::<Option<String>, Error>(entry.string_value().map(ToOwned::to_owned))
             };
+        let mut list_budget = ProjectionBudget::new();
         let mut visitor = TypedListVisitor::new(
             &mut converter,
+            &mut list_budget,
             tst::table_data_list::ListType::String as i32,
             false,
             true,
@@ -3768,15 +4540,18 @@ mod tests {
         }
         .encode_to_vec();
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 Ok::<Option<u64>, Error>(
                     entry
                         .rich_text_payload()
                         .map(|reference| reference.identifier()),
                 )
             };
+        let mut list_budget = ProjectionBudget::new();
         let mut visitor = TypedListVisitor::new(
             &mut converter,
+            &mut list_budget,
             tst::table_data_list::ListType::RichTextPayload as i32,
             false,
             true,
@@ -3818,11 +4593,14 @@ mod tests {
         }
         .encode_to_vec();
         let mut converter =
-            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>| {
+            |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+             _budget: &mut ProjectionBudget| {
                 Ok::<Option<String>, Error>(entry.string_value().map(ToOwned::to_owned))
             };
+        let mut list_budget = ProjectionBudget::new();
         let mut visitor = TypedListVisitor::new(
             &mut converter,
+            &mut list_budget,
             tst::table_data_list::ListType::String as i32,
             false,
             true,
