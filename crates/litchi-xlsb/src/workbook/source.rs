@@ -169,7 +169,7 @@ impl SourceBackedWorkbook {
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
+        let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
         if workbook_part.content_type() != content_type::XLSB_BIN {
             return Err(Error::InvalidContentType {
@@ -217,7 +217,7 @@ impl SourceBackedWorkbook {
                 resource: "source-backed XLSB worksheet catalog",
                 source,
             })?;
-        let mut sheet_targets = Vec::new();
+        let mut sheet_targets: Vec<PackURI> = Vec::new();
         sheet_targets
             .try_reserve_exact(info.worksheet_names.len())
             .map_err(|source| Error::Allocation {
@@ -232,6 +232,7 @@ impl SourceBackedWorkbook {
             .zip(&info.worksheet_rel_ids)
             .enumerate()
         {
+            package.check_execution()?;
             let relationship_id = relationship_id.as_deref().ok_or_else(|| {
                 Error::InvalidRelationship(format!(
                     "XLSB sheet {name:?} has no relationship identifier"
@@ -248,7 +249,10 @@ impl SourceBackedWorkbook {
                 )));
             }
             let partname = relationship.target_partname()?;
-            if sheet_targets.contains(&partname) {
+            if sheet_targets
+                .iter()
+                .any(|target| target.is_equivalent_to(&partname))
+            {
                 return Err(Error::InvalidRelationship(format!(
                     "multiple XLSB sheets resolve to {partname}"
                 )));
@@ -330,7 +334,7 @@ impl SourceBackedWorkbook {
             active_pivot_scope: None,
             current_sheet: None,
         };
-        package.source_version()?;
+        postflight_package(&package)?;
 
         Ok(Self {
             inner: Arc::new(SourceInner {
@@ -351,13 +355,15 @@ impl SourceBackedWorkbook {
 
     /// Return the number of workbook tabs after checking source freshness.
     pub fn sheet_count(&self) -> Result<usize> {
-        self.inner.package.source_version()?;
-        Ok(self.inner.sheets.len())
+        let _ = preflight_package(&self.inner.package)?;
+        let count = self.inner.sheets.len();
+        postflight_package(&self.inner.package)?;
+        Ok(count)
     }
 
     /// Snapshot all workbook tab names in workbook order after checking source freshness.
     pub fn sheet_names(&self) -> Result<Vec<String>> {
-        self.inner.package.source_version()?;
+        let _ = preflight_package(&self.inner.package)?;
         let mut names = Vec::new();
         names
             .try_reserve_exact(self.inner.sheets.len())
@@ -366,12 +372,13 @@ impl SourceBackedWorkbook {
                 source,
             })?;
         names.extend(self.inner.sheets.iter().map(|sheet| sheet.name.clone()));
+        postflight_package(&self.inner.package)?;
         Ok(names)
     }
 
     /// Snapshot all checked workbook tab handles in workbook order.
     pub fn sheets(&self) -> Result<Vec<SourceBackedWorksheet>> {
-        self.inner.package.source_version()?;
+        let _ = preflight_package(&self.inner.package)?;
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(self.inner.sheets.len())
@@ -385,22 +392,25 @@ impl SourceBackedWorkbook {
                 catalog_position,
             }),
         );
+        postflight_package(&self.inner.package)?;
         Ok(sheets)
     }
 
     /// Select a workbook tab by zero-based position in complete workbook order.
     pub fn sheet_by_index(&self, index: usize) -> Result<Option<SourceBackedWorksheet>> {
-        self.inner.package.source_version()?;
-        Ok(self.inner.sheets.get(index).map(|_| SourceBackedWorksheet {
+        let _ = preflight_package(&self.inner.package)?;
+        let sheet = self.inner.sheets.get(index).map(|_| SourceBackedWorksheet {
             inner: Arc::clone(&self.inner),
             catalog_position: index,
-        }))
+        });
+        postflight_package(&self.inner.package)?;
+        Ok(sheet)
     }
 
     /// Select a workbook tab by its exact workbook name.
     pub fn sheet_by_name(&self, name: &str) -> Result<Option<SourceBackedWorksheet>> {
-        self.inner.package.source_version()?;
-        Ok(self
+        let _ = preflight_package(&self.inner.package)?;
+        let sheet = self
             .inner
             .sheets
             .iter()
@@ -408,18 +418,22 @@ impl SourceBackedWorkbook {
             .map(|catalog_position| SourceBackedWorksheet {
                 inner: Arc::clone(&self.inner),
                 catalog_position,
-            }))
+            });
+        postflight_package(&self.inner.package)?;
+        Ok(sheet)
     }
 
     /// Return the number of worksheet owners after checking source freshness.
     pub fn worksheet_count(&self) -> Result<usize> {
-        self.inner.package.source_version()?;
-        Ok(self.inner.worksheet_positions.len())
+        let _ = preflight_package(&self.inner.package)?;
+        let count = self.inner.worksheet_positions.len();
+        postflight_package(&self.inner.package)?;
+        Ok(count)
     }
 
     /// Snapshot worksheet names in workbook order after checking source freshness.
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
-        self.inner.package.source_version()?;
+        let _ = preflight_package(&self.inner.package)?;
         let mut names = Vec::new();
         names
             .try_reserve_exact(self.inner.worksheet_positions.len())
@@ -433,12 +447,13 @@ impl SourceBackedWorkbook {
                 .iter()
                 .map(|&catalog_position| self.inner.sheets[catalog_position].name.clone()),
         );
+        postflight_package(&self.inner.package)?;
         Ok(names)
     }
 
     /// Snapshot all checked worksheet handles in workbook order.
     pub fn worksheets(&self) -> Result<Vec<SourceBackedWorksheet>> {
-        self.inner.package.source_version()?;
+        let _ = preflight_package(&self.inner.package)?;
         let mut worksheets = Vec::new();
         worksheets
             .try_reserve_exact(self.inner.worksheet_positions.len())
@@ -456,27 +471,30 @@ impl SourceBackedWorkbook {
                     catalog_position,
                 }),
         );
+        postflight_package(&self.inner.package)?;
         Ok(worksheets)
     }
 
     /// Select a worksheet by zero-based position in the worksheet-only catalog.
     pub fn worksheet_by_index(&self, index: usize) -> Result<Option<SourceBackedWorksheet>> {
-        self.inner.package.source_version()?;
-        Ok(self
-            .inner
-            .worksheet_positions
-            .get(index)
-            .copied()
-            .map(|catalog_position| SourceBackedWorksheet {
-                inner: Arc::clone(&self.inner),
-                catalog_position,
-            }))
+        let _ = preflight_package(&self.inner.package)?;
+        let worksheet =
+            self.inner
+                .worksheet_positions
+                .get(index)
+                .copied()
+                .map(|catalog_position| SourceBackedWorksheet {
+                    inner: Arc::clone(&self.inner),
+                    catalog_position,
+                });
+        postflight_package(&self.inner.package)?;
+        Ok(worksheet)
     }
 
     /// Select a worksheet by its exact workbook name.
     pub fn worksheet_by_name(&self, name: &str) -> Result<Option<SourceBackedWorksheet>> {
-        self.inner.package.source_version()?;
-        Ok(self
+        let _ = preflight_package(&self.inner.package)?;
+        let worksheet = self
             .inner
             .worksheet_positions
             .iter()
@@ -485,20 +503,24 @@ impl SourceBackedWorkbook {
             .map(|catalog_position| SourceBackedWorksheet {
                 inner: Arc::clone(&self.inner),
                 catalog_position,
-            }))
+            });
+        postflight_package(&self.inner.package)?;
+        Ok(worksheet)
     }
 
     /// Return the primary workbook view's physical sheet-catalog position.
     pub fn active_catalog_position(&self) -> Result<Option<usize>> {
-        self.inner.package.source_version()?;
-        Ok(self.inner.active_catalog_position)
+        let _ = preflight_package(&self.inner.package)?;
+        let position = self.inner.active_catalog_position;
+        postflight_package(&self.inner.package)?;
+        Ok(position)
     }
 
     /// Return the primary workbook view's public worksheet ordinal, when it
     /// names a worksheet rather than a chart, dialog, or macro sheet.
     pub fn active_worksheet_index(&self) -> Result<Option<usize>> {
-        self.inner.package.source_version()?;
-        Ok(self
+        let _ = preflight_package(&self.inner.package)?;
+        let index = self
             .inner
             .active_catalog_position
             .and_then(|catalog_position| {
@@ -506,18 +528,24 @@ impl SourceBackedWorkbook {
                     .worksheet_positions
                     .iter()
                     .position(|&position| position == catalog_position)
-            }))
+            });
+        postflight_package(&self.inner.package)?;
+        Ok(index)
     }
 
     /// Return the exact source identity and revision captured at open.
     pub fn source_version(&self) -> Result<SourceVersion> {
-        self.inner.package.source_version().map_err(Into::into)
+        let version = preflight_package(&self.inner.package)?;
+        postflight_package(&self.inner.package)?;
+        Ok(version)
     }
 
     /// Return whether this workbook uses Excel's 1904 date system.
     pub fn is_1904_date_system(&self) -> Result<bool> {
-        self.inner.package.source_version()?;
-        Ok(self.inner.is_1904_date_system)
+        let _ = preflight_package(&self.inner.package)?;
+        let is_1904 = self.inner.is_1904_date_system;
+        postflight_package(&self.inner.package)?;
+        Ok(is_1904)
     }
 
     /// Return content-free deferred-Part cache diagnostics.
@@ -546,6 +574,16 @@ impl SourceBackedWorkbook {
         let mut writer = SequentialTextWriter::new(&mut checked_output, options);
         let conversion = (|| {
             check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
+            if self
+                .inner
+                .sheets
+                .iter()
+                .any(|sheet| !matches!(sheet.kind, SheetKind::Worksheet))
+            {
+                return Err(writer.document_error(Error::UnsupportedFeature(
+                    "source-backed XLSB non-worksheet materialization is not supported".to_string(),
+                )));
+            }
             for &catalog_position in &self.inner.worksheet_positions {
                 check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
                 let sheet = SourceBackedWorksheet {
@@ -607,14 +645,18 @@ impl SourceBackedWorkbook {
 impl SourceBackedWorksheet {
     /// Return this sheet's name after checking source freshness.
     pub fn name(&self) -> Result<&str> {
-        self.inner.package.source_version()?;
-        Ok(&self.metadata().name)
+        let _ = preflight_package(&self.inner.package)?;
+        let name = &self.metadata().name;
+        postflight_package(&self.inner.package)?;
+        Ok(name)
     }
 
     /// Return this sheet's zero-based position in the complete workbook sheet order.
     pub fn workbook_position(&self) -> Result<usize> {
-        self.inner.package.source_version()?;
-        Ok(self.metadata().workbook_position)
+        let _ = preflight_package(&self.inner.package)?;
+        let position = self.metadata().workbook_position;
+        postflight_package(&self.inner.package)?;
+        Ok(position)
     }
 
     /// Parse the selected worksheet BIFF12 stream without reading unselected sheets.
@@ -690,7 +732,7 @@ impl SourceBackedWorksheet {
                 worksheet.add_comment(comment);
             }
         }
-        self.inner.package.source_version()?;
+        postflight_package(&self.inner.package)?;
         Ok(worksheet)
     }
 
@@ -881,6 +923,17 @@ impl Write for FallibleTextCollector {
 fn check_text_state(inner: &SourceInner) -> Result<()> {
     inner.package.check_execution()?;
     inner.package.source_version()?;
+    Ok(())
+}
+
+fn preflight_package(package: &SourceBackedPackage) -> Result<SourceVersion> {
+    package.check_execution()?;
+    package.source_version().map_err(Into::into)
+}
+
+fn postflight_package(package: &SourceBackedPackage) -> Result<()> {
+    package.source_version()?;
+    package.check_execution()?;
     Ok(())
 }
 

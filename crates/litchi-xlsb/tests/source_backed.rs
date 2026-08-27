@@ -4,14 +4,16 @@
 )]
 
 use std::io::{self, Cursor};
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
     OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
 };
 use litchi_opc::constants::relationship_type;
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, SourceCacheLimits};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, kind};
 use litchi_xlsb::{ReadLimits, SourceBackedWorkbook};
@@ -121,6 +123,36 @@ fn rewrite_sheet_relationship(relationship_type: &str, content_type: &str) -> Ve
     output
 }
 
+fn rewrite_sheet_target(target_partname: &str, target_ref: &str) -> Vec<u8> {
+    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let target_partname = PackURI::new(target_partname).unwrap();
+    let (r_id, rel_type, is_external) = package
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            let target = relationship.target_partname().ok()?;
+            (target == target_partname).then(|| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.reltype().to_owned(),
+                    relationship.is_external(),
+                )
+            })
+        })
+        .unwrap();
+    let workbook = package.get_part_mut(&workbook_uri).unwrap();
+    workbook.rels_mut().remove(&r_id).unwrap();
+    workbook
+        .rels_mut()
+        .add_relationship(rel_type, target_ref.to_owned(), r_id, is_external);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
 fn set_date1904() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
@@ -151,6 +183,57 @@ struct VersionedSource {
     revision: AtomicU64,
 }
 
+struct CancelOnArmedRead {
+    bytes: Vec<u8>,
+    cancellation_source: CancellationSource,
+    armed: AtomicBool,
+    triggered: AtomicBool,
+}
+
+impl CancelOnArmedRead {
+    fn new(bytes: Vec<u8>, cancellation_source: CancellationSource) -> Self {
+        Self {
+            bytes,
+            cancellation_source,
+            armed: AtomicBool::new(false),
+            triggered: AtomicBool::new(false),
+        }
+    }
+
+    fn arm(&self) {
+        self.armed.store(true, Ordering::SeqCst);
+    }
+
+    fn triggered(&self) -> bool {
+        self.triggered.load(Ordering::SeqCst)
+    }
+}
+
+impl ReadAt for CancelOnArmedRead {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if self.armed.swap(false, Ordering::SeqCst) {
+            self.triggered.store(true, Ordering::SeqCst);
+            self.cancellation_source.cancel();
+        }
+        let offset = usize::try_from(offset)
+            .map_err(|_error| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(0x4341_4e43, 0))
+    }
+}
+
 impl VersionedSource {
     fn new(bytes: Vec<u8>) -> Self {
         Self {
@@ -162,6 +245,32 @@ impl VersionedSource {
     fn change(&self) {
         self.revision.fetch_add(1, Ordering::SeqCst);
     }
+}
+
+fn managed_context() -> (CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsb-source-backed-test",
+        BudgetLimits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(u64::MAX).unwrap(),
+        0,
+    )
+    .unwrap();
+    (
+        cancellation_source,
+        ExecutionContext::new(budget, cancellation, execution_limits),
+    )
+}
+
+fn assert_cancelled<T>(result: Result<T, PackageError>) {
+    assert!(matches!(
+        result,
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
 }
 
 impl ReadAt for VersionedSource {
@@ -228,6 +337,160 @@ fn selectors_remain_metadata_only_and_source_checked() {
     assert!(workbook.worksheet_count().is_err());
     assert!(workbook.worksheet_by_name(&name).is_err());
     assert!(selected.materialize().is_err());
+}
+
+#[test]
+fn managed_cancellation_is_checked_for_catalog_selectors_state_and_handles() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        source,
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let sheet_name = workbook.sheet_names().unwrap().remove(0);
+    let worksheet_name = workbook.worksheet_names().unwrap().remove(0);
+    let selected_sheet = workbook.sheet_by_index(0).unwrap().unwrap();
+    let selected_worksheet = workbook
+        .worksheet_by_name(&worksheet_name)
+        .unwrap()
+        .unwrap();
+    selected_worksheet.materialize().unwrap();
+
+    cancellation_source.cancel();
+
+    assert_cancelled(workbook.sheet_count());
+    assert_cancelled(workbook.sheet_names());
+    assert_cancelled(workbook.sheets());
+    assert_cancelled(workbook.sheet_by_index(0));
+    assert_cancelled(workbook.sheet_by_index(usize::MAX));
+    assert_cancelled(workbook.sheet_by_name(&sheet_name));
+    assert_cancelled(workbook.sheet_by_name("missing"));
+    assert_cancelled(workbook.worksheet_count());
+    assert_cancelled(workbook.worksheet_names());
+    assert_cancelled(workbook.worksheets());
+    assert_cancelled(workbook.worksheet_by_index(0));
+    assert_cancelled(workbook.worksheet_by_index(usize::MAX));
+    assert_cancelled(workbook.worksheet_by_name(&worksheet_name));
+    assert_cancelled(workbook.worksheet_by_name("missing"));
+    assert_cancelled(workbook.active_catalog_position());
+    assert_cancelled(workbook.active_worksheet_index());
+    assert_cancelled(workbook.source_version());
+    assert_cancelled(workbook.is_1904_date_system());
+    assert_cancelled(selected_sheet.name());
+    assert_cancelled(selected_sheet.workbook_position());
+    assert_cancelled(selected_worksheet.materialize());
+}
+
+#[test]
+fn managed_cancellation_is_checked_before_catalog_construction() {
+    let (cancellation_source, context) = managed_context();
+    cancellation_source.cancel();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at_with_execution_context(
+            Arc::new(OwnedSource::new(fixture())),
+            ReadLimits::default(),
+            context,
+        ),
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
+}
+
+#[test]
+fn managed_cancellation_precedes_stale_source_preflight() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    source.change();
+    cancellation_source.cancel();
+
+    assert_cancelled(workbook.sheet_count());
+}
+
+#[test]
+fn stale_source_preflight_remains_source_changed_without_cancellation() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (_cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    source.change();
+
+    assert!(matches!(
+        workbook.sheet_count(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+}
+
+#[test]
+fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
+    let (cancellation_source, context) = managed_context();
+    let source = Arc::new(CancelOnArmedRead::new(fixture(), cancellation_source));
+    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        source.clone(),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let before = workbook.cache_diagnostics();
+
+    source.arm();
+    assert!(matches!(
+        selected.materialize(),
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
+    assert!(source.triggered());
+
+    let after = workbook.cache_diagnostics();
+    assert_eq!(after.retained_entries, before.retained_entries);
+}
+
+#[test]
+fn case_variant_duplicate_sheet_targets_are_rejected() {
+    let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/SHEET1.bin");
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+}
+
+#[test]
+fn unique_case_variant_sheet_target_opens_and_materializes() {
+    let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/SHEET2.bin");
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let selected = workbook.worksheet_by_index(1).unwrap().unwrap();
+    assert_eq!(
+        selected.name().unwrap(),
+        workbook.worksheet_names().unwrap()[1]
+    );
+    selected.materialize().unwrap();
+}
+
+#[test]
+fn managed_package_handoff_checks_cancellation_before_catalog_construction() {
+    let (cancellation_source, context) = managed_context();
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(fixture())),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        SourceBackedWorkbook::from_source_backed_package(package),
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
 }
 
 #[test]
