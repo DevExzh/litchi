@@ -10,8 +10,11 @@ pub(super) fn set_table_geometry_in_package(
     drawable_object_id: u64,
     geometry: DrawableGeometry,
 ) -> Result<()> {
-    let graph = ObjectGraph::read(package)?;
-    let archive_name = graph.archive_name(drawable_object_id)?.to_owned();
+    let catalog = KeynoteObjectCatalog::build(package).map_err(map_catalog_error)?;
+    let archive_name = catalog
+        .archive_name(drawable_object_id)
+        .map_err(map_catalog_error)?
+        .to_owned();
     package.update_archive(&archive_name, |archive| {
         let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("Keynote table {drawable_object_id} is missing"))
@@ -73,11 +76,16 @@ pub(super) fn set_uniform_table_dimensions(
 }
 
 pub(super) fn remove_objects(package: &mut IWorkPackage, identifiers: &[u64]) -> Result<()> {
-    let graph = ObjectGraph::read(package)?;
+    let catalog = KeynoteObjectCatalog::build(package).map_err(map_catalog_error)?;
     let mut by_archive = HashMap::<String, Vec<u64>>::new();
     for &identifier in identifiers {
         by_archive
-            .entry(graph.archive_name(identifier)?.to_owned())
+            .entry(
+                catalog
+                    .archive_name(identifier)
+                    .map_err(map_catalog_error)?
+                    .to_owned(),
+            )
             .or_default()
             .push(identifier);
     }

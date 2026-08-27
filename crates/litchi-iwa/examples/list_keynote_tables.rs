@@ -1,6 +1,7 @@
 use std::env;
 
 use litchi_iwa::keynote::KeynoteEditor;
+use litchi_keynote::slide::table::dimension::Dimension;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
@@ -20,11 +21,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 litchi_keynote::TableSelector::index(table_index),
             )?;
             let row_heights = (0..info.rows)
-                .map(|row| editor.slide_table_row_height(slide.index, info.model_object_id, row))
+                .map(|row| {
+                    package.slide_table_dimension_size(
+                        litchi_keynote::SlideSelector::index(slide.index),
+                        litchi_keynote::TableSelector::index(table_index),
+                        Dimension::Row(row),
+                    )
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             let column_widths = (0..info.columns)
                 .map(|column| {
-                    editor.slide_table_column_width(slide.index, info.model_object_id, column)
+                    package.slide_table_dimension_size(
+                        litchi_keynote::SlideSelector::index(slide.index),
+                        litchi_keynote::TableSelector::index(table_index),
+                        Dimension::Column(column),
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             println!(

@@ -19,6 +19,7 @@ mod slide_movie_title;
 mod slide_notes;
 mod slide_order;
 pub(crate) mod slide_table_appearance;
+pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_lock_state;
 pub(crate) mod slide_table_sort_order;
@@ -116,6 +117,11 @@ pub use slide_table_appearance::{
     SlideTableAppearanceCommit, SlideTableAppearanceDiagnostics, SlideTableAppearanceEdit,
     SlideTableAppearanceError, SlideTableAppearanceLimitKind, SlideTableAppearancePatch,
     SlideTableAppearancePath,
+};
+pub use slide_table_dimension::{
+    SlideTableDimensionCommit, SlideTableDimensionDiagnostics, SlideTableDimensionEdit,
+    SlideTableDimensionError, SlideTableDimensionLimitKind, SlideTableDimensionPatch,
+    SlideTableDimensionPath,
 };
 pub use slide_table_headers::{
     SlideTableHeaderCommit, SlideTableHeaderDiagnostics, SlideTableHeaderEdit,

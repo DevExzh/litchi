@@ -43,3 +43,6 @@ coverage
 !/corpus/keynote_slide_table_appearance/
 /corpus/keynote_slide_table_appearance/*
 !/corpus/keynote_slide_table_appearance/*.hex
+!/corpus/keynote_slide_table_dimension/
+/corpus/keynote_slide_table_dimension/*
+!/corpus/keynote_slide_table_dimension/*.hex
