@@ -2029,6 +2029,91 @@ IWA_KEYNOTE_SLIDE_TABLE_HEADERS_IMPORTS = (
 )
 IWA_KEYNOTE_SLIDE_TABLE_HEADERS_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 
+# Wave101 moves only the Keynote slide-table *listing* discovery boundary onto
+# a bounded catalog and a neutral, borrowed projection.  The native editor
+# still owns selected-table materialization and mutation compatibility, so the
+# ratchet is deliberately scoped to the listing call graph rather than the
+# whole ``slide_tables`` module.  The first catalog seam is an explicit
+# production marker; until it is present this audit remains dormant.
+IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "graph.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "catalog.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "keynote_object_catalog.rs",
+)
+IWA_KEYNOTE_SLIDE_DISCOVERY_ROOT_FUNCTION = "slide_tables"
+IWA_KEYNOTE_SLIDE_DISCOVERY_ACTIVATION = re.compile(
+    r"\b(?:KeynoteObjectCatalog|KeynoteTableCatalog|ObjectGraphIndex|"
+    r"KeynoteTableDiscovery)\b"
+)
+IWA_KEYNOTE_SLIDE_DISCOVERY_CATALOG_MARKERS = (
+    (
+        "bounded catalog",
+        re.compile(
+            r"\b(?:KeynoteObjectCatalog|KeynoteTableCatalog|ObjectGraphIndex|"
+            r"KeynoteTableDiscoveryCatalog)\b"
+        ),
+    ),
+    (
+        "catalog limits",
+        re.compile(
+            r"\b(?:Bounded(?:Keynote|Table|Object)?Catalog|"
+            r"(?:KeynoteObject|Keynote|Table|Object)?Catalog(?:Budget|Limits)|"
+            r"KeynoteObjectCatalogLimit(?:Kind|s)?|ObjectGraphLimits)\b|"
+            r"\b(?:max_(?:archives|archive_reads|objects|messages|"
+            r"references|reference_edges|payload_bytes|retained_bytes|"
+            r"semantic_decodes)|"
+            r"try_reserve(?:_exact)?|reserve_exact|charge_catalog)\b"
+        ),
+    ),
+    (
+        "neutral strict projection",
+        re.compile(
+            r"\b(?:table_model_discovery_codec|numbers_names_codec|"
+            r"numbers_table_header_settings_codec|table_info_codec|"
+            r"decode_table_names|decode_table_header_settings|"
+            r"decode_table_model_(?:discovery|projection|facts|snapshot|"
+            r"reference_only)|TableModel(?:DiscoverySnapshot|Facts|Projection|"
+            r"Snapshot)|TableInfoSnapshot)\b"
+        ),
+    ),
+)
+IWA_KEYNOTE_SLIDE_DISCOVERY_FORBIDDEN_PATTERNS = (
+    (
+        "ObjectGraph::read",
+        re.compile(
+            r"\bObjectGraph\s*::\s*read\s*\(|"
+            r"\bObjectGraph\s*::\s*read\s*<"
+        ),
+    ),
+    (
+        "TableModelArchive::decode",
+        re.compile(
+            r"\bTableModelArchive\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*TableModelArchive\b"
+        ),
+    ),
+    (
+        "TableInfoArchive::decode",
+        re.compile(
+            r"\bTableInfoArchive\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*TableInfoArchive\b"
+        ),
+    ),
+)
+IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLBACKS = frozenset(
+    {"decode_catalog_table_info"}
+)
+IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLERS = frozenset(
+    {
+        "slide_table_graph_from_catalog",
+        "slide_table_graph_from_catalog_context",
+    }
+)
+IWA_KEYNOTE_SLIDE_DISCOVERY_STRICT_INFO_PROJECTION = re.compile(
+    r"\btable_info_codec\s*::\s*decode_table_info\s*\("
+)
+
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -21152,6 +21237,254 @@ def audit_iwa_numbers_table_extractor_model_tile_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_table_discovery_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Keynote slide-table listing on one bounded neutral discovery path.
+
+    The legacy Keynote editor still owns selected-table materialization and
+    native mutation compatibility.  Only the production call graph rooted at
+    ``slide_tables`` is therefore inspected.  An uncalled compatibility or
+    mutation helper may retain its generated decode and its own graph read;
+    once the explicit catalog seam appears, however, the listing route must
+    use a bounded catalog and a strict neutral projection and may not rebuild
+    an ``ObjectGraph`` or decode complete generated TableInfo/TableModel
+    envelopes for every table.
+    """
+
+    existing_paths = [
+        root / relative
+        for relative in IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES
+        if (root / relative).is_file()
+    ]
+    if not existing_paths:
+        return []
+
+    # The bounded catalog type is the activation marker.  A missing marker
+    # keeps old source trees (and reduced checker fixtures) dormant until the
+    # production owner actually claims this migration.
+    production: dict[Path, str] = {}
+    combined_code: list[str] = []
+    for path in existing_paths:
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        production[path] = source
+        combined_code.append(_mask_rust_non_code(source))
+    if IWA_KEYNOTE_SLIDE_DISCOVERY_ACTIVATION.search("\n".join(combined_code)) is None:
+        return []
+
+    violations: list[str] = []
+    functions: dict[str, list[tuple[Path, str, int]]] = {}
+
+    def records(path: Path, source: str) -> None:
+        code = _mask_rust_non_code(source)
+        for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+            opening = code.find("{", declaration.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(code) and depth:
+                if code[cursor] == "{":
+                    depth += 1
+                elif code[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            functions.setdefault(declaration.group(1), []).append(
+                (path, code[opening + 1 : cursor - 1], opening + 1)
+            )
+
+    for path, source in production.items():
+        records(path, source)
+
+    def local_helper_call_matches(body: str, helper_name: str) -> list[re.Match[str]]:
+        """Return calls to local helpers, excluding neutral codec methods.
+
+        The catalog projection is allowed to call a codec method whose final
+        segment can have the same name as an old generated helper (for
+        example ``table_model_discovery_codec::decode_table_model``).  A
+        plain identifier search would incorrectly make that uncalled legacy
+        helper reachable from the listing root.  Qualified editor/catalog
+        helpers remain reachable; only a qualifier ending in ``_codec`` is
+        treated as an external projection call.
+        """
+
+        call = re.compile(
+            rf"(?<![A-Za-z0-9_])(?:r#)?{re.escape(helper_name)}"
+            r"[ \t\r\n]*\("
+        )
+        matches: list[re.Match[str]] = []
+        for match in call.finditer(body):
+            prefix = body[: match.start()]
+            qualifier = re.search(
+                r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+                r"[ \t\r\n]*::[ \t\r\n]*)+$",
+                prefix,
+            )
+            if qualifier:
+                segments = re.findall(
+                    r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)"
+                    r"[ \t\r\n]*::",
+                    qualifier.group(0),
+                )
+                if any(segment.endswith("_codec") for segment in segments):
+                    continue
+            matches.append(match)
+        return matches
+
+    roots = functions.get(IWA_KEYNOTE_SLIDE_DISCOVERY_ROOT_FUNCTION, [])
+    if not roots:
+        violations.append(
+            "legacy iwa Keynote slide-table discovery is missing production "
+            f"{IWA_KEYNOTE_SLIDE_DISCOVERY_ROOT_FUNCTION}: "
+            f"{IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[0]}"
+        )
+        return sorted(set(violations))
+
+    # Resolve only local helpers reachable from the listing entry point.  This
+    # is intentionally name-based, matching the other source ratchets; the
+    # source set is limited to the listing module and its graph/catalog
+    # companion so unrelated editor functions cannot satisfy or trip it.
+    reachable: list[tuple[str, Path, str, int]] = []
+    pending = [
+        (IWA_KEYNOTE_SLIDE_DISCOVERY_ROOT_FUNCTION, path, body, offset)
+        for path, body, offset in roots
+    ]
+    visited: set[tuple[str, Path, int]] = set()
+    while pending:
+        name, path, body, offset = pending.pop()
+        visit_key = (name, path, offset)
+        if visit_key in visited:
+            continue
+        visited.add(visit_key)
+        reachable.append((name, path, body, offset))
+        for helper_name, helper_records in functions.items():
+            if helper_name == name:
+                # A recursive listing helper cannot add a useful new route.
+                continue
+            # Include free and receiver calls.  Catalog methods are commonly
+            # invoked as ``catalog.with_object(...)`` while graph helpers are
+            # called directly.  Do not treat the final segment of an
+            # unrelated qualified codec call (for example
+            # ``table_model_discovery_codec::decode_table_model(...)``) as a
+            # local helper edge: doing so would pull an uncalled legacy
+            # generated decoder into the claimed listing path.
+            calls = local_helper_call_matches(body, helper_name)
+            referenced_callback = (
+                helper_name in IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLBACKS
+                and re.search(
+                    rf"(?<![A-Za-z0-9_])(?:r#)?{re.escape(helper_name)}"
+                    r"(?![A-Za-z0-9_])",
+                    body,
+                )
+                is not None
+            )
+            if not calls and not referenced_callback:
+                continue
+            pending.extend(
+                (helper_name, helper_path, helper_body, helper_offset)
+                for helper_path, helper_body, helper_offset in helper_records
+            )
+
+    reachable_keys = {
+        (name, path, offset) for name, path, _body, offset in reachable
+    }
+    reachable_callers: dict[tuple[str, Path, int], set[str]] = {}
+    for caller_name, _caller_path, caller_body, _caller_offset in reachable:
+        for helper_name, helper_records in functions.items():
+            if helper_name == caller_name:
+                continue
+            calls = local_helper_call_matches(caller_body, helper_name)
+            referenced_callback = (
+                helper_name in IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLBACKS
+                and re.search(
+                    rf"(?<![A-Za-z0-9_])(?:r#)?{re.escape(helper_name)}"
+                    r"(?![A-Za-z0-9_])",
+                    caller_body,
+                )
+                is not None
+            )
+            if not calls and not referenced_callback:
+                continue
+            for helper_path, helper_body, helper_offset in helper_records:
+                helper_key = (helper_name, helper_path, helper_offset)
+                if helper_key in reachable_keys:
+                    reachable_callers.setdefault(helper_key, set()).add(caller_name)
+
+    reachable_source = "\n".join(body for _name, _path, body, _offset in reachable)
+    for label, marker in IWA_KEYNOTE_SLIDE_DISCOVERY_CATALOG_MARKERS:
+        if marker.search(reachable_source) is None:
+            violations.append(
+                "legacy iwa Keynote slide-table discovery is missing "
+                f"{label} marker on the claimed listing path: "
+                f"{IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[0]}"
+            )
+
+    # A generated alias can otherwise evade the deliberately explicit type
+    # patterns below.  Keep aliases private to this production call graph and
+    # leave cfg(test) builders masked before collecting them.
+    generated_alias_patterns: list[tuple[str, re.Pattern[str]]] = []
+    for source in production.values():
+        code = _mask_rust_non_code(source)
+        for match in re.finditer(
+            r"\b(?:TableModelArchive|TableInfoArchive)\b"
+            r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+            r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            code,
+        ):
+            alias = match.group("alias")
+            original = (
+                "TableModelArchive"
+                if "TableModelArchive" in match.group(0)
+                else "TableInfoArchive"
+            )
+            generated_alias_patterns.append(
+                (
+                    f"{original} alias {alias}::decode",
+                    re.compile(
+                        rf"\b(?:r#)?{re.escape(alias)}\s*::\s*decode\s*\("
+                    ),
+                )
+            )
+
+    forbidden = list(IWA_KEYNOTE_SLIDE_DISCOVERY_FORBIDDEN_PATTERNS)
+    forbidden.extend(generated_alias_patterns)
+    for name, path, body, offset in reachable:
+        source = production[path]
+        for label, pattern in forbidden:
+            matches = list(pattern.finditer(body))
+            if label == "TableInfoArchive::decode" and matches:
+                record_key = (name, path, offset)
+                callers = reachable_callers.get(record_key, set())
+                strict_matches = list(
+                    IWA_KEYNOTE_SLIDE_DISCOVERY_STRICT_INFO_PROJECTION.finditer(body)
+                )
+                # Geometry still needs a complete selected TableInfo value,
+                # but that parse is safe only in the dedicated callback after
+                # the borrowed strict projection has admitted the payload.
+                # Candidate/template discovery has no such exemption.
+                if (
+                    name in IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLBACKS
+                    and callers
+                    and callers.issubset(
+                        IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLERS
+                    )
+                    and len(matches) == 1
+                    and len(strict_matches) == 1
+                    and strict_matches[0].start() < matches[0].start()
+                ):
+                    matches = []
+            for match in matches:
+                line_number = source.count("\n", 0, offset + match.start()) + 1
+                violations.append(
+                    "legacy iwa Keynote slide-table discovery production path uses "
+                    f"{label} via {name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_extractor_no_eager_table_data_list_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -29952,6 +30285,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
+        + audit_iwa_keynote_slide_table_discovery_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_iwa_numbers_table_cell_storage_source_topology()
         + audit_iwa_package_metadata_read_source_topology()

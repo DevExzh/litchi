@@ -1393,6 +1393,14 @@ pub mod pages_document_settings_codec;
 #[doc(hidden)]
 pub mod numbers_names_codec;
 
+/// Format-neutral strict borrowed table-model discovery projection.
+///
+/// The snapshot contains only required identity/name/dimension facts; the
+/// complete generated TableModel and all storage/style fields remain outside
+/// this boundary.
+#[doc(hidden)]
+pub mod table_model_discovery_codec;
+
 #[doc(hidden)]
 pub mod numbers_sheet_order_codec;
 

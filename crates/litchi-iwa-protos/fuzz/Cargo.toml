@@ -113,6 +113,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "table_model_discovery_codec"
+path = "fuzz_targets/table_model_discovery_codec.rs"
+test = false
+doc = false
+bench = false
+
 
 [[bin]]
 name = "comment_storage_codec"

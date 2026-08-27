@@ -34,8 +34,12 @@ mod storage;
 mod title;
 mod topology;
 
+use super::keynote_object_catalog::{KeynoteObjectCatalog, map_catalog_error};
 pub use conditional_highlight::KeynoteTableCellConditionalHighlightInfo;
-use graph::{require_table_model, slide_table_graph, table_template};
+use graph::{
+    catalog_slide_context, require_table_model, slide_table_graph,
+    slide_table_graph_from_catalog_context, table_template_from_catalog,
+};
 use litchi_iwa_common::comment::Comment;
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
@@ -44,6 +48,7 @@ pub use title::KeynoteTableTitleSettings;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+const TABLE_MODEL_ROLE_ALIAS_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_GEOMETRY_FLAGS: u32 = 3;
 const TABLE_ANGLE_DEGREES: f32 = 0.0;
 
@@ -178,21 +183,31 @@ pub struct RemovedKeynoteSlideTable {
 impl KeynoteEditor {
     /// List native tables owned directly by one slide in z-order.
     pub fn slide_tables(&self, slide_index: usize) -> Result<Vec<KeynoteSlideTableInfo>> {
-        let graph = ObjectGraph::read(self.package())?;
-        let context = text_box_create::text_box_context(&graph, slide_index)?;
+        let mut catalog = KeynoteObjectCatalog::build(self.package()).map_err(map_catalog_error)?;
+        let context = catalog_slide_context(self.package(), &mut catalog, slide_index)?;
         let mut tables = Vec::new();
         for reference in &context.slide.drawables_z_order {
-            let Some(messages) = graph.objects.get(&reference.identifier) else {
+            if catalog.object_descriptor(reference.identifier).is_err() {
                 return Err(Error::InvalidFormat(format!(
                     "Keynote slide {} drawable {} is missing",
                     context.slide_id, reference.identifier
                 )));
-            };
-            if messages
-                .iter()
-                .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            }
+            if catalog
+                .message_type_count(reference.identifier, TABLE_INFO_MESSAGE_TYPE)
+                .map_err(map_catalog_error)?
+                > 0
             {
-                tables.push(slide_table_graph(self, slide_index, reference.identifier)?.info);
+                tables.push(
+                    slide_table_graph_from_catalog_context(
+                        self,
+                        &mut catalog,
+                        slide_index,
+                        reference.identifier,
+                        &context,
+                    )?
+                    .info,
+                );
             }
         }
         Ok(tables)
@@ -204,15 +219,7 @@ impl KeynoteEditor {
         slide_index: usize,
         model_object_id: u64,
     ) -> Result<KeynoteSlideTable> {
-        let info = self
-            .slide_tables(slide_index)?
-            .into_iter()
-            .find(|table| table.model_object_id == model_object_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!(
-                    "Keynote table model {model_object_id} is not owned by slide {slide_index}"
-                ))
-            })?;
+        let info = require_table_model(self, slide_index, model_object_id)?;
         let bytes = self.package().to_bytes()?;
         let bundle = Bundle::from_bytes(&bytes)?;
         let index = ObjectIndex::from_bundle(&bundle)?;
@@ -322,10 +329,14 @@ impl KeynoteEditor {
             angle: Some(TABLE_ANGLE_DEGREES),
         }
         .validate()?;
-        let object_graph = ObjectGraph::read(self.package())?;
-        let context = text_box_create::text_box_context(&object_graph, slide_index)?;
-        let slide_archive = object_graph.archive_name(context.slide_id)?.to_owned();
-        let (template_info_id, template_model_id) = table_template(self.package())?;
+        let mut catalog = KeynoteObjectCatalog::build(self.package()).map_err(map_catalog_error)?;
+        let context = catalog_slide_context(self.package(), &mut catalog, slide_index)?;
+        let slide_archive = catalog
+            .archive_name(context.slide_id)
+            .map_err(map_catalog_error)?
+            .to_owned();
+        let (template_info_id, template_model_id) =
+            table_template_from_catalog(self.package(), &mut catalog)?;
 
         let mut staged = self.package().clone();
         let (info_id, model_id) = crate::numbers::editor::create_empty_table_graph_in_package(

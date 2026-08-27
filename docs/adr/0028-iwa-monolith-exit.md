@@ -6083,3 +6083,66 @@ migration debt, the migration host, generated-schema/normal Prost and Buffa
 owners, and the monolith deletion gate remain. Wave100 retires no crate,
 dependency edge, manifest dependency, host adapter, debt item, generated
 owner, or monolith owner.
+
+## 2026-08-27 amendment: Wave101 Keynote slide-table bounded borrowed discovery (not a monolith-exit gate)
+
+Wave101 narrows the legacy Keynote host's slide-table discovery boundary. The
+`KeynoteEditor::slide_tables` listing path and the template lookup used by
+`add_slide_table` build one private, operation-scoped
+`KeynoteObjectCatalog`, reuse the decoded slide context, and walk deterministic
+catalog descriptors instead of rebuilding the package-wide cloned
+`ObjectGraph` for each table. The catalog retains only bounded object slots,
+message type/length facts, and archive-name locators. Parsed archives and
+payload bytes are borrowed inside checked callbacks and are not retained by
+the catalog.
+
+The discovery path uses strict `table_info_codec` projections and the new
+borrowed `table_model_discovery_codec` facts for table identity, display name,
+and dimensions. Canonical model type 6001 is authoritative; strict legacy
+type-6000 is considered only when no type-6001 model exists. A malformed
+canonical candidate cannot fall back, simultaneous or duplicate 6000/6001
+candidates fail closed, and TableInfo-shaped role decoys are not promoted.
+Known fields,
+unknown canonical framing, unknown groups, duplicate/wrong-wire/noncanonical
+input, and missing or conflicting routes remain subject to strict projection
+and finite limits.
+
+The catalog's bounded axes cover archives, archive reads, objects, messages,
+payload bytes, reference edges, retained descriptor/name bytes, and semantic
+decodes, with checked reserves and stale-revision checks. The model projection
+adds finite input, field, work, text, and nesting limits. These are bounded
+discovery-operation resources; they are not a package-wide semantic extraction
+or publication ledger, and they do not make the complete Keynote package
+zero-copy or allocation-free.
+
+The selected complete TableInfo/model graph still uses the existing generated
+and native readers where geometry, appearance, storage, cells, formulas,
+tiles, comments, and mutation need the full graph. `ObjectGraph` wrappers and
+other editor callers remain compatibility paths. The catalog is private and
+does not change the legacy `KeynoteSlideTableInfo` native-ID surface; no new
+raw IDs, archive values, or wire values are added to a semantic package API.
+No row/cell/storage/formula/tile/metadata/UUID/save-token/preview mutation,
+native writer migration, or broader generated-free Keynote extraction is part
+of this amendment.
+
+The focused gates are 5/5 for the borrowed model-discovery codec, 9/9 for the
+bounded catalog, 30/30 for the affected slide-table tests, and 591/591 for
+the Python boundary suite; the focused Wave101 live audit returned no
+findings. An external
+public `KeynoteEditor` driver read the Wave99 source
+`/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
+`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`) and the
+Wave100 source (500,128 bytes, SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`). Each
+read one slide and one 5-by-4 table named `Table 1`; fresh reopen parity was
+true and post-read bytes and hashes were unchanged. Computer Use also opened
+the Wave100 source in Keynote 14.4 without repair, recovery, or conversion UI
+and observed `Table 1` with 5 rows and 4 columns; the source bytes and hash
+remained exact afterward. No Keynote save, normalization, or mutation run is
+claimed, nor any performance/RSS result or public catalog statistics.
+
+The migration host, the `litchi-iwa -> litchi-keynote` edge, all 13 ordered
+migration debts (including debts 014, 016, and 017), generated-schema and
+normal Prost/Buffa owners, and the IWA monolith deletion gate remain
+unchanged. Wave101 retires no crate, dependency edge, manifest dependency,
+host adapter, debt item, generated owner, or monolith owner.

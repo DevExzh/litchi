@@ -18,6 +18,7 @@ generated libFuzzer output part of the repository.
 | `table_appearance` | `fuzz_targets/table_appearance.rs` | `corpus/table_appearance/` |
 | `numbers_table_sort_order_codec` | `fuzz_targets/numbers_table_sort_order_codec.rs` | `corpus/numbers_table_sort_order_codec/` |
 | `numbers_table_header_settings_codec` | `fuzz_targets/numbers_table_header_settings_codec.rs` | `corpus/numbers_table_header_settings_codec/` |
+| `table_model_discovery_codec` | `fuzz_targets/table_model_discovery_codec.rs` | `corpus/table_model_discovery_codec/` |
 | `comment_storage_codec` | `fuzz_targets/comment_storage_codec.rs` | `corpus/comment_storage_codec/` |
 | `comment_storage_reply_codec` | `fuzz_targets/comment_storage_reply_codec.rs` | `corpus/comment_storage_reply_codec/` |
 | `keynote_chart_title` | `fuzz_targets/keynote_chart_title.rs` | `corpus/keynote_chart_title/` |

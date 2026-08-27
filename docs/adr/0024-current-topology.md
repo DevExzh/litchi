@@ -2886,3 +2886,48 @@ migration debts, the migration host, generated-schema and normal
 Prost/Buffa owners, and the IWA monolith deletion gate remain unchanged. No
 crate, dependency edge, manifest dependency, compatibility host, debt item,
 generated-schema owner, or monolith owner is retired by Wave100.
+
+## 2026-08-27 amendment: Wave101 current-topology Keynote slide-table bounded borrowed discovery (not a monolith-exit gate)
+
+The legacy `KeynoteEditor::slide_tables` listing path and the
+`add_slide_table` template lookup now share one private, bounded
+`KeynoteObjectCatalog` per operation. It retains compact object slots and
+message descriptors while borrowing archive payloads only inside bounded
+callbacks; listing reuses one decoded slide context rather than rebuilding a
+cloned package graph for each table.
+
+Strict TableInfo and borrowed table-model discovery projections admit table
+identity, name, and dimensions only after canonical/wire/duplicate/role checks.
+Canonical model type 6001 is authoritative; strict type-6000 legacy is
+considered only when no type-6001 model exists. Simultaneous 6000/6001
+candidates reject, malformed canonical input does not fall back, and
+TableInfo-shaped aliases fail closed. Catalog axes cover archive
+reads, objects, messages, payload/reference totals, retained descriptors, and
+semantic decodes. The separate projection has finite input/field/work/text/
+nesting limits. The catalog has no retained parsed payloads and is not a
+package-wide budget.
+
+This is a discovery/listing cut only. Full generated TableInfo/model values,
+geometry, appearance, storage, cells, formulas, tiles, comments, metadata,
+native mutation, and all existing `ObjectGraph` compatibility callers remain
+at their current owners. No public native-ID surface is removed or expanded,
+and no zero-copy, full generated-free Keynote, performance/RSS, or monolith
+exit claim is made. The focused evidence is codec 5/5, catalog 9/9,
+slide-table tests 30/30, and boundary tests 591/591; the focused Wave101 live
+audit returned no findings.
+An external public `KeynoteEditor` driver read the Wave99 source
+`/private/tmp/wave99-native-table-source.key` (499,854 bytes, SHA-256
+`e5ddda5583d4312f67501312f2681859e0969bc8c49cdcd8160f9b93fe4c21ef`) and the
+Wave100 source (500,128 bytes, SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`). Each
+read one slide and one 5-by-4 table named `Table 1`; fresh reopen parity was
+true and post-read bytes and hashes were unchanged. Computer Use also opened
+the Wave100 source in Keynote 14.4 without repair, recovery, or conversion UI
+and observed `Table 1` with 5 rows and 4 columns; the source bytes and hash
+remained exact afterward. No Keynote save, normalization, or mutation run is
+claimed, nor any performance/RSS result or public catalog statistics.
+
+The migration host, `litchi-iwa -> litchi-keynote`, all 13 ordered migration
+debts (including 014, 016, and 017), generated-schema/Prost/Buffa owners, and
+the IWA monolith remain unchanged. Wave101 retires no crate, edge, debt,
+manifest dependency, host adapter, or generated owner.
