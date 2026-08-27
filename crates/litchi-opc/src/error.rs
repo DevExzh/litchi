@@ -238,6 +238,15 @@ impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
         match err.kind() {
             soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
+            soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
+                if let Some(execution) = error
+                    .get_ref()
+                    .and_then(|source| source.downcast_ref::<ExecutionIoError>())
+                {
+                    return execution_to_opc_error(execution.0.clone());
+                }
+                Self::ZipError(err.to_string())
+            },
             soapberry_zip::ErrorKind::LimitExceeded {
                 resource,
                 actual,
@@ -272,6 +281,50 @@ impl From<quick_xml::events::attributes::AttrError> for OpcError {
 }
 
 pub type Result<T> = std::result::Result<T, OpcError>;
+
+#[derive(Debug)]
+pub(crate) struct ExecutionIoError(pub(crate) litchi_core::ExecutionError);
+
+impl std::fmt::Display for ExecutionIoError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, formatter)
+    }
+}
+
+impl std::error::Error for ExecutionIoError {}
+
+pub(crate) fn execution_io_error(error: litchi_core::ExecutionError) -> std::io::Error {
+    std::io::Error::other(ExecutionIoError(error))
+}
+
+pub(crate) fn map_io_error(error: std::io::Error) -> OpcError {
+    if let Some(execution) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<ExecutionIoError>())
+    {
+        return execution_to_opc_error(execution.0.clone());
+    }
+    if error
+        .get_ref()
+        .is_some_and(|source| source.is::<soapberry_zip::Error>())
+    {
+        let source = error
+            .into_inner()
+            .expect("a checked ZIP I/O error must retain its source");
+        let error = source
+            .downcast::<soapberry_zip::Error>()
+            .expect("the checked I/O error source must remain a ZIP error");
+        return OpcError::from(*error);
+    }
+    OpcError::IoError(error)
+}
+
+fn execution_to_opc_error(error: litchi_core::ExecutionError) -> OpcError {
+    match error {
+        litchi_core::ExecutionError::Cancelled => OpcError::Cancelled,
+        error => OpcError::Execution(error),
+    }
+}
 
 // `From<OpcError> for litchi_core::Error` lives here (not in the umbrella)
 // so the orphan rule is satisfied — both source and target crates are
@@ -337,7 +390,7 @@ impl From<OpcError> for litchi_core::Error {
 
 #[cfg(test)]
 mod tests {
-    use super::OpcError;
+    use super::{OpcError, execution_io_error};
 
     #[test]
     fn publication_capability_errors_retain_typed_core_classification() {
@@ -365,5 +418,13 @@ mod tests {
             }),
             litchi_core::Error::Other(message) if message.contains("accounting overflow")
         ));
+    }
+
+    #[test]
+    fn execution_io_errors_survive_zip_error_conversion() {
+        let error = soapberry_zip::Error::from(soapberry_zip::ErrorKind::IO(execution_io_error(
+            litchi_core::ExecutionError::Cancelled,
+        )));
+        assert!(matches!(OpcError::from(error), OpcError::Cancelled));
     }
 }

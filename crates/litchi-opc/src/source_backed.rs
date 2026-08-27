@@ -875,20 +875,11 @@ impl ZipReaderAt for SourceReader {
             output,
             "archive",
         );
-        result.map_err(|error| {
-            let execution = match &error {
-                OpcError::Cancelled => Some(ExecutionError::Cancelled),
-                OpcError::Execution(execution) => Some(execution.clone()),
-                _ => None,
-            };
-            if let Some(execution) = execution {
-                record_source_execution_failure(&self.snapshot, execution);
-            }
-            match error {
-                OpcError::IoError(error) => error,
-                OpcError::Execution(error) => execution_io_error(error),
-                error => std::io::Error::other(error.to_string()),
-            }
+        result.map_err(|error| match error {
+            OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
+            OpcError::Execution(error) => execution_io_error(error),
+            OpcError::IoError(error) => error,
+            error => std::io::Error::other(error.to_string()),
         })
     }
 }
@@ -901,7 +892,6 @@ struct SourceSnapshot {
     monitor_reads: Arc<AtomicBool>,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
-    execution_failure: Option<Arc<Mutex<Option<ExecutionError>>>>,
     input_reservation_failures: Option<Arc<DiagnosticCounter>>,
     output_reservation_failures: Option<Arc<DiagnosticCounter>>,
 }
@@ -1415,6 +1405,220 @@ impl PartView<'_> {
     ) -> Result<PartData> {
         self.package
             .read_part_with_accounting(self.index, Some(accounting))
+    }
+
+    /// Streams this part's decoded payload into `sink` without materializing or caching it.
+    ///
+    /// This bypasses the part cache, including warm entries and single-flight
+    /// loaders. The sink is not flushed or rolled back. On success, the
+    /// returned value is the exact number of decoded bytes accepted by the
+    /// sink. If a failure occurs after a prefix was accepted, the error is
+    /// [`OpcError::IncompleteOutput`]. Source-version changes, cancellation,
+    /// declared part limits, archive verification failures, and sink failures
+    /// are reported through the existing typed [`OpcError`] variants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source, execution context, archive validation, or sink fails.
+    pub fn stream_to<W: Write>(&self, sink: &mut W) -> Result<u64> {
+        self.package.stream_part_to(self.index, sink, None)
+    }
+
+    /// Streams this part's decoded payload and merges physical ZIP accounting into `accounting`.
+    ///
+    /// This bypasses the part cache, including warm entries and single-flight
+    /// loaders. The sink is not flushed or rolled back. On success, the
+    /// returned value is the exact number of decoded bytes accepted by the
+    /// sink. If a failure occurs after a prefix was accepted, the error is
+    /// [`OpcError::IncompleteOutput`]. Source-version changes, cancellation,
+    /// declared part limits, archive verification failures, and sink failures
+    /// are reported through the existing typed [`OpcError`] variants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source, execution context, archive validation, or sink fails.
+    pub fn stream_to_with_accounting<W: Write>(
+        &self,
+        sink: &mut W,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<u64> {
+        self.package
+            .stream_part_to(self.index, sink, Some(accounting))
+    }
+}
+
+impl SourceBackedPackage {
+    fn stream_part_to<W: Write>(
+        &self,
+        index: usize,
+        sink: &mut W,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<u64> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+
+        let part = self.parts.get(index).ok_or_else(|| {
+            OpcError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid source-backed part view",
+            ))
+        })?;
+        let declared_bytes = self
+            .archive
+            .metadata_for(part.entry_id)?
+            .uncompressed_size();
+
+        let limit_result = self.limits.check(
+            ReadResource::PartBytes,
+            declared_bytes,
+            self.limits.max_part_bytes(),
+        );
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        limit_result?;
+
+        if let Some(context) = self.source.context.as_ref() {
+            let work_result = context.consume(Resource::Work, declared_bytes);
+            self.source.ensure_current()?;
+            work_result.map_err(map_execution_error)?;
+        }
+
+        self.source.monitor_publication();
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let mut output = PartStreamSink::new(sink, &self.source);
+        let read_result = self.archive.read_entry_to_with_accounting(
+            part.entry_id,
+            &mut output,
+            &mut zip_accounting,
+        );
+        let accepted = output.accepted;
+        let pending_failure = output.pending_failure.take();
+        drop(output);
+
+        let source_error = self.source.ensure_current().err();
+        let execution_error = self.cache.check_context().err().map(map_execution_error);
+        let operation_error = read_result.err().map(Into::into);
+        let accounting_error = accounting.map(|value| {
+            let mut error = value.merge_zip(&zip_accounting).err();
+            if let Err(output_error) = value.add_output_bytes_accepted(accepted)
+                && error.is_none()
+            {
+                error = Some(output_error);
+            }
+            error
+        });
+        let accounting_error = accounting_error.flatten();
+        let error = source_error
+            .or(pending_failure)
+            .or(execution_error)
+            .or(operation_error)
+            .or(accounting_error);
+
+        match error {
+            Some(error) if accepted != 0 => Err(OpcError::IncompleteOutput {
+                written: accepted,
+                source: Box::new(error),
+            }),
+            Some(error) => Err(error),
+            None => Ok(accepted),
+        }
+    }
+}
+
+struct PartStreamSink<'a, W: Write> {
+    inner: &'a mut W,
+    source: &'a SourceSnapshot,
+    pending_failure: Option<OpcError>,
+    accepted: u64,
+}
+
+impl<'a, W: Write> PartStreamSink<'a, W> {
+    fn new(inner: &'a mut W, source: &'a SourceSnapshot) -> Self {
+        Self {
+            inner,
+            source,
+            pending_failure: None,
+            accepted: 0,
+        }
+    }
+
+    fn check_context(&self) -> std::io::Result<()> {
+        let Some(context) = self.source.context.as_ref() else {
+            return Ok(());
+        };
+        if let Err(error) = context.check() {
+            return Err(execution_io_error(error));
+        }
+        Ok(())
+    }
+}
+
+impl<W: Write> Write for PartStreamSink<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if let Some(error) = self.pending_failure.as_ref() {
+            return Err(std::io::Error::other(error.to_string()));
+        }
+        self.source.ensure_current_io_if_monitored()?;
+        self.check_context()?;
+
+        let reservation = self
+            .source
+            .context
+            .as_ref()
+            .map(|context| {
+                context
+                    .reserve(Resource::OutputBytes, bytes.len() as u64)
+                    .map_err(execution_io_error)
+            })
+            .transpose()?;
+
+        let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sink reported more bytes than supplied",
+            ));
+        }
+        let written_u64 = written as u64;
+        self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "part stream byte count overflow",
+            )
+        })?;
+        if let Some(reservation) = reservation {
+            if !reservation.commit(written_u64) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "part stream output reservation over-committed",
+                ));
+            }
+        }
+        if let Err(error) = self.source.ensure_current() {
+            self.pending_failure = Some(error);
+            return Ok(written);
+        }
+        if let Some(context) = self.source.context.as_ref()
+            && let Err(error) = context.check()
+        {
+            self.pending_failure = Some(map_execution_error(error));
+            return Ok(written);
+        }
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if let Some(error) = self.pending_failure.as_ref() {
+            return Err(std::io::Error::other(error.to_string()));
+        }
+        self.source.ensure_current_io_if_monitored()?;
+        self.check_context()?;
+        let result = self.inner.flush();
+        if result.is_ok() {
+            self.check_context()?;
+            self.source.ensure_current_io_if_monitored()?;
+        }
+        result
     }
 }
 
@@ -2181,7 +2385,6 @@ impl SourceBackedPackage {
             monitor_reads: Arc::new(AtomicBool::new(false)),
             lineage: SourceLineage(Arc::new(())),
             context: None,
-            execution_failure: None,
             input_reservation_failures: None,
             output_reservation_failures: None,
         };
@@ -2368,9 +2571,6 @@ impl SourceBackedPackage {
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
-        let execution_failure = context
-            .as_ref()
-            .map(|_| Arc::new(Mutex::new(None::<ExecutionError>)));
         let diagnostics = Arc::new(DiagnosticState::default());
         let input_reservation_failures = context
             .as_ref()
@@ -2391,7 +2591,6 @@ impl SourceBackedPackage {
             monitor_reads: Arc::new(AtomicBool::new(false)),
             lineage: SourceLineage(Arc::new(())),
             context: context.clone(),
-            execution_failure: execution_failure.clone(),
             input_reservation_failures: input_reservation_failures.clone(),
             output_reservation_failures: output_reservation_failures.clone(),
         };
@@ -2407,12 +2606,7 @@ impl SourceBackedPackage {
             limits.zip_limits(),
         ) {
             Ok(archive) => archive,
-            Err(error) => {
-                if let Some(execution) = take_source_execution_failure(&snapshot) {
-                    return Err(map_execution_error(execution));
-                }
-                return Err(error.into());
-            },
+            Err(error) => return Err(map_preservation_error(error)),
         };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
@@ -2446,12 +2640,7 @@ impl SourceBackedPackage {
             content_types_member,
         } = match PackageReader::source_catalog(&archive, limits) {
             Ok(catalog) => catalog,
-            Err(error) => {
-                if let Some(execution) = take_source_execution_failure(&snapshot) {
-                    return Err(map_execution_error(execution));
-                }
-                return Err(error);
-            },
+            Err(error) => return Err(map_source_backed_error(error)),
         };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
@@ -3188,13 +3377,10 @@ impl SourceBackedPackage {
             )?;
             validate_overlay_xml(relationship_uri.as_str(), &xml)?;
             if let Some(entry_id) = existing_entry {
-                let original = self.archive.read_entry(entry_id).map_err(|error| {
-                    if let Some(execution) = take_source_execution_failure(&self.source) {
-                        map_execution_error(execution)
-                    } else {
-                        OpcError::from(error)
-                    }
-                })?;
+                let original = self
+                    .archive
+                    .read_entry(entry_id)
+                    .map_err(map_preservation_error)?;
                 self.source.ensure_current()?;
                 let canonical = if owner.as_str() == PACKAGE_URI {
                     self.package_relationships.to_xml()
@@ -3777,12 +3963,7 @@ impl SourceBackedPackage {
         let original_part = self.read_part(target)?;
         let original_relationships = match self.archive.read_entry(relationship_entry) {
             Ok(bytes) => bytes,
-            Err(error) => {
-                if let Some(execution) = take_source_execution_failure(&self.source) {
-                    return Err(map_execution_error(execution));
-                }
-                return Err(error.into());
-            },
+            Err(error) => return Err(map_preservation_error(error)),
         };
         self.source.ensure_current()?;
         if self.has_signature_infrastructure() {
@@ -3978,12 +4159,7 @@ impl SourceBackedPackage {
         for (target, relationship_entry, _, relationship_xml) in &relationship_overlays {
             let original_relationships = match self.archive.read_entry(*relationship_entry) {
                 Ok(bytes) => bytes,
-                Err(error) => {
-                    if let Some(execution) = take_source_execution_failure(&self.source) {
-                        return Err(map_execution_error(execution));
-                    }
-                    return Err(error.into());
-                },
+                Err(error) => return Err(map_preservation_error(error)),
             };
             self.source.ensure_current()?;
             let relationship_uri = self.parts[*target]
@@ -4501,13 +4677,10 @@ impl SourceBackedPackage {
                     .archive
                     .entry_id(name)
                     .ok_or_else(|| OpcError::PartNotFound(name.to_string()))?;
-                let xml = self.archive.read_entry(entry).map_err(|error| {
-                    if let Some(execution) = take_source_execution_failure(&self.source) {
-                        map_execution_error(execution)
-                    } else {
-                        OpcError::from(error)
-                    }
-                })?;
+                let xml = self
+                    .archive
+                    .read_entry(entry)
+                    .map_err(map_preservation_error)?;
                 self.source.ensure_current()?;
                 let events = relationship_xml_event_count(&xml, self.limits)?;
                 relationship_event_total = checked_overlay_total(
@@ -4796,13 +4969,10 @@ impl SourceBackedPackage {
             self.limits.max_content_types_bytes() as u64,
         )?;
         let memory_reservation = self.reserve_topology_memory(declared_bytes)?;
-        let bytes = self.archive.read_entry(entry).map_err(|error| {
-            if let Some(execution) = take_source_execution_failure(&self.source) {
-                map_execution_error(execution)
-            } else {
-                OpcError::from(error)
-            }
-        })?;
+        let bytes = self
+            .archive
+            .read_entry(entry)
+            .map_err(map_preservation_error)?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         self.limits.check(
@@ -4966,11 +5136,12 @@ impl SourceBackedPackage {
         let index = match self.archive.preservation_index(&mut scratch) {
             Ok(index) => index,
             Err(error) => {
-                if let Some(execution) = take_source_execution_failure(&self.source) {
-                    return Err(map_execution_error(execution));
+                let mapped = map_preservation_error(error);
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(mapped);
                 }
                 self.source.ensure_current()?;
-                return Err(overlay_unavailable(error.to_string()));
+                return Err(overlay_unavailable(mapped.to_string()));
             },
         };
         self.source.ensure_current()?;
@@ -5190,8 +5361,14 @@ impl SourceBackedPackage {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take()
             .map_or(result, |error| Err(map_execution_error(error)));
-        let result = take_source_execution_failure(&self.source)
-            .map_or(result, |error| Err(map_execution_error(error)));
+        let result = match (
+            result,
+            self.cache.check_context().map_err(map_execution_error),
+        ) {
+            (Err(error), _) => Err(error),
+            (Ok(()), Err(error)) => Err(error),
+            (Ok(()), Ok(())) => Ok(()),
+        };
         let merge_result = accounting.map_or(Ok(()), |report| report.merge_zip(&zip_accounting));
         // Merge the operation-local ZIP report before the final source
         // decision. `finish_source_publication` must remain authoritative for
@@ -5300,12 +5477,7 @@ impl SourceBackedPackage {
                 None => self.archive.read_entry(part.entry_id),
             } {
                 Ok(bytes) => bytes,
-                Err(error) => {
-                    if let Some(execution) = take_source_execution_failure(&self.source) {
-                        return Err(map_execution_error(execution));
-                    }
-                    return Err(error.into());
-                },
+                Err(error) => return Err(map_preservation_error(error)),
             };
             // The decompressor has finished and no payload has been
             // published yet. Cancellation here discards the cold result.
@@ -5813,7 +5985,7 @@ fn overlay_unavailable(reason: impl Into<String>) -> OpcError {
 fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
     match error.into_kind() {
         soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-            OpcError::IoError(error)
+            map_io_error(error)
         },
         kind => OpcError::ZipError(kind.to_string()),
     }
@@ -5837,22 +6009,7 @@ fn map_execution_error(error: ExecutionError) -> OpcError {
 }
 
 fn execution_io_error(error: ExecutionError) -> std::io::Error {
-    std::io::Error::other(error.to_string())
-}
-
-fn record_execution_failure(failure: &Arc<Mutex<Option<ExecutionError>>>, error: ExecutionError) {
-    let mut slot = failure
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if slot.is_none() {
-        *slot = Some(error);
-    }
-}
-
-fn record_source_execution_failure(snapshot: &SourceSnapshot, error: ExecutionError) {
-    if let Some(failure) = snapshot.execution_failure.as_ref() {
-        record_execution_failure(failure, error);
-    }
+    crate::error::execution_io_error(error)
 }
 
 fn record_input_reservation_failure(snapshot: &SourceSnapshot) {
@@ -5861,13 +6018,15 @@ fn record_input_reservation_failure(snapshot: &SourceSnapshot) {
     }
 }
 
-fn take_source_execution_failure(snapshot: &SourceSnapshot) -> Option<ExecutionError> {
-    snapshot.execution_failure.as_ref().and_then(|failure| {
-        failure
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-    })
+fn map_io_error(error: std::io::Error) -> OpcError {
+    crate::error::map_io_error(error)
+}
+
+fn map_source_backed_error(error: OpcError) -> OpcError {
+    match error {
+        OpcError::IoError(error) => map_io_error(error),
+        error => error,
+    }
 }
 
 fn finish_source_publication(
@@ -6126,8 +6285,6 @@ fn write_exact_snapshot_with_accounting<W: Write>(
             Ok(())
         })()
     };
-    let result = take_source_execution_failure(source)
-        .map_or(result, |error| Err(map_execution_error(error)));
     let result = finish_source_publication(result, source, written);
     match result {
         Err(error) => Err(error),
@@ -6201,10 +6358,7 @@ fn read_source_at_with_context(
         }
     }
     if let Some(context) = context {
-        context.check().map_err(|error| {
-            record_source_execution_failure(snapshot, error.clone());
-            map_execution_error(error)
-        })?;
+        context.check().map_err(map_execution_error)?;
     }
     snapshot
         .ensure_current_io_if_monitored()
@@ -10862,5 +11016,35 @@ mod tests {
         assert_eq!(sink.calls, 1);
         assert_eq!(sink.accepted, 0);
         assert_eq!(budget.used(Resource::OutputBytes), 0);
+    }
+}
+
+#[cfg(test)]
+mod selected_part_stream_api_tests {
+    use super::{
+        ExecutionError, OpcError, OpcOperationAccounting, PartView, execution_io_error,
+        map_io_error,
+    };
+
+    #[test]
+    fn selected_part_stream_api_is_sink_oriented() {
+        let _ = PartView::stream_to::<Vec<u8>>;
+        let _ = PartView::stream_to_with_accounting::<Vec<u8>>;
+        let _ = OpcOperationAccounting::default();
+    }
+
+    #[test]
+    fn execution_io_error_round_trips_through_source_mapping() {
+        assert!(matches!(
+            map_io_error(execution_io_error(ExecutionError::Cancelled)),
+            OpcError::Cancelled
+        ));
+    }
+
+    #[test]
+    fn output_accounting_overflow_is_deferred_until_finalization() {
+        let mut accounting = OpcOperationAccounting::default();
+        assert!(accounting.add_output_bytes_accepted(u64::MAX).is_ok());
+        assert!(accounting.add_output_bytes_accepted(1).is_err());
     }
 }
