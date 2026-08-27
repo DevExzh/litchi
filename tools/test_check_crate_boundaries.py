@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import re
 import tempfile
 import unittest
 from dataclasses import replace
@@ -2179,6 +2180,135 @@ def add_pages_table_sort_canonical_scaffold(root: Path) -> None:
         boundaries.PAGES_TABLE_SORT_FUZZ_CORPUS,
     ):
         (root / corpus).mkdir(parents=True, exist_ok=True)
+
+
+def add_pages_table_appearance_canonical_scaffold(
+    root: Path,
+    *,
+    include_codec: bool = True,
+    include_fuzz: bool = True,
+    include_tests: bool = True,
+) -> None:
+    """Install a complete synthetic Wave104 body-table appearance owner."""
+
+    semantic = root / boundaries.PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub use crate::package::body_table_appearance::{\n"
+        "        BodyTableAppearanceCommit as Commit,\n"
+        "        BodyTableAppearanceDiagnostics as Diagnostics,\n"
+        "        BodyTableAppearanceEdit as Edit,\n"
+        "        BodyTableAppearanceError as Error,\n"
+        "        BodyTableAppearanceLimitKind as LimitKind,\n"
+        "        BodyTableAppearancePatch as Patch,\n"
+        "        BodyTableAppearancePath as Path,\n"
+        "    };\n"
+        "}\n"
+        "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, "
+        "GridlineVisibility, Gridlines, RowSizing};\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.PAGES_TABLE_APPEARANCE_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct BodyTableSelector<'a> { name: &'a str }\n"
+        "impl<'a> BodyTableSelector<'a> { pub fn name(name: &'a str) -> Self { Self { name } } }\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    marker_functions = "".join(
+        f"fn marker_{index}() {{ {' '.join(markers)} }}\n"
+        for index, markers in enumerate(
+            boundaries.PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS.values()
+        )
+    )
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_TABLE_APPEARANCE_CANONICAL_TYPES
+        )
+        + marker_functions
+        + "fn preserve_previews() { let deleted_previews = 0; let root_preview_deletions = (); }\n"
+        + "impl Package {\n"
+        + "    pub fn body_table_appearance<'table>(&self, table: impl Into<BodyTableSelector<'table>>) -> Result<Appearance, BodyTableAppearanceError> { let _ = table; todo!() }\n"
+        + "    pub fn edit_body_table_appearance<'table>(&self, table: impl Into<BodyTableSelector<'table>>) -> Result<BodyTableAppearanceEdit, BodyTableAppearanceError> { let _ = table; todo!() }\n"
+        + "    pub fn apply_body_table_appearance(&self, patch: &BodyTableAppearancePatch) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl BodyTableAppearanceEdit {\n"
+        + "    pub fn set(self, appearance: Appearance) -> Self { let _ = appearance; self }\n"
+        + "    pub fn commit(self) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib = root / boundaries.PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[0]
+    package = root / boundaries.PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+    table = root / boundaries.PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[2]
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text(
+        "pub mod table;\n"
+        "pub use selector::BodyTableSelector;\n"
+        "pub use package::{"
+        + ", ".join(boundaries.PAGES_TABLE_APPEARANCE_CANONICAL_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod body_table_appearance;\n"
+        "pub use body_table_appearance::{"
+        + ", ".join(boundaries.PAGES_TABLE_APPEARANCE_CANONICAL_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+    table.write_text("pub mod appearance;\n", encoding="utf-8")
+    if include_codec:
+        codec = root / boundaries.PAGES_TABLE_APPEARANCE_CODEC_SOURCE
+        codec.parent.mkdir(parents=True, exist_ok=True)
+        api_lines = []
+        for api in boundaries.PAGES_TABLE_APPEARANCE_CODEC_REQUIRED_APIS:
+            if api == "PreparedTableModelStyleRewrite":
+                api_lines.append("pub type PreparedTableModelStyleRewrite<'a> = PreparedRewrite<'a>;\n")
+            elif api.startswith("decode_") or api.startswith("prepare_") or api.startswith("canonical_") or api.startswith("append_") or api.startswith("resolve_"):
+                api_lines.append(f"pub fn {api}() {{}}\n")
+            else:
+                api_lines.append(f"pub struct {api};\n")
+        codec.write_text(
+            "".join(api_lines)
+            + "fn scan_group_fields() {} fn find_group_end() {} fn copy_from_slice() {}\n"
+            + "fn max_input_bytes() {} fn max_output_bytes() {} fn max_fields() {}\n"
+            + "fn max_work_bytes() {} fn max_allocations() {}\n"
+            + "fn execution_requirements() {} fn execute() {}\n"
+            + "#[cfg(test)] mod tests { #[test] fn strict_appearance_roundtrip() {} }\n",
+            encoding="utf-8",
+        )
+        codec_lib = root / boundaries.PAGES_TABLE_APPEARANCE_CODEC_PUBLIC_SOURCE
+        codec_lib.parent.mkdir(parents=True, exist_ok=True)
+        codec_lib.write_text(
+            "#[doc(hidden)]\n"
+            "pub mod table_appearance_codec;\n",
+            encoding="utf-8",
+        )
+    if include_tests:
+        integration = root / boundaries.PAGES_TABLE_APPEARANCE_TEST_SOURCES[0]
+        integration.parent.mkdir(parents=True, exist_ok=True)
+        integration.write_text(
+            "#[test]\n"
+            "fn exercises_owner() { body_table_appearance(); edit_body_table_appearance(); apply_body_table_appearance(); }\n",
+            encoding="utf-8",
+        )
+    if include_fuzz:
+        for fuzz_path in boundaries.PAGES_TABLE_APPEARANCE_FUZZ_SOURCES:
+            path = root / fuzz_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+                "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+                encoding="utf-8",
+            )
+        for corpus in boundaries.PAGES_TABLE_APPEARANCE_FUZZ_CORPORA:
+            (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
 def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
@@ -18749,6 +18879,296 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn("+ audit_iwa_pages_table_sort_source_topology()", main_source)
         self.assertIn("+ audit_pages_table_sort_facade_source_topology()", main_source)
+
+    def test_pages_table_appearance_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_APPEARANCE_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_APPEARANCE_METHODS,
+            ("body_table_appearance", "set_body_table_appearance"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE,
+            Path("crates/litchi-pages/src/package/body_table_appearance.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_APPEARANCE_PACKAGE_METHODS,
+            (
+                "body_table_appearance",
+                "edit_body_table_appearance",
+                "apply_body_table_appearance",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_APPEARANCE_CODEC_SOURCE,
+            Path("crates/litchi-iwa-protos/src/table_appearance_codec.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_APPEARANCE_TEST_SOURCES,
+            (Path("crates/litchi-pages/tests/body_table_appearance.rs"),),
+        )
+
+    def test_pages_table_appearance_boundary_is_dormant_until_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_pages_table_appearance_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_pages_table_appearance_resource_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_appearance_source_topology(root),
+                [],
+            )
+            # A package declaration without its owner must not activate the
+            # ratchet while a concurrent owner is still being assembled.
+            package = root / boundaries.PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod body_table_appearance;\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_pages_table_appearance_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_pages_table_appearance_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_TABLE_APPEARANCE_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_appearance_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(
+                            f"pub struct {missing};\n", "", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+                    self.assertTrue(
+                        any(
+                            f"missing canonical type {missing}:" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+        for missing in boundaries.PAGES_TABLE_APPEARANCE_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_appearance_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+                    source = owner.read_text(encoding="utf-8")
+                    source = re.sub(
+                        rf"\s+pub fn {re.escape(missing)}\b[^{{]*\{{[^}}]*\}}",
+                        "",
+                        source,
+                        count=1,
+                    )
+                    owner.write_text(source, encoding="utf-8")
+                    violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+                    self.assertTrue(
+                        any(
+                            f"Package method is missing {missing}:" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_focused_pages_table_appearance_requires_semantics_selector_modules_codec_and_fuzz(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
+            semantic.write_text("pub mod other;\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_TABLE_APPEARANCE_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            table = root / boundaries.PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[2]
+            table.write_text("pub mod other;\n", encoding="utf-8")
+            codec = root / boundaries.PAGES_TABLE_APPEARANCE_CODEC_SOURCE
+            codec.unlink()
+            integration = root / boundaries.PAGES_TABLE_APPEARANCE_TEST_SOURCES[0]
+            integration.unlink()
+            fuzz = root / boundaries.PAGES_TABLE_APPEARANCE_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            (root / boundaries.PAGES_TABLE_APPEARANCE_FUZZ_CORPORA[0]).rmdir()
+            violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+            for name in boundaries.PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"semantic API is missing {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing table::appearance::transaction" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical table::appearance module" in item for item in violations), violations)
+            self.assertTrue(any("missing strict hidden codec source" in item for item in violations), violations)
+            self.assertTrue(any("missing integration test" in item for item in violations), violations)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+            self.assertTrue(any("missing fuzz corpus" in item for item in violations), violations)
+
+    def test_focused_pages_table_appearance_rejects_leaks_aliases_and_masks_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableAppearanceEdit = Edit;\n"
+                + "pub fn raw_appearance(model_id: u64, source_bytes: &[u8], wire: WireView, archive: Archive, generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n"
+                + "// pub fn decoy(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub fn decoy(model_id: u64, bytes: &[u8])";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn test_only(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+            for fragment in (
+                "flat alias TableAppearanceEdit",
+                "raw parameter model_id: u64",
+                "raw byte slice &[u8]",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), (fragment, violations))
+            self.assertFalse(any("decoy" in item or "test_only" in item for item in violations), violations)
+
+    def test_focused_pages_table_appearance_resource_markers_and_scope_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS[
+                "metadata ownership"
+            ]:
+                source = source.replace(marker, "missing_marker")
+            source = source.replace("deleted_previews = 0", "deleted_previews = 1")
+            source += (
+                "fn move_rows() {}\n"
+                "fn rewrite_formula() {}\n"
+                "fn delete_previews() {}\n"
+                "fn rewrite_table_model_style() {}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_pages_table_appearance_resource_source_topology(root)
+            self.assertTrue(any("metadata ownership" in item for item in violations), violations)
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+            self.assertTrue(any("row/cell movement" in item for item in violations), violations)
+            self.assertTrue(any("formula/tile mutation" in item for item in violations), violations)
+            self.assertTrue(any("preview deletion" in item for item in violations), violations)
+            self.assertTrue(any("one-shot style rewrite" in item for item in violations), violations)
+
+    def test_iwa_pages_table_appearance_host_retirement_catches_storage_and_masks_scopes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/appearance.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use crate::table_appearance::table_appearance;\n"
+                "pub fn body_table_appearance(&self) {}\n"
+                "pub fn set_body_table_appearance(&self) {}\n",
+                encoding="utf-8",
+            )
+            storage = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/storage.rs"
+            storage.write_text(
+                "fn read() { crate::table_appearance::table_appearance(editor.package(), model_id); }\n"
+                "// crate::table_appearance::table_appearance(editor.package(), model_id);\n"
+                'const DOC: &str = "crate::table_appearance::table_appearance(editor.package(), model_id)";\n'
+                "#[cfg(test)] fn test_only() { crate::table_appearance::table_appearance(editor.package(), model_id); }\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tests.rs"
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "fn test_only() { editor.body_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_PAGES_TABLE_APPEARANCE_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "mixed_iwork.rs").write_text(
+                "fn pages_branch() { pages.set_body_table_appearance(); }\n"
+                "fn numbers_branch() { numbers.set_body_table_appearance(); }\n"
+                "fn keynote_branch() { keynote.set_table_appearance(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_appearance_source_topology(root)
+            self.assertTrue(any("method body_table_appearance" in item for item in violations), violations)
+            self.assertTrue(any("method set_body_table_appearance" in item for item in violations), violations)
+            self.assertTrue(any("storage.rs" in item and "call table_appearance" in item for item in violations), violations)
+            self.assertTrue(any("mixed_iwork.rs" in item for item in violations), violations)
+            self.assertFalse(any("tests.rs" in item for item in violations), violations)
+            self.assertFalse(any("numbers_branch" in item or "keynote_branch" in item for item in violations), violations)
+            self.assertFalse(any("DOC" in item or "test_only" in item for item in violations), violations)
+
+    def test_iwa_pages_table_appearance_allows_only_proven_focused_package_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            storage = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/storage.rs"
+            storage.parent.mkdir(parents=True, exist_ok=True)
+            storage.write_text(
+                "use litchi_pages::Package as PagesPackage;\n"
+                "fn focused_bound_alias() {\n"
+                "    let pages_package = PagesPackage::from_bytes(bytes).unwrap();\n"
+                "    pages_package.body_table_appearance(selector).unwrap();\n"
+                "}\n"
+                "fn focused_explicit_type() {\n"
+                "    let package: litchi_pages::Package = make_package();\n"
+                "    package.body_table_appearance(selector).unwrap();\n"
+                "}\n"
+                "fn raw_untyped_alias() {\n"
+                "    let pages_package = editor.package();\n"
+                "    pages_package.body_table_appearance(selector).unwrap();\n"
+                "}\n"
+                "fn raw_editor() { editor.body_table_appearance(model_id); }\n"
+                "fn raw_helper() {\n"
+                "    crate::table_appearance::table_appearance(editor.package(), model_id);\n"
+                "}\n"
+                "fn legacy_table_appearance_compatibility_read() {\n"
+                "    crate::table_appearance::table_appearance(editor.package(), model_id);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            examples = root / boundaries.IWA_PAGES_TABLE_APPEARANCE_EXAMPLE_ROOT
+            examples.mkdir(parents=True, exist_ok=True)
+            (examples / "create_iwork_table_appearance.rs").write_text(
+                "use litchi_pages::Package as PagesPackage;\n"
+                "fn pages_focused() {\n"
+                "    let pages_package = PagesPackage::from_bytes(bytes).unwrap();\n"
+                "    pages_package.body_table_appearance(selector).unwrap();\n"
+                "}\n"
+                "fn pages_raw() { pages.body_table_appearance(model_id); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_table_appearance_source_topology(root)
+            call_violations = [
+                item for item in violations if "table-appearance" in item
+            ]
+            self.assertEqual(len(call_violations), 4, violations)
+            self.assertTrue(any(item.endswith(":12") for item in call_violations), violations)
+            self.assertTrue(any(item.endswith(":14") for item in call_violations), violations)
+            self.assertTrue(any(item.endswith(":16") for item in call_violations), violations)
+            self.assertTrue(
+                any("create_iwork_table_appearance.rs:6" in item for item in call_violations),
+                violations,
+            )
+
+    def test_focused_pages_table_appearance_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_iwa_pages_table_appearance_source_topology()",
+            "+ audit_pages_table_appearance_facade_source_topology()",
+            "+ audit_pages_table_appearance_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
 
     def test_pages_header_footer_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

@@ -94,6 +94,10 @@ const MAX_DEFAULT_RECURSION: u32 = 64;
 const MAX_REGISTRY_FACTS: usize = 1_024;
 
 /// Finite limits for one source decode or prepared rewrite.
+///
+/// The retained and scratch ceilings are logical operation-accounting axes.
+/// Borrowed decode snapshots report zero retained bytes; owned variation and
+/// prepared rewrite outputs report their conservative candidate envelopes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecodeOptions {
     max_input_bytes: usize,
@@ -103,6 +107,8 @@ pub struct DecodeOptions {
     recursion_limit: u32,
     max_styles: usize,
     max_allocations: usize,
+    max_retained_bytes: usize,
+    max_scratch_bytes: usize,
 }
 
 impl DecodeOptions {
@@ -124,6 +130,8 @@ impl DecodeOptions {
             recursion_limit,
             max_styles,
             max_allocations: 64,
+            max_retained_bytes: usize::MAX,
+            max_scratch_bytes: usize::MAX,
         }
     }
 
@@ -183,6 +191,20 @@ impl DecodeOptions {
         self
     }
 
+    /// Replace the logical retained-candidate ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_retained_bytes(mut self, value: usize) -> Self {
+        self.max_retained_bytes = value;
+        self
+    }
+
+    /// Replace the logical scratch-byte ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_scratch_bytes(mut self, value: usize) -> Self {
+        self.max_scratch_bytes = value;
+        self
+    }
+
     #[must_use]
     pub const fn max_input_bytes(self) -> usize {
         self.max_input_bytes
@@ -217,6 +239,18 @@ impl DecodeOptions {
     pub const fn max_allocations(self) -> usize {
         self.max_allocations
     }
+
+    /// Return the logical retained-candidate ceiling used by rewrites.
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.max_retained_bytes
+    }
+
+    /// Return the logical scratch-byte ceiling used by rewrites.
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.max_scratch_bytes
+    }
 }
 
 /// Alias retained for package callers that use rewrite-specific terminology.
@@ -240,6 +274,11 @@ pub enum DecodeLimit {
     Styles { observed: usize, maximum: usize },
     /// Output allocation count exceeded the configured ceiling.
     Allocations { observed: usize, maximum: usize },
+    /// Candidate/source bytes retained by a prepared rewrite exceeded its
+    /// configured logical ceiling.
+    RetainedBytes { observed: usize, maximum: usize },
+    /// Temporary rewrite scratch exceeded its configured logical ceiling.
+    ScratchBytes { observed: usize, maximum: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -334,6 +373,14 @@ impl fmt::Display for DecodeError {
                 formatter,
                 "table appearance requested {observed} allocations; maximum is {maximum}"
             ),
+            ErrorKind::Limit(DecodeLimit::RetainedBytes { observed, maximum }) => write!(
+                formatter,
+                "table appearance retains {observed} bytes; maximum is {maximum}"
+            ),
+            ErrorKind::Limit(DecodeLimit::ScratchBytes { observed, maximum }) => write!(
+                formatter,
+                "table appearance requires {observed} scratch bytes; maximum is {maximum}"
+            ),
             ErrorKind::Allocation { requested } => {
                 write!(
                     formatter,
@@ -355,6 +402,8 @@ pub struct DecodeReport {
     work_bytes: usize,
     max_depth: u32,
     allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
 }
 
 impl DecodeReport {
@@ -387,9 +436,24 @@ impl DecodeReport {
     pub const fn allocations(self) -> usize {
         self.allocations
     }
+
+    /// Logical bytes retained by an owned rewrite result.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Logical temporary bytes required by a rewrite.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
 }
 
 /// Limits used by a prepared plan's output phase.
+///
+/// Retained and scratch limits are kept separate from output bytes so package
+/// owners can replay one aggregate transaction budget across codec stages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RewriteExecutionLimits {
     pub max_input_bytes: usize,
@@ -398,6 +462,8 @@ pub struct RewriteExecutionLimits {
     pub max_work_bytes: usize,
     pub max_depth: u32,
     pub max_allocations: usize,
+    pub max_retained_bytes: usize,
+    pub max_scratch_bytes: usize,
 }
 
 impl RewriteExecutionLimits {
@@ -417,6 +483,8 @@ impl RewriteExecutionLimits {
             max_work_bytes,
             max_depth,
             max_allocations,
+            max_retained_bytes: usize::MAX,
+            max_scratch_bytes: usize::MAX,
         }
     }
 
@@ -430,6 +498,20 @@ impl RewriteExecutionLimits {
             report.max_depth,
             report.allocations,
         )
+        .with_retained_bytes(report.retained_bytes)
+        .with_scratch_bytes(report.scratch_bytes)
+    }
+
+    #[must_use]
+    pub const fn with_retained_bytes(mut self, value: usize) -> Self {
+        self.max_retained_bytes = value;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_scratch_bytes(mut self, value: usize) -> Self {
+        self.max_scratch_bytes = value;
+        self
     }
 }
 
@@ -443,6 +525,8 @@ pub struct RewriteExecutionRequirements {
     work_bytes: usize,
     max_depth: u32,
     allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
 }
 
 impl RewriteExecutionRequirements {
@@ -470,6 +554,18 @@ impl RewriteExecutionRequirements {
     pub const fn allocations(self) -> usize {
         self.allocations
     }
+
+    /// Logical bytes retained by the executed candidate.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Logical temporary bytes required during execution and readback.
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
     #[must_use]
     pub const fn exact_limits(self) -> RewriteExecutionLimits {
         RewriteExecutionLimits::new(
@@ -480,6 +576,8 @@ impl RewriteExecutionRequirements {
             self.max_depth,
             self.allocations,
         )
+        .with_retained_bytes(self.retained_bytes)
+        .with_scratch_bytes(self.scratch_bytes)
     }
 }
 
@@ -823,6 +921,8 @@ impl<'source> PreparedRewrite<'source> {
             work_bytes: self.requirements.work_bytes,
             max_depth: self.requirements.max_depth.max(candidate_depth),
             allocations: self.requirements.allocations,
+            retained_bytes: self.requirements.retained_bytes,
+            scratch_bytes: self.requirements.scratch_bytes,
         };
         Ok((output, report))
     }
@@ -914,6 +1014,11 @@ pub fn prepare_table_model_style_rewrite<'source>(
         // is deliberately conservative; callers can lower the ceiling and
         // receive a typed allocation-limit failure before execute allocates.
         allocations: 16,
+        retained_bytes: output_bytes,
+        scratch_bytes: source
+            .len()
+            .checked_add(output_bytes)
+            .ok_or_else(|| DecodeError::invalid("scratch overflow"))?,
     };
     validate_requirements_against_options(requirements, options)?;
     Ok(PreparedRewrite {
@@ -1167,6 +1272,18 @@ pub fn canonical_table_style_variation(
             maximum: options.max_allocations,
         }));
     }
+    if output_len > options.max_retained_bytes {
+        return Err(DecodeError::limit(DecodeLimit::RetainedBytes {
+            observed: output_len,
+            maximum: options.max_retained_bytes,
+        }));
+    }
+    if output_len > options.max_scratch_bytes {
+        return Err(DecodeError::limit(DecodeLimit::ScratchBytes {
+            observed: output_len,
+            maximum: options.max_scratch_bytes,
+        }));
+    }
     let properties = canonical_properties_fallible(write.overrides)?;
     let style_super = {
         let mut bytes = Vec::new();
@@ -1200,6 +1317,8 @@ pub fn canonical_table_style_variation(
         work_bytes: work,
         max_depth: 3,
         allocations: 16,
+        retained_bytes: output_len,
+        scratch_bytes: output_len,
         ..Default::default()
     };
     Ok(TableStyleVariationPayload { bytes, report })
@@ -1312,6 +1431,11 @@ pub fn prepare_stylesheet_append<'source>(
             .saturating_add(parent_edge_len),
         max_depth: report.max_depth().max(3),
         allocations: 24,
+        retained_bytes: output_bytes,
+        scratch_bytes: source
+            .len()
+            .checked_add(output_bytes)
+            .ok_or_else(|| DecodeError::invalid("scratch overflow"))?,
     };
     validate_requirements_against_options(requirements, options)?;
     Ok(PreparedRewrite {
@@ -1393,6 +1517,18 @@ fn validate_requirements_against_options(
             maximum: options.max_allocations,
         }));
     }
+    if req.retained_bytes > options.max_retained_bytes {
+        return Err(DecodeError::limit(DecodeLimit::RetainedBytes {
+            observed: req.retained_bytes,
+            maximum: options.max_retained_bytes,
+        }));
+    }
+    if req.scratch_bytes > options.max_scratch_bytes {
+        return Err(DecodeError::limit(DecodeLimit::ScratchBytes {
+            observed: req.scratch_bytes,
+            maximum: options.max_scratch_bytes,
+        }));
+    }
     Ok(())
 }
 
@@ -1410,7 +1546,9 @@ fn validate_requirements(
             limits.max_depth,
             usize::MAX,
         )
-        .with_max_allocations(limits.max_allocations),
+        .with_max_allocations(limits.max_allocations)
+        .with_max_retained_bytes(limits.max_retained_bytes)
+        .with_max_scratch_bytes(limits.max_scratch_bytes),
     )
 }
 
@@ -1433,6 +1571,8 @@ impl Scan {
             work_bytes: self.work_bytes,
             max_depth: self.max_depth,
             allocations: 0,
+            retained_bytes: 0,
+            scratch_bytes: 0,
         }
     }
     fn nested_reference_bytes(self, new_len: usize) -> usize {
@@ -2363,6 +2503,8 @@ impl Budget {
             work_bytes: self.work,
             max_depth: self.max_depth,
             allocations: 0,
+            retained_bytes: 0,
+            scratch_bytes: 0,
         }
     }
 }
@@ -3262,6 +3404,20 @@ mod tests {
             prepared.execute(limits).unwrap_err().resource_limit(),
             Some(DecodeLimit::Allocations { .. })
         ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_retained_bytes = requirements.retained_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::RetainedBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_scratch_bytes = requirements.scratch_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::ScratchBytes { .. })
+        ));
     }
 
     #[test]
@@ -3276,6 +3432,8 @@ mod tests {
         assert_eq!(report.output_bytes(), candidate.len());
         assert_eq!(report.fields(), requirements.fields());
         assert_eq!(report.work_bytes(), requirements.work_bytes());
+        assert_eq!(report.retained_bytes(), requirements.retained_bytes());
+        assert_eq!(report.scratch_bytes(), requirements.scratch_bytes());
         assert!(
             candidate
                 .windows(5)
@@ -3453,6 +3611,8 @@ mod tests {
         assert!(report.work_bytes() > 0);
         assert!(report.max_depth() > 0);
         assert!(report.allocations() > 0);
+        assert_eq!(report.retained_bytes(), report.output_bytes());
+        assert_eq!(report.scratch_bytes(), report.output_bytes());
 
         let decoded = decode_table_style_with_report(payload.bytes(), options(payload.bytes()))
             .unwrap()
@@ -3469,7 +3629,9 @@ mod tests {
             .with_max_fields(report.fields())
             .with_max_work_bytes(report.work_bytes())
             .with_recursion_limit(report.max_depth())
-            .with_max_allocations(report.allocations());
+            .with_max_allocations(report.allocations())
+            .with_max_retained_bytes(report.retained_bytes())
+            .with_max_scratch_bytes(report.scratch_bytes());
         assert!(canonical_table_style_variation(write, exact_options).is_ok());
 
         let mut limited = base_options;
@@ -3516,6 +3678,24 @@ mod tests {
                 .resource_limit(),
             Some(DecodeLimit::Allocations { .. })
         ));
+
+        let mut limited = base_options;
+        limited.max_retained_bytes = report.retained_bytes() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::RetainedBytes { .. })
+        ));
+
+        let mut limited = base_options;
+        limited.max_scratch_bytes = report.scratch_bytes() - 1;
+        assert!(matches!(
+            canonical_table_style_variation(write, limited)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::ScratchBytes { .. })
+        ));
     }
 
     #[test]
@@ -3559,6 +3739,7 @@ mod tests {
         let prepared = prepare_stylesheet_append(&source, append, options(&source)).unwrap();
         let requirements = prepared.execution_requirements();
         let (candidate, _) = prepared.execute(requirements.exact_limits()).unwrap();
+        assert_eq!(candidate.len(), requirements.retained_bytes());
         assert_eq!(
             decode_stylesheet(&candidate, options(&candidate))
                 .unwrap()
@@ -3610,6 +3791,20 @@ mod tests {
         assert!(matches!(
             prepared.execute(limits).unwrap_err().resource_limit(),
             Some(DecodeLimit::Allocations { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_retained_bytes = requirements.retained_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::RetainedBytes { .. })
+        ));
+
+        let mut limits = requirements.exact_limits();
+        limits.max_scratch_bytes = requirements.scratch_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits).unwrap_err().resource_limit(),
+            Some(DecodeLimit::ScratchBytes { .. })
         ));
 
         assert!(

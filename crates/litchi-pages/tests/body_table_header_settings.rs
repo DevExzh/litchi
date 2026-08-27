@@ -47,7 +47,7 @@ impl ExactBytes for Package {
     }
 }
 
-fn reference(identifier: u64) -> tsp::Reference {
+pub(crate) fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
         ..tsp::Reference::default()
@@ -60,7 +60,7 @@ fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
     field
 }
 
-fn object(
+pub(crate) fn object(
     identifier: u64,
     type_: u32,
     data: Vec<u8>,
@@ -110,7 +110,7 @@ fn table_model(name: &str, settings: Settings) -> Vec<u8> {
     payload
 }
 
-fn synthetic_package(names: [&str; 2], locked: Option<bool>) -> TestResult<Vec<u8>> {
+pub(crate) fn synthetic_package(names: [&str; 2], locked: Option<bool>) -> TestResult<Vec<u8>> {
     let root = tp::DocumentArchive {
         super_: tsa::DocumentArchive::default(),
         body_storage: Some(reference(BODY_IDENTIFIER)),
@@ -257,7 +257,7 @@ fn model_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
         .clone())
 }
 
-fn rewrite_document_archive(
+pub(crate) fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {

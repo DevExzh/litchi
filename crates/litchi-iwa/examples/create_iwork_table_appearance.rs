@@ -66,7 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .body_text("Created from scratch with litchi-iwa.\n")
         .body_table("Appearance", 6, 3)
         .build()?;
-    let pages_table = pages.tables()?.remove(0);
     set_focused_pages_table_headers(
         &mut pages,
         PagesHeaderSettings {
@@ -76,10 +75,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    pages.set_body_table_appearance(pages_table.model_object_id, APPEARANCE)?;
+    let pages_table = BodyTableSelector::index(0);
+    pages = set_focused_pages_table_appearance(pages, pages_table, APPEARANCE)?;
     pages.save(&pages_path)?;
+    let pages_package = PagesPackage::from_bytes(&PagesEditor::open(&pages_path)?.to_bytes()?)?;
     assert_eq!(
-        PagesEditor::open(&pages_path)?.body_table_appearance(pages_table.model_object_id)?,
+        pages_package.body_table_appearance(pages_table)?,
         APPEARANCE
     );
 
@@ -162,6 +163,21 @@ fn set_focused_pages_table_headers(
     commit.package().write_to(&mut bytes)?;
     *editor = PagesEditor::from_bytes(&bytes)?;
     Ok(())
+}
+
+fn set_focused_pages_table_appearance(
+    editor: PagesEditor,
+    selector: BodyTableSelector<'static>,
+    appearance: Appearance,
+) -> Result<PagesEditor, Box<dyn std::error::Error>> {
+    let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_body_table_appearance(selector)?
+        .set(appearance)
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    Ok(PagesEditor::from_bytes(&bytes)?)
 }
 
 fn set_focused_keynote_table_headers(

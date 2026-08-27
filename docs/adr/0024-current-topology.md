@@ -3035,3 +3035,45 @@ migration debts (especially 014, 015, and 017), generated/native
 compatibility owners, and the IWA monolith deletion gate remain unchanged.
 Wave103 retires no crate, edge, debt, manifest dependency, host adapter,
 generated owner, or monolith owner.
+
+## 2026-08-27 amendment: Wave104 current-topology Pages body-table appearance owner (not a monolith-exit gate)
+
+`litchi-pages` now owns selector-first body-table appearance reads and the
+supported exact-source package transaction through
+`Package::body_table_appearance`, `edit_body_table_appearance`, and
+`apply_body_table_appearance`. Callers use `BodyTableSelector` and the
+archive-free `table::appearance::Appearance`; native IDs, archives, ZIP/wire
+values, and generated models do not cross this boundary. The focused owner
+admits canonical model/style routes, resolves the tested preset/network/default
+read paths, allows exact no-ops on locked sources, and rejects unproven
+ArchiveInfo, opaque metadata, role, and global style-inbound facts before
+publication. Legacy Pages physical table/content ownership remains in
+`litchi-iwa`.
+
+The focused Package owner is strict for all of its reads and changed writes.
+Separately, `litchi-iwa` legacy table listing retains one private read-only
+appearance helper for compatibility; it does not attempt a focused Package
+read, perform mutation, or bypass a focused Package write failure. Raw
+`PagesEditor` mutation APIs remain retired, and the appearance example uses
+the focused Package owner.
+
+Wave104 verification is 21/21 for the focused Pages integration, 18/18 for
+the appearance codec, 614/614 for the full boundary suite, and clean
+`py_compile`; strict Pages and protos Clippy, the `litchi-iwa` library and
+appearance example checks, and the eight-seed Pages fuzz-target check passed.
+The HOST/FACADE/RESOURCE live audits returned no findings. These counts are
+scoped to the Wave104 boundary and do not imply full-workspace health.
+
+The native source `/private/tmp/wave104-pages-native-source.pages` (108,776
+bytes, SHA-256
+`997509fda639f5dcdabd4546c392b9ebdc3d8c7e9c1d967f35b9f2a0aca38359`, 43
+members) failed strict selector read with `InvalidSource` at
+`Table { table: 0 }`; it remained byte-exact and produced no candidate or
+inverse. No native Pages mutation, save, reopen, or UI acceptance claim is
+made. The operation budget is logical rather than Package-cache,
+decompressed-Archive, allocator, or RSS telemetry.
+
+The `litchi-iwa -> litchi-pages` edge, all 13 ordered migration debts
+(including 017), generated/Prost/Buffa owners, and the monolith deletion gate
+remain unchanged. Wave104 retires no crate, edge, debt, manifest dependency,
+host adapter, generated owner, or monolith owner.
