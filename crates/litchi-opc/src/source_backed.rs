@@ -5559,7 +5559,15 @@ impl SourceBackedPackage {
                 None => self.archive.read_entry(part.entry_id),
             } {
                 Ok(bytes) => bytes,
-                Err(error) => return Err(map_preservation_error(error)),
+                Err(error) => {
+                    // A failed archive read can race with source mutation or
+                    // cooperative cancellation. Apply the same post-read
+                    // fences used by successful cold loads before exposing
+                    // the lower-level archive error.
+                    self.source.ensure_current()?;
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    return Err(map_preservation_error(error));
+                },
             };
             // The decompressor has finished and no payload has been
             // published yet. Cancellation here discards the cold result.
@@ -9100,6 +9108,64 @@ mod tests {
         assert_eq!(budget.used(Resource::Work), DOCUMENT.len() as u64);
         assert!(budget.used(Resource::InputBytes) > 0);
         assert_eq!(diagnostics.budget_cache_reserved_objects, 0);
+    }
+
+    #[test]
+    fn source_change_takes_precedence_over_archive_failure_and_releases_flight() {
+        const DOCUMENT: &[u8] = b"source changes while a corrupt payload is read";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[payload_offset] ^= 0xff;
+        let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        source.armed.store(true, Ordering::SeqCst);
+
+        assert!(matches!(
+            package.main_document_part().unwrap().data(),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.failed_loads, 1);
+    }
+
+    #[test]
+    fn cancellation_takes_precedence_over_accounted_archive_failure_and_releases_flight() {
+        const DOCUMENT: &[u8] = b"cancellation races with a corrupt accounted payload";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[payload_offset] ^= 0xff;
+        let (budget, cancellation_source, context) =
+            managed_context_with_cancellation(DOCUMENT.len() as u64);
+        let source = Arc::new(CancelOnHitVersionSource::new(bytes, cancellation_source));
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        source.arm_after_cache_enter();
+        let mut accounting = OpcOperationAccounting::default();
+
+        assert!(matches!(
+            package
+                .main_document_part()
+                .unwrap()
+                .data_with_accounting(&mut accounting),
+            Err(OpcError::Cancelled)
+        ));
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.in_flight_loads, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+        assert_eq!(diagnostics.failed_loads, 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     #[test]
