@@ -18,6 +18,8 @@ use crate::pkgreader::{
     ValidationCatalogPhase, is_xml_id,
 };
 use crate::rel::{Relationships, TargetMode};
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
 use litchi_core::{
     ExecutionContext, ExecutionError, OwnedSource, ReadAt, Reservation, Resource, SourceVersion,
 };
@@ -29,6 +31,8 @@ use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
 use std::io::Write;
+#[cfg(any(unix, windows))]
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -2464,6 +2468,34 @@ impl SourceBackedPackage {
             cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
             catalog_object_reservation: None,
         })
+    }
+
+    /// Open a filesystem-backed OPC package without materializing ordinary
+    /// part payloads.
+    ///
+    /// The path is held through an immutable positional [`FileSource`]. ZIP
+    /// metadata, content types, and relationship manifests are validated at
+    /// open; ordinary payloads remain cold until a [`PartView::data`] request.
+    /// This avoids the eager [`OpcPackage`] input and all-Part payload
+    /// allocations, but does not claim a total RSS bound. [`OpcPackage`] stays
+    /// the explicit eager CRUD type.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_read_at(Arc::new(FileSource::open(path)?))
+    }
+
+    /// Open a filesystem-backed OPC package with explicit read limits without
+    /// materializing ordinary part payloads.
+    ///
+    /// The path is held through an immutable positional [`FileSource`]. The
+    /// supplied limits govern ZIP indexing, catalog admission, relationship
+    /// parsing, and later payload reads. Ordinary payloads remain cold until a
+    /// [`PartView::data`] request. This avoids the eager [`OpcPackage`] input
+    /// and all-Part payload allocations, but does not claim a total RSS bound.
+    /// [`OpcPackage`] stays the explicit eager CRUD type.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), limits)
     }
 
     /// Open a source-backed package with the standard bounded read policy.
