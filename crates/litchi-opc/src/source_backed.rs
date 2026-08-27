@@ -4745,7 +4745,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: Vec<(PackURI, Vec<u8>)>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(writer, replacements, Arc::new)
+        self.write_part_overlays_impl(writer, replacements, Vec::new(), Arc::new)
     }
 
     /// Replace a bounded set of existing ordinary Parts with caller-owned
@@ -4764,29 +4764,99 @@ impl SourceBackedPackage {
         writer: W,
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(writer, replacements, std::convert::identity)
+        self.write_part_overlays_impl(writer, replacements, Vec::new(), std::convert::identity)
+    }
+
+    /// Replace and physically delete bounded sets of existing ordinary Parts.
+    ///
+    /// This is an explicit low-level OPC publication operation. Deletion omits
+    /// the selected physical Part member without reading or decompressing its
+    /// payload. It does not implicitly edit `[Content_Types].xml`, remove
+    /// inbound relationships, or remove the deleted Part's relationships
+    /// member. Callers must include every required manifest and relationship
+    /// payload in `replacements`, or the resulting package graph may be
+    /// invalid. Format-owned editors should prefer a topology-aware operation
+    /// whenever one is available.
+    ///
+    /// The complete selection is bounded, duplicate and overlapping Part URIs
+    /// are refused, and every selected Part must exist. All validation,
+    /// signature checks, source-version checks, cancellation checks, and ZIP
+    /// preservation planning complete before the first output byte. Untouched
+    /// members retain their compressed payloads and physical metadata. An
+    /// empty plan copies the complete source artifact byte for byte; any real
+    /// deletion or replacement of a signed source is refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, limit, duplicate-Part, missing-Part, signature,
+    /// XML-publication, ZIP, or sink error. If a non-atomic sink accepts bytes
+    /// before failing, the error is [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlays_with_deletions_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+        deletions: Vec<PackURI>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, deletions, Arc::new)
+    }
+
+    /// Shared-payload counterpart to
+    /// [`Self::write_part_overlays_with_deletions_to_stream`].
+    ///
+    /// Replacement payloads are retained through [`Arc<Vec<u8>>`] without a
+    /// payload-byte copy. Physical deletion and all validation, preservation,
+    /// signature, source, cancellation, and sink semantics are identical.
+    pub fn write_part_overlays_with_deletions_shared_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+        deletions: Vec<PackURI>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, deletions, std::convert::identity)
     }
 
     fn write_part_overlays_impl<W: Write, P, F>(
         self,
         writer: W,
         mut replacements: Vec<(PackURI, P)>,
+        mut deletions: Vec<PackURI>,
         mut into_shared: F,
     ) -> Result<()>
     where
         F: FnMut(P) -> Arc<Vec<u8>>,
     {
-        if replacements.len() > MAX_SOURCE_OVERLAY_PARTS {
+        let selected = replacements
+            .len()
+            .checked_add(deletions.len())
+            .ok_or_else(|| overlay_unavailable("replacement and deletion count overflows usize"))?;
+        if selected > MAX_SOURCE_OVERLAY_PARTS {
             return Err(overlay_unavailable(format!(
-                "replacement set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
+                "replacement and deletion set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
             )));
         }
-        if replacements.is_empty() {
+        if replacements.is_empty() && deletions.is_empty() {
             return self.write_exact_source(writer);
         }
         replacements.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
-        if let Some(duplicate) = replacements.windows(2).find(|pair| pair[0].0 == pair[1].0) {
-            return Err(OpcError::DuplicatePartName(duplicate[0].0.to_string()));
+        for (index, (partname, _)) in replacements.iter().enumerate() {
+            if replacements[..index]
+                .iter()
+                .any(|(candidate, _)| candidate.is_equivalent_to(partname))
+            {
+                return Err(OpcError::DuplicatePartName(partname.to_string()));
+            }
+        }
+        deletions.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+        for (index, partname) in deletions.iter().enumerate() {
+            if deletions[..index]
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(partname))
+                || replacements
+                    .iter()
+                    .any(|(candidate, _)| candidate.is_equivalent_to(partname))
+            {
+                return Err(OpcError::DuplicatePartName(partname.to_string()));
+            }
         }
 
         let mut overlays = Vec::new();
@@ -4798,14 +4868,25 @@ impl SourceBackedPackage {
             })?;
         for (partname, replacement) in replacements {
             let target = self
-                .parts_by_name
-                .get(&partname)
-                .copied()
+                .part_index(&partname)
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
             overlays.push(PendingOverlay {
                 target,
                 replacement: into_shared(replacement),
             });
+        }
+        let mut omitted_members = Vec::new();
+        omitted_members
+            .try_reserve_exact(deletions.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC deletion plan",
+                source,
+            })?;
+        for partname in deletions {
+            let target = self
+                .part_index(&partname)
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            omitted_members.push(self.parts[target].partname.membername().to_string());
         }
         self.validate_overlay_limits(
             overlays
@@ -4828,7 +4909,7 @@ impl SourceBackedPackage {
                 changed.push((overlay, original));
             }
         }
-        if changed.is_empty() {
+        if changed.is_empty() && omitted_members.is_empty() {
             return self.write_exact_source(writer);
         }
         if self.has_signature_infrastructure() {
@@ -4857,7 +4938,7 @@ impl SourceBackedPackage {
                 replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
             });
         }
-        self.write_changed_overlays(writer, &replacements)
+        self.write_changed_overlays_with_omissions(writer, &replacements, &omitted_members)
     }
 
     fn validate_overlay_limits<I>(&self, overlays: I) -> Result<()>
@@ -5602,13 +5683,28 @@ impl SourceBackedPackage {
         self.write_changed_overlays_with_appended(writer, replacements, Vec::new())
     }
 
+    fn write_changed_overlays_with_omissions<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            Vec::new(),
+            None,
+        )
+    }
+
     fn write_changed_overlays_with_appended<W: Write>(
         self,
         writer: W,
         replacements: &[ChangedOverlay],
         appended: Vec<soapberry_zip::RegeneratedEntry>,
     ) -> Result<()> {
-        self.write_changed_overlays_with_appended_inner(writer, replacements, appended, None)
+        self.write_changed_overlays_with_appended_inner(writer, replacements, &[], appended, None)
     }
 
     fn write_changed_overlays_with_appended_accounting<W: Write>(
@@ -5621,6 +5717,7 @@ impl SourceBackedPackage {
         self.write_changed_overlays_with_appended_inner(
             writer,
             replacements,
+            &[],
             appended,
             Some(accounting),
         )
@@ -5630,6 +5727,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
         appended: Vec<soapberry_zip::RegeneratedEntry>,
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
@@ -5643,7 +5741,10 @@ impl SourceBackedPackage {
                 source,
             })?;
         scratch.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
-        let index = match self.archive.preservation_index(&mut scratch) {
+        let index = match self
+            .archive
+            .preservation_index_with_limits(&mut scratch, self.limits.zip_limits())
+        {
             Ok(index) => index,
             Err(error) => {
                 let mapped = map_preservation_error(error);
@@ -5692,6 +5793,39 @@ impl SourceBackedPackage {
                 source,
             })?;
         replacement_entry_counts.resize(replacement_lookup.len(), 0);
+        let mut omission_lookup: Vec<&[u8]> = Vec::new();
+        omission_lookup
+            .try_reserve_exact(omitted_member_names.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC omission lookup",
+                source,
+            })?;
+        for member_name in omitted_member_names {
+            omission_lookup.push(member_name.as_bytes());
+        }
+        omission_lookup.sort_unstable();
+        if omission_lookup.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(overlay_unavailable(
+                "multiple deletions resolve to one source member",
+            ));
+        }
+        if replacement_lookup.iter().any(|(replacement, _)| {
+            omission_lookup
+                .binary_search_by(|candidate| candidate.cmp(replacement))
+                .is_ok()
+        }) {
+            return Err(overlay_unavailable(
+                "one source member cannot be replaced and deleted",
+            ));
+        }
+        let mut omission_entry_counts: Vec<usize> = Vec::new();
+        omission_entry_counts
+            .try_reserve_exact(omission_lookup.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC omission entry counts",
+                source,
+            })?;
+        omission_entry_counts.resize(omission_lookup.len(), 0);
         for (entry_index, entry) in index.entries().iter().enumerate() {
             if entry_index & 0xff == 0 {
                 self.source.ensure_current()?;
@@ -5707,6 +5841,13 @@ impl SourceBackedPackage {
                         overlay_unavailable("replacement entry count overflows usize")
                     })?;
             }
+            if let Ok(omission_index) =
+                omission_lookup.binary_search_by(|candidate| candidate.cmp(&entry.raw_name_bytes()))
+            {
+                omission_entry_counts[omission_index] = omission_entry_counts[omission_index]
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("omission entry count overflows usize"))?;
+            }
         }
         let mut replacement_bytes = 0_u64;
         for (replacement_index, (_, replacement)) in replacement_lookup.iter().enumerate() {
@@ -5718,6 +5859,11 @@ impl SourceBackedPackage {
             replacement_bytes = replacement_bytes
                 .checked_add(replacement.replacement.len() as u64)
                 .ok_or_else(|| overlay_unavailable("replacement byte total overflows u64"))?;
+        }
+        if omission_entry_counts.iter().any(|count| *count != 1) {
+            return Err(overlay_unavailable(
+                "selected deletion does not have one canonical UTF-8 source member",
+            ));
         }
         let appended_bytes = (appended.len() as u64)
             .checked_mul(4096)
@@ -5768,6 +5914,11 @@ impl SourceBackedPackage {
                     id: entry.id(),
                     entry: regenerated.compression_method(compression),
                 });
+            } else if omission_lookup
+                .binary_search_by(|candidate| candidate.cmp(&entry.raw_name_bytes()))
+                .is_ok()
+            {
+                plan.push(soapberry_zip::PreservationAction::Omit(entry.id()));
             } else {
                 plan.push(soapberry_zip::PreservationAction::Copy(entry.id()));
             }
