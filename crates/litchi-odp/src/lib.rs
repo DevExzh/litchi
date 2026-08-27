@@ -19,7 +19,10 @@ pub mod package;
 
 pub use facade::settings as show;
 pub use facade::slide::{Shape, Slide};
-pub use facade::{Builder, FlatPresentation, MasterPage, Presentation, SourceBackedPresentation};
+pub use facade::{
+    Builder, FlatPresentation, MasterPage, Presentation, SlideCatalogEntry,
+    SourceBackedPresentation, SourceBackedPresentationCatalog,
+};
 pub use facade::{edit, embedded, image, layout, master, page, slide};
 pub use package::ReadLimits;
 
