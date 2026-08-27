@@ -50,6 +50,7 @@ on:
       - 'tools/perf_resource_profile.py'
       - 'tools/test_perf_resource_profile.py'
       - 'tools/test_perf_baseline_source_policy.py'
+      - 'tools/test_perf_workflow_policy.py'
       - 'tools/check_perf_claims.py'
       - 'tools/test_perf_claims.py'
       - 'tools/check_report_claim_classification.py'
@@ -115,6 +116,7 @@ on:
       - 'tools/perf_resource_profile.py'
       - 'tools/test_perf_resource_profile.py'
       - 'tools/test_perf_baseline_source_policy.py'
+      - 'tools/test_perf_workflow_policy.py'
       - 'tools/check_perf_claims.py'
       - 'tools/test_perf_claims.py'
       - 'tools/check_report_claim_classification.py'
@@ -150,6 +152,10 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "1"
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
   RUST_BACKTRACE: 1
   PERF_MANIFEST: tools/perf-baseline/Cargo.toml
   RUSTFLAGS: "-D warnings -D deprecated"
@@ -159,10 +165,32 @@ jobs:
     name: deterministic container smoke
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Capture runner diagnostics before build
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/before-build.txt"
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
@@ -170,7 +198,8 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: tools/perf-baseline -> tools/perf-baseline/target
+          workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
+          cache-target: false
 
       - name: Check standalone harness
         run: |
@@ -255,7 +284,8 @@ jobs:
             tools.test_perf_compare \
             tools.test_perf_abba_summary \
             tools.test_perf_abba_package \
-            tools.test_perf_resource_profile
+            tools.test_perf_resource_profile \
+            tools.test_perf_workflow_policy
 
       - name: Test benchmark source policy
         run: python3 -m unittest tools.test_perf_baseline_source_policy
@@ -1232,14 +1262,82 @@ jobs:
               assert "source" not in item
           PY
 
+      - name: Capture runner diagnostics after workload
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "cargo_target_size"
+            du -sh "$CARGO_TARGET_DIR" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/after-workload.txt"
+
+      - name: Upload performance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-diagnostics-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/litchi-perf-diagnostics/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Clean temporary Cargo target
+        if: always()
+        run: |
+          if [ -n "${CARGO_TARGET_DIR:-}" ] &&
+             [ -n "${RUNNER_TEMP:-}" ] &&
+             [ "$CARGO_TARGET_DIR" = "$RUNNER_TEMP/litchi-perf-target" ] &&
+             [ "$CARGO_TARGET_DIR" != "/" ] &&
+             [ -d "$CARGO_TARGET_DIR" ] &&
+             [ ! -L "$CARGO_TARGET_DIR" ]; then
+            find "$CARGO_TARGET_DIR" -xdev -depth -delete
+          else
+            echo "Refusing to clean unexpected Cargo target: ${CARGO_TARGET_DIR:-<unset>}" >&2
+            exit 1
+          fi
+
   full:
     name: release container matrix
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      CARGO_TARGET_DIR: ${{ runner.temp }}/litchi-perf-target
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Capture runner diagnostics before build
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/before-build.txt"
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
@@ -1247,7 +1345,8 @@ jobs:
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: tools/perf-baseline -> tools/perf-baseline/target
+          workspaces: tools/perf-baseline -> ${{ runner.temp }}/litchi-perf-target
+          cache-target: false
 
       - name: Check historical REPORT claim classification
         run: |
@@ -2218,6 +2317,7 @@ jobs:
           PY
 
       - name: Upload performance baseline JSON
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: container-performance-baseline-${{ github.run_id }}
@@ -2254,11 +2354,58 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Capture runner diagnostics after workload
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/litchi-perf-diagnostics"
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner_temp=$RUNNER_TEMP"
+            echo "cargo_target_dir=$CARGO_TARGET_DIR"
+            echo "disk"
+            df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            echo "workspace_size"
+            du -sh "$GITHUB_WORKSPACE" 2>/dev/null || true
+            echo "cargo_target_size"
+            du -sh "$CARGO_TARGET_DIR" 2>/dev/null || true
+            echo "memory"
+            free -h
+            echo "cpu_count"
+            nproc
+            echo "processes_by_rss"
+            ps -eo pid,ppid,%cpu,%mem,rss,comm --sort=-rss | head -n 30
+          } | tee "$RUNNER_TEMP/litchi-perf-diagnostics/after-workload.txt"
+
+      - name: Upload performance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-performance-diagnostics-full-${{ github.run_id }}
+          path: ${{ runner.temp }}/litchi-perf-diagnostics/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Clean temporary Cargo target
+        if: always()
+        run: |
+          if [ -n "${CARGO_TARGET_DIR:-}" ] &&
+             [ -n "${RUNNER_TEMP:-}" ] &&
+             [ "$CARGO_TARGET_DIR" = "$RUNNER_TEMP/litchi-perf-target" ] &&
+             [ "$CARGO_TARGET_DIR" != "/" ] &&
+             [ -d "$CARGO_TARGET_DIR" ] &&
+             [ ! -L "$CARGO_TARGET_DIR" ]; then
+            find "$CARGO_TARGET_DIR" -xdev -depth -delete
+          else
+            echo "Refusing to clean unexpected Cargo target: ${CARGO_TARGET_DIR:-<unset>}" >&2
+            exit 1
+          fi
+
   reference-regression:
     name: reference-gated hosted comparison
     if: github.event_name == 'workflow_dispatch' && inputs.reference_run_id != ''
     needs: full
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
