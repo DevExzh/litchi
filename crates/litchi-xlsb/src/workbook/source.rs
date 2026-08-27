@@ -17,7 +17,7 @@ use once_cell::sync::OnceCell;
 
 use super::model::Workbook;
 use crate::package::error::{Error, Result};
-use crate::package::formula::Context;
+use crate::package::formula::{Context, Definition};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::StylesTable;
 use crate::raw::{Records, kind};
@@ -32,6 +32,7 @@ const XLSB_MAX_ROW_INDEX: u32 = 1_048_575;
 const XLSB_MAX_COLUMN_INDEX: u32 = 16_383;
 const XLSB_SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 const XLSB_STYLES_CONTENT_TYPE: &str = "application/vnd.ms-excel.styles";
+const XLSB_TABLE_CONTENT_TYPE: &str = "application/vnd.ms-excel.table";
 const XLSB_COMMENTS_CONTENT_TYPE: &str = "application/vnd.ms-excel.comments";
 const XLSB_CHARTSHEET_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -63,10 +64,17 @@ struct SheetMetadata {
     kind: SheetKind,
 }
 
+#[derive(Debug)]
+struct TablePartMetadata {
+    catalog_position: usize,
+    partname: PackURI,
+}
+
 struct SourceInner {
     package: SourceBackedPackage,
     sheets: Vec<SheetMetadata>,
     worksheet_positions: Vec<usize>,
+    table_parts: Vec<TablePartMetadata>,
     active_catalog_position: Option<usize>,
     formula_context: Context,
     shared_strings_part: Option<PackURI>,
@@ -75,15 +83,17 @@ struct SourceInner {
     is_1904_date_system: bool,
     shared_strings: SemanticCache<Vec<SharedString>>,
     styles: SemanticCache<StylesTable>,
+    tables: SemanticCache<TableDefinitions>,
 }
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
 ///
 /// Opening reads OPC metadata and `workbook.bin`, but not ordinary worksheet,
-/// shared-string, or style payloads. The handle is immutable and source-bound.
-/// `SourceCacheLimits` bounds retained OPC payload bytes; successfully parsed
-/// shared-string and style values are retained separately and remain bounded by
-/// the configured per-Part read limits.
+/// shared-string, style, or table-definition payloads. The handle is immutable
+/// and source-bound.
+/// `SourceCacheLimits` bounds retained OPC payload bytes, and configured
+/// per-Part read limits apply to each source payload. Successfully parsed
+/// shared-string, style, and table-definition values are retained separately.
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
@@ -92,7 +102,8 @@ pub struct SourceBackedWorkbook {
 /// A source-bound handle for one sheet in an XLSB workbook.
 ///
 /// The handle contains only catalog metadata. Calling [`Self::materialize`]
-/// reads the selected BIFF12 worksheet body and its shared-string/style inputs;
+/// reads the selected BIFF12 worksheet body, its shared-string/style inputs,
+/// and all workbook table definitions needed for cross-sheet formula context;
 /// non-worksheet handles return a typed capability error.
 #[derive(Clone)]
 pub struct SourceBackedWorksheet {
@@ -217,6 +228,13 @@ impl SourceBackedWorkbook {
                 resource: "source-backed XLSB worksheet catalog",
                 source,
             })?;
+        let mut table_parts = Vec::new();
+        table_parts
+            .try_reserve_exact(info.worksheet_names.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB table relationship catalog",
+                source,
+            })?;
         let mut sheet_targets: Vec<PackURI> = Vec::new();
         sheet_targets
             .try_reserve_exact(info.worksheet_names.len())
@@ -264,15 +282,37 @@ impl SourceBackedWorkbook {
                 relationship_type::WORKSHEET | relationship_type::STRICT_WORKSHEET
             ) {
                 require_content_type(&sheet_part, XLSB_WORKSHEET_CONTENT_TYPE)?;
-                incomplete_formula_context |= sheet_part.rels().iter().any(|relationship| {
-                    matches!(
+                for relationship in sheet_part.rels().iter() {
+                    if matches!(
                         relationship.reltype(),
-                        relationship_type::TABLE
-                            | relationship_type::STRICT_TABLE
-                            | relationship_type::PIVOT_TABLE
-                            | relationship_type::STRICT_PIVOT_TABLE
-                    )
-                });
+                        relationship_type::TABLE | relationship_type::STRICT_TABLE
+                    ) {
+                        if relationship.is_external() {
+                            return Err(Error::InvalidRelationship(format!(
+                                "XLSB worksheet {name:?} has an external table relationship"
+                            )));
+                        }
+                        let table_partname = relationship.target_partname()?;
+                        let table_part = package.part(&table_partname)?;
+                        require_content_type(&table_part, XLSB_TABLE_CONTENT_TYPE)?;
+                        table_parts
+                            .try_reserve(1)
+                            .map_err(|source| Error::Allocation {
+                                resource: "source-backed XLSB table relationship catalog",
+                                source,
+                            })?;
+                        table_parts.push(TablePartMetadata {
+                            catalog_position: workbook_position,
+                            partname: table_partname,
+                        });
+                    }
+                    if matches!(
+                        relationship.reltype(),
+                        relationship_type::PIVOT_TABLE | relationship_type::STRICT_PIVOT_TABLE
+                    ) {
+                        incomplete_formula_context = true;
+                    }
+                }
                 SheetKind::Worksheet
             } else {
                 match relationship.reltype() {
@@ -341,6 +381,7 @@ impl SourceBackedWorkbook {
                 package,
                 sheets,
                 worksheet_positions,
+                table_parts,
                 active_catalog_position,
                 formula_context,
                 shared_strings_part,
@@ -349,6 +390,7 @@ impl SourceBackedWorkbook {
                 is_1904_date_system,
                 shared_strings: SemanticCache::new(),
                 styles: SemanticCache::new(),
+                tables: SemanticCache::new(),
             }),
         })
     }
@@ -661,9 +703,11 @@ impl SourceBackedWorksheet {
 
     /// Parse the selected worksheet BIFF12 stream without reading unselected sheets.
     ///
-    /// This first source-backed layer materializes stream-owned worksheet data.
-    /// Workbook adjunct owners such as drawings, PivotTables, slicers, and
-    /// timelines remain separately deferred rather than forcing eager loading.
+    /// This source-backed layer materializes stream-owned worksheet data and
+    /// all table definitions needed for cross-sheet structured references.
+    /// Other workbook adjunct owners such as drawings, external books,
+    /// PivotTables, slicers, and timelines remain separately deferred rather
+    /// than forcing eager loading.
     pub fn materialize(&self) -> Result<Worksheet> {
         self.inner.package.check_execution()?;
         self.inner.package.source_version()?;
@@ -675,10 +719,11 @@ impl SourceBackedWorksheet {
         }
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB worksheet materialization requires deferred external, table, or PivotTable formula owners"
+                "source-backed XLSB worksheet materialization requires deferred external or PivotTable formula owners"
                     .to_string(),
             ));
         }
+        let tables = self.inner.tables()?;
         let worksheet_part = self.inner.package.part(&metadata.partname)?;
         if worksheet_part.rels().iter().any(|relationship| {
             relationship.reltype().contains("/slicer")
@@ -708,11 +753,13 @@ impl SourceBackedWorksheet {
         }
         let shared_strings = self.inner.shared_strings()?;
         let styles = self.inner.styles()?;
+        let mut formula_context = self.inner.formula_context.clone();
+        formula_context.tables = Arc::clone(&tables);
         let mut worksheet = Workbook::read_worksheet(
             Cursor::new(worksheet_data.as_bytes()),
             metadata.name.clone(),
             shared_strings.as_slice(),
-            &self.inner.formula_context,
+            &formula_context,
             metadata.workbook_position,
             styles.cell_xfs.len(),
         )?;
@@ -739,6 +786,10 @@ impl SourceBackedWorksheet {
     fn metadata(&self) -> &SheetMetadata {
         &self.inner.sheets[self.catalog_position]
     }
+}
+
+struct TableDefinitions {
+    definitions: Arc<[Definition]>,
 }
 
 struct SemanticCache<T> {
@@ -812,6 +863,68 @@ impl SourceInner {
         self.package.check_execution()?;
         self.package.source_version()?;
         Ok(styles)
+    }
+
+    fn tables(&self) -> Result<Arc<[Definition]>> {
+        let _ = preflight_package(&self.package)?;
+        let tables = self.tables.get_or_try_init(|| {
+            let _ = preflight_package(&self.package)?;
+            let mut tables = Vec::new();
+            tables
+                .try_reserve_exact(self.table_parts.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "source-backed XLSB table definitions",
+                    source,
+                })?;
+            for table_part in &self.table_parts {
+                let _ = preflight_package(&self.package)?;
+                let part = self.package.part(&table_part.partname)?;
+                require_content_type(&part, XLSB_TABLE_CONTENT_TYPE)?;
+                let _ = preflight_package(&self.package)?;
+                let data = part.data()?;
+                postflight_package(&self.package)?;
+                let _ = preflight_package(&self.package)?;
+                let table =
+                    Workbook::parse_table_definition(data.as_bytes(), table_part.catalog_position);
+                postflight_package(&self.package)?;
+                let table = table?;
+                let duplicate_error = if tables
+                    .iter()
+                    .any(|existing: &Definition| existing.table_id() == table.table_id())
+                {
+                    Some(Error::InvalidFormula(format!(
+                        "duplicate workbook table ID {}",
+                        table.table_id()
+                    )))
+                } else if tables.iter().any(|existing: &Definition| {
+                    crate::package::formula::excel_name_eq(
+                        existing.display_name(),
+                        table.display_name(),
+                    )
+                }) {
+                    Some(Error::InvalidFormula(format!(
+                        "duplicate workbook table display name {:?}",
+                        table.display_name()
+                    )))
+                } else {
+                    None
+                };
+                postflight_package(&self.package)?;
+                if let Some(error) = duplicate_error {
+                    return Err(error);
+                }
+                tables.push(table);
+                postflight_package(&self.package)?;
+            }
+            let tables = TableDefinitions {
+                definitions: tables.into(),
+            };
+            let tables = Arc::new(tables);
+            postflight_package(&self.package)?;
+            Ok::<_, Error>(tables)
+        })?;
+        postflight_package(&self.package)?;
+        Ok(Arc::clone(&tables.definitions))
     }
 }
 
