@@ -691,29 +691,7 @@ impl Workbook {
                 Ok(out)
             },
             #[cfg(feature = "xlsb")]
-            WorkbookImpl::XlsbSource(xlsb) => {
-                xlsb.ensure_source_current()?;
-                let result = (|| {
-                    let mut out = String::new();
-                    for i in 0..WorkbookTrait::worksheet_count(xlsb) {
-                        let ws = WorkbookTrait::worksheet_by_index(xlsb, i)?;
-                        let mut rows = ws.rows();
-                        while let Some(row) = rows.next() {
-                            let row = row?;
-                            for (idx, cell) in row.iter().enumerate() {
-                                if idx > 0 {
-                                    out.push('\t');
-                                }
-                                append_cell_text(&mut out, cell);
-                            }
-                            out.push('\n');
-                        }
-                    }
-                    Ok(out)
-                })();
-                xlsb.ensure_source_current()?;
-                result
-            },
+            WorkbookImpl::XlsbSource(xlsb) => xlsb.text(),
 
             #[cfg(feature = "xls")]
             WorkbookImpl::XlsFile(xls) => {

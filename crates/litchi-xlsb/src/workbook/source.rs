@@ -1,9 +1,14 @@
 //! Deferred, source-backed XLSB worksheet catalog and materialization.
 
-use std::io::Cursor;
+use std::fmt;
+use std::io::{self, Cursor, Write};
 use std::sync::{Arc, Mutex};
 
-use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
+use litchi_core::sheet::{Cell as SheetCell, Worksheet as SheetWorksheet};
+use litchi_core::{
+    ExecutionContext, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
+    TextOutputOptions, TextOutputReport,
+};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{
     PackURI, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
@@ -22,6 +27,8 @@ const XLSB_CHARTSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.chartsheet"
 const XLSB_DIALOGSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.dialogsheet";
 const XLSB_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.macrosheet";
 const XLSB_INTL_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.intlmacrosheet";
+const XLSB_MAX_ROW_INDEX: u32 = 1_048_575;
+const XLSB_MAX_COLUMN_INDEX: u32 = 16_383;
 const XLSB_SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 const XLSB_STYLES_CONTENT_TYPE: &str = "application/vnd.ms-excel.styles";
 const XLSB_COMMENTS_CONTENT_TYPE: &str = "application/vnd.ms-excel.comments";
@@ -492,6 +499,83 @@ impl SourceBackedWorkbook {
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
         self.inner.package.cache_diagnostics()
     }
+
+    /// Stream ordinary worksheet rows to a caller-owned sequential sink.
+    ///
+    /// Rows are emitted as paragraph-like objects with tab-separated cells.
+    /// The shared output policy controls separators, empty rows, and output
+    /// limits. This method never appends a terminal separator and never falls
+    /// back to the eager workbook owner.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: TextOutputOptions<'_>,
+    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        let failure = Arc::new(Mutex::new(None));
+        let mut checked_output = SourceCheckedTextSink {
+            output,
+            owner: &self.inner,
+            failure: Arc::clone(&failure),
+        };
+        let mut writer = SequentialTextWriter::new(&mut checked_output, options);
+        let conversion = (|| {
+            check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
+            for catalog_position in 0..self.inner.sheets.len() {
+                check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
+                let sheet = SourceBackedWorksheet {
+                    inner: Arc::clone(&self.inner),
+                    catalog_position,
+                };
+                let worksheet = sheet
+                    .materialize()
+                    .map_err(|source| writer.document_error(source))?;
+                write_text_worksheet(&self.inner, &worksheet, &mut writer, options)?;
+                drop(worksheet);
+                check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
+            }
+            Ok::<(), TextOutputError<Error>>(())
+        })();
+
+        let progress = writer.progress();
+        if let Some(source) = take_source_text_failure(&failure) {
+            return Err(TextOutputError::Document { source, progress });
+        }
+        if let Err(source) = check_text_state(&self.inner) {
+            return Err(TextOutputError::Document { source, progress });
+        }
+        conversion.map(|()| writer.finish())
+    }
+
+    /// Extract ordinary worksheet text while retaining the legacy terminal
+    /// newline projection used by the facade.
+    pub fn text(&self) -> Result<String> {
+        let mut collector = FallibleTextCollector::default();
+        let report = match self.write_text_to(&mut collector, TextOutputOptions::default()) {
+            Ok(report) => report,
+            Err(error) => {
+                let allocation = collector.allocation.take();
+                return Err(map_text_output_error(error, allocation));
+            },
+        };
+        if report.objects_written() != 0 {
+            check_text_state(&self.inner)?;
+            if let Err(error) = collector.push_terminal_newline(
+                report.bytes_written(),
+                TextOutputOptions::default().max_output_bytes(),
+            ) {
+                return match check_text_state(&self.inner) {
+                    Ok(()) => Err(error),
+                    Err(source) => Err(source),
+                };
+            }
+            check_text_state(&self.inner)?;
+        }
+        check_text_state(&self.inner)?;
+        String::from_utf8(collector.take_bytes()).map_err(|error| {
+            drop(error);
+            Error::Encoding("XLSB text output was not valid UTF-8".to_string())
+        })
+    }
 }
 
 impl SourceBackedWorksheet {
@@ -594,10 +678,10 @@ impl SourceInner {
         self.package.check_execution()?;
         self.package.source_version()?;
         {
-            let retained = self.shared_strings.lock().map_err(|_error| {
-                Error::InvalidFormat(
-                    "source-backed XLSB shared-string cache is poisoned".to_string(),
-                )
+            let retained = self.shared_strings.lock().map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "source-backed XLSB shared-string cache is poisoned: {error}"
+                ))
             })?;
             if let Some(strings) = retained.as_ref() {
                 return Ok(Arc::clone(strings));
@@ -611,8 +695,10 @@ impl SourceInner {
         }
         self.package.source_version()?;
         let strings = Arc::new(strings);
-        let mut retained = self.shared_strings.lock().map_err(|_error| {
-            Error::InvalidFormat("source-backed XLSB shared-string cache is poisoned".to_string())
+        let mut retained = self.shared_strings.lock().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "source-backed XLSB shared-string cache is poisoned: {error}"
+            ))
         })?;
         Ok(Arc::clone(retained.get_or_insert(strings)))
     }
@@ -621,8 +707,10 @@ impl SourceInner {
         self.package.check_execution()?;
         self.package.source_version()?;
         {
-            let retained = self.styles.lock().map_err(|_error| {
-                Error::InvalidFormat("source-backed XLSB style cache is poisoned".to_string())
+            let retained = self.styles.lock().map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "source-backed XLSB style cache is poisoned: {error}"
+                ))
             })?;
             if let Some(styles) = retained.as_ref() {
                 return Ok(Arc::clone(styles));
@@ -636,10 +724,396 @@ impl SourceInner {
         };
         self.package.source_version()?;
         let styles = Arc::new(styles);
-        let mut retained = self.styles.lock().map_err(|_error| {
-            Error::InvalidFormat("source-backed XLSB style cache is poisoned".to_string())
+        let mut retained = self.styles.lock().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "source-backed XLSB style cache is poisoned: {error}"
+            ))
         })?;
         Ok(Arc::clone(retained.get_or_insert(styles)))
+    }
+}
+
+struct SourceCheckedTextSink<'owner, 'output, W: ?Sized> {
+    output: &'output mut W,
+    owner: &'owner SourceInner,
+    failure: Arc<Mutex<Option<Error>>>,
+}
+
+impl<'owner, 'output, W: Write + ?Sized> SourceCheckedTextSink<'owner, 'output, W> {
+    fn record_failure(&self, error: Error) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check(&self) -> io::Result<()> {
+        match check_text_state(self.owner) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let message = error.to_string();
+                self.record_failure(error);
+                Err(io::Error::other(message))
+            },
+        }
+    }
+}
+
+impl<W: Write + ?Sized> Write for SourceCheckedTextSink<'_, '_, W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.check()?;
+        let result = self.output.write(bytes);
+        let _ = self.check();
+        result
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.check()?;
+        let result = self.output.flush();
+        let _ = self.check();
+        result
+    }
+}
+
+fn take_source_text_failure(failure: &Arc<Mutex<Option<Error>>>) -> Option<Error> {
+    failure
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
+}
+
+#[derive(Default)]
+struct FallibleTextCollector {
+    bytes: Vec<u8>,
+    allocation: Option<Error>,
+}
+
+impl FallibleTextCollector {
+    fn push_terminal_newline(&mut self, current_bytes: u64, max_output_bytes: u64) -> Result<()> {
+        let required = current_bytes
+            .checked_add(1)
+            .ok_or(Error::CapacityOverflow {
+                resource: "XLSB text output",
+            })?;
+        if required > max_output_bytes {
+            return Err(Error::CapacityOverflow {
+                resource: "XLSB text output",
+            });
+        }
+        self.bytes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "XLSB text output",
+                source,
+            })?;
+        self.bytes.push(b'\n');
+        Ok(())
+    }
+
+    fn take_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for FallibleTextCollector {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if let Err(source) = self.bytes.try_reserve(bytes.len()) {
+            let error = Error::Allocation {
+                resource: "XLSB text output",
+                source,
+            };
+            let message = error.to_string();
+            self.allocation = Some(error);
+            return Err(io::Error::other(message));
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn check_text_state(inner: &SourceInner) -> Result<()> {
+    inner.package.check_execution()?;
+    inner.package.source_version()?;
+    Ok(())
+}
+
+fn map_text_output_error(error: TextOutputError<Error>, allocation: Option<Error>) -> Error {
+    match error {
+        TextOutputError::Document { source, .. } => source,
+        TextOutputError::Limit { .. } => Error::CapacityOverflow {
+            resource: "XLSB text output",
+        },
+        TextOutputError::Sink { source, .. } => allocation.unwrap_or(Error::Io(source)),
+        TextOutputError::NonDeterministicFragments { .. } => {
+            Error::InvalidFormat("XLSB text fragments were not deterministic".to_string())
+        },
+        _ => Error::InvalidFormat("unsupported XLSB text output error".to_string()),
+    }
+}
+
+fn worksheet_dimensions(worksheet: &Worksheet) -> Result<(usize, usize)> {
+    let (min_row, min_column, max_row, max_column) =
+        SheetWorksheet::dimensions(worksheet).unwrap_or((0, 0, 0, 0));
+    if min_row > max_row || min_column > max_column {
+        return Err(Error::InvalidFormat(
+            "XLSB worksheet dimensions are reversed".to_string(),
+        ));
+    }
+    if max_row > XLSB_MAX_ROW_INDEX {
+        return Err(Error::InvalidFormat(
+            "XLSB worksheet row dimension exceeds the BIFF12 bound".to_string(),
+        ));
+    }
+    if max_column > XLSB_MAX_COLUMN_INDEX {
+        return Err(Error::InvalidFormat(
+            "XLSB worksheet column dimension exceeds the BIFF12 bound".to_string(),
+        ));
+    }
+    let row_count = max_row.checked_add(1).ok_or(Error::CapacityOverflow {
+        resource: "XLSB text row count",
+    })?;
+    let column_count = max_column.checked_add(1).ok_or(Error::CapacityOverflow {
+        resource: "XLSB text column count",
+    })?;
+    let row_count = usize::try_from(row_count).map_err(|error| {
+        let _ = error;
+        Error::CapacityOverflow {
+            resource: "XLSB text row count",
+        }
+    })?;
+    let column_count = usize::try_from(column_count).map_err(|error| {
+        let _ = error;
+        Error::CapacityOverflow {
+            resource: "XLSB text column count",
+        }
+    })?;
+    Ok((row_count, column_count))
+}
+
+fn count_formatted_text<F>(render: &F) -> Result<usize>
+where
+    F: Fn(&mut dyn fmt::Write) -> fmt::Result,
+{
+    let mut counter = TextByteCounter { bytes: 0 };
+    render(&mut counter).map_err(|error| {
+        let _ = error;
+        Error::CapacityOverflow {
+            resource: "XLSB text row",
+        }
+    })?;
+    Ok(counter.bytes)
+}
+
+fn count_cell_text(value: &litchi_core::sheet::CellValue) -> Result<usize> {
+    use litchi_core::sheet::CellValue;
+
+    match value {
+        CellValue::Empty => Ok(0),
+        CellValue::Bool(value) => Ok(if *value { 4 } else { 5 }),
+        CellValue::Int(value) => {
+            count_formatted_text(&|writer| fmt::write(writer, format_args!("{value}")))
+        },
+        CellValue::Float(value) | CellValue::DateTime(value) => {
+            count_formatted_text(&|writer| fmt::write(writer, format_args!("{value}")))
+        },
+        CellValue::String(value) | CellValue::Error(value) => Ok(value.len()),
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(CellValue::Empty) | None => count_formatted_text(&|writer| {
+                fmt::Write::write_char(writer, '=')?;
+                fmt::Write::write_str(writer, formula)
+            }),
+            Some(value) => count_cell_text(value),
+        },
+    }
+}
+
+fn count_text_row(worksheet: &Worksheet, row: u32, column_count: usize) -> Result<usize> {
+    let mut bytes = 0_usize;
+    for column_index in 0..column_count {
+        if column_index != 0 {
+            bytes = bytes.checked_add(1).ok_or(Error::CapacityOverflow {
+                resource: "XLSB text row",
+            })?;
+        }
+        if let Some(cell) = worksheet.get_cell(
+            row,
+            u32::try_from(column_index).map_err(|error| {
+                let _ = error;
+                Error::CapacityOverflow {
+                    resource: "XLSB text column",
+                }
+            })?,
+        ) {
+            bytes = bytes
+                .checked_add(count_cell_text(SheetCell::value(cell))?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "XLSB text row",
+                })?;
+        }
+    }
+    Ok(bytes)
+}
+
+fn write_text_worksheet<W: Write + ?Sized>(
+    owner: &SourceInner,
+    worksheet: &Worksheet,
+    writer: &mut SequentialTextWriter<'_, '_, W>,
+    options: TextOutputOptions<'_>,
+) -> std::result::Result<(), TextOutputError<Error>> {
+    const MAX_LIMIT_PROBE_ROW_BYTES: usize = 1024 * 1024;
+
+    let (row_count, column_count) =
+        worksheet_dimensions(worksheet).map_err(|source| writer.document_error(source))?;
+    for row_index in 0..row_count {
+        check_text_state(owner).map_err(|source| writer.document_error(source))?;
+        let row = u32::try_from(row_index).map_err(|error| {
+            let _ = error;
+            writer.document_error(Error::CapacityOverflow {
+                resource: "XLSB text row",
+            })
+        })?;
+        let row_bytes = count_text_row(worksheet, row, column_count)
+            .map_err(|source| writer.document_error(source))?;
+        check_text_state(owner).map_err(|source| writer.document_error(source))?;
+        if row_bytes == 0 && !options.include_empty_objects() {
+            continue;
+        }
+        let progress = writer.progress();
+        let row_bytes_u64 = u64::try_from(row_bytes).map_err(|error| {
+            let _ = error;
+            writer.document_error(Error::CapacityOverflow {
+                resource: "XLSB text row",
+            })
+        })?;
+        let separator_bytes = if progress.objects_written() == 0 {
+            0
+        } else {
+            u64::try_from(options.paragraph_separator().len()).map_err(|error| {
+                let _ = error;
+                writer.document_error(Error::CapacityOverflow {
+                    resource: "XLSB text separator",
+                })
+            })?
+        };
+        let required = progress
+            .bytes_written()
+            .checked_add(separator_bytes)
+            .and_then(|bytes| bytes.checked_add(row_bytes_u64))
+            .ok_or_else(|| {
+                writer.document_error(Error::CapacityOverflow {
+                    resource: "XLSB text output",
+                })
+            })?;
+        if required > options.max_output_bytes() && row_bytes > MAX_LIMIT_PROBE_ROW_BYTES {
+            return Err(writer.document_error(Error::CapacityOverflow {
+                resource: "XLSB text row exceeds configured output capacity",
+            }));
+        }
+        let objects_required = progress.objects_written().checked_add(1).ok_or_else(|| {
+            writer.document_error(Error::CapacityOverflow {
+                resource: "XLSB text object count",
+            })
+        })?;
+        if objects_required > options.max_objects() && row_bytes > MAX_LIMIT_PROBE_ROW_BYTES {
+            return Err(writer.document_error(Error::CapacityOverflow {
+                resource: "XLSB text row exceeds configured object capacity",
+            }));
+        }
+        let mut value = String::new();
+        value.try_reserve(row_bytes).map_err(|source| {
+            writer.document_error(Error::Allocation {
+                resource: "XLSB text row",
+                source,
+            })
+        })?;
+        for column_index in 0..column_count {
+            if column_index != 0 {
+                value.push('\t');
+            }
+            let column = u32::try_from(column_index).map_err(|error| {
+                let _ = error;
+                writer.document_error(Error::CapacityOverflow {
+                    resource: "XLSB text row",
+                })
+            })?;
+            if let Some(cell) = worksheet.get_cell(row, column) {
+                append_cell_text(&mut value, SheetCell::value(cell))
+                    .map_err(|source| writer.document_error(source))?;
+            }
+        }
+        writer.write_object(TextObjectKind::Paragraph, &value)?;
+        check_text_state(owner).map_err(|source| writer.document_error(source))?;
+    }
+    Ok(())
+}
+
+struct TextByteCounter {
+    bytes: usize,
+}
+
+impl fmt::Write for TextByteCounter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        self.bytes = self.bytes.checked_add(value.len()).ok_or(fmt::Error)?;
+        Ok(())
+    }
+}
+
+fn append_counted_text<F>(output: &mut String, render: F) -> Result<()>
+where
+    F: Fn(&mut dyn fmt::Write) -> fmt::Result,
+{
+    let bytes = count_formatted_text(&render)?;
+    output
+        .try_reserve(bytes)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB text row",
+            source,
+        })?;
+    render(output).map_err(|error| {
+        let _ = error;
+        Error::InvalidFormat("XLSB text formatting failed".to_string())
+    })
+}
+
+fn append_cell_text(output: &mut String, value: &litchi_core::sheet::CellValue) -> Result<()> {
+    use litchi_core::sheet::CellValue;
+
+    match value {
+        CellValue::Empty => Ok(()),
+        CellValue::Bool(value) => append_counted_text(output, |writer| {
+            fmt::Write::write_str(writer, if *value { "TRUE" } else { "FALSE" })
+        }),
+        CellValue::Int(value) => {
+            append_counted_text(output, |writer| fmt::write(writer, format_args!("{value}")))
+        },
+        CellValue::Float(value) | CellValue::DateTime(value) => {
+            append_counted_text(output, |writer| fmt::write(writer, format_args!("{value}")))
+        },
+        CellValue::String(value) | CellValue::Error(value) => {
+            append_counted_text(output, |writer| fmt::Write::write_str(writer, value))
+        },
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(CellValue::Empty) | None => append_counted_text(output, |writer| {
+                fmt::Write::write_char(writer, '=')?;
+                fmt::Write::write_str(writer, formula)
+            }),
+            Some(value) => append_cell_text(output, value),
+        },
     }
 }
 
