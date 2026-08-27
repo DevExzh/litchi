@@ -615,7 +615,12 @@ impl<'a> SstCursor<'a> {
     }
 
     fn read_characters(&mut self, count: u16, mut high_byte: bool) -> Result<String> {
-        let mut characters = Vec::with_capacity(count as usize);
+        let mut characters = Vec::new();
+        characters
+            .try_reserve_exact(count as usize)
+            .map_err(|error| {
+                Error::InvalidData(format!("cannot allocate shared string characters: {error}"))
+            })?;
         while characters.len() < count as usize {
             let bytes_per_character = if high_byte { 2 } else { 1 };
             let available_characters = self.remaining() / bytes_per_character;
@@ -669,7 +674,12 @@ impl<'a> SstCursor<'a> {
         character_count: u16,
         string_index: usize,
     ) -> Result<Vec<SharedStringFormatRun>> {
-        let mut runs = Vec::with_capacity(count as usize);
+        let mut runs = Vec::new();
+        runs.try_reserve_exact(count as usize).map_err(|error| {
+            Error::InvalidData(format!(
+                "cannot allocate shared string formatting runs: {error}"
+            ))
+        })?;
         let mut previous = None;
         for _ in 0..count {
             let character_index = self.read_u16_continued("shared string formatting run")?;
@@ -806,6 +816,221 @@ fn parse_phonetic_string(
         runs,
         extra_data: data[required..].to_vec(),
     })
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SharedStringSstSegment {
+    pub(crate) source_offset: u64,
+    pub(crate) logical_offset: usize,
+    pub(crate) len: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SharedStringEntryLocation {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+}
+
+#[derive(Debug)]
+pub(crate) struct SharedStringSstScan {
+    pub(crate) segments: Vec<SharedStringSstSegment>,
+    pub(crate) entries: Vec<SharedStringEntryLocation>,
+}
+
+impl SharedStringSstScan {
+    pub(crate) fn empty() -> Self {
+        Self {
+            segments: Vec::new(),
+            entries: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum SharedStringScanError {
+    Biff(Error),
+    Invalid(String),
+    Allocation {
+        resource: &'static str,
+        requested: usize,
+    },
+}
+
+impl From<Error> for SharedStringScanError {
+    fn from(error: Error) -> Self {
+        Self::Biff(error)
+    }
+}
+
+impl<'a> SstCursor<'a> {
+    fn logical_position(&self) -> usize {
+        self.segments
+            .iter()
+            .take(self.segment_index)
+            .map(|segment| segment.len())
+            .sum::<usize>()
+            .saturating_add(self.offset)
+    }
+}
+
+fn parse_one_shared_string(
+    cursor: &mut SstCursor<'_>,
+    string_index: usize,
+) -> Result<String, SharedStringScanError> {
+    cursor
+        .ensure_current(3, "shared string header")
+        .map_err(SharedStringScanError::Biff)?;
+    let character_count = cursor
+        .read_u16_continued("shared string character count")
+        .map_err(SharedStringScanError::Biff)?;
+    let flags = cursor
+        .read_u8_continued("shared string flags")
+        .map_err(SharedStringScanError::Biff)?;
+    let run_count = if flags & 0x08 != 0 {
+        cursor
+            .ensure_current(2, "shared string rich-text count")
+            .map_err(SharedStringScanError::Biff)?;
+        cursor
+            .read_u16_continued("shared string rich-text count")
+            .map_err(SharedStringScanError::Biff)?
+    } else {
+        0
+    };
+    let extension_length = if flags & 0x04 != 0 {
+        cursor
+            .ensure_current(4, "shared string extension length")
+            .map_err(SharedStringScanError::Biff)?;
+        let length = cursor
+            .read_u32_continued("shared string extension length")
+            .map_err(SharedStringScanError::Biff)?;
+        if length > i32::MAX as u32 {
+            return Err(SharedStringScanError::Invalid(format!(
+                "shared string {string_index} has a negative extension length"
+            )));
+        }
+        length as usize
+    } else {
+        0
+    };
+
+    let value = cursor
+        .read_characters(character_count, flags & 0x01 != 0)
+        .map_err(SharedStringScanError::Biff)?;
+    cursor
+        .read_formatting_runs(run_count, character_count, string_index)
+        .map_err(SharedStringScanError::Biff)?;
+    if flags & 0x04 != 0 {
+        let extension = cursor
+            .read_bytes(extension_length, "shared string ExtRst")
+            .map_err(SharedStringScanError::Biff)?;
+        parse_phonetic_string(&extension, character_count, string_index)
+            .map_err(SharedStringScanError::Biff)?;
+    }
+    Ok(value)
+}
+
+pub(crate) fn scan_shared_string_records(
+    records: &[RecordRef<'_>],
+) -> Result<SharedStringSstScan, SharedStringScanError> {
+    if records.is_empty() {
+        return Ok(SharedStringSstScan::empty());
+    }
+    if records[0].kind().get() != 0x00FC {
+        return Err(SharedStringScanError::Biff(Error::UnexpectedRecordType {
+            expected: 0x00FC,
+            found: records[0].kind().get(),
+        }));
+    }
+    if let Some(record) = records
+        .iter()
+        .skip(1)
+        .find(|record| record.kind().get() != 0x003C)
+    {
+        return Err(SharedStringScanError::Biff(Error::UnexpectedRecordType {
+            expected: 0x003C,
+            found: record.kind().get(),
+        }));
+    }
+
+    let mut segments = Vec::new();
+    segments
+        .try_reserve_exact(records.len())
+        .map_err(|_| SharedStringScanError::Allocation {
+            resource: "SST segment locator",
+            requested: records.len(),
+        })?;
+    let mut payloads = Vec::new();
+    payloads
+        .try_reserve_exact(records.len())
+        .map_err(|_| SharedStringScanError::Allocation {
+            resource: "SST parser segments",
+            requested: records.len(),
+        })?;
+    let mut logical_offset = 0usize;
+    for record in records {
+        let payload = record.payload();
+        let next = logical_offset.checked_add(payload.len()).ok_or_else(|| {
+            SharedStringScanError::Invalid("SST payload length overflow".to_owned())
+        })?;
+        segments.push(SharedStringSstSegment {
+            source_offset: (record.offset() as u64).saturating_add(4),
+            logical_offset,
+            len: payload.len(),
+        });
+        payloads.push(payload);
+        logical_offset = next;
+    }
+
+    let mut cursor = SstCursor::new(&payloads);
+    cursor
+        .ensure_current(8, "SST header")
+        .map_err(SharedStringScanError::Biff)?;
+    let total_count = cursor
+        .read_u32_continued("SST total count")
+        .map_err(SharedStringScanError::Biff)?;
+    let unique_count = cursor
+        .read_u32_continued("SST unique count")
+        .map_err(SharedStringScanError::Biff)?;
+    if total_count > i32::MAX as u32 || unique_count > i32::MAX as u32 {
+        return Err(SharedStringScanError::Invalid(
+            "SST counts must be non-negative signed integers".to_owned(),
+        ));
+    }
+    if total_count < unique_count {
+        return Err(SharedStringScanError::Invalid(
+            "SST total count is smaller than its unique count".to_owned(),
+        ));
+    }
+    let unique_count = usize::try_from(unique_count).map_err(|_| {
+        SharedStringScanError::Invalid("SST unique count does not fit in usize".to_owned())
+    })?;
+    if unique_count > logical_offset.saturating_sub(8) / 3 {
+        return Err(SharedStringScanError::Invalid(format!(
+            "SST declares {unique_count} strings but its records are too short"
+        )));
+    }
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(unique_count)
+        .map_err(|_| SharedStringScanError::Allocation {
+            resource: "SST entry locator",
+            requested: unique_count,
+        })?;
+    for string_index in 0..unique_count {
+        let start = cursor.logical_position();
+        parse_one_shared_string(&mut cursor, string_index)?;
+        let end = cursor.logical_position();
+        entries.push(SharedStringEntryLocation { start, end });
+    }
+
+    Ok(SharedStringSstScan { segments, entries })
+}
+
+pub(crate) fn decode_shared_string_entry(
+    segments: &[&[u8]],
+) -> Result<String, SharedStringScanError> {
+    let mut cursor = SstCursor::new(segments);
+    parse_one_shared_string(&mut cursor, 0)
 }
 
 #[cfg(test)]

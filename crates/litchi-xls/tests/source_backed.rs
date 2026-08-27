@@ -369,6 +369,67 @@ fn first_label_sst_cell(stream: &[u8]) -> (u16, u16) {
     )
 }
 
+fn first_sst_payload_span(stream: &[u8]) -> (usize, usize) {
+    let mut cursor = 0_usize;
+    while cursor + 4 <= stream.len() {
+        let kind = u16::from_le_bytes([stream[cursor], stream[cursor + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[cursor + 2], stream[cursor + 3]]));
+        if kind == 0x00FC {
+            let start = cursor + 4;
+            let mut end = start + length;
+            cursor = end;
+            while cursor + 4 <= stream.len()
+                && u16::from_le_bytes([stream[cursor], stream[cursor + 1]]) == 0x003C
+            {
+                let continuation_length =
+                    usize::from(u16::from_le_bytes([stream[cursor + 2], stream[cursor + 3]]));
+                end = cursor + 4 + continuation_length;
+                cursor = end;
+            }
+            return (start, end - start);
+        }
+        cursor += 4 + length;
+    }
+    panic!("fixture has no SST");
+}
+
+fn sst_header(stream: &[u8]) -> (usize, u32, u32) {
+    let mut cursor = 0_usize;
+    while cursor + 12 <= stream.len() {
+        let kind = u16::from_le_bytes([stream[cursor], stream[cursor + 1]]);
+        let length = usize::from(u16::from_le_bytes([stream[cursor + 2], stream[cursor + 3]]));
+        if kind == 0x00FC {
+            let payload = cursor + 4;
+            return (
+                payload,
+                u32::from_le_bytes([
+                    stream[payload],
+                    stream[payload + 1],
+                    stream[payload + 2],
+                    stream[payload + 3],
+                ]),
+                u32::from_le_bytes([
+                    stream[payload + 4],
+                    stream[payload + 5],
+                    stream[payload + 6],
+                    stream[payload + 7],
+                ]),
+            );
+        }
+        cursor += 4 + length;
+    }
+    panic!("fixture has no SST");
+}
+
+fn label_sst_frame(row: u16, column: u16, string_index: u32) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(10);
+    payload.extend_from_slice(&row.to_le_bytes());
+    payload.extend_from_slice(&column.to_le_bytes());
+    payload.extend_from_slice(&0_u16.to_le_bytes());
+    payload.extend_from_slice(&string_index.to_le_bytes());
+    frame_bytes(0x00FD, &payload)
+}
+
 #[derive(Clone)]
 struct CountingSource {
     bytes: Arc<Vec<u8>>,
@@ -637,8 +698,8 @@ fn split_global_sst_continue_matches_eager_workbook() {
     let (row, column) = first_label_sst_cell(&original);
     let modified = split_global_sst_stream(&original);
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
-    let owner =
-        SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let eager = Workbook::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
@@ -646,6 +707,7 @@ fn split_global_sst_continue_matches_eager_workbook() {
         .get_cell(u32::from(row), u32::from(column))
         .map(CellTrait::value);
     assert!(matches!(expected, Some(CellValue::String(_))));
+    source.clear_ranges();
     assert_eq!(
         owner
             .cell_value_by_index(0, u32::from(row), u32::from(column))
@@ -653,6 +715,65 @@ fn split_global_sst_continue_matches_eager_workbook() {
             .as_ref(),
         expected
     );
+    let query_ranges = source.ranges();
+    assert!(!query_ranges.is_empty());
+}
+
+#[test]
+fn invalid_label_sst_index_is_typed_without_an_sst_read() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let (sst_offset, sst_length) = first_sst_payload_span(&original);
+    let modified = insert_before_worksheet_eof(&original, &label_sst_frame(60_005, 6, u32::MAX));
+    let bytes = cfb_with_streams(&[("Workbook", &modified)]);
+    let source = Arc::new(CountingSource::new(bytes));
+    let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let sst_ranges = physical_ranges_for_stream_range(&source, sst_offset as u64, sst_length);
+    let before_query = source.ranges();
+
+    assert!(matches!(
+        owner.cell_value_by_index(0, 60_005, 6).unwrap(),
+        Some(CellValue::Error(message))
+            if message.starts_with("Invalid SST index: 4294967295 (max: ")
+    ));
+    let after_query = source.ranges();
+    assert!(after_query[before_query.len()..].iter().all(|range| {
+        sst_ranges
+            .iter()
+            .all(|sst_range| !ranges_overlap(*range, *sst_range))
+    }));
+}
+
+#[test]
+fn exact_sst_entry_limit_is_allowed_and_one_over_is_rejected() {
+    let original = workbook_stream(fixture("Simple.xls"), "Workbook");
+    let (payload, total, unique) = sst_header(&original);
+    let maximum = usize::try_from(total.max(unique)).unwrap();
+    let exact = cfb_with_streams(&[("Workbook", &original)]);
+    assert!(
+        SourceBackedWorkbook::from_read_at_with_limits(
+            Arc::new(CountingSource::new(exact)),
+            SourceBackedLimits::default().with_max_sst_entries(maximum),
+        )
+        .is_ok()
+    );
+
+    let mut over_stream = original;
+    let over = total.max(unique).checked_add(1).unwrap();
+    over_stream[payload..payload + 4].copy_from_slice(&over.to_le_bytes());
+    let source = Arc::new(CountingSource::new(cfb_with_streams(&[(
+        "Workbook",
+        &over_stream,
+    )])));
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at_with_limits(
+            source,
+            SourceBackedLimits::default().with_max_sst_entries(maximum),
+        ),
+        Err(SourceBackedError::ResourceLimit {
+            resource: "SST entries",
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -713,6 +834,8 @@ fn selected_queries_are_bounded_to_the_selected_owner() {
     let open_ranges = source.ranges();
     let workbook = workbook_stream(bytes.clone(), "Workbook");
     let sheet_ranges = physical_ranges_for_workbook_sheets(&source, &workbook);
+    let (sst_offset, sst_length) = first_sst_payload_span(&workbook);
+    let sst_ranges = physical_ranges_for_stream_range(&source, sst_offset as u64, sst_length);
     let descriptors = owner.worksheet_descriptors().unwrap();
     assert!(descriptors.len() >= 2);
     let first_workbook_index = descriptors[0].workbook_index();
@@ -744,8 +867,13 @@ fn selected_queries_are_bounded_to_the_selected_owner() {
             query_ranges,
             &sheet_ranges[selected_workbook_index]
         ));
+        let allowed_ranges = sheet_ranges[selected_workbook_index]
+            .iter()
+            .chain(&sst_ranges)
+            .copied()
+            .collect::<Vec<_>>();
         assert!(query_ranges.iter().copied().all(|range| {
-            sheet_ranges[selected_workbook_index]
+            allowed_ranges
                 .iter()
                 .copied()
                 .any(|selected| ranges_overlap(range, selected))
