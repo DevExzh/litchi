@@ -67,6 +67,7 @@ struct SourceInner {
     package: SourceBackedPackage,
     sheets: Vec<SheetMetadata>,
     worksheet_positions: Vec<usize>,
+    active_catalog_position: Option<usize>,
     formula_context: Context,
     shared_strings_part: Option<PackURI>,
     styles_part: Option<PackURI>,
@@ -180,6 +181,8 @@ impl SourceBackedWorkbook {
         let workbook_data = workbook_part.data()?;
         let mut records = Records::new(workbook_data.as_bytes());
         let info = Workbook::read_workbook(&mut records)?;
+        let active_catalog_position =
+            (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
             return Err(Error::InvalidRelationship(
                 "XLSB sheet names and relationship identifiers have different lengths".to_string(),
@@ -334,6 +337,7 @@ impl SourceBackedWorkbook {
                 package,
                 sheets,
                 worksheet_positions,
+                active_catalog_position,
                 formula_context,
                 shared_strings_part,
                 styles_part,
@@ -481,6 +485,27 @@ impl SourceBackedWorkbook {
             .map(|catalog_position| SourceBackedWorksheet {
                 inner: Arc::clone(&self.inner),
                 catalog_position,
+            }))
+    }
+
+    /// Return the primary workbook view's physical sheet-catalog position.
+    pub fn active_catalog_position(&self) -> Result<Option<usize>> {
+        self.inner.package.source_version()?;
+        Ok(self.inner.active_catalog_position)
+    }
+
+    /// Return the primary workbook view's public worksheet ordinal, when it
+    /// names a worksheet rather than a chart, dialog, or macro sheet.
+    pub fn active_worksheet_index(&self) -> Result<Option<usize>> {
+        self.inner.package.source_version()?;
+        Ok(self
+            .inner
+            .active_catalog_position
+            .and_then(|catalog_position| {
+                self.inner
+                    .worksheet_positions
+                    .iter()
+                    .position(|&position| position == catalog_position)
             }))
     }
 

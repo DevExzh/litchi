@@ -210,6 +210,9 @@ impl WorkbookWriter {
 
     /// Write book views (REQUIRED by Excel)
     fn write_book_views<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+        if self.sheet_order.is_empty() {
+            return Ok(());
+        }
         writer.write_record(kind::BEGIN_BOOK_VIEWS, &[])?;
 
         // Write one default book view
@@ -226,8 +229,17 @@ impl WorkbookWriter {
         temp_writer.write_u32(0)?;
         // itabFirst (4): first visible bundle sheet index
         temp_writer.write_u32(0)?;
-        // itabCur (4): active sheet index
-        temp_writer.write_u32(0)?;
+        // itabCur (4): active sheet index. The public workbook API exposes
+        // worksheets, so choose the first worksheet when a chart sheet was
+        // inserted before it in the complete workbook tab order.
+        let active_tab = self
+            .sheet_order
+            .iter()
+            .position(|slot| matches!(slot, SheetSlot::Worksheet(_)))
+            .unwrap_or(0);
+        temp_writer.write_u32(u32::try_from(active_tab).map_err(|_| {
+            Error::InvalidFormula("active workbook sheet index overflow".to_string())
+        })?)?;
 
         // Flags (1 byte) - D/E/F bits set for scrollbars and tabs
         temp_writer.write_u8(0x78)?; // Total: 7*4 + 1 = 29 bytes

@@ -112,6 +112,8 @@ pub(crate) struct Workbook {
     limits: ReadLimits,
     names: Box<[String]>,
     date1904: bool,
+    active_catalog_position: Option<usize>,
+    active_worksheet_ordinal: Option<usize>,
     eager: OnceLock<xlsb::Workbook>,
     eager_init: Mutex<()>,
     worksheet_ordinals: Box<[Option<usize>]>,
@@ -125,6 +127,7 @@ impl std::fmt::Debug for Workbook {
             .debug_struct("Workbook")
             .field("worksheet_count", &self.names.len())
             .field("date1904", &self.date1904)
+            .field("active_catalog_position", &self.active_catalog_position)
             .finish()
     }
 }
@@ -168,6 +171,12 @@ impl Workbook {
             }
         }
         let date1904 = workbook.is_1904_date_system().map_err(boxed_xlsb_error)?;
+        let active_catalog_position = workbook
+            .active_catalog_position()
+            .map_err(boxed_xlsb_error)?;
+        let active_worksheet_ordinal = workbook
+            .active_worksheet_index()
+            .map_err(boxed_xlsb_error)?;
         let worksheets = std::iter::repeat_with(OnceLock::new)
             .take(catalog_count)
             .collect::<Vec<_>>()
@@ -182,6 +191,8 @@ impl Workbook {
             limits,
             names,
             date1904,
+            active_catalog_position,
+            active_worksheet_ordinal,
             eager: OnceLock::new(),
             eager_init: Mutex::new(()),
             worksheet_ordinals: worksheet_ordinals.into_boxed_slice(),
@@ -404,11 +415,17 @@ fn append_eager_cell_text(output: &mut String, value: &CellValue) {
 
 impl WorkbookTrait for Workbook {
     fn active_sheet_index(&self) -> usize {
-        0
+        self.active_worksheet_ordinal.unwrap_or(0)
     }
 
     fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
-        self.worksheet(0)
+        self.ensure_source_current()?;
+        let index = self.active_worksheet_ordinal.ok_or_else(|| {
+            boxed_xlsb_error(XlsbError::UnsupportedFeature(
+                "XLSB active sheet is not a worksheet".to_string(),
+            ))
+        })?;
+        self.worksheet(index)
     }
 
     fn is_1904_date_system(&self) -> bool {
