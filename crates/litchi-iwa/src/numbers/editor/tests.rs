@@ -10,6 +10,7 @@ use litchi_iwa_common::table::cell::{
     BorderSide,
     layout::{Inset, Insets, Layout, TextWrap, VerticalAlignment},
 };
+use litchi_iwa_protos::table_dimension_codec as neutral_dimension_codec;
 use litchi_numbers::table::lock::State as FocusedTableLockState;
 use litchi_numbers::table::sort::Order as FocusedSortOrder;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
@@ -1138,6 +1139,647 @@ fn header_bucket_wire_mutations_preserve_unknown_entries_and_restore_exactly() {
     assert!(
         rewrite_header_bucket_wire(&duplicate, &duplicate_previous, &duplicate_current).is_err()
     );
+}
+
+fn neutral_dimension_header(index: u32, size_bits: u32) -> Vec<u8> {
+    let mut header = Vec::new();
+    crate::wire::append_varint_field(&mut header, 1, u64::from(index)).unwrap();
+    header.push(0x15);
+    header.extend_from_slice(&size_bits.to_le_bytes());
+    crate::wire::append_varint_field(&mut header, 3, 0).unwrap();
+    crate::wire::append_varint_field(&mut header, 4, 0).unwrap();
+    header
+}
+
+fn neutral_dimension_bucket(headers: &[Vec<u8>]) -> Vec<u8> {
+    let mut bucket = Vec::new();
+    crate::wire::append_varint_field(&mut bucket, 1, 7).unwrap();
+    for header in headers {
+        crate::wire::append_length_delimited_field(&mut bucket, 2, header).unwrap();
+    }
+    bucket
+}
+
+fn neutral_dimension_options(
+    max_message_bytes: usize,
+    max_fields: usize,
+    max_work_bytes: usize,
+) -> neutral_dimension_codec::DecodeOptions {
+    neutral_dimension_codec::DecodeOptions::new(
+        max_message_bytes,
+        max_fields,
+        max_work_bytes,
+        64,
+        128,
+        1024,
+    )
+}
+
+#[test]
+fn neutral_dimension_codec_preserves_unknown_order_and_exact_inverse() {
+    let mut third = neutral_dimension_header(3, 40.0f32.to_bits());
+    append_unknown_varint(&mut third, 99, 990);
+    let first = neutral_dimension_header(1, 20.0f32.to_bits());
+    let mut source = neutral_dimension_bucket(&[third.clone(), first.clone()]);
+    append_unknown_varint(&mut source, 100, 128);
+    let before = source.clone();
+    let options = neutral_dimension_options(4096, 4096, 100_000);
+
+    let (snapshot, source_report) =
+        neutral_dimension_codec::decode_header_storage_bucket_with_report(&source, options)
+            .unwrap();
+    assert_eq!(snapshot.bucket_hash_function(), 7);
+    assert_eq!(source_report.source_bytes(), source.len());
+
+    let edits = [
+        neutral_dimension_codec::HeaderSizeEdit::set(3, 98.0f32.to_bits()),
+        neutral_dimension_codec::HeaderSizeEdit::set(2, 44.0f32.to_bits()),
+    ];
+    let plan =
+        neutral_dimension_codec::plan_header_storage_bucket_sizes(&source, 4, &edits, options)
+            .unwrap();
+    let requirements = plan.requirements();
+    let (changed, report) =
+        neutral_dimension_codec::execute_header_storage_bucket_size_plan(plan, options).unwrap();
+    assert_eq!(source, before);
+    assert_eq!(
+        (report.updated(), report.inserted(), report.removed()),
+        (1, 1, 0)
+    );
+    assert_eq!(changed.len(), requirements.output_bytes());
+    let raw_headers = crate::wire::repeated_length_delimited_payloads(&changed, 2).unwrap();
+    assert_eq!(
+        raw_headers
+            .iter()
+            .map(|raw| neutral_dimension_codec::decode_header(raw, options)
+                .unwrap()
+                .index())
+            .collect::<Vec<_>>(),
+        [3, 1, 2]
+    );
+    assert_eq!(
+        neutral_dimension_codec::decode_header(raw_headers[0], options)
+            .unwrap()
+            .size_bits(),
+        98.0f32.to_bits()
+    );
+    assert!(raw_headers[0].ends_with(&third[third.len() - 4..]));
+    assert_eq!(raw_headers[1], first.as_slice());
+    let source_fields = crate::wire::parse_wire_fields(&source).unwrap();
+    let changed_fields = crate::wire::parse_wire_fields(&changed).unwrap();
+    let source_root_unknown = source_fields
+        .iter()
+        .find(|field| field.number() == 100)
+        .unwrap();
+    let changed_root_unknown = changed_fields
+        .iter()
+        .find(|field| field.number() == 100)
+        .unwrap();
+    assert_eq!(
+        source_root_unknown.raw(&source).unwrap(),
+        changed_root_unknown.raw(&changed).unwrap()
+    );
+    let source_prefix = source_fields
+        .iter()
+        .take_while(|field| field.number() != 100)
+        .map(|field| field.number())
+        .collect::<Vec<_>>();
+    let changed_prefix = changed_fields
+        .iter()
+        .take_while(|field| field.number() != 100)
+        .map(|field| field.number())
+        .collect::<Vec<_>>();
+    assert_eq!(changed_prefix, source_prefix);
+
+    let inverse = [
+        neutral_dimension_codec::HeaderSizeEdit::set(3, 40.0f32.to_bits()),
+        neutral_dimension_codec::HeaderSizeEdit::remove(2),
+    ];
+    let (restored, inverse_report) = neutral_dimension_codec::rewrite_header_storage_bucket_sizes(
+        &changed, 4, &inverse, options,
+    )
+    .unwrap();
+    assert_eq!(restored, source);
+    assert_eq!(
+        (
+            inverse_report.updated(),
+            inverse_report.inserted(),
+            inverse_report.removed()
+        ),
+        (1, 0, 1)
+    );
+
+    let (no_op, no_op_report) =
+        neutral_dimension_codec::rewrite_header_storage_bucket_sizes(&source, 4, &[], options)
+            .unwrap();
+    assert_eq!(no_op, source);
+    assert_eq!(
+        (
+            no_op_report.updated(),
+            no_op_report.inserted(),
+            no_op_report.removed()
+        ),
+        (0, 0, 0)
+    );
+}
+
+#[test]
+fn neutral_dimension_codec_removes_only_minimal_defaults_and_preserves_facets() {
+    let canonical = neutral_dimension_header(0, 25.0f32.to_bits());
+    let mut non_minimal = neutral_dimension_header(1, 30.0f32.to_bits());
+    crate::wire::append_length_delimited_field(&mut non_minimal, 5, &[0x08, 0x09]).unwrap();
+    append_unknown_varint(&mut non_minimal, 99, 7);
+    let source = neutral_dimension_bucket(&[canonical, non_minimal.clone()]);
+    let options = neutral_dimension_options(4096, 4096, 100_000);
+
+    let (changed, report) = neutral_dimension_codec::rewrite_header_storage_bucket_sizes(
+        &source,
+        2,
+        &[
+            neutral_dimension_codec::HeaderSizeEdit::remove(0),
+            neutral_dimension_codec::HeaderSizeEdit::remove(1),
+        ],
+        options,
+    )
+    .unwrap();
+    assert_eq!(
+        (report.updated(), report.inserted(), report.removed()),
+        (1, 0, 1)
+    );
+    let raw_headers = crate::wire::repeated_length_delimited_payloads(&changed, 2).unwrap();
+    assert_eq!(raw_headers.len(), 1);
+    let remaining = neutral_dimension_codec::decode_header(raw_headers[0], options).unwrap();
+    assert_eq!(remaining.index(), 1);
+    assert_eq!(remaining.size_bits(), 0.0f32.to_bits());
+    assert!(
+        raw_headers[0]
+            .windows(2)
+            .any(|window| window == [0x2a, 0x02])
+    );
+    assert!(raw_headers[0].ends_with(&non_minimal[non_minimal.len() - 3..]));
+}
+
+#[test]
+fn neutral_dimension_codec_rejects_malformed_ranges_and_keeps_source_exact() {
+    let options = neutral_dimension_options(4096, 4096, 100_000);
+    let record = neutral_dimension_header(1, 10.0f32.to_bits());
+    let duplicate = neutral_dimension_bucket(&[record.clone(), record]);
+    let duplicate_before = duplicate.clone();
+    assert!(
+        neutral_dimension_codec::plan_header_storage_bucket_sizes(
+            &duplicate,
+            2,
+            &[neutral_dimension_codec::HeaderSizeEdit::set(
+                1,
+                20.0f32.to_bits()
+            )],
+            options,
+        )
+        .is_err()
+    );
+    assert_eq!(duplicate, duplicate_before);
+
+    let mut wrong_wire_header = Vec::new();
+    crate::wire::append_varint_field(&mut wrong_wire_header, 1, 0).unwrap();
+    crate::wire::append_varint_field(&mut wrong_wire_header, 2, 10).unwrap();
+    crate::wire::append_varint_field(&mut wrong_wire_header, 3, 0).unwrap();
+    crate::wire::append_varint_field(&mut wrong_wire_header, 4, 0).unwrap();
+    let wrong_wire = neutral_dimension_bucket(&[wrong_wire_header]);
+    let wrong_wire_before = wrong_wire.clone();
+    assert!(neutral_dimension_codec::decode_header_storage_bucket(&wrong_wire, options).is_err());
+    assert_eq!(wrong_wire, wrong_wire_before);
+
+    let out_of_range = neutral_dimension_bucket(&[neutral_dimension_header(2, 10.0f32.to_bits())]);
+    let out_of_range_before = out_of_range.clone();
+    assert!(
+        neutral_dimension_codec::plan_header_storage_bucket_sizes(&out_of_range, 2, &[], options,)
+            .is_err()
+    );
+    assert_eq!(out_of_range, out_of_range_before);
+
+    let source = neutral_dimension_bucket(&[neutral_dimension_header(0, 10.0f32.to_bits())]);
+    let source_before = source.clone();
+    assert!(
+        neutral_dimension_codec::plan_header_storage_bucket_sizes(
+            &source,
+            2,
+            &[neutral_dimension_codec::HeaderSizeEdit::set(2, 1)],
+            options,
+        )
+        .is_err()
+    );
+    assert!(
+        neutral_dimension_codec::plan_header_storage_bucket_sizes(
+            &source,
+            2,
+            &[
+                neutral_dimension_codec::HeaderSizeEdit::set(1, 1),
+                neutral_dimension_codec::HeaderSizeEdit::remove(1),
+            ],
+            options,
+        )
+        .is_err()
+    );
+    assert_eq!(source, source_before);
+}
+
+#[test]
+fn neutral_dimension_codec_refuses_tight_output_before_execute_and_preserves_source() {
+    let source = neutral_dimension_bucket(&[neutral_dimension_header(0, 10.0f32.to_bits())]);
+    let before = source.clone();
+    let generous = neutral_dimension_options(4096, 4096, 100_000);
+    let plan = neutral_dimension_codec::plan_header_storage_bucket_sizes(
+        &source,
+        2,
+        &[neutral_dimension_codec::HeaderSizeEdit::set(
+            1,
+            20.0f32.to_bits(),
+        )],
+        generous,
+    )
+    .unwrap();
+    let required = plan.requirements().output_bytes();
+    assert!(required > 0);
+    let error = neutral_dimension_codec::execute_header_storage_bucket_size_plan(
+        plan,
+        neutral_dimension_options(required - 1, 4096, 100_000),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error.resource_limit(),
+        Some(neutral_dimension_codec::DecodeLimit::Bytes { observed, maximum })
+            if observed == required && maximum == required - 1
+    ));
+    assert_eq!(source, before);
+
+    let error = neutral_dimension_codec::plan_header_storage_bucket_sizes(
+        &source,
+        2,
+        &[neutral_dimension_codec::HeaderSizeEdit::set(
+            1,
+            20.0f32.to_bits(),
+        )],
+        neutral_dimension_options(source.len(), 0, 100_000),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error.resource_limit(),
+        Some(neutral_dimension_codec::DecodeLimit::Fields { .. })
+    ));
+    assert_eq!(source, before);
+}
+
+#[test]
+fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() -> crate::Result<()>
+{
+    use litchi_numbers::table::dimension::{Dimension, Size};
+
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_name("Neutral dimension builder")
+        .table_dimensions(3, 2)
+        .build()?;
+    let table_id = editor
+        .tables()?
+        .first()
+        .ok_or_else(|| Error::InvalidFormat("builder produced no table".to_owned()))?
+        .object_id;
+    crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 0, 0, cell_number(1.0))?;
+    crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 1, 0, cell_number(2.0))?;
+
+    let mut package = editor.into_package();
+    let descriptor = attached_table_descriptor(&package, table_id)?;
+    let bucket_id = descriptor
+        .model
+        .base_data_store
+        .row_headers
+        .buckets
+        .first()
+        .ok_or_else(|| Error::InvalidFormat("builder produced no row-header bucket".to_owned()))?
+        .identifier;
+    let archive_name = object_locations(&package)?
+        .get(&bucket_id)
+        .cloned()
+        .ok_or_else(|| Error::InvalidFormat("row-header bucket location is missing".to_owned()))?;
+
+    let bucket_message = |package: &IWorkPackage| -> crate::Result<Vec<u8>> {
+        let archive = package.archive(&archive_name)?;
+        let object = archive.object(bucket_id).ok_or_else(|| {
+            Error::InvalidFormat("row-header bucket object is missing".to_owned())
+        })?;
+        object
+            .messages
+            .iter()
+            .find(|message| message.type_ == 6_006)
+            .map(|message| message.data.clone())
+            .ok_or_else(|| Error::InvalidFormat("row-header bucket message is missing".to_owned()))
+    };
+
+    let original_bucket = bucket_message(&package)?;
+    let original_headers = crate::wire::repeated_length_delimited_payloads(&original_bucket, 2)?;
+    assert_eq!(original_headers.len(), 2);
+
+    let mut header_unknown = Vec::new();
+    append_unknown_varint(&mut header_unknown, 98, 980);
+    let mut root_unknown = Vec::new();
+    append_unknown_varint(&mut root_unknown, 99, 990);
+    let augmented =
+        crate::wire::transform_length_delimited_fields_at_path(&original_bucket, &[2], |header| {
+            let mut header = header.to_vec();
+            header.extend_from_slice(&header_unknown);
+            Ok(header)
+        })?;
+    let mut augmented = augmented;
+    augmented.extend_from_slice(&root_unknown);
+    let augmented_headers = crate::wire::repeated_length_delimited_payloads(&augmented, 2)?;
+    assert_eq!(augmented_headers.len(), original_headers.len());
+    package.update_archive(&archive_name, |archive| {
+        let object = archive.object_mut(bucket_id).ok_or_else(|| {
+            Error::InvalidFormat("row-header bucket object is missing".to_owned())
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == 6_006)
+            .ok_or_else(|| {
+                Error::InvalidFormat("row-header bucket message is missing".to_owned())
+            })?;
+        let message_type = object.messages[message_index].type_;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data: augmented.clone(),
+            },
+        )?;
+        Ok(())
+    })?;
+
+    let source = package.to_bytes()?;
+    let dimension = Dimension::Row(0);
+    assert_eq!(
+        table_dimension_size_in_package(&package, table_id, dimension)?,
+        Size::Default
+    );
+
+    let mut no_op = package.clone();
+    set_table_dimension_size_in_package(&mut no_op, table_id, dimension, Size::Default)?;
+    assert_eq!(no_op.to_bytes()?, source);
+
+    let explicit = Size::points(31.0).unwrap();
+    let mut changed = package.clone();
+    set_table_dimension_size_in_package(&mut changed, table_id, dimension, explicit)?;
+    let changed_bytes = changed.to_bytes()?;
+    assert_ne!(changed_bytes, source);
+    assert_eq!(
+        table_dimension_size_in_package(&changed, table_id, dimension)?,
+        explicit
+    );
+
+    let changed_bucket = bucket_message(&changed)?;
+    let changed_headers = crate::wire::repeated_length_delimited_payloads(&changed_bucket, 2)?;
+    assert_eq!(changed_headers.len(), augmented_headers.len());
+    assert_ne!(changed_headers[0], augmented_headers[0]);
+    assert_eq!(changed_headers[1], augmented_headers[1]);
+    assert!(
+        changed_headers
+            .iter()
+            .all(|header| header.ends_with(&header_unknown))
+    );
+    let source_fields = crate::wire::parse_wire_fields(&augmented)?;
+    let changed_fields = crate::wire::parse_wire_fields(&changed_bucket)?;
+    assert_eq!(
+        source_fields
+            .iter()
+            .map(|field| field.number())
+            .collect::<Vec<_>>(),
+        changed_fields
+            .iter()
+            .map(|field| field.number())
+            .collect::<Vec<_>>()
+    );
+    let changed_root = changed_fields
+        .last()
+        .ok_or_else(|| Error::InvalidFormat("changed header bucket is empty".to_owned()))?;
+    assert_eq!(changed_root.number(), 99);
+    assert_eq!(changed_root.raw(&changed_bucket)?, root_unknown.as_slice());
+
+    let reopened = NumbersEditor::from_bytes(&changed_bytes)?;
+    assert_eq!(
+        table_dimension_size_in_package(reopened.package(), table_id, dimension)?,
+        explicit
+    );
+    let mut reset = reopened.into_package();
+    set_table_dimension_size_in_package(&mut reset, table_id, dimension, Size::Default)?;
+    assert_eq!(reset.to_bytes()?, source);
+
+    let mut out_of_range = package.clone();
+    let before_out_of_range = out_of_range.to_bytes()?;
+    assert!(
+        set_table_dimension_size_in_package(
+            &mut out_of_range,
+            table_id,
+            Dimension::Row(3),
+            explicit,
+        )
+        .is_err()
+    );
+    assert_eq!(out_of_range.to_bytes()?, before_out_of_range);
+
+    let mut duplicate = package.clone();
+    let duplicate_bucket = bucket_message(&duplicate)?;
+    let duplicate_header = crate::wire::repeated_length_delimited_payloads(&duplicate_bucket, 2)?
+        .first()
+        .copied()
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| Error::InvalidFormat("row-header record is missing".to_owned()))?;
+    let mut duplicate_bucket = duplicate_bucket;
+    crate::wire::append_length_delimited_field(&mut duplicate_bucket, 2, &duplicate_header)?;
+    duplicate.update_archive(&archive_name, |archive| {
+        let object = archive.object_mut(bucket_id).ok_or_else(|| {
+            Error::InvalidFormat("row-header bucket object is missing".to_owned())
+        })?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == 6_006)
+            .ok_or_else(|| {
+                Error::InvalidFormat("row-header bucket message is missing".to_owned())
+            })?;
+        let message_type = object.messages[message_index].type_;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: message_type,
+                data: std::mem::take(&mut duplicate_bucket),
+            },
+        )?;
+        Ok(())
+    })?;
+    let before_duplicate = duplicate.to_bytes()?;
+    assert!(
+        set_table_dimension_size_in_package(&mut duplicate, table_id, dimension, explicit).is_err()
+    );
+    assert_eq!(duplicate.to_bytes()?, before_duplicate);
+
+    let replace_bucket = |package: &mut IWorkPackage,
+                          replacement: Vec<u8>,
+                          alternate_role: Option<u32>|
+     -> crate::Result<()> {
+        package.update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(bucket_id).ok_or_else(|| {
+                Error::InvalidFormat("row-header bucket object is missing".to_owned())
+            })?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == 6_006)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("row-header bucket message is missing".to_owned())
+                })?;
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: 6_006,
+                    data: replacement,
+                },
+            )?;
+            if let Some(type_) = alternate_role {
+                object.push_message(RawMessage {
+                    type_,
+                    data: Vec::new(),
+                })?;
+            }
+            Ok(())
+        })
+    };
+    let assert_dimension_rejected_atomically = |hostile: IWorkPackage,
+                                                hostile_dimension: Dimension|
+     -> crate::Result<()> {
+        let before = hostile.to_bytes()?;
+        assert!(table_dimension_size_in_package(&hostile, table_id, hostile_dimension).is_err());
+        let mut changed = hostile.clone();
+        assert!(
+            set_table_dimension_size_in_package(
+                &mut changed,
+                table_id,
+                hostile_dimension,
+                explicit,
+            )
+            .is_err()
+        );
+        assert_eq!(changed.to_bytes()?, before);
+        Ok(())
+    };
+    let assert_rejected_atomically =
+        |hostile: IWorkPackage| assert_dimension_rejected_atomically(hostile, dimension);
+    let rewrite_model = |package: &mut IWorkPackage,
+                         mutate: &dyn Fn(&mut TableModelArchive)|
+     -> crate::Result<()> {
+        let archive_name = object_locations(package)?
+            .get(&table_id)
+            .cloned()
+            .ok_or_else(|| Error::InvalidFormat("table model location is missing".to_owned()))?;
+        package.update_archive(&archive_name, |archive| {
+            let object = archive
+                .object_mut(table_id)
+                .ok_or_else(|| Error::InvalidFormat("table model object is missing".to_owned()))?;
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| TableModelArchive::decode(message.data.as_slice()).is_ok())
+                .ok_or_else(|| Error::InvalidFormat("table model message is missing".to_owned()))?;
+            let message_type = object.messages[message_index].type_;
+            let mut model =
+                TableModelArchive::decode(object.messages[message_index].data.as_slice())?;
+            mutate(&mut model);
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data: model.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+    };
+
+    let mut nonselected_nan = package.clone();
+    let invalid_nonselected =
+        crate::wire::transform_length_delimited_fields_at_path(&augmented, &[2], |header| {
+            let snapshot = neutral_dimension_codec::decode_header(
+                header,
+                neutral_dimension_options(4096, 4096, 100_000),
+            )
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "neutral dimension fixture header failed to decode: {error}"
+                ))
+            })?;
+            if snapshot.index() == 1 {
+                crate::wire::patch_fixed32_field(header, 2, true, Some(f32::NAN.to_bits()))
+            } else {
+                Ok(header.to_vec())
+            }
+        })?;
+    replace_bucket(&mut nonselected_nan, invalid_nonselected, None)?;
+    assert_rejected_atomically(nonselected_nan)?;
+
+    let mut mismatched_hash = package.clone();
+    let invalid_hash = crate::wire::patch_varint_field(&augmented, 1, true, Some(2))?;
+    replace_bucket(&mut mismatched_hash, invalid_hash, None)?;
+    assert_rejected_atomically(mismatched_hash)?;
+
+    for alternate_role in [
+        6_002, 6_004, 6_005, 6_010, 6_011, 6_201, 6_267, 6_305, 6_306,
+    ] {
+        let mut role_alias = package.clone();
+        replace_bucket(&mut role_alias, augmented.clone(), Some(alternate_role))?;
+        assert_rejected_atomically(role_alias)?;
+    }
+
+    let mut external_bucket = package.clone();
+    rewrite_model(&mut external_bucket, &|model| {
+        model.base_data_store.row_headers.buckets[0].deprecated_is_external = Some(true);
+    })?;
+    assert_rejected_atomically(external_bucket)?;
+
+    let mut extra_bucket = package.clone();
+    rewrite_model(&mut extra_bucket, &|model| {
+        model.base_data_store.row_headers.buckets.push(Reference {
+            identifier: bucket_id.saturating_add(10_000),
+            ..Default::default()
+        });
+    })?;
+    assert_rejected_atomically(extra_bucket)?;
+
+    let mut aliased_bucket = package.clone();
+    rewrite_model(&mut aliased_bucket, &|model| {
+        model.base_data_store.column_headers = model.base_data_store.row_headers.buckets[0];
+    })?;
+    assert_rejected_atomically(aliased_bucket)?;
+
+    let mut cross_slot = package.clone();
+    let cross_slot_bucket_id = bucket_id.saturating_add(20_000);
+    rewrite_model(&mut cross_slot, &|model| {
+        model.number_of_rows = 65_537;
+        model.base_data_store.row_headers.buckets.push(Reference {
+            identifier: cross_slot_bucket_id,
+            ..Default::default()
+        });
+    })?;
+    cross_slot.update_archive(&archive_name, |archive| {
+        archive.insert_object(ArchiveObject::new(
+            cross_slot_bucket_id,
+            vec![RawMessage {
+                type_: 6_006,
+                data: augmented.clone(),
+            }],
+        )?)?;
+        Ok(())
+    })?;
+    assert_dimension_rejected_atomically(cross_slot, Dimension::Row(65_536))?;
+
+    Ok(())
 }
 
 #[test]

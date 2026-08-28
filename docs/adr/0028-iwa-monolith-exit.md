@@ -6558,3 +6558,35 @@ packages, 239 internal dependency declarations, one migration host, and 13
 ordered debts; the litchi-iwa -> litchi-keynote edge/debt 014, all other
 edges/debts, generated/Prost/Buffa ownership, and the IWA monolith deletion
 gate remain unchanged.
+
+## 2026-08-28 amendment: Wave110 dimension wire seam is not a deletion gate
+
+Wave110 replaces production generated `TST.HeaderStorageBucket` and nested
+header decoding/encoding in the private Numbers dimension-storage adapter
+with the neutral `table_dimension_codec` streaming projection and prepared
+rewrite flow. Full-bucket semantic validation, finite options, role-alias and
+row-bucket identity/hash/cardinality checks, local-reference and row/column
+alias checks, slot-local row validation, raw unknown preservation, and atomic
+archive publication now cover that seam. The codec's execution-time header
+rescan also uses the caller's finite limits.
+
+The surrounding IWA route still relies on generated `TableModelArchive`
+selection and remains a physical compatibility implementation. This amendment
+does not add a selector-first owner, remove a raw-ID method, prove global
+shared-bucket authority, or provide patch/conflict/inverse/reopen/locality
+artifacts. It therefore does not satisfy a monolith-exit gate by itself.
+
+Scoped gates passed: 58/58 focused codec tests, protos check and strict
+Clippy, five IWA regressions, IWA library check and strict scoped Clippy,
+667/667 boundary tests, `py_compile`, and an empty live storage-codec audit.
+The full checker was blocked only by three unrelated findings from the
+pre-existing untracked Pages table-lock file. No native/UI acceptance evidence
+is claimed.
+
+Accounting is a conservative logical envelope. Package caches, decompressed
+Archives, ZIP/Snappy buffers, allocator behavior, RSS, and zero-copy behavior
+are not telemetry from this seam. The authoritative topology remains 64
+packages, 239 internal dependency declarations, one migration host, and 13
+ordered debts. No crate, manifest, dependency edge, debt, public owner, or
+monolith gate closes, and all remaining generated/Prost/Buffa ownership work
+remains explicit.

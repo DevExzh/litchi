@@ -2713,6 +2713,7 @@ pub fn execute_header_storage_bucket_size_plan(
         &plan.header_indices,
         &plan.edits,
         plan.requirements.output_bytes,
+        options,
     )?;
     let (_bucket, result_report) = decode_header_storage_bucket_with_report(&result, options)?;
     let requirements = plan.requirements;
@@ -2814,21 +2815,11 @@ fn canonical_minimal_header(index: u32, size_bits: u32) -> ([u8; 16], usize) {
     (output, length)
 }
 
-fn header_size_offset(source: &[u8]) -> Result<usize, DecodeError> {
+fn header_size_offset(source: &[u8], options: DecodeOptions) -> Result<usize, DecodeError> {
     let mut remaining = source;
     let mut offset = 0usize;
     let mut found = None;
-    let mut budget = Budget::new(
-        source,
-        DecodeOptions::new(
-            source.len().max(1),
-            usize::MAX,
-            usize::MAX,
-            MAX_RECURSION,
-            usize::MAX,
-            usize::MAX,
-        ),
-    )?;
+    let mut budget = Budget::new(source, options)?;
     while !remaining.is_empty() {
         let before = remaining.len();
         let field = next_field(&mut remaining, &mut budget, 1)?.ok_or_else(DecodeError::invalid)?;
@@ -2913,6 +2904,7 @@ fn assemble_rewritten_bucket(
     header_indices: &[u32],
     edits: &[HeaderSizeEdit],
     output_len: usize,
+    options: DecodeOptions,
 ) -> Result<Vec<u8>, DecodeError> {
     let mut output = Vec::new();
     reserve_exact(&mut output, output_len)?;
@@ -2929,7 +2921,7 @@ fn assemble_rewritten_bucket(
                         output.extend_from_slice(&source[record.start..record.end]);
                     } else {
                         let raw = &source[record.payload_start..record.payload_end];
-                        let size_offset = header_size_offset(raw)?;
+                        let size_offset = header_size_offset(raw, options)?;
                         encode_key(&mut output, 2, 2);
                         encode_varint(
                             &mut output,

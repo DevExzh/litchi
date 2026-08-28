@@ -23641,6 +23641,137 @@ fn rewrite_movie_title_operation(
             main_source,
         )
 
+    def test_numbers_table_dimension_storage_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE,
+            Path(
+                "crates/litchi-iwa/src/numbers/editor/table_dimension/storage.rs"
+            ),
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_MODULE,
+            "table_dimension_codec",
+        )
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_FUNCTIONS,
+            (
+                "decode_header_storage_bucket_with_visitor",
+                "plan_header_storage_bucket_sizes",
+                "execute_header_storage_bucket_size_plan",
+            ),
+        )
+
+    def test_numbers_table_dimension_storage_requires_neutral_prepared_flow(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn storage(bytes: &[u8], options: Options, visitor: &mut Visitor) {\n"
+                "    table_dimension_codec::decode_header_storage_bucket_with_visitor("
+                "bytes, options, visitor);\n"
+                "    let plan = table_dimension_codec::plan_header_storage_bucket_sizes("
+                "bytes, 4, edits, options);\n"
+                "    let requirements = plan.requirements();\n"
+                "    table_dimension_codec::execute_header_storage_bucket_size_plan("
+                "plan, requirements.exact_limits());\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_dimension_storage_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_dimension_storage_rejects_generated_wire_access(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn storage(bytes: &[u8]) {\n"
+                "    let bucket = tst::HeaderStorageBucket::decode(bytes);\n"
+                "    let header = tst::header_storage_bucket::Header::decode(bytes);\n"
+                "    let _ = bucket.encode_to_vec();\n"
+                "    let _ = header.encode_to_vec();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_dimension_storage_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("HeaderStorageBucket generated type" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "header_storage_bucket::Header generated type" in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any("generated header encode" in item for item in violations),
+                violations,
+            )
+            for marker in (
+                "neutral table_dimension_codec decode/visitor",
+                "neutral table_dimension_codec prepared plan",
+                "neutral table_dimension_codec execution requirements",
+                "neutral table_dimension_codec execute",
+            ):
+                self.assertTrue(any(marker in item for item in violations), violations)
+
+    def test_numbers_table_dimension_storage_masks_cfg_test_generated_fixtures(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn storage(bytes: &[u8], options: Options, visitor: &mut Visitor) {\n"
+                "    table_dimension_codec::decode_header_storage_bucket_with_visitor("
+                "bytes, options, visitor);\n"
+                "    let plan = table_dimension_codec::plan_header_storage_bucket_sizes("
+                "bytes, 4, edits, options);\n"
+                "    let requirements = plan.requirements();\n"
+                "    table_dimension_codec::execute_header_storage_bucket_size_plan("
+                "plan, requirements.exact_limits());\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    fn generated(bytes: &[u8]) {\n"
+                "        let bucket = tst::HeaderStorageBucket::decode(bytes);\n"
+                "        let _ = bucket.encode_to_vec();\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_dimension_storage_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_dimension_storage_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_table_dimension_storage_codec_source_topology()",
+            main_source,
+        )
+
     def test_numbers_table_dimension_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_NUMBERS_TABLE_DIMENSION_METHODS,

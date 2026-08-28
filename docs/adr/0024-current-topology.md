@@ -3320,3 +3320,35 @@ remains 64 packages, 239 internal dependency declarations, one migration host,
 and 13 ordered debts; litchi-iwa -> litchi-keynote/debt 014, all other
 edges/debts, generated/Prost/Buffa ownership, and the IWA monolith deletion
 gate remain unchanged.
+
+## 2026-08-28 amendment: Wave110 Numbers dimension bucket wire ownership
+
+The private `litchi-iwa` Numbers dimension-storage adapter now delegates
+header-bucket wire reads and edits to the generated-free
+`table_dimension_codec`. It uses a finite streaming projection and the
+prepared plan -> requirements -> single execute path, preserving unknown raw
+fields and ordering while rejecting malformed, duplicate, out-of-range,
+non-finite, negative, noncanonical-zero, hash-mismatched, or role-aliased
+bucket sources before publication. External storage references, incorrect row
+bucket counts, row/column storage aliasing, and cross-slot row records also fail
+closed. The codec's internal header-size rescan now inherits the caller's
+finite options instead of constructing unlimited ceilings.
+
+This is intentionally narrower than a focused owner migration. The outer
+legacy path still uses generated `TableModelArchive` selection and does not
+claim package-wide shared-bucket authority, selector transaction artifacts,
+candidate reopen/locality, or raw-ID retirement. Public crate topology and
+dependency direction do not change.
+
+Verification passed 58/58 focused codec tests, protos check/strict Clippy,
+five Wave110 IWA regressions, IWA library check/strict scoped Clippy, 667/667
+boundary unit tests, `py_compile`, and an empty live storage-codec audit. The
+full checker reported only the three unrelated findings from the pre-existing
+untracked Pages table-lock file. No native/UI evidence is claimed.
+
+The finite limits are logical envelopes rather than package-cache,
+decompressed-Archive, ZIP/Snappy, allocator, RSS, or zero-copy telemetry. The
+authoritative topology remains 64 packages, 239 internal dependency
+declarations, one migration host, and 13 ordered debts. No crate, manifest,
+edge, debt, public owner, generated owner, or monolith gate closes here; the
+remaining generated/Prost/Buffa ledger stays open.
