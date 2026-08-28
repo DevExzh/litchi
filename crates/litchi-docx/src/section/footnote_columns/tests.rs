@@ -266,6 +266,146 @@ fn mutation_merges_existing_ignorable_tokens_and_custom_prefixes() {
 }
 
 #[test]
+fn inserts_before_section_change_without_rewriting_opaque_trivia() {
+    let source = section_xml(
+        r#"
+            <?keep processing?>
+            <!-- preserve before the extension -->
+            <x:opaque xmlns:x="urn:opaque" x:before="1"/>
+            <![CDATA[ preserve cdata trivia ]]>
+            <w:sectPrChange w:id="7">
+                <x:opaque xmlns:x="urn:opaque" x:inside="1"/>
+            </w:sectPrChange>
+            <!-- preserve after the barrier -->
+        "#,
+    );
+    let snapshot = Snapshot::from_xml(source.clone().into_bytes()).expect("valid section");
+    let mut edit = snapshot.edit();
+    edit.set_layout(Some(layout(4))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    let output = String::from_utf8(commit.snapshot().xml_bytes().to_vec()).expect("UTF-8 XML");
+    let inserted = r#"<w12:footnoteColumns w:val="4"/>"#;
+    let inserted_at = output.find(inserted).expect("inserted footnote layout");
+    let barrier_at = output
+        .find("<w:sectPrChange")
+        .expect("section change barrier");
+    assert!(inserted_at < barrier_at);
+    assert!(output.contains("<?keep processing?>"));
+    assert!(output.contains("<!-- preserve before the extension -->"));
+    assert!(output.contains("<![CDATA[ preserve cdata trivia ]]>"));
+    assert!(output.contains(r#"<x:opaque xmlns:x="urn:opaque" x:inside="1"/>"#));
+    assert!(output.contains("<!-- preserve after the barrier -->"));
+    assert_eq!(output.replacen(inserted, "", 1), source);
+}
+
+#[test]
+fn selects_matching_aliases_when_preferred_namespace_prefixes_collide() {
+    let source = format!(
+        r#"<w:sectPr xmlns:w="{W}" xmlns:w12="urn:occupied-word12" xmlns:x12="{W12}" xmlns:mc="urn:occupied-mc" xmlns:c="{MC}" c:Ignorable="opaque"><w:sectPrChange w:id="7"/></w:sectPr>"#
+    );
+    let snapshot = Snapshot::from_xml(source.into_bytes()).expect("valid aliased section");
+    let mut edit = snapshot.edit();
+    edit.set_layout(Some(layout(5))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    let output = std::str::from_utf8(commit.snapshot().xml_bytes()).expect("UTF-8 XML");
+
+    assert!(output.contains(r#"<x12:footnoteColumns w:val="5"/>"#));
+    assert!(!output.contains(r#"<w12:footnoteColumns"#));
+    assert!(output.contains(r#"xmlns:w12="urn:occupied-word12""#));
+    assert!(output.contains(r#"xmlns:mc="urn:occupied-mc""#));
+    assert!(output.contains(r#"c:Ignorable="opaque x12""#));
+    assert!(output.find("<x12:footnoteColumns").unwrap() < output.find("<w:sectPrChange").unwrap());
+}
+
+#[test]
+fn rejects_duplicate_expanded_mc_ignorable_aliases() {
+    let fragment = format!(
+        r#"<w:sectPr xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" xmlns:c="{MC}" mc:Ignorable="w12" c:Ignorable="w12"><w12:footnoteColumns w:val="2"/></w:sectPr>"#
+    );
+    assert!(Snapshot::from_xml(fragment.clone().into_bytes()).is_err());
+
+    let part = BlobPart::new(
+        PackURI::new("/word/document.xml").expect("URI"),
+        "application/xml".into(),
+        format!(
+            r#"<w:document xmlns:w="{W}" xmlns:w12="{W12}" xmlns:mc="{MC}" xmlns:c="{MC}" mc:Ignorable="w12" c:Ignorable="w12"><w:body>{fragment}</w:body></w:document>"#
+        )
+        .into_bytes(),
+    );
+    assert!(parse_part(&part).is_err());
+}
+
+#[test]
+fn unresolved_word_prefix_still_places_the_extension_before_section_change() {
+    let source = r#"<w:sectPr><w:sectPrChange w:id="7"/></w:sectPr>"#;
+    let snapshot = Snapshot::from_xml(source.as_bytes().to_vec()).expect("detached section");
+    let mut edit = snapshot.edit();
+    edit.set_layout(Some(layout(3))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    assert_eq!(
+        commit.snapshot().xml_bytes(),
+        br#"<w:sectPr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w12="http://schemas.microsoft.com/office/word/2012/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w12"><w12:footnoteColumns w:val="3"/><w:sectPrChange w:id="7"/></w:sectPr>"#
+    );
+}
+
+#[test]
+fn insertion_refuses_unknown_or_post_change_word_children() {
+    let unknown = Snapshot::from_xml(
+        format!(r#"<w:sectPr xmlns:w="{W}"><w:future/></w:sectPr>"#).into_bytes(),
+    )
+    .expect("opaque Word child remains readable");
+    let mut edit = unknown.edit();
+    edit.set_layout(Some(layout(2))).expect("valid value");
+    assert!(edit.commit().is_err());
+
+    let post_change = Snapshot::from_xml(
+        format!(r#"<w:sectPr xmlns:w="{W}"><w:sectPrChange/><w:pgSz/></w:sectPr>"#).into_bytes(),
+    )
+    .expect("source remains losslessly readable");
+    let mut edit = post_change.edit();
+    edit.set_layout(Some(layout(2))).expect("valid value");
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn insertion_does_not_capture_opaque_descendant_prefixes() {
+    let source = format!(
+        r#"<w:sectPr xmlns:w="{W}"><x:opaque xmlns:x="urn:opaque"><w12:nested/></x:opaque></w:sectPr>"#
+    );
+    let snapshot = Snapshot::from_xml(source.into_bytes()).expect("opaque descendant");
+    let mut edit = snapshot.edit();
+    edit.set_layout(Some(layout(6))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    let output = std::str::from_utf8(commit.snapshot().xml_bytes()).expect("UTF-8 XML");
+    assert!(
+        output.contains(r#"xmlns:w12_1="http://schemas.microsoft.com/office/word/2012/wordml""#)
+    );
+    assert!(output.contains(r#"<w12_1:footnoteColumns w:val="6"/>"#));
+    assert!(output.contains("<w12:nested/>"));
+}
+
+#[test]
+fn inherited_ignorable_tokens_are_not_duplicated_or_rebound_locally() {
+    let part = BlobPart::new(
+        PackURI::new("/word/document.xml").expect("URI"),
+        "application/xml".into(),
+        format!(
+            r#"<q:document xmlns:q="{W}" xmlns:x12="{W12}" xmlns:m="{MC}" m:Ignorable="x12"><q:body><q:sectPr xmlns:x12="urn:locally-shadowed"/></q:body></q:document>"#
+        )
+        .into_bytes(),
+    );
+    let sections = parse_part(&part).expect("document sections");
+    let mut edit = sections[0].edit();
+    edit.set_layout(Some(layout(7))).expect("valid edit");
+    let commit = edit.commit().expect("commit");
+    let output = std::str::from_utf8(commit.snapshot().xml_bytes()).expect("UTF-8 XML");
+    assert!(output.contains(r#"m:Ignorable="w12""#));
+    assert!(!output.contains("x12 w12"));
+    assert!(!output.contains("w12 w12"));
+    assert!(output.contains(r#"<w12:footnoteColumns q:val="7"/>"#));
+}
+
+#[test]
 fn rejects_overdeep_section_fragments() {
     let nested = format!(
         "<x:opaque xmlns:x=\"urn:x\">{} </x:opaque>",

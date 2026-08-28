@@ -26,7 +26,7 @@ use crate::namespace::is_wordprocessing_namespace;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::fmt::Write;
 
@@ -124,6 +124,8 @@ pub(crate) struct Parsed {
     root: Root,
     extension: Option<Range>,
     value_range: Option<Range>,
+    sect_pr_change_start: Option<usize>,
+    unsafe_insertion_child: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -136,6 +138,7 @@ struct Root {
     open: Vec<u8>,
     word_prefix: Vec<u8>,
     word_namespace: Vec<u8>,
+    resolver: NamespaceResolver,
 }
 
 #[derive(Debug, Clone)]
@@ -173,6 +176,8 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
     let mut extension_depth = None;
     let mut extension_start = None;
     let mut root_ignorable = None;
+    let mut sect_pr_change_start = None;
+    let mut unsafe_insertion_child = false;
 
     loop {
         let event_start = offset(&reader)?;
@@ -222,6 +227,7 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
                         word_namespace: namespace_uri(&namespace).unwrap_or_else(|| {
                             crate::namespace::WORDPROCESSINGML_NAMESPACE.to_vec()
                         }),
+                        resolver: resolver.clone(),
                     });
                     depth = 1;
                 } else {
@@ -233,6 +239,16 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
                     let is_extension = depth == 1
                         && is_extension_element(&namespace, &element)
                         && element.local_name().as_ref() == EXTENSION;
+                    if depth == 1 {
+                        observe_direct_word_child(
+                            &namespace,
+                            &element,
+                            fragment_prefix.as_ref(),
+                            event_start,
+                            &mut sect_pr_change_start,
+                            &mut unsafe_insertion_child,
+                        );
+                    }
                     if is_extension {
                         if extension.is_some() || extension_depth.is_some() {
                             return Err(Error::InvalidFormat(
@@ -290,6 +306,7 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
                         word_namespace: namespace_uri(&namespace).unwrap_or_else(|| {
                             crate::namespace::WORDPROCESSINGML_NAMESPACE.to_vec()
                         }),
+                        resolver: resolver.clone(),
                     });
                 } else if extension_depth.is_some() {
                     return Err(Error::InvalidFormat(
@@ -322,6 +339,15 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
                     value_prefix = Some(attribute_prefix);
                     value_range = Some(value_span);
                     let _ = layout;
+                } else if depth == 1 {
+                    observe_direct_word_child(
+                        &namespace,
+                        &element,
+                        fragment_prefix.as_ref(),
+                        event_start,
+                        &mut sect_pr_change_start,
+                        &mut unsafe_insertion_child,
+                    );
                 }
             },
             Event::Text(text)
@@ -418,6 +444,8 @@ pub(crate) fn read_with_context(xml: &[u8], context: &Context) -> Result<Parsed>
         root,
         extension,
         value_range,
+        sect_pr_change_start,
+        unsafe_insertion_child,
     })
 }
 
@@ -442,9 +470,19 @@ pub(crate) fn rewrite_with_context(
 }
 
 fn insert_extension(xml: &[u8], parsed: &Parsed, value: Layout) -> Result<Vec<u8>> {
+    if parsed.unsafe_insertion_child {
+        return Err(Error::InvalidFormat(
+            "cannot prove a schema-safe footnoteColumns insertion point".into(),
+        ));
+    }
     let root = &parsed.root;
-    let (element_prefix, compatibility_prefix, open) =
-        prepare_root(&root.open, &root.word_prefix, &root.word_namespace)?;
+    let (element_prefix, open) = prepare_root(
+        xml,
+        &root.open,
+        &root.word_prefix,
+        &root.word_namespace,
+        &root.resolver,
+    )?;
     let rendered = render(&element_prefix, &root.word_prefix, value)?;
     let Some(close_start) = root.close_start else {
         let mut expanded = expand_root(&open, &root.name)?;
@@ -457,14 +495,15 @@ fn insert_extension(xml: &[u8], parsed: &Parsed, value: Layout) -> Result<Vec<u8
         return Ok(output);
     };
 
-    let insertion = trailing_whitespace_start(xml, root.open_end, close_start);
+    let insertion = parsed
+        .sect_pr_change_start
+        .unwrap_or_else(|| trailing_whitespace_start(xml, root.open_end, close_start));
     let mut output = Vec::with_capacity(xml.len() + rendered.len() + 32);
     output.extend_from_slice(&xml[..root.start]);
     output.extend_from_slice(&open);
     output.extend_from_slice(&xml[root.open_end..insertion]);
     output.extend_from_slice(&rendered);
     output.extend_from_slice(&xml[insertion..]);
-    let _ = compatibility_prefix;
     Ok(output)
 }
 
@@ -649,15 +688,29 @@ fn require_ignorable(value: Option<&str>, prefix: &[u8], inherited: bool) -> Res
 }
 
 fn prepare_root(
+    source_xml: &[u8],
     root_open: &[u8],
     word_prefix: &[u8],
     word_namespace: &[u8],
-) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+    resolver: &NamespaceResolver,
+) -> Result<(Vec<u8>, Vec<u8>)> {
     let attributes = scan_attributes(root_open)?;
-    let element_prefix = choose_prefix(&attributes, validation::WORD_2012_NAMESPACE, b"w12");
-    let compatibility_prefix = choose_prefix(&attributes, validation::MC_NAMESPACE, b"mc");
+    let element_prefix = choose_prefix(
+        &attributes,
+        resolver,
+        source_xml,
+        validation::WORD_2012_NAMESPACE,
+        b"w12",
+    )?;
+    let compatibility_prefix = choose_prefix(
+        &attributes,
+        resolver,
+        source_xml,
+        validation::MC_NAMESPACE,
+        b"mc",
+    )?;
     let mut edits = Vec::new();
-    if !has_namespace(&attributes, word_prefix, word_namespace) {
+    if !has_namespace(&attributes, resolver, word_prefix, word_namespace) {
         edits.push((
             close_insert(root_open),
             format!(" xmlns:{}=\"{}\"", text(word_prefix), text(word_namespace)).into_bytes(),
@@ -665,6 +718,7 @@ fn prepare_root(
     }
     let has_word_decl = has_namespace(
         &attributes,
+        resolver,
         &element_prefix,
         validation::WORD_2012_NAMESPACE,
     );
@@ -679,7 +733,12 @@ fn prepare_root(
             .into_bytes(),
         ));
     }
-    let has_mc_decl = has_namespace(&attributes, &compatibility_prefix, validation::MC_NAMESPACE);
+    let has_mc_decl = has_namespace(
+        &attributes,
+        resolver,
+        &compatibility_prefix,
+        validation::MC_NAMESPACE,
+    );
     if !has_mc_decl {
         edits.push((
             close_insert(root_open),
@@ -692,13 +751,7 @@ fn prepare_root(
         ));
     }
 
-    let ignorable = attributes.iter().find(|attribute| {
-        attribute.name.ends_with(b":Ignorable")
-            && attribute
-                .name
-                .strip_suffix(b":Ignorable")
-                .is_some_and(|prefix| prefix == compatibility_prefix.as_slice())
-    });
+    let ignorable = find_ignorable_attribute(&attributes, resolver)?;
     if let Some(ignorable) = ignorable {
         if !has_ignorable_prefix_bytes(&ignorable.value, &element_prefix) {
             edits.push((
@@ -723,7 +776,7 @@ fn prepare_root(
     for (position, bytes) in edits.into_iter().rev() {
         output.splice(position..position, bytes);
     }
-    Ok((element_prefix, compatibility_prefix, output))
+    Ok((element_prefix, output))
 }
 
 fn scan_attributes(tag: &[u8]) -> Result<Vec<Attribute>> {
@@ -806,35 +859,177 @@ fn skip_name(bytes: &[u8], index: &mut usize) -> Result<()> {
     }
 }
 
-fn choose_prefix(attributes: &[Attribute], namespace: &[u8], preferred: &[u8]) -> Vec<u8> {
-    if let Some(prefix) = attributes.iter().find_map(|attribute| {
-        let prefix = attribute.name.strip_prefix(b"xmlns:")?;
-        (attribute.value == namespace).then(|| prefix.to_vec())
+fn choose_prefix(
+    attributes: &[Attribute],
+    resolver: &NamespaceResolver,
+    source_xml: &[u8],
+    namespace: &[u8],
+    preferred: &[u8],
+) -> Result<Vec<u8>> {
+    if let Some(prefix) = resolver.bindings().find_map(|(prefix, value)| {
+        let PrefixDeclaration::Named(prefix) = prefix else {
+            return None;
+        };
+        let prefix = prefix.to_vec();
+        (value.as_ref() == namespace && has_namespace(attributes, resolver, &prefix, namespace))
+            .then_some(prefix)
     }) {
-        return prefix;
+        return Ok(prefix);
     }
-    if !attributes
-        .iter()
-        .any(|attribute| attribute.name == [b"xmlns:".as_slice(), preferred].concat())
-    {
-        return preferred.to_vec();
-    }
+
+    let mut candidate = preferred.to_vec();
     let mut suffix = 1u32;
-    loop {
-        let candidate = format!("{}_{}", text(preferred), suffix).into_bytes();
-        if !attributes.iter().any(|attribute| {
-            attribute.name == [b"xmlns:".as_slice(), candidate.as_slice()].concat()
-        }) {
-            return candidate;
+    while prefix_is_in_use(attributes, resolver, source_xml, &candidate) {
+        candidate = format!("{}_{}", text(preferred), suffix).into_bytes();
+        suffix = suffix.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("namespace prefix candidate counter overflow".into())
+        })?;
+    }
+    Ok(candidate)
+}
+
+fn has_namespace(
+    attributes: &[Attribute],
+    resolver: &NamespaceResolver,
+    prefix: &[u8],
+    namespace: &[u8],
+) -> bool {
+    if attributes.iter().any(|attribute| {
+        attribute.name == [b"xmlns:".as_slice(), prefix].concat() && attribute.value == namespace
+    }) {
+        return true;
+    }
+    let qualified = [prefix, b":__litchi_namespace_probe"].concat();
+    matches!(
+        resolver.resolve_attribute(QName(&qualified)).0,
+        ResolveResult::Bound(Namespace(value)) if value == namespace
+    )
+}
+
+fn find_ignorable_attribute<'a>(
+    attributes: &'a [Attribute],
+    resolver: &NamespaceResolver,
+) -> Result<Option<&'a Attribute>> {
+    let mut found = None;
+    for attribute in attributes {
+        if !attribute.name.ends_with(b":Ignorable") {
+            continue;
         }
-        suffix = suffix.saturating_add(1);
+        let is_compatibility = matches!(
+            resolver.resolve_attribute(QName(&attribute.name)).0,
+            ResolveResult::Bound(Namespace(value)) if value == validation::MC_NAMESPACE
+        );
+        if !is_compatibility {
+            continue;
+        }
+        if found.is_some() {
+            return Err(Error::InvalidFormat(
+                "sectPr has duplicate mc:Ignorable attributes".into(),
+            ));
+        }
+        found = Some(attribute);
+    }
+    Ok(found)
+}
+
+fn prefix_is_in_use(
+    attributes: &[Attribute],
+    resolver: &NamespaceResolver,
+    source_xml: &[u8],
+    prefix: &[u8],
+) -> bool {
+    if resolver
+        .bindings()
+        .any(|(binding, _)| matches!(binding, PrefixDeclaration::Named(value) if value == prefix))
+    {
+        return true;
+    }
+    attributes.iter().any(|attribute| {
+        if attribute.name == [b"xmlns:".as_slice(), prefix].concat() {
+            return true;
+        }
+        attribute
+            .name
+            .iter()
+            .position(|byte| *byte == b':')
+            .is_some_and(|index| &attribute.name[..index] == prefix)
+    }) || qualified_prefix_occurs(source_xml, prefix)
+}
+
+fn qualified_prefix_occurs(xml: &[u8], prefix: &[u8]) -> bool {
+    let Some(width) = prefix.len().checked_add(1) else {
+        return true;
+    };
+    xml.windows(width)
+        .any(|window| window[..prefix.len()] == *prefix && window[prefix.len()] == b':')
+}
+
+fn observe_direct_word_child(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    fragment_prefix: Option<&Option<Vec<u8>>>,
+    event_start: usize,
+    sect_pr_change_start: &mut Option<usize>,
+    unsafe_insertion_child: &mut bool,
+) {
+    if !is_fragment_word_element(namespace, element, fragment_prefix) {
+        return;
+    }
+    let local = element.local_name();
+    if local.as_ref() == b"sectPrChange" {
+        if sect_pr_change_start.replace(event_start).is_some() {
+            *unsafe_insertion_child = true;
+        }
+    } else if sect_pr_change_start.is_some() || !is_pre_extension_section_child(local.as_ref()) {
+        *unsafe_insertion_child = true;
     }
 }
 
-fn has_namespace(attributes: &[Attribute], prefix: &[u8], namespace: &[u8]) -> bool {
-    attributes.iter().any(|attribute| {
-        attribute.name == [b"xmlns:".as_slice(), prefix].concat() && attribute.value == namespace
-    })
+fn is_fragment_word_element(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    fragment_prefix: Option<&Option<Vec<u8>>>,
+) -> bool {
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => {
+            fragment_prefix.and_then(|value| value.as_deref()) == Some(prefix.as_slice())
+                && element.name().prefix().is_some()
+        },
+        ResolveResult::Unbound => {
+            fragment_prefix.is_some_and(Option::is_none) && element.name().prefix().is_none()
+        },
+        ResolveResult::Bound(_) => false,
+    }
+}
+
+fn is_pre_extension_section_child(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"headerReference"
+            | b"footerReference"
+            | b"footnotePr"
+            | b"endnotePr"
+            | b"type"
+            | b"pgSz"
+            | b"pgMar"
+            | b"paperSrc"
+            | b"pgBorders"
+            | b"lnNumType"
+            | b"pgNumType"
+            | b"cols"
+            | b"formProt"
+            | b"vAlign"
+            | b"noEndnote"
+            | b"titlePg"
+            | b"textDirection"
+            | b"bidi"
+            | b"rtlGutter"
+            | b"docGrid"
+            | b"printerSettings"
+    )
 }
 
 fn has_ignorable_prefix_bytes(value: &[u8], prefix: &[u8]) -> bool {
