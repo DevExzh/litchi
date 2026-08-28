@@ -6590,3 +6590,46 @@ packages, 239 internal dependency declarations, one migration host, and 13
 ordered debts. No crate, manifest, dependency edge, debt, public owner, or
 monolith gate closes, and all remaining generated/Prost/Buffa ownership work
 remains explicit.
+
+## 2026-08-28 amendment: Wave111 Keynote movie-transform bounded owner slice (not a monolith-exit gate)
+
+Wave111 completes the supported transform portion of the existing Keynote
+movie-geometry slice. The public semantic boundary keeps `MovieGeometry` as
+position plus displayed size and adds archive-free `MovieTransform` (finite
+angle and supported reflection) and `MovieFlipAxis`. The existing
+`Package::{slide_movie_geometry, edit_slide_movie_geometry,
+apply_slide_movie_geometry}` transaction stages geometry and transform as one
+source-fingerprinted patch. Its prepared codec path validates optional flags
+and angle, preserves unknown framing and unrelated flag bits, rejects
+malformed/duplicate/wrong-wire/non-finite input, and performs one checked
+execution before candidate validation and reread.
+
+The raw Keynote host geometry, original-size, and flip entry points plus their
+fallback are retired. Selector-first bridges call the focused package and do
+not bypass its errors. Private physical movie helpers remain for media
+creation/removal, offsets, properties, and graph maintenance outside this
+owner. The focused package suite is 27/27 and the transform codec suite is
+10/10. Both the low-level `keynote_movie_geometry_codec` and package-level
+`keynote_slide_movie_geometry` fuzz targets passed isolated cargo checks and
+strict target Clippy, and the bounded 32-run smoke passed. The package-level
+corpus contains nine command-only seeds, with eight new command seeds across
+the package and low-level targets. The final completion ratchet passed its
+focused 8/8 and full 670/670 boundary checks; `py_compile` passed and the live
+audits were empty. The full checker reported only the three unrelated findings
+from the pre-existing untracked Pages table-lock file. A broader
+`litchi-keynote` library sweep was 152/153, with the sole `soundtrack_order`
+failure unrelated to Wave111.
+
+No Wave111 native movie source was available: tracked `basic.key` has no
+file-backed `.mov`, and historical Wave87 artifacts are absent. There is no
+Wave111 driver/UI candidate, inverse, save/reopen, or native acceptance claim.
+The prior Wave87 native geometry record, including strict normalized reread
+`InvalidSource`, remains historical evidence only.
+
+This extension closes no crate, manifest dependency, migration edge, debt,
+generated/Prost/Buffa owner, host-exit, or monolith-exit gate. The
+`litchi-iwa -> litchi-keynote` edge, all 13 debts, and the 64-package/
+239-internal-dependency topology remain unchanged. Accounting is a conservative
+logical envelope; package caches, decompressed Archives, ZIP/Snappy buffers,
+codec-internal allocation, the OS allocator, RSS, and zero-copy behavior are
+not measured or claimed.
