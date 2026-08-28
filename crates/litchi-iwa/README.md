@@ -2970,3 +2970,30 @@ packages, 239 internal dependency declarations, one migration host, and 13
 ordered debts; litchi-iwa -> litchi-keynote/debt 014, all other edges/debts,
 generated/Prost/Buffa ownership, and the IWA monolith deletion gate remain
 unchanged.
+
+## Wave110 amendment: Numbers dimension bucket wire is generated-free
+
+The private Numbers table-dimension storage adapter now reads and rewrites
+type-6006 header buckets through the neutral `table_dimension_codec`, not the
+generated `TST.HeaderStorageBucket` or nested header types. Reads validate the
+whole bucket under finite limits; writes use a prepared plan, inspect its
+requirements, execute once, preserve untouched raw fields/order, and publish
+atomically. Duplicate/out-of-range records, invalid sizes, mismatched row
+hashes, duplicate/zero row-bucket references, and known table/storage role
+aliases fail closed. External storage references, incorrect bucket counts,
+row/column storage aliasing, and row records outside their assigned 65,536-row
+slot are rejected as well.
+
+This is a private wire migration only. The surrounding route still uses a
+generated `TableModelArchive` for legacy selection; it is not a new public
+package owner, a package-wide shared-bucket authority proof, or a raw-ID API
+retirement. No native/UI acceptance is claimed.
+
+Wave110 verification passed 58/58 focused codec tests, protos check/strict
+Clippy, five IWA regressions, IWA library check/strict scoped Clippy, 667/667
+boundary tests, `py_compile`, and the live storage-codec audit. The full
+checker's only failures were three unrelated findings from the pre-existing
+untracked Pages table-lock file. Limits are conservative logical envelopes,
+not package-cache, decompressed-Archive, ZIP/Snappy, allocator, RSS, or
+zero-copy telemetry. The 64-package/239-internal-dependency/13-debt topology,
+all dependency edges, and the IWA monolith deletion gate remain unchanged.

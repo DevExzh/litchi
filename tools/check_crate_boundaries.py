@@ -5357,6 +5357,36 @@ NUMBERS_TABLE_DIMENSION_OWNER_SOURCE = Path(
 NUMBERS_TABLE_DIMENSION_OWNER_HELPER_ROOT = Path(
     "crates/litchi-numbers/src/package/table_dimension"
 )
+IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor/table_dimension/storage.rs"
+)
+IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_MODULE = "table_dimension_codec"
+IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_FUNCTIONS = (
+    "decode_header_storage_bucket_with_visitor",
+    "plan_header_storage_bucket_sizes",
+    "execute_header_storage_bucket_size_plan",
+)
+IWA_NUMBERS_TABLE_DIMENSION_STORAGE_GENERATED_PATTERNS = (
+    (
+        "HeaderStorageBucket generated type",
+        re.compile(r"(?<![A-Za-z0-9_#])(?:r#)?HeaderStorageBucket\b"),
+    ),
+    (
+        "header_storage_bucket::Header generated type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?header_storage_bucket"
+            r"[ \t\r\n]*::[ \t\r\n]*(?:r#)?Header\b"
+        ),
+    ),
+    (
+        "generated header encode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+            r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?(?:encode|encode_to_vec)"
+            r"[ \t\r\n]*\("
+        ),
+    ),
+)
 NUMBERS_TABLE_DIMENSION_IMPLEMENTATION_SOURCES = (
     NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE,
     NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE,
@@ -17937,6 +17967,134 @@ def audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
             violations.append(
                 "focused litchi-numbers cell-control Pop-Up Menu split "
                 f"{kind} fuzz corpus is empty: {corpus}"
+            )
+
+    return sorted(set(violations))
+
+
+def _iwa_numbers_table_dimension_codec_call_present(
+    source: str, function_name: str
+) -> bool:
+    """Recognize a real call through the hidden neutral dimension codec.
+
+    The adapter may import the module under a local alias or import one of
+    the codec functions directly.  Requiring the module/function spelling in
+    the import keeps a same-named local helper from satisfying the ratchet.
+    """
+
+    module = re.escape(IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_MODULE)
+    function = re.escape(function_name)
+    if re.search(rf"\b{module}[ \t\r\n]*::[ \t\r\n]*{function}\b", source):
+        return True
+
+    for match in re.finditer(
+        rf"\buse\b[^;]*\b{module}[ \t\r\n]+as[ \t\r\n]+"
+        r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+        source,
+        re.DOTALL,
+    ):
+        alias = re.escape(match.group("alias"))
+        if re.search(
+            rf"\b{alias}[ \t\r\n]*::[ \t\r\n]*{function}\b", source
+        ):
+            return True
+
+    imported_names: set[str] = set()
+    for match in re.finditer(
+        rf"\buse\b[^;]*\b{module}[ \t\r\n]*::[ \t\r\n]*"
+        r"\{(?P<body>[^{}]*)\}",
+        source,
+        re.DOTALL,
+    ):
+        body_match = re.search(
+            rf"\b{function}\b(?:[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b)?",
+            match.group("body"),
+        )
+        if body_match is not None:
+            imported_names.add(body_match.group("alias") or function_name)
+    for match in re.finditer(
+        rf"\buse\b[^;]*\b{module}[ \t\r\n]*::[ \t\r\n]*"
+        rf"(?:r#)?{function}\b(?:[ \t\r\n]+as[ \t\r\n]+"
+        r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b)?[ \t\r\n]*;",
+        source,
+        re.DOTALL,
+    ):
+        imported_names.add(match.group("alias") or function_name)
+    return any(
+        re.search(
+            rf"(?<![A-Za-z0-9_#])(?:r#)?{re.escape(name)}"
+            r"[ \t\r\n]*\(",
+            source,
+        )
+        for name in imported_names
+    )
+
+
+def audit_iwa_numbers_table_dimension_storage_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep header-bucket dimension wire access on the neutral codec seam.
+
+    This is deliberately scoped to the private physical storage adapter. The
+    public Numbers API ratchet owns selector/transaction vocabulary; this
+    ratchet owns the generated-free wire handoff. ``cfg(test)`` items are
+    masked before inspection so generated fixture/oracle code remains legal
+    without making a production decode or encode invisible.
+    """
+
+    source_path = root / IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE
+    if not source_path.is_file():
+        return []
+
+    production_source = _mask_rust_cfg_test_items(
+        source_path.read_text(encoding="utf-8")
+    )
+    production_code = _mask_rust_non_code(production_source)
+    violations: list[str] = []
+
+    for label, pattern in IWA_NUMBERS_TABLE_DIMENSION_STORAGE_GENERATED_PATTERNS:
+        for match in pattern.finditer(production_code):
+            line_number = production_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-iwa Numbers table-dimension storage production "
+                f"source uses {label}: "
+                f"{IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE}:{line_number}"
+            )
+
+    required_markers = (
+        (
+            "neutral table_dimension_codec decode/visitor",
+            IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_FUNCTIONS[0],
+        ),
+        (
+            "neutral table_dimension_codec prepared plan",
+            IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_FUNCTIONS[1],
+        ),
+        (
+            "neutral table_dimension_codec execution requirements",
+            "requirements",
+        ),
+        (
+            "neutral table_dimension_codec execute",
+            IWA_NUMBERS_TABLE_DIMENSION_STORAGE_CODEC_FUNCTIONS[2],
+        ),
+    )
+    for label, function_name in required_markers:
+        if function_name == "requirements":
+            present = re.search(
+                r"\.[ \t\r\n]*(?:r#)?requirements[ \t\r\n]*\(",
+                production_code,
+            ) is not None
+        else:
+            present = _iwa_numbers_table_dimension_codec_call_present(
+                production_code, function_name
+            )
+        if not present:
+            violations.append(
+                "focused litchi-iwa Numbers table-dimension storage production "
+                f"source is missing {label}: "
+                f"{IWA_NUMBERS_TABLE_DIMENSION_STORAGE_SOURCE}"
             )
 
     return sorted(set(violations))
@@ -34781,6 +34939,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_pop_up_menu_source_topology()
         + audit_numbers_table_cell_pop_up_menu_facade_source_topology()
         + audit_iwa_numbers_table_dimension_source_topology()
+        + audit_iwa_numbers_table_dimension_storage_codec_source_topology()
         + audit_numbers_table_dimension_facade_source_topology()
         + audit_numbers_formula_facade_source_topology()
         + audit_numbers_table_cells_facade_source_topology()

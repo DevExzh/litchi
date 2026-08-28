@@ -14758,3 +14758,45 @@ packages, 239 internal dependency declarations, one migration host, and 13
 ordered debts; the litchi-iwa -> litchi-keynote edge/debt 014, all other
 edges/debts, generated/Prost/Buffa ownership, and the IWA monolith deletion
 gate remain unchanged.
+
+## 2026-08-28 amendment: Wave110 Numbers dimension storage wire seam
+
+Wave110 moves the private Numbers table-dimension header-bucket read/write
+seam in `litchi-iwa` from generated `TST.HeaderStorageBucket` materialization
+to the neutral `table_dimension_codec`. Reads use a bounded streaming visitor;
+writes use the codec's prepared plan, inspect its finite execution
+requirements, and execute once. The adapter preserves untouched raw fields and
+field order, validates every header record rather than only the selected
+index, rejects duplicate or out-of-range indices, invalid floating-point
+sizes, mismatched row-bucket hashes, duplicate/zero row-bucket identities, and
+known table/storage role aliases. Model admission also rejects externally
+marked storage references, noncanonical row-bucket cardinality, row/column
+storage aliasing, and records outside their 65,536-row bucket slot before
+publishing through the existing archive transaction.
+
+This is an internal generated/Prost ownership reduction, not a new public
+package owner. The surrounding legacy dimension route still selects through a
+generated `TableModelArchive`; package-wide inbound/shared-bucket authority,
+selector transactions, fingerprints, conflicts, inverse artifacts, candidate
+reopen, and locality remain the responsibility of existing focused package
+owners or later migration work. No raw-ID API is retired by this amendment.
+
+Scoped verification passed 58/58 focused storage-codec tests, the
+`litchi-iwa-protos` library check and strict Clippy, five Wave110 IWA
+regressions (four neutral-codec cases plus one source-created package lifecycle
+case), the `litchi-iwa` library check, and strict IWA library/test Clippy with
+only unrelated existing lint allowances. The boundary unit suite passed
+667/667, `py_compile` passed, and the live dimension-storage codec audit was
+empty. The full boundary checker was blocked only by three findings from the
+unrelated pre-existing untracked Pages table-lock file.
+
+No native/UI run or native acceptance claim is made for this private wire
+migration. Finite codec options and prepared requirements are conservative
+logical bounds; package caches, decompressed Archives, ZIP/Snappy buffers, the
+process allocator, RSS, and codec-internal allocator telemetry are not
+measured. No zero-copy, allocator/RSS, or package-wide performance claim
+follows. The authoritative topology remains 64 packages, 239 internal
+dependency declarations, one migration host, and 13 ordered debts. Wave110
+closes no crate, manifest, dependency edge, debt, public owner, or monolith
+gate; all existing edges, debts, and the remaining generated/Prost/Buffa
+ownership ledger stay open.
