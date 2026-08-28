@@ -2997,3 +2997,50 @@ untracked Pages table-lock file. Limits are conservative logical envelopes,
 not package-cache, decompressed-Archive, ZIP/Snappy, allocator, RSS, or
 zero-copy telemetry. The 64-package/239-internal-dependency/13-debt topology,
 all dependency edges, and the IWA monolith deletion gate remain unchanged.
+
+## Wave111 Keynote movie-transform ownership
+
+The selector-first `litchi_keynote::Package` movie-geometry transaction now
+keeps `MovieGeometry` as the archive-free position/display-size value and adds
+archive-free `MovieTransform` (finite angle plus supported reflection) and
+`MovieFlipAxis`. `Package::{slide_movie_geometry, edit_slide_movie_geometry,
+apply_slide_movie_geometry}` stages geometry and transform atomically, with
+exact-source fingerprints, no-op/conflict and inverse behavior, strict
+candidate reread, preview invalidation, and locality checks. Native IDs,
+archives, media assets, and unrelated flag bits remain private.
+
+The strict `keynote_movie_geometry_codec` handles optional native flags and
+angle fields through finite prepared limits and one execution, preserving
+unknown fields/groups and unrelated flag bits while rejecting duplicate,
+wrong-wire, malformed, and non-finite input. The focused package and codec
+suites are 27/27 and 10/10. The four raw Keynote host geometry/restore/flip
+entry points and their fallback are retired; typed host bridges delegate to
+the focused package and propagate its errors. Private physical helpers remain
+only for unrelated media lifecycle, offset, property, and graph work.
+
+Both the low-level `keynote_movie_geometry_codec` and package-level
+`keynote_slide_movie_geometry` fuzz targets passed isolated cargo checks and
+strict target Clippy, and the bounded 32-run smoke passed. The package-level
+corpus contains nine hand-authored command seeds, with eight new command seeds
+across the package and low-level targets; no native package artifact is
+implied. The final completion ratchet passed its focused 8/8 and full 670/670
+boundary checks; `py_compile` passed and live audits were empty. The full
+checker reported only the three unrelated findings from the pre-existing
+untracked Pages table-lock file. Both fuzz targets passed isolated checks,
+strict target Clippy, and the bounded 32-run smoke; the package-level corpus
+contains nine hand-authored command seeds, with eight new seeds across both
+targets and no native package artifact. A broader `litchi-keynote` library
+sweep was 152/153, with the sole `soundtrack_order` failure unrelated to
+Wave111. No Wave111 native movie source exists:
+tracked `basic.key` contains no `.mov`, and historical Wave87 artifacts are
+absent. No Wave111 candidate/inverse/UI/save/reopen acceptance is claimed;
+the historical Wave87 geometry record and its strict normalized reread
+`InvalidSource` remain unchanged.
+
+This is a bounded ownership extension, not a monolith-exit gate. The
+64-package/239-internal-dependency/13-debt topology, all dependency edges,
+`litchi-iwa -> litchi-keynote`, generated/Prost/Buffa ownership, and the IWA
+monolith gate remain unchanged. Resource limits are conservative logical
+envelopes; package caches, decompressed Archives, ZIP/Snappy buffers,
+codec-internal allocation, the process allocator, RSS, and zero-copy behavior
+are not directly measured.

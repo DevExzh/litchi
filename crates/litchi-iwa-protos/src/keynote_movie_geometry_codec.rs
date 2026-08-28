@@ -1,9 +1,10 @@
 //! Strict, generated-free projection and source-preserving rewrite for the
 //! Keynote `TSD.MovieArchive` geometry edge.
 //!
-//! Only `MovieArchive.super.geometry.position` and `.size` are semantic write
-//! targets.  Flags, angle, envelope framing, and unknown fields remain raw
-//! source bytes.  A private Buffa lazy view is used as an ingress cross-check;
+//! The geometry transaction owns `MovieArchive.super.geometry.position` and
+//! `.size`; the additive transform transaction owns the optional `flags` and
+//! `angle` scalars.  Envelope framing and unknown fields remain raw source
+//! bytes.  A private Buffa lazy view is used as an ingress cross-check;
 //! generated types never cross this module's public boundary.
 
 #![allow(
@@ -28,6 +29,18 @@ const POINT_Y_FIELD: u32 = 2;
 const SIZE_WIDTH_FIELD: u32 = 1;
 const SIZE_HEIGHT_FIELD: u32 = 2;
 const MAX_RECURSION: u32 = 64;
+
+// These are logical operation-accounting units.  The strict scanner uses one
+// fallibly-reserved `Vec<ParsedField>` for each message, while Buffa's lazy
+// projection and the rewrite stages have additional bounded working buffers.
+// Keep these envelopes deliberately conservative: allocator/RSS telemetry is
+// not available at this neutral codec boundary.
+const BUFFA_LOGICAL_ALLOCATIONS: usize = 2;
+const TRANSFORM_EXECUTE_ALLOCATIONS: usize = 6;
+const GEOMETRY_EXECUTE_ALLOCATIONS: usize = 10;
+const CANDIDATE_SCAN_ALLOCATIONS: usize = 5 + BUFFA_LOGICAL_ALLOCATIONS;
+const TRANSFORM_OUTPUT_BUFFERS: usize = 3;
+const GEOMETRY_OUTPUT_BUFFERS: usize = 5;
 
 /// Finite limits for one geometry payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,7 +87,10 @@ impl DecodeOptions {
             16,
         )
         .with_max_output_bytes(bytes.saturating_mul(2).max(1))
-        .with_max_retained_bytes(bytes.saturating_mul(2).max(1))
+        // Prepared execution retains the source envelope plus the bounded
+        // geometry/drawable/output staging buffers.  This is a logical peak
+        // envelope, rather than an allocator or RSS measurement.
+        .with_max_retained_bytes(bytes.saturating_mul(16).max(1))
         .with_max_scratch_bytes(
             bytes
                 .saturating_mul(size_of::<ParsedField>())
@@ -305,6 +321,203 @@ impl MovieGeometrySnapshot {
     #[must_use]
     pub const fn height(self) -> f32 {
         self.size.height
+    }
+}
+
+/// Archive-free projection of the optional movie transform scalars.
+///
+/// `None` preserves the distinction between an absent protobuf field and an
+/// explicit zero value.  The angle is the native wire value in degrees; no
+/// range normalization is performed by this neutral codec.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MovieTransformSnapshot {
+    flags: Option<u32>,
+    angle_degrees: Option<f32>,
+}
+
+impl MovieTransformSnapshot {
+    /// Return the optional native reflection/transform bitfield.
+    #[must_use]
+    pub const fn flags(self) -> Option<u32> {
+        self.flags
+    }
+
+    /// Return the optional native angle in degrees.
+    #[must_use]
+    pub const fn angle_degrees(self) -> Option<f32> {
+        self.angle_degrees
+    }
+
+    /// Alias for callers that use the wire field's concise name.
+    #[must_use]
+    pub const fn angle(self) -> Option<f32> {
+        self.angle_degrees
+    }
+}
+
+/// One optional transform-field update.
+///
+/// `Preserve` copies the complete source field span, `Set` writes one
+/// canonical known field, and `Clear` removes an existing known field.  A
+/// clear of an absent field is an exact no-op.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TransformField<T> {
+    /// Leave the source field, including its presence and raw framing, alone.
+    Preserve,
+    /// Set an explicit canonical value.
+    Set(T),
+    /// Remove the field when it is present.
+    Clear,
+}
+
+impl<T> TransformField<T> {
+    /// Construct a preserve update.
+    #[must_use]
+    pub const fn preserve() -> Self {
+        Self::Preserve
+    }
+
+    /// Construct a set update.
+    #[must_use]
+    pub const fn set(value: T) -> Self {
+        Self::Set(value)
+    }
+
+    /// Construct a clear update.
+    #[must_use]
+    pub const fn clear() -> Self {
+        Self::Clear
+    }
+}
+
+/// Requested optional movie transform replacement.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MovieTransformWrite {
+    flags: TransformField<u32>,
+    angle_degrees: TransformField<f32>,
+}
+
+impl MovieTransformWrite {
+    /// Construct an exact replacement for both optional wire fields.
+    ///
+    /// `Some(value)` writes a present field and `None` clears that field.
+    #[must_use]
+    pub const fn new(flags: Option<u32>, angle_degrees: Option<f32>) -> Self {
+        Self {
+            flags: match flags {
+                Some(value) => TransformField::Set(value),
+                None => TransformField::Clear,
+            },
+            angle_degrees: match angle_degrees {
+                Some(value) => TransformField::Set(value),
+                None => TransformField::Clear,
+            },
+        }
+    }
+
+    /// Construct a write that preserves both optional fields.
+    #[must_use]
+    pub const fn preserve() -> Self {
+        Self {
+            flags: TransformField::Preserve,
+            angle_degrees: TransformField::Preserve,
+        }
+    }
+
+    /// Construct a write from explicit preserve/set/clear updates.
+    #[must_use]
+    pub const fn with_updates(
+        flags: TransformField<u32>,
+        angle_degrees: TransformField<f32>,
+    ) -> Self {
+        Self {
+            flags,
+            angle_degrees,
+        }
+    }
+
+    /// Alias for [`Self::new`].
+    #[must_use]
+    pub const fn from_values(flags: Option<u32>, angle_degrees: Option<f32>) -> Self {
+        Self::new(flags, angle_degrees)
+    }
+
+    /// Replace the flags field, or clear it when `None` is supplied.
+    #[must_use]
+    pub const fn with_flags(mut self, value: Option<u32>) -> Self {
+        self.flags = match value {
+            Some(value) => TransformField::Set(value),
+            None => TransformField::Clear,
+        };
+        self
+    }
+
+    /// Replace the angle field, or clear it when `None` is supplied.
+    #[must_use]
+    pub const fn with_angle_degrees(mut self, value: Option<f32>) -> Self {
+        self.angle_degrees = match value {
+            Some(value) => TransformField::Set(value),
+            None => TransformField::Clear,
+        };
+        self
+    }
+
+    /// Alias for [`Self::with_angle_degrees`].
+    #[must_use]
+    pub const fn with_angle(self, value: Option<f32>) -> Self {
+        self.with_angle_degrees(value)
+    }
+
+    /// Set one explicit flags value.
+    #[must_use]
+    pub const fn set_flags(mut self, value: u32) -> Self {
+        self.flags = TransformField::Set(value);
+        self
+    }
+
+    /// Clear the flags field.
+    #[must_use]
+    pub const fn clear_flags(mut self) -> Self {
+        self.flags = TransformField::Clear;
+        self
+    }
+
+    /// Set one explicit angle value.
+    #[must_use]
+    pub const fn set_angle_degrees(mut self, value: f32) -> Self {
+        self.angle_degrees = TransformField::Set(value);
+        self
+    }
+
+    /// Alias for [`Self::set_angle_degrees`].
+    #[must_use]
+    pub const fn set_angle(mut self, value: f32) -> Self {
+        self.angle_degrees = TransformField::Set(value);
+        self
+    }
+
+    /// Clear the angle field.
+    #[must_use]
+    pub const fn clear_angle_degrees(mut self) -> Self {
+        self.angle_degrees = TransformField::Clear;
+        self
+    }
+
+    /// Alias for [`Self::clear_angle_degrees`].
+    #[must_use]
+    pub const fn clear_angle(mut self) -> Self {
+        self.angle_degrees = TransformField::Clear;
+        self
+    }
+
+    #[must_use]
+    pub const fn flags_update(self) -> TransformField<u32> {
+        self.flags
+    }
+
+    #[must_use]
+    pub const fn angle_update(self) -> TransformField<f32> {
+        self.angle_degrees
     }
 }
 
@@ -629,6 +842,83 @@ impl<'source> PreparedMovieGeometryRewrite<'source> {
     }
 }
 
+/// Prepared optional transform rewrite.  Preparation performs strict source
+/// validation and output sizing; execution is the single candidate-producing
+/// step.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedMovieTransformRewrite<'source> {
+    source: &'source [u8],
+    write: MovieTransformWrite,
+    options: DecodeOptions,
+    requirements: RewriteExecutionRequirements,
+    source_report: DecodeReport,
+    candidate_fields: usize,
+    candidate_work: usize,
+    candidate_depth: u32,
+    candidate_transform: MovieTransformSnapshot,
+}
+
+impl<'source> PreparedMovieTransformRewrite<'source> {
+    #[must_use]
+    pub const fn prepare_report(self) -> DecodeReport {
+        self.source_report
+    }
+
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Execute the prepared optional transform rewrite with exact ceilings.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_limits(self.requirements, limits)?;
+        let output = emit_transform_rewrite(
+            self.source,
+            self.write,
+            self.requirements.output_bytes,
+            self.options,
+        )?;
+        if output.len() != self.requirements.output_bytes {
+            return Err(DecodeError::plain(
+                "movie transform rewrite size disagreed with preflight",
+            ));
+        }
+        let candidate_options = DecodeOptions::new(
+            output.len(),
+            self.requirements.fields,
+            self.requirements.work_bytes,
+            self.requirements.max_depth,
+        )
+        .with_max_output_bytes(self.requirements.output_bytes)
+        .with_max_allocations(self.requirements.allocations)
+        .with_max_retained_bytes(self.requirements.retained_bytes)
+        .with_max_scratch_bytes(self.requirements.scratch_bytes);
+        let (transform, candidate_report) =
+            decode_movie_transform_with_report(&output, candidate_options)?;
+        if candidate_report.fields() != self.candidate_fields
+            || candidate_report.work_bytes() != self.candidate_work
+            || candidate_report.max_depth() != self.candidate_depth
+            || transform != self.candidate_transform
+        {
+            return Err(DecodeError::plain(
+                "movie transform rewrite candidate disagreed with preflight",
+            ));
+        }
+        let report = RewriteReport {
+            input_bytes: self.source.len(),
+            output_bytes: output.len(),
+            fields: self.requirements.fields,
+            work_bytes: self.requirements.work_bytes,
+            max_depth: self.requirements.max_depth,
+            allocations: self.requirements.allocations,
+            retained_bytes: self.requirements.retained_bytes,
+            scratch_bytes: self.requirements.scratch_bytes,
+            changed: output.as_slice() != self.source,
+        };
+        Ok(RewriteOutput { output, report })
+    }
+}
+
 /// Decode the strict movie geometry projection.
 pub fn decode_movie_geometry(
     source: &[u8],
@@ -645,24 +935,26 @@ pub fn decode_movie_geometry_with_report(
     validate_input(source, options)?;
     let (snapshot, scan) = scan_document(source, options)?;
     force_buffa(source, options)?;
-    if scan.scratch_bytes > options.max_scratch_bytes {
-        return Err(DecodeError::limited(DecodeLimit::Scratch {
-            observed: scan.scratch_bytes,
-            maximum: options.max_scratch_bytes,
-        }));
-    }
-    Ok((
-        snapshot,
-        DecodeReport {
-            input_bytes: source.len(),
-            fields: scan.fields,
-            work_bytes: scan.work,
-            max_depth: scan.max_depth,
-            allocations: scan.allocations,
-            retained_bytes: source.len(),
-            scratch_bytes: scan.scratch_bytes,
-        },
-    ))
+    Ok((snapshot, scan_report(source, scan, options)?))
+}
+
+/// Decode the strict optional movie transform projection.
+pub fn decode_movie_transform(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<MovieTransformSnapshot, DecodeError> {
+    Ok(decode_movie_transform_with_report(source, options)?.0)
+}
+
+/// Decode transform fields and return exact strict source accounting.
+pub fn decode_movie_transform_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(MovieTransformSnapshot, DecodeReport), DecodeError> {
+    validate_input(source, options)?;
+    let (_geometry, transform, scan) = scan_document_projection(source, options)?;
+    force_buffa(source, options)?;
+    Ok((transform, scan_report(source, scan, options)?))
 }
 
 /// Prepare a position/size rewrite without allocating candidate output.
@@ -683,38 +975,264 @@ pub fn prepare_movie_geometry_rewrite<'source>(
             maximum: options.max_output_bytes,
         }));
     }
+    let requirements = rewrite_requirements(
+        source.len(),
+        source_scan,
+        output_measure,
+        options,
+        GEOMETRY_EXECUTE_ALLOCATIONS,
+    )?;
+    Ok(PreparedMovieGeometryRewrite {
+        source,
+        write,
+        options,
+        requirements,
+        source_report: scan_report(source, source_scan, options)?,
+        candidate_fields: output_measure.fields,
+        candidate_work: output_measure.work,
+        candidate_depth: output_measure.max_depth,
+    })
+}
+
+/// Rewrite position and size while preserving every other source span.
+pub fn rewrite_movie_geometry(
+    source: &[u8],
+    write: MovieGeometryWrite,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    let prepared = prepare_movie_geometry_rewrite(source, write, options)?;
+    Ok(prepared
+        .execute(prepared.execution_requirements().exact())?
+        .into_output())
+}
+
+/// Prepare an optional transform rewrite without allocating candidate output.
+pub fn prepare_movie_transform_rewrite<'source>(
+    source: &'source [u8],
+    write: MovieTransformWrite,
+    options: DecodeOptions,
+) -> Result<PreparedMovieTransformRewrite<'source>, DecodeError> {
+    validate_input(source, options)?;
+    validate_transform_write(write)?;
+    let (_geometry, transform, source_scan) = scan_document_projection(source, options)?;
+    force_buffa(source, options)?;
+    let output_measure = measure_transform_output(source, write, source_scan, options)?;
+    if output_measure.bytes > options.max_output_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Output {
+            observed: output_measure.bytes,
+            maximum: options.max_output_bytes,
+        }));
+    }
+    let requirements = rewrite_requirements(
+        source.len(),
+        source_scan,
+        output_measure,
+        options,
+        TRANSFORM_EXECUTE_ALLOCATIONS,
+    )?;
+    Ok(PreparedMovieTransformRewrite {
+        source,
+        write,
+        options,
+        requirements,
+        source_report: scan_report(source, source_scan, options)?,
+        candidate_fields: output_measure.fields,
+        candidate_work: output_measure.work,
+        candidate_depth: output_measure.max_depth,
+        candidate_transform: transform_after_write(transform, write),
+    })
+}
+
+/// Rewrite optional transform fields while preserving every other source span.
+pub fn rewrite_movie_transform(
+    source: &[u8],
+    write: MovieTransformWrite,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    let prepared = prepare_movie_transform_rewrite(source, write, options)?;
+    Ok(prepared
+        .execute(prepared.execution_requirements().exact())?
+        .into_output())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ParsedField {
+    number: u32,
+    wire: u8,
+    start: usize,
+    value_start: usize,
+    value_end: usize,
+    end: usize,
+    value: Option<u64>,
+    field_count: usize,
+}
+
+#[derive(Default)]
+struct Budget {
+    fields: usize,
+    work: usize,
+    max_depth: u32,
+    allocations: usize,
+    scratch_bytes: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ScanAccounting {
+    fields: usize,
+    work: usize,
+    max_depth: u32,
+    allocations: usize,
+    scratch_bytes: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct OutputMeasure {
+    bytes: usize,
+    fields: usize,
+    work: usize,
+    max_depth: u32,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct TransformDelta {
+    add_fields: usize,
+    remove_fields: usize,
+    add_work: usize,
+    remove_work: usize,
+}
+
+fn scan_report(
+    source: &[u8],
+    scan: ScanAccounting,
+    options: DecodeOptions,
+) -> Result<DecodeReport, DecodeError> {
+    let allocations = scan
+        .allocations
+        .checked_add(BUFFA_LOGICAL_ALLOCATIONS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Allocations {
+                observed: usize::MAX,
+                maximum: options.max_allocations,
+            })
+        })?;
+    if allocations > options.max_allocations {
+        return Err(DecodeError::limited(DecodeLimit::Allocations {
+            observed: allocations,
+            maximum: options.max_allocations,
+        }));
+    }
+    let work_bytes = scan.work.checked_add(source.len()).ok_or_else(|| {
+        DecodeError::limited(DecodeLimit::Work {
+            observed: usize::MAX,
+            maximum: options.max_work_bytes,
+        })
+    })?;
+    if work_bytes > options.max_work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    let scratch_bytes = scan
+        .scratch_bytes
+        .checked_add(source.len())
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    if scratch_bytes > options.max_scratch_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Scratch {
+            observed: scratch_bytes,
+            maximum: options.max_scratch_bytes,
+        }));
+    }
+    Ok(DecodeReport {
+        input_bytes: source.len(),
+        fields: scan.fields,
+        work_bytes,
+        max_depth: scan.max_depth,
+        allocations,
+        retained_bytes: source.len(),
+        scratch_bytes,
+    })
+}
+
+fn rewrite_requirements(
+    source_bytes: usize,
+    source_scan: ScanAccounting,
+    output_measure: OutputMeasure,
+    options: DecodeOptions,
+    execute_allocations: usize,
+) -> Result<RewriteExecutionRequirements, DecodeError> {
+    let fields = source_scan
+        .fields
+        .checked_add(output_measure.fields)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Fields {
+                observed: usize::MAX,
+                maximum: options.max_fields,
+            })
+        })?;
+    // The source is parsed for admission, sizing, and emission.  The
+    // candidate is emitted and then parsed again for exact readback.  Include
+    // one Buffa pass for each side and the copied output bytes; these are
+    // conservative logical work units, not CPU-instruction telemetry.
+    let work_bytes = source_scan
+        .work
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(output_measure.work.checked_mul(2)?))
+        .and_then(|value| value.checked_add(source_bytes))
+        .and_then(|value| value.checked_add(output_measure.bytes))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Work {
+                observed: usize::MAX,
+                maximum: options.max_work_bytes,
+            })
+        })?;
+    let scratch_bytes = source_scan
+        .scratch_bytes
+        .checked_add(output_measure.scratch_bytes)
+        .and_then(|value| value.checked_add(source_bytes))
+        .and_then(|value| value.checked_add(output_measure.bytes))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let allocations = source_scan
+        .allocations
+        .checked_add(BUFFA_LOGICAL_ALLOCATIONS)
+        .and_then(|value| value.checked_add(output_measure.allocations))
+        .and_then(|value| value.checked_add(execute_allocations))
+        .and_then(|value| value.checked_add(CANDIDATE_SCAN_ALLOCATIONS))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Allocations {
+                observed: usize::MAX,
+                maximum: options.max_allocations,
+            })
+        })?;
+    let retained_bytes = source_bytes
+        .checked_add(output_measure.retained_bytes)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Retained {
+                observed: usize::MAX,
+                maximum: options.max_retained_bytes,
+            })
+        })?;
     let requirements = RewriteExecutionRequirements {
         output_bytes: output_measure.bytes,
-        fields: source_scan
-            .fields
-            .checked_add(output_measure.fields)
-            .ok_or_else(|| {
-                DecodeError::limited(DecodeLimit::Fields {
-                    observed: usize::MAX,
-                    maximum: options.max_fields,
-                })
-            })?,
-        work_bytes: source_scan
-            .work
-            .checked_add(output_measure.work)
-            .ok_or_else(|| {
-                DecodeError::limited(DecodeLimit::Work {
-                    observed: usize::MAX,
-                    maximum: options.max_work_bytes,
-                })
-            })?,
+        fields,
+        work_bytes,
         max_depth: output_measure.max_depth,
-        allocations: 3,
-        retained_bytes: output_measure.bytes,
-        scratch_bytes: source_scan
-            .scratch_bytes
-            .checked_add(output_measure.scratch_bytes)
-            .ok_or_else(|| {
-                DecodeError::limited(DecodeLimit::Scratch {
-                    observed: usize::MAX,
-                    maximum: options.max_scratch_bytes,
-                })
-            })?,
+        allocations,
+        retained_bytes,
+        scratch_bytes,
     };
     for (observed, maximum, limit) in [
         (
@@ -762,73 +1280,25 @@ pub fn prepare_movie_geometry_rewrite<'source>(
             return Err(DecodeError::limited(limit));
         }
     }
-    Ok(PreparedMovieGeometryRewrite {
-        source,
-        write,
-        options,
-        requirements,
-        source_report: DecodeReport {
-            input_bytes: source.len(),
-            fields: source_scan.fields,
-            work_bytes: source_scan.work,
-            max_depth: source_scan.max_depth,
-            allocations: source_scan.allocations,
-            retained_bytes: source.len(),
-            scratch_bytes: source_scan.scratch_bytes,
+    Ok(requirements)
+}
+
+fn transform_after_write(
+    current: MovieTransformSnapshot,
+    write: MovieTransformWrite,
+) -> MovieTransformSnapshot {
+    MovieTransformSnapshot {
+        flags: match write.flags {
+            TransformField::Preserve => current.flags,
+            TransformField::Set(value) => Some(value),
+            TransformField::Clear => None,
         },
-        candidate_fields: output_measure.fields,
-        candidate_work: output_measure.work,
-        candidate_depth: output_measure.max_depth,
-    })
-}
-
-/// Rewrite position and size while preserving every other source span.
-pub fn rewrite_movie_geometry(
-    source: &[u8],
-    write: MovieGeometryWrite,
-    options: DecodeOptions,
-) -> Result<Vec<u8>, DecodeError> {
-    let prepared = prepare_movie_geometry_rewrite(source, write, options)?;
-    Ok(prepared
-        .execute(prepared.execution_requirements().exact())?
-        .into_output())
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ParsedField {
-    number: u32,
-    wire: u8,
-    start: usize,
-    value_start: usize,
-    value_end: usize,
-    end: usize,
-    value: Option<u64>,
-    field_count: usize,
-}
-
-#[derive(Default)]
-struct Budget {
-    fields: usize,
-    work: usize,
-    max_depth: u32,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ScanAccounting {
-    fields: usize,
-    work: usize,
-    max_depth: u32,
-    allocations: usize,
-    scratch_bytes: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OutputMeasure {
-    bytes: usize,
-    fields: usize,
-    work: usize,
-    max_depth: u32,
-    scratch_bytes: usize,
+        angle_degrees: match write.angle_degrees {
+            TransformField::Preserve => current.angle_degrees,
+            TransformField::Set(value) => Some(value),
+            TransformField::Clear => None,
+        },
+    }
 }
 
 fn validate_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
@@ -863,6 +1333,15 @@ fn validate_write(write: MovieGeometryWrite) -> Result<(), DecodeError> {
     Ok(())
 }
 
+fn validate_transform_write(write: MovieTransformWrite) -> Result<(), DecodeError> {
+    if let TransformField::Set(value) = write.angle_degrees {
+        if !value.is_finite() {
+            return Err(DecodeError::plain("movie transform angle must be finite"));
+        }
+    }
+    Ok(())
+}
+
 fn force_buffa(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
     let view: projection::MovieArchiveLazyView<'_> = options
         .buffa()
@@ -885,6 +1364,21 @@ fn scan_document(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(MovieGeometrySnapshot, ScanAccounting), DecodeError> {
+    let (snapshot, _transform, scan) = scan_document_projection(source, options)?;
+    Ok((snapshot, scan))
+}
+
+fn scan_document_projection(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<
+    (
+        MovieGeometrySnapshot,
+        MovieTransformSnapshot,
+        ScanAccounting,
+    ),
+    DecodeError,
+> {
     let mut budget = Budget::default();
     let root = parse_message(source, options, &mut budget, 1)?;
     let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
@@ -907,7 +1401,7 @@ fn scan_document(
     let size_field = unique_known(&geometry_fields, GEOMETRY_SIZE_FIELD, "Geometry.size")?;
     require_wire(position_field, 2)?;
     require_wire(size_field, 2)?;
-    validate_geometry_known(&geometry_fields, geometry)?;
+    let transform = parse_transform(&geometry_fields, geometry)?;
     let position = parse_point(
         &geometry[position_field.value_start..position_field.value_end],
         options,
@@ -920,16 +1414,13 @@ fn scan_document(
     )?;
     Ok((
         MovieGeometrySnapshot { position, size },
+        transform,
         ScanAccounting {
             fields: budget.fields,
             work: budget.work,
             max_depth: budget.max_depth,
-            allocations: 3,
-            scratch_bytes: source
-                .len()
-                .min(options.max_fields)
-                .saturating_mul(size_of::<ParsedField>())
-                .saturating_mul(5),
+            allocations: budget.allocations,
+            scratch_bytes: budget.scratch_bytes,
         },
     ))
 }
@@ -970,31 +1461,54 @@ fn parse_size(
     Ok(Size::new(width, height))
 }
 
-fn validate_geometry_known(fields: &[ParsedField], source: &[u8]) -> Result<(), DecodeError> {
-    for field in fields {
-        match field.number {
-            GEOMETRY_FLAGS_FIELD => {
-                require_wire(field, 0)?;
-                let value = field
-                    .value
-                    .ok_or_else(|| DecodeError::plain("invalid geometry flags"))?;
-                if varint_len(value) != field.value_end.saturating_sub(field.value_start)
-                    || value > u64::from(u32::MAX)
-                {
-                    return Err(DecodeError::plain("noncanonical geometry flags"));
-                }
-            },
-            GEOMETRY_ANGLE_FIELD => {
-                require_wire(field, 5)?;
-                let value = fixed32(source, field)?;
-                if !value.is_finite() {
-                    return Err(DecodeError::plain("geometry angle must be finite"));
-                }
-            },
-            _ => {},
+fn parse_transform(
+    fields: &[ParsedField],
+    source: &[u8],
+) -> Result<MovieTransformSnapshot, DecodeError> {
+    let flags_field = optional_known(fields, GEOMETRY_FLAGS_FIELD)?;
+    let flags = if let Some(field) = flags_field {
+        require_wire(field, 0)?;
+        let value = field
+            .value
+            .ok_or_else(|| DecodeError::plain("invalid geometry flags"))?;
+        if varint_len(value) != field.value_end.saturating_sub(field.value_start)
+            || value > u64::from(u32::MAX)
+        {
+            return Err(DecodeError::plain("noncanonical geometry flags"));
         }
+        Some(value as u32)
+    } else {
+        None
+    };
+    let angle_field = optional_known(fields, GEOMETRY_ANGLE_FIELD)?;
+    let angle_degrees = if let Some(field) = angle_field {
+        require_wire(field, 5)?;
+        let value = fixed32(source, field)?;
+        if !value.is_finite() {
+            return Err(DecodeError::plain("geometry angle must be finite"));
+        }
+        Some(value)
+    } else {
+        None
+    };
+    Ok(MovieTransformSnapshot {
+        flags,
+        angle_degrees,
+    })
+}
+
+fn optional_known(
+    fields: &[ParsedField],
+    number: u32,
+) -> Result<Option<&ParsedField>, DecodeError> {
+    let mut found = None;
+    for field in fields.iter().filter(|field| field.number == number) {
+        if found.is_some() {
+            return Err(DecodeError::plain("duplicate known geometry field"));
+        }
+        found = Some(field);
     }
-    Ok(())
+    Ok(found)
 }
 
 fn unique_known<'a>(
@@ -1050,19 +1564,40 @@ fn parse_message(
                 maximum: options.max_scratch_bytes,
             })
         })?;
-    if scratch > options.max_scratch_bytes {
-        return Err(DecodeError::limited(DecodeLimit::Scratch {
-            observed: scratch,
+    let scratch_bytes = budget.scratch_bytes.checked_add(scratch).ok_or_else(|| {
+        DecodeError::limited(DecodeLimit::Scratch {
+            observed: usize::MAX,
             maximum: options.max_scratch_bytes,
+        })
+    })?;
+    if scratch_bytes > options.max_scratch_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Scratch {
+            observed: scratch_bytes,
+            maximum: options.max_scratch_bytes,
+        }));
+    }
+    let allocation = usize::from(capacity != 0);
+    let allocations = budget.allocations.checked_add(allocation).ok_or_else(|| {
+        DecodeError::limited(DecodeLimit::Allocations {
+            observed: usize::MAX,
+            maximum: options.max_allocations,
+        })
+    })?;
+    if allocations > options.max_allocations {
+        return Err(DecodeError::limited(DecodeLimit::Allocations {
+            observed: allocations,
+            maximum: options.max_allocations,
         }));
     }
     let mut fields = Vec::new();
     fields.try_reserve_exact(capacity).map_err(|_| {
         DecodeError::limited(DecodeLimit::Scratch {
-            observed: scratch,
+            observed: scratch_bytes,
             maximum: options.max_scratch_bytes,
         })
     })?;
+    budget.allocations = allocations;
+    budget.scratch_bytes = scratch_bytes;
     let mut offset = 0;
     while offset < source.len() {
         let (field, next) = parse_field(source, offset, source.len(), depth, options, budget)?;
@@ -1070,6 +1605,22 @@ fn parse_message(
         offset = next;
     }
     Ok(fields)
+}
+
+fn parsed_fields_scratch_envelope(
+    source_bytes: usize,
+    options: DecodeOptions,
+) -> Result<usize, DecodeError> {
+    source_bytes
+        .min(options.max_fields)
+        .checked_mul(size_of::<ParsedField>())
+        .and_then(|value| value.checked_mul(5))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })
 }
 
 fn parse_field(
@@ -1275,17 +1826,18 @@ fn measure_output(
     source_scan: ScanAccounting,
     options: DecodeOptions,
 ) -> Result<OutputMeasure, DecodeError> {
-    let root = parse_message(source, options, &mut Budget::default(), 1)?;
+    let mut budget = Budget::default();
+    let root = parse_message(source, options, &mut budget, 1)?;
     let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
     let drawable = &source[super_field.value_start..super_field.value_end];
-    let drawable_fields = parse_message(drawable, options, &mut Budget::default(), 2)?;
+    let drawable_fields = parse_message(drawable, options, &mut budget, 2)?;
     let geometry_field = unique_known(
         &drawable_fields,
         DRAWABLE_GEOMETRY_FIELD,
         "DrawableArchive.geometry",
     )?;
     let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
-    let geometry_fields = parse_message(geometry, options, &mut Budget::default(), 3)?;
+    let geometry_fields = parse_message(geometry, options, &mut budget, 3)?;
     let position_field = unique_known(
         &geometry_fields,
         GEOMETRY_POSITION_FIELD,
@@ -1294,8 +1846,8 @@ fn measure_output(
     let size_field = unique_known(&geometry_fields, GEOMETRY_SIZE_FIELD, "Geometry.size")?;
     let point = &geometry[position_field.value_start..position_field.value_end];
     let size = &geometry[size_field.value_start..size_field.value_end];
-    let point_fields = parse_message(point, options, &mut Budget::default(), 4)?;
-    let size_fields = parse_message(size, options, &mut Budget::default(), 4)?;
+    let point_fields = parse_message(point, options, &mut budget, 4)?;
+    let size_fields = parse_message(size, options, &mut budget, 4)?;
     let point_len = encoded_fixed_pair_len(&point_fields, POINT_X_FIELD, POINT_Y_FIELD)?;
     let size_len = encoded_fixed_pair_len(&size_fields, SIZE_WIDTH_FIELD, SIZE_HEIGHT_FIELD)?;
     let new_geometry_len = geometry
@@ -1313,18 +1865,331 @@ fn measure_output(
         .saturating_sub(super_field.end - super_field.start)
         .saturating_add(length_field_len(MOVIE_SUPER_FIELD, new_drawable_len));
     let candidate_fields = source_scan.fields.max(source_fields);
-    let candidate_work = source_scan.work;
-    let scratch = output_len
-        .min(options.max_fields)
-        .saturating_mul(size_of::<ParsedField>())
-        .saturating_mul(5);
+    let candidate_work = source_scan.work.checked_add(output_len).ok_or_else(|| {
+        DecodeError::limited(DecodeLimit::Work {
+            observed: usize::MAX,
+            maximum: options.max_work_bytes,
+        })
+    })?;
+    let candidate_parse_scratch = parsed_fields_scratch_envelope(output_len, options)?;
+    let output_scratch = output_len
+        .checked_mul(GEOMETRY_OUTPUT_BUFFERS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let scratch = budget
+        .scratch_bytes
+        .checked_add(candidate_parse_scratch)
+        .and_then(|value| value.checked_add(output_scratch))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let retained_bytes = output_len
+        .checked_mul(GEOMETRY_OUTPUT_BUFFERS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Retained {
+                observed: usize::MAX,
+                maximum: options.max_retained_bytes,
+            })
+        })?;
     Ok(OutputMeasure {
         bytes: output_len,
         fields: candidate_fields,
         work: candidate_work,
         max_depth: source_scan.max_depth,
+        allocations: budget.allocations,
+        retained_bytes,
         scratch_bytes: scratch,
     })
+}
+
+fn measure_transform_output(
+    source: &[u8],
+    write: MovieTransformWrite,
+    source_scan: ScanAccounting,
+    options: DecodeOptions,
+) -> Result<OutputMeasure, DecodeError> {
+    let mut budget = Budget::default();
+    let root = parse_message(source, options, &mut budget, 1)?;
+    let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
+    let drawable = &source[super_field.value_start..super_field.value_end];
+    let drawable_fields = parse_message(drawable, options, &mut budget, 2)?;
+    let geometry_field = unique_known(
+        &drawable_fields,
+        DRAWABLE_GEOMETRY_FIELD,
+        "DrawableArchive.geometry",
+    )?;
+    let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
+    let geometry_fields = parse_message(geometry, options, &mut budget, 3)?;
+    let position_field = unique_known(
+        &geometry_fields,
+        GEOMETRY_POSITION_FIELD,
+        "Geometry.position",
+    )?;
+    let size_field = unique_known(&geometry_fields, GEOMETRY_SIZE_FIELD, "Geometry.size")?;
+    require_wire(position_field, 2)?;
+    require_wire(size_field, 2)?;
+    let _ = parse_transform(&geometry_fields, geometry)?;
+    let flags_field = optional_known(&geometry_fields, GEOMETRY_FLAGS_FIELD)?;
+    let angle_field = optional_known(&geometry_fields, GEOMETRY_ANGLE_FIELD)?;
+    let new_geometry_len = replace_optional_fields_len(
+        geometry.len(),
+        flags_field,
+        write.flags,
+        angle_field,
+        write.angle_degrees,
+    )?;
+    let new_drawable_len = replace_length(
+        drawable.len(),
+        geometry_field.end - geometry_field.start,
+        length_field_len(DRAWABLE_GEOMETRY_FIELD, new_geometry_len),
+    )?;
+    let output_len = replace_length(
+        source.len(),
+        super_field.end - super_field.start,
+        length_field_len(MOVIE_SUPER_FIELD, new_drawable_len),
+    )?;
+    let flags_delta = transform_delta(
+        flags_field,
+        write.flags,
+        encoded_flags_len(flags_field, write.flags),
+    );
+    let angle_delta = transform_delta(
+        angle_field,
+        write.angle_degrees,
+        encoded_angle_len(angle_field, write.angle_degrees),
+    );
+    let delta = TransformDelta {
+        add_fields: flags_delta
+            .add_fields
+            .checked_add(angle_delta.add_fields)
+            .ok_or_else(|| {
+                DecodeError::limited(DecodeLimit::Fields {
+                    observed: usize::MAX,
+                    maximum: options.max_fields,
+                })
+            })?,
+        remove_fields: flags_delta
+            .remove_fields
+            .checked_add(angle_delta.remove_fields)
+            .ok_or_else(|| {
+                DecodeError::limited(DecodeLimit::Fields {
+                    observed: usize::MAX,
+                    maximum: options.max_fields,
+                })
+            })?,
+        add_work: flags_delta
+            .add_work
+            .checked_add(angle_delta.add_work)
+            .ok_or_else(|| {
+                DecodeError::limited(DecodeLimit::Work {
+                    observed: usize::MAX,
+                    maximum: options.max_work_bytes,
+                })
+            })?,
+        remove_work: flags_delta
+            .remove_work
+            .checked_add(angle_delta.remove_work)
+            .ok_or_else(|| {
+                DecodeError::limited(DecodeLimit::Work {
+                    observed: usize::MAX,
+                    maximum: options.max_work_bytes,
+                })
+            })?,
+    };
+    let mut delta = delta;
+    add_work_delta(
+        &mut delta,
+        geometry_field.end - geometry_field.start,
+        length_field_len(DRAWABLE_GEOMETRY_FIELD, new_geometry_len),
+    );
+    add_work_delta(
+        &mut delta,
+        super_field.end - super_field.start,
+        length_field_len(MOVIE_SUPER_FIELD, new_drawable_len),
+    );
+    let candidate_fields = apply_delta(
+        source_scan.fields,
+        delta.add_fields,
+        delta.remove_fields,
+        DecodeLimit::Fields {
+            observed: usize::MAX,
+            maximum: options.max_fields,
+        },
+    )?;
+    let candidate_work = apply_delta(
+        source_scan.work,
+        delta.add_work,
+        delta.remove_work,
+        DecodeLimit::Work {
+            observed: usize::MAX,
+            maximum: options.max_work_bytes,
+        },
+    )?
+    .checked_add(output_len)
+    .ok_or_else(|| {
+        DecodeError::limited(DecodeLimit::Work {
+            observed: usize::MAX,
+            maximum: options.max_work_bytes,
+        })
+    })?;
+    let candidate_parse_scratch = parsed_fields_scratch_envelope(output_len, options)?;
+    let output_scratch = output_len
+        .checked_mul(TRANSFORM_OUTPUT_BUFFERS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let scratch = budget
+        .scratch_bytes
+        .checked_add(candidate_parse_scratch)
+        .and_then(|value| value.checked_add(output_scratch))
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Scratch {
+                observed: usize::MAX,
+                maximum: options.max_scratch_bytes,
+            })
+        })?;
+    let retained_bytes = output_len
+        .checked_mul(TRANSFORM_OUTPUT_BUFFERS)
+        .ok_or_else(|| {
+            DecodeError::limited(DecodeLimit::Retained {
+                observed: usize::MAX,
+                maximum: options.max_retained_bytes,
+            })
+        })?;
+    Ok(OutputMeasure {
+        bytes: output_len,
+        fields: candidate_fields,
+        work: candidate_work,
+        max_depth: source_scan.max_depth,
+        allocations: budget.allocations,
+        retained_bytes,
+        scratch_bytes: scratch,
+    })
+}
+
+fn replace_optional_fields_len(
+    original: usize,
+    flags_field: Option<&ParsedField>,
+    flags: TransformField<u32>,
+    angle_field: Option<&ParsedField>,
+    angle: TransformField<f32>,
+) -> Result<usize, DecodeError> {
+    let after_flags = replace_length(
+        original,
+        flags_field.map_or(0, field_span),
+        encoded_flags_len(flags_field, flags),
+    )?;
+    replace_length(
+        after_flags,
+        angle_field.map_or(0, field_span),
+        encoded_angle_len(angle_field, angle),
+    )
+}
+
+fn encoded_flags_len(field: Option<&ParsedField>, update: TransformField<u32>) -> usize {
+    match update {
+        TransformField::Preserve => field.map_or(0, field_span),
+        TransformField::Set(value) => varint_len(u64::from(GEOMETRY_FLAGS_FIELD << 3))
+            .saturating_add(varint_len(u64::from(value))),
+        TransformField::Clear => 0,
+    }
+}
+
+fn encoded_angle_len(field: Option<&ParsedField>, update: TransformField<f32>) -> usize {
+    match update {
+        TransformField::Preserve => field.map_or(0, field_span),
+        TransformField::Set(_) => varint_len(u64::from(GEOMETRY_ANGLE_FIELD << 3 | 5)) + 4,
+        TransformField::Clear => 0,
+    }
+}
+
+fn field_span(field: &ParsedField) -> usize {
+    field.end.saturating_sub(field.start)
+}
+
+fn replace_length(
+    original: usize,
+    removed: usize,
+    replacement: usize,
+) -> Result<usize, DecodeError> {
+    original
+        .checked_sub(removed)
+        .and_then(|value| value.checked_add(replacement))
+        .ok_or_else(|| DecodeError::plain("movie transform output length overflow"))
+}
+
+fn transform_delta<T>(
+    field: Option<&ParsedField>,
+    update: TransformField<T>,
+    replacement_len: usize,
+) -> TransformDelta {
+    let Some(field) = field else {
+        return match update {
+            TransformField::Set(_) => TransformDelta {
+                add_fields: 1,
+                add_work: 1usize.saturating_add(replacement_len),
+                ..TransformDelta::default()
+            },
+            TransformField::Preserve | TransformField::Clear => TransformDelta::default(),
+        };
+    };
+    let old_span = field_span(field);
+    let old_work = varint_len(u64::from(field.number << 3 | u32::from(field.wire))) + old_span;
+    match update {
+        TransformField::Preserve => TransformDelta::default(),
+        TransformField::Set(_) => {
+            if replacement_len >= old_span {
+                TransformDelta {
+                    add_work: replacement_len - old_span,
+                    ..TransformDelta::default()
+                }
+            } else {
+                TransformDelta {
+                    remove_work: old_span - replacement_len,
+                    ..TransformDelta::default()
+                }
+            }
+        },
+        TransformField::Clear => TransformDelta {
+            remove_fields: 1,
+            remove_work: old_work,
+            ..TransformDelta::default()
+        },
+    }
+}
+
+fn add_work_delta(delta: &mut TransformDelta, original: usize, replacement: usize) {
+    if replacement >= original {
+        delta.add_work = delta
+            .add_work
+            .saturating_add(replacement.saturating_sub(original));
+    } else {
+        delta.remove_work = delta
+            .remove_work
+            .saturating_add(original.saturating_sub(replacement));
+    }
+}
+
+fn apply_delta(
+    current: usize,
+    added: usize,
+    removed: usize,
+    limit: DecodeLimit,
+) -> Result<usize, DecodeError> {
+    current
+        .checked_add(added)
+        .and_then(|value| value.checked_sub(removed))
+        .ok_or_else(|| DecodeError::limited(limit))
 }
 
 fn length_field_len(number: u32, payload: usize) -> usize {
@@ -1354,17 +2219,18 @@ fn emit_rewrite(
     expected: usize,
     options: DecodeOptions,
 ) -> Result<Vec<u8>, DecodeError> {
-    let root = parse_message(source, options, &mut Budget::default(), 1)?;
+    let mut budget = Budget::default();
+    let root = parse_message(source, options, &mut budget, 1)?;
     let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
     let drawable = &source[super_field.value_start..super_field.value_end];
-    let drawable_fields = parse_message(drawable, options, &mut Budget::default(), 2)?;
+    let drawable_fields = parse_message(drawable, options, &mut budget, 2)?;
     let geometry_field = unique_known(
         &drawable_fields,
         DRAWABLE_GEOMETRY_FIELD,
         "DrawableArchive.geometry",
     )?;
     let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
-    let geometry_fields = parse_message(geometry, options, &mut Budget::default(), 3)?;
+    let geometry_fields = parse_message(geometry, options, &mut budget, 3)?;
     let position_field = unique_known(
         &geometry_fields,
         GEOMETRY_POSITION_FIELD,
@@ -1375,7 +2241,10 @@ fn emit_rewrite(
     let size = &geometry[size_field.value_start..size_field.value_end];
     let rewritten_point = rewrite_fixed_message(point, write.position, true, options)?;
     let rewritten_size = rewrite_fixed_message(size, write.size, false, options)?;
-    let mut new_geometry = Vec::with_capacity(geometry.len());
+    let mut new_geometry = Vec::new();
+    new_geometry
+        .try_reserve_exact(geometry.len())
+        .map_err(|_| DecodeError::plain("geometry staging allocation failed"))?;
     for field in geometry_fields.iter().copied() {
         match field.number {
             GEOMETRY_POSITION_FIELD => {
@@ -1387,7 +2256,10 @@ fn emit_rewrite(
             _ => new_geometry.extend_from_slice(&geometry[field.start..field.end]),
         }
     }
-    let mut new_drawable = Vec::with_capacity(drawable.len());
+    let mut new_drawable = Vec::new();
+    new_drawable
+        .try_reserve_exact(drawable.len())
+        .map_err(|_| DecodeError::plain("drawable staging allocation failed"))?;
     for field in drawable_fields.iter().copied() {
         if field.number == DRAWABLE_GEOMETRY_FIELD {
             append_length_replacement(&mut new_drawable, drawable, field, &new_geometry);
@@ -1414,6 +2286,180 @@ fn emit_rewrite(
     Ok(output)
 }
 
+fn emit_transform_rewrite(
+    source: &[u8],
+    write: MovieTransformWrite,
+    expected: usize,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    let mut budget = Budget::default();
+    let root = parse_message(source, options, &mut budget, 1)?;
+    let super_field = unique_known(&root, MOVIE_SUPER_FIELD, "MovieArchive.super")?;
+    let drawable = &source[super_field.value_start..super_field.value_end];
+    let drawable_fields = parse_message(drawable, options, &mut budget, 2)?;
+    let geometry_field = unique_known(
+        &drawable_fields,
+        DRAWABLE_GEOMETRY_FIELD,
+        "DrawableArchive.geometry",
+    )?;
+    let geometry = &drawable[geometry_field.value_start..geometry_field.value_end];
+    let geometry_fields = parse_message(geometry, options, &mut budget, 3)?;
+    let position_field = unique_known(
+        &geometry_fields,
+        GEOMETRY_POSITION_FIELD,
+        "Geometry.position",
+    )?;
+    let size_field = unique_known(&geometry_fields, GEOMETRY_SIZE_FIELD, "Geometry.size")?;
+    require_wire(position_field, 2)?;
+    require_wire(size_field, 2)?;
+    let _ = parse_transform(&geometry_fields, geometry)?;
+    let flags_field = optional_known(&geometry_fields, GEOMETRY_FLAGS_FIELD)?;
+    let angle_field = optional_known(&geometry_fields, GEOMETRY_ANGLE_FIELD)?;
+    let geometry_len = replace_optional_fields_len(
+        geometry.len(),
+        flags_field,
+        write.flags,
+        angle_field,
+        write.angle_degrees,
+    )?;
+    let mut new_geometry = Vec::new();
+    new_geometry
+        .try_reserve_exact(geometry_len)
+        .map_err(|_| DecodeError::plain("movie transform geometry allocation failed"))?;
+    let mut saw_flags = false;
+    let mut saw_angle = false;
+    for field in geometry_fields.iter().copied() {
+        match field.number {
+            GEOMETRY_FLAGS_FIELD => {
+                saw_flags = true;
+                append_flags_replacement(&mut new_geometry, geometry, field, write.flags);
+            },
+            GEOMETRY_ANGLE_FIELD => {
+                saw_angle = true;
+                append_angle_replacement(&mut new_geometry, geometry, field, write.angle_degrees);
+            },
+            _ => new_geometry.extend_from_slice(&geometry[field.start..field.end]),
+        }
+    }
+    if !saw_flags {
+        append_missing_transform(&mut new_geometry, GEOMETRY_FLAGS_FIELD, write.flags);
+    }
+    if !saw_angle {
+        append_missing_transform(&mut new_geometry, GEOMETRY_ANGLE_FIELD, write.angle_degrees);
+    }
+    if new_geometry.len() != geometry_len {
+        return Err(DecodeError::plain(
+            "movie transform geometry sizing disagreed",
+        ));
+    }
+    let new_drawable_len = replace_length(
+        drawable.len(),
+        geometry_field.end - geometry_field.start,
+        length_field_len(DRAWABLE_GEOMETRY_FIELD, new_geometry.len()),
+    )?;
+    let mut new_drawable = Vec::new();
+    new_drawable
+        .try_reserve_exact(new_drawable_len)
+        .map_err(|_| DecodeError::plain("movie transform drawable allocation failed"))?;
+    for field in drawable_fields.iter().copied() {
+        if field.number == DRAWABLE_GEOMETRY_FIELD {
+            append_length_replacement(&mut new_drawable, drawable, field, &new_geometry);
+        } else {
+            new_drawable.extend_from_slice(&drawable[field.start..field.end]);
+        }
+    }
+    if new_drawable.len() != new_drawable_len {
+        return Err(DecodeError::plain(
+            "movie transform drawable sizing disagreed",
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(expected)
+        .map_err(|_| DecodeError::plain("movie transform output allocation failed"))?;
+    for field in root.iter().copied() {
+        if field.number == MOVIE_SUPER_FIELD {
+            append_length_replacement(&mut output, source, field, &new_drawable);
+        } else {
+            output.extend_from_slice(&source[field.start..field.end]);
+        }
+    }
+    if output.len() != expected {
+        return Err(DecodeError::plain(
+            "movie transform rewrite output sizing disagreed",
+        ));
+    }
+    Ok(output)
+}
+
+fn append_flags_replacement(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    field: ParsedField,
+    update: TransformField<u32>,
+) {
+    match update {
+        TransformField::Preserve => {
+            output.extend_from_slice(&source[field.start..field.end]);
+        },
+        TransformField::Set(value) => {
+            append_varint(output, u64::from(GEOMETRY_FLAGS_FIELD << 3));
+            append_varint(output, u64::from(value));
+        },
+        TransformField::Clear => {},
+    }
+}
+
+fn append_angle_replacement(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    field: ParsedField,
+    update: TransformField<f32>,
+) {
+    match update {
+        TransformField::Preserve => {
+            output.extend_from_slice(&source[field.start..field.end]);
+        },
+        TransformField::Set(value) => {
+            append_varint(output, u64::from(GEOMETRY_ANGLE_FIELD << 3 | 5));
+            output.extend_from_slice(&value.to_bits().to_le_bytes());
+        },
+        TransformField::Clear => {},
+    }
+}
+
+fn append_missing_transform<T>(output: &mut Vec<u8>, number: u32, update: TransformField<T>)
+where
+    T: TransformScalar,
+{
+    if let TransformField::Set(value) = update {
+        append_varint(output, u64::from(number << 3 | T::WIRE));
+        T::append(output, value);
+    }
+}
+
+trait TransformScalar: Copy {
+    const WIRE: u32;
+
+    fn append(output: &mut Vec<u8>, value: Self);
+}
+
+impl TransformScalar for u32 {
+    const WIRE: u32 = 0;
+
+    fn append(output: &mut Vec<u8>, value: Self) {
+        append_varint(output, u64::from(value));
+    }
+}
+
+impl TransformScalar for f32 {
+    const WIRE: u32 = 5;
+
+    fn append(output: &mut Vec<u8>, value: Self) {
+        output.extend_from_slice(&value.to_bits().to_le_bytes());
+    }
+}
+
 fn rewrite_fixed_message<T: FixedPair + Copy>(
     source: &[u8],
     value: T,
@@ -1431,7 +2477,10 @@ fn rewrite_fixed_message<T: FixedPair + Copy>(
     } else {
         SIZE_HEIGHT_FIELD
     };
-    let mut output = Vec::with_capacity(source.len());
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|_| DecodeError::plain("fixed geometry staging allocation failed"))?;
     for field in fields {
         if field.number == first {
             append_fixed_replacement(&mut output, source, field, value.first());
@@ -1546,6 +2595,21 @@ mod tests {
     use super::*;
 
     fn source() -> Vec<u8> {
+        source_with_transform(true)
+    }
+
+    fn source_without_transform() -> Vec<u8> {
+        source_with_transform(false)
+    }
+
+    fn source_with_transform(include_transform: bool) -> Vec<u8> {
+        source_with_optional_transform(
+            include_transform.then_some(7),
+            include_transform.then_some(1.0),
+        )
+    }
+
+    fn source_with_optional_transform(flags: Option<u32>, angle: Option<f32>) -> Vec<u8> {
         fn varint(mut value: usize) -> Vec<u8> {
             let mut bytes = Vec::new();
             while value >= 0x80 {
@@ -1572,10 +2636,243 @@ mod tests {
         size.extend(fixed(2, 480.0));
         let mut geometry = length(1, &point);
         geometry.extend(length(2, &size));
-        geometry.extend([0x18, 0x07]);
-        geometry.extend(fixed(4, 1.0));
+        if let Some(flags) = flags {
+            geometry.extend([0x18]);
+            geometry.extend(varint(flags as usize));
+        }
+        if let Some(angle) = angle {
+            geometry.extend(fixed(4, angle));
+        }
         let drawable = length(1, &geometry);
         length(1, &drawable)
+    }
+
+    #[test]
+    fn transform_projection_preserves_optional_presence_and_values() {
+        let bytes = source();
+        let transform = decode_movie_transform(&bytes, DecodeOptions::for_source(&bytes)).unwrap();
+        assert_eq!(transform.flags(), Some(7));
+        assert_eq!(transform.angle_degrees(), Some(1.0));
+        assert_eq!(transform.angle(), Some(1.0));
+
+        let absent = source_without_transform();
+        assert_eq!(
+            decode_movie_transform(&absent, DecodeOptions::for_source(&absent)).unwrap(),
+            MovieTransformSnapshot {
+                flags: None,
+                angle_degrees: None,
+            }
+        );
+    }
+
+    #[test]
+    fn transform_rewrite_updates_only_known_scalars_and_preserves_unknowns() {
+        let mut bytes = source();
+        let unknown = [
+            0x98, 0x06, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0,
+        ];
+        bytes.extend_from_slice(&unknown);
+        let output = rewrite_movie_transform(
+            &bytes,
+            MovieTransformWrite::with_updates(TransformField::set(9), TransformField::set(225.5)),
+            DecodeOptions::for_source(&bytes),
+        )
+        .unwrap();
+        assert!(output.ends_with(&unknown));
+        assert_eq!(
+            decode_movie_transform(&output, DecodeOptions::for_source(&output)).unwrap(),
+            MovieTransformSnapshot {
+                flags: Some(9),
+                angle_degrees: Some(225.5),
+            }
+        );
+        assert_eq!(
+            decode_movie_geometry(&bytes, DecodeOptions::for_source(&bytes)).unwrap(),
+            decode_movie_geometry(&output, DecodeOptions::for_source(&output)).unwrap()
+        );
+    }
+
+    #[test]
+    fn transform_rewrite_can_clear_or_append_optional_fields() {
+        let bytes = source();
+        let cleared = rewrite_movie_transform(
+            &bytes,
+            MovieTransformWrite::with_updates(TransformField::clear(), TransformField::clear()),
+            DecodeOptions::for_source(&bytes),
+        )
+        .unwrap();
+        assert_eq!(
+            decode_movie_transform(&cleared, DecodeOptions::for_source(&cleared)).unwrap(),
+            MovieTransformSnapshot {
+                flags: None,
+                angle_degrees: None,
+            }
+        );
+
+        let absent = source_without_transform();
+        let appended = rewrite_movie_transform(
+            &absent,
+            MovieTransformWrite::new(Some(4), Some(90.0)),
+            DecodeOptions::for_source(&absent),
+        )
+        .unwrap();
+        assert_eq!(
+            decode_movie_transform(&appended, DecodeOptions::for_source(&appended)).unwrap(),
+            MovieTransformSnapshot {
+                flags: Some(4),
+                angle_degrees: Some(90.0),
+            }
+        );
+    }
+
+    #[test]
+    fn transform_rewrite_replays_candidate_accounting_for_optional_presence() {
+        for (source_flags, source_angle) in [
+            (None, None),
+            (Some(7), None),
+            (None, Some(1.0)),
+            (Some(7), Some(1.0)),
+        ] {
+            let bytes = source_with_optional_transform(source_flags, source_angle);
+            let options = DecodeOptions::for_source(&bytes);
+            for flags in [
+                TransformField::Preserve,
+                TransformField::Set(0x24),
+                TransformField::Clear,
+            ] {
+                for angle in [
+                    TransformField::Preserve,
+                    TransformField::Set(180.0),
+                    TransformField::Clear,
+                ] {
+                    let write = MovieTransformWrite::with_updates(flags, angle);
+                    let prepared = prepare_movie_transform_rewrite(&bytes, write, options).unwrap();
+                    let requirements = prepared.execution_requirements();
+                    let source_report = prepared.prepare_report();
+                    let output = prepared.execute(requirements.exact()).unwrap();
+                    let (_, candidate_report) = decode_movie_transform_with_report(
+                        output.output(),
+                        DecodeOptions::for_source(output.output()),
+                    )
+                    .unwrap();
+                    assert_eq!(
+                        candidate_report.fields(),
+                        requirements.fields - source_report.fields()
+                    );
+                    assert!(
+                        requirements.work_bytes
+                            >= source_report
+                                .work_bytes()
+                                .saturating_add(candidate_report.work_bytes())
+                    );
+                    assert!(
+                        requirements.allocations
+                            >= source_report
+                                .allocations()
+                                .saturating_add(candidate_report.allocations())
+                    );
+                    assert!(requirements.retained_bytes >= output.output().len());
+                    assert!(
+                        requirements.scratch_bytes
+                            >= source_report
+                                .scratch_bytes()
+                                .saturating_add(candidate_report.scratch_bytes())
+                    );
+                    assert_eq!(candidate_report.max_depth(), requirements.max_depth);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn transform_preserve_is_an_exact_noop_and_prepared_limits_are_replayed() {
+        let bytes = source();
+        let options = DecodeOptions::for_source(&bytes);
+        assert_eq!(
+            rewrite_movie_transform(&bytes, MovieTransformWrite::preserve(), options).unwrap(),
+            bytes
+        );
+        let prepared = prepare_movie_transform_rewrite(
+            &bytes,
+            MovieTransformWrite::new(Some(11), Some(180.0)),
+            options,
+        )
+        .unwrap();
+        let requirements = prepared.execution_requirements();
+        assert!(requirements.allocations > BUFFA_LOGICAL_ALLOCATIONS);
+        assert!(requirements.retained_bytes > requirements.output_bytes);
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_output_bytes(requirements.output_bytes.saturating_sub(1))
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_allocations(requirements.allocations.saturating_sub(1))
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_retained_bytes(requirements.retained_bytes.saturating_sub(1))
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_scratch_bytes(requirements.scratch_bytes.saturating_sub(1))
+                )
+                .is_err()
+        );
+        let output = prepared.execute(requirements.exact()).unwrap();
+        assert!(output.report().changed());
+    }
+
+    #[test]
+    fn transform_known_fields_reject_duplicate_noncanonical_wrong_wire_and_nonfinite() {
+        let mut duplicate = source();
+        let flags = duplicate
+            .windows(2)
+            .position(|window| window == [0x18, 0x07])
+            .unwrap();
+        duplicate.splice(flags..flags, [0x18, 0x08]);
+        assert!(decode_movie_transform(&duplicate, DecodeOptions::for_source(&duplicate)).is_err());
+
+        let mut noncanonical = source();
+        let flags = noncanonical
+            .windows(2)
+            .position(|window| window == [0x18, 0x07])
+            .unwrap();
+        noncanonical.splice(flags..flags + 2, [0x18, 0x87, 0x00]);
+        assert!(
+            decode_movie_transform(&noncanonical, DecodeOptions::for_source(&noncanonical))
+                .is_err()
+        );
+
+        let mut wrong_wire = source();
+        let angle = wrong_wire.iter().position(|value| *value == 0x25).unwrap();
+        wrong_wire[angle] = 0x20;
+        assert!(
+            decode_movie_transform(&wrong_wire, DecodeOptions::for_source(&wrong_wire)).is_err()
+        );
+
+        let mut nonfinite = source();
+        let angle = nonfinite.iter().position(|value| *value == 0x25).unwrap();
+        nonfinite[angle + 1..angle + 5].copy_from_slice(&f32::NAN.to_le_bytes());
+        assert!(decode_movie_transform(&nonfinite, DecodeOptions::for_source(&nonfinite)).is_err());
     }
 
     #[test]
@@ -1627,12 +2924,41 @@ mod tests {
         )
         .unwrap();
         let requirements = prepared.execution_requirements();
+        assert!(requirements.allocations > BUFFA_LOGICAL_ALLOCATIONS);
+        assert!(requirements.retained_bytes > requirements.output_bytes);
         assert!(
             prepared
                 .execute(
                     requirements
                         .exact()
                         .with_output_bytes(requirements.output_bytes.saturating_sub(1))
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_allocations(requirements.allocations.saturating_sub(1))
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_retained_bytes(requirements.retained_bytes.saturating_sub(1))
+                )
+                .is_err()
+        );
+        assert!(
+            prepared
+                .execute(
+                    requirements
+                        .exact()
+                        .with_scratch_bytes(requirements.scratch_bytes.saturating_sub(1))
                 )
                 .is_err()
         );

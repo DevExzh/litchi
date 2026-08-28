@@ -144,15 +144,20 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
-## Keynote movie geometry codec
+## Keynote movie geometry and transform codec
 
 `keynote_movie_geometry_codec` drives the strict, source-preserving geometry
-projection for the drawable envelope inside `TSD.MovieArchive`. Successful
-inputs exercise scalar decode accounting, prepared rewrite/execute replay,
-candidate readback, and one-shot equivalence without exposing generated
-protobuf values. The target also probes malformed and truncated envelopes,
-unknown balanced groups, unknown overlong scalars, unterminated groups, and a
-deep group chain that must stop at the typed nesting ceiling.
+projection for the drawable envelope inside `TSD.MovieArchive`, together with
+the optional native flags/angle transform projection. Successful inputs
+exercise scalar decode accounting, prepared rewrite/execute replay, optional
+transform preserve/set/clear rewrites, candidate readback, and one-shot
+equivalence without exposing generated protobuf values. Transform writes
+toggle only the semantic reflection bit in generated commands while the
+source-preserving codec retains all other native flag bits and unknown spans.
+The target also probes malformed and truncated envelopes, duplicate and
+non-finite transform fields, unknown balanced groups, unknown overlong
+scalars, unterminated groups, and a deep group chain that must stop at the
+typed nesting ceiling.
 
 The target accepts at most 64 KiB and uses 8,192 fields, 512 KiB of work, 128
 KiB of output, and recursion depth 64. Prepared execution is replayed against

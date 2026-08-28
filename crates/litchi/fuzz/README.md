@@ -387,12 +387,14 @@ campaign without changing the public harness boundary.
 for an existing file-backed movie. It offers arbitrary bytes to bounded
 Keynote ingress and reuses the same bytes as typed `SlideSelector` and
 `MovieSelector` commands against the checked-in Keynote seed. When a source
-contains an admitted movie geometry, it covers position/size reads, no-op and
-replacement commits, exact patch application and conflicts, inverse
-restoration, candidate readback, selector failures, and source-byte
-atomicity. Native flags, angles, movie graph records, and identifiers remain
-opaque; movie creation/removal, media replacement, and cross-component writes
-are outside this target.
+contains an admitted movie geometry, it covers position/size and typed
+angle/reflection reads, geometry no-op/replacement, transform no-op/set, both
+horizontal and vertical flip semantics, exact patch application and conflicts,
+inverse restoration, candidate readback, selector failures, and source-byte
+atomicity. Native flag bits, movie graph records, and identifiers remain
+opaque (raw-field preservation is exercised by the neutral codec target);
+movie creation/removal, media replacement, and cross-component writes are
+outside this target.
 
 The target uses the finite Keynote physical and semantic profile used by the
 other focused Keynote targets; keep `-max_len` at 1 KiB so malformed ingress

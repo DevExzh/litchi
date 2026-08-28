@@ -4,15 +4,28 @@ use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveObject, FieldInfo, FieldPath, MessageInfo, RawMessage, SnappyStream,
+};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
-use litchi_keynote::slide::media::{Point, Size, geometry::MovieGeometry};
+use litchi_keynote::slide::media::{
+    Point, Size,
+    geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
+};
 use litchi_keynote::{Package, ReadOptions};
 use prost::Message as _;
 
 const DOCUMENT: &str = "Index/Document.iwa";
 const METADATA: &str = "Index/Metadata.iwa";
 const MOVIE_TYPE: u32 = 3_007;
+const SLIDE_TYPE: u32 = 5;
+const TABLE_INFO_TYPE: u32 = 6_000;
+const TABLE_MODEL_TYPE: u32 = 6_001;
+const HEADER_BUCKET_TYPE: u32 = 6_006;
+const TABLE_STYLE_TYPE: u32 = 6_003;
+const TABLE_STYLE_PRESET_TYPE: u32 = 6_008;
+const TABLE_STYLE_NETWORK_TYPE: u32 = 6_247;
+const STYLESHEET_TYPE: u32 = 401;
 const MOVIES: [u64; 2] = [100, 101];
 const AUDIO: u64 = 102;
 const SLIDE_NODE: u64 = 3;
@@ -264,6 +277,154 @@ fn replace_document(source: &[u8], archive: Archive) -> R<Vec<u8>> {
         Limits::default(),
     )?)
 }
+
+fn metadata_stream(package: &[u8]) -> R<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata"))?;
+    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+}
+
+fn replace_metadata(source: &[u8], archive: Archive) -> R<Vec<u8>> {
+    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let catalog = Catalog::from_bytes(source)?;
+    Ok(litchi_iwa_archive::package::to_bytes(
+        catalog
+            .iter()
+            .map(|entry| {
+                if entry.name() == METADATA {
+                    (entry.name(), replacement.as_slice())
+                } else {
+                    (entry.name(), entry.data())
+                }
+            })
+            .collect::<Vec<_>>(),
+        Limits::default(),
+    )?)
+}
+
+fn with_metadata(source: &[u8], edit: impl FnOnce(&mut tsp::PackageMetadata)) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let object = archive
+        .object_mut(300)
+        .ok_or_else(|| io::Error::other("metadata object"))?;
+    let mut metadata = tsp::PackageMetadata::decode(object.messages[0].data.as_slice())?;
+    edit(&mut metadata);
+    object.messages[0].data = metadata.encode_to_vec();
+    replace_metadata(source, archive)
+}
+
+fn with_message_alias(source: &[u8], id: u64, alias_type: u32) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let object = archive
+        .object_mut(id)
+        .ok_or_else(|| io::Error::other("alias object"))?;
+    let data = object
+        .messages
+        .first()
+        .ok_or_else(|| io::Error::other("alias message"))?
+        .data
+        .clone();
+    object.messages.push(RawMessage {
+        type_: alias_type,
+        data: data.clone(),
+    });
+    object
+        .archive_info
+        .message_infos
+        .push(MessageInfo::new(alias_type, u32::try_from(data.len())?));
+    replace_document(source, archive)
+}
+
+fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut foreign = object_refs(
+        900,
+        MOVIE_TYPE,
+        movie_payload(0, true),
+        vec![TITLE[0], CAPTION[0], STYLE[0]],
+    )?;
+    let info = &mut foreign.archive_info.message_infos[0];
+    match mode {
+        ForeignInbound::Object => info.object_references.push(target),
+        ForeignInbound::Data => info.data_references.push(target),
+        ForeignInbound::Field => info.field_infos.push(FieldInfo {
+            path: FieldPath::new(vec![99]),
+            object_references: vec![target],
+            ..FieldInfo::default()
+        }),
+        ForeignInbound::FieldData => info.field_infos.push(FieldInfo {
+            path: FieldPath::new(vec![100]),
+            data_references: vec![target],
+            ..FieldInfo::default()
+        }),
+    }
+    archive.objects.push(foreign);
+    replace_document(source, archive)
+}
+
+fn with_foreign_z_order(source: &[u8]) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let foreign = object_refs(
+        900,
+        MOVIE_TYPE,
+        movie_payload(0, true),
+        vec![TITLE[0], CAPTION[0], STYLE[0]],
+    )?;
+    let slide = archive
+        .object_mut(SLIDE)
+        .ok_or_else(|| io::Error::other("slide"))?;
+    let message = slide
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == 5)
+        .ok_or_else(|| io::Error::other("slide message"))?;
+    let mut payload = kn::SlideArchive::decode(message.data.as_slice())?;
+    payload.owned_drawables.push(r(900));
+    payload.drawables_z_order.push(r(900));
+    message.data = payload.encode_to_vec();
+    slide.archive_info.message_infos[0]
+        .object_references
+        .push(900);
+    archive.objects.push(foreign);
+    replace_document(source, archive)
+}
+
+fn with_movie_data_id(source: &[u8], id: u64, data_identifier: u64) -> R<Vec<u8>> {
+    let mut movie = tsd::MovieArchive::decode(movie_payload_at(source, id)?.as_slice())?;
+    movie.movie_data = Some(tsp::DataReference {
+        identifier: data_identifier,
+    });
+    with_movie(source, id, movie.encode_to_vec())
+}
+
+fn with_duplicate_movie_data(source: &[u8], id: u64) -> R<Vec<u8>> {
+    let mut payload = movie_payload_at(source, id)?;
+    let data = tsp::DataReference { identifier: 2_002 }.encode_to_vec();
+    append_length_delimited_field(&mut payload, 14, &data)?;
+    with_movie(source, id, payload)
+}
+
+fn with_movie_archive_data_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    archive
+        .object_mut(id)
+        .ok_or_else(|| io::Error::other("movie"))?
+        .archive_info
+        .message_infos[0]
+        .data_references = refs;
+    replace_document(source, archive)
+}
+
+#[derive(Clone, Copy)]
+enum ForeignInbound {
+    Object,
+    Data,
+    Field,
+    FieldData,
+}
 fn with_alias_member(source: &[u8], id: u64) -> R<Vec<u8>> {
     let archive = Archive::parse(&document_stream(source)?)?;
     let alias = archive
@@ -294,6 +455,261 @@ fn with_movie(source: &[u8], id: u64, payload: Vec<u8>) -> R<Vec<u8>> {
         .data = payload;
     replace_document(source, archive)
 }
+
+fn with_transform_fields(
+    source: &[u8],
+    id: u64,
+    flags: Option<u32>,
+    angle: Option<f32>,
+) -> R<Vec<u8>> {
+    let mut movie = tsd::MovieArchive::decode(movie_payload_at(source, id)?.as_slice())?;
+    let geometry = movie
+        .super_
+        .geometry
+        .as_mut()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    geometry.flags = flags;
+    geometry.angle = angle;
+    with_movie(source, id, movie.encode_to_vec())
+}
+
+fn with_locked_movie(source: &[u8], id: u64) -> R<Vec<u8>> {
+    let mut movie = tsd::MovieArchive::decode(movie_payload_at(source, id)?.as_slice())?;
+    movie.super_.locked = Some(true);
+    with_movie(source, id, movie.encode_to_vec())
+}
+
+fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
+    let payload = movie_payload_at(source, id)?;
+    let root = litchi_iwa_common::wire::WireView::parse(&payload)?;
+    let super_field = root
+        .fields()
+        .find(|field| field.number() == 1)
+        .ok_or_else(|| io::Error::other("movie super"))?;
+    let drawable = litchi_iwa_common::wire::WireView::parse(super_field.payload())?;
+    let geometry_field = drawable
+        .fields()
+        .find(|field| field.number() == 1)
+        .ok_or_else(|| io::Error::other("movie geometry"))?;
+    let mut geometry = geometry_field.payload().to_vec();
+    geometry.extend_from_slice(extra);
+
+    let mut drawable_output = Vec::new();
+    for field in drawable.fields() {
+        if field.number() == 1 {
+            append_length_delimited_field(&mut drawable_output, 1, &geometry)?;
+        } else {
+            drawable_output.extend_from_slice(field.raw());
+        }
+    }
+    let mut output = Vec::new();
+    for field in root.fields() {
+        if field.number() == 1 {
+            append_length_delimited_field(&mut output, 1, &drawable_output)?;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    with_movie(source, id, output)
+}
+
+fn append_fixed32(payload: &mut Vec<u8>, field: u32, value: f32) {
+    let mut key = u64::from(field) << 3 | 5;
+    while key >= 0x80 {
+        payload.push((key as u8 & 0x7f) | 0x80);
+        key >>= 7;
+    }
+    payload.push(key as u8);
+    payload.extend_from_slice(&value.to_le_bytes());
+}
+
+fn with_noncanonical_super_key(source: &[u8], id: u64) -> R<Vec<u8>> {
+    let mut payload = movie_payload_at(source, id)?;
+    if payload.first() != Some(&0x0a) {
+        return Err(io::Error::other("unexpected movie super key").into());
+    }
+    payload[0] = 0x8a;
+    payload.insert(1, 0);
+    with_movie(source, id, payload)
+}
+
+fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
+    let payload = movie_payload_at(source, id)?;
+    let root = litchi_iwa_common::wire::WireView::parse(&payload)?;
+    let super_field = root
+        .fields()
+        .find(|field| field.number() == 1)
+        .ok_or_else(|| io::Error::other("movie super"))?;
+    let drawable = litchi_iwa_common::wire::WireView::parse(super_field.payload())?;
+    let parent_field = drawable
+        .fields()
+        .find(|field| field.number() == 2)
+        .ok_or_else(|| io::Error::other("movie parent"))?;
+    let mut reference = parent_field.payload().to_vec();
+    if reference.first() != Some(&0x08) {
+        return Err(io::Error::other("unexpected reference key").into());
+    }
+    reference[0] = 0x88;
+    reference.insert(1, 0);
+
+    let mut drawable_output = Vec::new();
+    for field in drawable.fields() {
+        if field.number() == 2 {
+            append_length_delimited_field(&mut drawable_output, 2, &reference)?;
+        } else {
+            drawable_output.extend_from_slice(field.raw());
+        }
+    }
+    let mut output = Vec::new();
+    for field in root.fields() {
+        if field.number() == 1 {
+            append_length_delimited_field(&mut output, 1, &drawable_output)?;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    with_movie(source, id, output)
+}
+
+fn append_wire_varint(output: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        output.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+fn append_noncanonical_length_field(
+    output: &mut Vec<u8>,
+    field_number: u32,
+    payload: &[u8],
+) -> R<()> {
+    append_wire_varint(output, (u64::from(field_number) << 3) | 2);
+    let mut length = Vec::new();
+    append_wire_varint(&mut length, u64::try_from(payload.len())?);
+    let last = length
+        .last_mut()
+        .ok_or_else(|| io::Error::other("length encoding"))?;
+    *last |= 0x80;
+    length.push(0);
+    output.extend_from_slice(&length);
+    output.extend_from_slice(payload);
+    Ok(())
+}
+
+fn rewrite_noncanonical_length(payload: &[u8], path: &[u32]) -> R<Vec<u8>> {
+    let field_number = *path
+        .first()
+        .ok_or_else(|| io::Error::other("empty wire path"))?;
+    let view = litchi_iwa_common::wire::WireView::parse(payload)?;
+    let mut output = Vec::with_capacity(payload.len().saturating_add(1));
+    let mut matched = 0usize;
+    for field in view.fields() {
+        if field.number() != field_number {
+            output.extend_from_slice(field.raw());
+            continue;
+        }
+        matched = matched.saturating_add(1);
+        if matched != 1 || field.wire_type() != 2 {
+            return Err(io::Error::other("wire path is not unique and nested").into());
+        }
+        if path.len() == 1 {
+            append_noncanonical_length_field(&mut output, field_number, field.payload())?;
+        } else {
+            let nested = rewrite_noncanonical_length(field.payload(), &path[1..])?;
+            append_length_delimited_field(&mut output, field_number, &nested)?;
+        }
+    }
+    if matched != 1 {
+        return Err(io::Error::other("wire path not found").into());
+    }
+    Ok(output)
+}
+
+fn with_noncanonical_length_path(source: &[u8], id: u64, path: &[u32]) -> R<Vec<u8>> {
+    let payload = movie_payload_at(source, id)?;
+    with_movie(source, id, rewrite_noncanonical_length(&payload, path)?)
+}
+
+fn with_movie_payload_reference(
+    source: &[u8],
+    id: u64,
+    field_number: u32,
+    identifier: u64,
+) -> R<Vec<u8>> {
+    let mut movie = tsd::MovieArchive::decode(movie_payload_at(source, id)?.as_slice())?;
+    let reference = Some(r(identifier));
+    match field_number {
+        10 => movie.super_.title = reference,
+        11 => movie.super_.caption = reference,
+        19 => movie.style = reference,
+        _ => return Err(io::Error::other("unsupported movie reference field").into()),
+    }
+    with_movie(source, id, movie.encode_to_vec())
+}
+
+fn with_field_info_path(
+    source: &[u8],
+    id: u64,
+    path: &[u32],
+    object_references: &[u64],
+    data_references: &[u64],
+) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    archive
+        .object_mut(id)
+        .ok_or_else(|| io::Error::other("movie"))?
+        .archive_info
+        .message_infos[0]
+        .field_infos
+        .push(FieldInfo {
+            path: FieldPath::new(path.to_vec()),
+            object_references: object_references.to_vec(),
+            data_references: data_references.to_vec(),
+            ..FieldInfo::default()
+        });
+    replace_document(source, archive)
+}
+
+fn with_invalid_slide_drawable_role(source: &[u8]) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let slide = archive
+        .object_mut(SLIDE)
+        .ok_or_else(|| io::Error::other("slide"))?;
+    let message = slide
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == SLIDE_TYPE)
+        .ok_or_else(|| io::Error::other("slide message"))?;
+    let mut payload = kn::SlideArchive::decode(message.data.as_slice())?;
+    payload.owned_drawables.push(r(SLIDE_NODE));
+    payload.drawables_z_order.push(r(SLIDE_NODE));
+    message.data = payload.encode_to_vec();
+    slide.archive_info.message_infos[0]
+        .object_references
+        .push(SLIDE_NODE);
+    replace_document(source, archive)
+}
+
+fn with_z_order_only_reference(source: &[u8], target: u64) -> R<Vec<u8>> {
+    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let slide = archive
+        .object_mut(SLIDE)
+        .ok_or_else(|| io::Error::other("slide"))?;
+    let message = slide
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == SLIDE_TYPE)
+        .ok_or_else(|| io::Error::other("slide message"))?;
+    let mut payload = kn::SlideArchive::decode(message.data.as_slice())?;
+    payload.drawables_z_order.push(r(target));
+    message.data = payload.encode_to_vec();
+    slide.archive_info.message_infos[0]
+        .object_references
+        .push(target);
+    replace_document(source, archive)
+}
+
 fn with_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
     let mut archive = Archive::parse(&document_stream(source)?)?;
     archive
@@ -356,6 +772,18 @@ fn reject(source: &[u8]) -> R<()> {
             Ok(())
         },
     }
+}
+
+fn reject_transform(source: &[u8], label: &str) -> R<()> {
+    let package = match Package::from_bytes(source) {
+        Err(_) => return Ok(()),
+        Ok(package) => package,
+    };
+    assert!(
+        package.slide_movie_transform(0usize, 0usize).is_err(),
+        "accepted hostile movie-transform source: {label}"
+    );
+    Ok(())
 }
 
 #[test]
@@ -692,5 +1120,668 @@ fn parent_title_caption_playback_and_media_edges_are_unchanged() -> R<()> {
             .as_ref()
             .and_then(|geometry| geometry.angle)
     );
+    Ok(())
+}
+
+#[test]
+fn transform_reads_defaults_and_flip_axes() -> R<()> {
+    let source = source()?;
+    let package = Package::from_bytes(&source)?;
+    let before = MovieTransform::new(17.5, false)?;
+    assert_eq!(package.slide_movie_transform(0usize, 0usize)?, Some(before));
+    assert!(!before.is_reflected());
+    assert!(!before.reflected());
+    assert_eq!(
+        before.flipped(MovieFlipAxis::Horizontal),
+        MovieTransform::new(17.5, true)?
+    );
+    assert_eq!(
+        before.flipped(MovieFlipAxis::Vertical),
+        MovieTransform::new(197.5, true)?
+    );
+    assert_eq!(
+        MovieTransform::new(180.0, true)?.flipped(MovieFlipAxis::Vertical),
+        MovieTransform::identity()
+    );
+    Ok(())
+}
+
+#[test]
+fn absent_flags_read_unreflected_but_horizontal_flip_is_rejected_atomically() -> R<()> {
+    let source = with_transform_fields(&source()?, MOVIES[0], None, Some(17.5))?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(
+        package.slide_movie_transform(0usize, 0usize)?,
+        Some(MovieTransform::new(17.5, false)?)
+    );
+    let before = bytes(&package)?;
+    assert!(
+        package
+            .edit_slide_movie_geometry(0usize, 0usize)?
+            .flip(MovieFlipAxis::Horizontal)
+            .is_err()
+    );
+    assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn absent_angle_horizontal_preserves_absence_and_vertical_inserts_half_turn() -> R<()> {
+    let source = with_transform_fields(&source()?, MOVIES[0], Some(0x20), None)?;
+    let package = Package::from_bytes(&source)?;
+
+    let horizontal = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .flip(MovieFlipAxis::Horizontal)?
+        .commit()?;
+    let horizontal_archive = tsd::MovieArchive::decode(
+        movie_payload_at(&bytes(horizontal.package())?, MOVIES[0])?.as_slice(),
+    )?;
+    let horizontal_geometry = horizontal_archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    assert_eq!(horizontal_geometry.flags, Some(0x24));
+    assert_eq!(horizontal_geometry.angle, None);
+    assert_eq!(
+        horizontal.package().slide_movie_transform(0usize, 0usize)?,
+        Some(MovieTransform::new(0.0, true)?)
+    );
+
+    let vertical = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .flip(MovieFlipAxis::Vertical)?
+        .commit()?;
+    let vertical_archive = tsd::MovieArchive::decode(
+        movie_payload_at(&bytes(vertical.package())?, MOVIES[0])?.as_slice(),
+    )?;
+    let vertical_geometry = vertical_archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    assert_eq!(vertical_geometry.flags, Some(0x24));
+    assert_eq!(vertical_geometry.angle, Some(180.0));
+    assert_eq!(
+        vertical.package().slide_movie_transform(0usize, 0usize)?,
+        Some(MovieTransform::new(180.0, true)?)
+    );
+    Ok(())
+}
+
+#[test]
+fn explicit_zero_presence_survives_noop_and_geometry_only_change() -> R<()> {
+    let source = with_transform_fields(&source()?, MOVIES[0], Some(0), Some(0.0))?;
+    let package = Package::from_bytes(&source)?;
+    let identity = MovieTransform::identity();
+    assert_eq!(
+        package.slide_movie_transform(0usize, 0usize)?,
+        Some(identity)
+    );
+    let no_op = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .set_transform(identity)?
+        .commit()?;
+    assert_eq!(bytes(no_op.package())?, source);
+    assert!(no_op.patch().is_noop());
+    let no_op_archive = tsd::MovieArchive::decode(
+        movie_payload_at(&bytes(no_op.package())?, MOVIES[0])?.as_slice(),
+    )?;
+    let no_op_geometry = no_op_archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    assert_eq!(no_op_geometry.flags, Some(0));
+    assert_eq!(no_op_geometry.angle, Some(0.0));
+
+    let geometry_only = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .set(g(12.0, 34.0, 400.0, 250.0)?)?
+        .commit()?;
+    let geometry_only_archive = tsd::MovieArchive::decode(
+        movie_payload_at(&bytes(geometry_only.package())?, MOVIES[0])?.as_slice(),
+    )?;
+    let geometry_only_geometry = geometry_only_archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    assert_eq!(geometry_only_geometry.flags, Some(0));
+    assert_eq!(geometry_only_geometry.angle, Some(0.0));
+    Ok(())
+}
+
+#[test]
+fn unknown_flag_bits_and_top_level_flags_survive_reflection_toggle() -> R<()> {
+    let source = with_transform_fields(&source()?, MOVIES[0], Some(0x8000_0024), Some(17.5))?;
+    let before_archive =
+        tsd::MovieArchive::decode(movie_payload_at(&source, MOVIES[0])?.as_slice())?;
+    let before_geometry = before_archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    let before_flags = before_geometry
+        .flags
+        .ok_or_else(|| io::Error::other("flags"))?;
+    let before_top_level_flags = before_archive.flags;
+
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .flip(MovieFlipAxis::Horizontal)?
+        .commit()?;
+    let after_archive = tsd::MovieArchive::decode(
+        movie_payload_at(&bytes(commit.package())?, MOVIES[0])?.as_slice(),
+    )?;
+    let after_geometry = after_archive
+        .super_
+        .geometry
+        .as_ref()
+        .ok_or_else(|| io::Error::other("geometry"))?;
+    let after_flags = after_geometry
+        .flags
+        .ok_or_else(|| io::Error::other("flags"))?;
+    assert_eq!(after_flags & !0x04, before_flags & !0x04);
+    assert_eq!(after_flags & 0x04, 0);
+    assert_eq!(after_archive.flags, before_top_level_flags);
+    Ok(())
+}
+
+#[test]
+fn combined_geometry_and_transform_round_trip_inverse_and_conflict() -> R<()> {
+    let source = source()?;
+    let package = Package::from_bytes(&source)?;
+    let replacement = g(240.5, 315.25, 1_280.0, 720.0)?;
+    let transform = MovieTransform::new(270.0, true)?;
+    let commit = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .set(replacement)?
+        .set_transform(transform)?
+        .commit()?;
+    assert_eq!(commit.patch().before(), g(100.0, 200.0, 800.0, 300.0)?);
+    assert_eq!(commit.patch().after(), replacement);
+    assert_eq!(
+        commit.patch().before_transform(),
+        MovieTransform::new(17.5, false)?
+    );
+    assert_eq!(commit.patch().after_transform(), transform);
+    assert_eq!(
+        commit.package().slide_movie_geometry(0usize, 0usize)?,
+        Some(replacement)
+    );
+    assert_eq!(
+        commit.package().slide_movie_transform(0usize, 0usize)?,
+        Some(transform)
+    );
+
+    let candidate = bytes(commit.package())?;
+    let inverse = commit
+        .package()
+        .apply_slide_movie_geometry(&commit.patch().inverse())?;
+    assert_eq!(bytes(inverse.package())?, source);
+    let applied = Package::from_bytes(&source)?.apply_slide_movie_geometry(commit.patch())?;
+    assert_eq!(bytes(applied.package())?, candidate);
+
+    let stale = Package::from_bytes(&source)?
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .set(g(22.0, 44.0, 500.0, 260.0)?)?
+        .set_transform(MovieTransform::new(45.0, true)?)?
+        .commit()?;
+    assert!(
+        stale
+            .package()
+            .apply_slide_movie_geometry(commit.patch())
+            .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn locked_movie_allows_exact_transform_noop_but_rejects_changes() -> R<()> {
+    let source = with_locked_movie(&source()?, MOVIES[0])?;
+    let package = Package::from_bytes(&source)?;
+    let before = MovieTransform::new(17.5, false)?;
+    let no_op = package
+        .edit_slide_movie_geometry(0usize, 0usize)?
+        .set_transform(before)?
+        .commit()?;
+    assert_eq!(bytes(no_op.package())?, source);
+    assert!(!no_op.diagnostics().changed());
+
+    let before_bytes = bytes(&package)?;
+    assert!(
+        package
+            .edit_slide_movie_geometry(0usize, 0usize)?
+            .flip(MovieFlipAxis::Horizontal)
+            .and_then(|edit| edit.commit())
+            .is_err()
+    );
+    assert!(
+        package
+            .edit_slide_movie_geometry(0usize, 0usize)?
+            .set(g(1.0, 2.0, 3.0, 4.0)?)?
+            .commit()
+            .is_err()
+    );
+    assert_eq!(bytes(&package)?, before_bytes);
+    Ok(())
+}
+
+#[test]
+fn malformed_transform_duplicate_wrong_wire_and_nonfinite_angle_reject() -> R<()> {
+    let source = source()?;
+    let original = movie_payload_at(&source, MOVIES[0])?;
+
+    let mut duplicate = Vec::new();
+    append_fixed32(&mut duplicate, 4, 9.0);
+    reject(&with_geometry_extra(&source, MOVIES[0], &duplicate)?)?;
+
+    let mut wrong_wire = Vec::new();
+    append_varint_field(&mut wrong_wire, 4, 9)?;
+    reject(&with_geometry_extra(&source, MOVIES[0], &wrong_wire)?)?;
+
+    let mut nonfinite = tsd::MovieArchive::decode(original.as_slice())?;
+    nonfinite
+        .super_
+        .geometry
+        .as_mut()
+        .ok_or_else(|| io::Error::other("geometry"))?
+        .angle = Some(f32::NAN);
+    reject(&with_movie(&source, MOVIES[0], nonfinite.encode_to_vec())?)?;
+    Ok(())
+}
+
+#[test]
+fn hostile_movie_roles_and_global_inbound_routes_fail_closed() -> R<()> {
+    let source = source()?;
+    let cases = [
+        (
+            "movie carries slide role alias",
+            with_message_alias(&source, MOVIES[0], 5)?,
+        ),
+        (
+            "slide carries movie role alias",
+            with_message_alias(&source, SLIDE, MOVIE_TYPE)?,
+        ),
+        (
+            "foreign object inbound",
+            with_foreign_inbound(&source, MOVIES[0], ForeignInbound::Object)?,
+        ),
+        (
+            "foreign data inbound",
+            with_foreign_inbound(&source, 2_002, ForeignInbound::Data)?,
+        ),
+        (
+            "foreign data inbound to movie",
+            with_foreign_inbound(&source, MOVIES[0], ForeignInbound::Data)?,
+        ),
+        (
+            "foreign field-info inbound",
+            with_foreign_inbound(&source, MOVIES[0], ForeignInbound::Field)?,
+        ),
+        (
+            "foreign field-info data inbound",
+            with_foreign_inbound(&source, 2_002, ForeignInbound::FieldData)?,
+        ),
+        (
+            "foreign slide z-order object",
+            with_foreign_z_order(&source)?,
+        ),
+    ];
+    for (label, hostile) in cases {
+        reject_transform(&hostile, label)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn hostile_metadata_identity_and_authority_routes_fail_closed() -> R<()> {
+    let source = source()?;
+    let cases = [
+        (
+            "missing current movie uuid",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .retain(|entry| entry.identifier != MOVIES[0]);
+            })?,
+        ),
+        (
+            "movie uuid in wrong component",
+            with_metadata(&source, |metadata| {
+                let entry = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .iter()
+                    .find(|entry| entry.identifier == MOVIES[0])
+                    .cloned()
+                    .expect("movie uuid");
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .retain(|candidate| candidate.identifier != MOVIES[0]);
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 2)
+                    .expect("unrelated component")
+                    .object_uuid_map_entries
+                    .push(entry);
+            })?,
+        ),
+        (
+            "duplicate current movie uuid",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .push(uuid(MOVIES[0]));
+            })?,
+        ),
+        (
+            "movie uuid collides with versioned registry",
+            with_metadata(&source, |metadata| {
+                metadata.versioned_components.push(tsp::ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "Document".into(),
+                    locator: Some("Document".into()),
+                    object_uuid_map_entries: vec![uuid(MOVIES[0])],
+                    ..Default::default()
+                });
+            })?,
+        ),
+        (
+            "ambiguous movie uuid",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .ambiguous_object_identifiers
+                    .push(MOVIES[0]);
+            })?,
+        ),
+        (
+            "movie used as metadata-map owner",
+            with_metadata(&source, |metadata| {
+                metadata.data_metadata_map = Some(r(MOVIES[0]));
+            })?,
+        ),
+        (
+            "movie used as data-reference owner",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .data_references
+                    .push(tsp::ComponentDataReference {
+                        data_identifier: 2_002,
+                        object_reference_list: vec![
+                            tsp::component_data_reference::ObjectReference {
+                                object_identifier: MOVIES[0],
+                                count: 1,
+                            },
+                        ],
+                    });
+            })?,
+        ),
+        (
+            "missing current slide uuid",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .retain(|entry| entry.identifier != SLIDE);
+            })?,
+        ),
+        (
+            "slide uuid in wrong component",
+            with_metadata(&source, |metadata| {
+                let entry = metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .iter()
+                    .find(|entry| entry.identifier == SLIDE)
+                    .cloned()
+                    .expect("slide uuid");
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .retain(|candidate| candidate.identifier != SLIDE);
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 2)
+                    .expect("unrelated component")
+                    .object_uuid_map_entries
+                    .push(entry);
+            })?,
+        ),
+        (
+            "duplicate current slide uuid",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .object_uuid_map_entries
+                    .push(uuid(SLIDE));
+            })?,
+        ),
+        (
+            "slide uuid collides with versioned registry",
+            with_metadata(&source, |metadata| {
+                metadata.versioned_components.push(tsp::ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "Document".into(),
+                    locator: Some("Document".into()),
+                    object_uuid_map_entries: vec![uuid(SLIDE)],
+                    ..Default::default()
+                });
+            })?,
+        ),
+        (
+            "ambiguous slide uuid",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .ambiguous_object_identifiers
+                    .push(SLIDE);
+            })?,
+        ),
+        (
+            "slide used as metadata-map owner",
+            with_metadata(&source, |metadata| {
+                metadata.data_metadata_map = Some(r(SLIDE));
+            })?,
+        ),
+        (
+            "slide used as data-reference owner",
+            with_metadata(&source, |metadata| {
+                metadata
+                    .components
+                    .iter_mut()
+                    .find(|component| component.identifier == 1)
+                    .expect("document component")
+                    .data_references
+                    .push(tsp::ComponentDataReference {
+                        data_identifier: 2_002,
+                        object_reference_list: vec![
+                            tsp::component_data_reference::ObjectReference {
+                                object_identifier: SLIDE,
+                                count: 1,
+                            },
+                        ],
+                    });
+            })?,
+        ),
+    ];
+    for (label, hostile) in cases {
+        reject_transform(&hostile, label)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn hostile_movie_data_and_noncanonical_reference_routes_fail_closed() -> R<()> {
+    let source = source()?;
+    let cases = [
+        (
+            "dangling movie data",
+            with_movie_data_id(&source, MOVIES[0], 9_999)?,
+        ),
+        (
+            "poster used as movie data",
+            with_movie_data_id(&source, MOVIES[0], 2_001)?,
+        ),
+        (
+            "duplicate archive data reference",
+            with_movie_archive_data_refs(&source, MOVIES[0], vec![2_002, 2_002])?,
+        ),
+        (
+            "duplicate movie data field",
+            with_duplicate_movie_data(&source, MOVIES[0])?,
+        ),
+        (
+            "wrong archive data reference",
+            with_movie_archive_data_refs(&source, MOVIES[0], vec![2_001])?,
+        ),
+        (
+            "noncanonical movie super key",
+            with_noncanonical_super_key(&source, MOVIES[0])?,
+        ),
+        (
+            "noncanonical movie parent key",
+            with_noncanonical_parent_key(&source, MOVIES[0])?,
+        ),
+    ];
+    for (label, hostile) in cases {
+        reject_transform(&hostile, label)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn noncanonical_length_prefixes_on_movie_reference_and_size_routes_fail_closed() -> R<()> {
+    let source = source()?;
+    for (path, label) in [
+        (&[1, 2][..], "movie parent reference length"),
+        (&[1, 10][..], "movie title reference length"),
+        (&[1, 11][..], "movie caption reference length"),
+        (&[19][..], "movie style reference length"),
+        (&[20][..], "movie original-size length"),
+        (&[21][..], "movie natural-size length"),
+    ] {
+        reject_transform(
+            &with_noncanonical_length_path(&source, MOVIES[0], path)?,
+            label,
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn movie_payload_and_archive_info_routes_must_match_exactly() -> R<()> {
+    let source = source()?;
+    reject_transform(
+        &with_movie_payload_reference(&source, MOVIES[0], 10, TITLE[1])?,
+        "movie payload title differs from ArchiveInfo",
+    )?;
+    reject_transform(
+        &with_refs(
+            &source,
+            MOVIES[0],
+            vec![TITLE[0], CAPTION[0], STYLE[0], AUDIO],
+        )?,
+        "movie ArchiveInfo has an extra object reference",
+    )?;
+    reject_transform(
+        &with_field_info_path(&source, MOVIES[0], &[10], &[TITLE[0]], &[])?,
+        "movie ArchiveInfo has a canonical field route",
+    )?;
+    let duplicate = with_field_info_path(&source, MOVIES[0], &[10], &[TITLE[0]], &[])?;
+    reject_transform(
+        &with_field_info_path(&duplicate, MOVIES[0], &[10], &[TITLE[0]], &[])?,
+        "movie ArchiveInfo has duplicate canonical field routes",
+    )?;
+    reject_transform(
+        &with_field_info_path(&source, MOVIES[0], &[10, 1], &[TITLE[0]], &[])?,
+        "movie ArchiveInfo has a noncanonical field route",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn invalid_owned_and_z_order_drawable_roles_fail_closed() -> R<()> {
+    reject_transform(
+        &with_invalid_slide_drawable_role(&source()?)?,
+        "slide owns a non-drawable known-role object",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn z_order_only_dangling_and_wrong_role_ids_fail_closed() -> R<()> {
+    let source = source()?;
+    for (target, label) in [
+        (9_999, "z-order-only dangling drawable"),
+        (TITLE[0], "z-order-only title object"),
+        (STYLE[0], "z-order-only style object"),
+        (SLIDE, "z-order-only slide object"),
+        (SLIDE_NODE, "z-order-only slide-node object"),
+    ] {
+        reject_transform(&with_z_order_only_reference(&source, target)?, label)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn every_known_movie_role_alias_fails_closed() -> R<()> {
+    let source = source()?;
+    for (role, label) in [
+        (SLIDE_TYPE, "slide role alias"),
+        (MOVIE_TYPE, "movie role duplicate"),
+        (TABLE_INFO_TYPE, "table-info role alias"),
+        (TABLE_MODEL_TYPE, "table-model role alias"),
+        (HEADER_BUCKET_TYPE, "header-bucket role alias"),
+        (TABLE_STYLE_TYPE, "table-style role alias"),
+        (TABLE_STYLE_PRESET_TYPE, "table-style-preset role alias"),
+        (TABLE_STYLE_NETWORK_TYPE, "table-style-network role alias"),
+        (STYLESHEET_TYPE, "stylesheet role alias"),
+    ] {
+        reject_transform(&with_message_alias(&source, MOVIES[0], role)?, label)?;
+    }
     Ok(())
 }

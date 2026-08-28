@@ -11,10 +11,7 @@ use crate::data_reference_registry::{
 };
 use crate::media::MediaAssetId;
 use crate::media_playback::media_playback_settings;
-use crate::shapes::{
-    DrawableFlipAxis, DrawableGeometry, DrawableProperties, DrawableSize, flip_drawable_geometry,
-    geometry_from_drawable, restore_drawable_original_size,
-};
+use crate::shapes::{DrawableGeometry, DrawableProperties, DrawableSize, geometry_from_drawable};
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod builds;
@@ -224,115 +221,6 @@ impl KeynoteEditor {
         }
         *self = verified;
         Ok(created)
-    }
-
-    /// Read typed geometry for one slide-owned movie.
-    pub fn slide_movie_geometry(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<DrawableGeometry> {
-        Ok(self
-            .slide_movie_graph(slide_index, drawable_object_id)?
-            .info
-            .geometry)
-    }
-
-    /// Restore a file-backed slide movie's displayed dimensions from its stored original size.
-    ///
-    /// This keeps the current position, rotation, reflection, media assets, playback,
-    /// and properties unchanged. It returns an error when the movie has no native
-    /// original-size metadata.
-    pub fn restore_slide_movie_original_size(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<DrawableGeometry> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        let original_size = source.info.original_size.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote movie {drawable_object_id} has no original-size metadata"
-            ))
-        })?;
-        let geometry = restore_drawable_original_size(source.info.geometry, original_size)?;
-        let mut staged = self.package().clone();
-        set_movie_geometry(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            geometry,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_movie_geometry(slide_index, drawable_object_id)? != geometry {
-            return Err(Error::InvalidFormat(
-                "Keynote movie original-size update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(geometry)
-    }
-
-    /// Apply one native Arrange Flip operation to an ordinary file-backed slide movie.
-    ///
-    /// Returns the updated geometry after applying the same transform as the
-    /// Keynote Flip Horizontally or Flip Vertically command.
-    pub fn flip_slide_movie(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        axis: DrawableFlipAxis,
-    ) -> Result<DrawableGeometry> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        let geometry = flip_drawable_geometry(source.info.geometry, axis)?;
-        let mut staged = self.package().clone();
-        set_movie_geometry(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            geometry,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_movie_geometry(slide_index, drawable_object_id)? != geometry {
-            return Err(Error::InvalidFormat(
-                "Keynote movie flip update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(geometry)
-    }
-
-    /// Update geometry on an ordinary file-backed movie while preserving unknown wire fields.
-    pub fn set_slide_movie_geometry(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        geometry: DrawableGeometry,
-    ) -> Result<()> {
-        let source = self.require_file_movie(slide_index, drawable_object_id)?;
-        if let Some(result) = try_set_file_movie_geometry_with_package(
-            self,
-            slide_index,
-            drawable_object_id,
-            &source,
-            geometry,
-        ) {
-            return result;
-        }
-        let mut staged = self.package().clone();
-        set_movie_geometry(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            geometry,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_movie_geometry(slide_index, drawable_object_id)? != geometry {
-            return Err(Error::InvalidFormat(
-                "Keynote movie geometry update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
     }
 
     /// Read shared drawable properties for one ordinary file-backed slide movie.
@@ -965,7 +853,7 @@ fn take_movie_identifier(next: &mut u64) -> Result<u64> {
 mod tests {
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
-    use crate::shapes::DrawablePoint;
+    use crate::shapes::{DrawableFlipAxis, DrawablePoint};
     use litchi_core::Position;
     use litchi_keynote::slide::audio::Options as SlideAudioOptions;
     use litchi_keynote::slide::media::geometry::MovieGeometry;
@@ -1122,6 +1010,10 @@ mod tests {
             DrawableProperties::default()
         );
 
+        // Builder snapshots are not admitted by the focused movie-geometry
+        // owner. Keep the host fail-closed and verify that rejection is
+        // atomic; the focused package integration suite covers successful
+        // geometry and transform edits on admitted sources.
         let changed_geometry = MovieGeometry::new(
             KeynotePoint { x: 48.0, y: 72.0 },
             KeynoteSize {
@@ -1130,82 +1022,39 @@ mod tests {
             },
         )
         .unwrap();
-        editor
-            .set_slide_movie_geometry_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                changed_geometry,
-            )
-            .unwrap();
-        assert_eq!(
+        let before_geometry = editor.to_bytes().unwrap();
+        assert!(
             editor
-                .slide_movie_geometry_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
-            Some(changed_geometry)
+                .set_slide_movie_geometry_by_selector(
+                    Position::new(0),
+                    MovieSelector::index(0),
+                    changed_geometry,
+                )
+                .is_err()
         );
-        let native_geometry = DrawableGeometry {
-            position: Some(DrawablePoint { x: 48.0, y: 72.0 }),
-            size: Some(DrawableSize {
-                width: 320.0,
-                height: 180.0,
-            }),
-            flags: Some(3),
-            angle: Some(8.0),
-        };
-        editor
-            .set_slide_movie_geometry(0, created.drawable_object_id, native_geometry)
-            .unwrap();
-        assert_eq!(
+        assert_eq!(editor.to_bytes().unwrap(), before_geometry);
+        let before_flip = editor.to_bytes().unwrap();
+        assert!(
             editor
-                .slide_movie_geometry(0, created.drawable_object_id)
-                .unwrap(),
-            native_geometry
+                .flip_slide_movie_by_selector(
+                    Position::new(0),
+                    MovieSelector::index(0),
+                    DrawableFlipAxis::Horizontal,
+                )
+                .is_err()
         );
-        let restored_original_size = editor
-            .restore_slide_movie_original_size_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-            )
-            .unwrap();
-        let expected_original_size_geometry = MovieGeometry::new(
-            KeynotePoint { x: 48.0, y: 72.0 },
-            KeynoteSize {
-                width: NATURAL_SIZE.width,
-                height: NATURAL_SIZE.height,
-            },
-        )
-        .unwrap();
-        assert_eq!(restored_original_size, expected_original_size_geometry);
-        assert_eq!(
-            editor
-                .slide_movie_geometry_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
-            Some(expected_original_size_geometry)
-        );
-        let horizontally_flipped = editor
-            .flip_slide_movie_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                DrawableFlipAxis::Horizontal,
-            )
-            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), before_flip);
+
         assert_eq!(
             editor.slide_movies(0).unwrap()[0].geometry,
-            horizontally_flipped
+            created.geometry
         );
-        assert_ne!(horizontally_flipped.flags, native_geometry.flags);
-        let vertically_flipped = editor
-            .flip_slide_movie_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                DrawableFlipAxis::Vertical,
-            )
-            .unwrap();
+        assert_eq!(editor.extract_media(movie_data_identifier).unwrap(), MOVIE);
         assert_eq!(
-            editor.slide_movies(0).unwrap()[0].geometry,
-            vertically_flipped
+            editor.extract_media(poster_data_identifier).unwrap(),
+            POSTER
         );
-        assert_ne!(vertically_flipped.angle, native_geometry.angle);
+        let source_geometry = editor.slide_movies(0).unwrap()[0].geometry;
         assert_eq!(
             editor
                 .replace_slide_movie_data(0, created.drawable_object_id, REPLACEMENT_MOVIE)
@@ -1222,13 +1071,6 @@ mod tests {
         let duplicate_properties = properties("Duplicated Keynote movie");
         editor
             .set_slide_movie_properties(0, created.drawable_object_id, duplicate_properties.clone())
-            .unwrap();
-        let source_geometry = editor
-            .flip_slide_movie_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                DrawableFlipAxis::Vertical,
-            )
             .unwrap();
 
         let duplicate = editor
@@ -1535,7 +1377,8 @@ mod tests {
                     MovieSelector::index(0),
                     DrawableFlipAxis::Horizontal,
                 )
-                .is_ok()
+                .is_err()
         );
+        assert_eq!(editor.to_bytes().unwrap(), before_flip);
     }
 }

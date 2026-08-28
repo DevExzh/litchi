@@ -36,6 +36,9 @@ pub struct Size {
 pub mod geometry {
     use super::{Point, Size};
 
+    const HALF_TURN_DEGREES: f32 = 180.0;
+    const FULL_TURN_DEGREES: f32 = 360.0;
+
     /// Semantic validation failures for movie geometry values.
     pub use crate::Error;
     /// Result type for validated movie geometry construction.
@@ -84,6 +87,115 @@ pub mod geometry {
         pub const fn size(self) -> Size {
             self.size
         }
+    }
+
+    /// The archive-free transform controls for a file-backed movie.
+    ///
+    /// Keynote stores reflection and rotation in native geometry flags and an
+    /// angle field.  The semantic layer intentionally exposes only the
+    /// supported transform controls; all other native flag bits remain opaque
+    /// to the package adapter and are preserved during a rewrite.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct MovieTransform {
+        angle_degrees: f32,
+        reflected: bool,
+    }
+
+    impl Default for MovieTransform {
+        fn default() -> Self {
+            Self::identity()
+        }
+    }
+
+    impl MovieTransform {
+        /// Construct a finite movie transform in clockwise degrees.
+        pub const fn new(angle_degrees: f32, reflected: bool) -> Result<Self> {
+            if !angle_degrees.is_finite() {
+                return Err(Error::InvalidMovieAngle);
+            }
+            Ok(Self {
+                angle_degrees: if angle_degrees == 0.0 {
+                    0.0
+                } else {
+                    angle_degrees
+                },
+                reflected,
+            })
+        }
+
+        /// Construct the native default transform.
+        #[must_use]
+        pub const fn identity() -> Self {
+            Self {
+                angle_degrees: 0.0,
+                reflected: false,
+            }
+        }
+
+        /// Return the clockwise rotation in degrees.
+        #[must_use]
+        pub const fn angle_degrees(self) -> f32 {
+            self.angle_degrees
+        }
+
+        /// Return whether the movie is reflected.
+        #[must_use]
+        pub const fn is_reflected(self) -> bool {
+            self.reflected
+        }
+
+        /// Return a copy with a different finite angle.
+        pub const fn with_angle_degrees(self, angle_degrees: f32) -> Result<Self> {
+            if !angle_degrees.is_finite() {
+                return Err(Error::InvalidMovieAngle);
+            }
+            Ok(Self {
+                angle_degrees: if angle_degrees == 0.0 {
+                    0.0
+                } else {
+                    angle_degrees
+                },
+                ..self
+            })
+        }
+
+        /// Return a copy with a different reflection state.
+        #[must_use]
+        pub const fn with_reflected(self, reflected: bool) -> Self {
+            Self { reflected, ..self }
+        }
+
+        /// Return whether the transform is reflected along either axis.
+        #[must_use]
+        pub const fn reflected(self) -> bool {
+            self.reflected
+        }
+
+        /// Apply one native Arrange flip operation.
+        #[must_use]
+        pub fn flipped(self, axis: MovieFlipAxis) -> Self {
+            let angle_degrees = match axis {
+                MovieFlipAxis::Horizontal => self.angle_degrees,
+                MovieFlipAxis::Vertical => {
+                    let current = self.angle_degrees.rem_euclid(FULL_TURN_DEGREES);
+                    let flipped = (current + HALF_TURN_DEGREES).rem_euclid(FULL_TURN_DEGREES);
+                    if flipped == 0.0 { 0.0 } else { flipped }
+                },
+            };
+            Self {
+                angle_degrees,
+                reflected: !self.reflected,
+            }
+        }
+    }
+
+    /// The axis used by a native Arrange flip operation.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum MovieFlipAxis {
+        /// Toggle reflection without changing rotation.
+        Horizontal,
+        /// Toggle reflection and add a half turn to rotation.
+        Vertical,
     }
 
     /// Package transaction types for an existing movie's geometry.

@@ -14800,3 +14800,56 @@ dependency declarations, one migration host, and 13 ordered debts. Wave110
 closes no crate, manifest, dependency edge, debt, public owner, or monolith
 gate; all existing edges, debts, and the remaining generated/Prost/Buffa
 ownership ledger stay open.
+
+## 2026-08-28 amendment: Wave111 Keynote movie-transform owner extension
+
+Wave111 extends the existing Wave87 Keynote movie-geometry owner without
+changing the semantic meaning of `MovieGeometry`: it remains the archive-free
+position and displayed-size value. The same `litchi-keynote::Package` movie
+transaction now also exposes archive-free `MovieTransform` (finite
+`angle_degrees` plus the supported reflection bit) and `MovieFlipAxis`. The
+existing `Package::{slide_movie_geometry, edit_slide_movie_geometry,
+apply_slide_movie_geometry}` transaction carries geometry and transform in one
+atomic patch, including exact-source fingerprints, no-op/conflict handling,
+inverse artifacts, candidate reread, and preview invalidation. Native archive
+records, identifiers, media assets, and all unsupported flag bits remain
+private; unknown wire spans and unselected native flag bits are preserved.
+
+The strict `keynote_movie_geometry_codec` now projects and prepares the
+optional native flags/angle fields with finite residual limits, duplicate and
+wrong-wire rejection, non-finite-value rejection, absent-versus-present
+handling, unknown-field/group preservation, and one prepared execution. The
+focused package suite is 27/27 and the focused codec suite is 10/10 in the
+current frozen report. The four raw Keynote host geometry/restore/flip entry
+points and their compatibility fallback are retired. Selector-based host
+bridges now delegate to the focused package and propagate its errors; private
+physical helpers remain only for unrelated media lifecycle, offset, property,
+and graph work.
+
+Both the low-level `keynote_movie_geometry_codec` and package-level
+`keynote_slide_movie_geometry` fuzz targets passed isolated cargo checks and
+strict target Clippy; the bounded 32-run smoke also passed. The package-level
+corpus contains nine command-only seeds, with eight new command seeds across
+the package and low-level targets; no native package corpus is implied. The
+final completion ratchet passed its focused 8/8 and full 670/670 boundary
+checks; `py_compile` passed and the live audits were empty. The full checker
+reported only the three unrelated findings from the pre-existing untracked
+Pages table-lock file. A broader `litchi-keynote` library sweep was 152/153,
+with the sole `soundtrack_order` failure unrelated to Wave111. The existing
+Wave87 scoped gates and native record remain historical geometry evidence only.
+
+No new native Keynote driver or UI run was possible in Wave111: no real
+file-backed movie `.key` source is currently available, the tracked `basic.key`
+contains only a blank movie poster and no `.mov`, and the historical Wave87
+artifacts are absent. Accordingly Wave111 makes no native mutation, save,
+reopen, normalized-ingress, or UI acceptance claim. Wave87's recorded native
+open/save/reopen result and its strict normalized reread `InvalidSource`
+remain unchanged and are not upgraded by this extension.
+
+This is a bounded selector/codec/host ownership extension, not a monolith-exit
+gate. The `litchi-iwa -> litchi-keynote` edge, all 13 ordered debts, generated
+schema/Prost/Buffa owners, migration hosts, the 64-package/239-internal-
+dependency topology, and the IWA monolith deletion gate remain unchanged.
+The operation ledger is a conservative logical envelope: package caches,
+decompressed Archives, ZIP/Snappy buffers, codec-internal allocations, the
+process allocator, RSS, and zero-copy behavior are not directly measured.

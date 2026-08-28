@@ -1175,6 +1175,60 @@ def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
+    """Activate the Wave111 geometry handoff with a complete fake bridge."""
+
+    add_keynote_movie_geometry_canonical_scaffold(root)
+    semantic = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE
+    semantic.write_text(
+        semantic.read_text(encoding="utf-8")
+        + "pub enum MovieFlipAxis { Horizontal, Vertical }\n"
+        + "impl MovieGeometry {\n"
+        + "    pub fn angle(self) -> f32 { 0.0 }\n"
+        + "    pub fn flags(self) -> u32 { 0 }\n"
+        + "    pub fn flip(self, _axis: MovieFlipAxis) -> Self { self }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+    owner.write_text(
+        owner.read_text(encoding="utf-8")
+        + "const MOVIE_GEOMETRY_COMPLETE: () = ();\n"
+        + "impl Package { pub fn slide_movie_transform(&self, slide: SlideSelector, movie: MovieSelector) {} }\n"
+        + "impl SlideMovieGeometryEdit { pub fn set_transform(self, value: MovieTransform) -> Self { let _ = value; self } pub fn flip(self, axis: MovieFlipAxis) -> Self { let _ = axis; self } }\n"
+        + "fn complete_geometry_codec_flow() {\n"
+        + "    let options = DecodeOptions::residual();\n"
+        + "    let prepared = prepare_movie_transform_rewrite(bytes, write, options);\n"
+        + "    let report = prepared.prepare_report();\n"
+        + "    let requirements = prepared.execution_requirements();\n"
+        + "    let output = prepared.execute(requirements);\n"
+        + "    let _ = (report, output);\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+    codec.write_text(
+        codec.read_text(encoding="utf-8")
+        + "const GEOMETRY_ANGLE_FIELD: u32 = 4;\n"
+        + "const GEOMETRY_FLAGS_FIELD: u32 = 3;\n"
+        + "const GEOMETRY_FLIP_FIELD: u32 = 5;\n"
+        + "struct PreparedMovieTransformRewrite; enum TransformField<T> { Preserve, Set(T) }\n"
+        + "fn set_angle_degrees() {} fn set_flags() {}\n",
+        encoding="utf-8",
+    )
+    host = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "impl KeynoteEditor {\n"
+        "    pub fn slide_movie_geometry_by_selector(&self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.slide_movie_geometry(slide, movie); }\n"
+        "    pub fn set_slide_movie_geometry_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.edit_slide_movie_geometry(slide, movie).commit(); }\n"
+        "    pub fn restore_slide_movie_original_size_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.edit_slide_movie_geometry(slide, movie).commit(); }\n"
+        "    pub fn flip_slide_movie_by_selector(&mut self, slide: SlideSelector, movie: MovieSelector) { focused_movie_geometry_package(self)?.edit_slide_movie_geometry(slide, movie).commit(); }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -13669,8 +13723,119 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_keynote_movie_geometry_source_topology()",
             "+ audit_keynote_movie_geometry_facade_source_topology()",
             "+ audit_keynote_movie_geometry_resource_source_topology()",
+            "+ audit_keynote_movie_geometry_completion_source_topology()",
         ):
             self.assertIn(expression, main_source)
+
+    def test_keynote_movie_geometry_completion_is_dormant_until_explicit_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "const MOVIE_GEOMETRY_COMPLETE: () = ();\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("missing angle" in item for item in violations), violations)
+            self.assertTrue(any("missing flip" in item for item in violations), violations)
+            self.assertTrue(any("host source root" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_completion_requires_capabilities_and_prepared_flow(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_completion_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+            # The legacy host audit must delegate once the completion token is
+            # present; otherwise its Wave87 compatibility exemption could
+            # silently survive alongside the new ratchet.
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_movie_geometry_source_topology(root),
+                [],
+            )
+
+            example = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_EXAMPLES[0]
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "fn edit() { let package = KeynotePackage::from_bytes(bytes); "
+                "package.slide_movie_geometry(slide, movie); "
+                "package.edit_slide_movie_geometry(slide, movie); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source.replace("let report = prepared.prepare_report();\n", "")
+                .replace("let output = prepared.execute(requirements);\n", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(
+                any("codec report" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("single prepared execute" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_movie_geometry_completion_retires_raw_fallback_and_direct_rewrite(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_completion_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_MOVIE_GEOMETRY_SOURCE
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "fn try_set_file_movie_geometry_with_package() { set_movie_geometry(); }\n"
+                + "pub fn set_slide_movie_geometry(&mut self, slide_index: usize, movie_id: u64) {}\n"
+                + "fn direct_host_rewrite() { keynote_movie_geometry_codec::rewrite_movie_transform(bytes); }\n",
+                encoding="utf-8",
+            )
+            compatibility = (
+                root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "slide_movies" / "geometry.rs"
+            )
+            compatibility.parent.mkdir(parents=True, exist_ok=True)
+            compatibility.write_text(
+                "fn compatibility_fallback() { flip_drawable_geometry(); }\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn bad_direct_rewrite() { keynote_movie_geometry_codec::rewrite_movie_geometry(bytes); }\n"
+                + "fn bad_direct_transform() { keynote_movie_geometry_codec::rewrite_movie_transform(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("raw-ID" in item for item in violations), violations)
+            self.assertTrue(any("native mutator/helper" in item for item in violations), violations)
+            self.assertTrue(any("rewrite_movie_geometry" in item for item in violations), violations)
+            self.assertTrue(any("rewrite_movie_transform" in item for item in violations), violations)
+            self.assertTrue(any("direct codec rewrite" in item for item in violations), violations)
 
     def test_keynote_slide_table_title_facade_is_dormant_then_strict(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

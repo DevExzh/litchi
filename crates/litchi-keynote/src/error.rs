@@ -27,6 +27,9 @@ pub enum Error {
     /// A slide-movie position contained a non-finite coordinate.
     #[error("Keynote slide-movie position must have finite coordinates")]
     InvalidMoviePosition,
+    /// A slide-movie angle contained a non-finite value.
+    #[error("Keynote slide-movie angle must be finite")]
+    InvalidMovieAngle,
     /// A slide-movie displayed or natural size was not finite and strictly positive.
     #[error("Keynote slide-movie dimensions must be finite and greater than zero")]
     InvalidMovieSize,

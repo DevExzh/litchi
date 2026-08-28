@@ -2,11 +2,13 @@
 
 use super::*;
 use crate::shapes::{
-    DrawableProperties, drawable_properties, patch_drawable_geometry,
+    DrawableFlipAxis, DrawableProperties, drawable_properties, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
 use litchi_core::Position;
-use litchi_keynote::slide::media::{Point, Size, geometry::MovieGeometry};
+use litchi_keynote::slide::media::geometry::{
+    MovieFlipAxis as FocusedMovieFlipAxis, MovieGeometry,
+};
 use litchi_keynote::{MovieSelector, Package as KeynotePackage};
 
 const MOVIE_DRAWABLE_FIELD: u32 = 1;
@@ -66,7 +68,12 @@ impl KeynoteEditor {
                 Error::InvalidFormat(format!("focused Keynote slides failed: {error}"))
             })?
             .get(slide_position.get())
-            .and_then(|slide| slide.video_movies().nth(movie_selector.as_index()))
+            .and_then(|slide| {
+                slide
+                    .video_movies()
+                    .filter(|movie| movie.kind() == MovieKind::File)
+                    .nth(movie_selector.as_index())
+            })
             .and_then(|movie| movie.original_size())
             .ok_or_else(|| {
                 Error::InvalidFormat(
@@ -88,84 +95,42 @@ impl KeynoteEditor {
         Ok(restored)
     }
 
-    /// Apply the retained native Arrange flip through a typed movie selector.
+    /// Apply a native Arrange flip through a typed movie selector.
     ///
-    /// Flip flags and angle conventions remain opaque to the focused package
-    /// owner, so this method delegates to the compatibility implementation
-    /// after resolving the selector against source-ordered file movies.
+    /// The focused package owns the transform read and rewrite. The returned
+    /// legacy geometry is only a compatibility projection for callers that
+    /// still consume the physical movie listing; it is never used to choose a
+    /// fallback mutation path.
     pub fn flip_slide_movie_by_selector(
         &mut self,
         slide_position: Position,
         movie_selector: MovieSelector,
         axis: DrawableFlipAxis,
     ) -> Result<DrawableGeometry> {
-        let movie = self
-            .slide_movies(slide_position.get())?
+        let focused_axis = match axis {
+            DrawableFlipAxis::Horizontal => FocusedMovieFlipAxis::Horizontal,
+            DrawableFlipAxis::Vertical => FocusedMovieFlipAxis::Vertical,
+        };
+        let package = focused_movie_geometry_package(self)?;
+        let edit = package
+            .edit_slide_movie_geometry(slide_position, movie_selector)
+            .map_err(map_focused_movie_geometry_error)?;
+        let commit = edit
+            .flip(focused_axis)
+            .map_err(map_focused_movie_geometry_error)?
+            .commit()
+            .map_err(map_focused_movie_geometry_error)?;
+        if !commit.patch().is_noop() {
+            replace_from_focused_movie_geometry_commit(self, commit)?;
+        }
+        self.slide_movies(slide_position.get())?
             .into_iter()
             .filter(|movie| movie.kind == MovieKind::File)
             .nth(movie_selector.as_index())
+            .map(|movie| movie.geometry)
             .ok_or_else(|| {
                 Error::InvalidFormat("focused Keynote movie selector is unavailable".to_owned())
-            })?;
-        self.flip_slide_movie(slide_position.get(), movie.drawable_object_id, axis)
-    }
-}
-
-fn file_movie_selector(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    movie_id: u64,
-) -> Option<MovieSelector> {
-    editor
-        .slide_movies(slide_index)
-        .ok()?
-        .into_iter()
-        .filter(|movie| movie.kind == MovieKind::File)
-        .position(|movie| movie.drawable_object_id == movie_id)
-        .map(MovieSelector::index)
-}
-
-pub(super) fn try_set_file_movie_geometry_with_package(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    movie_id: u64,
-    source: &SlideMovieGraph,
-    geometry: DrawableGeometry,
-) -> Option<Result<()>> {
-    if source.info.geometry.flags != geometry.flags || source.info.geometry.angle != geometry.angle
-    {
-        return None;
-    }
-    let (Some(position), Some(size), Some(movie_selector)) = (
-        geometry.position,
-        geometry.size,
-        file_movie_selector(editor, slide_index, movie_id),
-    ) else {
-        return None;
-    };
-    let geometry = match MovieGeometry::new(
-        Point {
-            x: position.x,
-            y: position.y,
-        },
-        Size {
-            width: size.width,
-            height: size.height,
-        },
-    ) {
-        Ok(value) => value,
-        Err(error) => return Some(Err(Error::InvalidFormat(error.to_string()))),
-    };
-    match editor.set_slide_movie_geometry_by_selector(
-        Position::new(slide_index),
-        movie_selector,
-        geometry,
-    ) {
-        Ok(()) => Some(Ok(())),
-        // The focused owner intentionally rejects legacy/synthetic graph
-        // shapes outside its bounded authority. Preserve the compatibility
-        // implementation for those sources and for native angle/flag edits.
-        Err(_) => None,
+            })
     }
 }
 

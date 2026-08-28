@@ -1466,6 +1466,7 @@ struct BuildPreflight<'source> {
 #[derive(Debug, Clone, Copy, Default)]
 struct MoviePreflight {
     super_fields: usize,
+    locked: Option<bool>,
     geometry_fields: usize,
     geometry_flags: Option<u32>,
     geometry_angle: Option<f32>,
@@ -2457,6 +2458,10 @@ fn preflight_movie(
                     "Keynote movie geometry",
                 )?;
                 Ok(WireDescent::Descend)
+            },
+            ([1], 5) => {
+                set_unique_bool(field, &mut movie.locked, "Keynote movie lock state")?;
+                Ok(WireDescent::Skip)
             },
             ([1, 1], 1) => {
                 require_unique_length_delimited(
