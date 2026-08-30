@@ -1042,3 +1042,62 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
   -timeout=10 -rss_limit_mb=2048
 ```
+
+## Numbers table-title codec
+
+`numbers_table_title_codec` drives the strict generated-free projection for
+the optional `TST.TableModelArchive` table-title settings.  It compares the
+scalar and reported decode paths over caller-owned bytes, checks every
+proto2 presence state for the visibility/border flags and every IEEE-754
+fixed64 height bit pattern (including negative zero, NaN, and infinities),
+and forces both style references through the private Buffa lazy view.  A
+successful snapshot must retain non-zero reference identifiers and valid
+legacy reference scalar presence without copying or changing the source.
+
+Canonical unknown varint, fixed64, bytes, fixed32, and balanced nested-group
+spans are exercised alongside duplicate selected fields, wrong wire types,
+non-canonical keys/values, missing or zero reference identifiers, truncated
+payloads, invalid legacy values, malformed groups, and invalid field tags.
+The target replays one rich source at its exact bytes/fields/work/nesting/
+reference report limits and requires each max-minus-one limit to fail with the
+matching typed `DecodeLimit`.  It also probes a group chain beyond the finite
+nesting ceiling.  Failed and successful paths assert that the caller-owned
+source remains byte-for-byte unchanged and that scalar/report results agree.
+
+Inputs are bounded at 64 KiB with 8,192 fields, 256 KiB of work, depth 64,
+and two selected references.  The 25 checked-in recipes under
+`corpus/numbers_table_title_codec/` are hand-authored `hex:` protobuf wire
+payloads; they contain no native Numbers package bytes or crash artifacts.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_title_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build
+output outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-numbers-table-title-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_title_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_title_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation.  Corpus additions,
+artifacts, and build output stay in the temporary root; set
+`KEEP_FUZZ_CORPUS=1` to retain it for review.

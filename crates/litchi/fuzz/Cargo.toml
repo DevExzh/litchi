@@ -124,6 +124,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_title"
+path = "fuzz_targets/numbers_table_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_formula_cells"
 path = "fuzz_targets/numbers_formula_cells.rs"
 test = false

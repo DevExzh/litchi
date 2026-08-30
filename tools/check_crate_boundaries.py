@@ -4703,6 +4703,46 @@ RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_METHODS = (
 RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_METHOD_SET = frozenset(
     RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_METHODS
 )
+# The focused Numbers package owns the complete table-title transaction now.
+# Keep every former migration-host implementation seam in the retirement
+# inventory: private helpers and their wire module are just as much a second
+# host as the old public methods.  This prevents a future compatibility
+# wrapper from silently recreating the old raw-ID path under a narrower
+# visibility.
+RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_title.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_title" / "wire.rs"
+)
+RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPERS = (
+    "table_title_settings_in_package",
+    "set_table_title_settings_in_package",
+)
+RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPER_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPERS
+)
+RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPERS = (
+    "read_table_title_settings_wire",
+    "write_table_title_settings_wire",
+)
+RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPER_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPERS
+)
+IWA_NUMBERS_TABLE_TITLE_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(table_title)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+# ``Settings`` used to be re-exported by ``numbers::editor`` for the host
+# methods.  Match the qualified path after masking comments/literals so a
+# private or aliased import cannot bring that migration surface back.
+IWA_NUMBERS_TABLE_TITLE_SETTINGS_ALIAS = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?litchi_numbers[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?table[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?title[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:\{[ \t\r\n]*)?(?:r#)?Settings\b"
+)
 RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE = Path(
     "crates/litchi-iwa/examples/edit_numbers_table_title.rs"
 )
@@ -16420,15 +16460,26 @@ def audit_numbers_table_header_settings_facade_source_topology(
 def audit_iwa_numbers_table_title_settings_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep retired Numbers table-title ownership out of the host facade."""
+    """Keep the retired Numbers table-title owner completely out of IWA.
+
+    The focused ``litchi-numbers`` package owns both the semantic settings and
+    the transaction.  Once that owner exists, the compatibility host must not
+    retain a private bridge, a wire-only helper, a module declaration, or a
+    re-export of the shared ``Settings`` value: each would preserve a second
+    raw-ID ownership route.
+    """
 
     violations: list[str] = []
-    example = root / RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE
-    if example.exists():
-        violations.append(
-            "retired litchi-iwa Numbers table-title settings example returned: "
-            + str(RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE)
-        )
+    for retired, label in (
+        (RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_SOURCE, "source"),
+        (RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_SOURCE, "wire source"),
+        (RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE, "example"),
+    ):
+        if (root / retired).exists():
+            violations.append(
+                "retired litchi-iwa Numbers table-title settings "
+                f"{label} returned: {retired}"
+            )
 
     source_root = root / IWA_NUMBERS_SOURCE_ROOT
     if source_root.is_dir():
@@ -16441,6 +16492,51 @@ def audit_iwa_numbers_table_title_settings_source_topology(
                     "retired litchi-iwa Numbers table-title settings method "
                     f"{name}: {path.relative_to(root)}:{line_number}"
                 )
+
+    # The old private bridge was shared by other IWA format adapters.  Scan the
+    # complete compatibility host for references, not just declarations under
+    # ``numbers``; otherwise a Pages/Keynote import could keep the retired
+    # Numbers writer alive after its defining module had been removed.
+    host_source_root = root / IWA_HOST_SOURCE_ROOT
+    if host_source_root.is_dir():
+        helper_names = (
+            RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPERS
+            + RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPERS
+        )
+        helper_name_set = frozenset(helper_names)
+        for path in sorted(host_source_root.rglob("*.rs")):
+            source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            for match in IWA_NUMBERS_TABLE_TITLE_SETTINGS_ALIAS.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table-title settings alias Settings: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(source):
+                name = match.group(1)
+                if name not in helper_name_set:
+                    continue
+                line_number = source.count("\n", 0, match.start(1)) + 1
+                if name in RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPER_SET:
+                    violations.append(
+                        "retired litchi-iwa Numbers table-title settings private "
+                        f"helper {name}: {path.relative_to(root)}:{line_number}"
+                    )
+                else:
+                    violations.append(
+                        "retired litchi-iwa Numbers table-title settings wire "
+                        f"helper {name}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    editor_path = root / IWA_NUMBERS_SOURCE_ROOT / "editor.rs"
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+        for match in IWA_NUMBERS_TABLE_TITLE_SETTINGS_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table-title settings module "
+                f"{match.group(1)}: {editor_path.relative_to(root)}:{line_number}"
+            )
 
     tests_path = root / IWA_NUMBERS_EDITOR_TEST_SOURCE
     if tests_path.is_file():

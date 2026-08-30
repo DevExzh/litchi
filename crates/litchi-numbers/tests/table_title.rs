@@ -178,6 +178,91 @@ fn native_absence_and_explicit_false_are_distinct_changes() -> TestResult<()> {
     Ok(())
 }
 
+#[test]
+fn native_explicit_outline_and_combined_changes_are_exact_and_reversible() -> TestResult<()> {
+    let package = Package::open(fixture_path())?;
+    let source = package.exact_bytes();
+    let before = package.table_title_settings(0usize, 0usize)?;
+    assert_eq!(before, Settings::new(Some(true), None));
+
+    let outlined = Settings::new(Some(true), Some(true));
+    let outlined_commit = package
+        .edit_table_title(0usize, 0usize)?
+        .set(outlined)
+        .commit()?;
+    assert!(!outlined_commit.patch().is_noop());
+    assert_eq!(outlined_commit.patch().before(), before);
+    assert_eq!(outlined_commit.patch().after(), outlined);
+    assert_eq!(
+        outlined_commit
+            .package()
+            .table_title_settings(0usize, 0usize)?,
+        outlined
+    );
+    assert!(outlined_commit.diagnostics().changed());
+    assert_eq!(outlined_commit.diagnostics().touched_components(), 1);
+    assert_eq!(outlined_commit.diagnostics().deleted_previews(), 3);
+    let outlined_bytes = outlined_commit.package().exact_bytes();
+    assert_ne!(outlined_bytes, source);
+    assert_exact_locality(&source, &outlined_bytes)?;
+
+    // A second transaction against the candidate must recognize the complete
+    // lossless value as an exact no-op, including the explicit true presence.
+    let no_op = outlined_commit
+        .package()
+        .edit_table_title(0usize, 0usize)?
+        .set(outlined)
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.patch().before(), outlined);
+    assert_eq!(no_op.patch().after(), outlined);
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.diagnostics().touched_components(), 0);
+    assert_eq!(no_op.diagnostics().deleted_previews(), 0);
+    assert_eq!(no_op.package().exact_bytes(), outlined_bytes);
+
+    let combined = Settings::new(Some(false), Some(true));
+    let combined_commit = outlined_commit
+        .package()
+        .edit_table_title(0usize, 0usize)?
+        .set(combined)
+        .commit()?;
+    assert!(!combined_commit.patch().is_noop());
+    assert_eq!(combined_commit.patch().before(), outlined);
+    assert_eq!(combined_commit.patch().after(), combined);
+    assert_eq!(
+        combined_commit
+            .package()
+            .table_title_settings(0usize, 0usize)?,
+        combined
+    );
+    let combined_bytes = combined_commit.package().exact_bytes();
+    assert_ne!(combined_bytes, outlined_bytes);
+
+    let restored_outlined = combined_commit
+        .package()
+        .apply_table_title(&combined_commit.patch().inverse())?;
+    assert_eq!(restored_outlined.package().exact_bytes(), outlined_bytes);
+    assert_eq!(
+        restored_outlined
+            .package()
+            .table_title_settings(0usize, 0usize)?,
+        outlined
+    );
+
+    let restored_source = restored_outlined
+        .package()
+        .apply_table_title(&outlined_commit.patch().inverse())?;
+    assert_eq!(restored_source.package().exact_bytes(), source);
+    assert_eq!(
+        restored_source
+            .package()
+            .table_title_settings(0usize, 0usize)?,
+        before
+    );
+    Ok(())
+}
+
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult<()> {
     let source = Catalog::from_bytes(source)?;
     let target = Catalog::from_bytes(target)?;

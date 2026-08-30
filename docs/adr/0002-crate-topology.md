@@ -4032,3 +4032,58 @@ gate. The authoritative topology remains 64 workspace packages, 239 internal
 dependency declarations, and 13 ordered migration debts; debt 014 and the
 `litchi-iwa -> litchi-keynote` edge, migration hosts, and the IWA monolith
 remain open.
+
+## 2026-08-30 amendment: Wave113 Numbers table-title host cleanup
+
+Wave113 completes the retirement of the dead Numbers table-title seam in
+`litchi-iwa`. The private `numbers::editor::table_title` module and its wire
+submodule are removed, together with the host's table-title helper exports and
+the `numbers::editor::Settings` alias for
+`litchi_numbers::table::title::Settings`. No raw-ID table-title reader,
+writer, compatibility alias, or host fallback remains. The canonical
+selector-first `litchi-numbers` table-title package owner and its archive-free
+`table::title::Settings` value remain; this cleanup does not remove the
+cross-format table-title paths used by Pages or Keynote.
+
+Table-title fuzzing is now deliberately two-layered. The low-level
+`litchi-iwa-protos::numbers_table_title_codec` target exercises bounded
+projection, all proto2 presence states, reference and IEEE-754 scalar reads,
+unknown spans, malformed-input rejection, scalar/report agreement, and exact
+typed decode limits. The package-level `litchi` target exercises semantic
+selector reads and the table-title no-op, changed, inverse, conflict, preview
+locality, candidate reopen, and bounded-ingress paths against package inputs.
+Both layers keep native identifiers, generated/Prost values, Buffa views, and
+source artifacts inside their respective private boundaries. Fixed-corpus
+smoke passes 25/25 codec recipes and 5/5 package command recipes; this is not a
+claim of sanitizer-backed fuzzing, exhaustive coverage, or performance/RSS
+telemetry.
+
+Scoped evidence also includes 9/9 codec unit cases, 2/2 focused package-owner
+unit cases, 6/6 table-title integration cases, the `litchi-iwa` all-target
+check, 679/679 boundary unit cases, strict Clippy for the codec, focused
+Numbers package/test, and both fuzz targets, and the leaf/root public-API and
+Numbers dependency audits. The live boundary checker has no Wave113 finding;
+its only three findings are from the pre-existing untracked Pages table-lock
+file.
+
+Computer Use supplied the previously missing explicit-outline evidence. The
+source package changed from `visible=Some(true), outlined=None` to
+`visible=Some(true), outlined=Some(true)`, opened in Numbers without repair,
+and exposed `Title` and `Outline Table Title` checkboxes both at value `1`.
+Numbers saved a native copy, closed it, reopened it without repair, and again
+reported both controls at value `1`. The focused reader then observed the
+native copy as `Some(true)/Some(true)`, proved an exact no-op, changed the
+outline to absence, and restored the exact native bytes through the inverse.
+The source/no-op/source-inverse SHA-256 was
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
+the focused outlined candidate was
+`13b812ec056d6358ae44772c9b0db957f23c57d033991b39f9f002c71331558e`;
+and the native-save/no-op/native-inverse SHA-256 was
+`af9f6138949bc7ba2c752c2b2500998e1307a3e247fe1ae56aaf010ea165daf1`.
+These disposable UI artifacts are evidence, not checked-in fixtures.
+
+This is a focused host-module and alias cleanup, not a crate-topology change.
+The authoritative inventory remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. No workspace crate,
+production dependency edge, ordered debt, format owner, generated-schema/
+Prost/Buffa owner, or monolith gate closes in Wave113.
