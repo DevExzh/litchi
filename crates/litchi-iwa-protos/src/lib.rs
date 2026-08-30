@@ -459,6 +459,44 @@ mod buffa_keynote_chart_axis_title_generated {
     ));
 }
 
+/// Private Buffa borrowed-view projection for the selected Keynote chart value
+/// axis settings. The handwritten codec performs strict raw preflight before
+/// accessing this view; generated values never cross this crate boundary.
+#[doc(hidden)]
+mod buffa_keynote_chart_axis_value_settings_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa 0.9.1 generated views are private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-chart-axis-value-settings/iwa_keynote_chart_axis_value_settings_buffa_protos.rs"
+    ));
+}
+
 /// Private strict Buffa lazy-view projection for Keynote placeholder text.
 ///
 /// Generated code sees only the singular inheritance chain, optional kind,
@@ -1345,6 +1383,12 @@ pub mod keynote_chart_title_codec;
 /// preservation authority.
 #[doc(hidden)]
 pub mod keynote_chart_axis_title_codec;
+
+/// Internal strict Keynote value-axis settings projection. Generated types
+/// remain private and caller-owned source bytes remain the preservation
+/// authority.
+#[doc(hidden)]
+pub mod keynote_chart_axis_value_settings_codec;
 
 /// Internal strict Keynote placeholder text-owner projection. Generated types
 /// remain inaccessible and source bytes stay authoritative.

@@ -2,7 +2,6 @@
 
 mod arrangement;
 mod axis;
-mod axis_bounds;
 mod axis_gridlines;
 mod axis_label_affixes;
 mod axis_label_angle;
@@ -11,9 +10,7 @@ mod axis_labels;
 mod axis_line;
 mod axis_minimum_label;
 mod axis_number_format;
-mod axis_scale;
 mod axis_series_names;
-mod axis_steps;
 mod axis_tick_marks;
 mod background_fill;
 mod bar_shape_3d;

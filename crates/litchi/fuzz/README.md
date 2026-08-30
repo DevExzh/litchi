@@ -106,6 +106,19 @@ redacted malformed ingress, and max-minus-one package/output limits. Changed
 transactions additionally verify the opposite and secondary axes, unknown
 wire spans, unrelated members, and preview invalidation remain correct.
 
+`keynote_chart_value_axis` is the focused selector-first value-axis settings
+target. It builds the same bounded two-chart graph with category, primary
+value, and secondary value axes, metadata, opaque native fields, unrelated
+members, and root previews. Command bytes drive one atomic
+`ValueAxisSettings` transaction for optional bounds, major/minor steps, and
+linear/logarithmic (including future) scales. The target checks positional and
+name selector parity, exact source-byte no-ops, changed-axis locality and
+preview invalidation, strict candidate reopen/readback, stale and cross-source
+patch conflicts, inverse restoration, redacted selector and malformed-input
+errors, and bounded failure atomicity. Corpus files are command recipes only;
+the target never exposes native identifiers or protobuf values through its
+public API calls.
+
 `numbers_table_lock` is the focused interactive table-lock target. It offers
 arbitrary bytes to checked Numbers package ingress and also interprets them as
 bounded selector and lock-state commands against the native `basic.numbers`

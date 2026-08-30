@@ -144,6 +144,64 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
+## Keynote chart value-axis settings codec
+
+`keynote_chart_axis_value_settings_codec` drives the strict, source-preserving
+projection for the selected value-axis scalar settings in
+`TSCH.Generated.ChartAxisNonStyleArchive`. It covers manual or automatic
+bounds (including partial endpoints), major/minor step counts, and linear,
+logarithmic, or forward-compatible scale values. The harness compares the
+scalar and reported decode paths, keeps the caller-owned source immutable,
+replays every prepared rewrite with its exact resource requirements, and
+requires the one-shot helper to produce the same candidate and report.
+
+Successful rewrites are decoded again and checked for semantic readback,
+exact no-op bytes, and preservation of every unrelated root and nested span,
+including unknown fields, balanced groups, field order, and signed-zero
+payloads. Malformed recipes exercise duplicate or wrong-wire selected fields,
+non-canonical and truncated varints/lengths, missing nested bound values,
+non-finite or inverted bounds, negative and zero step counts, and malformed
+signed-int32 encodings. Every candidate is attempted only with finite input,
+field, work, nesting, allocation, retained-source, scratch, and output
+ceilings; max-minus-one replays must fail atomically without changing the
+source.
+
+The target accepts at most 64 KiB and uses 8,192 wire fields, 512 KiB of
+aggregate work, 128 KiB of output, and nesting depth 64. Its checked-in
+`corpus/keynote_chart_axis_value_settings/` recipes are small hand-authored
+`hex:` protobuf payloads covering automatic/full/partial settings, unknown
+interleaving and groups, nested unknown spans, and malformed boundaries.
+They are not copied from native Keynote packages.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check keynote_chart_axis_value_settings_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-keynote-chart-axis-value-settings-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/keynote_chart_axis_value_settings/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  keynote_chart_axis_value_settings_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Keynote chart-axis-title codec
 
 `keynote_chart_axis_title_codec` sends one bounded generated

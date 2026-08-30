@@ -14,25 +14,13 @@
     reason = "The transaction redacts lower-layer failures and keeps native graph adapters private."
 )]
 
-use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{
-    SourceCatalog,
-    package::{EntryEdit, ExactArtifacts},
-};
-use litchi_iwa_common::{
-    WireLimits, decode_varint_from_bytes, encode_varint_into,
-    varint::encoded_len,
-    wire::{WireField, WireView, parse_wire_fields_with_limits},
-};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor, RawMessage,
-    SnappyStream,
-};
+use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
+use litchi_iwa_common::{WireLimits, encode_varint_into, varint::encoded_len, wire::WireField};
+use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::keynote_chart_axis_title_codec::{
     AxisTitleKind, AxisTitleWrite, DecodeError as ChartAxisTitleDecodeError,
     DecodeLimit as ChartAxisTitleDecodeLimit, DecodeOptions, DecodeReport,
@@ -42,23 +30,13 @@ use litchi_iwa_protos::keynote_chart_axis_title_codec::{
 use litchi_iwa_protos::package_metadata_codec;
 use thiserror::Error;
 
+use super::chart_axis_support::{self, AxisSelection, AxisSupportBudget, AxisSupportError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{Axis, ChartSelector, SlideSelector};
 
-const CHART_MESSAGE_TYPE: u32 = 5_021;
-const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5_023;
 const CHART_AXIS_MESSAGE_TYPE: u32 = 5_027;
-const STANDIN_MESSAGE_TYPE: u32 = 3_097;
-const STYLESHEET_MESSAGE_TYPE: u32 = 401;
-const DRAWABLE_SUPER_FIELD: u32 = 1;
-const DRAWABLE_TITLE_FIELD: u32 = 10;
-const CHART_EXTENSION_FIELD: u32 = 10_000;
-const CHART_AXIS_VALUE_FIELD: u32 = 14;
-const CHART_AXIS_CATEGORY_FIELD: u32 = 16;
-const DRAWABLE_LOCKED_FIELD: u32 = 5;
 const GENERATED_CHART_AXIS_EXTENSION_FIELD: u32 = 10_000;
 const MAX_CHART_TITLE_BYTES: usize = 64 * 1024 * 1024;
-const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 
 /// One aggregate finite ledger shared by selection, rewrite, reopen, and
 /// locality verification for a single public operation.
@@ -417,17 +395,14 @@ impl AxisTitleBudget {
         Ok(())
     }
 
-    fn charge_inbound_scan(&mut self, package: &Package) -> Result<(), ChartAxisTitleError> {
-        // Archive reference inspection walks every MessageInfo and FieldInfo
-        // exactly once and retains only the visitor's scalar counters.
-        self.charge_scan_pass(package, 0)
-    }
-
     fn charge_locality_scan(&mut self, package: &Package) -> Result<(), ChartAxisTitleError> {
         // Locality compares the physical catalog and the selected component's
         // complete object/message inventory without constructing a new index.
         let inventory = package_scan_inventory(package)?;
-        let entries = physical_catalog(package)?.package().len();
+        let entries = chart_axis_support::physical_catalog(package)
+            .map_err(map_axis_support_error)?
+            .package()
+            .len();
         self.charge_components(inventory.objects)?;
         self.charge_references(inventory.references)?;
         self.charge_fields(inventory.metadata_fields)?;
@@ -602,6 +577,110 @@ impl AxisTitleBudget {
     }
 }
 
+impl AxisSupportBudget for AxisTitleBudget {
+    fn charge_selection_scans(
+        &mut self,
+        package: &Package,
+        mutation_guards: bool,
+    ) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_selection_scans(self, package, mutation_guards)
+            .map_err(axis_support_budget_error)
+    }
+
+    fn charge_input(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_input(self, amount).map_err(axis_support_budget_error)
+    }
+
+    fn charge_wire_vector(&mut self, payload: usize) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_wire_vector(self, payload).map_err(axis_support_budget_error)
+    }
+
+    fn finish_wire_scan(&mut self, fields: usize) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::finish_wire_scan(self, fields).map_err(axis_support_budget_error)
+    }
+
+    fn charge_reference_vector(&mut self, capacity: usize) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_reference_vector(self, capacity).map_err(axis_support_budget_error)
+    }
+
+    fn charge_references(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_references(self, amount).map_err(axis_support_budget_error)
+    }
+
+    fn charge_scan_pass(
+        &mut self,
+        package: &Package,
+        retained_vectors: usize,
+    ) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_scan_pass(self, package, retained_vectors)
+            .map_err(axis_support_budget_error)
+    }
+
+    fn charge_locality_scan(&mut self, package: &Package) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_locality_scan(self, package).map_err(axis_support_budget_error)
+    }
+
+    fn charge_work(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge(self, amount).map_err(axis_support_budget_error)
+    }
+
+    fn metadata_options(
+        &self,
+        package: &Package,
+    ) -> Result<package_metadata_codec::RewriteOptions, AxisSupportError> {
+        metadata_options(package, self).map_err(axis_support_budget_error)
+    }
+
+    fn charge_metadata_report(
+        &mut self,
+        report: package_metadata_codec::RewriteReport,
+    ) -> Result<(), AxisSupportError> {
+        AxisTitleBudget::charge_metadata_report(self, report).map_err(axis_support_budget_error)
+    }
+}
+
+fn metadata_options(
+    package: &Package,
+    budget: &AxisTitleBudget,
+) -> Result<package_metadata_codec::RewriteOptions, ChartAxisTitleError> {
+    let limits = package.wire_limits().map_err(map_wire_error)?;
+    Ok(package_metadata_codec::RewriteOptions::new(
+        budget
+            .maximum_input
+            .checked_sub(budget.input)
+            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .min(limits.max_input_bytes()),
+        budget
+            .maximum_output
+            .checked_sub(budget.output)
+            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .min(limits.max_output_bytes()),
+        budget
+            .maximum_fields
+            .checked_sub(budget.fields)
+            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .min(limits.max_fields()),
+        budget
+            .maximum_work
+            .checked_sub(budget.work)
+            .ok_or(ChartAxisTitleError::InvalidSource)?
+            .min(limits.max_rewrite_work()),
+        u32::try_from(limits.max_nesting()).map_err(|_| ChartAxisTitleError::InvalidSource)?,
+        budget
+            .maximum_components
+            .checked_sub(budget.components)
+            .ok_or(ChartAxisTitleError::InvalidSource)?,
+        budget
+            .maximum_references
+            .checked_sub(budget.references)
+            .ok_or(ChartAxisTitleError::InvalidSource)?,
+        budget
+            .maximum_allocations
+            .checked_sub(budget.allocations)
+            .ok_or(ChartAxisTitleError::InvalidSource)?,
+    ))
+}
+
 #[derive(Clone, Copy, Default)]
 struct PackageScanInventory {
     components: usize,
@@ -722,7 +801,9 @@ fn candidate_reopen_envelope(
             maximum: physical_limits.max_input_bytes(),
         });
     }
-    let catalog = physical_catalog(source)?.package();
+    let catalog = chart_axis_support::physical_catalog(source)
+        .map_err(map_axis_support_error)?
+        .package();
     if catalog.len() > physical_limits.max_entries() {
         return Err(ChartAxisTitleError::InvalidSource);
     }
@@ -961,15 +1042,16 @@ impl<'a> ChartAxisTitleEdit<'a> {
     ) -> Result<Self, ChartAxisTitleError> {
         let mut budget = AxisTitleBudget::new(source)?;
         budget.charge_catalog_scan(source)?;
-        let selection = select_axis(
+        let selection = chart_axis_support::select_axis(
             source,
             slide_selector.into(),
             chart_selector.into(),
             axis,
             true,
             &mut budget,
-        )?;
-        let before = selection.title;
+        )
+        .map_err(map_axis_support_error)?;
+        let before = read_selected_axis_title(source, &selection, &mut budget)?;
         let after = before.as_deref().map(copy_title).transpose()?;
         Ok(Self {
             source,
@@ -1028,24 +1110,27 @@ impl<'a> ChartAxisTitleEdit<'a> {
 
     /// Validate and atomically publish the staged immutable candidate.
     pub fn commit(self) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> {
-        let catalog = physical_catalog(self.source)?;
+        let catalog =
+            chart_axis_support::physical_catalog(self.source).map_err(map_axis_support_error)?;
         let source_bytes = catalog.shared_source();
         let mut budget = AxisTitleBudget::new(self.source)?;
         budget.charge_catalog_scan(self.source)?;
-        let source_selection = select_axis(
+        let source_selection = chart_axis_support::select_axis(
             self.source,
             SlideSelector::position(self.slide_position),
             ChartSelector::index(self.chart_position.get()),
             self.axis,
             true,
             &mut budget,
-        )?;
+        )
+        .map_err(map_axis_support_error)?;
+        let source_title = read_selected_axis_title(self.source, &source_selection, &mut budget)?;
         if source_selection.chart_identifier != self.chart_identifier
             || source_selection.axis_identifier != self.axis_identifier
             || source_selection.axis_component_name != self.axis_component_name
             || source_selection.axis_message_index != self.axis_message_index
             || source_selection.slide_identifier != self.slide_identifier
-            || source_selection.title != self.before
+            || source_title != self.before
         {
             return Err(ChartAxisTitleError::InvalidSource);
         }
@@ -1084,22 +1169,27 @@ impl<'a> ChartAxisTitleEdit<'a> {
             &mut budget,
         )?;
         package.validate().map_err(map_read_error)?;
-        let target = physical_catalog(&package)?.shared_source();
+        let target = chart_axis_support::physical_catalog(&package)
+            .map_err(map_axis_support_error)?
+            .shared_source();
         budget.charge_exact_artifacts(source_bytes.len(), target.len())?;
-        let candidate_selection = select_axis(
+        let candidate_selection = chart_axis_support::select_axis(
             &package,
             SlideSelector::position(self.slide_position),
             ChartSelector::index(self.chart_position.get()),
             self.axis,
             true,
             &mut budget,
-        )?;
+        )
+        .map_err(map_axis_support_error)?;
+        let candidate_title =
+            read_selected_axis_title(&package, &candidate_selection, &mut budget)?;
         if candidate_selection.chart_identifier != self.chart_identifier
             || candidate_selection.axis_identifier != self.axis_identifier
             || candidate_selection.axis_component_name != self.axis_component_name
             || candidate_selection.axis_message_index != self.axis_message_index
             || candidate_selection.slide_identifier != self.slide_identifier
-            || candidate_selection.title != self.after
+            || candidate_title != self.after
         {
             return Err(ChartAxisTitleError::Verification);
         }
@@ -1328,15 +1418,16 @@ impl Package {
     ) -> Result<Option<String>, ChartAxisTitleError> {
         let mut budget = AxisTitleBudget::new(self)?;
         budget.charge_catalog_scan(self)?;
-        Ok(select_axis(
+        let selection = chart_axis_support::select_axis(
             self,
             slide_selector.into(),
             chart_selector.into(),
             axis,
             false,
             &mut budget,
-        )?
-        .title)
+        )
+        .map_err(map_axis_support_error)?;
+        read_selected_axis_title(self, &selection, &mut budget)
     }
 
     /// Start an exact immutable edit of one selected chart-axis title.
@@ -1354,27 +1445,29 @@ impl Package {
         &self,
         patch: &ChartAxisTitlePatch,
     ) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> {
-        let catalog = physical_catalog(self)?;
+        let catalog = chart_axis_support::physical_catalog(self).map_err(map_axis_support_error)?;
         let source = catalog.shared_source();
         let mut budget = AxisTitleBudget::new(self)?;
         budget.charge_catalog_scan(self)?;
         if !patch.artifacts.authorizes_source(&source) {
             return Err(ChartAxisTitleError::PatchConflict);
         }
-        let source_selection = select_axis(
+        let source_selection = chart_axis_support::select_axis(
             self,
             SlideSelector::position(patch.slide_position),
             ChartSelector::index(patch.chart_position.get()),
             patch.axis,
             true,
             &mut budget,
-        )?;
+        )
+        .map_err(map_axis_support_error)?;
+        let source_title = read_selected_axis_title(self, &source_selection, &mut budget)?;
         if source_selection.chart_identifier != patch.chart_identifier
             || source_selection.axis_identifier != patch.axis_identifier
             || source_selection.axis_component_name != patch.axis_component_name
             || source_selection.axis_message_index != patch.axis_message_index
             || source_selection.slide_identifier != patch.slide_identifier
-            || source_selection.title != patch.before
+            || source_title != patch.before
         {
             return Err(ChartAxisTitleError::PatchConflict);
         }
@@ -1395,20 +1488,23 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        let candidate_selection = select_axis(
+        let candidate_selection = chart_axis_support::select_axis(
             &candidate,
             SlideSelector::position(patch.slide_position),
             ChartSelector::index(patch.chart_position.get()),
             patch.axis,
             true,
             &mut budget,
-        )?;
+        )
+        .map_err(map_axis_support_error)?;
+        let candidate_title =
+            read_selected_axis_title(&candidate, &candidate_selection, &mut budget)?;
         if candidate_selection.chart_identifier != patch.chart_identifier
             || candidate_selection.axis_identifier != patch.axis_identifier
             || candidate_selection.axis_component_name != patch.axis_component_name
             || candidate_selection.axis_message_index != patch.axis_message_index
             || candidate_selection.slide_identifier != patch.slide_identifier
-            || candidate_selection.title != patch.after
+            || candidate_title != patch.after
         {
             return Err(ChartAxisTitleError::Verification);
         }
@@ -1430,894 +1526,13 @@ impl Package {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct AxisSelection {
-    slide_position: Position,
-    chart_position: Position,
-    slide_identifier: u64,
-    chart_identifier: u64,
-    axis: Axis,
-    axis_identifier: u64,
-    axis_component_name: String,
-    axis_message_index: usize,
-    title: Option<String>,
-}
-
-fn select_axis(
-    package: &Package,
-    slide_selector: SlideSelector<'_>,
-    chart_selector: ChartSelector<'_>,
-    axis: Axis,
-    mutation_guards: bool,
-    budget: &mut AxisTitleBudget,
-) -> Result<AxisSelection, ChartAxisTitleError> {
-    budget.charge_selection_scans(package, mutation_guards)?;
-    let chart = super::slide_chart_title::select_chart(
-        package,
-        slide_selector,
-        chart_selector,
-        mutation_guards,
-    )
-    .map_err(map_chart_title_error)?;
-    let (chart_component, chart_object) = package
-        .object_with_component(chart.chart_identifier)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    if chart_component != chart.slide_component_name {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    let (chart_message_index, chart_message) = unique_message(chart_object, CHART_MESSAGE_TYPE)?;
-    validate_selected_message_metadata(chart_object, chart_message_index)?;
-    let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = accounted_wire_fields(&chart_message.data, limits, budget)?;
-    let super_payload =
-        unique_length_delimited_field(&outer, &chart_message.data, DRAWABLE_SUPER_FIELD)?
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-    if mutation_guards {
-        validate_unlocked_drawable(super_payload, limits, budget)?;
-    }
-    let title_identifier = required_reference(super_payload, DRAWABLE_TITLE_FIELD, limits, budget)?;
-    validate_graph_object(package, title_identifier, STANDIN_MESSAGE_TYPE)?;
-    validate_graph_object(
-        package,
-        chart.non_style_identifier,
-        CHART_NON_STYLE_MESSAGE_TYPE,
-    )?;
-    let chart_payload =
-        unique_length_delimited_field(&outer, &chart_message.data, CHART_EXTENSION_FIELD)?
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let category = repeated_references(chart_payload, CHART_AXIS_CATEGORY_FIELD, limits, budget)?;
-    let value = repeated_references(chart_payload, CHART_AXIS_VALUE_FIELD, limits, budget)?;
-    validate_axis_roles(&category, &value, budget)?;
-    let selected = match axis {
-        Axis::Category => &category,
-        Axis::Value => &value,
-    };
-    let axis_identifier = selected
-        .iter()
-        .copied()
-        .find(|identifier| *identifier != 0)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let (axis_component, axis_object) = unique_object(package, axis_identifier)?;
-    if axis_object.messages.len() != 1 {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    let (axis_message_index, axis_message) = unique_message(axis_object, CHART_AXIS_MESSAGE_TYPE)?;
-    validate_selected_message_metadata(axis_object, axis_message_index)?;
-    let kind = axis_title_kind(axis);
-    let title = read_chart_axis_title(&axis_message.data, limits, kind, budget)?;
-    if mutation_guards {
-        prove_unique_primary_axis(package, axis_identifier, budget)?;
-        let stylesheet_component_name = validate_global_axis_references(
-            package,
-            chart.chart_identifier,
-            chart_message_index,
-            axis_identifier,
-            budget,
-        )?;
-        validate_axis_metadata(
-            package,
-            chart_component,
-            axis_component,
-            stylesheet_component_name,
-            axis_identifier,
-            budget,
-        )?;
-    }
-    if axis_identifier == chart.chart_identifier
-        || axis_identifier == chart.non_style_identifier
-        || axis_identifier == chart.slide_identifier
-    {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    Ok(AxisSelection {
-        slide_position: chart.slide_position,
-        chart_position: chart.chart_position,
-        slide_identifier: chart.slide_identifier,
-        chart_identifier: chart.chart_identifier,
-        axis,
-        axis_identifier,
-        axis_component_name: axis_component.to_owned(),
-        axis_message_index,
-        title,
-    })
-}
-
-fn repeated_references(
-    payload: &[u8],
-    field_number: u32,
-    limits: WireLimits,
-    budget: &mut AxisTitleBudget,
-) -> Result<Vec<u64>, ChartAxisTitleError> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
-    budget.charge_input(payload.len())?;
-    budget.finish_wire_scan(fields.len())?;
-    let mut references = Vec::new();
-    budget.charge_reference_vector(fields.len())?;
-    references
-        .try_reserve(fields.len())
-        .map_err(|_error| ChartAxisTitleError::Allocation {
-            amount: fields.len(),
-        })?;
-    for field in fields.fields() {
-        if field.number() != field_number {
-            continue;
-        }
-        if field.wire_type() != 2 {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-        field.validate_canonical_framing().map_err(map_wire_error)?;
-        references.push(
-            super::validate_reference_payload(field.payload(), limits, "Keynote chart drawable")
-                .map_err(map_wire_error)?,
-        );
-    }
-    budget.charge_references(references.len())?;
-    Ok(references)
-}
-
-fn accounted_wire_fields(
-    payload: &[u8],
-    limits: WireLimits,
-    budget: &mut AxisTitleBudget,
-) -> Result<Vec<WireField>, ChartAxisTitleError> {
-    budget.charge_wire_vector(payload.len())?;
-    let fields = parse_wire_fields_with_limits(payload, limits).map_err(map_wire_error)?;
-    budget.finish_wire_scan(fields.len())?;
-    Ok(fields)
-}
-
-fn unique_length_delimited_field<'a>(
-    fields: &[WireField],
-    source: &'a [u8],
-    number: u32,
-) -> Result<Option<&'a [u8]>, ChartAxisTitleError> {
-    let mut selected = None;
-    for field in fields
-        .iter()
-        .copied()
-        .filter(|field| field.number() == number)
-    {
-        if selected.is_some() || field.wire_type() != 2 {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-        field
-            .validate_canonical_framing(source)
-            .map_err(map_wire_error)?;
-        selected = Some(field.payload(source).map_err(map_wire_error)?);
-    }
-    Ok(selected)
-}
-
-fn unique_message(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<(usize, &RawMessage), ChartAxisTitleError> {
-    let mut selected = None;
-    for (index, message) in object.messages.iter().enumerate() {
-        if message.type_ != message_type {
-            continue;
-        }
-        if selected.replace((index, message)).is_some() {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-    }
-    selected.ok_or(ChartAxisTitleError::InvalidSource)
-}
-
-fn required_reference(
-    payload: &[u8],
-    field_number: u32,
-    limits: WireLimits,
-    budget: &mut AxisTitleBudget,
-) -> Result<u64, ChartAxisTitleError> {
-    let fields = accounted_wire_fields(payload, limits, budget)?;
-    let reference = unique_length_delimited_field(&fields, payload, field_number)?
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let identifier = super::validate_reference_payload(reference, limits, "Keynote chart drawable")
-        .map_err(map_wire_error)?;
-    if identifier == 0 {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    Ok(identifier)
-}
-
-fn validate_graph_object(
-    package: &Package,
-    identifier: u64,
-    message_type: u32,
-) -> Result<(), ChartAxisTitleError> {
-    let (_component, object) = unique_object(package, identifier)?;
-    if object.messages.len() != 1 {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    let (message_index, _message) = unique_message(object, message_type)?;
-    validate_selected_message_metadata(object, message_index)
-}
-
-fn validate_unlocked_drawable(
-    payload: &[u8],
-    limits: WireLimits,
-    budget: &mut AxisTitleBudget,
-) -> Result<(), ChartAxisTitleError> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
-    budget.charge_input(payload.len())?;
-    budget.finish_wire_scan(view.len())?;
-    let mut locked = None;
-    for field in view
-        .fields()
-        .filter(|field| field.number() == DRAWABLE_LOCKED_FIELD)
-    {
-        if locked.is_some() || field.wire_type() != 0 {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-        field.validate_canonical_framing().map_err(map_wire_error)?;
-        let (value, bytes) = decode_varint_from_bytes(field.payload())
-            .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
-        if bytes != field.payload().len() || value > 1 {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-        locked = Some(value != 0);
-    }
-    if locked == Some(true) {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    Ok(())
-}
-
-fn validate_axis_roles(
-    category: &[u64],
-    value: &[u64],
-    budget: &mut AxisTitleBudget,
-) -> Result<(), ChartAxisTitleError> {
-    let category_primary = category.iter().copied().find(|identifier| *identifier != 0);
-    let value_primary = value.iter().copied().find(|identifier| *identifier != 0);
-    if category_primary.is_none() || value_primary.is_none() {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    let mut seen = HashSet::new();
-    let roles = category
-        .len()
-        .checked_add(value.len())
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    budget.charge_reference_vector(roles)?;
-    seen.try_reserve(roles)
-        .map_err(|_error| ChartAxisTitleError::Allocation { amount: roles })?;
-    for identifier in category.iter().chain(value).copied() {
-        if identifier != 0 && !seen.insert(identifier) {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-    }
-    Ok(())
-}
-
-fn unique_object(
-    package: &Package,
-    identifier: u64,
-) -> Result<(&str, &ArchiveObject), ChartAxisTitleError> {
-    let mut selected = None;
-    for component in package.state.source.components().iter() {
-        for object in &component.archive().objects {
-            if object.archive_info.identifier == Some(identifier) {
-                if selected.replace((component.name(), object)).is_some() {
-                    return Err(ChartAxisTitleError::InvalidSource);
-                }
-            }
-        }
-    }
-    selected.ok_or(ChartAxisTitleError::InvalidSource)
-}
-
-fn validate_selected_message_metadata(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), ChartAxisTitleError> {
-    let message = object
-        .messages
-        .get(message_index)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let info = object
-        .archive_info
-        .message_infos
-        .get(message_index)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    if object.archive_info.should_merge == Some(true)
-        || info.type_ != message.type_
-        || usize::try_from(info.length).ok() != Some(message.data.len())
-        || info.base_message_index.is_some()
-        || !info.diff_merge_version.is_empty()
-        || info.diff_field_path.is_some()
-        || !info.fields_to_remove.is_empty()
-        || !info.diff_read_version.is_empty()
-    {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    Ok(())
-}
-
-fn prove_unique_primary_axis(
-    package: &Package,
-    axis_identifier: u64,
-    budget: &mut AxisTitleBudget,
-) -> Result<(), ChartAxisTitleError> {
-    budget.charge_scan_pass(package, 0)?;
-    let limits = package.wire_limits().map_err(map_wire_error)?;
-    let mut primary_owners = 0usize;
-    for component in package.state.source.components().iter() {
-        for object in &component.archive().objects {
-            for message in &object.messages {
-                if message.type_ != CHART_MESSAGE_TYPE {
-                    continue;
-                }
-                let outer = accounted_wire_fields(&message.data, limits, budget)?;
-                let chart =
-                    unique_length_delimited_field(&outer, &message.data, CHART_EXTENSION_FIELD)?
-                        .ok_or(ChartAxisTitleError::InvalidSource)?;
-                let category =
-                    repeated_references(chart, CHART_AXIS_CATEGORY_FIELD, limits, budget)?;
-                let value = repeated_references(chart, CHART_AXIS_VALUE_FIELD, limits, budget)?;
-                validate_axis_roles(&category, &value, budget)?;
-                for roles in [&category, &value] {
-                    let primary = roles.iter().copied().find(|identifier| *identifier != 0);
-                    if primary == Some(axis_identifier) {
-                        primary_owners = primary_owners
-                            .checked_add(1)
-                            .ok_or(ChartAxisTitleError::InvalidSource)?;
-                    } else if roles.contains(&axis_identifier) {
-                        return Err(ChartAxisTitleError::InvalidSource);
-                    }
-                }
-            }
-        }
-    }
-    if primary_owners == 1 {
-        Ok(())
-    } else {
-        Err(ChartAxisTitleError::InvalidSource)
-    }
-}
-
-fn validate_global_axis_references<'a>(
-    package: &'a Package,
-    chart_identifier: u64,
-    chart_message_index: usize,
-    axis_identifier: u64,
-    budget: &mut AxisTitleBudget,
-) -> Result<Option<&'a str>, ChartAxisTitleError> {
-    budget.charge_inbound_scan(package)?;
-    let chart_object = package
-        .object(chart_identifier)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let chart_info = chart_object
-        .archive_info
-        .message_infos
-        .get(chart_message_index)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let aggregate_edges = chart_info
-        .object_references
-        .iter()
-        .filter(|identifier| **identifier == axis_identifier)
-        .count();
-    let aggregate_data_edges = chart_info
-        .data_references
-        .iter()
-        .filter(|identifier| **identifier == axis_identifier)
-        .count();
-    let mut field_edges = 0usize;
-    let mut field_data_edges = 0usize;
-    for field in &chart_info.field_infos {
-        field_edges = field_edges
-            .checked_add(
-                field
-                    .object_references
-                    .iter()
-                    .filter(|identifier| **identifier == axis_identifier)
-                    .count(),
-            )
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-        field_data_edges = field_data_edges
-            .checked_add(
-                field
-                    .data_references
-                    .iter()
-                    .filter(|identifier| **identifier == axis_identifier)
-                    .count(),
-            )
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-    }
-    if aggregate_edges != 1
-        || aggregate_data_edges != 0
-        || field_edges != 0
-        || field_data_edges != 0
-    {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    let archive_limits = package
-        .state
-        .options
-        .archive()
-        .effective_archive_limits()
-        .map_err(map_archive_error)?;
-    let mut visitor = AxisInboundReferenceVisitor {
-        package,
-        chart_identifier,
-        chart_message_index,
-        axis_identifier,
-        selected_references: 0,
-        stylesheet_references: 0,
-        stylesheet_component_name: None,
-        invalid: false,
-    };
-    for component in package.state.source.components().iter() {
-        for object in &component.archive().objects {
-            object
-                .inspect_references_with_policy_and_limits(
-                    &mut visitor,
-                    ArchiveReferencePolicy::RejectUnknownMetadata,
-                    archive_limits,
-                )
-                .map_err(map_core_error)?;
-        }
-    }
-    if visitor.invalid || visitor.selected_references != 1 {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    Ok(visitor.stylesheet_component_name)
-}
-
-struct AxisInboundReferenceVisitor<'a> {
-    package: &'a Package,
-    chart_identifier: u64,
-    chart_message_index: usize,
-    axis_identifier: u64,
-    selected_references: usize,
-    stylesheet_references: usize,
-    stylesheet_component_name: Option<&'a str>,
-    invalid: bool,
-}
-
-impl ArchiveReferenceVisitor for AxisInboundReferenceVisitor<'_> {
-    fn visit_reference(
-        &mut self,
-        occurrence: ArchiveReferenceOccurrence,
-    ) -> litchi_iwa_core::Result<()> {
-        // Data references occupy a separate namespace, so unrelated chart
-        // datasets do not participate in object ownership.  Still reject a
-        // numeric collision with the selected axis: this focused owner does
-        // not rewrite or prove that ambiguous cross-namespace relationship.
-        if occurrence.kind == ArchiveReferenceKind::Data
-            && occurrence.referenced_identifier == self.axis_identifier
-        {
-            self.invalid = true;
-        }
-        if occurrence.referenced_identifier == self.axis_identifier {
-            if occurrence.kind == ArchiveReferenceKind::Object
-                && occurrence.scope == ArchiveReferenceScope::Message
-                && occurrence.object_identifier == self.chart_identifier
-                && occurrence.message_index == self.chart_message_index
-            {
-                self.selected_references = self.selected_references.saturating_add(1);
-            } else if let Some(component_name) =
-                stylesheet_registration_component(self.package, occurrence)
-            {
-                self.stylesheet_references = self.stylesheet_references.saturating_add(1);
-                self.stylesheet_component_name = Some(component_name);
-                if self.stylesheet_references > 1 {
-                    self.invalid = true;
-                }
-            } else {
-                self.invalid = true;
-            }
-        }
-        Ok(())
-    }
-}
-
-fn stylesheet_registration_component(
-    package: &Package,
-    occurrence: ArchiveReferenceOccurrence,
-) -> Option<&str> {
-    if occurrence.kind != ArchiveReferenceKind::Object
-        || occurrence.scope != ArchiveReferenceScope::Message
-    {
-        return None;
-    }
-    let (component, object) = package.object_with_component(occurrence.object_identifier)?;
-    (object.messages.len() == 1
-        && object
-            .messages
-            .get(occurrence.message_index)
-            .is_some_and(|message| message.type_ == STYLESHEET_MESSAGE_TYPE)
-        && validate_selected_message_metadata(object, occurrence.message_index).is_ok())
-    .then_some(component)
-}
-
-fn validate_axis_metadata(
-    package: &Package,
-    chart_component_name: &str,
-    axis_component_name: &str,
-    stylesheet_component_name: Option<&str>,
-    axis_identifier: u64,
-    budget: &mut AxisTitleBudget,
-) -> Result<(), ChartAxisTitleError> {
-    budget.charge_scan_pass(package, 0)?;
-    let Some(metadata) = package_metadata_payload(package)? else {
-        return Ok(());
-    };
-    let limits = package.wire_limits().map_err(map_wire_error)?;
-    let remaining_input = budget
-        .maximum_input
-        .checked_sub(budget.input)
-        .ok_or(ChartAxisTitleError::InvalidSource)?
-        .min(limits.max_input_bytes());
-    let remaining_output = budget
-        .maximum_output
-        .checked_sub(budget.output)
-        .ok_or(ChartAxisTitleError::InvalidSource)?
-        .min(limits.max_output_bytes());
-    let remaining_fields = budget
-        .maximum_fields
-        .checked_sub(budget.fields)
-        .ok_or(ChartAxisTitleError::InvalidSource)?
-        .min(limits.max_fields());
-    let remaining_work = budget
-        .maximum_work
-        .checked_sub(budget.work)
-        .ok_or(ChartAxisTitleError::InvalidSource)?
-        .min(limits.max_rewrite_work());
-    let remaining_components = budget
-        .maximum_components
-        .checked_sub(budget.components)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let remaining_references = budget
-        .maximum_references
-        .checked_sub(budget.references)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| ChartAxisTitleError::InvalidSource)?;
-    let options = package_metadata_codec::RewriteOptions::new(
-        remaining_input,
-        remaining_output,
-        remaining_fields,
-        remaining_work,
-        recursion,
-        remaining_components,
-        remaining_references,
-        budget
-            .maximum_allocations
-            .checked_sub(budget.allocations)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
-    );
-    let owner_external_component_name =
-        (chart_component_name != axis_component_name).then_some(chart_component_name);
-    let registry_external_component_name = stylesheet_component_name.filter(|component_name| {
-        *component_name != axis_component_name
-            && Some(*component_name) != owner_external_component_name
-    });
-    let mut selected = SelectedAxisMetadataVisitor {
-        axis_component_name,
-        owner_external_component_name,
-        registry_external_component_name,
-        axis_identifier,
-        selected_uuid: None,
-        selected_component_identifier: None,
-        external_target_component_identifier: None,
-        owner_external_seen: false,
-        registry_external_seen: false,
-        count: 0,
-        invalid: false,
-    };
-    let inspection = package_metadata_codec::inspect_package_metadata_with_visitor(
-        metadata,
-        options,
-        &mut selected,
-    )
-    .map_err(map_metadata_error)?;
-    budget.charge_metadata_report(inspection.report())?;
-    let expects_external =
-        owner_external_component_name.is_some() || registry_external_component_name.is_some();
-    if selected.owner_external_seen != owner_external_component_name.is_some()
-        || selected.registry_external_seen != registry_external_component_name.is_some()
-        || (expects_external
-            && selected.external_target_component_identifier
-                != selected.selected_component_identifier)
-        || (!expects_external && selected.external_target_component_identifier.is_some())
-    {
-        selected.invalid = true;
-    }
-    let selected_uuid = selected
-        .selected_uuid
-        .filter(|_uuid| !selected.invalid && selected.count == 1)
-        .ok_or(ChartAxisTitleError::InvalidSource)?;
-
-    let options = metadata_options(package, budget)?;
-    let mut authority = AxisMetadataAuthorityVisitor {
-        axis_identifier,
-        selected_uuid,
-        selected_pair_count: 0,
-        selected_object_count: 0,
-        invalid: false,
-    };
-    let inspection = package_metadata_codec::inspect_package_metadata_with_visitor(
-        metadata,
-        options,
-        &mut authority,
-    )
-    .map_err(map_metadata_error)?;
-    budget.charge_metadata_report(inspection.report())?;
-    if authority.invalid
-        || authority.selected_pair_count != 1
-        || authority.selected_object_count != 1
-    {
-        return Err(ChartAxisTitleError::InvalidSource);
-    }
-    Ok(())
-}
-
-fn metadata_options(
-    package: &Package,
-    budget: &AxisTitleBudget,
-) -> Result<package_metadata_codec::RewriteOptions, ChartAxisTitleError> {
-    let limits = package.wire_limits().map_err(map_wire_error)?;
-    Ok(package_metadata_codec::RewriteOptions::new(
-        budget
-            .maximum_input
-            .checked_sub(budget.input)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
-            .min(limits.max_input_bytes()),
-        budget
-            .maximum_output
-            .checked_sub(budget.output)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
-            .min(limits.max_output_bytes()),
-        budget
-            .maximum_fields
-            .checked_sub(budget.fields)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
-            .min(limits.max_fields()),
-        budget
-            .maximum_work
-            .checked_sub(budget.work)
-            .ok_or(ChartAxisTitleError::InvalidSource)?
-            .min(limits.max_rewrite_work()),
-        u32::try_from(limits.max_nesting()).map_err(|_error| ChartAxisTitleError::InvalidSource)?,
-        budget
-            .maximum_components
-            .checked_sub(budget.components)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
-        budget
-            .maximum_references
-            .checked_sub(budget.references)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
-        budget
-            .maximum_allocations
-            .checked_sub(budget.allocations)
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
-    ))
-}
-
-fn package_metadata_payload(package: &Package) -> Result<Option<&[u8]>, ChartAxisTitleError> {
-    let mut payload = None;
-    for component in package.state.source.components().iter() {
-        for object in &component.archive().objects {
-            if object.messages.len() != object.archive_info.message_infos.len() {
-                return Err(ChartAxisTitleError::InvalidSource);
-            }
-            for (index, message) in object.messages.iter().enumerate() {
-                let info = object
-                    .archive_info
-                    .message_infos
-                    .get(index)
-                    .ok_or(ChartAxisTitleError::InvalidSource)?;
-                if message.type_ != info.type_
-                    || usize::try_from(info.length).ok() != Some(message.data.len())
-                {
-                    return Err(ChartAxisTitleError::InvalidSource);
-                }
-                if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE {
-                    validate_selected_message_metadata(object, index)?;
-                    if payload.replace(message.data.as_slice()).is_some() {
-                        return Err(ChartAxisTitleError::InvalidSource);
-                    }
-                }
-            }
-        }
-    }
-    Ok(payload)
-}
-
-fn metadata_component_matches_physical(
-    component: package_metadata_codec::ComponentDescriptor<'_>,
-    physical: &str,
-) -> bool {
-    let Some(expected) = physical
-        .strip_prefix("Index/")
-        .and_then(|value| value.strip_suffix(".iwa"))
-    else {
-        return false;
-    };
-    component.preferred_locator() == expected
-        && component
-            .locator()
-            .is_none_or(|locator| locator == expected)
-        && component.effective_locator() == expected
-}
-
-struct SelectedAxisMetadataVisitor<'a> {
-    axis_component_name: &'a str,
-    owner_external_component_name: Option<&'a str>,
-    registry_external_component_name: Option<&'a str>,
-    axis_identifier: u64,
-    selected_uuid: Option<package_metadata_codec::UuidBits>,
-    selected_component_identifier: Option<u64>,
-    external_target_component_identifier: Option<u64>,
-    owner_external_seen: bool,
-    registry_external_seen: bool,
-    count: usize,
-    invalid: bool,
-}
-
-impl package_metadata_codec::PackageMetadataVisitor for SelectedAxisMetadataVisitor<'_> {
-    fn visit_object_uuid(
-        &mut self,
-        binding: package_metadata_codec::ObjectUuidDescriptor<'_>,
-    ) -> Result<(), package_metadata_codec::RewriteError> {
-        if binding.object_identifier() == self.axis_identifier {
-            self.count = self.count.saturating_add(1);
-            if self.selected_uuid.replace(binding.uuid()).is_some() {
-                self.invalid = true;
-            }
-            if self
-                .selected_component_identifier
-                .replace(binding.component().identifier())
-                .is_some()
-            {
-                self.invalid = true;
-            }
-            if !binding.component().is_current()
-                || !metadata_component_matches_physical(
-                    binding.component(),
-                    self.axis_component_name,
-                )
-            {
-                self.invalid = true;
-            }
-        }
-        Ok(())
-    }
-
-    fn visit_external_reference(
-        &mut self,
-        reference: package_metadata_codec::ExternalReferenceDescriptor<'_>,
-    ) -> Result<(), package_metadata_codec::RewriteError> {
-        if reference.object_identifier() == Some(self.axis_identifier) {
-            let target = reference.target_component_identifier();
-            if self
-                .external_target_component_identifier
-                .is_some_and(|identifier| identifier != target)
-            {
-                self.invalid = true;
-            } else {
-                self.external_target_component_identifier = Some(target);
-            }
-            let source_matches = |component_name: &str| {
-                reference.source().is_current()
-                    && metadata_component_matches_physical(reference.source(), component_name)
-            };
-            if self
-                .owner_external_component_name
-                .is_some_and(source_matches)
-            {
-                if self.owner_external_seen {
-                    self.invalid = true;
-                }
-                self.owner_external_seen = true;
-            } else if self
-                .registry_external_component_name
-                .is_some_and(source_matches)
-            {
-                if self.registry_external_seen {
-                    self.invalid = true;
-                }
-                self.registry_external_seen = true;
-            } else {
-                self.invalid = true;
-            }
-            if reference.is_weak() == Some(true) || reference.is_versioned() {
-                self.invalid = true;
-            }
-        }
-        Ok(())
-    }
-
-    fn visit_data_reference_owner(
-        &mut self,
-        owner: package_metadata_codec::DataReferenceOwnerDescriptor<'_>,
-    ) -> Result<(), package_metadata_codec::RewriteError> {
-        if owner.object_identifier() == self.axis_identifier {
-            self.invalid = true;
-        }
-        Ok(())
-    }
-
-    fn visit_ambiguous_object_identifier(
-        &mut self,
-        _component: package_metadata_codec::ComponentDescriptor<'_>,
-        identifier: u64,
-    ) -> Result<(), package_metadata_codec::RewriteError> {
-        if identifier == self.axis_identifier {
-            self.invalid = true;
-        }
-        Ok(())
-    }
-
-    fn visit_data_metadata_map(
-        &mut self,
-        object_identifier: u64,
-        _has_unknown_fields: bool,
-    ) -> Result<(), package_metadata_codec::RewriteError> {
-        if object_identifier == self.axis_identifier {
-            self.invalid = true;
-        }
-        Ok(())
-    }
-}
-
-struct AxisMetadataAuthorityVisitor {
-    axis_identifier: u64,
-    selected_uuid: package_metadata_codec::UuidBits,
-    selected_pair_count: usize,
-    selected_object_count: usize,
-    invalid: bool,
-}
-
-impl package_metadata_codec::PackageMetadataVisitor for AxisMetadataAuthorityVisitor {
-    fn visit_object_uuid(
-        &mut self,
-        binding: package_metadata_codec::ObjectUuidDescriptor<'_>,
-    ) -> Result<(), package_metadata_codec::RewriteError> {
-        if binding.uuid() == self.selected_uuid {
-            self.selected_pair_count = self.selected_pair_count.saturating_add(1);
-            if binding.object_identifier() != self.axis_identifier {
-                self.invalid = true;
-            }
-        }
-        if binding.object_identifier() == self.axis_identifier {
-            self.selected_object_count = self.selected_object_count.saturating_add(1);
-            if binding.uuid() != self.selected_uuid {
-                self.invalid = true;
-            }
-        }
-        Ok(())
-    }
-}
-
 fn rewrite_chart_axis_title(
     source: &Package,
     selection: &AxisSelection,
     after: Option<&str>,
     budget: &mut AxisTitleBudget,
 ) -> Result<(Package, usize), ChartAxisTitleError> {
-    let catalog = physical_catalog(source)?;
+    let catalog = chart_axis_support::physical_catalog(source).map_err(map_axis_support_error)?;
     let entry = catalog
         .package()
         .iter()
@@ -2358,7 +1573,12 @@ fn rewrite_chart_axis_title(
         .map_err(map_core_error)?;
     let mut archive =
         Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
-    validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
+    chart_axis_support::validate_canonical_object_length_prefixes_with_budget(
+        stream.as_bytes(),
+        &archive,
+        budget,
+    )
+    .map_err(map_axis_support_error)?;
     let message_data = {
         let object = archive
             .object(selection.axis_identifier)
@@ -2430,39 +1650,6 @@ fn rewrite_chart_axis_title(
     Ok((candidate, previews.len()))
 }
 
-fn validate_canonical_object_length_prefixes(
-    source: &[u8],
-    archive: &Archive,
-) -> Result<(), ChartAxisTitleError> {
-    for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
-        let remaining = source
-            .get(offset..)
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-        let (header_bytes, prefix_bytes) = decode_varint_from_bytes(remaining)
-            .map_err(|_error| ChartAxisTitleError::InvalidSource)?;
-        if prefix_bytes != encoded_len(header_bytes) {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-        let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_error| ChartAxisTitleError::InvalidSource)?,
-            )
-            .ok_or(ChartAxisTitleError::InvalidSource)?;
-        if framed_header_bytes != object.header_length
-            || object
-                .header_offset
-                .checked_add(object.header_length)
-                .ok_or(ChartAxisTitleError::InvalidSource)?
-                != object.data_offset
-        {
-            return Err(ChartAxisTitleError::InvalidSource);
-        }
-    }
-    Ok(())
-}
-
 fn read_chart_axis_title(
     data: &[u8],
     limits: WireLimits,
@@ -2497,6 +1684,37 @@ fn read_chart_axis_title(
     snapshot.visible_title(kind).map(copy_title).transpose()
 }
 
+fn read_selected_axis_title(
+    package: &Package,
+    selection: &AxisSelection,
+    budget: &mut AxisTitleBudget,
+) -> Result<Option<String>, ChartAxisTitleError> {
+    let (_component, object) = package
+        .object_with_component(selection.axis_identifier)
+        .ok_or(ChartAxisTitleError::InvalidSource)?;
+    let message = object
+        .messages
+        .get(selection.axis_message_index)
+        .filter(|message| message.type_ == CHART_AXIS_MESSAGE_TYPE)
+        .ok_or(ChartAxisTitleError::InvalidSource)?;
+    let limits = package.wire_limits().map_err(map_wire_error)?;
+    read_chart_axis_title(
+        &message.data,
+        limits,
+        axis_title_kind(selection.axis),
+        budget,
+    )
+}
+
+fn accounted_wire_fields(
+    payload: &[u8],
+    limits: WireLimits,
+    budget: &mut AxisTitleBudget,
+) -> Result<Vec<WireField>, ChartAxisTitleError> {
+    chart_axis_support::accounted_wire_fields(payload, limits, budget)
+        .map_err(map_axis_support_error)
+}
+
 fn verify_candidate_reopen_locality(
     source: &Package,
     candidate: &Package,
@@ -2510,26 +1728,29 @@ fn verify_candidate_reopen_locality(
     if source.state.total_objects != candidate.state.total_objects {
         return Err(ChartAxisTitleError::Verification);
     }
-    let source_selected = select_axis(
+    let source_selected = chart_axis_support::select_axis(
         source,
         SlideSelector::position(slide_position),
         ChartSelector::index(chart_position.get()),
         axis,
         true,
         budget,
-    )?;
-    let candidate_selected = select_axis(
+    )
+    .map_err(map_axis_support_error)?;
+    let candidate_selected = chart_axis_support::select_axis(
         candidate,
         SlideSelector::position(slide_position),
         ChartSelector::index(chart_position.get()),
         axis,
         true,
         budget,
-    )?;
+    )
+    .map_err(map_axis_support_error)?;
+    let candidate_title = read_selected_axis_title(candidate, &candidate_selected, budget)?;
     if source_selected.axis_identifier != candidate_selected.axis_identifier
         || source_selected.chart_identifier != candidate_selected.chart_identifier
         || source_selected.axis_component_name != candidate_selected.axis_component_name
-        || candidate_selected.title.as_deref() != expected_title
+        || candidate_title.as_deref() != expected_title
     {
         return Err(ChartAxisTitleError::Verification);
     }
@@ -2538,125 +1759,23 @@ fn verify_candidate_reopen_locality(
     if source_show != candidate_show {
         return Err(ChartAxisTitleError::Verification);
     }
-    verify_package_locality(
+    chart_axis_support::verify_package_locality(
         source,
         candidate,
         &source_selected,
         target_requires_invalidated_previews,
         budget,
-    )?;
+    )
+    .map_err(map_axis_support_error)?;
     if target_requires_invalidated_previews
         && !super::rendering_invalidation::root_previews_absent(
-            physical_catalog(candidate)?.package(),
+            chart_axis_support::physical_catalog(candidate)
+                .map_err(map_axis_support_error)?
+                .package(),
         )
         .map_err(|_error| ChartAxisTitleError::Verification)?
     {
         return Err(ChartAxisTitleError::Verification);
-    }
-    Ok(())
-}
-
-fn verify_package_locality(
-    source: &Package,
-    candidate: &Package,
-    selection: &AxisSelection,
-    previews_must_be_absent: bool,
-    budget: &mut AxisTitleBudget,
-) -> Result<(), ChartAxisTitleError> {
-    budget.charge_locality_scan(source)?;
-    budget.charge_locality_scan(candidate)?;
-    let source_catalog = physical_catalog(source)?.package();
-    let candidate_catalog = physical_catalog(candidate)?.package();
-    let source_previews = super::rendering_invalidation::root_preview_deletions(source_catalog)
-        .map_err(|_error| ChartAxisTitleError::Verification)?;
-    let candidate_previews =
-        super::rendering_invalidation::root_preview_deletions(candidate_catalog)
-            .map_err(|_error| ChartAxisTitleError::Verification)?;
-    budget.charge(
-        source_catalog
-            .len()
-            .checked_add(candidate_catalog.len())
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
-    )?;
-    for entry in source_catalog.iter() {
-        if source_previews.names().contains(&entry.name()) {
-            continue;
-        }
-        let other = candidate_catalog
-            .iter()
-            .find(|candidate_entry| candidate_entry.name() == entry.name())
-            .ok_or(ChartAxisTitleError::Verification)?;
-        let selected_component = entry.name() == selection.axis_component_name;
-        if (!selected_component && entry.data() != other.data())
-            || entry.raw_name() != other.raw_name()
-            || entry.is_opaque() != other.is_opaque()
-            // Reassembly necessarily updates CRC and compressed/uncompressed
-            // sizes for the selected member.  The local/central header
-            // metadata itself must remain byte-equivalent, though; this
-            // catches a metadata rewrite without rejecting an expected
-            // payload-size update.
-            || entry.metadata().local() != other.metadata().local()
-            || entry.metadata().central() != other.metadata().central()
-            || (!selected_component && entry.metadata() != other.metadata())
-            // Central-directory offsets may legitimately move after a
-            // rewritten member, but an untouched member's local record is
-            // expected to remain byte-identical.
-            || (!selected_component
-                && entry.raw_record().local_record() != other.raw_record().local_record())
-        {
-            return Err(ChartAxisTitleError::Verification);
-        }
-    }
-    for entry in candidate_catalog.iter() {
-        if candidate_previews.names().contains(&entry.name()) {
-            continue;
-        }
-        if source_catalog
-            .iter()
-            .all(|source_entry| source_entry.name() != entry.name())
-        {
-            return Err(ChartAxisTitleError::Verification);
-        }
-    }
-    if previews_must_be_absent && !candidate_previews.names().is_empty() {
-        return Err(ChartAxisTitleError::Verification);
-    }
-
-    let source_component = source
-        .state
-        .source
-        .components()
-        .iter()
-        .find(|component| component.name() == selection.axis_component_name)
-        .ok_or(ChartAxisTitleError::Verification)?;
-    let candidate_component = candidate
-        .state
-        .source
-        .components()
-        .iter()
-        .find(|component| component.name() == selection.axis_component_name)
-        .ok_or(ChartAxisTitleError::Verification)?;
-    let source_objects = &source_component.archive().objects;
-    let candidate_objects = &candidate_component.archive().objects;
-    budget.charge(
-        source_objects
-            .len()
-            .checked_add(candidate_objects.len())
-            .ok_or(ChartAxisTitleError::InvalidSource)?,
-    )?;
-    if source_objects.len() != candidate_objects.len() {
-        return Err(ChartAxisTitleError::Verification);
-    }
-    for (source_object, candidate_object) in source_objects.iter().zip(candidate_objects) {
-        if source_object.archive_info.identifier != candidate_object.archive_info.identifier {
-            return Err(ChartAxisTitleError::Verification);
-        }
-        if source_object.archive_info.identifier != Some(selection.axis_identifier)
-            && (source_object.archive_info != candidate_object.archive_info
-                || source_object.messages != candidate_object.messages)
-        {
-            return Err(ChartAxisTitleError::Verification);
-        }
     }
     Ok(())
 }
@@ -2925,96 +2044,175 @@ fn map_chart_axis_title_codec_error(error: ChartAxisTitleDecodeError) -> ChartAx
     ChartAxisTitleError::InvalidSource
 }
 
-fn map_chart_title_error(error: super::slide_chart_title::ChartTitleError) -> ChartAxisTitleError {
-    use super::slide_chart_title::{ChartTitleError, ChartTitleLimitKind};
+fn axis_support_budget_error(error: ChartAxisTitleError) -> AxisSupportError {
     match error {
-        ChartTitleError::UnsupportedSource => ChartAxisTitleError::UnsupportedSource,
-        ChartTitleError::AmbiguousSelector => ChartAxisTitleError::AmbiguousSelector,
-        ChartTitleError::EmptySlideName => ChartAxisTitleError::EmptySlideName,
-        ChartTitleError::SlideNameNotFound => ChartAxisTitleError::SlideNameNotFound,
-        ChartTitleError::SlidePositionNotFound { position } => {
-            ChartAxisTitleError::SlidePositionNotFound { position }
+        ChartAxisTitleError::UnsupportedSource => AxisSupportError::Selector(
+            chart_axis_support::AxisSupportSelectorError::UnsupportedSource,
+        ),
+        ChartAxisTitleError::AmbiguousSelector => AxisSupportError::Selector(
+            chart_axis_support::AxisSupportSelectorError::AmbiguousSelector,
+        ),
+        ChartAxisTitleError::EmptySlideName => {
+            AxisSupportError::Selector(chart_axis_support::AxisSupportSelectorError::EmptySlideName)
         },
-        ChartTitleError::ChartNameNotFound => ChartAxisTitleError::ChartNameNotFound,
-        ChartTitleError::ChartPositionNotFound { position } => {
-            ChartAxisTitleError::ChartPositionNotFound { position }
+        ChartAxisTitleError::SlideNameNotFound => AxisSupportError::Selector(
+            chart_axis_support::AxisSupportSelectorError::SlideNameNotFound,
+        ),
+        ChartAxisTitleError::SlidePositionNotFound { position } => AxisSupportError::Selector(
+            chart_axis_support::AxisSupportSelectorError::SlidePositionNotFound { position },
+        ),
+        ChartAxisTitleError::ChartNameNotFound => AxisSupportError::Selector(
+            chart_axis_support::AxisSupportSelectorError::ChartNameNotFound,
+        ),
+        ChartAxisTitleError::ChartPositionNotFound { position } => AxisSupportError::Selector(
+            chart_axis_support::AxisSupportSelectorError::ChartPositionNotFound { position },
+        ),
+        ChartAxisTitleError::EmptyChartName => {
+            AxisSupportError::Selector(chart_axis_support::AxisSupportSelectorError::EmptyChartName)
         },
-        ChartTitleError::EmptyChartName => ChartAxisTitleError::EmptyChartName,
-        ChartTitleError::LimitExceeded {
+        ChartAxisTitleError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => AxisSupportError::LimitExceeded {
+            kind: match kind {
+                ChartAxisTitleLimitKind::InputBytes => {
+                    chart_axis_support::AxisSupportLimitKind::InputBytes
+                },
+                ChartAxisTitleLimitKind::OutputBytes => {
+                    chart_axis_support::AxisSupportLimitKind::OutputBytes
+                },
+                ChartAxisTitleLimitKind::WireBytes => {
+                    chart_axis_support::AxisSupportLimitKind::WireBytes
+                },
+                ChartAxisTitleLimitKind::Entries => {
+                    chart_axis_support::AxisSupportLimitKind::Entries
+                },
+                ChartAxisTitleLimitKind::EntryBytes => {
+                    chart_axis_support::AxisSupportLimitKind::EntryBytes
+                },
+                ChartAxisTitleLimitKind::TotalBytes => {
+                    chart_axis_support::AxisSupportLimitKind::TotalBytes
+                },
+                ChartAxisTitleLimitKind::Slides => chart_axis_support::AxisSupportLimitKind::Slides,
+                ChartAxisTitleLimitKind::References => {
+                    chart_axis_support::AxisSupportLimitKind::References
+                },
+                ChartAxisTitleLimitKind::TextStorages => {
+                    chart_axis_support::AxisSupportLimitKind::TextStorages
+                },
+                ChartAxisTitleLimitKind::TextFragments => {
+                    chart_axis_support::AxisSupportLimitKind::TextFragments
+                },
+                ChartAxisTitleLimitKind::TextBytes => {
+                    chart_axis_support::AxisSupportLimitKind::TextBytes
+                },
+                ChartAxisTitleLimitKind::WireFields => {
+                    chart_axis_support::AxisSupportLimitKind::WireFields
+                },
+                ChartAxisTitleLimitKind::WireNesting => {
+                    chart_axis_support::AxisSupportLimitKind::WireNesting
+                },
+                ChartAxisTitleLimitKind::WireWork => {
+                    chart_axis_support::AxisSupportLimitKind::WireWork
+                },
+                ChartAxisTitleLimitKind::TitleBytes => {
+                    chart_axis_support::AxisSupportLimitKind::TitleBytes
+                },
+            },
+            observed,
+            maximum,
+        },
+        ChartAxisTitleError::Allocation { amount } => AxisSupportError::Allocation { amount },
+        ChartAxisTitleError::InvalidSource
+        | ChartAxisTitleError::Verification
+        | ChartAxisTitleError::PatchConflict => AxisSupportError::InvalidSource,
+    }
+}
+
+fn map_axis_support_error(error: AxisSupportError) -> ChartAxisTitleError {
+    match error {
+        AxisSupportError::Selector(selector) => match selector {
+            chart_axis_support::AxisSupportSelectorError::UnsupportedSource => {
+                ChartAxisTitleError::UnsupportedSource
+            },
+            chart_axis_support::AxisSupportSelectorError::AmbiguousSelector => {
+                ChartAxisTitleError::AmbiguousSelector
+            },
+            chart_axis_support::AxisSupportSelectorError::EmptySlideName => {
+                ChartAxisTitleError::EmptySlideName
+            },
+            chart_axis_support::AxisSupportSelectorError::SlideNameNotFound => {
+                ChartAxisTitleError::SlideNameNotFound
+            },
+            chart_axis_support::AxisSupportSelectorError::SlidePositionNotFound { position } => {
+                ChartAxisTitleError::SlidePositionNotFound { position }
+            },
+            chart_axis_support::AxisSupportSelectorError::ChartNameNotFound => {
+                ChartAxisTitleError::ChartNameNotFound
+            },
+            chart_axis_support::AxisSupportSelectorError::ChartPositionNotFound { position } => {
+                ChartAxisTitleError::ChartPositionNotFound { position }
+            },
+            chart_axis_support::AxisSupportSelectorError::EmptyChartName => {
+                ChartAxisTitleError::EmptyChartName
+            },
+        },
+        AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
         } => ChartAxisTitleError::LimitExceeded {
             kind: match kind {
-                ChartTitleLimitKind::InputBytes => ChartAxisTitleLimitKind::InputBytes,
-                ChartTitleLimitKind::OutputBytes => ChartAxisTitleLimitKind::OutputBytes,
-                ChartTitleLimitKind::WireBytes => ChartAxisTitleLimitKind::WireBytes,
-                ChartTitleLimitKind::Entries => ChartAxisTitleLimitKind::Entries,
-                ChartTitleLimitKind::EntryBytes => ChartAxisTitleLimitKind::EntryBytes,
-                ChartTitleLimitKind::TotalBytes => ChartAxisTitleLimitKind::TotalBytes,
-                ChartTitleLimitKind::Slides => ChartAxisTitleLimitKind::Slides,
-                ChartTitleLimitKind::References => ChartAxisTitleLimitKind::References,
-                ChartTitleLimitKind::TextStorages => ChartAxisTitleLimitKind::TextStorages,
-                ChartTitleLimitKind::TextFragments => ChartAxisTitleLimitKind::TextFragments,
-                ChartTitleLimitKind::TextBytes => ChartAxisTitleLimitKind::TextBytes,
-                ChartTitleLimitKind::WireFields => ChartAxisTitleLimitKind::WireFields,
-                ChartTitleLimitKind::WireNesting => ChartAxisTitleLimitKind::WireNesting,
-                ChartTitleLimitKind::WireWork => ChartAxisTitleLimitKind::WireWork,
-                ChartTitleLimitKind::TitleBytes => ChartAxisTitleLimitKind::TitleBytes,
+                chart_axis_support::AxisSupportLimitKind::InputBytes => {
+                    ChartAxisTitleLimitKind::InputBytes
+                },
+                chart_axis_support::AxisSupportLimitKind::OutputBytes => {
+                    ChartAxisTitleLimitKind::OutputBytes
+                },
+                chart_axis_support::AxisSupportLimitKind::WireBytes => {
+                    ChartAxisTitleLimitKind::WireBytes
+                },
+                chart_axis_support::AxisSupportLimitKind::Entries => {
+                    ChartAxisTitleLimitKind::Entries
+                },
+                chart_axis_support::AxisSupportLimitKind::EntryBytes => {
+                    ChartAxisTitleLimitKind::EntryBytes
+                },
+                chart_axis_support::AxisSupportLimitKind::TotalBytes => {
+                    ChartAxisTitleLimitKind::TotalBytes
+                },
+                chart_axis_support::AxisSupportLimitKind::Slides => ChartAxisTitleLimitKind::Slides,
+                chart_axis_support::AxisSupportLimitKind::References => {
+                    ChartAxisTitleLimitKind::References
+                },
+                chart_axis_support::AxisSupportLimitKind::TextStorages => {
+                    ChartAxisTitleLimitKind::TextStorages
+                },
+                chart_axis_support::AxisSupportLimitKind::TextFragments => {
+                    ChartAxisTitleLimitKind::TextFragments
+                },
+                chart_axis_support::AxisSupportLimitKind::TextBytes => {
+                    ChartAxisTitleLimitKind::TextBytes
+                },
+                chart_axis_support::AxisSupportLimitKind::WireFields => {
+                    ChartAxisTitleLimitKind::WireFields
+                },
+                chart_axis_support::AxisSupportLimitKind::WireNesting => {
+                    ChartAxisTitleLimitKind::WireNesting
+                },
+                chart_axis_support::AxisSupportLimitKind::WireWork => {
+                    ChartAxisTitleLimitKind::WireWork
+                },
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => {
+                    ChartAxisTitleLimitKind::TitleBytes
+                },
             },
             observed,
             maximum,
         },
-        ChartTitleError::Allocation { amount } => ChartAxisTitleError::Allocation { amount },
-        ChartTitleError::InvalidSource
-        | ChartTitleError::Verification
-        | ChartTitleError::PatchConflict => ChartAxisTitleError::InvalidSource,
-    }
-}
-
-fn map_metadata_error(error: package_metadata_codec::RewriteError) -> ChartAxisTitleError {
-    if let Some(limit) = error.resource_limit() {
-        let (kind, observed, maximum) = match limit {
-            package_metadata_codec::RewriteLimit::InputBytes { observed, maximum } => {
-                (ChartAxisTitleLimitKind::WireBytes, observed, maximum)
-            },
-            package_metadata_codec::RewriteLimit::OutputBytes { observed, maximum } => {
-                (ChartAxisTitleLimitKind::OutputBytes, observed, maximum)
-            },
-            package_metadata_codec::RewriteLimit::Fields { observed, maximum } => {
-                (ChartAxisTitleLimitKind::WireFields, observed, maximum)
-            },
-            package_metadata_codec::RewriteLimit::Work { observed, maximum } => {
-                (ChartAxisTitleLimitKind::WireWork, observed, maximum)
-            },
-            package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => (
-                ChartAxisTitleLimitKind::WireNesting,
-                observed as usize,
-                maximum as usize,
-            ),
-            package_metadata_codec::RewriteLimit::Components { observed, maximum }
-            | package_metadata_codec::RewriteLimit::References { observed, maximum }
-            | package_metadata_codec::RewriteLimit::Additions { observed, maximum } => {
-                (ChartAxisTitleLimitKind::References, observed, maximum)
-            },
-            _ => return ChartAxisTitleError::InvalidSource,
-        };
-        return ChartAxisTitleError::LimitExceeded {
-            kind,
-            observed: usize_to_u64(observed),
-            maximum: usize_to_u64(maximum),
-        };
-    }
-    if let Some(amount) = error.allocation_request() {
-        return ChartAxisTitleError::Allocation { amount };
-    }
-    ChartAxisTitleError::InvalidSource
-}
-
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartAxisTitleError> {
-    match &package.state.source {
-        PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(ChartAxisTitleError::UnsupportedSource),
+        AxisSupportError::Allocation { amount } => ChartAxisTitleError::Allocation { amount },
+        AxisSupportError::InvalidSource => ChartAxisTitleError::InvalidSource,
     }
 }
 

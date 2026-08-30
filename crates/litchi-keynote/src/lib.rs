@@ -365,6 +365,10 @@ pub use package::{
     SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats,
     TextStorageFailure, WriteError,
 };
+pub use package::{
+    ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
+    ChartValueAxisLimitKind, ChartValueAxisPatch,
+};
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;

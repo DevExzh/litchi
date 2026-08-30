@@ -103,6 +103,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_chart_value_axis"
+path = "fuzz_targets/keynote_chart_value_axis.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_lock"
 path = "fuzz_targets/numbers_table_lock.rs"
 test = false

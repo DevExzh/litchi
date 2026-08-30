@@ -55,3 +55,6 @@ coverage
 !/corpus/keynote_slide_table_name/
 /corpus/keynote_slide_table_name/*
 !/corpus/keynote_slide_table_name/*.hex
+!/corpus/keynote_chart_value_axis/
+/corpus/keynote_chart_value_axis/*
+!/corpus/keynote_chart_value_axis/*.seed

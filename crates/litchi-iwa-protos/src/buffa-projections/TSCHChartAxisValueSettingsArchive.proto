@@ -1,0 +1,25 @@
+// Wire-only projection of the generated chart-axis non-style extension.
+//
+// The native `TSCH.Generated.ChartAxisNonStyleArchive` stores value-axis
+// decades in field 4, major/minor grid-line counts in fields 5/6, the scale
+// enum in field 8, and optional user bounds in fields 17/18.  The nested
+// number archive is deliberately restricted to its fixed64 value field.  The
+// handwritten codec validates the complete source message and keeps source
+// spans authoritative; this schema only supplies a private Buffa view for an
+// independent semantic cross-check.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message ChartAxisValueSettingsArchive {
+  optional int32 tschchartaxisvaluenumberofdecades = 4;
+  optional int32 tschchartaxisvaluenumberofmajorgridlines = 5;
+  optional int32 tschchartaxisvaluenumberofminorgridlines = 6;
+  optional int32 tschchartaxisvaluescale = 8;
+  optional ChartsNsNumberDoubleArchive tschchartaxisdefaultusermax = 17;
+  optional ChartsNsNumberDoubleArchive tschchartaxisdefaultusermin = 18;
+}
+
+message ChartsNsNumberDoubleArchive {
+  optional double number_archive = 1;
+}

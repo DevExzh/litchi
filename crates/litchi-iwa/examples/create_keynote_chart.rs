@@ -19,14 +19,15 @@ use litchi_iwa::charts::{
     ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Kind, LabelAffixes, MajorStepCount,
     MinorStepCount, NegativeStyle, NumberFormat, Scale, Steps, Visibility,
 };
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::shapes::{
     Appearance, BlurRadius, DrawablePoint, DrawableSize, Drop, Offset, Pattern, RgbColorSpace,
     RgbaColor, ShapeFill, Stroke, Width,
 };
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity};
-use litchi_keynote::ChartSelector;
+use litchi_keynote::chart::axis::ValueAxisSettings;
+use litchi_keynote::{ChartSelector, Package as KeynotePackage, SlideSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -129,16 +130,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     editor.set_slide_chart_axis_title_by_selector(0, chart_selector, Axis::Category, "Quarter")?;
     editor.set_slide_chart_axis_title_by_selector(0, chart_selector, Axis::Value, "Revenue")?;
-    editor.set_slide_chart_value_axis_bounds(
-        0,
-        chart.drawable_object_id,
-        Bounds::fixed(Bound::new(1.0)?, Bound::new(30.0)?)?,
-    )?;
-    editor.set_slide_chart_value_axis_scale(0, chart.drawable_object_id, Scale::Logarithmic)?;
-    editor.set_slide_chart_value_axis_steps(
-        0,
-        chart.drawable_object_id,
-        Steps::fixed(MajorStepCount::new(6)?, MinorStepCount::new(2)?),
+    set_keynote_axis_values(
+        &mut editor,
+        SlideSelector::index(0),
+        chart_selector,
+        ValueAxisSettings::automatic()
+            .with_bounds(Bounds::fixed(Bound::new(1.0)?, Bound::new(30.0)?)?)
+            .with_scale(Scale::Logarithmic)
+            .with_steps(Steps::fixed(
+                MajorStepCount::new(6)?,
+                MinorStepCount::new(2)?,
+            )),
     )?;
     editor.set_slide_chart_value_axis_minimum_label_visible(
         0,
@@ -311,5 +313,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label and line, a visible 18 pt Avenir Next Bold pale-blue legend with a blue 2.5 pt medium-dash stroke and black 12 pt shadow, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, fixed and percentage series error bars with per-series Auto-Fit, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
+    Ok(())
+}
+
+fn set_keynote_axis_values(
+    editor: &mut KeynoteEditor,
+    slide_selector: SlideSelector<'_>,
+    chart_selector: ChartSelector<'_>,
+    settings: ValueAxisSettings,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let package = KeynotePackage::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_chart_value_axis_settings(slide_selector, chart_selector)?
+        .set(settings)?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .slide_chart_value_axis_settings(slide_selector, chart_selector)?,
+        settings
+    );
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
     Ok(())
 }

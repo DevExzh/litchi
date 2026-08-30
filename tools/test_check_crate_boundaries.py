@@ -1355,6 +1355,208 @@ def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_chart_axis_value_settings_canonical_scaffold(root: Path) -> None:
+    """Install a complete Wave114 aggregate value-axis boundary fixture."""
+
+    common = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_COMMON_SOURCE
+    common.parent.mkdir(parents=True, exist_ok=True)
+    common.write_text("pub struct ValueAxisSettings;\n", encoding="utf-8")
+    common_axis = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_COMMON_AXIS_SOURCE
+    common_axis.parent.mkdir(parents=True, exist_ok=True)
+    common_axis.write_text("pub use settings::ValueAxisSettings;\n", encoding="utf-8")
+
+    semantic = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use litchi_iwa_common::chart::axis::{"
+        "Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, "
+        "ValueAxisSettings};\n"
+        "pub struct ChartSelector;\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text("pub struct SlideSelector;\n", encoding="utf-8")
+
+    owner = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES
+        )
+        + "struct ChartValueAxisBudget;\n"
+        + "fn account() { let mut budget = ChartValueAxisBudget; "
+        "budget.charge(); budget.account(); }\n"
+        + "fn strict_prepared() { keynote_chart_axis_value_settings_codec; "
+        "decode_axis_value_settings_with_report(); "
+        "prepare_axis_value_settings_rewrite(); let prepared = prepared; "
+        "let requirements = prepared.execution_requirements(); "
+        "let output = prepared.execute(requirements); let _ = output; }\n"
+        + "fn exact_source_authority() { ExactArtifacts; source_fingerprint; inverse; "
+        "PatchConflict; is_noop; candidate; reopen; verify_locality; same_content; "
+        "authority; root_preview_deletions; deleted_previews; }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_chart_value_axis_settings<'slide, 'chart>(&self, "
+        "slide: SlideSelector, chart: ChartSelector) -> "
+        "Result<ValueAxisSettings, ChartValueAxisError> { let _ = (slide, chart); todo!() }\n"
+        + "    pub fn edit_slide_chart_value_axis_settings<'slide, 'chart>(&self, "
+        "slide: SlideSelector, chart: ChartSelector) -> "
+        "Result<ChartValueAxisEdit, ChartValueAxisError> { let _ = (slide, chart); todo!() }\n"
+        + "    pub fn apply_slide_chart_value_axis_settings(&self, patch: "
+        "&ChartValueAxisPatch) -> Result<ChartValueAxisCommit, "
+        "ChartValueAxisError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl ChartValueAxisEdit {\n"
+        + "    pub fn before(&self) -> ValueAxisSettings { todo!() }\n"
+        + "    pub fn after(&self) -> ValueAxisSettings { todo!() }\n"
+        + "    pub fn set(self, value: ValueAxisSettings) -> Result<Self, "
+        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        + "    pub fn set_bounds(self, value: Bounds) -> Result<Self, "
+        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        + "    pub fn set_steps(self, value: Steps) -> Result<Self, "
+        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        + "    pub fn set_scale(self, value: Scale) -> Result<Self, "
+        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        + "    pub fn commit(self) -> Result<ChartValueAxisCommit, "
+        "ChartValueAxisError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    package = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES[0]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_chart_value_axis;\n"
+        "pub use slide_chart_value_axis::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES)
+        )
+        + "};\n",
+        encoding="utf-8",
+    )
+    library = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES[1]
+    library.write_text(
+        "pub use package::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES)
+        )
+        + "};\n"
+        "pub use chart::{Bound, Bounds, ChartSelector, MajorStepCount, MinorStepCount, "
+        "Scale, Steps, ValueAxisSettings};\n"
+        "pub use selector::SlideSelector;\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct DecodeError;\n"
+        "pub enum DecodeLimit { Bytes }\n"
+        "pub struct DecodeOptions;\n"
+        "pub struct AxisValueSettingsSnapshot;\n"
+        "pub struct AxisValueSettingsWrite;\n"
+        "pub struct DecodeReport;\n"
+        "pub struct RewriteReport;\n"
+        "pub struct PreparedAxisValueSettingsRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "const VALUE_AXIS_DECADES_FIELD: u32 = 4;\n"
+        "const VALUE_AXIS_MAJOR_FIELD: u32 = 5; // field 5\n"
+        "const VALUE_AXIS_MINOR_FIELD: u32 = 6; // field 6\n"
+        "const VALUE_AXIS_SCALE_FIELD: u32 = 8; // field 8\n"
+        "const VALUE_AXIS_MAXIMUM_FIELD: u32 = 17; // field 17\n"
+        "const VALUE_AXIS_MINIMUM_FIELD: u32 = 18; // field 18\n"
+        "pub fn decode_axis_value_settings() {}\n"
+        "pub fn decode_axis_value_settings_with_report() {}\n"
+        "pub fn prepare_axis_value_settings_rewrite() {}\n"
+        "pub fn rewrite_axis_value_settings() {}\n"
+        "fn preflight() {} fn next_strict_field() {} fn duplicate() {} "
+        "fn wrong_wire() {} fn noncanonical() {} fn finite() {} fn NaN() {} "
+        "fn infinite() {} fn negative() {} fn overflow() {} fn unknown() {} "
+        "fn raw() {} fn extend_from_slice() {} fn span() {} fn lazy() {} "
+        "fn decode_lazy_view() {} fn use_projection() { "
+        "buffa_keynote_chart_axis_value_settings_generated; }\n"
+        "impl PreparedAxisValueSettingsRewrite { fn execution_requirements(self) "
+        "-> RewriteExecutionRequirements { RewriteExecutionRequirements } fn execute(self, "
+        "_: RewriteExecutionRequirements) {} }\n"
+        "#[cfg(test)] mod tests { #[test] fn codec_round_trip() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        "mod buffa_keynote_chart_axis_value_settings_generated {\n"
+        "    include!(\"buffa-keynote-chart-axis-value-settings/"
+        "iwa_keynote_chart_axis_value_settings_buffa_protos.rs\");\n"
+        "}\n"
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+
+    projection = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_PROJECTION_SOURCE
+    projection.parent.mkdir(parents=True, exist_ok=True)
+    projection.write_text(
+        'syntax = "proto2";\n'
+        "message ChartAxisValueSettingsArchive {\n"
+        "  optional int32 tschchartaxisvaluenumberofdecades = 4;\n"
+        "  optional int32 tschchartaxisvaluenumberofmajorgridlines = 5;\n"
+        "  optional int32 tschchartaxisvaluenumberofminorgridlines = 6;\n"
+        "  optional int32 tschchartaxisvaluescale = 8;\n"
+        "  optional ChartsNsNumberDoubleArchive tschchartaxisdefaultusermax = 17;\n"
+        "  optional ChartsNsNumberDoubleArchive tschchartaxisdefaultusermin = 18;\n"
+        "}\n"
+        "message ChartsNsNumberDoubleArchive { optional double number_archive = 1; }\n",
+        encoding="utf-8",
+    )
+    build = root / "crates/litchi-iwa-protos/build.rs"
+    build.parent.mkdir(parents=True, exist_ok=True)
+    build.write_text(
+        "fn enforce_keynote_chart_axis_value_settings_projection_provenance() {}\n"
+        "TSCHChartAxisValueSettingsArchive.proto\n"
+        "generate_views(true) lazy_views(true) preserve_unknown_fields(false)\n"
+        "include_file(\"iwa_keynote_chart_axis_value_settings_buffa_protos.rs\")\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_TEST_SOURCES[0]
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn value_axis_settings_lifecycle() { package.slide_chart_value_axis_settings("
+        "slide, chart); package.edit_slide_chart_value_axis_settings(slide, chart); "
+        "package.apply_slide_chart_value_axis_settings(&patch); let _: ValueAxisSettings; "
+        "let _: Bounds; let _: Steps; let _: Scale; deleted_previews = 1; reopen; "
+        "inverse; locality; }\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FUZZ_SOURCES:
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FUZZ_CORPORA:
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+    host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "impl KeynoteEditor {\n"
+        "    pub fn slide_chart_value_axis_settings_by_selector(&self, "
+        "selector: ChartSelector, value: ValueAxisSettings) { "
+        "focused_chart_axis_value_settings_package(self)?.slide_chart_value_axis_settings(selector, value); }\n"
+        "    pub fn set_slide_chart_value_axis_settings_by_selector(&mut self, "
+        "selector: ChartSelector, value: ValueAxisSettings) { "
+        "focused_chart_axis_value_settings_package(self)?.edit_slide_chart_value_axis_settings(selector, value).commit(); }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -29082,6 +29284,301 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_chart_axis_title_facade_source_topology()",
             "+ audit_keynote_chart_axis_title_resource_source_topology()",
             "+ audit_keynote_chart_axis_title_completion_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_chart_axis_value_settings_boundary_inventories_are_exact(
+        self,
+    ) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_METHODS,
+            (
+                "slide_chart_value_axis_bounds",
+                "set_slide_chart_value_axis_bounds",
+                "slide_chart_value_axis_steps",
+                "set_slide_chart_value_axis_steps",
+                "slide_chart_value_axis_scale",
+                "set_slide_chart_value_axis_scale",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCES,
+            (
+                Path("crates/litchi-iwa/src/keynote/editor/slide_charts/axis_bounds.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_charts/axis_steps.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_charts/axis_scale.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_MODULE,
+            "keynote_chart_axis_value_settings_codec",
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE,
+            Path("crates/litchi-keynote/src/package/slide_chart_value_axis.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES,
+            frozenset(
+                {
+                    "ChartValueAxisCommit",
+                    "ChartValueAxisDiagnostics",
+                    "ChartValueAxisEdit",
+                    "ChartValueAxisError",
+                    "ChartValueAxisLimitKind",
+                    "ChartValueAxisPatch",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_PACKAGE_METHODS,
+            {
+                "slide_chart_value_axis_settings",
+                "edit_slide_chart_value_axis_settings",
+                "apply_slide_chart_value_axis_settings",
+            },
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FUZZ_SOURCES,
+            (
+                Path(
+                    "crates/litchi-iwa-protos/fuzz/fuzz_targets/"
+                    "keynote_chart_axis_value_settings_codec.rs"
+                ),
+                Path("crates/litchi/fuzz/fuzz_targets/keynote_chart_value_axis.rs"),
+            ),
+        )
+        self.assertIn(
+            "ValueAxisSettings",
+            boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SEMANTIC_TYPES,
+        )
+
+    def test_keynote_chart_axis_value_settings_audits_are_dormant_until_owner_wiring(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn set_slide_chart_value_axis_bounds(&mut self, id: u64) {}\n",
+                encoding="utf-8",
+            )
+            for audit in (
+                boundaries.audit_keynote_chart_axis_value_settings_legacy_calls,
+                boundaries.audit_iwa_keynote_chart_axis_value_settings_source_topology,
+                boundaries.audit_keynote_chart_axis_value_settings_facade_source_topology,
+                boundaries.audit_keynote_chart_axis_value_settings_resource_source_topology,
+                boundaries.audit_keynote_chart_axis_value_settings_completion_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [])
+
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("pub struct ChartValueAxisPatch;\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_axis_value_settings_source_topology(
+                    root
+                ),
+                [],
+            )
+            package = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod slide_chart_value_axis;\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_chart_axis_value_settings_source_topology(
+                root
+            )
+            self.assertTrue(any("raw-ID method" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_value_settings_complete_scaffold_satisfies_all_ratchets(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_value_settings_canonical_scaffold(root)
+            for audit in (
+                boundaries.audit_keynote_chart_axis_value_settings_legacy_calls,
+                boundaries.audit_iwa_keynote_chart_axis_value_settings_source_topology,
+                boundaries.audit_keynote_chart_axis_value_settings_facade_source_topology,
+                boundaries.audit_keynote_chart_axis_value_settings_resource_source_topology,
+                boundaries.audit_keynote_chart_axis_value_settings_completion_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [], audit(root))
+
+    def test_iwa_keynote_chart_axis_value_settings_retires_raw_surface_and_allows_shared_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_value_settings_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCE
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_value_axis_bounds(&self, drawable_object_id: u64) {}\n"
+                "    pub fn set_slide_chart_value_axis_bounds(&mut self, drawable_object_id: u64, bounds: Bounds) {}\n"
+                "    pub fn slide_chart_value_axis_steps(&self, drawable_object_id: u64) {}\n"
+                "    pub fn set_slide_chart_value_axis_steps(&mut self, drawable_object_id: u64, steps: Steps) {}\n"
+                "    pub fn slide_chart_value_axis_scale(&self, drawable_object_id: u64) {}\n"
+                "    pub fn set_slide_chart_value_axis_scale(&mut self, drawable_object_id: u64, scale: Scale) {}\n"
+                "    fn chart_value_axis_bounds() {}\n"
+                "    fn legacy() { set_chart_value_axis_bounds(self, 1, bounds); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            for source in boundaries.RETIRED_IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SOURCES:
+                retired = root / source
+                retired.parent.mkdir(parents=True, exist_ok=True)
+                retired.write_text("// retired file must not return\n", encoding="utf-8")
+            shared = root / "crates/litchi-iwa/src/charts/axis_bounds.rs"
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "fn chart_value_axis_bounds() {}\nfn set_chart_value_axis_bounds() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_axis_value_settings_source_topology(
+                root
+            )
+            for method in boundaries.RETIRED_IWA_KEYNOTE_CHART_AXIS_VALUE_SETTINGS_METHODS:
+                self.assertTrue(
+                    any(f"raw-ID method {method}:" in item for item in violations),
+                    msg=f"missing method finding for {method}: {violations!r}",
+                )
+            self.assertEqual(
+                sum("source returned" in item for item in violations),
+                3,
+            )
+            self.assertTrue(
+                any("native helper chart_value_axis_bounds" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(any("crates/litchi-iwa/src/charts" in item for item in violations))
+
+    def test_keynote_chart_axis_value_settings_facade_requires_common_semantic_types_and_codec(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_value_settings_canonical_scaffold(root)
+            common = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_COMMON_SOURCE
+            common.write_text("pub struct OtherSettings;\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_axis_value_settings_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("common ValueAxisSettings" in item for item in violations))
+
+            codec = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "prepare_axis_value_settings_rewrite",
+                    "prepare_missing_axis_value_settings_rewrite",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_value_settings_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("strict API prepare_axis_value_settings_rewrite" in item for item in violations))
+
+            library = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES[1]
+            library.write_text(
+                library.read_text(encoding="utf-8")
+                + "pub mod raw;\n"
+                + "pub use crate::wire::WireView;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_value_settings_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("compatibility module" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("compatibility re-export" in item for item in violations),
+                violations,
+            )
+
+            codec = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "fn eager(bytes: &[u8]) { let _ = Generated::decode(bytes); generated.encode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_value_settings_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("eager generated decode/encode" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_chart_axis_value_settings_resource_requires_one_budget_and_prepared_execution(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_value_settings_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("authority;", "source_selection;").replace("prepared.execute(requirements);", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_value_settings_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("source authority" in item for item in violations), violations)
+            violations = boundaries.audit_keynote_chart_axis_value_settings_completion_source_topology(
+                root
+            )
+            self.assertTrue(any("exactly one prepared execute" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "struct ChartValueAxisOtherBudget;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_value_settings_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("exactly one aggregate transaction budget" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8") + "fn saturating_counter() { value.saturating_sub(1); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_value_settings_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("checked resource accounting" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_value_settings_completion_requires_fuzz_and_integration_seams(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_value_settings_canonical_scaffold(root)
+            test_source = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_TEST_SOURCES[0]
+            test_source.unlink()
+            violations = boundaries.audit_keynote_chart_axis_value_settings_completion_source_topology(
+                root
+            )
+            self.assertTrue(any("missing integration test" in item for item in violations), violations)
+            fuzz = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_chart_axis_value_settings_completion_source_topology(
+                root
+            )
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_value_settings_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_axis_value_settings_legacy_calls()",
+            "+ audit_iwa_keynote_chart_axis_value_settings_source_topology()",
+            "+ audit_keynote_chart_axis_value_settings_facade_source_topology()",
+            "+ audit_keynote_chart_axis_value_settings_resource_source_topology()",
+            "+ audit_keynote_chart_axis_value_settings_completion_source_topology()",
         ):
             self.assertIn(expression, main_source)
 

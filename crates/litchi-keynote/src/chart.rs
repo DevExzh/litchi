@@ -14,7 +14,15 @@ use std::collections::TryReserveError;
 
 use litchi_core::Position;
 
-pub use litchi_iwa_common::chart::axis::Axis;
+/// Archive-free semantic values for selecting and editing chart axes.
+pub mod axis {
+    pub use litchi_iwa_common::chart::axis::{
+        Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
+    };
+}
+
+/// Preserve the historical `litchi_keynote::chart::Axis` path.
+pub use axis::Axis;
 
 /// Selects one chart by its visible native title or checked zero-based position.
 ///

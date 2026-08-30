@@ -7,11 +7,12 @@ use litchi_iwa::charts::{
     Axis, Bound, Bounds, ChartData, Direction, Kind, LabelAngle, MajorStepCount, MinorStepCount,
     Scale, Steps,
 };
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
-use litchi_keynote::ChartSelector;
+use litchi_keynote::chart::axis::ValueAxisSettings;
+use litchi_keynote::{ChartSelector, Package as KeynotePackage, SlideSelector};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -82,7 +83,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     keynote.set_slide_chart_direction(0, ChartSelector::index(0), Direction::Columns)?;
     keynote.set_slide_chart_title_by_selector(0, 0usize, "Axis values")?;
-    set_keynote_axis_values(&mut keynote, chart.drawable_object_id, bounds, steps)?;
+    set_keynote_axis_values(
+        &mut keynote,
+        ChartSelector::index(0),
+        chart.drawable_object_id,
+        bounds,
+        steps,
+    )?;
     keynote.save(output.join("axis-values-crate.key"))?;
 
     println!("created axis-value fixtures in {}", output.display());
@@ -140,26 +147,36 @@ fn set_pages_axis_values(
 }
 
 fn set_keynote_axis_values(
-    editor: &mut litchi_iwa::keynote::KeynoteEditor,
+    editor: &mut KeynoteEditor,
+    chart_selector: ChartSelector<'_>,
     chart_id: u64,
     bounds: Bounds,
     steps: Steps,
-) -> litchi_iwa::Result<()> {
-    editor.set_slide_chart_value_axis_bounds(0, chart_id, bounds)?;
-    editor.set_slide_chart_value_axis_scale(0, chart_id, Scale::Logarithmic)?;
-    editor.set_slide_chart_value_axis_steps(0, chart_id, steps)?;
+) -> Result<(), Box<dyn std::error::Error>> {
+    let package = KeynotePackage::from_bytes(&editor.to_bytes()?)?;
+    let settings = ValueAxisSettings::automatic()
+        .with_bounds(bounds)
+        .with_steps(steps)
+        .with_scale(Scale::Logarithmic);
+    let commit = package
+        .edit_slide_chart_value_axis_settings(SlideSelector::index(0), chart_selector)?
+        .set(settings)?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .slide_chart_value_axis_settings(SlideSelector::index(0), chart_selector,)?,
+        settings
+    );
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
     editor.set_slide_chart_axis_label_angle(
         0,
         chart_id,
         Axis::Value,
         LabelAngle::RIGHT_DIAGONAL,
     )?;
-    assert_eq!(editor.slide_chart_value_axis_bounds(0, chart_id)?, bounds);
-    assert_eq!(
-        editor.slide_chart_value_axis_scale(0, chart_id)?,
-        Scale::Logarithmic
-    );
-    assert_eq!(editor.slide_chart_value_axis_steps(0, chart_id)?, steps);
     Ok(())
 }
 
