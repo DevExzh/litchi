@@ -240,13 +240,11 @@ pub(crate) mod table_model_projection;
 mod table_move;
 mod table_sort;
 mod table_sparse_storage;
-mod table_title;
 mod table_topology;
 mod text_box_create;
 mod text_box_duplicate;
 
 pub use crate::charts::Direction;
-pub use litchi_numbers::table::title::Settings;
 use model::*;
 
 #[cfg(test)]
@@ -419,9 +417,6 @@ pub(crate) use table_sort::{
     apply_table_sort_order_in_package, apply_table_sort_order_to_rows_in_package,
     clear_table_sort_order_in_package, set_table_sort_order_in_package,
     table_sort_order_in_package,
-};
-pub(crate) use table_title::{
-    set_table_title_settings_in_package, table_title_settings_in_package,
 };
 
 pub(crate) use package::*;

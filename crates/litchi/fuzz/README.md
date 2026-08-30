@@ -321,6 +321,16 @@ Fuzzer-derived names are decoded lossily as UTF-8, reject NUL, and consume at
 most 256 input bytes; keep `-max_len` at 1 KiB so malformed ingress and native
 name transactions both receive every input.
 
+`numbers_table_title` is the dedicated selector-first table-title lifecycle
+target. It reuses the immutable native `basic.numbers` seed and visits every
+presence/value combination of both optional Boolean settings (`None`, explicit
+`Some(false)`, and `Some(true)`). Each bounded command covers index/name
+selectors, exact no-op publication, candidate reopen/readback, preview
+locality, source-bound apply/conflict/inverse replay, and source-byte atomicity
+for rejected selectors, malformed ingress, and limits. Keep `-max_len` at 1 KiB
+so arbitrary package admission remains bounded while the complete title state
+matrix receives every command.
+
 `numbers_formula_cells` uses the same finite Numbers physical and semantic
 profile, with 8 KiB formula-render work and depth 32. Its stress command builds
 at most a 5,461-node bounded formula tree; keep `-max_len` at 1 KiB so
@@ -570,6 +580,14 @@ Run the focused Numbers names target without a checked-in duplicate corpus:
 
 ```sh
 cargo +nightly fuzz run numbers_names -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-title target with its command recipes:
+
+```sh
+cargo +nightly fuzz run numbers_table_title \
+  corpus/numbers_table_title -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

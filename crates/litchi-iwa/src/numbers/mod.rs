@@ -89,7 +89,7 @@ pub use editor::{
     NumbersTableSortDirection, NumbersTableSortOrder, NumbersTableSortRowRange,
     NumbersTableSortRule, NumbersTableSortScope, NumbersTextBoxInfo, RemovedNumbersSheetAudio,
     RemovedNumbersSheetChart, RemovedNumbersSheetImage, RemovedNumbersSheetMovie,
-    RemovedNumbersSheetShape, RemovedNumbersTextBox, Settings, TableCellConditionalHighlightInfo,
+    RemovedNumbersSheetShape, RemovedNumbersTextBox, TableCellConditionalHighlightInfo,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

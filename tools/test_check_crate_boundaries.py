@@ -23085,6 +23085,28 @@ fn rewrite_movie_title_operation(
             ("table_title_settings", "set_table_title_settings"),
         )
         self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/table_title.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/table_title/wire.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPERS,
+            (
+                "table_title_settings_in_package",
+                "set_table_title_settings_in_package",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPERS,
+            (
+                "read_table_title_settings_wire",
+                "write_table_title_settings_wire",
+            ),
+        )
+        self.assertEqual(
             boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_EXAMPLE,
             Path("crates/litchi-iwa/examples/edit_numbers_table_title.rs"),
         )
@@ -23140,7 +23162,7 @@ fn rewrite_movie_title_operation(
     def test_retired_iwa_numbers_table_title_surface_cannot_return(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            host = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor/table_title.rs"
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_SOURCE
             host.parent.mkdir(parents=True)
             host.write_text(
                 "pub fn table_title_settings() {}\n"
@@ -23149,7 +23171,22 @@ fn rewrite_movie_title_operation(
                 "pub(crate) fn set_table_title_settings_in_package() {}\n",
                 encoding="utf-8",
             )
+            wire = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_SOURCE
+            wire.parent.mkdir(parents=True)
+            wire.write_text(
+                "pub(super) fn read_table_title_settings_wire() {}\n"
+                "pub(super) fn write_table_title_settings_wire() {}\n",
+                encoding="utf-8",
+            )
+            editor = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "editor.rs"
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text(
+                "pub(crate) mod table_title;\n"
+                "pub use litchi_numbers::table::title::Settings;\n",
+                encoding="utf-8",
+            )
             tests = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            tests.parent.mkdir(parents=True, exist_ok=True)
             tests.write_text(
                 "\n".join(
                     f"fn {name}() {{}}"
@@ -23170,17 +23207,28 @@ fn rewrite_movie_title_operation(
                 )
             )
 
-            self.assertEqual(len(violations), 7)
+            self.assertEqual(len(violations), 15)
+            self.assertTrue(any("source returned" in item for item in violations))
+            self.assertTrue(any("wire source returned" in item for item in violations))
             self.assertTrue(any("example returned" in item for item in violations))
             for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_METHODS:
                 self.assertTrue(
                     any(f"settings method {method}:" in item for item in violations)
                 )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPERS:
+                self.assertTrue(
+                    any(f"private helper {helper}:" in item for item in violations)
+                )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPERS:
+                self.assertTrue(
+                    any(f"wire helper {helper}:" in item for item in violations)
+                )
+            self.assertTrue(any("module table_title:" in item for item in violations))
+            self.assertTrue(any("alias Settings:" in item for item in violations))
             for name in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_TESTS:
                 self.assertTrue(
                     any(f"settings test {name}:" in item for item in violations)
                 )
-            self.assertFalse(any("in_package" in item for item in violations))
 
     def test_retired_iwa_numbers_table_title_readme_calls_and_example(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -23213,7 +23261,7 @@ fn rewrite_movie_title_operation(
                 2,
             )
 
-    def test_iwa_numbers_table_title_policy_retains_private_shared_helpers(
+    def test_iwa_numbers_table_title_policy_rejects_private_shared_helpers(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -23241,10 +23289,39 @@ fn rewrite_movie_title_operation(
                 encoding="utf-8",
             )
 
-            self.assertEqual(
-                boundaries.audit_iwa_numbers_table_title_settings_source_topology(root),
-                [],
+            violations = boundaries.audit_iwa_numbers_table_title_settings_source_topology(
+                root
             )
+            self.assertEqual(len(violations), 7)
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_PRIVATE_HELPERS:
+                self.assertTrue(
+                    any(f"private helper {helper}:" in item for item in violations),
+                    msg=f"missing private helper violation for {helper}: {violations!r}",
+                )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_TITLE_SETTINGS_WIRE_HELPERS:
+                self.assertTrue(
+                    any(f"wire helper {helper}:" in item for item in violations),
+                    msg=f"missing wire helper violation for {helper}: {violations!r}",
+                )
+
+    def test_iwa_numbers_table_title_policy_rejects_settings_alias_anywhere_in_host(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_NUMBERS_SOURCE_ROOT / "mod.rs"
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub use litchi_numbers::table::title::Settings as LegacySettings;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_title_settings_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("alias Settings:", violations[0])
+            self.assertIn("crates/litchi-iwa/src/numbers/mod.rs:1", violations[0])
 
     def test_focused_numbers_table_title_requires_each_direct_canonical_type(
         self,

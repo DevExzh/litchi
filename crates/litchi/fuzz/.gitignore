@@ -43,6 +43,9 @@ coverage
 !/corpus/numbers_table_appearance/
 /corpus/numbers_table_appearance/*
 !/corpus/numbers_table_appearance/*.hex
+!/corpus/numbers_table_title/
+/corpus/numbers_table_title/*
+!/corpus/numbers_table_title/*.hex
 !/corpus/keynote_slide_table_appearance/
 /corpus/keynote_slide_table_appearance/*
 !/corpus/keynote_slide_table_appearance/*.hex
