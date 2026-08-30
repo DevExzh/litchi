@@ -1062,125 +1062,64 @@ fn selector_chart_title_set_accepts_owned_text() {
 }
 
 #[test]
-fn scratch_presentation_supports_native_chart_axis_title_crud() {
+fn selector_chart_axis_title_builder_route_is_semantic_and_atomic() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
-    let source = editor
+    editor
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
-    for axis in [Axis::Category, Axis::Value] {
+    for (axis, title) in [(Axis::Category, "Quarter"), (Axis::Value, "Revenue")] {
+        let baseline = editor.to_bytes().unwrap();
+        let error = editor
+            .slide_chart_axis_title_by_selector(0, ChartSelector::index(usize::MAX), axis)
+            .expect_err("invalid axis selector must be rejected by the focused owner");
+        assert!(
+            error
+                .to_string()
+                .contains("focused Keynote chart axis title"),
+            "axis title read bypassed the focused owner: {error}"
+        );
+        assert_eq!(editor.to_bytes().unwrap(), baseline);
+
         assert_eq!(
             editor
-                .slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
                 .unwrap(),
             None
         );
-    }
-    editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Category, "Month")
-        .unwrap();
-    editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Value, "Revenue")
-        .unwrap();
-
-    let duplicate = editor
-        .duplicate_slide_chart(0, chart_selector(&editor, &source))
-        .unwrap();
-    for (axis, title) in [(Axis::Category, "Month"), (Axis::Value, "Revenue")] {
+        editor
+            .set_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis, title)
+            .unwrap();
         assert_eq!(
             editor
-                .slide_chart_axis_title(0, source.drawable_object_id, axis)
-                .unwrap()
-                .as_deref(),
-            Some(title)
+                .slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
+                .unwrap(),
+            Some(title.to_owned())
         );
-        assert_eq!(
-            editor
-                .slide_chart_axis_title(0, duplicate.drawable_object_id, axis)
-                .unwrap()
-                .as_deref(),
-            Some(title)
-        );
-    }
 
-    editor
-        .set_slide_chart_axis_title(
-            0,
-            source.drawable_object_id,
-            Axis::Category,
-            "Updated month",
-        )
-        .unwrap();
-    editor
-        .set_slide_chart_axis_title(0, source.drawable_object_id, Axis::Value, "Updated revenue")
-        .unwrap();
-    assert_eq!(
+        let changed = editor.to_bytes().unwrap();
         editor
-            .slide_chart_axis_title(0, source.drawable_object_id, Axis::Category)
-            .unwrap()
-            .as_deref(),
-        Some("Updated month")
-    );
-    assert_eq!(
-        editor
-            .slide_chart_axis_title(0, source.drawable_object_id, Axis::Value)
-            .unwrap()
-            .as_deref(),
-        Some("Updated revenue")
-    );
-    assert_eq!(
-        editor
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Category)
-            .unwrap()
-            .as_deref(),
-        Some("Month")
-    );
-    assert_eq!(
-        editor
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Value)
-            .unwrap()
-            .as_deref(),
-        Some("Revenue")
-    );
+            .set_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis, title)
+            .unwrap();
+        assert_eq!(editor.to_bytes().unwrap(), changed);
 
-    for axis in [Axis::Category, Axis::Value] {
         assert!(
             editor
-                .remove_slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .remove_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
                 .unwrap()
+        );
+        assert_eq!(
+            editor
+                .slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
+                .unwrap(),
+            None
         );
         assert!(
             !editor
-                .remove_slide_chart_axis_title(0, source.drawable_object_id, axis)
+                .remove_slide_chart_axis_title_by_selector(0, ChartSelector::index(0), axis)
                 .unwrap()
         );
     }
-
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Category)
-            .unwrap()
-            .as_deref(),
-        Some("Month")
-    );
-    assert_eq!(
-        reopened
-            .slide_chart_axis_title(0, duplicate.drawable_object_id, Axis::Value)
-            .unwrap()
-            .as_deref(),
-        Some("Revenue")
-    );
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
-        .unwrap();
-    assert!(
-        reopened
-            .slide_charts(0)
-            .unwrap()
-            .iter()
-            .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
-    );
 }
 
 #[test]

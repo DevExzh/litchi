@@ -26,6 +26,7 @@ use litchi_iwa::shapes::{
 };
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 use litchi_iwa_common::shape::shadow::{Angle as ShadowAngle, Opacity};
+use litchi_keynote::ChartSelector;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -58,7 +59,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             height: 600.0,
         },
     )?;
-    editor.set_slide_chart_title_by_selector(0, 0usize, "Quarterly revenue")?;
+    let chart_selector = ChartSelector::index(0);
+    editor.set_slide_chart_title_by_selector(0, chart_selector, "Quarterly revenue")?;
     editor.set_slide_chart_background_fill(
         0,
         chart.drawable_object_id,
@@ -125,8 +127,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShadowAngle::from_degrees(60.0)?,
         )),
     )?;
-    editor.set_slide_chart_axis_title(0, chart.drawable_object_id, Axis::Category, "Quarter")?;
-    editor.set_slide_chart_axis_title(0, chart.drawable_object_id, Axis::Value, "Revenue")?;
+    editor.set_slide_chart_axis_title_by_selector(0, chart_selector, Axis::Category, "Quarter")?;
+    editor.set_slide_chart_axis_title_by_selector(0, chart_selector, Axis::Value, "Revenue")?;
     editor.set_slide_chart_value_axis_bounds(
         0,
         chart.drawable_object_id,

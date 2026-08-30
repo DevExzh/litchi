@@ -7,6 +7,9 @@ target
 !/corpus/keynote_chart_title/hidden_stale.hex
 !/corpus/keynote_chart_title/malformed_parent.hex
 !/corpus/keynote_chart_title/malformed_wire.hex
+!/corpus/keynote_chart_axis_title/
+/corpus/keynote_chart_axis_title/*
+!/corpus/keynote_chart_axis_title/*.seed
 !/corpus/pages_body_footnote_lifecycle/
 !/corpus/pages_body_footnote_lifecycle/*
 !/corpus/pages_section_text/
