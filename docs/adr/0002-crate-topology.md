@@ -3956,3 +3956,79 @@ ordered migration debts. Debt 015 and the `litchi-iwa -> litchi-numbers`
 edge remain open, as do the other hosts, generated-schema/normal Prost/Buffa
 owners, and the IWA monolith. No crate, edge, debt item, production manifest
 dependency, or monolith owner is removed by Wave93.
+
+## 2026-08-30 amendment: Wave112 Keynote chart-axis-title ownership
+
+The focused `litchi-keynote` package now owns selector-first reads and exact
+transactions for visible category- and value-axis titles on admitted existing
+slide charts. Its archive-free public surface is
+`Package::{slide_chart_axis_title, edit_slide_chart_axis_title,
+apply_slide_chart_axis_title}` with `SlideSelector`, `ChartSelector`, `Axis`,
+and `ChartAxisTitle{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` values.
+Native object identifiers, component/member locators, ZIP and IWA archives,
+raw wire bytes, generated messages, Prost values, and Buffa views remain
+private to the adapter.
+
+The hidden `litchi-iwa-protos::keynote_chart_axis_title_codec` is the strict
+neutral wire seam. It projects only the generated
+`TSCH.Generated.ChartAxisNonStyleArchive` axis-title fields 13--16 through a
+private Buffa lazy view after bounded canonical preflight, preserves unknown
+source spans and field order, and exposes prepared rewrite requirements before
+one execution. The selected raw payload remains the preservation authority;
+the codec does not locate charts or own package transactions.
+
+The package owner resolves the rooted slide/chart graph and validates an
+unlocked chart, a unique primary category or value axis, unique inbound object
+ownership, and, when present, current PackageMetadata UUID, locator, and
+cross-component authority before a changed publication. It admits both the
+source-built layout, where chart non-style and axis objects remain with the
+slide, and Keynote's normalized layout, where those objects move into
+`DocumentStylesheet`; the latter is accepted only when the physical stylesheet
+registration and matching metadata external-reference direction agree. It owns
+one aggregate operation budget, exact source/target artifacts and fingerprints,
+conflict-checked patches and inverses, prepared ZIP reassembly, candidate
+reopen and semantic readback, root-preview invalidation, and physical
+member/object locality. A changed transaction rewrites only the selected
+primary axis non-style object: secondary axes, axis styles, the opposite axis,
+unknown fields, and unrelated members remain exact. Hidden stale text is not
+reported as visible; a visible title with absent text reads as an empty title,
+and clearing an already absent title is an exact no-op.
+
+The old raw-ID Keynote host methods and native axis-title helpers are retired.
+`KeynoteEditor` retains only selector bridges
+`{slide,set,remove}_slide_chart_axis_title_by_selector`, which route through
+the focused package. The source-built chart builder and chart example use this
+selector bridge and are admitted through the same stylesheet/metadata proof;
+there is no raw-ID fallback. Pages and Numbers continue to use the shared
+low-level chart-axis adapter and are outside this cut.
+
+Scoped evidence is 23/23 codec unit cases, 16/16 focused axis-title integration
+cases, 10/10 chart-title integration cases (including the normalized
+cross-component graph), and 3/3 focused migration-host regressions. The
+boundary unit suite is 678/678, both strict Clippy targets pass with warnings
+denied, and fixed-corpus fuzz smoke passes 20 codec seeds and 8 package seeds.
+The codec smoke also corrected its inverse-layout oracle: a removed selected
+field has no retained historical position and may be appended on inverse,
+while every unrelated wire span remains exact.
+
+Computer Use supplied real Keynote evidence. A source-built chart changed its
+value-axis title from `Revenue` to `Wave112 Revenue`, reopened in Keynote with
+the accessibility tree reporting `Y-axis, Wave112 Revenue` and `X-axis,
+Quarter`, saved natively, closed, and reopened without repair. The native save
+normalized the chart non-style and axis objects into `DocumentStylesheet`; the
+focused owner then changed that normalized artifact to `Native Roundtrip`,
+deleted three stale previews, restored the exact native source through its
+inverse, and Keynote reopened the changed artifact with `Y-axis, Native
+Roundtrip`. SHA-256 exact-inverse pairs were
+`74a1876ab0b286a7ebc610e53b452e3a4c8cf8e779c1ec781aaa8f0e25803b31`
+for the source-built artifact and
+`87db4dc036ece68c27144ab0303d54517b02dc433b839337b598fdd677788a8c`
+for the native save. These temporary UI artifacts are evidence, not checked-in
+fixtures or a full-workspace-green claim.
+
+Wave112 closes no crate, production manifest dependency, dependency edge,
+ordered debt, host owner, generated-schema/Prost/Buffa owner, or monolith
+gate. The authoritative topology remains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts; debt 014 and the
+`litchi-iwa -> litchi-keynote` edge, migration hosts, and the IWA monolith
+remain open.

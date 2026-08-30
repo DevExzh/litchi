@@ -1,122 +1,130 @@
-//! Native axis-title CRUD for Keynote slide charts.
+//! Selector-first native axis-title CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::Axis;
-use crate::charts::axis::{
-    chart_axis_title as read_native_chart_axis_title,
-    remove_chart_axis_title as remove_native_chart_axis_title,
-    set_chart_axis_title as set_native_chart_axis_title,
-};
+use litchi_keynote::{Axis, SlideSelector};
 
 impl KeynoteEditor {
-    /// Read the title shown by Keynote for one native slide-chart axis.
-    pub fn slide_chart_axis_title(
+    /// Read the title shown by Keynote for one selected slide-chart axis.
+    pub fn slide_chart_axis_title_by_selector<'selector>(
         &self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: impl Into<ChartSelector<'selector>>,
         axis: Axis,
     ) -> Result<Option<String>> {
-        slide_chart_axis_title(self, slide_index, drawable_object_id, axis)
+        let selector = selector.into();
+        focused_chart_axis_title_package(self)?
+            .slide_chart_axis_title(SlideSelector::index(slide_index), selector, axis)
+            .map_err(map_focused_chart_axis_title_error)
     }
 
-    /// Create or replace the title shown by Keynote for one native slide-chart axis.
-    pub fn set_slide_chart_axis_title(
+    /// Create or replace the title shown by Keynote for one selected
+    /// slide-chart axis through an atomic focused-package transaction.
+    pub fn set_slide_chart_axis_title_by_selector<'selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: impl Into<ChartSelector<'selector>>,
         axis: Axis,
-        title: &str,
+        title: impl AsRef<str>,
     ) -> Result<()> {
-        set_slide_chart_axis_title(self, slide_index, drawable_object_id, axis, title)
+        let selector = selector.into();
+        let package = focused_chart_axis_title_package(self)?;
+        let title = title.as_ref();
+        let commit = package
+            .edit_slide_chart_axis_title(SlideSelector::index(slide_index), selector, axis)
+            .map_err(map_focused_chart_axis_title_error)?
+            .set(title)
+            .map_err(map_focused_chart_axis_title_error)?
+            .commit()
+            .map_err(map_focused_chart_axis_title_error)?;
+        if commit.patch().is_noop() {
+            return Ok(());
+        }
+        replace_from_focused_chart_axis_title_commit(
+            self,
+            commit,
+            slide_index,
+            selector,
+            axis,
+            Some(title),
+        )
     }
 
-    /// Remove the title shown by Keynote for one native slide-chart axis.
+    /// Remove the title shown by Keynote for one selected slide-chart axis
+    /// through an atomic focused-package transaction.
     ///
     /// Returns whether a visible title was present.
-    pub fn remove_slide_chart_axis_title(
+    pub fn remove_slide_chart_axis_title_by_selector<'selector>(
         &mut self,
         slide_index: usize,
-        drawable_object_id: u64,
+        selector: impl Into<ChartSelector<'selector>>,
         axis: Axis,
     ) -> Result<bool> {
-        remove_slide_chart_axis_title(self, slide_index, drawable_object_id, axis)
+        let selector = selector.into();
+        let package = focused_chart_axis_title_package(self)?;
+        let edit = package
+            .edit_slide_chart_axis_title(SlideSelector::index(slide_index), selector, axis)
+            .map_err(map_focused_chart_axis_title_error)?;
+        let had_visible_title = edit.before().is_some();
+        let commit = edit
+            .clear()
+            .map_err(map_focused_chart_axis_title_error)?
+            .commit()
+            .map_err(map_focused_chart_axis_title_error)?;
+        if commit.patch().is_noop() {
+            return Ok(false);
+        }
+        replace_from_focused_chart_axis_title_commit(
+            self,
+            commit,
+            slide_index,
+            selector,
+            axis,
+            None,
+        )?;
+        Ok(had_visible_title)
     }
 }
 
-fn slide_chart_axis_title(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-    axis: Axis,
-) -> Result<Option<String>> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    read_native_chart_axis_title(
-        editor.package(),
-        &graph.archive_name,
-        drawable_object_id,
-        "Keynote",
-        axis,
-    )
+fn focused_chart_axis_title_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
+    let bytes = editor.to_bytes()?;
+    litchi_keynote::Package::from_bytes(&bytes).map_err(map_focused_chart_axis_title_read_error)
 }
 
-fn set_slide_chart_axis_title(
+fn replace_from_focused_chart_axis_title_commit<'selector>(
     editor: &mut KeynoteEditor,
+    commit: litchi_keynote::ChartAxisTitleCommit,
     slide_index: usize,
-    drawable_object_id: u64,
+    selector: ChartSelector<'selector>,
     axis: Axis,
-    title: &str,
+    expected: Option<&str>,
 ) -> Result<()> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    let mut staged = editor.package().clone();
-    set_native_chart_axis_title(
-        &mut staged,
-        &graph.archive_name,
-        drawable_object_id,
-        "Keynote",
-        axis,
-        title,
-    )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if verified
-        .slide_chart_axis_title(slide_index, drawable_object_id, axis)?
-        .as_deref()
-        != Some(title)
-    {
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Keynote chart axis title write failed: {error}"
+        ))
+    })?;
+    let reopened = KeynoteEditor::from_bytes(&bytes)?;
+    let actual = focused_chart_axis_title_package(&reopened)?
+        .slide_chart_axis_title(SlideSelector::index(slide_index), selector, axis)
+        .map_err(map_focused_chart_axis_title_error)?;
+    if actual.as_deref() != expected {
         return Err(Error::InvalidFormat(
-            "Keynote chart axis title update failed validation".to_owned(),
+            "Keynote chart axis title update failed semantic verification".to_owned(),
         ));
     }
-    *editor = verified;
+    *editor = reopened;
     Ok(())
 }
 
-fn remove_slide_chart_axis_title(
-    editor: &mut KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-    axis: Axis,
-) -> Result<bool> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    let mut staged = editor.package().clone();
-    let removed = remove_native_chart_axis_title(
-        &mut staged,
-        &graph.archive_name,
-        drawable_object_id,
-        "Keynote",
-        axis,
-    )?;
-    if !removed {
-        return Ok(false);
-    }
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if verified
-        .slide_chart_axis_title(slide_index, drawable_object_id, axis)?
-        .is_some()
-    {
-        return Err(Error::InvalidFormat(
-            "Keynote chart axis title removal failed validation".to_owned(),
-        ));
-    }
-    *editor = verified;
-    Ok(true)
+fn map_focused_chart_axis_title_error(error: litchi_keynote::ChartAxisTitleError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Keynote chart axis title operation failed: {error}"
+    ))
+}
+
+fn map_focused_chart_axis_title_read_error(error: litchi_keynote::ReadError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Keynote chart axis title source failed: {error}"
+    ))
 }

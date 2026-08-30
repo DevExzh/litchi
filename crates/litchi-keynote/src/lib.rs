@@ -312,7 +312,7 @@ pub mod transition;
 
 pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use build::{AnimationType, Build};
-pub use chart::{ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError};
+pub use chart::{Axis, ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError};
 pub use document::{
     Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind, DocumentReadOptions,
     DocumentSemanticLimitKind, DocumentSemanticLimits, DocumentSemanticLimitsError,
@@ -328,21 +328,22 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
 pub use package::{
-    ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit, ChartCaptionError,
-    ChartCaptionLimitKind, ChartCaptionPatch, ChartTitleCommit, ChartTitleDiagnostics,
-    ChartTitleEdit, ChartTitleError, ChartTitleLimitKind, ChartTitlePatch, Commit, Diagnostics,
-    Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES,
-    MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind, ReadError,
-    ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
-    SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
-    SlideBackgroundLimitKind, SlideBackgroundPatch, SlideMovieCaptionCommit,
-    SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
-    SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideMovieGeometryCommit,
-    SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit, SlideMovieGeometryError,
-    SlideMovieGeometryLimitKind, SlideMovieGeometryPatch, SlideMoviePlaybackCommit,
-    SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit, SlideMoviePlaybackError,
-    SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch, SlideMovieTitleCommit,
-    SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
+    ChartAxisTitleCommit, ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError,
+    ChartAxisTitleLimitKind, ChartAxisTitlePatch, ChartCaptionCommit, ChartCaptionDiagnostics,
+    ChartCaptionEdit, ChartCaptionError, ChartCaptionLimitKind, ChartCaptionPatch,
+    ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
+    ChartTitlePatch, Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES,
+    MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch,
+    PayloadLimitKind, ReadError, ReadOptions, SemanticLimitKind, SemanticLimits,
+    SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
+    SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
+    SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
+    SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
+    SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
+    SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
+    SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
+    SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
+    SlideMovieTitleCommit, SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
     SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,

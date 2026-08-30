@@ -144,6 +144,55 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
+## Keynote chart-axis-title codec
+
+`keynote_chart_axis_title_codec` sends one bounded generated
+`TSCH.Generated.ChartAxisNonStyleArchive` extension through the strict
+category/value title projection. Successful cases cover category fields 13/15
+and value fields 14/16 across absent, visible-empty, hidden-stale, set, clear,
+and no-op states. Rewrites are checked for exact source atomicity, semantic
+inverse/readback, and byte-for-byte preservation of unknown, opposite-axis,
+and secondary marker spans. Fixed mutations cover wrong wire types, duplicate
+singular fields, non-canonical lengths, invalid UTF-8, truncation,
+unterminated groups, redacted malformed errors, and max-minus-one field,
+work, output, title, input, and nesting limits.
+
+The target accepts raw inputs up to 64 KiB and uses 8,192 fields, 256 KiB of
+aggregate work, 128 KiB of rewrite output, 64 KiB of title text, and nesting
+depth 64. Prepared rewrites also enforce four logical allocations, 256 KiB of
+retained source/candidate bytes, and 128 KiB of candidate scratch. The harness
+replays the exact prepared requirements and each max-minus-one execution
+ceiling before publishing a candidate, so failed output is never observable.
+The checked-in `corpus/keynote_chart_axis_title/` recipes are tiny
+hand-authored `hex:` wire payloads covering category/value presence, visible
+empty and hidden-stale values, Unicode, unknown interleaving, opposite and
+secondary fields, fixed-width unknown values, balanced groups, and malformed
+boundaries. They contain no native package bytes or crash artifacts.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check keynote_chart_axis_title_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-keynote-chart-axis-title-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/keynote_chart_axis_title/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  keynote_chart_axis_title_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+The `.hex` recipes are decoded by the harness into bounded caller-owned
+inputs; they are not copied into a mutable in-checkout libFuzzer corpus.
+
 ## Keynote movie geometry and transform codec
 
 `keynote_movie_geometry_codec` drives the strict, source-preserving geometry

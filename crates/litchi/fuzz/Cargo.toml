@@ -96,6 +96,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_chart_axis_title"
+path = "fuzz_targets/keynote_chart_axis_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_lock"
 path = "fuzz_targets/numbers_table_lock.rs"
 test = false
@@ -232,6 +239,11 @@ bench = false
 [dependencies]
 libfuzzer-sys = "0.4"
 litchi = { path = "..", default-features = false, features = ["iwork"] }
+litchi-iwa-archive = { path = "../../litchi-iwa-archive" }
+litchi-iwa-common = { path = "../../litchi-iwa-common" }
+litchi-iwa-core = { path = "../../litchi-iwa-core" }
+litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
+prost = "0.14"
 
 [profile.release]
 debug = 1

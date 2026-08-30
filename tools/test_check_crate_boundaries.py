@@ -1229,6 +1229,132 @@ def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
+    """Install a complete Wave112 axis-title boundary fixture."""
+
+    semantic = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub enum Axis { Category, Value }\n"
+        "pub struct ChartSelector;\n",
+        encoding="utf-8",
+    )
+    selector = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text("pub enum SlideSelector { Index }\n", encoding="utf-8")
+
+    owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES
+        )
+        + "struct ChartAxisTitlePackageBudget;\n"
+        + "fn account() { let mut budget = ChartAxisTitlePackageBudget; budget.charge(); budget.account(); }\n"
+        + "fn strict_prepared() { keynote_chart_axis_title_codec; decode_axis_titles_with_report(); prepare_axis_title_rewrite(); let prepared = prepared; let requirements = prepared.execution_requirements(); let output = prepared.execute(requirements); let _ = output; }\n"
+        + "fn exact_source_authority() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; is_noop; candidate; reopen; verify_locality; same_content; authority; root_preview_deletions; deleted_previews; }\n"
+        + "impl Package {\n"
+        + "    pub fn slide_chart_axis_title<'slide, 'chart>(&self, slide: SlideSelector<'slide>, chart: ChartSelector<'chart>, axis: Axis) -> Result<Option<String>, ChartAxisTitleError> { let _ = (slide, chart, axis); todo!() }\n"
+        + "    pub fn edit_slide_chart_axis_title<'slide, 'chart>(&self, slide: SlideSelector<'slide>, chart: ChartSelector<'chart>, axis: Axis) -> Result<ChartAxisTitleEdit, ChartAxisTitleError> { let _ = (slide, chart, axis); todo!() }\n"
+        + "    pub fn apply_slide_chart_axis_title(&self, patch: &ChartAxisTitlePatch) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl ChartAxisTitleEdit {\n"
+        + "    pub fn axis(self) -> Axis { Axis::Category }\n"
+        + "    pub fn before(&self) -> Option<&str> { None }\n"
+        + "    pub fn after(&self) -> Option<&str> { None }\n"
+        + "    pub fn set(self, title: impl AsRef<str>) -> Result<Self, ChartAxisTitleError> { let _ = title; Ok(self) }\n"
+        + "    pub fn clear(self) -> Result<Self, ChartAxisTitleError> { Ok(self) }\n"
+        + "    pub fn commit(self) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    package = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_chart_axis_title;\n"
+        "pub use slide_chart_axis_title::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    library = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[1]
+    library.write_text(
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES))
+        + "};\n"
+        "pub use chart::{Axis, ChartSelector};\n"
+        "pub use selector::SlideSelector;\n",
+        encoding="utf-8",
+    )
+    codec = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct DecodeError;\n"
+        "pub enum DecodeLimit { Bytes }\n"
+        "pub struct DecodeOptions;\n"
+        "pub struct AxisTitleSnapshot;\n"
+        "pub struct AxisTitleWrite;\n"
+        "pub struct DecodeReport;\n"
+        "pub struct RewriteReport;\n"
+        "pub enum AxisTitleKind { Category, Value }\n"
+        "pub struct PreparedAxisTitleRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "const CHART_AXIS_CATEGORY_VISIBLE_FIELD: u32 = 13;\n"
+        "const CHART_AXIS_VALUE_VISIBLE_FIELD: u32 = 14;\n"
+        "const CHART_AXIS_CATEGORY_TEXT_FIELD: u32 = 15;\n"
+        "const CHART_AXIS_VALUE_TEXT_FIELD: u32 = 16;\n"
+        "const MAX_RECURSION_LIMIT: u32 = 64;\n"
+        "pub fn decode_axis_titles() {}\n"
+        "pub fn decode_axis_titles_with_report() {}\n"
+        "pub fn prepare_axis_title_rewrite() {}\n"
+        "fn preflight_axis_titles() {}\n"
+        "fn next_strict_field() {}\n"
+        "fn require_canonical_bool() {}\n"
+        "pub fn rewrite_axis_title() {}\n"
+        "impl PreparedAxisTitleRewrite { fn execution_requirements(self) -> RewriteExecutionRequirements { RewriteExecutionRequirements } fn execute(self) {} }\n"
+        "impl AxisTitleKind { pub fn visible_title(self, kind: AxisTitleKind) {} }\n"
+        "fn strict() { duplicate; noncanonical; unknown; raw; extend_from_slice; execution_requirements; execute; }\n"
+        "#[cfg(test)] mod tests { #[test] fn codec_round_trip() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_CHART_AXIS_TITLE_CODEC_MODULE};\n",
+        encoding="utf-8",
+    )
+    test_source = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_TEST_SOURCES[0]
+    test_source.parent.mkdir(parents=True, exist_ok=True)
+    test_source.write_text(
+        "#[test]\n"
+        "fn chart_axis_title_lifecycle() { package.slide_chart_axis_title(slide, chart, axis); package.edit_slide_chart_axis_title(slide, chart, axis); package.apply_slide_chart_axis_title(&patch); deleted_previews = 1; }\n",
+        encoding="utf-8",
+    )
+    for fuzz_target in boundaries.KEYNOTE_CHART_AXIS_TITLE_FUZZ_SOURCES:
+        absolute = root / fuzz_target
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in boundaries.KEYNOTE_CHART_AXIS_TITLE_FUZZ_CORPORA:
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+    host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "impl KeynoteEditor {\n"
+        "    pub fn slide_chart_axis_title_by_selector(&self, slide_index: usize, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.slide_chart_axis_title(selector, axis); }\n"
+        "    pub fn set_slide_chart_axis_title_by_selector(&mut self, slide_index: usize, selector: ChartSelector, axis: Axis, title: &str) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).set(title).commit(); }\n"
+        "    pub fn remove_slide_chart_axis_title_by_selector(&mut self, slide_index: usize, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).clear().commit(); }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -28686,6 +28812,201 @@ fn rewrite_movie_title_operation(
             "+ audit_iwa_numbers_cell_comment_reply_mutation_source_topology()",
             main_source,
         )
+
+
+    def test_keynote_chart_axis_title_audits_are_dormant_until_owner_module_wiring(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn set_slide_chart_axis_title(&mut self, id: u64) {}\n",
+                encoding="utf-8",
+            )
+            for audit in (
+                boundaries.audit_keynote_chart_axis_title_legacy_calls,
+                boundaries.audit_iwa_keynote_chart_axis_title_source_topology,
+                boundaries.audit_keynote_chart_axis_title_facade_source_topology,
+                boundaries.audit_keynote_chart_axis_title_resource_source_topology,
+                boundaries.audit_keynote_chart_axis_title_completion_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [])
+
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("pub struct ChartAxisTitlePatch;\n", encoding="utf-8")
+            # An owner file alone is still staged; the package module is the
+            # activation seam shared by every axis-title audit.
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root),
+                [],
+            )
+            package = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod slide_chart_axis_title;\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root)
+            self.assertTrue(any("raw-ID method" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_title_test_only_module_wiring_does_not_activate_audits(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("pub struct ChartAxisTitlePatch;\n", encoding="utf-8")
+            package = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text(
+                "#[cfg(test)]\nmod slide_chart_axis_title;\n", encoding="utf-8"
+            )
+            host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn set_slide_chart_axis_title(&mut self, id: u64) {}\n",
+                encoding="utf-8",
+            )
+            for audit in (
+                boundaries.audit_keynote_chart_axis_title_legacy_calls,
+                boundaries.audit_iwa_keynote_chart_axis_title_source_topology,
+                boundaries.audit_keynote_chart_axis_title_facade_source_topology,
+                boundaries.audit_keynote_chart_axis_title_resource_source_topology,
+                boundaries.audit_keynote_chart_axis_title_completion_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [])
+
+    def test_keynote_chart_axis_title_complete_scaffold_satisfies_all_ratchets(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            for audit in (
+                boundaries.audit_keynote_chart_axis_title_legacy_calls,
+                boundaries.audit_iwa_keynote_chart_axis_title_source_topology,
+                boundaries.audit_keynote_chart_axis_title_facade_source_topology,
+                boundaries.audit_keynote_chart_axis_title_resource_source_topology,
+                boundaries.audit_keynote_chart_axis_title_completion_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [], audit(root))
+
+    def test_keynote_chart_axis_title_facade_requires_axis_and_strict_codec_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE
+            semantic.write_text("pub struct ChartSelector;\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_axis_title_facade_source_topology(root)
+            self.assertTrue(any("semantic API is missing Axis" in item for item in violations), violations)
+
+            semantic.write_text("pub enum Axis { Category, Value }\npub struct ChartSelector;\n", encoding="utf-8")
+            codec = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            codec.write_text(codec_source.replace("prepare_axis_title_rewrite", "prepare_missing_axis_title_rewrite"), encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_axis_title_facade_source_topology(root)
+            self.assertTrue(any("strict API prepare_axis_title_rewrite" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_title_resource_requires_one_budget_and_all_authority_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("exact_source_authority", "exact_source")
+                .replace("authority;", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_resource_source_topology(root)
+            self.assertTrue(any("source authority" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8") + "struct ChartAxisTitleOtherBudget;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_resource_source_topology(root)
+            self.assertTrue(any("exactly one aggregate transaction budget" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_title_completion_requires_tests_fuzz_and_single_execute(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("let output = prepared.execute(requirements);", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_completion_source_topology(root)
+            self.assertTrue(any("exactly one prepared execute" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn second() { prepared.execute(requirements); prepared.execute(requirements); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_completion_source_topology(root)
+            self.assertTrue(any("exactly one prepared execute" in item for item in violations), violations)
+
+            fuzz = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_chart_axis_title_completion_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+    def test_iwa_keynote_chart_axis_title_retires_raw_methods_calls_helpers_and_allows_focused_bridge(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_axis_title(&self, drawable_object_id: u64, axis: Axis) {}\n"
+                "    pub fn set_slide_chart_axis_title(&mut self, drawable_object_id: u64, axis: Axis) {}\n"
+                "    pub fn remove_slide_chart_axis_title(&mut self, drawable_object_id: u64, axis: Axis) {}\n"
+                "    fn axis_non_style_slot(&self, drawable_object_id: u64) {}\n"
+                "    fn legacy(&mut self) { set_chart_axis_title(self, 1, Axis::Category, \"x\"); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root)
+            self.assertTrue(any("raw-ID method" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
+            self.assertTrue(any("native helper" in item for item in violations), violations)
+
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_axis_title_by_selector(&self, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.slide_chart_axis_title(selector, axis); }\n"
+                "    pub fn set_slide_chart_axis_title_by_selector(&mut self, selector: ChartSelector, axis: Axis, title: &str) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).set(title).commit(); }\n"
+                "    pub fn remove_slide_chart_axis_title_by_selector(&mut self, selector: ChartSelector, axis: Axis) { focused_chart_axis_title_package(self)?.edit_slide_chart_axis_title(selector, axis).clear().commit(); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_axis_title_source_topology(root),
+                [],
+            )
+
+    def test_keynote_chart_axis_title_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_axis_title_legacy_calls()",
+            "+ audit_iwa_keynote_chart_axis_title_source_topology()",
+            "+ audit_keynote_chart_axis_title_facade_source_topology()",
+            "+ audit_keynote_chart_axis_title_resource_source_topology()",
+            "+ audit_keynote_chart_axis_title_completion_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
 
 
 if __name__ == "__main__":

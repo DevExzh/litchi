@@ -6633,3 +6633,93 @@ generated/Prost/Buffa owner, host-exit, or monolith-exit gate. The
 logical envelope; package caches, decompressed Archives, ZIP/Snappy buffers,
 codec-internal allocation, the OS allocator, RSS, and zero-copy behavior are
 not measured or claimed.
+
+## 2026-08-30 amendment: Wave112 Keynote chart-axis-title owner and raw-ID host exit (not a complete monolith gate)
+
+Wave112 gives `litchi-keynote::Package` a selector-first chart-axis-title
+surface through `Package::{slide_chart_axis_title,
+edit_slide_chart_axis_title, apply_slide_chart_axis_title}` and the focused
+`ChartAxisTitle::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` types.
+Callers select a slide and chart by semantic position or exact visible name and
+choose the common `chart::axis::Axis::{Category, Value}` value. Native chart,
+axis, component, message, wire, and source-artifact identities remain private;
+exact output is emitted through `Package::write_to`.
+
+The owner admits only an exact physical package with one rooted, unambiguous
+chart and primary category/value-axis ownership. It checks the drawable lock,
+role-reference uniqueness, selected message framing, package-wide inbound
+references, and PackageMetadata UUID/component authority. Axis and chart
+non-style objects may remain with the source-built slide or occupy Keynote's
+native `DocumentStylesheet` component; every cross-component owner/registry
+edge must agree across physical references and current, non-weak metadata
+external references. Aliases, duplicate or contradictory role/metadata
+evidence, foreign object ownership, colliding data/object identifiers,
+merge/diff state, malformed framing, and unsupported graph shapes fail closed.
+Unrelated data references are separate namespace members and do not make an
+otherwise proven chart uneditable. Non-exact/semantic sources and changed
+nested legacy packages remain unsupported for publication; exact no-ops
+preserve their existing compatibility where the source path admits them.
+
+The private Buffa projection contains only the four generated
+`TSCH.Generated.ChartAxisNonStyleArchive` scalar controls: category visibility
+and text (fields 13 and 15), and value visibility and text (fields 14 and 16).
+Strict canonical raw preflight runs before the borrowed lazy view and
+cross-checks presence, boolean values, UTF-8, duplicate fields, unknown spans,
+and finite bytes/fields/work/nesting/allocation ceilings. A prepared,
+source-preserving wire rewrite executes once; generated repeated views,
+Buffa unknown-field retention, and generated production encoders are forbidden
+by the provenance/build ratchets; caller-owned raw spans remain the
+preservation authority. One aggregate transaction budget covers selection,
+ownership scans, codec work, rewriting, reassembly, candidate reopen, exact
+artifact authorization, and locality verification. This is conservative
+logical accounting, not allocator/RSS/latency or whole-package performance
+telemetry.
+
+Changed edits rewrite only the selected primary axis non-style message in one
+component, preserve the selected message's unknown/untouched records and all
+unselected chart/axis and package state, and remove existing root rendering
+previews (`preview.jpg`, `preview-micro.jpg`, and `preview-web.jpg`) because
+axis titles affect rendering. The complete candidate is reopened and checked
+for semantic readback and exact locality before publication. No-ops share the
+source bytes and skip reassembly/reopen; process-local exact patches authorize
+conflicts and support inverse restoration.
+
+The former Keynote host methods `slide_chart_axis_title`,
+`set_slide_chart_axis_title`, and `remove_slide_chart_axis_title`, together
+with their Keynote-local direct native-helper path, are retired as raw-ID
+surfaces. For this seam, `KeynoteEditor` retains only `_by_selector`
+compatibility bridges that route through the focused Package, and the
+chart-creation example now uses `ChartSelector`; chart creation,
+duplication/removal, value-axis bounds, storage/data/series work, and the
+remaining Pages/Numbers chart paths remain host/shared responsibilities. This
+is a narrow raw-ID host seam exit, not a replacement of the chart editor or a
+full generated-graph migration.
+
+Executed scoped evidence is 23/23 codec tests, 16/16 focused axis-title tests,
+10/10 chart-title tests, 3/3 focused migration-host regressions, 678/678
+boundary-unit tests, strict Clippy for codec/package targets, and fixed-corpus
+fuzz smoke over 20 codec and 8 package seeds. The codec fuzz oracle separately
+recognizes the documented remove/reinsert rule: selected layout cannot be
+reconstructed after removal, but unrelated spans remain byte-exact.
+
+Computer Use verified both directions against Keynote. A source-built edit
+opened with `Y-axis, Wave112 Revenue` and `X-axis, Quarter`, saved natively,
+closed, and reopened without repair. The focused owner then admitted Keynote's
+normalized `DocumentStylesheet` layout, proved an exact no-op, changed it to
+`Native Roundtrip`, removed three stale previews, restored the exact native
+source through the inverse, and Keynote opened the changed artifact with the
+new value-axis title. Exact-inverse SHA-256 values were
+`74a1876ab0b286a7ebc610e53b452e3a4c8cf8e779c1ec781aaa8f0e25803b31`
+before native normalization and
+`87db4dc036ece68c27144ab0303d54517b02dc433b839337b598fdd677788a8c`
+after it. These disposable artifacts are not committed fixtures, and the
+known unrelated Pages boundary findings and Keynote soundtrack-order failures
+prevent a full-workspace-green claim.
+
+Durable versioned semantic patch serialization, read/write sets and
+composition/merge/history, complete aggregate peak-memory and work accounting,
+a transitive fallible-allocation proof, library-owned atomic durable filesystem
+publication, and broader chart/graph ownership remain open. The
+`litchi-iwa -> litchi-keynote` edge, all 13 ordered debts, the one migration
+host, and the 64-package/239-internal-dependency topology remain unchanged;
+Wave112 closes no crate, manifest edge, debt, or monolith-deletion gate.

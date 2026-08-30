@@ -541,6 +541,298 @@ KEYNOTE_CHART_CAPTION_PACKAGE_METHODS = frozenset(
     }
 )
 
+# Wave112 moves Keynote chart-axis-title reads and mutations behind the same
+# selector-first package boundary as chart titles/captions.  Keep this gate
+# independent from the Pages/Numbers native axis helpers: those editors still
+# share the low-level chart-axis wire implementation until their own owners
+# land.  Every audit below is dormant until both the focused owner source and
+# its private package module declaration exist.
+KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_AXIS_TITLE_SELECTOR_SOURCE = KEYNOTE_SOURCE_ROOT / "selector.rs"
+KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_axis_title.rs"
+)
+KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES = frozenset(
+    {
+        "ChartAxisTitleCommit",
+        "ChartAxisTitleDiagnostics",
+        "ChartAxisTitleEdit",
+        "ChartAxisTitleError",
+        "ChartAxisTitleLimitKind",
+        "ChartAxisTitlePatch",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_TYPES = frozenset({"Axis"})
+KEYNOTE_CHART_AXIS_TITLE_SELECTOR_TYPES = frozenset(
+    {"ChartSelector", "SlideSelector"}
+)
+KEYNOTE_CHART_AXIS_TITLE_PACKAGE_METHODS = frozenset(
+    {
+        "slide_chart_axis_title",
+        "edit_slide_chart_axis_title",
+        "apply_slide_chart_axis_title",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_EDIT_METHODS = frozenset(
+    {"before", "after", "set", "clear", "commit"}
+)
+KEYNOTE_CHART_AXIS_TITLE_FLAT_ALIASES = frozenset(
+    {
+        "AxisTitle",
+        "AxisTitleCommit",
+        "AxisTitleDiagnostics",
+        "AxisTitleEdit",
+        "AxisTitleError",
+        "AxisTitleLimitKind",
+        "AxisTitlePatch",
+        "AxisTitleSnapshot",
+        "AxisTitleWrite",
+        "ChartAxisTitle",
+        "ChartAxisTitleSnapshot",
+        "ChartAxisTitleWrite",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+        "ChartAxisTitleArchive",
+        "ChartAxisTitleSnapshot",
+        "ChartAxisTitleWrite",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "PreparedAxisTitleRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteReport",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_PROTO_ORIGINS = frozenset(
+    {
+        "buffa",
+        "prost",
+        "prost_types",
+        "kn",
+        "tsch",
+        "tsp",
+        "tsd",
+        "tswp",
+        "litchi_iwa_protos",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_PUBLIC_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|"
+    r"drawable_object_id|chart_object_id|axis_id|component_id|member_id|"
+    r"archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_CHART_AXIS_TITLE_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|chart|axis|native|component|archive|"
+    r"message|resource|entry|metadata|package|uuid)[A-Za-z_]*(?:id|identifier))"
+    r"[ \t\r\n]*:[ \t\r\n]*u64\b"
+)
+KEYNOTE_CHART_AXIS_TITLE_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_axis_title|"
+    r"remove_slide_chart_axis_title)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+KEYNOTE_CHART_AXIS_TITLE_ALL_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>slide_chart_axis_title|"
+    r"set_slide_chart_axis_title|remove_slide_chart_axis_title)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts" / "axis.rs"
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_TYPED_METHODS = frozenset(
+    {
+        "slide_chart_axis_title_by_selector",
+        "set_slide_chart_axis_title_by_selector",
+        "remove_slide_chart_axis_title_by_selector",
+    }
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_LEGACY_METHODS = frozenset(
+    {
+        "slide_chart_axis_title",
+        "set_slide_chart_axis_title",
+        "remove_slide_chart_axis_title",
+    }
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_chart_axis_title|"
+    r"set_slide_chart_axis_title|remove_slide_chart_axis_title)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_IDENTIFIER_POSITION_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"chart_axis_position_for_identifier|chart_axis_position_from_identifier|"
+    r"chart_axis_index_for_identifier|chart_axis_index_from_identifier|"
+    r"axis_position_for_identifier|axis_position_from_identifier|"
+    r"axis_index_for_identifier|axis_index_from_identifier|"
+    r"chart_position_for_identifier|chart_position_from_identifier|"
+    r"chart_index_for_identifier|chart_index_from_identifier"
+    r")(?![A-Za-z0-9_])|"
+    r"\.position[ \t\r\n]*\([ \t\r\n]*\|[^{}\n|]{0,400}\b(?:"
+    r"drawable_object_id|chart_object_id|native_id|object_id|identifier)"
+    r"[^{}\n|]{0,400}\)"
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:read_native_chart_axis_title|"
+    r"set_native_chart_axis_title|remove_native_chart_axis_title|"
+    r"chart_axis_title|set_chart_axis_title|remove_chart_axis_title|"
+    r"axis_non_style_slot|patch_axis_non_style_title|"
+    r"validate_patched_axis_title|primary_non_style_identifier|"
+    r"AxisNonStyleSlot)(?![A-Za-z0-9_])"
+)
+IWA_KEYNOTE_CHART_AXIS_TITLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+
+# The low-level codec is intentionally a private, format-neutral seam.  The
+# build-script provenance check fixes the exact ingress/rewrite spelling, so
+# keep those names explicit here as a second source-boundary ratchet.
+KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_chart_axis_title_codec.rs"
+)
+KEYNOTE_CHART_AXIS_TITLE_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_CHART_AXIS_TITLE_CODEC_MODULE = "keynote_chart_axis_title_codec"
+KEYNOTE_CHART_AXIS_TITLE_CODEC_REQUIRED_APIS = (
+    "DecodeError",
+    "DecodeLimit",
+    "DecodeOptions",
+    "AxisTitleSnapshot",
+    "AxisTitleWrite",
+    "DecodeReport",
+    "RewriteReport",
+    "decode_axis_titles",
+    "decode_axis_titles_with_report",
+    "prepare_axis_title_rewrite",
+    "rewrite_axis_title",
+    "AxisTitleKind",
+)
+KEYNOTE_CHART_AXIS_TITLE_CODEC_REQUIRED_MARKER_GROUPS = {
+    "field-13-to-16 axis projection": (
+        "CHART_AXIS_CATEGORY_VISIBLE_FIELD: u32 = 13",
+        "CHART_AXIS_VALUE_VISIBLE_FIELD: u32 = 14",
+        "CHART_AXIS_CATEGORY_TEXT_FIELD: u32 = 15",
+        "CHART_AXIS_VALUE_TEXT_FIELD: u32 = 16",
+    ),
+    "strict canonical ingress": (
+        "next_strict_field",
+        "require_canonical_bool",
+        "duplicate",
+        "noncanonical",
+    ),
+    "unknown/raw preservation": (
+        "unknown",
+        "raw",
+        "extend_from_slice",
+    ),
+    "finite prepared rewrite": (
+        "MAX_RECURSION_LIMIT",
+        "preflight_axis_titles",
+        "execution_requirements",
+        "execute",
+    ),
+    "typed axis projection": ("visible_title(self, kind: AxisTitleKind)",),
+}
+KEYNOTE_CHART_AXIS_TITLE_CODEC_PREPARED_TYPES = frozenset(
+    {
+        "PreparedAxisTitleRewrite",
+        "RewriteExecutionRequirements",
+        "RewriteExecutionLimits",
+    }
+)
+KEYNOTE_CHART_AXIS_TITLE_CODEC_FLOW_MARKERS = {
+    "decode report": re.compile(r"\bdecode_axis_titles_with_report\s*\("),
+    "prepared rewrite": re.compile(r"\bprepare_axis_title_rewrite\s*\("),
+    "execution requirements": re.compile(r"\bexecution_requirements\s*\("),
+    "single prepared execute": re.compile(
+        r"\b(?:prepared|rewrite)[A-Za-z0-9_]*[ \t\r\n]*\.[ \t\r\n]*execute\s*\("
+    ),
+}
+KEYNOTE_CHART_AXIS_TITLE_PACKAGE_BUDGET_TYPE = re.compile(
+    r"(?m)^[ \t]*(?:pub[ \t]*\([ \t]*super[ \t]*\)[ \t]+)?struct[ \t]+"
+    r"(?P<name>(?:ChartAxisTitle|AxisTitle|Chart|Axis|Package|Transaction)"
+    r"[A-Za-z0-9_]*Budget)\b"
+)
+KEYNOTE_CHART_AXIS_TITLE_PACKAGE_MARKER_GROUPS = {
+    "aggregate transaction budget": (
+        "Budget",
+        "budget",
+        "charge",
+    ),
+    "strict prepared codec": (
+        "keynote_chart_axis_title_codec",
+        "prepare_axis_title_rewrite",
+        "execution_requirements",
+        "execute",
+    ),
+    "exact artifacts/fingerprint/inverse/conflict": (
+        "ExactArtifacts",
+        "source_fingerprint",
+        "inverse",
+        "PatchConflict",
+    ),
+    "candidate reopen/locality": (
+        "candidate",
+        "reopen",
+        "locality",
+    ),
+    "root preview deletion": (
+        "root_preview_deletions",
+        "deleted_previews",
+    ),
+    "source authority": (
+        "authority",
+        "ChartSelector",
+        "Axis",
+    ),
+}
+KEYNOTE_CHART_AXIS_TITLE_SOURCE_AUTHORITY_MARKER = re.compile(
+    r"\b(?:authority|authorizes_source|source_authority|selection_authority)\b"
+)
+KEYNOTE_CHART_AXIS_TITLE_TEST_SOURCES = (
+    Path("crates/litchi-keynote/tests/slide_chart_axis_title.rs"),
+)
+KEYNOTE_CHART_AXIS_TITLE_FUZZ_SOURCES = (
+    Path(
+        "crates/litchi-iwa-protos/fuzz/fuzz_targets/keynote_chart_axis_title_codec.rs"
+    ),
+    Path("crates/litchi/fuzz/fuzz_targets/keynote_chart_axis_title.rs"),
+)
+KEYNOTE_CHART_AXIS_TITLE_FUZZ_CORPORA = (
+    Path("crates/litchi-iwa-protos/fuzz/corpus/keynote_chart_axis_title"),
+    Path("crates/litchi/fuzz/corpus/keynote_chart_axis_title"),
+)
+
 # Keynote movie-caption replacement is the next focused package owner.  Keep
 # this ratchet deliberately narrower than the chart-caption graph audit:
 # phase 1 owns the selector-first existing-caption transaction, while the
@@ -27114,6 +27406,702 @@ def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str
     return sorted(set(violations))
 
 
+def _keynote_chart_axis_title_owner_present(root: Path) -> bool:
+    """Return whether the Wave112 axis-title owner crossed its wiring seam."""
+
+    owner_path = root / KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+    package_path = root / KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_chart_axis_title\s*;",
+        package_source,
+    ) is not None
+
+
+def _keynote_chart_axis_title_focused_package_call(
+    source: str, match: re.Match[str]
+) -> bool:
+    """Recognize only selector-first calls on the focused package adapter.
+
+    The raw getter has the same spelling as the semantic Package method.  A
+    compatibility bridge may therefore retain that *call* while it routes a
+    borrowed ChartSelector/Axis into ``litchi-keynote``.  Do not extend this
+    exception to setter/remover calls, raw object identifiers, or positional
+    lookup fallbacks.
+    """
+
+    prefix = source[max(0, match.start() - 320) : match.start()]
+    call_end = source.find(")", match.end())
+    depth = 1
+    cursor = match.end()
+    while cursor < len(source) and depth:
+        if source[cursor] == "(":
+            depth += 1
+        elif source[cursor] == ")":
+            depth -= 1
+        cursor += 1
+    if depth == 0:
+        call_end = cursor - 1
+    suffix = source[match.end() : call_end if call_end >= 0 else match.end() + 360]
+    receiver = re.compile(
+        r"(?:focused_chart_axis_title_package|"
+        r"focused_chart_title_package|"
+        r"litchi_keynote[ \t\r\n]*::[ \t\r\n]*Package|"
+        r"KeynotePackage|package)"
+    )
+    if receiver.search(prefix) is None:
+        return False
+    if re.search(r"\b(?:selector|chart_selector)\b", suffix) is None:
+        return False
+    if re.search(r"\baxis\b", suffix) is None:
+        return False
+    return re.search(
+        r"\b(?:drawable_object_id|chart_object_id|native_id|object_id|"
+        r"axis_id|identifier|chart_position)\b",
+        suffix,
+    ) is None
+
+
+def audit_keynote_chart_axis_title_legacy_calls(root: Path = ROOT) -> list[str]:
+    """Keep focused package source off retired Keynote axis-title calls."""
+
+    if not _keynote_chart_axis_title_owner_present(root):
+        return []
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        for match in KEYNOTE_CHART_AXIS_TITLE_LEGACY_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "focused litchi-keynote chart-axis-title source retains legacy call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_chart_axis_title_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire raw Keynote chart-axis-title methods, calls, and helpers.
+
+    Pages and Numbers continue to use the shared ``crates/litchi-iwa/src/charts``
+    implementation, so this scan is deliberately scoped to the Keynote host,
+    its examples, and its README.  A selector-first bridge can remain only
+    when it visibly calls the focused Package with ChartSelector and Axis.
+    """
+
+    if not _keynote_chart_axis_title_owner_present(root):
+        return []
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    violations: list[str] = []
+    source_paths = (
+        sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
+    )
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+        r"(?:unsafe[ \t\r\n]+|async[ \t\r\n]+|const[ \t\r\n]+)*"
+        r"fn[ \t\r\n]+(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+
+    for path in source_paths:
+        # The compatibility suite is source-built under cfg(test), and its
+        # historical raw calls do not form a production boundary.  Mask the
+        # whole test item before scanning declarations and calls.
+        if path.name == "tests.rs" or "tests" in path.parts:
+            continue
+        production = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        source = _mask_rust_non_code(production)
+        relative = path.relative_to(root)
+        for match in declaration.finditer(source):
+            name = match.group("name")
+            line_number = source.count("\n", 0, match.start()) + 1
+            if name in IWA_KEYNOTE_CHART_AXIS_TITLE_LEGACY_METHODS:
+                violations.append(
+                    "retired litchi-iwa Keynote chart-axis-title raw-ID method "
+                    f"{name}: {relative}:{line_number}"
+                )
+            if IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_HELPER.search(name):
+                violations.append(
+                    "retired litchi-iwa Keynote chart-axis-title native helper "
+                    f"{name}: {relative}:{line_number}"
+                )
+
+        for match in IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_ID_CALL.finditer(source):
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            line = source[line_start:line_end]
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b", line
+            ):
+                # The declaration receives a method finding above; avoid
+                # adding a second call finding for the same declaration line.
+                continue
+            if (
+                match.group("method") == "slide_chart_axis_title"
+                and _keynote_chart_axis_title_focused_package_call(source, match)
+            ):
+                continue
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title raw-ID call "
+                f"{match.group('method')}: {relative}:{line_number}"
+            )
+
+        for match in IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_HELPER.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            # A declaration was already reported with the clearer helper
+            # message.  Imports and calls still need their own retirement
+            # finding, but do not duplicate the declaration token.
+            line_start = source.rfind("\n", 0, match.start()) + 1
+            line_end = source.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(source)
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group(0))}\b",
+                source[line_start:line_end],
+            ):
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title native helper/call "
+                f"{match.group(0)}: {relative}:{line_number}"
+            )
+
+        if path != root / IWA_KEYNOTE_CHART_AXIS_TITLE_SOURCE:
+            continue
+        for match in KEYNOTE_CHART_AXIS_TITLE_RAW_ID_PARAMETER.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title raw identifier parameter "
+                f"{match.group(0).strip()}: {relative}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_CHART_AXIS_TITLE_IDENTIFIER_POSITION_FALLBACK.finditer(
+            source
+        ):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title identifier-to-position "
+                f"fallback {match.group(0).strip()}: {relative}:{line_number}"
+            )
+
+        for match in declaration.finditer(source):
+            name = match.group("name")
+            if name not in IWA_KEYNOTE_CHART_AXIS_TITLE_TYPED_METHODS:
+                continue
+            opening = source.find("{", match.end())
+            signature = source[match.start() : opening if opening >= 0 else len(source)]
+            if re.search(r"\bChartSelector\b", signature) is None:
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa Keynote chart-axis-title selector bridge must accept "
+                    f"ChartSelector {name}: {relative}:{line_number}"
+                )
+            if re.search(r"\bAxis\b", signature) is None:
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa Keynote chart-axis-title selector bridge must accept "
+                    f"semantic Axis {name}: {relative}:{line_number}"
+                )
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(source) and depth:
+                if source[cursor] == "{":
+                    depth += 1
+                elif source[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            body = source[opening + 1 : cursor - 1] if depth == 0 else ""
+            required = (
+                ("focused_chart_axis_title_package", "slide_chart_axis_title")
+                if name == "slide_chart_axis_title_by_selector"
+                else (
+                    "focused_chart_axis_title_package",
+                    "edit_slide_chart_axis_title",
+                    ".commit(",
+                )
+            )
+            if not all(marker in body for marker in required):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa Keynote chart-axis-title selector bridge must route "
+                    f"through focused Package {name}: {relative}:{line_number}"
+                )
+
+    example_root = root / IWA_KEYNOTE_CHART_AXIS_TITLE_EXAMPLE_ROOT
+    if example_root.is_dir():
+        for path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            relative = path.relative_to(root)
+            for match in IWA_KEYNOTE_CHART_AXIS_TITLE_RAW_ID_CALL.finditer(source):
+                if (
+                    match.group("method") == "slide_chart_axis_title"
+                    and _keynote_chart_axis_title_focused_package_call(source, match)
+                ):
+                    continue
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote chart-axis-title example retains "
+                    f"raw-ID call {match.group('method')}: {relative}:{line_number}"
+                )
+
+    readme_path = root / IWA_KEYNOTE_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for match in KEYNOTE_CHART_AXIS_TITLE_ALL_LEGACY_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title README retains raw-ID call "
+                f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
+            )
+        for match in KEYNOTE_CHART_AXIS_TITLE_RAW_ID_PARAMETER.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-axis-title README retains raw identifier "
+                f"{match.group(0).strip()}: {IWA_KEYNOTE_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def _keynote_chart_axis_title_check_codec(root: Path) -> list[str]:
+    """Require the private neutral projection and prepared rewrite seam."""
+
+    codec_path = root / KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE
+    if not codec_path.is_file():
+        return [
+            "focused litchi-keynote chart-axis-title public API is missing strict neutral "
+            f"codec source: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+        ]
+    raw_source = codec_path.read_text(encoding="utf-8")
+    source = _mask_rust_cfg_test_items(raw_source)
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+    for api in KEYNOTE_CHART_AXIS_TITLE_CODEC_REQUIRED_APIS:
+        if re.search(
+            rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(api)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title hidden codec is missing strict API "
+                f"{api}: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+            )
+    for type_name in sorted(KEYNOTE_CHART_AXIS_TITLE_CODEC_PREPARED_TYPES):
+        if re.search(
+            rf"\b(?:pub\s+)?(?:struct|enum|type)\s+{re.escape(type_name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title hidden codec is missing prepared "
+                f"type {type_name}: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+            )
+    for label, markers in KEYNOTE_CHART_AXIS_TITLE_CODEC_REQUIRED_MARKER_GROUPS.items():
+        if not all(marker in code for marker in markers):
+            violations.append(
+                "focused litchi-keynote chart-axis-title hidden codec is missing "
+                f"{label} marker: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+            )
+    if any(marker in code for marker in ("prost", "IWorkPackage", "chart_graph")):
+        violations.append(
+            "focused litchi-keynote chart-axis-title hidden codec must remain neutral "
+            f"and generated-free: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+        )
+
+    codec_lib_path = root / KEYNOTE_CHART_AXIS_TITLE_CODEC_PUBLIC_SOURCE
+    codec_lib = (
+        _mask_rust_cfg_test_items(codec_lib_path.read_text(encoding="utf-8"))
+        if codec_lib_path.is_file()
+        else ""
+    )
+    if re.search(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(KEYNOTE_CHART_AXIS_TITLE_CODEC_MODULE)}\b",
+        codec_lib,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote chart-axis-title public API is missing hidden codec "
+            f"module {KEYNOTE_CHART_AXIS_TITLE_CODEC_MODULE}: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_CODEC_PUBLIC_SOURCE}"
+        )
+    if re.search(r"(?m)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]", raw_source) is None:
+        violations.append(
+            "focused litchi-keynote chart-axis-title hidden codec is missing cfg(test) coverage: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+        )
+    elif re.search(r"(?m)#\s*\[\s*test\s*\]", raw_source) is None:
+        violations.append(
+            "focused litchi-keynote chart-axis-title hidden codec is missing #[test] coverage: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+        )
+    return violations
+
+
+def audit_keynote_chart_axis_title_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the typed Axis/ChartSelector package owner and neutral codec."""
+
+    if not _keynote_chart_axis_title_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_CHART_AXIS_TITLE_SELECTOR_SOURCE
+    package_path = root / KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
+    lib_path = root / KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[1]
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+    package_code = code[package_path]
+    package_library_code = _mask_rust_non_code(
+        sources[package_path] + sources[lib_path]
+    )
+    if re.search(
+        r"(?m)^pub[ \t]+mod[ \t]+slide_chart_axis_title\b",
+        package_library_code,
+    ):
+        violations.append(
+            "focused litchi-keynote chart-axis-title owner module must remain private: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]}"
+        )
+    if re.search(
+        r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+        r"mod[ \t]+slide_chart_axis_title\s*;",
+        package_code,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote chart-axis-title owner module is missing: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]}"
+        )
+
+    for name in sorted(KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-axis-title public API is missing canonical "
+                    f"type {name}: {path.relative_to(root)}"
+                )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path], KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_TYPES
+    )
+    for name in sorted(KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_TYPES - semantic_exports):
+        violations.append(
+            "focused litchi-keynote chart-axis-title semantic API is missing "
+            f"{name}: {KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE}"
+        )
+    selector_exports = _rust_canonical_exports(
+        sources[selector_path] + sources[semantic_path] + sources[lib_path],
+        KEYNOTE_CHART_AXIS_TITLE_SELECTOR_TYPES,
+    )
+    for name in sorted(KEYNOTE_CHART_AXIS_TITLE_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote chart-axis-title public API is missing selector "
+            f"{name}: {KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[1]}"
+        )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_CHART_AXIS_TITLE_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title Package method is missing "
+                f"{name}: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+            )
+            continue
+        if name != "apply_slide_chart_axis_title":
+            for selector in ("SlideSelector", "ChartSelector", "Axis"):
+                if not re.search(rf"\b{selector}\b", declaration):
+                    violations.append(
+                        "focused litchi-keynote chart-axis-title Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+                    )
+        elif "ChartAxisTitlePatch" not in declaration:
+            violations.append(
+                "focused litchi-keynote chart-axis-title apply method must accept "
+                f"ChartAxisTitlePatch: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line in _rust_public_methods_in_impl(
+            sources[owner_path], "ChartAxisTitleEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_CHART_AXIS_TITLE_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-keynote chart-axis-title edit is missing "
+            f"{name}: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES
+        | KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_TYPES
+        | KEYNOTE_CHART_AXIS_TITLE_SELECTOR_TYPES
+        | KEYNOTE_CHART_AXIS_TITLE_PACKAGE_METHODS
+        | KEYNOTE_CHART_AXIS_TITLE_FLAT_ALIASES
+    )
+    dedicated_sources = {owner_path, semantic_path, selector_path}
+    for path in paths:
+        dedicated = path in dedicated_sources
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not dedicated and not identifiers.intersection(facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier == "litchi_iwa_common":
+                    reason = None
+                elif identifier in KEYNOTE_CHART_AXIS_TITLE_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_CHART_AXIS_TITLE_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif (
+                    identifier == "wire"
+                    or identifier in KEYNOTE_CHART_AXIS_TITLE_WIRE_TYPES
+                ):
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote chart-axis-title public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_CHART_AXIS_TITLE_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote chart-axis-title public API retains flat "
+                        f"alias {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote chart-axis-title public API exposes raw byte "
+                    f"slice {byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_CHART_AXIS_TITLE_PUBLIC_RAW_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-axis-title public API exposes raw "
+                    f"parameter {match.group(0).strip()}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote chart-axis-title public API retains a glob "
+                    f"re-export: {path.relative_to(root)}:{line_number}"
+                )
+
+    owner_code = code[owner_path]
+    for label, marker in KEYNOTE_CHART_AXIS_TITLE_CODEC_FLOW_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title owner is missing strict prepared "
+                f"{label} marker: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+            )
+    violations.extend(_keynote_chart_axis_title_check_codec(root))
+    return sorted(set(violations))
+
+
+def audit_keynote_chart_axis_title_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require one bounded transaction budget and source-authoritative graph work."""
+
+    if not _keynote_chart_axis_title_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    budgets = list(KEYNOTE_CHART_AXIS_TITLE_PACKAGE_BUDGET_TYPE.finditer(owner))
+    if len(budgets) != 1:
+        violations.append(
+            "focused litchi-keynote chart-axis-title owner must define exactly one "
+            f"aggregate transaction budget (found {len(budgets)}): "
+            f"{KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+        )
+    for label, markers in KEYNOTE_CHART_AXIS_TITLE_PACKAGE_MARKER_GROUPS.items():
+        if label == "source authority":
+            present = KEYNOTE_CHART_AXIS_TITLE_SOURCE_AUTHORITY_MARKER.search(owner) is not None and all(
+                marker in owner for marker in markers if marker != "authority"
+            )
+        else:
+            present = all(marker in owner for marker in markers)
+        if not present:
+            violations.append(
+                "focused litchi-keynote chart-axis-title owner is missing "
+                f"{label} marker: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+            )
+    return sorted(set(violations))
+
+
+def audit_keynote_chart_axis_title_completion_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require exact completion artifacts and a single prepared execution."""
+
+    if not _keynote_chart_axis_title_owner_present(root):
+        return []
+    owner_path = root / KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    violations: list[str] = []
+    for label, marker in KEYNOTE_CHART_AXIS_TITLE_CODEC_FLOW_MARKERS.items():
+        if marker.search(owner) is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title completion is missing "
+                f"{label}: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+            )
+    execute_calls = list(
+        re.finditer(r"\.[ \t\r\n]*execute\s*\(", owner)
+    )
+    if len(execute_calls) != 1:
+        violations.append(
+            "focused litchi-keynote chart-axis-title completion must have exactly one "
+            f"prepared execute call (found {len(execute_calls)}): "
+            f"{KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+        )
+    direct_rewrite_patterns = [
+        re.compile(
+            r"\b(?:keynote_chart_axis_title_codec\s*::\s*)?"
+            r"rewrite_axis_title\s*\("
+        )
+    ]
+    # The owner commonly aliases the neutral function on import to keep the
+    # axis-title domain visible at call sites. Resolve those aliases before
+    # scanning so a direct rewrite cannot hide behind a compatibility name.
+    for import_match in re.finditer(
+        r"\brewrite_axis_title\b[ \t\r\n]+as[ \t\r\n]+"
+        r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+        owner,
+    ):
+        direct_rewrite_patterns.append(
+            re.compile(rf"\b{re.escape(import_match.group('alias'))}\s*\(")
+        )
+    for direct_rewrite in direct_rewrite_patterns:
+        for match in direct_rewrite.finditer(owner):
+            line_start = owner.rfind("\n", 0, match.start()) + 1
+            line_end = owner.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(owner)
+            if re.search(r"\bfn\s+rewrite_axis_title\b", owner[line_start:line_end]):
+                continue
+            line_number = owner.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote chart-axis-title completion must execute the prepared "
+                f"codec, not direct rewrite_axis_title: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}:{line_number}"
+            )
+
+    codec_path = root / KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE
+    if codec_path.is_file():
+        codec_raw = codec_path.read_text(encoding="utf-8")
+        codec = _mask_rust_non_code(_mask_rust_cfg_test_items(codec_raw))
+        if re.search(r"\bexecute\s*\(", codec) is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title completion is missing codec execute "
+                f"implementation: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+            )
+    else:
+        violations.append(
+            "focused litchi-keynote chart-axis-title completion is missing codec source: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+        )
+
+    # Keep the unit-test and fuzz seams tied to the owner activation.  A
+    # cfg(test) decoy in the owner cannot satisfy the integration requirement.
+    codec_raw = (
+        codec_path.read_text(encoding="utf-8") if codec_path.is_file() else ""
+    )
+    if re.search(r"(?m)#\s*\[\s*test\s*\]", codec_raw) is None:
+        violations.append(
+            "focused litchi-keynote chart-axis-title completion is missing codec #[test] coverage: "
+            f"{KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
+        )
+    for test_path in KEYNOTE_CHART_AXIS_TITLE_TEST_SOURCES:
+        absolute = root / test_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote chart-axis-title boundary is missing integration test: "
+                f"{test_path}"
+            )
+            continue
+        test_code = _mask_rust_non_code(absolute.read_text(encoding="utf-8"))
+        if re.search(r"(?m)#\s*\[\s*test\s*\]", test_code) is None:
+            violations.append(
+                "focused litchi-keynote chart-axis-title integration test is missing #[test] coverage: "
+                f"{test_path}"
+            )
+        if not re.search(
+            r"\b(?:slide_chart_axis_title|edit_slide_chart_axis_title|"
+            r"apply_slide_chart_axis_title)\b",
+            test_code,
+        ):
+            violations.append(
+                "focused litchi-keynote chart-axis-title integration test does not exercise owner: "
+                f"{test_path}"
+            )
+        if "deleted_previews" not in test_code:
+            violations.append(
+                "focused litchi-keynote chart-axis-title integration test must report root "
+                f"preview deletions: {test_path}"
+            )
+
+    for fuzz_path in KEYNOTE_CHART_AXIS_TITLE_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote chart-axis-title boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-keynote chart-axis-title fuzz target is missing fuzz_target! harness: "
+                f"{fuzz_path}"
+            )
+    for corpus in KEYNOTE_CHART_AXIS_TITLE_FUZZ_CORPORA:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-keynote chart-axis-title boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+    return sorted(set(violations))
+
+
 def audit_keynote_movie_title_legacy_calls(root: Path = ROOT) -> list[str]:
     """Keep focused Keynote movie-title code off legacy host mutations."""
 
@@ -35316,6 +36304,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_package_no_eager_prost_source_topology()
         + audit_keynote_chart_title_legacy_calls()
         + audit_iwa_keynote_chart_title_source_topology()
+        + audit_keynote_chart_axis_title_legacy_calls()
+        + audit_iwa_keynote_chart_axis_title_source_topology()
+        + audit_keynote_chart_axis_title_facade_source_topology()
+        + audit_keynote_chart_axis_title_resource_source_topology()
+        + audit_keynote_chart_axis_title_completion_source_topology()
         + audit_keynote_movie_title_legacy_calls()
         + audit_iwa_keynote_movie_title_source_topology()
         + audit_keynote_movie_title_facade_source_topology()

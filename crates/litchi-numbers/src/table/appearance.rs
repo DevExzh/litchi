@@ -1,16 +1,20 @@
 //! Archive-free Numbers table appearance semantics.
 //!
-//! [`Appearance`] is the complete effective appearance value for one table.
+//! [`crate::table::appearance::Appearance`] is the complete effective
+//! appearance value for one table.
 //! It contains only typed style settings; native style objects, inheritance
 //! graphs, object identifiers, protobuf messages, and package bytes remain
 //! private to the Numbers package adapter.
 //!
 //! Read and edit a rooted table through [`crate::Package::table_appearance`]
 //! and [`crate::Package::edit_table_appearance`]. The exact-source
-//! transaction types are available below [`transaction`]. A staged edit uses
-//! [`transaction::Edit::set`] to replace the complete appearance value and
-//! [`transaction::Edit::commit`] to publish it. Apply a retained exact-source
-//! patch with [`crate::Package::apply_table_appearance`].
+//! transaction types are available below
+//! [`crate::table::appearance::transaction`]. A staged edit uses
+//! [`crate::table::appearance::transaction::Edit::set`] to replace the
+//! complete appearance value and
+//! [`crate::table::appearance::transaction::Edit::commit`] to publish it.
+//! Apply a retained exact-source patch with
+//! [`crate::Package::apply_table_appearance`].
 
 /// Exact-source transactions for one rooted Numbers table's appearance.
 pub mod transaction {

@@ -610,6 +610,7 @@ pub(super) struct ChartSelection {
     pub(super) non_style_identifier: u64,
     pub(super) title: Option<String>,
     pub(super) slide_component_name: String,
+    pub(super) non_style_component_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -620,6 +621,7 @@ struct ChartGraph {
     title_identifier: u64,
     title: Option<String>,
     slide_component_name: String,
+    non_style_component_name: String,
 }
 
 pub(super) fn select_chart(
@@ -660,6 +662,7 @@ pub(super) fn select_chart(
         non_style_identifier: graph.non_style_identifier,
         title,
         slide_component_name: graph.slide_component_name.clone(),
+        non_style_component_name: graph.non_style_component_name.clone(),
     })
 }
 
@@ -815,7 +818,7 @@ fn chart_graph(
     let (non_style_component, non_style_object) = package
         .object_with_component(non_style_identifier)
         .ok_or(ChartTitleError::InvalidSource)?;
-    if title_component != slide_component_name || non_style_component != slide_component_name {
+    if title_component != slide_component_name {
         return Err(ChartTitleError::InvalidSource);
     }
     exactly_one_message(title_object, STANDIN_MESSAGE_TYPE)?;
@@ -828,6 +831,7 @@ fn chart_graph(
         title_identifier,
         title,
         slide_component_name: slide_component_name.to_owned(),
+        non_style_component_name: non_style_component.to_owned(),
     })
 }
 
@@ -1025,7 +1029,7 @@ fn rewrite_chart_title(
     let entry = catalog
         .package()
         .iter()
-        .find(|entry| entry.name() == selection.slide_component_name)
+        .find(|entry| entry.name() == selection.non_style_component_name)
         .ok_or(ChartTitleError::InvalidSource)?;
     if entry.is_opaque() {
         return Err(ChartTitleError::InvalidSource);
@@ -1084,7 +1088,7 @@ fn rewrite_chart_title(
         .map_err(map_core_error)?;
     let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
     let edit = EntryEdit::new(
-        selection.slide_component_name.as_str(),
+        selection.non_style_component_name.as_str(),
         compressed.as_slice(),
     );
     let output = catalog
@@ -1178,6 +1182,7 @@ fn verify_chart_candidate(
             || source_graph.non_style_identifier != candidate_graph.non_style_identifier
             || source_graph.title_identifier != candidate_graph.title_identifier
             || source_graph.slide_component_name != candidate_graph.slide_component_name
+            || source_graph.non_style_component_name != candidate_graph.non_style_component_name
         {
             return Err(ChartTitleError::Verification);
         }

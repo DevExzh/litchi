@@ -376,6 +376,10 @@ mod tests {
             include_str!("keynote_chart_title_codec.rs"),
         ),
         (
+            "keynote_chart_axis_title",
+            include_str!("keynote_chart_axis_title_codec.rs"),
+        ),
+        (
             "keynote_placeholder_text",
             include_str!("keynote_placeholder_text_codec.rs"),
         ),

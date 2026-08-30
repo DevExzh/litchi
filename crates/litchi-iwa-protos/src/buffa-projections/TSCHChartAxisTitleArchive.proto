@@ -1,0 +1,16 @@
+// Wire-only projection of the generated chart-axis non-style extension.
+//
+// The native `TSCH.Generated.ChartAxisNonStyleArchive` stores category-axis
+// title controls in fields 13 and 15 and value-axis title controls in fields
+// 14 and 16. The outer `TSCH.ChartAxisNonStyleArchive` and every unrelated
+// source field remain caller-owned.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message ChartAxisTitleArchive {
+  optional bool tschchartaxiscategoryshowtitle = 13;
+  optional bool tschchartaxisvalueshowtitle = 14;
+  optional string tschchartaxiscategorytitle = 15;
+  optional string tschchartaxisvaluetitle = 16;
+}

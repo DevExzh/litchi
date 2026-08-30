@@ -95,6 +95,17 @@ The checked-in seeds are small ZIP/IWA packages under
 `corpus/keynote_chart_title/`; they contain no native fixture data. Arbitrary
 bytes still exercise bounded Keynote ingress before each transaction batch.
 
+`keynote_chart_axis_title` is the focused selector-first chart-axis-title
+target. It builds a bounded two-chart source graph in memory, with category and
+value primary axes, secondary value axes, opaque unknown spans, metadata, and
+root previews; the checked-in corpus contains command recipes only. Each
+command reaches positional/name selectors, visible/hidden/absent/empty reads,
+set/clear/no-op edits, exact patch application, stale and cross-source
+conflicts, inverse replay, candidate reopen/readback, source-byte atomicity,
+redacted malformed ingress, and max-minus-one package/output limits. Changed
+transactions additionally verify the opposite and secondary axes, unknown
+wire spans, unrelated members, and preview invalidation remain correct.
+
 `numbers_table_lock` is the focused interactive table-lock target. It offers
 arbitrary bytes to checked Numbers package ingress and also interprets them as
 bounded selector and lock-state commands against the native `basic.numbers`
@@ -525,6 +536,14 @@ Run the focused chart-title target with its reviewable package seeds:
 ```sh
 cargo +nightly fuzz run keynote_chart_title \
   corpus/keynote_chart_title -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused chart-axis-title target with command-only seeds:
+
+```sh
+cargo +nightly fuzz run keynote_chart_axis_title \
+  corpus/keynote_chart_axis_title -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 

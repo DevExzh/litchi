@@ -3396,3 +3396,74 @@ generated-schema/Prost/Buffa ownership, migration hosts, and the IWA monolith
 gate remain open. Resource reporting remains a conservative logical operation
 envelope, not package-cache, decompressed-Archive, ZIP/Snappy, allocator, RSS,
 or zero-copy telemetry.
+
+## 2026-08-30 amendment: Wave112 current-topology Keynote chart-axis-title owner (not a monolith-exit gate)
+
+Wave112 gives `litchi-keynote` selector-first ownership of existing slide-chart
+axis-title reads and transactions. `Package::{slide_chart_axis_title,
+edit_slide_chart_axis_title, apply_slide_chart_axis_title}` exposes semantic
+category/value titles through `SlideSelector`, `ChartSelector`, and `Axis`,
+along with typed `ChartAxisTitleEdit`, `ChartAxisTitleCommit`,
+`ChartAxisTitlePatch`, diagnostics, limits, and errors. Set and clear edits are
+atomic and exact-source checked: no-op and conflict handling, reversible
+patches, candidate reopen/readback, package-locality checks, and stale root
+preview invalidation remain part of the focused transaction. Native object
+identifiers, archive names, generated values, and wire views remain private;
+only the selected primary axis payload is rewritten, while the chart graph,
+opposite and secondary axes, unrelated members, and unknown wire spans remain
+preservation boundaries.
+
+The admitted route requires a rooted, uniquely selected chart graph with its
+title stand-in, chart non-style, unlocked drawable, primary axis role, and
+selected metadata and inbound-reference authority. Both source-built
+same-component graphs and Keynote-normalized `DocumentStylesheet` graphs are
+supported. Cross-component objects require matching physical stylesheet
+registration plus current, non-weak PackageMetadata external references in the
+proven owner direction; unrelated data references remain valid, while numeric
+data/object collisions, foreign ownership, malformed, duplicate, wrong-wire,
+noncanonical, role-aliased, locked, ambiguous, or otherwise unproven sources
+fail closed before staging. The `litchi-iwa` Keynote host now delegates
+axis-title read/set/remove operations through the semantic selector bridge; the
+former raw-ID axis-title CRUD route has no fallback. Other native chart,
+storage, formula, tile, and graph duties remain in `litchi-iwa`.
+
+`litchi-iwa-protos::keynote_chart_axis_title_codec` owns only the four selected
+fields (13/14 visibility and 15/16 text) from the generated
+`TSCH.Generated.ChartAxisNonStyleArchive` extension. Its private Buffa
+lazy-view projection is cross-checked by strict borrowed preflight and uses a
+presence-preserving wire-local rewrite with finite limits and the prepared
+plan -> requirements -> single execute path. The outer axis envelope and raw
+source bytes remain caller-owned; generated/Prost/Buffa values do not cross the
+semantic package boundary.
+
+Recorded scoped evidence is 23/23 codec cases, 16/16 focused
+`litchi-keynote` chart-axis-title cases, 10/10 chart-title cases, 3/3 focused
+`litchi-iwa` host regressions, 678/678 boundary unit cases, strict Clippy for
+the codec and package targets, and fixed-corpus fuzz smoke over 20 codec and 8
+package seeds. The full boundary command retains three unrelated pre-existing
+untracked Pages table-lock findings, and the broader Keynote suite retains its
+pre-existing soundtrack-order failures; these results are scoped and do not
+establish a full-workspace-green claim.
+
+Real Keynote verification opened the source-built `Wave112 Revenue` candidate,
+observed its category/value axes through the accessibility tree, saved it
+natively, closed it, and reopened it without repair. The focused owner then
+read the native-normalized `DocumentStylesheet` graph, proved an exact no-op,
+changed the value title to `Native Roundtrip`, restored the exact native bytes
+through the inverse patch, and Keynote opened that changed artifact with the
+new value-axis title. The source-built and native exact-inverse SHA-256 values
+are respectively
+`74a1876ab0b286a7ebc610e53b452e3a4c8cf8e779c1ec781aaa8f0e25803b31`
+and
+`87db4dc036ece68c27144ab0303d54517b02dc433b839337b598fdd677788a8c`;
+the disposable files are not checked-in fixtures.
+
+Finite resource reports remain conservative logical operation envelopes, not
+Package/SourceCatalog cache, decompressed-Archive, ZIP/Snappy, process
+allocator, RSS, or zero-copy telemetry. Workspace package and dependency
+topology do not change: the authoritative inventory remains 64 packages, 239
+internal dependency declarations, one migration host, and 13 ordered debts.
+The `litchi-iwa -> litchi-keynote` edge/debt 014, all other edges and debts,
+the generated-schema/Prost/Buffa ownership ledger, and the IWA monolith
+deletion gate remain open. Wave112 closes no workspace crate, production
+manifest dependency, edge, debt, or monolith gate.
