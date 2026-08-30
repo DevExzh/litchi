@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
@@ -36,6 +37,7 @@ use litchi_iwa_protos::keynote_chart_title_codec::{
 };
 use thiserror::Error;
 
+use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
 use super::{
     Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE, SemanticLimitKind, SlideRecord,
     unique_payload,
@@ -666,6 +668,191 @@ pub(super) fn select_chart(
     })
 }
 
+/// Resolve a chart selector while sharing the caller's aggregate axis
+/// budget. The ordinary chart-title API intentionally keeps its historical
+/// local accounting; axis owners enter through this private path so every
+/// temporary graph/catalog allocation and nested wire scan is charged to the
+/// same transaction ledger.
+pub(super) fn select_chart_with_budget(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    chart_selector: ChartSelector<'_>,
+    mutation_guards: bool,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<ChartSelection, AxisSupportError> {
+    let slide_position = resolve_slide_position(package, slide_selector)
+        .map_err(chart_axis_support::map_chart_title_error)?;
+    let graphs = chart_graphs_with_budget(package, slide_position, mutation_guards, budget)?;
+    charge_chart_catalog(&graphs, budget)?;
+    let catalog = ChartCatalog::try_from_titles(graphs.iter().map(|graph| graph.title.as_deref()))
+        .map_err(|_error| {
+            chart_axis_support::map_chart_title_error(ChartTitleError::Allocation {
+                amount: graphs.len(),
+            })
+        })?;
+    charge_chart_catalog_selection(&graphs, chart_selector, budget)?;
+    let chart_position = match chart_selector {
+        ChartSelector::Index(index) => graphs.get(index).map(|_graph| Position::new(index)).ok_or(
+            chart_axis_support::map_chart_title_error(ChartTitleError::ChartPositionNotFound {
+                position: Position::new(index),
+            }),
+        )?,
+        ChartSelector::Name(name) => {
+            let selected = catalog
+                .select_position(name)
+                .map_err(map_chart_selector_error)
+                .map_err(chart_axis_support::map_chart_title_error)?
+                .ok_or_else(|| {
+                    chart_axis_support::map_chart_title_error(ChartTitleError::ChartNameNotFound)
+                })?;
+            Position::new(selected)
+        },
+    };
+    let graph = graphs
+        .into_iter()
+        .nth(chart_position.get())
+        .ok_or(AxisSupportError::InvalidSource)?;
+    let title = graph
+        .title
+        .as_deref()
+        .map(|title| copy_title_with_budget(title, budget))
+        .transpose()?;
+    Ok(ChartSelection {
+        slide_position,
+        chart_position,
+        slide_identifier: graph.slide_identifier,
+        chart_identifier: graph.chart_identifier,
+        non_style_identifier: graph.non_style_identifier,
+        title,
+        slide_component_name: graph.slide_component_name,
+        non_style_component_name: graph.non_style_component_name,
+    })
+}
+
+fn selector_allocation_units(bytes: usize) -> Result<usize, AxisSupportError> {
+    bytes
+        .checked_add(size_of::<u64>() - 1)
+        .and_then(|value| value.checked_div(size_of::<u64>()))
+        .ok_or(AxisSupportError::InvalidSource)
+}
+
+fn charge_selector_allocation(
+    budget: &mut dyn AxisSupportBudget,
+    bytes: usize,
+) -> Result<(), AxisSupportError> {
+    let units = selector_allocation_units(bytes)?;
+    if bytes == 0 {
+        budget.charge_reference_vector(0)
+    } else {
+        budget.charge_reference_vector(units.max(1))
+    }
+}
+
+fn charge_selector_allocations(
+    budget: &mut dyn AxisSupportBudget,
+    count: usize,
+    bytes: usize,
+) -> Result<(), AxisSupportError> {
+    if count == 0 {
+        return Ok(());
+    }
+    charge_selector_allocation(budget, bytes)?;
+    for _ in 1..count {
+        charge_selector_allocation(budget, 0)?;
+    }
+    Ok(())
+}
+
+fn charge_selector_string(
+    budget: &mut dyn AxisSupportBudget,
+    value: &str,
+) -> Result<(), AxisSupportError> {
+    budget.charge_work(value.len())?;
+    if !value.is_empty() {
+        charge_selector_allocation(budget, value.len())?;
+    }
+    Ok(())
+}
+
+fn copy_title_with_budget(
+    title: &str,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<String, AxisSupportError> {
+    if title.len() > MAX_CHART_TITLE_BYTES {
+        return Err(AxisSupportError::LimitExceeded {
+            kind: chart_axis_support::AxisSupportLimitKind::TitleBytes,
+            observed: usize_to_u64(title.len()),
+            maximum: usize_to_u64(MAX_CHART_TITLE_BYTES),
+        });
+    }
+    charge_selector_string(budget, title)?;
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(title.len())
+        .map_err(|_error| AxisSupportError::Allocation {
+            amount: title.len(),
+        })?;
+    owned.push_str(title);
+    Ok(owned)
+}
+
+fn charge_chart_catalog(
+    graphs: &[ChartGraph],
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    // `try_from_titles` calls `try_reserve(1)` for each descriptor and then
+    // converts the vector to a boxed slice. Charge the conservative upper
+    // bound before entering that collection, including every borrowed-title
+    // copy performed by `try_boxed_str`.
+    let descriptor_bytes = graphs
+        .len()
+        .checked_mul(size_of::<crate::ChartDescriptor>())
+        .and_then(|value| value.checked_mul(8))
+        .ok_or(AxisSupportError::InvalidSource)?;
+    budget.charge_work(graphs.len())?;
+    let catalog_allocations = if graphs.is_empty() {
+        0
+    } else {
+        graphs
+            .len()
+            .checked_add(1)
+            .ok_or(AxisSupportError::InvalidSource)?
+    };
+    charge_selector_allocations(budget, catalog_allocations, descriptor_bytes)?;
+    for graph in graphs {
+        if let Some(title) = graph.title.as_deref() {
+            charge_selector_string(budget, title)?;
+        }
+    }
+    Ok(())
+}
+
+fn charge_chart_catalog_selection(
+    graphs: &[ChartGraph],
+    selector: ChartSelector<'_>,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    let ChartSelector::Name(name) = selector else {
+        return Ok(());
+    };
+    let title_bytes = graphs.iter().try_fold(0usize, |total, graph| {
+        total
+            .checked_add(graph.title.as_deref().map_or(0, str::len))
+            .ok_or(AxisSupportError::InvalidSource)
+    })?;
+    budget.charge_work(
+        graphs
+            .len()
+            .checked_add(title_bytes)
+            .and_then(|value| value.checked_add(name.len()))
+            .ok_or(AxisSupportError::InvalidSource)?,
+    )
+}
+
+fn chart_graph_error(error: ChartTitleError) -> AxisSupportError {
+    chart_axis_support::map_chart_title_error(error)
+}
+
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
@@ -714,6 +901,7 @@ fn chart_graphs(
         .map_err(|_error| ChartTitleError::Allocation {
             amount: z_order.len(),
         })?;
+    let reference_counts = ChartGraphReferenceCounts::new(&owned, &z_order)?;
     // The mutation guard below needs to prove that each selected non-style
     // object and title stand-in have exactly one chart owner. Keep the
     // package-wide index lazy so a slide with no charts never pays for the
@@ -742,8 +930,7 @@ fn chart_graphs(
             package,
             record,
             slide_component_name,
-            &owned,
-            &z_order,
+            &reference_counts,
             &chart_message.data,
             identifier,
         )?;
@@ -766,25 +953,120 @@ fn chart_graphs(
     Ok(graphs)
 }
 
+fn chart_graphs_with_budget(
+    package: &Package,
+    slide_position: Position,
+    mutation_guards: bool,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<Vec<ChartGraph>, AxisSupportError> {
+    let record = package
+        .slide_record_at(slide_position.get())
+        .map_err(map_read_error)
+        .map_err(chart_graph_error)?
+        .ok_or(ChartTitleError::SlidePositionNotFound {
+            position: slide_position,
+        })
+        .map_err(chart_graph_error)?;
+    let (slide_component_name, slide) = package
+        .object_with_component(record.slide_identifier)
+        .ok_or(AxisSupportError::InvalidSource)?;
+    let slide_payload = unique_payload(&slide.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")
+        .map_err(|_error| AxisSupportError::InvalidSource)?;
+    let limits = package
+        .wire_limits()
+        .map_err(map_wire_error)
+        .map_err(chart_graph_error)?;
+    let owned = chart_axis_support::repeated_references(
+        slide_payload,
+        SLIDE_OWNED_DRAWABLES_FIELD,
+        limits,
+        budget,
+    )?;
+    let z_order = chart_axis_support::repeated_references(
+        slide_payload,
+        SLIDE_DRAWABLES_Z_ORDER_FIELD,
+        limits,
+        budget,
+    )?;
+    let mut graphs = Vec::new();
+    if !z_order.is_empty() {
+        let graph_bytes = z_order
+            .len()
+            .checked_mul(size_of::<ChartGraph>())
+            .and_then(|value| value.checked_mul(4))
+            .ok_or(AxisSupportError::InvalidSource)?;
+        charge_selector_allocation(budget, graph_bytes)?;
+    }
+    graphs
+        .try_reserve(z_order.len())
+        .map_err(|_error| AxisSupportError::Allocation {
+            amount: z_order.len(),
+        })?;
+    let reference_counts = ChartGraphReferenceCounts::new_with_budget(&owned, &z_order, budget)?;
+    // Keep the package-wide owner index lazy so a slide with no charts does
+    // not retain its maps. The shared path charges each wire parse and map
+    // insertion directly on the caller's ledger.
+    let mut graph_owners = None;
+    for identifier in z_order.iter().copied() {
+        budget.charge_work(1)?;
+        let Some((component_name, drawable)) = package.object_with_component(identifier) else {
+            return Err(AxisSupportError::InvalidSource);
+        };
+        budget.charge_work(drawable.messages.len())?;
+        let mut chart_message = None;
+        for message in &drawable.messages {
+            if message.type_ != CHART_MESSAGE_TYPE {
+                continue;
+            }
+            if chart_message.replace(message).is_some() {
+                return Err(AxisSupportError::InvalidSource);
+            }
+        }
+        let Some(chart_message) = chart_message else {
+            continue;
+        };
+        if component_name != slide_component_name {
+            return Err(AxisSupportError::InvalidSource);
+        }
+        let graph = chart_graph_with_budget(
+            package,
+            record,
+            slide_component_name,
+            &reference_counts,
+            &chart_message.data,
+            identifier,
+            budget,
+        )?;
+        if mutation_guards {
+            if graph_owners.is_none() {
+                graph_owners = Some(scan_chart_graph_owners_with_budget(package, budget)?);
+            }
+            let owners = graph_owners
+                .as_ref()
+                .ok_or(AxisSupportError::InvalidSource)?;
+            budget.charge_work(2)?;
+            if owners.non_style.get(&graph.non_style_identifier).copied() != Some(1)
+                || owners.title_standin.get(&graph.title_identifier).copied() != Some(1)
+                || graph.chart_identifier == 0
+            {
+                return Err(AxisSupportError::InvalidSource);
+            }
+        }
+        graphs.push(graph);
+    }
+    Ok(graphs)
+}
+
 fn chart_graph(
     package: &Package,
     record: SlideRecord,
     slide_component_name: &str,
-    owned: &[u64],
-    z_order: &[u64],
+    reference_counts: &ChartGraphReferenceCounts,
     chart_data: &[u8],
     chart_identifier: u64,
 ) -> Result<ChartGraph, ChartTitleError> {
-    if owned
-        .iter()
-        .filter(|candidate| **candidate == chart_identifier)
-        .count()
-        != 1
-        || z_order
-            .iter()
-            .filter(|candidate| **candidate == chart_identifier)
-            .count()
-            != 1
+    if reference_counts.owned.get(&chart_identifier).copied() != Some(1)
+        || reference_counts.z_order.get(&chart_identifier).copied() != Some(1)
     {
         return Err(ChartTitleError::InvalidSource);
     }
@@ -833,6 +1115,201 @@ fn chart_graph(
         slide_component_name: slide_component_name.to_owned(),
         non_style_component_name: non_style_component.to_owned(),
     })
+}
+
+fn chart_graph_with_budget(
+    package: &Package,
+    record: SlideRecord,
+    slide_component_name: &str,
+    reference_counts: &ChartGraphReferenceCounts,
+    chart_data: &[u8],
+    chart_identifier: u64,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<ChartGraph, AxisSupportError> {
+    budget.charge_work(2)?;
+    if reference_counts.owned.get(&chart_identifier).copied() != Some(1)
+        || reference_counts.z_order.get(&chart_identifier).copied() != Some(1)
+    {
+        return Err(AxisSupportError::InvalidSource);
+    }
+    let limits = package
+        .wire_limits()
+        .map_err(map_wire_error)
+        .map_err(chart_graph_error)?;
+    let outer = chart_axis_support::accounted_wire_fields(chart_data, limits, budget)?;
+    let super_payload = chart_axis_support::unique_length_delimited_field(
+        &outer,
+        chart_data,
+        DRAWABLE_SUPER_FIELD,
+        budget,
+    )?
+    .ok_or(AxisSupportError::InvalidSource)?;
+    let chart_payload = chart_axis_support::unique_length_delimited_field(
+        &outer,
+        chart_data,
+        CHART_EXTENSION_FIELD,
+        budget,
+    )?
+    .ok_or(AxisSupportError::InvalidSource)?;
+    let parent = chart_axis_support::required_reference(
+        super_payload,
+        DRAWABLE_PARENT_FIELD,
+        limits,
+        budget,
+    )?;
+    let title_identifier = chart_axis_support::required_reference(
+        super_payload,
+        DRAWABLE_TITLE_FIELD,
+        limits,
+        budget,
+    )?;
+    if parent != record.slide_identifier || title_identifier == 0 {
+        return Err(AxisSupportError::InvalidSource);
+    }
+    let non_style_identifier = chart_axis_support::required_reference(
+        chart_payload,
+        CHART_NON_STYLE_FIELD,
+        limits,
+        budget,
+    )?;
+    if non_style_identifier == 0
+        || title_identifier == chart_identifier
+        || title_identifier == non_style_identifier
+        || non_style_identifier == chart_identifier
+    {
+        return Err(AxisSupportError::InvalidSource);
+    }
+    let (title_component, title_object) = package
+        .object_with_component(title_identifier)
+        .ok_or(AxisSupportError::InvalidSource)?;
+    let (non_style_component, non_style_object) = package
+        .object_with_component(non_style_identifier)
+        .ok_or(AxisSupportError::InvalidSource)?;
+    if title_component != slide_component_name {
+        return Err(AxisSupportError::InvalidSource);
+    }
+    let (_title_message_index, _title_message) =
+        chart_axis_support::unique_message(title_object, STANDIN_MESSAGE_TYPE, budget)?;
+    let (_non_style_message_index, non_style_message) =
+        chart_axis_support::unique_message(non_style_object, CHART_NON_STYLE_MESSAGE_TYPE, budget)?;
+    let title = read_chart_title_with_budget(non_style_message.data.as_slice(), limits, budget)?;
+    charge_selector_string(budget, slide_component_name)?;
+    charge_selector_string(budget, non_style_component)?;
+    Ok(ChartGraph {
+        slide_identifier: record.slide_identifier,
+        chart_identifier,
+        non_style_identifier,
+        title_identifier,
+        title,
+        slide_component_name: slide_component_name.to_owned(),
+        non_style_component_name: non_style_component.to_owned(),
+    })
+}
+
+#[derive(Debug, Default)]
+struct ChartGraphReferenceCounts {
+    owned: HashMap<u64, usize>,
+    z_order: HashMap<u64, usize>,
+}
+
+impl ChartGraphReferenceCounts {
+    fn new(owned: &[u64], z_order: &[u64]) -> Result<Self, ChartTitleError> {
+        let mut counts = Self::default();
+        counts
+            .owned
+            .try_reserve(owned.len())
+            .map_err(|_error| ChartTitleError::Allocation {
+                amount: owned.len(),
+            })?;
+        counts
+            .z_order
+            .try_reserve(z_order.len())
+            .map_err(|_error| ChartTitleError::Allocation {
+                amount: z_order.len(),
+            })?;
+        for &identifier in owned {
+            increment_chart_reference_count(&mut counts.owned, identifier)?;
+        }
+        for &identifier in z_order {
+            increment_chart_reference_count(&mut counts.z_order, identifier)?;
+        }
+        Ok(counts)
+    }
+
+    fn new_with_budget(
+        owned: &[u64],
+        z_order: &[u64],
+        budget: &mut dyn AxisSupportBudget,
+    ) -> Result<Self, AxisSupportError> {
+        let mut counts = Self::default();
+        charge_selector_hash_map(owned.len(), budget)?;
+        charge_selector_hash_map(z_order.len(), budget)?;
+        budget.charge_work(
+            owned
+                .len()
+                .checked_add(z_order.len())
+                .ok_or(AxisSupportError::InvalidSource)?,
+        )?;
+        counts
+            .owned
+            .try_reserve(owned.len())
+            .map_err(|_error| AxisSupportError::Allocation {
+                amount: owned.len(),
+            })?;
+        counts
+            .z_order
+            .try_reserve(z_order.len())
+            .map_err(|_error| AxisSupportError::Allocation {
+                amount: z_order.len(),
+            })?;
+        for &identifier in owned {
+            increment_chart_reference_count_with_budget(&mut counts.owned, identifier, budget)?;
+        }
+        for &identifier in z_order {
+            increment_chart_reference_count_with_budget(&mut counts.z_order, identifier, budget)?;
+        }
+        Ok(counts)
+    }
+}
+
+fn increment_chart_reference_count(
+    counts: &mut HashMap<u64, usize>,
+    identifier: u64,
+) -> Result<(), ChartTitleError> {
+    let count = counts.entry(identifier).or_insert(0);
+    *count = count.checked_add(1).ok_or(ChartTitleError::InvalidSource)?;
+    Ok(())
+}
+
+fn increment_chart_reference_count_with_budget(
+    counts: &mut HashMap<u64, usize>,
+    identifier: u64,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    budget.charge_work(1)?;
+    let count = counts.entry(identifier).or_insert(0);
+    *count = count
+        .checked_add(1)
+        .ok_or(AxisSupportError::InvalidSource)?;
+    Ok(())
+}
+
+fn charge_selector_hash_map(
+    entries: usize,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    if entries == 0 {
+        return Ok(());
+    }
+    // HashMap::try_reserve(entries) allocates a bucket table whose capacity
+    // is implementation-defined. Four key/value slots per requested entry
+    // cover the current SwissTable growth/control-byte overhead while
+    // remaining a checked conservative bound for future allocators.
+    let bytes = entries
+        .checked_mul(size_of::<(u64, usize)>())
+        .and_then(|value| value.checked_mul(4))
+        .ok_or(AxisSupportError::InvalidSource)?;
+    charge_selector_allocation(budget, bytes)
 }
 
 fn repeated_references(
@@ -1005,6 +1482,71 @@ fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, ChartT
     Ok(owners)
 }
 
+fn scan_chart_graph_owners_with_budget(
+    package: &Package,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<ChartGraphOwners, AxisSupportError> {
+    let limits = package
+        .wire_limits()
+        .map_err(map_wire_error)
+        .map_err(chart_graph_error)?;
+    let mut owners = ChartGraphOwners::default();
+    for component in package.state.source.components().iter() {
+        budget.charge_work(1)?;
+        for object in &component.archive().objects {
+            budget.charge_work(1)?;
+            for message in &object.messages {
+                budget.charge_work(1)?;
+                if message.type_ != CHART_MESSAGE_TYPE {
+                    continue;
+                }
+                let fields = chart_axis_support::accounted_wire_fields(
+                    message.data.as_slice(),
+                    limits,
+                    budget,
+                )?;
+                let drawable_payload = chart_axis_support::unique_length_delimited_field(
+                    &fields,
+                    message.data.as_slice(),
+                    DRAWABLE_SUPER_FIELD,
+                    budget,
+                )?
+                .ok_or(AxisSupportError::InvalidSource)?;
+                let title_identifier = chart_axis_support::required_reference(
+                    drawable_payload,
+                    DRAWABLE_TITLE_FIELD,
+                    limits,
+                    budget,
+                )?;
+                let chart_payload = chart_axis_support::unique_length_delimited_field(
+                    &fields,
+                    message.data.as_slice(),
+                    CHART_EXTENSION_FIELD,
+                    budget,
+                )?
+                .ok_or(AxisSupportError::InvalidSource)?;
+                let non_style_identifier = chart_axis_support::required_reference(
+                    chart_payload,
+                    CHART_NON_STYLE_FIELD,
+                    limits,
+                    budget,
+                )?;
+                increment_graph_owner_with_budget(
+                    &mut owners.non_style,
+                    non_style_identifier,
+                    budget,
+                )?;
+                increment_graph_owner_with_budget(
+                    &mut owners.title_standin,
+                    title_identifier,
+                    budget,
+                )?;
+            }
+        }
+    }
+    Ok(owners)
+}
+
 fn increment_graph_owner(
     owners: &mut HashMap<u64, usize>,
     identifier: u64,
@@ -1018,6 +1560,25 @@ fn increment_graph_owner(
         owners.insert(identifier, 1);
     }
     Ok(())
+}
+
+fn increment_graph_owner_with_budget(
+    owners: &mut HashMap<u64, usize>,
+    identifier: u64,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<(), AxisSupportError> {
+    if let Some(count) = owners.get_mut(&identifier) {
+        *count = count
+            .checked_add(1)
+            .ok_or(AxisSupportError::InvalidSource)?;
+    } else {
+        charge_selector_hash_map(1, budget)?;
+        owners
+            .try_reserve(1)
+            .map_err(|_error| AxisSupportError::Allocation { amount: 1 })?;
+        owners.insert(identifier, 1);
+    }
+    budget.charge_work(1)
 }
 
 fn rewrite_chart_title(
@@ -1154,6 +1715,69 @@ fn read_chart_title(data: &[u8], limits: WireLimits) -> Result<Option<String>, C
     decode_visible_chart_title(extension, chart_title_decode_options(limits)?)
         .map_err(map_chart_title_codec_error)?
         .map(copy_title)
+        .transpose()
+}
+
+fn read_chart_title_with_budget(
+    data: &[u8],
+    limits: WireLimits,
+    budget: &mut dyn AxisSupportBudget,
+) -> Result<Option<String>, AxisSupportError> {
+    let fields = chart_axis_support::accounted_wire_fields(data, limits, budget)?;
+    let mut extension_field = None;
+    let mut extension_count = 0usize;
+    budget.charge_work(fields.len())?;
+    for field in &fields {
+        if field.number() == GENERATED_CHART_NON_STYLE_EXTENSION_FIELD {
+            extension_count = extension_count
+                .checked_add(1)
+                .ok_or(AxisSupportError::InvalidSource)?;
+            extension_field = Some(*field);
+        }
+    }
+    let Some(field) = extension_field else {
+        return Ok(None);
+    };
+    if extension_count != 1 || field.wire_type() != 2 {
+        return Err(AxisSupportError::InvalidSource);
+    }
+    field
+        .validate_canonical_framing(data)
+        .map_err(map_wire_error)
+        .map_err(chart_graph_error)?;
+    let extension = field
+        .payload(data)
+        .map_err(map_wire_error)
+        .map_err(chart_graph_error)?;
+    // `decode_visible_chart_title` returns a borrowed view, but its strict
+    // decoder still traverses every encoded field. Charge the codec's
+    // source-sized worst case before invoking it; the title's owned copy is
+    // charged separately before `String::try_reserve_exact` below.
+    let worst_fields = extension
+        .len()
+        .checked_mul(4)
+        .ok_or(AxisSupportError::InvalidSource)?
+        .max(1);
+    let worst_work = extension
+        .len()
+        .checked_mul(8)
+        .ok_or(AxisSupportError::InvalidSource)?
+        .max(1);
+    budget.charge_input(extension.len())?;
+    budget.finish_wire_scan(worst_fields)?;
+    budget.charge_work(
+        worst_work
+            .checked_sub(worst_fields)
+            .ok_or(AxisSupportError::InvalidSource)?,
+    )?;
+    let title = decode_visible_chart_title(
+        extension,
+        chart_title_decode_options(limits).map_err(chart_graph_error)?,
+    )
+    .map_err(map_chart_title_codec_error)
+    .map_err(chart_graph_error)?;
+    title
+        .map(|title| copy_title_with_budget(title, budget))
         .transpose()
 }
 

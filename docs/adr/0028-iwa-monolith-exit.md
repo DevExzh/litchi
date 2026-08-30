@@ -6778,3 +6778,41 @@ The authoritative inventory remains 64 workspace packages, 239 internal
 dependency declarations, and 13 ordered migration debts. No workspace crate,
 production dependency edge, ordered debt, format owner, generated-schema/
 Prost/Buffa owner, or monolith gate closes in Wave113.
+
+## 2026-08-30 amendment: Wave114 Keynote primary value-axis exit
+
+Wave114 moves the Keynote primary value-axis aggregate (bounds, steps, and
+scale) to a selector-first `litchi-keynote` owner. Its private Buffa codec
+performs strict raw preflight, with a bounded eager borrowed-view exception
+for generated non-style fields 5, 6, 8, 17, and 18; field 4 (decades) is
+strictly validated and preserved. A shared chart-axis graph authority now
+owns the selection path. Exact no-op and inverse behavior, selected-message
+locality, and finite transaction resource accounting are verified.
+
+The six raw-ID host methods
+`slide_chart_value_axis_bounds`, `set_slide_chart_value_axis_bounds`,
+`slide_chart_value_axis_steps`, `set_slide_chart_value_axis_steps`,
+`slide_chart_value_axis_scale`, and `set_slide_chart_value_axis_scale`, as
+well as the `axis_bounds`, `axis_steps`, and `axis_scale` modules, are
+retired. This is a focused value-axis seam exit; broader chart and graph
+ownership remains open.
+
+Scoped evidence is 13 common-axis, 18 codec, 17 production-guard, 20 value-
+axis, 16 axis-title, 10 chart-title, and 1 typed-API test; 687/687
+boundary-unit tests; low sanitizer smoke over 28 files/29 executions; and
+high-fuzz smoke over 10 seeds/11 runs. The live boundary checker reports only
+the three known unrelated untracked Pages table-lock findings, so this is not
+a full-workspace-green claim.
+
+Computer Use verified the changed artifact in Keynote: Logarithmic scale,
+minimum 1, maximum 120, and 2 decades were shown, with no repair after close
+and reopen. The source, edited, and native-save SHA-256 values are
+`74a1876ab0b286a7ebc610e53b452e3a4c8cf8e779c1ec781aaa8f0e25803b31`,
+`10d215489857fff5c3bc93dfd68e931d8282aa069b2cefacd03fe0b687f573d6`, and
+`783c1f750d2012c25186b4a4379fba0a4cdf13c75e976139f6ab37b43c4acf12`,
+respectively. A native no-op retained the same SHA and reported
+`changed=false`.
+
+The authoritative topology remains 64 packages, 239 internal dependency
+edges, 13 debts, and one monolith host. Debt 014 and the open exit edge
+remain; Wave114 closes no topology, debt, or monolith-deletion gate.

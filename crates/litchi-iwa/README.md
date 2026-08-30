@@ -209,14 +209,20 @@ titles remain independent through duplicate, delete, and package round-trip
 operations.
 
 The value-axis `Min` and `Max` fields are represented without sentinel values
-by `Bounds` and `Bound`. Read them through
-`body_chart_value_axis_bounds`, `sheet_chart_value_axis_bounds`, or
-`slide_chart_value_axis_bounds`, then use the matching
-`set_*_chart_value_axis_bounds` method to modify the native
-`Axis > Value (Y) > Axis Scale` controls. Each endpoint is independently optional (`None` means
-the app's `Auto` value); `Bounds::automatic()` restores both
-endpoints, while invalid non-finite or inverted ranges are rejected before any
-package mutation.
+by `Bounds` and `Bound`. Pages and Numbers still expose their corresponding
+legacy migration-host bounds, steps, and scale methods while those format
+owners are being migrated. Keynote value-axis settings are now owned by the
+selector-first `litchi_keynote::Package` aggregate API:
+`slide_chart_value_axis_settings`,
+`edit_slide_chart_value_axis_settings`, and
+`apply_slide_chart_value_axis_settings`. Select a slide with
+`SlideSelector` and a chart with `ChartSelector`, then update one
+`ValueAxisSettings` value atomically through the edit's `set`, `set_bounds`,
+`set_steps`, or `set_scale` methods. The focused owner validates graph
+ownership, preserves unknown native fields, and keeps exact-source inverse
+patches; it does not expose Keynote drawable IDs. Each bound remains
+independently optional (`None` means the app's `Auto` value), and invalid
+non-finite or inverted ranges are rejected before package mutation.
 
 Axis-line visibility is likewise typed through
 `body_chart_axis_line_visible`, `sheet_chart_axis_line_visible`, and

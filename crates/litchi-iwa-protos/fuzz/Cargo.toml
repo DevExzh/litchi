@@ -164,6 +164,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_chart_axis_value_settings_codec"
+path = "fuzz_targets/keynote_chart_axis_value_settings_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_chart_caption"
 path = "fuzz_targets/keynote_chart_caption.rs"
 test = false

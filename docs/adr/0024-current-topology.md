@@ -3522,3 +3522,42 @@ The authoritative inventory remains 64 workspace packages, 239 internal
 dependency declarations, and 13 ordered migration debts. No workspace crate,
 production dependency edge, ordered debt, format owner, generated-schema/
 Prost/Buffa owner, or monolith gate closes in Wave113.
+
+## 2026-08-30 amendment: Wave114 current-topology Keynote value-axis owner
+
+Wave114 moves the Keynote primary value-axis aggregate (bounds, steps, and
+scale) into a selector-first `litchi-keynote` package owner. The owner exposes
+typed settings and an atomic edit/patch/commit path without raw identifiers or
+low-level objects, and shares chart-axis graph authority with the existing
+axis-title owner. The former six raw-ID host methods and the private
+`axis_bounds`, `axis_steps`, and `axis_scale` modules are retired; no host
+fallback remains.
+
+The focused codec is private Buffa with strict raw-wire preflight and a bounded
+eager borrowed-view exception for generated non-style fields 5, 6, 8, 17, and
+18. Field 4 (decades) is strictly validated and preserved. Source spans remain
+the rewrite authority, with exact no-op and inverse behavior, selected-message
+and ZIP/member locality checks, and finite transaction resource accounting.
+
+Scoped evidence is 13/13 common-axis, 18/18 codec, 17/17 production-guard,
+20/20 value-axis, 16/16 axis-title, 10/10 chart-title, and 1/1 typed-API
+tests; 687/687 boundary unit cases; low sanitizer smoke over 28 files and 29
+executions; and high fuzz smoke over 10 seeds and 11 runs. The live boundary
+checker reports only the three known unrelated untracked Pages table-lock
+findings. These results are scoped and do not claim a full-workspace-green
+build.
+
+Computer Use verified the native Keynote artifact after save, close, and
+reopen without repair: the value axis showed `Logarithmic`, Min `1`, Max
+`120`, and Decades `2`. The source, focused edited, and native-save SHA-256
+values are respectively
+`74a1876ab0b286a7ebc610e53b452e3a4c8cf8e779c1ec781aaa8f0e25803b31`,
+`10d215489857fff5c3bc93dfd68e931d8282aa069b2cefacd03fe0b687f573d6`, and
+`783c1f750d2012c25186b4a4379fba0a4cdf13c75e976139f6ab37b43c4acf12`.
+Native no-op output retained the same SHA and reported `changed=false`.
+
+This remains a focused owner and host-seam migration, not a topology or debt
+closure. The authoritative inventory remains 64 workspace packages, 239
+internal dependency edges, 13 ordered debts, and one monolithic IWA host.
+The `litchi-iwa -> litchi-keynote` edge and debt 014/open monolith-exit edge
+remain open; no topology, debt, or monolith gate closes in Wave114.

@@ -12,15 +12,15 @@ use litchi_iwa_common::chart::error_bar::{
 use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
 use crate::charts::{
-    Axis, Bound, Bounds, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize,
-    ChartLegendFill, ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect,
-    ChartLegendShadow, ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle,
-    ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit,
-    ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder,
-    ChartSeriesValueLabelAutoFit, ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index,
-    LabelAffixes, LabelVisibility, LeaderLineVisibility, MajorStepCount, MinorStepCount,
-    NegativeStyle, NumberFormat, Scale, Steps, TickMarkLocation, Visibility,
+    Axis, ChartCornerRadius, ChartDonutInnerRadius, ChartFont, ChartFontSize, ChartLegendFill,
+    ChartLegendFont, ChartLegendFontSize, ChartLegendFrame, ChartLegendRect, ChartLegendShadow,
+    ChartLegendStroke, ChartPieLabelDistance, ChartPieStartAngle, ChartPieWedgeExplosion,
+    ChartPieWedgeIndex, ChartRoundedCorners, ChartSeriesErrorBarAutoFit, ChartSeriesStroke,
+    ChartSeriesStrokePattern, ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
+    ChartSeriesValueLabelLocation, ChartShadow, DecimalPlaces, Index, LabelAffixes,
+    LabelVisibility, LeaderLineVisibility, NegativeStyle, NumberFormat, TickMarkLocation,
+    Visibility,
 };
 use crate::keynote::KeynoteDocumentBuilder;
 use crate::shapes::{
@@ -1123,78 +1123,6 @@ fn selector_chart_axis_title_builder_route_is_semantic_and_atomic() {
 }
 
 #[test]
-fn scratch_presentation_supports_native_chart_value_axis_bounds_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
-    let source = editor
-        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
-        .unwrap();
-    let automatic = Bounds::automatic();
-    let fixed = Bounds::fixed(Bound::new(-10.0).unwrap(), Bound::new(40.0).unwrap()).unwrap();
-    let minimum_only = Bounds::new(Some(Bound::new(-5.0).unwrap()), None).unwrap();
-
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
-            .unwrap(),
-        automatic
-    );
-    let baseline = editor.to_bytes().unwrap();
-    editor
-        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, automatic)
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    editor
-        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, fixed)
-        .unwrap();
-    let duplicate = editor
-        .duplicate_slide_chart(0, chart_selector(&editor, &source))
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_bounds(0, duplicate.drawable_object_id)
-            .unwrap(),
-        fixed
-    );
-
-    editor
-        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, minimum_only)
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
-            .unwrap(),
-        minimum_only
-    );
-
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
-            .unwrap(),
-        minimum_only
-    );
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_bounds(0, duplicate.drawable_object_id)
-            .unwrap(),
-        fixed
-    );
-    reopened
-        .set_slide_chart_value_axis_bounds(0, source.drawable_object_id, automatic)
-        .unwrap();
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_bounds(0, source.drawable_object_id)
-            .unwrap(),
-        automatic
-    );
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
-        .unwrap();
-}
-
-#[test]
 fn scratch_presentation_supports_native_chart_border_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let source = editor
@@ -1376,84 +1304,6 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
         .unwrap();
     assert!(reopened.slide_charts(0).unwrap().is_empty());
-}
-
-#[test]
-fn scratch_presentation_supports_native_chart_value_axis_steps_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
-    let source = editor
-        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
-        .unwrap();
-    let defaults = Steps::fixed(
-        MajorStepCount::new(5).unwrap(),
-        MinorStepCount::new(1).unwrap(),
-    );
-    let fixed = Steps::fixed(
-        MajorStepCount::new(6).unwrap(),
-        MinorStepCount::new(2).unwrap(),
-    );
-    let major_only = Steps::new(Some(MajorStepCount::new(4).unwrap()), None);
-
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_steps(0, source.drawable_object_id)
-            .unwrap(),
-        defaults
-    );
-    let baseline = editor.to_bytes().unwrap();
-    editor
-        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, defaults)
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    editor
-        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, fixed)
-        .unwrap();
-    let duplicate = editor
-        .duplicate_slide_chart(0, chart_selector(&editor, &source))
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_steps(0, duplicate.drawable_object_id)
-            .unwrap(),
-        fixed
-    );
-
-    editor
-        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, major_only)
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_steps(0, source.drawable_object_id)
-            .unwrap(),
-        major_only
-    );
-
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_steps(0, source.drawable_object_id)
-            .unwrap(),
-        major_only
-    );
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_steps(0, duplicate.drawable_object_id)
-            .unwrap(),
-        fixed
-    );
-    reopened
-        .set_slide_chart_value_axis_steps(0, source.drawable_object_id, Steps::automatic())
-        .unwrap();
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_steps(0, source.drawable_object_id)
-            .unwrap(),
-        Steps::automatic()
-    );
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
-        .unwrap();
 }
 
 #[test]
@@ -2529,69 +2379,6 @@ fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
         .set_slide_chart_legend_shadow(0, object_id, ChartLegendShadow::Inherited)
         .unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), baseline);
-}
-
-#[test]
-fn scratch_presentation_supports_native_chart_value_axis_scale_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
-    let source = editor
-        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
-        .unwrap();
-
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_scale(0, source.drawable_object_id)
-            .unwrap(),
-        Scale::Linear
-    );
-    let baseline = editor.to_bytes().unwrap();
-    editor
-        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, Scale::Linear)
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-
-    editor
-        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, Scale::Logarithmic)
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_scale(0, source.drawable_object_id)
-            .unwrap(),
-        Scale::Logarithmic
-    );
-
-    let duplicate = editor
-        .duplicate_slide_chart(0, chart_selector(&editor, &source))
-        .unwrap();
-    assert_eq!(
-        editor
-            .slide_chart_value_axis_scale(0, duplicate.drawable_object_id)
-            .unwrap(),
-        Scale::Logarithmic
-    );
-    editor
-        .set_slide_chart_value_axis_scale(0, source.drawable_object_id, Scale::Linear)
-        .unwrap();
-
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_scale(0, source.drawable_object_id)
-            .unwrap(),
-        Scale::Linear
-    );
-    assert_eq!(
-        reopened
-            .slide_chart_value_axis_scale(0, duplicate.drawable_object_id)
-            .unwrap(),
-        Scale::Logarithmic
-    );
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &source))
-        .unwrap();
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
-        .unwrap();
 }
 
 #[test]

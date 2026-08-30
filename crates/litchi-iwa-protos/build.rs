@@ -29,6 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_chart_caption_graph_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
@@ -132,6 +133,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     enforce_keynote_chart_title_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_chart_axis_title_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_chart_axis_value_settings_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -430,6 +435,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_keynote_chart_axis_title_projection_budget(
         &buffa_keynote_chart_axis_title_out_directory,
+    )?;
+
+    // Keynote chart value-axis settings need only the adjacent decades field,
+    // major/minor step counts, scale enum, and the two nested user-bound
+    // numbers.  The handwritten codec performs strict raw preflight before
+    // touching this private borrowed view and preserves every source span.
+    let buffa_keynote_chart_axis_value_settings_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-chart-axis-value-settings");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCHChartAxisValueSettingsArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_chart_axis_value_settings_out_directory)
+        .include_file("iwa_keynote_chart_axis_value_settings_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_chart_axis_value_settings_projection_budget(
+        &buffa_keynote_chart_axis_value_settings_out_directory,
     )?;
 
     // Numbers reaches a table model through field 2 of TableInfo. Keep the
@@ -1076,6 +1104,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "3ef9edf45976054285d35708198d42440a9fd38eb5eca7e5d57561afc156c0f5",
         ),
         (
+            "TSCHChartAxisValueSettingsArchive.proto",
+            1115,
+            "cef1a983d4262d0d16acdbb37a5fed00e06f15cf156c4a98093651082b8a1174",
+        ),
+        (
             "TSDCommentStorageArchive.proto",
             1173,
             "396d98fd78f6a417a57af4a1e7f3830362e3174753687aef2fe49aaf7a88087d",
@@ -1275,6 +1308,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_keynote_chart_axis_title_generated {",
         ),
         (
+            "src/keynote_chart_axis_value_settings_codec.rs",
+            "crate::buffa_keynote_chart_axis_value_settings_generated::",
+            "mod buffa_keynote_chart_axis_value_settings_generated {",
+        ),
+        (
             "src/keynote_placeholder_text_codec.rs",
             "crate::buffa_keynote_placeholder_text_generated::",
             "mod buffa_keynote_placeholder_text_generated {",
@@ -1435,6 +1473,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_pages_body_generated {",
         ),
     ];
+    // This scalar projection deliberately uses Buffa's borrowed eager view
+    // only after its own complete strict preflight.  Keep the exception
+    // explicit: every other generated ingress remains on the lazy-view path,
+    // and adding another eager codec must be an audited build-script change.
+    const EAGER_VIEW_CODECS: &[&str] = &["src/keynote_chart_axis_value_settings_codec.rs"];
     // Not every focused codec needs a generated view.  Keep those raw-only
     // paths explicit as well, so adding a new `*_codec.rs` cannot silently
     // bypass the production ingress review.  Raw entries are checked below
@@ -1485,7 +1528,13 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         // the shared source slicer removes every test-only item without
         // truncating production at the first such probe.
         let production = production_codec_source(&source);
-        if !production.contains("decode_lazy_view")
+        let eager_view = EAGER_VIEW_CODECS.contains(path);
+        let view_decode_ok = if eager_view {
+            production.contains("decode_view(") && !production.contains("decode_lazy_view")
+        } else {
+            production.contains("decode_lazy_view")
+        };
+        if !view_decode_ok
             || !production.contains(generated_marker)
             || !has_exact_private_module_declaration(&lib, private_module_marker)
             || FORBIDDEN_PROST_CODEC_MARKERS
@@ -1496,7 +1545,8 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
                 .any(|fragment| production.contains(fragment))
         {
             return Err(format!(
-                "production Buffa ingress ratchet failed for {path}: expected private {generated_marker} lazy decode and no Prost decode"
+                "production Buffa ingress ratchet failed for {path}: expected private {generated_marker} {} view decode and no Prost decode",
+                if eager_view { "eager" } else { "lazy" }
             )
             .into());
         }
@@ -2673,6 +2723,106 @@ optional string tschchartaxisvaluetitle = 16;\n\
     {
         return Err(
             "derived Keynote chart-axis-title projection/router drifted from TSCH.Generated.ChartAxisNonStyleArchive fields 13-16, exposed the outer chart transaction, or introduced production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_chart_axis_value_settings_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSCH_NON_STYLE_FIELDS: [&str; 8] = [
+        "message ChartAxisNonStyleArchive {",
+        "optional int32 tschchartaxisvaluenumberofdecades = 4;",
+        "optional int32 tschchartaxisvaluenumberofmajorgridlines = 5;",
+        "optional int32 tschchartaxisvaluenumberofminorgridlines = 6;",
+        "optional int32 tschchartaxisvaluescale = 8;",
+        "optional .TSCH.ChartsNSNumberDoubleArchive tschchartaxisdefaultusermax = 17;",
+        "optional .TSCH.ChartsNSNumberDoubleArchive tschchartaxisdefaultusermin = 18;",
+        "extend .TSCH.ChartAxisNonStyleArchive {",
+    ];
+    const TSCH_NUMBER_FIELD: &str =
+        "message ChartsNSNumberDoubleArchive {\n  optional double number_archive = 1;";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message ChartAxisValueSettingsArchive {\n\
+optional int32 tschchartaxisvaluenumberofdecades = 4;\n\
+optional int32 tschchartaxisvaluenumberofmajorgridlines = 5;\n\
+optional int32 tschchartaxisvaluenumberofminorgridlines = 6;\n\
+optional int32 tschchartaxisvaluescale = 8;\n\
+optional ChartsNsNumberDoubleArchive tschchartaxisdefaultusermax = 17;\n\
+optional ChartsNsNumberDoubleArchive tschchartaxisdefaultusermin = 18;\n\
+}\n\
+message ChartsNsNumberDoubleArchive {\n\
+optional double number_archive = 1;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 17] = [
+        "const CHART_AXIS_VALUE_DECADES_FIELD: u32 = 4;",
+        "const CHART_AXIS_VALUE_MAJOR_STEPS_FIELD: u32 = 5;",
+        "const CHART_AXIS_VALUE_MINOR_STEPS_FIELD: u32 = 6;",
+        "const CHART_AXIS_VALUE_SCALE_FIELD: u32 = 8;",
+        "const CHART_AXIS_VALUE_MAXIMUM_FIELD: u32 = 17;",
+        "const CHART_AXIS_VALUE_MINIMUM_FIELD: u32 = 18;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub fn decode_axis_value_settings<'source>(",
+        "pub fn decode_axis_value_settings_with_report<'source>(",
+        "pub fn prepare_axis_value_settings_rewrite<'source>(",
+        "fn preflight_axis_value_settings(",
+        "fn next_strict_field<",
+        "fn require_canonical_i32(",
+        "fn require_canonical_f64(",
+        "decode_view(source)",
+        "pub fn rewrite_axis_value_settings(",
+        "pub struct AxisValueSettingsSnapshot<'source>",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_chart_axis_value_settings_generated {",
+        "/buffa-keynote-chart-axis-value-settings/iwa_keynote_chart_axis_value_settings_buffa_protos.rs",
+    ];
+
+    let tsch = fs::read_to_string(proto_directory.join("TSCHArchives.GEN.proto"))?;
+    let tsch_common = fs::read_to_string(proto_directory.join("TSCHArchives.Common.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSCHChartAxisValueSettingsArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let expected_projection = normalize(PROJECTION_SCHEMA);
+    let codec = fs::read_to_string("src/keynote_chart_axis_value_settings_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !TSCH_NON_STYLE_FIELDS
+        .iter()
+        .all(|declaration| tsch.matches(declaration).count() == 1)
+        || tsch_common.matches(TSCH_NUMBER_FIELD).count() != 1
+        || normalize(&projection) != expected_projection
+        || projection.len() > 3 * 1024
+        || projection.contains("repeated ")
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("decode_lazy_view")
+        || !production_codec.contains("decode_view(source)")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+        || production_codec.contains("chart_graph")
+        || production_codec.contains("IWorkPackage")
+    {
+        return Err(
+                "derived Keynote chart value-axis settings projection/router drifted from TSCH.Generated.ChartAxisNonStyleArchive fields 4-8/17-18, lost strict preflight before the private borrowed decode_view, exposed the outer chart transaction, or introduced production encoding"
                 .into(),
         );
     }
@@ -6345,6 +6495,48 @@ fn enforce_keynote_chart_axis_title_projection_budget(
     {
         return Err(format!(
             "Keynote chart-axis-title projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_chart_axis_value_settings_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    // Buffa emits five source units for this scalar-only projection (the
+    // include file plus the root/nested view and owned-view companions). Keep
+    // the ceiling finite and reject any accidental repeated/deferred vector
+    // closure.
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 80 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote chart value-axis settings projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

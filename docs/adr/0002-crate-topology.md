@@ -4087,3 +4087,37 @@ The authoritative inventory remains 64 workspace packages, 239 internal
 dependency declarations, and 13 ordered migration debts. No workspace crate,
 production dependency edge, ordered debt, format owner, generated-schema/
 Prost/Buffa owner, or monolith gate closes in Wave113.
+
+## 2026-08-30 amendment: Wave114 Keynote value-axis ownership
+
+Wave114 moves the Keynote primary value-axis aggregate (bounds, steps, and
+scale) to a selector-first `litchi-keynote` package owner. The private Buffa
+codec performs strict raw preflight and uses a bounded eager borrowed-view
+exception for generated non-style fields 5, 6, 8, 17, and 18; field 4
+(`decades`) is strictly validated and preserved. Shared chart-axis graph
+authority, exact no-op/inverse/locality proofs, and finite transaction resource
+accounting remain below the public archive-free API. The old six raw-ID host
+methods and `axis_bounds`, `axis_steps`, and `axis_scale` modules are retired.
+
+Scoped evidence includes 13/13 common-axis tests, 18/18 codec tests, 17/17
+production-guard tests, 20/20 value-axis integration tests, 16/16 axis-title
+tests, 10/10 chart-title tests, 1/1 typed-API test, 687/687 boundary unit
+tests, low sanitizer smoke over 28 corpus files and 29 executions, and high
+fuzz smoke over 10 seeds and 11 runs. The live boundary checker reports only
+the three known unrelated untracked Pages table-lock findings; this is not a
+full-workspace-green claim.
+
+Computer Use verified the changed artifact in native Keynote: the value axis
+showed `Logarithmic`, minimum `1`, maximum `120`, and `Decades 2`, then saved,
+closed, and reopened without repair. The source, edited, and native-save
+SHA-256 values are respectively
+`74a1876ab0b286a7ebc610e53b452e3a4c8cf8e779c1ec781aaa8f0e25803b31`,
+`10d215489857fff5c3bc93dfd68e931d8282aa069b2cefacd03fe0b687f573d6`, and
+`783c1f750d2012c25186b4a4379fba0a4cdf13c75e976139f6ab37b43c4acf12`.
+Reading the native save proved a semantic no-op with the same SHA and
+`changed=false`.
+
+The authoritative topology remains 64 workspace packages, 239 internal
+dependency edges, 13 ordered debts, and one monolith host. Debt 014 and the
+open `litchi-iwa -> litchi-keynote` exit edge remain open; no topology or debt
+closure is claimed by this amendment.

@@ -36,7 +36,8 @@ pub(crate) const FORBIDDEN_PROST_CODEC_MARKERS: &[&str] = &[
 ];
 
 /// Generated Buffa's owned-view surface is not an ingress boundary. The
-/// focused codecs may force a borrowed lazy view, but they must not retain a
+/// focused codecs may force a borrowed lazy or eager view after their own
+/// strict preflight, but they must not retain a
 /// `Bytes`-backed `OwnedView`, convert it into an owned generated message, or
 /// ask a generated view to allocate an encoded byte container. Keep these
 /// markers specific to Buffa's ownership helpers instead of banning every
@@ -50,10 +51,10 @@ pub(crate) const FORBIDDEN_BUFFA_OWNERSHIP_MARKERS: &[&str] = &[
     "decode_view_handle",
     "encode_to_bytes",
     "try_encode_to_bytes",
-    // Eager message/view entry points are not an ingress boundary. A focused
-    // codec may force a borrowed lazy view, but it must not decode an owned
-    // message, materialize an eager view, or bypass explicit lazy-view options
-    // through one of these convenience APIs.
+    // Owned-message/eager convenience entry points are not an ingress
+    // boundary. A focused codec may force a borrowed `decode_view` only after
+    // strict preflight; it must not materialize an owned message or bypass
+    // explicit view validation through one of these helpers.
     "decode_from_slice",
     "merge_from_slice",
     "decode_reader",
@@ -378,6 +379,10 @@ mod tests {
         (
             "keynote_chart_axis_title",
             include_str!("keynote_chart_axis_title_codec.rs"),
+        ),
+        (
+            "keynote_chart_axis_value_settings",
+            include_str!("keynote_chart_axis_value_settings_codec.rs"),
         ),
         (
             "keynote_placeholder_text",
