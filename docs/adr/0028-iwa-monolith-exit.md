@@ -6836,3 +6836,46 @@ the native file was 502,679 bytes with SHA-256
 This is native UI persistence evidence, not a library-emitted-output claim: the
 legacy table-creation example compiles but still returns
 `UnsupportedDependency` before writing a file.
+
+## 2026-08-31 amendment: Wave116 package-store debt 009 exit
+
+Wave116 closes one concrete monolith-exit item: the direct normal
+`litchi-iwa -> litchi-iwa-package` dependency and ordered debt 009 are gone.
+The legacy package module imports its remaining neutral entry, patch,
+change-kind, and error types through doc-hidden renamed re-exports beside
+`litchi-iwa-archive::package::PackageState`. Direct re-export identity keeps
+the deprecated raw `Commit::patch`, `Commit::into_parts_with_patch`, and
+`Snapshot::apply` contracts interoperable with the package leaf without a
+wrapper, conversion, copy, allocation, or serialization change. A host-only
+integration test exercises snapshot, no-op edit, patch replay, inverse, and
+exact output without naming either lower-level crate.
+
+This retires the direct edge, not all of the historical exit text attached to
+debt 009. `litchi-iwa-package` remains the neutral COW entry-store leaf, with
+canonical inbound edges from archive and detect. The raw package facade and
+transactions still live in `litchi-iwa`; concrete format owners have not yet
+absorbed all of them, and the host itself is not deletable. No generated
+schema, Prost/Buffa owner, lazy-view path, ZIP/Snappy codec, package cache, or
+format feature changes in this slice.
+
+The current exit inventory is 64 workspace packages, 238 internal dependency
+declarations, 226 canonical edges, 12 ordered migration debts, and one
+migration host. Remaining orders are
+`[1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17]`. Verification passes 1/1 alias
+identity, 10/10 archive state, 9/9 archive atomicity, 44/44 host package,
+1/1 host-only roundtrip, and 690/690 boundary tests. Metadata records the
+archive edge and no host edge; source and AST searches find no direct host
+package-leaf import. The live boundary checker remains separately subject to
+the three pre-existing untracked Pages table-lock findings, so no
+full-workspace-green claim is made.
+
+Computer Use separately verifies byte and native preservation. The raw no-op
+replay/inverse emitted the 5-by-4 Keynote table package byte-exact at 500,128
+bytes and SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`.
+Keynote opened it without repair, displayed the table, saved a 500,006-byte
+native copy with SHA-256
+`18aaa4042124fd5cc5d94fb37e6b8b2f8b4f4f7fe3d5bd44dc50e2487d0cdfdd`,
+and reopened that copy without repair. This is preservation evidence only;
+the remaining semantic parity, raw-facade removal, and monolith deletion gates
+remain open.

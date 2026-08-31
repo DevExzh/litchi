@@ -429,13 +429,6 @@
       "exit": "Adopt the focused index inside concrete package owners and delete litchi-iwa."
     },
     {
-      "order": 9,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-package",
-      "reason": "Legacy mutable package state and its explicit raw facade still use the extracted ordered entry store.",
-      "exit": "Move remaining package transactions behind concrete format owners, remove the raw facade, and delete litchi-iwa."
-    },
-    {
       "order": 10,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-protos",

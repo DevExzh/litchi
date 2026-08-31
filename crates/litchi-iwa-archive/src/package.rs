@@ -19,6 +19,17 @@ use litchi_core::ReadAt;
 use crate::zip::{PhysicalEntry, PhysicalHeader, ZipArchive};
 use crate::{Error, Limits, Result};
 
+/// Archive-owned names for the neutral package-entry primitives.
+//
+// The physical ZIP projection in this module also has an [`Entry`] type. Keep
+// these aliases distinct so format owners can name the archive-neutral
+// copy-on-write values without accidentally importing the physical record.
+#[doc(hidden)]
+pub use litchi_iwa_package::{
+    Entry as PackageEntry, EntryChangeKind as PackageEntryChangeKind,
+    Error as PackageEntryStoreError, Patch as PackagePatch,
+};
+
 #[allow(
     clippy::module_name_repetitions,
     reason = "PackageState is the explicit cache-coherent state for physical package snapshots."

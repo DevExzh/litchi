@@ -497,7 +497,7 @@ mod tests {
             .apply_patch(&patch)
             .unwrap_or_else(|error| panic!("matching patch should publish: {error}"));
 
-        let document_parse_count = std::sync::atomic::AtomicUsize::new(0);
+        let document_parse_count = AtomicUsize::new(0);
         let replaced_document = published
             .get_or_parse_archive("Index/Document.iwa", |_| {
                 document_parse_count.fetch_add(1, Ordering::SeqCst);

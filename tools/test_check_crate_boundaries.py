@@ -3235,6 +3235,54 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_checked_in_policy_is_internally_consistent(self) -> None:
         self.assertEqual(boundaries.audit_snapshot(valid_snapshot(self.policy), self.policy), [])
 
+    def test_iwa_package_edge_is_archive_owned_and_host_edge_cannot_return(self) -> None:
+        host_edge = boundaries.Edge("litchi-iwa", "litchi-iwa-package")
+        archive_edge = boundaries.Edge("litchi-iwa-archive", "litchi-iwa-package")
+        all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
+
+        self.assertEqual(len(self.policy.packages), 64)
+        self.assertEqual(len(all_policy_edges), 238)
+        self.assertEqual(len(self.policy.migration_debt), 12)
+        self.assertEqual(
+            [item.order for item in self.policy.migration_debt],
+            [1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17],
+        )
+        self.assertNotIn(host_edge, all_policy_edges)
+        self.assertIn(archive_edge, self.policy.canonical_edges)
+        self.assertNotIn(archive_edge, self.policy.migration_edges)
+        self.assertEqual(
+            boundaries.audit_snapshot(valid_snapshot(self.policy), self.policy), []
+        )
+
+        raw = copy.deepcopy(self.raw_policy)
+        raw["packages"]["litchi-iwa"].append("litchi-iwa-package")
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "migration-host edges must be debt, not canonical: "
+            "litchi-iwa -> litchi-iwa-package",
+        ):
+            boundaries.parse_policy(raw)
+
+        snapshot = valid_snapshot(self.policy)
+        evidence = dict(snapshot.edges)
+        evidence[host_edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[host_edge.dependent] |= frozenset({host_edge.dependency})
+        normal_dependencies = dict(snapshot.normal_dependencies)
+        normal_dependencies[host_edge.dependent] |= frozenset({host_edge.dependency})
+        snapshot = replace(
+            snapshot,
+            edges=evidence,
+            dependencies=dependencies,
+            normal_dependencies=normal_dependencies,
+        )
+
+        self.assertIn(
+            "unclassified internal edge litchi-iwa -> litchi-iwa-package "
+            "(kind=normal, optional=false, target=*, rename=-)",
+            boundaries.audit_snapshot(snapshot, self.policy),
+        )
+
     def test_checked_in_dev_only_edges_are_exact(self) -> None:
         self.assertEqual(
             self.policy.dev_only_edges,
