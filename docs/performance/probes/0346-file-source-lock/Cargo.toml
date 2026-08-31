@@ -1,0 +1,10 @@
+[package]
+name = "file-source-lock-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+parking_lot = "0.12"

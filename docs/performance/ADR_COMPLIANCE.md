@@ -274,3 +274,13 @@ linked evidence:
    and RSS changes, copied/decompressed/recompressed bytes, regressions, and
    remaining limitations?
 8. If the result is not useful, was the speculative complexity removed?
+
+## Change 0346 update
+
+Change 0346 adds no production code, dependency edge, public type, source
+fence, freshness policy, unsafe code or iWork path. The six control reports and
+the standalone `std` versus `parking_lot` probe are harness/evidence-only. The
+probe's 0.36-0.40% modeled whole-operation gain is below the usefulness
+threshold, so no lock substitution candidate was retained and
+`performance_claim: none`. The next XLS performance batch must target a
+different design; the unchanged 0279 freshness candidate remains rejected.

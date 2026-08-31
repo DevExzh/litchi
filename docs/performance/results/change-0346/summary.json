@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "change": 346,
+  "date": "2026-08-31",
+  "status": "diagnostic control smoke retained; no production candidate applied",
+  "performance_claim": "none",
+  "head": {
+    "revision": "3a2926f8a",
+    "control_binary": {
+      "bytes": 8565704,
+      "sha256": "e3a6744a0ebe720dbbd583ddd5f5d82fb2ca007f4e73c4dcf9667b82cc8b0fe4"
+    }
+  },
+  "candidate": {
+    "applied": false,
+    "revision": null,
+    "reason": "No production candidate was applied; the batch records current-head control evidence only."
+  },
+  "corpus": {
+    "repository_path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "archive_bytes": 1402368,
+    "archive_sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "workbook_stream_bytes": 1314225,
+    "workbook_stream_sha256": "99305abd97f40bfc2fa4c052701bbebc971c1feb12278e8b76ecfbaca777676f"
+  },
+  "protocol": {
+    "profile": "release",
+    "rust_toolchain": "1.95.0",
+    "cpu": 2,
+    "workers": 1,
+    "warmups": 3,
+    "samples": 50,
+    "cache_state": "warm",
+    "process_scope": "one serialized process per selector; warmups and retained samples share that process",
+    "fresh_child_per_sample": false,
+    "coordinates": {
+      "worksheet_index": 1,
+      "row": 1,
+      "column": 0
+    },
+    "selector_order": [
+      "file-source/open",
+      "file-source/list",
+      "file-source/one-cell",
+      "atomic-file/open",
+      "atomic-file/list",
+      "atomic-file/one-cell"
+    ],
+    "scope": "control-only diagnostic smoke; no A/B, RSS, allocation, physical-I/O, or selector-wide claim"
+  },
+  "control_reports": [
+    {
+      "path": "control/file-source-open.json",
+      "mode": "file-source",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": 487742,
+        "mean": 494581.66
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": {
+          "p50": 216575,
+          "mean": 221300.26,
+          "p50_per_call": 171.070300158,
+          "mean_per_call": 174.802733018
+        },
+        "len_calls": 1,
+        "seek_calls": 0,
+        "source_version_stable": true
+      }
+    },
+    {
+      "path": "control/file-source-list.json",
+      "mode": "file-source",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": 488428,
+        "mean": 505194.64
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": {
+          "p50": 220725,
+          "mean": 227664.52,
+          "p50_per_call": 174.348341232,
+          "mean_per_call": 179.829794629
+        },
+        "len_calls": 1,
+        "seek_calls": 0,
+        "source_version_stable": true
+      }
+    },
+    {
+      "path": "control/file-source-one-cell.json",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": 651062,
+        "mean": 657285.02
+      },
+      "metrics": {
+        "read_calls": 921,
+        "read_bytes": 569398,
+        "version_calls": 1813,
+        "version_ns": {
+          "p50": 312560,
+          "mean": 316427.64,
+          "p50_per_call": 172.399338114,
+          "mean_per_call": 174.532619967
+        },
+        "len_calls": 1,
+        "seek_calls": 0,
+        "source_version_stable": true
+      }
+    },
+    {
+      "path": "control/atomic-file-open.json",
+      "mode": "atomic-file",
+      "operation": "open",
+      "elapsed_ns": {
+        "p50": 293089,
+        "mean": 300644.34
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": {
+          "p50": 32317,
+          "mean": 32979.36,
+          "p50_per_call": 25.526856240,
+          "mean_per_call": 26.050047393
+        },
+        "len_calls": 1,
+        "seek_calls": 0,
+        "source_version_stable": true
+      }
+    },
+    {
+      "path": "control/atomic-file-list.json",
+      "mode": "atomic-file",
+      "operation": "list",
+      "elapsed_ns": {
+        "p50": 293304,
+        "mean": 302483.28
+      },
+      "metrics": {
+        "read_calls": 655,
+        "read_bytes": 567685,
+        "version_calls": 1266,
+        "version_ns": {
+          "p50": 32393,
+          "mean": 32765.62,
+          "p50_per_call": 25.586887836,
+          "mean_per_call": 25.881216430
+        },
+        "len_calls": 1,
+        "seek_calls": 0,
+        "source_version_stable": true
+      }
+    },
+    {
+      "path": "control/atomic-file-one-cell.json",
+      "mode": "atomic-file",
+      "operation": "one-cell",
+      "elapsed_ns": {
+        "p50": 381511,
+        "mean": 388565.04
+      },
+      "metrics": {
+        "read_calls": 921,
+        "read_bytes": 569398,
+        "version_calls": 1813,
+        "version_ns": {
+          "p50": 46390,
+          "mean": 48552.74,
+          "p50_per_call": 25.587424159,
+          "mean_per_call": 26.780330943
+        },
+        "len_calls": 1,
+        "seek_calls": 0,
+        "source_version_stable": true
+      }
+    }
+  ],
+  "semantic_projection": {
+    "worksheet_count": 16,
+    "worksheet_names": [
+      "Home",
+      "Products1",
+      "Products2",
+      "Book tour",
+      "Grades",
+      "Customers1",
+      "Quarters",
+      "Bike rating",
+      "FY months",
+      "Regional sales",
+      "Mountains",
+      "Category sales",
+      "Banded rows",
+      "Compare to totals",
+      "Products3",
+      "Customers2"
+    ],
+    "selected_cell": "string:4:Date"
+  },
+  "lock_probe": {
+    "report": "file-source-lock-probe.tsv",
+    "blocks": 40,
+    "calls_per_block": 200000,
+    "measured_calls_per_implementation": 8000000,
+    "order_pattern": "orders 0..3 repeat; std first for orders 0 and 3, parking_lot first for orders 1 and 2",
+    "std": {
+      "mean_ns_per_call": 155.47,
+      "p50_ns_per_call": 155,
+      "p95_ns_per_call": 161
+    },
+    "parking_lot": {
+      "mean_ns_per_call": 154.03,
+      "p50_ns_per_call": 153,
+      "p95_ns_per_call": 158
+    },
+    "projected_whole_operation_gain": "0.36-0.40%",
+    "scope": "diagnostic mutex/fingerprint microbenchmark; not whole-operation XLS/CFB evidence"
+  },
+  "reproduction": {
+    "probe_manifest": "docs/performance/probes/0346-file-source-lock/Cargo.toml",
+    "command": "CARGO_TARGET_DIR=/home/zhuhe/CodeProjects/.cargo-targets/change-0346/probe-target CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 taskset --cpu-list 2 cargo run --release --locked --manifest-path docs/performance/probes/0346-file-source-lock/Cargo.toml -- test-data/ole/xls/ConditionalFormattingSamples.xls"
+  }
+}
