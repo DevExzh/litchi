@@ -709,6 +709,32 @@ impl Package {
         Ok(properties?.map(Into::into).unwrap_or_default())
     }
 
+    /// Inventory embedded-object and embedded-package relationships without
+    /// materializing the OPC package or any payload bytes.
+    ///
+    /// The returned catalog entries borrow this source-backed package. Their
+    /// payload views remain deferred; reading a payload is an explicit,
+    /// fallible operation on the returned entry rather than part of this
+    /// inventory call.
+    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        Ok(litchi_ooxml_common::embedded::scan_source(&self.package)?)
+    }
+
+    /// Inventory embedded relationships with explicit resource limits.
+    ///
+    /// This is a catalog-only operation over the retained source-backed OPC
+    /// package. Payload bytes are not read or materialized; callers must use
+    /// the deferred fallible payload operation on each returned entry.
+    pub fn embedded_with_limits(
+        &self,
+        limits: &litchi_ooxml_common::embedded::Limits,
+    ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        Ok(litchi_ooxml_common::embedded::scan_source_with(
+            &self.package,
+            limits,
+        )?)
+    }
+
     /// Load the exact raw main-document bytes as a semantic transaction
     /// snapshot.
     ///

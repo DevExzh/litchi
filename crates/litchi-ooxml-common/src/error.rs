@@ -1,5 +1,7 @@
 //! Shared failures for host-neutral OOXML package services.
 
+use std::collections::TryReserveError;
+
 use thiserror::Error;
 
 /// Result returned by shared OOXML package services.
@@ -51,6 +53,16 @@ pub enum Error {
         max: usize,
         /// Observed value, or `usize::MAX` when arithmetic overflowed.
         actual: usize,
+    },
+
+    /// A bounded inventory collection could not reserve its next entry.
+    #[error("OOXML allocation failed for {resource}: {source}")]
+    Allocation {
+        /// Collection whose bounded reservation failed.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
     },
 
     /// A package URI is invalid for the requested operation.

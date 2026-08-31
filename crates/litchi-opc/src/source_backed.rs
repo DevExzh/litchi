@@ -1513,27 +1513,28 @@ struct CatalogPart {
 }
 
 /// Immutable metadata and deferred payload access for one OPC package part.
+#[derive(Clone, Copy)]
 pub struct PartView<'package> {
     package: &'package SourceBackedPackage,
     index: usize,
 }
 
-impl PartView<'_> {
+impl<'package> PartView<'package> {
     /// The part's absolute OPC URI.
     #[must_use]
-    pub fn partname(&self) -> &PackURI {
+    pub fn partname(&self) -> &'package PackURI {
         &self.package.parts[self.index].partname
     }
 
     /// The content type declared by `[Content_Types].xml`.
     #[must_use]
-    pub fn content_type(&self) -> &str {
+    pub fn content_type(&self) -> &'package str {
         &self.package.parts[self.index].content_type
     }
 
     /// The part's already-validated relationships.
     #[must_use]
-    pub fn rels(&self) -> &Relationships {
+    pub fn rels(&self) -> &'package Relationships {
         &self.package.parts[self.index].relationships
     }
 

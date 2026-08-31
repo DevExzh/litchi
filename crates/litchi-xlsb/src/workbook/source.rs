@@ -734,6 +734,32 @@ impl SourceBackedWorkbook {
         Ok(version)
     }
 
+    /// Inventory embedded-object and embedded-package relationships without
+    /// materializing the OPC package or any payload bytes.
+    ///
+    /// The returned catalog entries borrow this source-backed package. Their
+    /// payload views remain deferred; reading a payload is an explicit,
+    /// fallible operation on the returned entry rather than part of this
+    /// inventory call.
+    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        self.embedded_with_limits(&litchi_ooxml_common::embedded::Limits::default())
+    }
+
+    /// Inventory embedded relationships with explicit resource limits.
+    ///
+    /// This is a catalog-only operation over the retained source-backed OPC
+    /// package. Payload bytes are not read or materialized; callers must use
+    /// the deferred fallible payload operation on each returned entry.
+    pub fn embedded_with_limits(
+        &self,
+        limits: &litchi_ooxml_common::embedded::Limits,
+    ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let entries = litchi_ooxml_common::embedded::scan_source_with(&self.inner.package, limits);
+        postflight_package(&self.inner.package)?;
+        Ok(entries?)
+    }
+
     /// Return whether this workbook uses Excel's 1904 date system.
     pub fn is_1904_date_system(&self) -> Result<bool> {
         let _ = preflight_package(&self.inner.package)?;
