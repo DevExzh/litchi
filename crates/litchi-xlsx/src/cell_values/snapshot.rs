@@ -6,12 +6,12 @@ use std::sync::Arc;
 use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, SourceBackedPackage,
-    SourceLineage, TargetMode,
+    BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships,
+    SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
 };
 
 use crate::cell::{Cell, Store, Value};
-use crate::error::{Error, Result, allocation, invalid};
+use crate::error::{EditBlock, Error, Result, allocation, invalid};
 use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, WorksheetKind, raw};
@@ -29,6 +29,8 @@ const INTL_MACROSHEET_REL: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 const CHARTSHEET_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
+const CALCULATION_CHAIN_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
 
 fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     let Some(context) = context else {
@@ -74,6 +76,7 @@ struct SourceCatalogCapture {
     owner_relationship: SourceRelationship,
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
+    calculation_chain: Option<CalculationChainState>,
     style_count: u32,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
@@ -90,6 +93,7 @@ struct OwnedCatalogCapture {
     owner_relationship: SourceRelationship,
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
+    calculation_chain: Option<CalculationChainState>,
     style_count: u32,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
@@ -393,6 +397,7 @@ impl Snapshot {
                 sheet_relationship: graph.relationship.clone(),
                 package_relationships: Arc::clone(&capture.package_relationships),
                 workbook_relationships: Arc::clone(&capture.workbook_relationships),
+                calculation_chain: capture.calculation_chain.clone(),
                 auxiliary: Arc::clone(&capture.auxiliary),
                 graph: Arc::clone(&capture.graph),
                 context: None,
@@ -447,6 +452,7 @@ impl Snapshot {
                 sheet_relationship: graph.relationship.clone(),
                 package_relationships: Arc::clone(&capture.package_relationships),
                 workbook_relationships: Arc::clone(&capture.workbook_relationships),
+                calculation_chain: capture.calculation_chain.clone(),
                 auxiliary: Arc::clone(&capture.auxiliary),
                 graph: Arc::clone(&capture.graph),
                 context: package.execution_context(),
@@ -507,6 +513,7 @@ impl Snapshot {
         let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
         validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+        let calculation_chain = capture_calculation_chain_source(package, &workbook)?;
         let owner = unique_owner(package.rels())?;
         let snapshot = Self::from_parts(
             &sheet.name,
@@ -522,6 +529,7 @@ impl Snapshot {
             worksheet_xml,
             sheet_relationship,
             style_count,
+            calculation_chain,
             auxiliary,
             capture_sheet_graph_source(package, &workbook, &catalog.sheets, &sheet_parts)?,
             package.execution_context(),
@@ -589,6 +597,7 @@ impl Snapshot {
         let worksheet_xml = SourcePayload::Owned(worksheet.blob_arc());
         validation::worksheet_xml(worksheet_xml.as_bytes())?;
         let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
+        let calculation_chain = capture_calculation_chain_owned(package, workbook)?;
         let owner = unique_owner(package.rels())?;
         Self::from_parts(
             &sheet.name,
@@ -604,6 +613,7 @@ impl Snapshot {
             worksheet_xml,
             relationship,
             style_count,
+            calculation_chain,
             auxiliary,
             capture_sheet_graph_owned(package, workbook, &catalog.sheets, &sheet_parts)?,
             None,
@@ -627,6 +637,7 @@ impl Snapshot {
         worksheet_xml: SourcePayload,
         sheet_relationship: &Relationship,
         style_count: u32,
+        calculation_chain: Option<CalculationChainState>,
         auxiliary: Box<[PartState]>,
         graph: Box<[SheetGraphState]>,
         context: Option<ExecutionContext>,
@@ -653,6 +664,7 @@ impl Snapshot {
                 sheet_relationship: SourceRelationship::capture(sheet_relationship)?,
                 package_relationships: Arc::from(capture_relationships(package_relationships)?),
                 workbook_relationships: Arc::from(capture_relationships(workbook_relationships)?),
+                calculation_chain,
                 auxiliary: Arc::from(auxiliary),
                 graph: Arc::from(graph),
                 context,
@@ -671,6 +683,32 @@ impl Snapshot {
         result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
         result.source.check_execution()?;
         Ok(result)
+    }
+
+    pub(super) fn invalidated_workbook_xml(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.check_execution()?;
+        let bytes = raw::recalc::invalidate(self.source.workbook.bytes.as_bytes())?;
+        validation::workbook_xml(&bytes)?;
+        self.source.check_execution()?;
+        Ok(Arc::new(bytes))
+    }
+
+    pub(super) fn with_invalidated_calculation(self) -> Result<Self> {
+        let workbook = self.invalidated_workbook_xml()?;
+        self.with_invalidated_workbook(workbook)
+    }
+
+    pub(super) fn with_invalidated_workbook(mut self, workbook: Arc<Vec<u8>>) -> Result<Self> {
+        self.source.check_execution()?;
+        validation::workbook_xml(workbook.as_slice())?;
+        self.source.workbook.bytes = SourcePayload::Owned(workbook);
+        if let Some(chain) = self.source.calculation_chain.take() {
+            let mut relationships = self.source.workbook_relationships.to_vec();
+            relationships.retain(|relationship| relationship.id != chain.relationship.id);
+            self.source.workbook_relationships = Arc::from(relationships.into_boxed_slice());
+        }
+        self.source.check_execution()?;
+        Ok(self)
     }
 
     /// Rebind worksheet bytes after the row-visibility owner proves that only
@@ -719,6 +757,53 @@ impl Snapshot {
         }
     }
 
+    /// Exact semantic cell stored at a coordinate.
+    #[must_use]
+    pub fn cell(&self, address: litchi_sheet::Cell) -> Option<&Cell> {
+        self.cells.entry(address).map(|entry| &entry.cell)
+    }
+
+    pub(super) fn editable_cell(&self, address: litchi_sheet::Cell) -> Option<&Cell> {
+        self.cell(address)
+    }
+
+    pub(super) fn edit_blocked(&self, address: litchi_sheet::Cell) -> Error {
+        let reason = self
+            .cells
+            .entry(address)
+            .and_then(|entry| entry.formula_range)
+            .map_or(EditBlock::UnknownCell, |_| EditBlock::GroupFormula);
+        Error::EditBlocked {
+            sheet: self.sheet_name().to_owned(),
+            address,
+            reason,
+        }
+    }
+
+    pub(super) fn require_formula_target(&self, address: litchi_sheet::Cell) -> Result<()> {
+        let entry = self.cells.entry(address).ok_or_else(|| {
+            invalid(format!(
+                "formula selector '{address}' has no existing cell owner"
+            ))
+        })?;
+        if entry.formula_range.is_some() {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::GroupFormula,
+            });
+        }
+        if matches!(entry.cell, Cell::Value(_) | Cell::Formula(_)) {
+            Ok(())
+        } else {
+            Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::UnknownCell,
+            })
+        }
+    }
+
     /// Whether an explicit `<c>` owner exists at this coordinate.
     ///
     /// This distinguishes a cleared cell record from a removed cell record.
@@ -737,17 +822,6 @@ impl Snapshot {
     #[must_use]
     pub const fn worksheet_part_name(&self) -> &PackURI {
         &self.source.worksheet.uri
-    }
-
-    pub(super) fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
-        self.source.worksheet.bytes.detached_arc()
-    }
-
-    pub(super) fn materialized_source_arc(&self, maximum: usize) -> Result<Arc<Vec<u8>>> {
-        self.source
-            .worksheet
-            .bytes
-            .materialized_arc(maximum, "value-only worksheet materialization")
     }
 
     pub(crate) fn same_source(&self, other: &Self) -> bool {
@@ -811,6 +885,18 @@ impl Snapshot {
         {
             return false;
         }
+        if let Some(chain) = &self.source.calculation_chain {
+            let Some(relationship) = workbook.rels().get(chain.relationship.id.as_ref()) else {
+                return false;
+            };
+            if !chain.relationship.matches(relationship)
+                || package.get_part(&chain.part.uri).map_or(true, |part| {
+                    !chain.part.matches_part(part) || !part.rels().is_empty()
+                })
+            {
+                return false;
+            }
+        }
         let Ok(workbook_xml) = raw::parse_catalog(workbook.blob()) else {
             return false;
         };
@@ -840,6 +926,97 @@ impl Snapshot {
         package
             .get_part(&self.source.worksheet.uri)
             .is_ok_and(|part| self.source.worksheet.matches_part(part) && part.rels().is_empty())
+    }
+
+    pub(super) fn topology_plan_from(&self, before: &Self) -> Result<SourceTopologyPlan> {
+        let mut plan = SourceTopologyPlan::new();
+        append_owner_topology(&mut plan, &before.source, &self.source)?;
+        append_worksheet_replacement(&mut plan, &before.source, &self.source)?;
+        Ok(plan)
+    }
+
+    pub(super) fn apply_owned_target(
+        before: &Self,
+        after: &Self,
+        package: &mut OpcPackage,
+        maximum_bytes: Option<usize>,
+    ) -> Result<()> {
+        let mut materialized = 0usize;
+        apply_owner_target(
+            &before.source,
+            &after.source,
+            package,
+            maximum_bytes,
+            &mut materialized,
+        )?;
+        apply_worksheet_target(
+            &before.source,
+            &after.source,
+            package,
+            maximum_bytes,
+            &mut materialized,
+        )
+    }
+}
+
+impl MultiSnapshot {
+    pub(super) fn topology_plan_from(&self, before: &Self) -> Result<SourceTopologyPlan> {
+        if self.len() != before.len() {
+            return Err(invalid(
+                "multi-sheet topology snapshots have different owners",
+            ));
+        }
+        let mut plan = SourceTopologyPlan::new();
+        let first_before = before
+            .sheets()
+            .first()
+            .ok_or_else(|| invalid("multi-sheet topology has no source owner"))?;
+        let first_after = self
+            .sheets()
+            .first()
+            .ok_or_else(|| invalid("multi-sheet topology has no target owner"))?;
+        append_owner_topology(&mut plan, &first_before.source, &first_after.source)?;
+        for (before, after) in before.sheets().iter().zip(self.sheets()) {
+            append_worksheet_replacement(&mut plan, &before.source, &after.source)?;
+        }
+        Ok(plan)
+    }
+
+    pub(super) fn apply_owned_target(
+        before: &Self,
+        after: &Self,
+        package: &mut OpcPackage,
+        maximum_bytes: Option<usize>,
+    ) -> Result<()> {
+        if before.len() != after.len() {
+            return Err(invalid("multi-sheet patch owner count changed"));
+        }
+        let mut materialized = 0usize;
+        let first_before = before
+            .sheets()
+            .first()
+            .ok_or_else(|| invalid("multi-sheet patch has no source owner"))?;
+        let first_after = after
+            .sheets()
+            .first()
+            .ok_or_else(|| invalid("multi-sheet patch has no target owner"))?;
+        apply_owner_target(
+            &first_before.source,
+            &first_after.source,
+            package,
+            maximum_bytes,
+            &mut materialized,
+        )?;
+        for (before, after) in before.sheets().iter().zip(after.sheets()) {
+            apply_worksheet_target(
+                &before.source,
+                &after.source,
+                package,
+                maximum_bytes,
+                &mut materialized,
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -903,6 +1080,7 @@ struct SourceState {
     sheet_relationship: SourceRelationship,
     package_relationships: Arc<[SourceRelationship]>,
     workbook_relationships: Arc<[SourceRelationship]>,
+    calculation_chain: Option<CalculationChainState>,
     auxiliary: Arc<[PartState]>,
     graph: Arc<[SheetGraphState]>,
     context: Option<ExecutionContext>,
@@ -922,6 +1100,7 @@ impl SourceState {
             && self.sheet_relationship == other.sheet_relationship
             && self.package_relationships == other.package_relationships
             && self.workbook_relationships == other.workbook_relationships
+            && self.calculation_chain == other.calculation_chain
             && self.auxiliary == other.auxiliary
             && self.graph == other.graph
             && match (&self.source_lineage, &other.source_lineage) {
@@ -940,6 +1119,12 @@ struct PartState {
     uri: PackURI,
     content_type: Box<str>,
     bytes: SourcePayload,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CalculationChainState {
+    part: PartState,
+    relationship: SourceRelationship,
 }
 
 impl PartState {
@@ -992,6 +1177,311 @@ impl SourceRelationship {
     }
 }
 
+fn copy_payload(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| allocation(resource, source))?;
+    output.extend_from_slice(bytes);
+    Ok(output)
+}
+
+fn append_worksheet_replacement(
+    plan: &mut SourceTopologyPlan,
+    before: &SourceState,
+    after: &SourceState,
+) -> Result<()> {
+    if before.worksheet.uri != after.worksheet.uri
+        || before.worksheet.content_type != after.worksheet.content_type
+    {
+        return Err(invalid("worksheet topology changed during a cell edit"));
+    }
+    if before.worksheet.bytes != after.worksheet.bytes {
+        plan.try_replace_part(
+            after.worksheet.uri.clone(),
+            copy_payload(
+                after.worksheet.bytes.as_bytes(),
+                "source-backed worksheet topology replacement",
+            )?,
+        )?;
+    }
+    Ok(())
+}
+
+fn append_owner_topology(
+    plan: &mut SourceTopologyPlan,
+    before: &SourceState,
+    after: &SourceState,
+) -> Result<()> {
+    if before.workbook.uri != after.workbook.uri
+        || before.workbook.content_type != after.workbook.content_type
+    {
+        return Err(invalid("workbook topology changed during a cell edit"));
+    }
+    if before.workbook.bytes != after.workbook.bytes {
+        plan.try_replace_part(
+            after.workbook.uri.clone(),
+            copy_payload(
+                after.workbook.bytes.as_bytes(),
+                "source-backed workbook topology replacement",
+            )?,
+        )?;
+    }
+    match (&before.calculation_chain, &after.calculation_chain) {
+        (Some(before_chain), None) => {
+            plan.try_remove_relationship(
+                after.workbook.uri.clone(),
+                before_chain.relationship.id.as_ref(),
+            )?;
+            plan.try_remove_part(before_chain.part.uri.clone())?;
+        },
+        (None, Some(after_chain)) => {
+            plan.try_add_part(
+                after_chain.part.uri.clone(),
+                after_chain.part.content_type.as_ref(),
+                copy_payload(
+                    after_chain.part.bytes.as_bytes(),
+                    "source-backed calculation-chain addition",
+                )?,
+            )?;
+            plan.try_add_relationship(
+                after.workbook.uri.clone(),
+                after_chain.relationship.id.as_ref(),
+                after_chain.relationship.kind.as_ref(),
+                SourceRelationshipTarget::Internal(after_chain.part.uri.clone()),
+            )?;
+        },
+        (Some(before_chain), Some(after_chain)) if before_chain != after_chain => {
+            return Err(invalid(
+                "calculation-chain replacement is outside the cell transaction",
+            ));
+        },
+        (Some(_), Some(_)) | (None, None) => {},
+    }
+    Ok(())
+}
+
+fn materialized_part_arc(
+    part: &PartState,
+    maximum_bytes: Option<usize>,
+    materialized_bytes: &mut usize,
+    resource: &'static str,
+) -> Result<Arc<Vec<u8>>> {
+    match maximum_bytes {
+        Some(maximum) => {
+            let prior = *materialized_bytes;
+            let updated = prior
+                .checked_add(part.bytes.len())
+                .ok_or_else(|| invalid("cell patch materialization size overflows usize"))?;
+            if updated > maximum {
+                return Err(invalid(format!(
+                    "cell patch materialization exceeds the explicit bound {maximum} bytes"
+                )));
+            }
+            let output = part.bytes.materialized_arc(maximum - prior, resource)?;
+            *materialized_bytes = updated;
+            Ok(output)
+        },
+        None => part.bytes.detached_arc(),
+    }
+}
+
+fn apply_worksheet_target(
+    before: &SourceState,
+    after: &SourceState,
+    package: &mut OpcPackage,
+    maximum_bytes: Option<usize>,
+    materialized_bytes: &mut usize,
+) -> Result<()> {
+    if before.worksheet.uri != after.worksheet.uri
+        || before.worksheet.content_type != after.worksheet.content_type
+    {
+        return Err(invalid(
+            "worksheet topology changed during patch application",
+        ));
+    }
+    if before.worksheet.bytes != after.worksheet.bytes {
+        let bytes = materialized_part_arc(
+            &after.worksheet,
+            maximum_bytes,
+            materialized_bytes,
+            "cell patch worksheet materialization",
+        )?;
+        package
+            .get_part_mut(&after.worksheet.uri)?
+            .set_blob_shared(bytes);
+    }
+    Ok(())
+}
+
+fn apply_owner_target(
+    before: &SourceState,
+    after: &SourceState,
+    package: &mut OpcPackage,
+    maximum_bytes: Option<usize>,
+    materialized_bytes: &mut usize,
+) -> Result<()> {
+    if before.workbook.uri != after.workbook.uri
+        || before.workbook.content_type != after.workbook.content_type
+    {
+        return Err(invalid(
+            "workbook topology changed during patch application",
+        ));
+    }
+    if let (Some(before_chain), None) = (&before.calculation_chain, &after.calculation_chain)
+        && calculation_chain_is_referenced_elsewhere(
+            package,
+            &before_chain.part.uri,
+            &before.workbook.uri,
+            before_chain.relationship.id.as_ref(),
+        )?
+    {
+        return Err(invalid(
+            "calculation-chain Part has another inbound relationship",
+        ));
+    }
+    if before.workbook.bytes != after.workbook.bytes {
+        let bytes = materialized_part_arc(
+            &after.workbook,
+            maximum_bytes,
+            materialized_bytes,
+            "cell patch workbook materialization",
+        )?;
+        package
+            .get_part_mut(&after.workbook.uri)?
+            .set_blob_shared(bytes);
+    }
+    match (&before.calculation_chain, &after.calculation_chain) {
+        (Some(before_chain), None) => {
+            let removed = package
+                .get_part_mut(&after.workbook.uri)?
+                .rels_mut()
+                .remove(before_chain.relationship.id.as_ref());
+            if removed.is_none() || !package.remove_part(&before_chain.part.uri) {
+                return Err(invalid(
+                    "calculation-chain topology changed before patch application",
+                ));
+            }
+        },
+        (None, Some(after_chain)) => {
+            let bytes = materialized_part_arc(
+                &after_chain.part,
+                maximum_bytes,
+                materialized_bytes,
+                "cell patch calculation-chain materialization",
+            )?;
+            package.try_add_part(Box::new(BlobPart::new_shared(
+                after_chain.part.uri.clone(),
+                after_chain.part.content_type.to_string(),
+                bytes,
+            )))?;
+            package
+                .get_part_mut(&after.workbook.uri)?
+                .rels_mut()
+                .try_add_relationship(
+                    after_chain.relationship.kind.to_string(),
+                    after_chain.relationship.target.to_string(),
+                    after_chain.relationship.id.to_string(),
+                    after_chain.relationship.mode,
+                )?;
+        },
+        (Some(before_chain), Some(after_chain)) if before_chain != after_chain => {
+            return Err(invalid(
+                "calculation-chain replacement is outside the cell patch",
+            ));
+        },
+        (Some(_), Some(_)) | (None, None) => {},
+    }
+    Ok(())
+}
+
+fn calculation_chain_is_referenced_elsewhere(
+    package: &OpcPackage,
+    target: &PackURI,
+    workbook: &PackURI,
+    workbook_relationship: &str,
+) -> Result<bool> {
+    for part in package.iter_parts() {
+        for relationship in part.rels().iter() {
+            if part.partname() == workbook && relationship.r_id() == workbook_relationship {
+                continue;
+            }
+            if !relationship.is_external()
+                && relationship.target_partname()?.is_equivalent_to(target)
+            {
+                return Ok(true);
+            }
+        }
+    }
+    for relationship in package.rels().iter() {
+        if !relationship.is_external() && relationship.target_partname()?.is_equivalent_to(target) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn calculation_chain_relationship(relationships: &Relationships) -> Result<Option<&Relationship>> {
+    let mut matching = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::CALC_CHAIN | rt::STRICT_CALC_CHAIN
+        )
+    });
+    let first = matching.next();
+    if matching.next().is_some() {
+        return Err(invalid(
+            "workbook has multiple calculation-chain relationships",
+        ));
+    }
+    Ok(first)
+}
+
+fn capture_calculation_chain_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+) -> Result<Option<CalculationChainState>> {
+    let Some(relationship) = calculation_chain_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("calculation-chain relationship cannot be external"));
+    }
+    let part = package.part(&relationship.target_partname()?)?;
+    if part.content_type() != CALCULATION_CHAIN_CONTENT_TYPE || !part.rels().is_empty() {
+        return Err(invalid("calculation-chain Part has unsupported topology"));
+    }
+    let bytes = SourcePayload::from_part_data(package, part.data()?)?;
+    Ok(Some(CalculationChainState {
+        part: PartState::new(part.partname().clone(), part.content_type(), bytes)?,
+        relationship: SourceRelationship::capture(relationship)?,
+    }))
+}
+
+fn capture_calculation_chain_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+) -> Result<Option<CalculationChainState>> {
+    let Some(relationship) = calculation_chain_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("calculation-chain relationship cannot be external"));
+    }
+    let part = package.get_part(&relationship.target_partname()?)?;
+    if part.content_type() != CALCULATION_CHAIN_CONTENT_TYPE || !part.rels().is_empty() {
+        return Err(invalid("calculation-chain Part has unsupported topology"));
+    }
+    Ok(Some(CalculationChainState {
+        part: PartState::new(
+            part.partname().clone(),
+            part.content_type(),
+            SourcePayload::Owned(part.blob_arc()),
+        )?,
+        relationship: SourceRelationship::capture(relationship)?,
+    }))
+}
+
 fn validate_workbook_relationships(
     relationships: &Relationships,
     require_single_sheet: bool,
@@ -999,6 +1489,7 @@ fn validate_workbook_relationships(
     let mut worksheets = 0usize;
     let mut styles = 0usize;
     let mut themes = 0usize;
+    let mut calculation_chains = 0usize;
     for relationship in relationships.iter() {
         if relationship.is_external() {
             return Err(invalid(
@@ -1007,7 +1498,13 @@ fn validate_workbook_relationships(
         }
         if !matches!(
             relationship.reltype(),
-            rt::WORKSHEET | rt::STRICT_WORKSHEET | rt::STYLES | rt::STRICT_STYLES | rt::THEME
+            rt::WORKSHEET
+                | rt::STRICT_WORKSHEET
+                | rt::STYLES
+                | rt::STRICT_STYLES
+                | rt::THEME
+                | rt::CALC_CHAIN
+                | rt::STRICT_CALC_CHAIN
         ) {
             return Err(invalid(format!(
                 "value-only edits refuse workbook relationship '{}'",
@@ -1018,6 +1515,7 @@ fn validate_workbook_relationships(
             rt::WORKSHEET | rt::STRICT_WORKSHEET => worksheets += 1,
             rt::STYLES | rt::STRICT_STYLES => styles += 1,
             rt::THEME => themes += 1,
+            rt::CALC_CHAIN | rt::STRICT_CALC_CHAIN => calculation_chains += 1,
             _ => {},
         }
     }
@@ -1026,9 +1524,9 @@ fn validate_workbook_relationships(
     } else {
         worksheets > 0
     };
-    if !worksheets_valid || styles > 1 || themes > 1 {
+    if !worksheets_valid || styles > 1 || themes > 1 || calculation_chains > 1 {
         return Err(invalid(
-            "value-only edits require worksheet relationships and at most one styles and theme relationship",
+            "cell edits require worksheet relationships and at most one styles, theme, and calculation-chain relationship",
         ));
     }
     Ok(())
@@ -1036,13 +1534,11 @@ fn validate_workbook_relationships(
 
 fn validate_scalar_cells(cells: &Store) -> Result<()> {
     if cells.entries().iter().any(|entry| {
-        matches!(entry.cell, Cell::Formula(_) | Cell::Unknown(_))
+        matches!(entry.cell, Cell::Unknown(_))
             || entry.cell_metadata.is_some()
             || entry.value_metadata.is_some()
     }) {
-        return Err(invalid(
-            "value-only edits refuse formulas, unknown cells, and cell metadata",
-        ));
+        return Err(invalid("cell edits refuse unknown cells and cell metadata"));
     }
     Ok(())
 }
@@ -1147,6 +1643,7 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
     let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+    let calculation_chain = capture_calculation_chain_source(package, &workbook)?;
     let graph = capture_sheet_graph_source(package, &workbook, &catalog.sheets, &parts)?;
     package.check_execution()?;
     Ok(SourceCatalogCapture {
@@ -1161,6 +1658,7 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
         owner_relationship: SourceRelationship::capture(owner)?,
         package_relationships: Arc::from(capture_relationships(package.rels())?),
         workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
+        calculation_chain,
         style_count,
         auxiliary: Arc::from(auxiliary),
         graph: Arc::from(graph),
@@ -1184,6 +1682,7 @@ fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;
     let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
+    let calculation_chain = capture_calculation_chain_owned(package, workbook)?;
     let graph = capture_sheet_graph_owned(package, workbook, &catalog.sheets, &parts)?;
     Ok(OwnedCatalogCapture {
         sheets: catalog.sheets.clone(),
@@ -1197,6 +1696,7 @@ fn load_owned_catalog(package: &OpcPackage) -> Result<OwnedCatalogCapture> {
         owner_relationship: SourceRelationship::capture(owner)?,
         package_relationships: Arc::from(capture_relationships(package.rels())?),
         workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
+        calculation_chain,
         style_count,
         auxiliary: Arc::from(auxiliary),
         graph: Arc::from(graph),

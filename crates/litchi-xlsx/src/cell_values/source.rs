@@ -15,8 +15,9 @@ use litchi_sheet::Cell as Address;
 use super::snapshot::SourceProvenance;
 use super::{Commit, MAX_SHEET_OWNERS, MultiCommit, MultiPatch, MultiSnapshot, Patch, Snapshot};
 use crate::Selector;
-use crate::cell::{Content, Value};
+use crate::cell::{Cell, Content, Value};
 use crate::error::{Error, Result, invalid};
+use crate::formula::Formula;
 use crate::raw::worksheet::edit::{Action, rewrite};
 
 /// Maximum unique existing cells in one atomic value transaction.
@@ -28,6 +29,8 @@ pub const MAX_BATCH_EDITS: usize = 256;
 pub enum CellValueEdit {
     /// Replace the stored scalar value without changing local style.
     Set { address: Address, value: Value },
+    /// Replace the payload with a checked cacheless scalar formula.
+    SetFormula { address: Address, formula: Formula },
     /// Remove the stored scalar payload while retaining the cell record.
     Clear { address: Address },
     /// Remove the complete stored scalar cell record.
@@ -60,6 +63,18 @@ impl<'a> SheetCellValueEdit<'a> {
         }
     }
 
+    /// Construct a selector-first scalar formula replacement.
+    pub fn set_formula(
+        selector: impl Into<Selector<'a>>,
+        address: Address,
+        formula: Formula,
+    ) -> Self {
+        Self {
+            selector: selector.into(),
+            edit: CellValueEdit::set_formula(address, formula),
+        }
+    }
+
     /// Construct a selector-first scalar clear.
     #[must_use]
     pub fn clear(selector: impl Into<Selector<'a>>, address: Address) -> Self {
@@ -88,6 +103,12 @@ impl CellValueEdit {
         }
     }
 
+    /// Construct a checked cacheless scalar formula replacement.
+    #[must_use]
+    pub const fn set_formula(address: Address, formula: Formula) -> Self {
+        Self::SetFormula { address, formula }
+    }
+
     /// Construct a scalar-value clear.
     #[must_use]
     pub const fn clear(address: Address) -> Self {
@@ -104,16 +125,17 @@ impl CellValueEdit {
     #[must_use]
     pub const fn address(&self) -> Address {
         match self {
-            Self::Set { address, .. } | Self::Clear { address } | Self::Remove { address } => {
-                *address
-            },
+            Self::Set { address, .. }
+            | Self::SetFormula { address, .. }
+            | Self::Clear { address }
+            | Self::Remove { address } => *address,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 enum StagedValueEdit {
-    Set(Value),
+    Set(Content),
     Clear,
     Remove,
 }
@@ -518,7 +540,7 @@ impl SourceBackedEditor {
             self.package
                 .write_part_overlays_shared_to_stream(writer, Vec::new())?;
         } else {
-            self.write_snapshot_overlay_to_stream(writer, &target)?;
+            self.write_snapshot_overlay_to_stream(writer, before, &target)?;
         }
         Ok(target)
     }
@@ -526,15 +548,12 @@ impl SourceBackedEditor {
     pub(crate) fn write_snapshot_overlay_to_stream<W: Write>(
         self,
         writer: W,
+        before: &Snapshot,
         target: &Snapshot,
     ) -> Result<()> {
         self.package.check_execution()?;
-        let replacement = target.source_arc()?;
-        self.package.write_part_overlay_shared_to_stream(
-            writer,
-            target.worksheet_part_name(),
-            replacement,
-        )?;
+        let plan = target.topology_plan_from(before)?;
+        self.package.write_topology_to_stream(writer, plan)?;
         Ok(())
     }
 
@@ -583,24 +602,12 @@ impl SourceBackedEditor {
         } else {
             commit.patch().after().clone()
         };
-        let replacements = if commit.patch().is_empty() {
-            Vec::new()
+        let plan = if commit.patch().is_empty() {
+            litchi_opc::SourceTopologyPlan::new()
         } else {
-            target
-                .sheets()
-                .iter()
-                .zip(before.sheets())
-                .filter(|(after, before)| after.source_xml() != before.source_xml())
-                .map(|(snapshot, _)| {
-                    Ok((
-                        snapshot.worksheet_part_name().clone(),
-                        snapshot.source_arc()?,
-                    ))
-                })
-                .collect::<Result<Vec<_>>>()?
+            target.topology_plan_from(before)?
         };
-        self.package
-            .write_part_overlays_shared_to_stream(writer, replacements)?;
+        self.package.write_topology_to_stream(writer, plan)?;
         Ok(target)
     }
 }
@@ -634,6 +641,11 @@ impl SourceEdit {
     /// Stage one value replacement. Repeated selectors are rejected.
     pub fn set(&mut self, address: Address, value: impl Into<Value>) -> Result<()> {
         self.apply_batch([CellValueEdit::set(address, value)])
+    }
+
+    /// Stage one cacheless scalar formula replacement.
+    pub fn set_formula(&mut self, address: Address, formula: Formula) -> Result<()> {
+        self.apply_batch([CellValueEdit::set_formula(address, formula)])
     }
 
     /// Stage one scalar clear. Repeated selectors are rejected.
@@ -677,25 +689,37 @@ impl SourceEdit {
                     "duplicate value-only selector '{address}'"
                 )));
             }
-            let source = self.before.value(address).ok_or_else(|| {
+            let source = self.before.editable_cell(address).ok_or_else(|| {
                 invalid(format!(
-                    "value-only selector '{address}' is not an existing scalar value cell"
+                    "cell selector '{address}' has no existing cell owner"
                 ))
             })?;
             let value = match edit {
                 CellValueEdit::Set { value, .. } => {
                     value.validate_for_write()?;
-                    if matches!(value, Value::Date(_)) {
-                        return Err(invalid("value-only batches currently refuse date cells"));
+                    if !matches!(source, Cell::Value(_)) {
+                        return Err(self.before.edit_blocked(address));
                     }
-                    StagedValueEdit::Set(value)
+                    StagedValueEdit::Set(Content::Value(value))
                 },
-                CellValueEdit::Clear { .. } => StagedValueEdit::Clear,
-                CellValueEdit::Remove { .. } => StagedValueEdit::Remove,
+                CellValueEdit::SetFormula { formula, .. } => {
+                    Content::Formula(formula.clone()).validate_for_write()?;
+                    self.before.require_formula_target(address)?;
+                    StagedValueEdit::Set(Content::Formula(formula))
+                },
+                CellValueEdit::Clear { .. } => {
+                    if !matches!(source, Cell::Value(_)) {
+                        return Err(self.before.edit_blocked(address));
+                    }
+                    StagedValueEdit::Clear
+                },
+                CellValueEdit::Remove { .. } => {
+                    if !matches!(source, Cell::Value(_)) {
+                        return Err(self.before.edit_blocked(address));
+                    }
+                    StagedValueEdit::Remove
+                },
             };
-            if matches!(source, Value::Date(_)) {
-                return Err(invalid("value-only batches currently refuse date cells"));
-            }
             self.before.check_execution()?;
             pending.push((address, value));
         }
@@ -715,11 +739,11 @@ impl SourceEdit {
         let mut actions = BTreeMap::new();
         for (address, value) in &self.staged {
             let action = match value {
-                StagedValueEdit::Set(value) => {
-                    if Some(value) == self.before.value(*address) {
+                StagedValueEdit::Set(content) => {
+                    if self.before.cell(*address) == Some(&content.as_cell()) {
                         continue;
                     }
-                    Action::set(Content::Value(value.clone()))
+                    Action::set(content.clone())
                 },
                 StagedValueEdit::Clear => Action::clear(false),
                 StagedValueEdit::Remove => Action::Remove,
@@ -733,10 +757,13 @@ impl SourceEdit {
         }
         let changed = actions.len();
         let output = rewrite(self.before.source_xml(), self.before.sheet_name(), actions)?;
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
+        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?
+            .with_invalidated_calculation()?;
         for (address, expected) in &self.staged {
             let matches = match expected {
-                StagedValueEdit::Set(value) => snapshot.value(*address) == Some(value),
+                StagedValueEdit::Set(content) => {
+                    snapshot.cell(*address) == Some(&content.as_cell())
+                },
                 StagedValueEdit::Clear => {
                     snapshot.contains_cell(*address) && snapshot.value(*address).is_none()
                 },
@@ -797,6 +824,16 @@ impl MultiSourceEdit {
         self.apply_batch([SheetCellValueEdit::set(selector, address, value)])
     }
 
+    /// Stage one selector-first cacheless scalar formula replacement.
+    pub fn set_formula<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        address: Address,
+        formula: Formula,
+    ) -> Result<()> {
+        self.apply_batch([SheetCellValueEdit::set_formula(selector, address, formula)])
+    }
+
     /// Stage one selector-first scalar clear.
     pub fn clear<'a>(&mut self, selector: impl Into<Selector<'a>>, address: Address) -> Result<()> {
         self.apply_batch([SheetCellValueEdit::clear(selector, address)])
@@ -853,9 +890,9 @@ impl MultiSourceEdit {
                     address
                 )));
             }
-            let source = snapshot.value(address).ok_or_else(|| {
+            let source = snapshot.editable_cell(address).ok_or_else(|| {
                 invalid(format!(
-                    "value-only selector '{}!{}' is not an existing scalar value cell",
+                    "cell selector '{}!{}' has no existing cell owner",
                     snapshot.sheet_name(),
                     address
                 ))
@@ -863,17 +900,29 @@ impl MultiSourceEdit {
             let value = match request.edit {
                 CellValueEdit::Set { value, .. } => {
                     value.validate_for_write()?;
-                    if matches!(value, Value::Date(_)) {
-                        return Err(invalid("value-only batches currently refuse date cells"));
+                    if !matches!(source, Cell::Value(_)) {
+                        return Err(snapshot.edit_blocked(address));
                     }
-                    StagedValueEdit::Set(value)
+                    StagedValueEdit::Set(Content::Value(value))
                 },
-                CellValueEdit::Clear { .. } => StagedValueEdit::Clear,
-                CellValueEdit::Remove { .. } => StagedValueEdit::Remove,
+                CellValueEdit::SetFormula { formula, .. } => {
+                    Content::Formula(formula.clone()).validate_for_write()?;
+                    snapshot.require_formula_target(address)?;
+                    StagedValueEdit::Set(Content::Formula(formula))
+                },
+                CellValueEdit::Clear { .. } => {
+                    if !matches!(source, Cell::Value(_)) {
+                        return Err(snapshot.edit_blocked(address));
+                    }
+                    StagedValueEdit::Clear
+                },
+                CellValueEdit::Remove { .. } => {
+                    if !matches!(source, Cell::Value(_)) {
+                        return Err(snapshot.edit_blocked(address));
+                    }
+                    StagedValueEdit::Remove
+                },
             };
-            if matches!(source, Value::Date(_)) {
-                return Err(invalid("value-only batches currently refuse date cells"));
-            }
             self.before.check_execution()?;
             pending.push((position, address, value));
         }
@@ -947,11 +996,11 @@ impl MultiSourceEdit {
             let mut actions = BTreeMap::new();
             for (address, value) in staged {
                 let action = match value {
-                    StagedValueEdit::Set(value) => {
-                        if Some(value) == snapshot.value(*address) {
+                    StagedValueEdit::Set(content) => {
+                        if snapshot.cell(*address) == Some(&content.as_cell()) {
                             continue;
                         }
-                        Action::set(Content::Value(value.clone()))
+                        Action::set(content.clone())
                     },
                     StagedValueEdit::Clear => Action::clear(false),
                     StagedValueEdit::Remove => Action::Remove,
@@ -978,7 +1027,9 @@ impl MultiSourceEdit {
             let candidate = Snapshot::from_rewritten_source(snapshot, output)?;
             for (address, expected) in staged {
                 let matches = match expected {
-                    StagedValueEdit::Set(value) => candidate.value(*address) == Some(value),
+                    StagedValueEdit::Set(content) => {
+                        candidate.cell(*address) == Some(&content.as_cell())
+                    },
                     StagedValueEdit::Clear => {
                         candidate.contains_cell(*address) && candidate.value(*address).is_none()
                     },
@@ -991,6 +1042,14 @@ impl MultiSourceEdit {
                 }
             }
             after.push(candidate);
+        }
+        if changed_cells != 0 {
+            let workbook = self.before.sheets()[0].invalidated_workbook_xml()?;
+            for snapshot in &mut after {
+                *snapshot = snapshot
+                    .clone()
+                    .with_invalidated_workbook(Arc::clone(&workbook))?;
+            }
         }
         self.before.check_execution()?;
         let after = MultiSnapshot::from_sheets(after)?;

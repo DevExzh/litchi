@@ -154,7 +154,7 @@ fn text_allowed(owner: XmlOwner, context: Option<&[u8]>, value: &str) -> bool {
 }
 
 fn text_context_allowed(owner: XmlOwner, context: Option<&[u8]>) -> bool {
-    matches!(owner, XmlOwner::Worksheet) && matches!(context, Some(b"v" | b"t"))
+    matches!(owner, XmlOwner::Worksheet) && matches!(context, Some(b"f" | b"v" | b"t"))
 }
 
 fn validate_element(
@@ -182,6 +182,7 @@ fn validate_element(
                 | b"workbookView"
                 | b"sheets"
                 | b"sheet"
+                | b"calcPr"
         ),
         XmlOwner::Worksheet => matches!(
             local,
@@ -197,6 +198,7 @@ fn validate_element(
                 | b"sheetData"
                 | b"row"
                 | b"c"
+                | b"f"
                 | b"v"
                 | b"is"
                 | b"t"
@@ -227,7 +229,7 @@ fn validate_parent(owner: XmlOwner, local: &[u8], parent: Option<&[u8]>) -> Resu
             (None, b"workbook")
                 | (
                     Some(b"workbook"),
-                    b"fileVersion" | b"workbookPr" | b"bookViews" | b"sheets"
+                    b"fileVersion" | b"workbookPr" | b"bookViews" | b"sheets" | b"calcPr"
                 )
                 | (Some(b"bookViews"), b"workbookView")
                 | (Some(b"sheets"), b"sheet")
@@ -244,7 +246,7 @@ fn validate_parent(owner: XmlOwner, local: &[u8], parent: Option<&[u8]>) -> Resu
                 | (Some(b"cols"), b"col")
                 | (Some(b"sheetData"), b"row")
                 | (Some(b"row"), b"c")
-                | (Some(b"c"), b"v" | b"is")
+                | (Some(b"c"), b"f" | b"v" | b"is")
                 | (Some(b"is"), b"t")
         ),
     };
@@ -272,6 +274,9 @@ fn validate_attributes(owner: XmlOwner, element: &BytesStart<'_>, local: &[u8]) 
             continue;
         }
         if name == b"xml:space" && matches!(owner, XmlOwner::Worksheet) && local == b"t" {
+            continue;
+        }
+        if matches!(owner, XmlOwner::Workbook) && local == b"calcPr" {
             continue;
         }
         if name.contains(&b':') || !allowed_unqualified_attribute(owner, local, name) {
@@ -330,6 +335,7 @@ fn allowed_unqualified_attribute(owner: XmlOwner, local: &[u8], name: &[u8]) -> 
                     | b"autoFilterDateGrouping"
             ),
             b"sheet" => matches!(name, b"name" | b"sheetId" | b"state"),
+            b"calcPr" => true,
             _ => false,
         },
         XmlOwner::Worksheet => match local {
@@ -401,6 +407,19 @@ fn allowed_unqualified_attribute(owner: XmlOwner, local: &[u8], name: &[u8]) -> 
                     | b"ph"
             ),
             b"c" => matches!(name, b"r" | b"s" | b"t"),
+            b"f" => matches!(
+                name,
+                b"t" | b"ref"
+                    | b"si"
+                    | b"dt2D"
+                    | b"dtr"
+                    | b"del1"
+                    | b"del2"
+                    | b"r1"
+                    | b"r2"
+                    | b"ca"
+                    | b"bx"
+            ),
             b"t" => false,
             _ => false,
         },
