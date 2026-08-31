@@ -15049,3 +15049,25 @@ internal dependency declarations, 226 canonical edges, and 11 ordered
 migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
 one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
 the remaining host logic stay open.
+
+## 2026-08-31 amendment: Wave120 bounded TableDataList text projection
+
+Wave120 migrates the compatibility host's private generic text decoders for
+`TST.TableDataList` and `TST.TableDataListSegment` (message types 6005, 6201,
+and 6011) away from eager generated Prost values. They now use the existing
+strict `numbers_table_cell_storage_codec`, which performs bounded handwritten
+wire validation and forces its private Buffa lazy-view parity checks without
+making generated values or re-encoded bytes authoritative.
+
+The adapter fallibly stages only validated non-empty strings and publishes no
+wrapper until the entire source succeeds. Verification covers root/segment
+parity with the former generated projection, source-lifetime independence,
+truncation, duplicate and wrong-wire fields, invalid UTF-8, aggregate text
+refusal, and the case where a visitor observed a valid prefix before a later
+wire error. A production-source guard rejects either retired generated decode
+route from returning.
+
+This is a focused extraction-path migration, not a public semantic-owner exit.
+The generated editor and mutation paths remain, and Wave120 changes no package,
+dependency edge, ordered migration debt, compatibility-host count, or
+monolith-deletion gate.

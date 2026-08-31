@@ -3148,3 +3148,18 @@ Numbers was 135,985 bytes with SHA-256
 and Keynote was 499,981 bytes with SHA-256
 `a720f3a1dbe32070a1c72bc710621747b9c305261b86c4ade1879b6a3eadaf02`.
 These were disposable preservation artifacts, not checked-in fixtures.
+
+## Wave120 bounded TableDataList text projection
+
+The private generic text registry no longer eagerly constructs generated Prost
+`TST.TableDataList` or `TST.TableDataListSegment` values for message types
+6005, 6201, and 6011. It now routes those payloads through the existing strict
+`numbers_table_cell_storage_codec`, whose handwritten validation and private
+Buffa lazy-view parity keep the caller-owned archive bytes authoritative.
+
+Only validated, non-empty cell strings are copied into a fallibly allocated
+staging vector, and that vector is published only after the complete payload
+passes its byte, field, work, nesting, reference, and text limits. This is a
+private extraction-path migration: editor mutation paths and other generated
+decoders remain open, and it changes no public API, dependency edge, ordered
+migration debt, or monolith-deletion gate.

@@ -22,6 +22,7 @@ pub use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsch, tsd, tsk, tsp, tss, tst
 const ARCHIVE_CODEC_RECURSION_LIMIT: u32 = 16;
 const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 const TEXT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+const TABLE_DATA_LIST_CODEC_RECURSION_LIMIT: u32 = 64;
 const STORAGE_TEXT_FIELD: u32 = 3;
 
 /// One allocation-free wire summary for the text projection.
@@ -426,9 +427,7 @@ fn table_names_codec_decode_options(
     )
 }
 
-fn table_names_codec_error(
-    error: litchi_iwa_protos::numbers_names_codec::DecodeError,
-) -> Error {
+fn table_names_codec_error(error: litchi_iwa_protos::numbers_names_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
         return Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
             kind: litchi_iwa_common::LimitKind::Fields,
@@ -468,13 +467,11 @@ fn table_names_codec_error(
 
 fn own_table_name(table_name: &str) -> Result<String> {
     if table_name.len() > WireLimits::MAX_OUTPUT_BYTES {
-        return Err(Error::IwaCommon(
-            litchi_iwa_common::Error::LimitExceeded {
-                kind: litchi_iwa_common::LimitKind::OutputBytes,
-                observed: table_name.len(),
-                limit: WireLimits::MAX_OUTPUT_BYTES,
-            },
-        ));
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::OutputBytes,
+            observed: table_name.len(),
+            limit: WireLimits::MAX_OUTPUT_BYTES,
+        }));
     }
     let mut owned = String::new();
     owned.try_reserve_exact(table_name.len()).map_err(|_| {
@@ -501,14 +498,148 @@ fn decode_table_model(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 
 /// Static decoder function for TableDataList messages
 fn decode_table_data_list(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tst::TableDataList::decode(data)?;
-    Ok(Box::new(TableDataListWrapper(msg)) as Box<dyn DecodedMessage>)
+    let text =
+        decode_table_data_list_text(data, table_data_list_codec_decode_options(data), false)?;
+    Ok(Box::new(TableDataListWrapper { text }) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for segmented TableDataList payloads.
 fn decode_table_data_list_segment(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tst::TableDataListSegment::decode(data)?;
-    Ok(Box::new(TableDataListSegmentWrapper(msg)) as Box<dyn DecodedMessage>)
+    let text = decode_table_data_list_text(data, table_data_list_codec_decode_options(data), true)?;
+    Ok(Box::new(TableDataListSegmentWrapper { text }) as Box<dyn DecodedMessage>)
+}
+
+fn table_data_list_codec_decode_options(
+    data: &[u8],
+) -> litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeOptions {
+    litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeOptions::new(
+        data.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        data.len().clamp(1, WireLimits::MAX_FIELDS),
+        data.len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        TABLE_DATA_LIST_CODEC_RECURSION_LIMIT,
+        data.len().clamp(1, litchi_numbers::MAX_REFERENCES),
+        data.len().clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+    )
+}
+
+fn table_data_list_codec_error(
+    context: &str,
+    error: litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeError,
+) -> Error {
+    use litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeLimit;
+
+    match error.resource_limit() {
+        Some(DecodeLimit::Bytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::InputBytes,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Fields { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Work { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Nesting { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                limit: usize::try_from(maximum).unwrap_or(usize::MAX),
+            })
+        },
+        Some(DecodeLimit::Allocation { requested }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "iWork TableDataList text projection",
+                amount: requested,
+            })
+        },
+        Some(DecodeLimit::References { observed, maximum }) => Error::InvalidFormat(format!(
+            "{context} exceeded its aggregate reference limit: observed {observed}, limit {maximum}"
+        )),
+        Some(DecodeLimit::Text { observed, maximum }) => Error::InvalidFormat(format!(
+            "{context} exceeded its aggregate text limit: observed {observed}, limit {maximum}"
+        )),
+        Some(DecodeLimit::Retained { observed, maximum }) => Error::InvalidFormat(format!(
+            "{context} exceeded its retained-byte limit: observed {observed}, limit {maximum}"
+        )),
+        Some(_) => Error::InvalidFormat(format!(
+            "{context} exceeded an unsupported strict resource limit"
+        )),
+        None => Error::InvalidFormat(format!("{context} failed strict validation: {error}")),
+    }
+}
+
+#[derive(Debug, Default)]
+struct TableDataListTextStage {
+    text: Vec<String>,
+}
+
+impl litchi_iwa_protos::numbers_table_cell_storage_codec::StorageVisitor
+    for TableDataListTextStage
+{
+    fn visit_list_entry(
+        &mut self,
+        entry: litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> std::result::Result<(), litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeError>
+    {
+        let Some(value) = entry.string_value().filter(|value| !value.is_empty()) else {
+            return Ok(());
+        };
+
+        self.text.try_reserve(1).map_err(|_| {
+            litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeError::allocation(
+                self.text.len().saturating_add(1),
+            )
+        })?;
+        let mut owned = String::new();
+        owned.try_reserve_exact(value.len()).map_err(|_| {
+            litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeError::allocation(
+                value.len(),
+            )
+        })?;
+        owned.push_str(value);
+        self.text.push(owned);
+        Ok(())
+    }
+}
+
+fn decode_table_data_list_text(
+    data: &[u8],
+    options: litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeOptions,
+    segment: bool,
+) -> Result<Vec<String>> {
+    let mut stage = TableDataListTextStage::default();
+    if segment {
+        litchi_iwa_protos::numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+            data,
+            options,
+            &mut stage,
+        )
+        .map_err(|error| {
+            table_data_list_codec_error(
+                "iWork TableDataListSegment payload",
+                error,
+            )
+        })?;
+    } else {
+        litchi_iwa_protos::numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
+            data, options, &mut stage,
+        )
+        .map_err(|error| table_data_list_codec_error("iWork TableDataList payload", error))?;
+    }
+    Ok(stage.text)
 }
 
 /// Static decoder function for ShapeArchive messages
@@ -724,41 +855,30 @@ impl DecodedMessage for TableModelWrapper {
     }
 }
 
-/// Wrapper for Table Data List (cell content storage)
+/// Wrapper for a TableDataList text projection.
+///
+/// The source archive object retains the original bytes. This adapter owns
+/// only the selected non-empty strings needed by the neutral text extractor.
 #[derive(Debug)]
-pub struct TableDataListWrapper(pub tst::TableDataList);
+pub struct TableDataListWrapper {
+    text: Vec<String>,
+}
 
 impl DecodedMessage for TableDataListWrapper {
     fn extract_text(&self) -> Vec<String> {
-        // TableDataList contains actual cell data as ListEntry items
-        // Extract string values from entries
-        let mut strings = Vec::new();
-
-        for entry in &self.0.entries {
-            if let Some(ref string_val) = entry.string
-                && !string_val.is_empty()
-            {
-                strings.push(string_val.clone());
-            }
-        }
-
-        strings
+        self.text.clone()
     }
 }
 
-/// Wrapper for a segmented TableDataList payload.
+/// Wrapper for a segmented TableDataList text projection.
 #[derive(Debug)]
-pub struct TableDataListSegmentWrapper(pub tst::TableDataListSegment);
+pub struct TableDataListSegmentWrapper {
+    text: Vec<String>,
+}
 
 impl DecodedMessage for TableDataListSegmentWrapper {
     fn extract_text(&self) -> Vec<String> {
-        self.0
-            .entries
-            .iter()
-            .filter_map(|entry| entry.string.as_ref())
-            .filter(|value| !value.is_empty())
-            .cloned()
-            .collect()
+        self.text.clone()
     }
 }
 
@@ -869,6 +989,61 @@ mod tests {
         let name_len = u8::try_from(table_name.len()).expect("test table name fits one byte");
         let mut data = vec![0x0a, 0x02, b'i', b'd', 0x42, name_len];
         data.extend_from_slice(table_name);
+        data
+    }
+
+    fn table_data_list_wire(values: &[Option<&str>]) -> Vec<u8> {
+        let entries = values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| tst::table_data_list::ListEntry {
+                key: u32::try_from(index + 1).expect("test key fits u32"),
+                refcount: u32::try_from(index + 1).expect("test refcount fits u32"),
+                string: value.map(str::to_owned),
+                ..Default::default()
+            })
+            .collect();
+        tst::TableDataList {
+            list_type: tst::table_data_list::ListType::String as i32,
+            next_list_id: 9,
+            entries,
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn table_data_list_raw_string_wire(value: &[u8]) -> Vec<u8> {
+        let entry_length = 6usize
+            .checked_add(value.len())
+            .expect("test entry length fits usize");
+        let entry_length = u8::try_from(entry_length).expect("test entry fits one byte");
+        let value_length = u8::try_from(value.len()).expect("test value fits one byte");
+        let mut data = vec![0x08, 0x01, 0x10, 0x01, 0x1a, entry_length];
+        data.extend_from_slice(&[0x08, 0x01, 0x10, 0x01, 0x1a, value_length]);
+        data.extend_from_slice(value);
+        data
+    }
+
+    fn table_data_list_segment_raw_string_wire(value: &[u8]) -> Vec<u8> {
+        let entry_length = 6usize
+            .checked_add(value.len())
+            .expect("test entry length fits usize");
+        let entry_length = u8::try_from(entry_length).expect("test entry fits one byte");
+        let value_length = u8::try_from(value.len()).expect("test value fits one byte");
+        let mut data = vec![
+            0x08,
+            0x01, // list_type = String
+            0x12,
+            0x04,
+            0x08,
+            0x07,
+            0x10,
+            0x01, // key_range
+            0x1a,
+            entry_length,
+        ];
+        data.extend_from_slice(&[0x08, 0x01, 0x10, 0x01, 0x1a, value_length]);
+        data.extend_from_slice(value);
         data
     }
 
@@ -1130,6 +1305,29 @@ mod tests {
     }
 
     #[test]
+    fn table_data_list_text_projection_matches_prost_and_owns_text() {
+        let mut data = table_data_list_wire(&[Some("first"), Some(""), None, Some("第二")]);
+        let expected = tst::TableDataList::decode(data.as_slice())
+            .unwrap()
+            .entries
+            .into_iter()
+            .filter_map(|entry| entry.string)
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>();
+
+        let decoded = decode_common(6005, &data).unwrap();
+        data.fill(0);
+
+        assert_eq!(decoded.extract_text(), expected);
+        assert_eq!(
+            decode_common(6201, &table_data_list_wire(&[Some("first"), Some("第二")]))
+                .unwrap()
+                .extract_text(),
+            ["first", "第二"]
+        );
+    }
+
+    #[test]
     fn table_data_list_segments_use_their_concrete_decoder() {
         let segment = tst::TableDataListSegment {
             list_type: tst::table_data_list::ListType::String as i32,
@@ -1146,6 +1344,92 @@ mod tests {
         };
         let decoded = decode_common(6011, &segment.encode_to_vec()).unwrap();
         assert_eq!(decoded.extract_text(), ["Segmented"]);
+    }
+
+    #[test]
+    fn table_data_list_text_projection_rejects_malformed_duplicate_wrong_wire_and_utf8() {
+        let valid = table_data_list_wire(&[Some("valid")]);
+
+        let mut truncated = valid.clone();
+        truncated.pop();
+        assert!(decode_common(6005, &truncated).is_err());
+
+        let mut duplicate = valid.clone();
+        duplicate.extend_from_slice(&[0x08, 0x01]); // duplicate list_type
+        assert!(decode_common(6005, &duplicate).is_err());
+
+        let mut wrong_wire = valid;
+        wrong_wire.extend_from_slice(&[0x18, 0x01]); // field 3 with varint wire type
+        assert!(decode_common(6005, &wrong_wire).is_err());
+
+        assert!(decode_common(6005, &table_data_list_raw_string_wire(&[0xff])).is_err());
+    }
+
+    #[test]
+    fn table_data_list_segment_text_projection_rejects_duplicate_wrong_wire_and_utf8() {
+        let valid = table_data_list_segment_raw_string_wire(b"segment");
+
+        let mut duplicate = valid.clone();
+        duplicate.extend_from_slice(&[0x08, 0x01]); // duplicate list_type
+        assert!(decode_common(6011, &duplicate).is_err());
+
+        let mut wrong_wire = valid.clone();
+        wrong_wire.extend_from_slice(&[0x18, 0x01]); // field 3 with varint wire type
+        assert!(decode_common(6011, &wrong_wire).is_err());
+
+        assert!(decode_common(6011, &table_data_list_segment_raw_string_wire(&[0xff])).is_err());
+    }
+
+    #[test]
+    fn table_data_list_text_projection_rejects_budget_without_publishing_partial_output() {
+        let data = table_data_list_wire(&[Some("first"), Some("second")]);
+        let options = litchi_iwa_protos::numbers_table_cell_storage_codec::DecodeOptions::new(
+            data.len(),
+            WireLimits::MAX_FIELDS,
+            WireLimits::MAX_REWRITE_WORK,
+            TABLE_DATA_LIST_CODEC_RECURSION_LIMIT,
+            litchi_numbers::MAX_REFERENCES,
+            1,
+        );
+
+        let error = decode_table_data_list_text(&data, options, false).unwrap_err();
+        assert!(error.to_string().contains("aggregate text limit"));
+
+        // The strict visitor can observe a valid prefix before a later error.
+        // The adapter stages that prefix privately and publishes no wrapper
+        // when the complete list fails.
+        let mut malformed = table_data_list_wire(&[Some("first")]);
+        malformed.extend_from_slice(&[0x1a, 0x02, 0x08]); // truncated second entry
+        let mut stage = TableDataListTextStage::default();
+        assert!(
+            litchi_iwa_protos::numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
+                &malformed,
+                table_data_list_codec_decode_options(&malformed),
+                &mut stage,
+            )
+            .is_err()
+        );
+        assert_eq!(stage.text, ["first"]);
+        assert!(decode_common(6005, &malformed).is_err());
+    }
+
+    #[test]
+    fn table_data_list_routes_have_no_production_generated_decode() {
+        let source = include_str!("protobuf.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map(|(production, _)| production)
+            .expect("test module marker is present");
+
+        assert!(
+            production
+                .contains("numbers_table_cell_storage_codec::decode_table_data_list_with_visitor")
+        );
+        assert!(production.contains(
+            "numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor"
+        ));
+        assert!(!production.contains("tst::TableDataList::decode(data)"));
+        assert!(!production.contains("tst::TableDataListSegment::decode(data)"));
     }
 
     #[test]
