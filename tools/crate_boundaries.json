@@ -415,13 +415,6 @@
       "exit": "Move every editor adapter to its concrete owner and delete litchi-iwa."
     },
     {
-      "order": 5,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-core",
-      "reason": "Unmigrated editors still parse and publish neutral IWA archive objects through the legacy host.",
-      "exit": "Move object-level mutation behind concrete package APIs and delete litchi-iwa."
-    },
-    {
       "order": 8,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-index",

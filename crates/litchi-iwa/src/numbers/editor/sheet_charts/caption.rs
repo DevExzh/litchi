@@ -1,14 +1,13 @@
 //! Native caption CRUD for Numbers sheet charts.
 
 use super::*;
+use crate::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use crate::charts::caption_edge::{chart_caption_identifier, rewrite_chart_caption_identifier};
 use crate::image_caption::{
     CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
     componentized_caption_objects, drawable_caption_slot, insert_componentized_caption_style,
     standin_caption_object,
 };
-use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
-
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -2928,7 +2928,7 @@ format APIs must not re-export these values.
 
 ```rust
 use litchi_iwa::raw::package::IWorkPackage;
-use litchi_iwa_core::RawMessage;
+use litchi_iwa_archive::iwa::RawMessage;
 
 let mut package = IWorkPackage::open("document.pages")?;
 package.update_archive("Index/Document.iwa", |archive| {
@@ -3118,3 +3118,33 @@ native SHA-256 values are
 and `b82af597b4469b056b559cde678db508fca13d7ec725633bdd82749fab560adf`.
 These are disposable acceptance artifacts, not checked-in fixtures or a
 complete monolith-exit claim.
+
+## Wave119 debt-005 archive/core boundary
+
+The neutral archive primitives used by the migration host are now reached
+through the archive owner's doc-hidden `litchi_iwa_archive::iwa` route. The
+inspection examples and the low-level compatibility example use that route
+rather than naming `litchi_iwa_core` directly; native archive identities and
+preservation behavior are unchanged. The `litchi-iwa` manifest no longer
+carries a direct dependency on `litchi-iwa-core`; the archive owner remains
+responsible for the physical archive/core boundary.
+
+This retires ordered migration debt 005 only. The workspace topology is 64
+packages, 237 internal dependency declarations, 226 canonical edges, and one
+migration host, with the remaining ordered debts `[1, 2, 4, 8, 10, 12, 13,
+14, 15, 16, 17]`. The IWA monolith deletion gate, generated/Prost/Buffa
+ownership, and the other migration-host edges remain open. This amendment
+makes no semantic-mutation or performance claim.
+
+Computer Use opened the canonical Pages, Numbers, and Keynote fixtures,
+created native copies, closed them, and reopened the copies without repair or
+recovery UI. Pages retained its three text/date markers, Numbers retained the
+fixture marker and value `42`, and Keynote retained its title/body/date
+markers. The format-owned `Package::save` APIs then republished those
+native-normalized copies byte-for-byte: Pages was 96,407 bytes with SHA-256
+`d321bde90824664eb6122690eacd30441aa5d4d329c655b808e1b420a78e6bb5`,
+Numbers was 135,985 bytes with SHA-256
+`1e23a5b36e3f11bc0de2b11de37488c4c981f13f7335ef415e63eccb2adedc18`,
+and Keynote was 499,981 bytes with SHA-256
+`a720f3a1dbe32070a1c72bc710621747b9c305261b86c4ade1879b6a3eadaf02`.
+These were disposable preservation artifacts, not checked-in fixtures.

@@ -5,7 +5,7 @@ use litchi_iwa::keynote::{Acceleration, KeynoteEditor, Mode, TextDelivery};
 use litchi_iwa::media::MediaAssetId;
 #[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
-use litchi_iwa_core::ArchiveObject;
+use litchi_iwa_archive::iwa::ArchiveObject;
 use litchi_iwa_protos::kn::{
     BuildArchive, BuildChunkArchive, DocumentArchive, PlaceholderArchive, ShowArchive,
     SlideArchive, SlideNodeArchive, Soundtrack, ThemeArchive,

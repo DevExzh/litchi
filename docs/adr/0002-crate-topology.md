@@ -4291,3 +4291,35 @@ dependency declarations, 226 canonical edges, and 12 ordered migration debts
 `[1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host. Wave118
 claims no dependency-edge or ordered-debt closure, including debt 014 and the
 `litchi-iwa -> litchi-keynote` edge, and no IWA monolith deletion gate is closed.
+
+## 2026-08-31 amendment: Wave119 debt-005 archive routing
+
+Wave119 retires ordered migration debt 005. The archive owns a doc-hidden,
+explicit, exact-type `iwa` route for the compatibility host. The route exposes
+the core boundary by exact type identity; it introduces no wrapper, conversion,
+copied value, compatibility implementation, or second owner. `litchi-iwa` no
+longer declares or imports `litchi-iwa-core` directly; its existing host paths
+consume that archive-owned route.
+
+This is dependency routing only, not an object-level semantic migration.
+Host/edge debt 002 and the migration host remain, as do the remaining host
+editor/compatibility logic and the other ordered debts. No Buffa or
+generated-schema implementation, projection, or budget changes are included.
+Computer Use opened the canonical Pages, Numbers, and Keynote fixtures,
+created native copies, closed them, and reopened the copies without repair or
+recovery UI while retaining their text/date markers and Numbers value `42`.
+The format-owned `Package::save` APIs then republished the native-normalized
+copies byte-for-byte: Pages 96,407 bytes/
+`d321bde90824664eb6122690eacd30441aa5d4d329c655b808e1b420a78e6bb5`,
+Numbers 135,985 bytes/
+`1e23a5b36e3f11bc0de2b11de37488c4c981f13f7335ef415e63eccb2adedc18`,
+and Keynote 499,981 bytes/
+`a720f3a1dbe32070a1c72bc710621747b9c305261b86c4ade1879b6a3eadaf02`.
+These disposable artifacts are preservation evidence, not semantic-mutation
+or performance evidence.
+
+The authoritative post-Wave119 inventory is 64 workspace packages, 237
+internal dependency declarations, 226 canonical edges, and 11 ordered
+migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
+one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
+the remaining host logic stay open.

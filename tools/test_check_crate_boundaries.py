@@ -3258,11 +3258,11 @@ class BoundaryPolicyTests(unittest.TestCase):
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
         self.assertEqual(len(self.policy.packages), 64)
-        self.assertEqual(len(all_policy_edges), 238)
-        self.assertEqual(len(self.policy.migration_debt), 12)
+        self.assertEqual(len(all_policy_edges), 237)
+        self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
-            [1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17],
+            [1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17],
         )
         self.assertNotIn(host_edge, all_policy_edges)
         self.assertIn(archive_edge, self.policy.canonical_edges)
@@ -3846,6 +3846,66 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "crates/litchi-iwa/src/lib.rs:2"
                 ],
             )
+
+    def test_iwa_direct_core_path_rejects_production_source_and_examples(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_CORE_SOURCE_ROOT / "nested" / "module.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_core::ArchiveObject;\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_CORE_EXAMPLE_SOURCE_ROOT / "inspect.rs"
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "fn main() { let _ = litchi_iwa_core::ArchiveObject; }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_direct_core_path_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-iwa production source directly references "
+                    "litchi_iwa_core: crates/litchi-iwa/examples/inspect.rs:1",
+                    "litchi-iwa production source directly references "
+                    "litchi_iwa_core: crates/litchi-iwa/src/nested/module.rs:1",
+                ],
+            )
+
+    def test_iwa_direct_core_path_masks_non_code_and_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_CORE_SOURCE_ROOT / "lib.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// use litchi_iwa_core::ArchiveObject;\n"
+                'const NOTE: &str = "litchi_iwa_core::ArchiveObject";\n'
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_core::ArchiveObject;\n"
+                "}\n"
+                "use litchi_iwa_archive::ArchiveObject;\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_CORE_EXAMPLE_SOURCE_ROOT / "inspect.rs"
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "// litchi_iwa_core::ArchiveObject\n"
+                'const NOTE: &str = "litchi_iwa_core::ArchiveObject";\n'
+                "fn main() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_iwa_direct_core_path_source_topology(root), [])
+
+    def test_iwa_direct_core_path_audit_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_iwa_direct_core_path_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
 
     def test_litchi_semantic_facades_require_complete_checked_exports(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
