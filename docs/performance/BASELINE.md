@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest DOCX source-backed selected-story text result (change 0352)
+
+Change 0352 adds a source-backed DOCX lifecycle for one selected `Main`,
+`Header(index)`, or `Footer(index)` story: bounded snapshot/text streaming,
+direct-paragraph edits, reversible source-bound patches/inverses, and a
+same-topology one-part overlay. Exact no-op/trailing-byte copying and
+canonical relationship/content-type/external/shared-target, namespace, and
+markup-compatibility validation remain; ambiguous or unsupported XML, stale or
+foreign sources, signature changes, cancellation, and non-atomic failures are
+typed boundaries. Managed edits are refused. Final evidence is the new
+`source_backed_story_text` target `11/11` and existing `source_backed` `16/16`,
+serialized with one job/thread, disabled incremental/debug compilation, one
+disk target, and an 8 GiB limit. The target reached 347 MiB; post-run
+available memory was approximately 15 GiB with swap saturated. This is
+correctness/CRUD evidence only (`performance_claim: none`); no speed, RSS,
+allocation, physical-I/O, benchmark, or broader story-family claim follows.
+The focused cases include strict duplicate/end-tag validation, inverse
+hostile-writer refusal, decoded namespaces, and actual emitted-byte bounds.
+
 ## Latest indexed-stream validation result (change 0351)
 
 Change 0351 is correctness/resource hardening only (`performance_claim: none`).

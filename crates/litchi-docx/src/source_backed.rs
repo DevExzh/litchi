@@ -10,6 +10,13 @@
 
 pub mod paragraph_copy;
 pub mod paragraph_remove;
+pub mod story_text;
+
+pub use story_text::{
+    Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError,
+    Limits as StoryTextLimits, Patch as StoryTextPatch, Publication as StoryTextPublication,
+    Selector as StorySelector, Snapshot as StoryTextSnapshot,
+};
 
 use crate::alt::Data;
 use crate::document::{Commit, Edit, Snapshot, TransactionResult};

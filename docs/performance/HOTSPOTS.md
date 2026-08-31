@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## Selected-story text lifecycle boundary (change 0352)
+
+Change 0352 is a DOCX source-backed correctness/CRUD closure, not a measured
+hotspot (`performance_claim: none`). A selected `Main`, `Header(index)`, or
+`Footer(index)` story supports bounded snapshot/text streaming, direct
+paragraph edits, source-bound patch/inverse, and a same-topology one-part
+overlay. Exact no-op/trailing-byte copying, canonical relationship/content-
+type/external/shared-target checks, namespace/MCE resolution, freshness,
+lineage, fingerprints, signatures, cancellation, and failure atomicity remain
+explicit; unsupported XML and managed edits are typed refusals. The new test
+target is `11/11` and existing `source_backed` is `16/16` under serialized
+constrained execution. The 347 MiB target and approximately 15 GiB post-run
+available memory with saturated swap are run observations only. No latency,
+throughput, RSS, allocation, physical-I/O, benchmark, or broader DOCX claim
+is made. Footnotes, endnotes, comments, and glossary remain outside this
+slice. Focused coverage includes strict duplicate/end-tag validation, inverse
+hostile-writer refusal, decoded namespaces, and actual emitted-byte bounds.
+
 ## Indexed-stream validation boundary (change 0351)
 
 Change 0351 is not a measured hotspot (`performance_claim: none`). No artifact
